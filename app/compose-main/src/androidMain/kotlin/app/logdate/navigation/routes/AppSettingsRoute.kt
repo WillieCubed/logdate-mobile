@@ -29,6 +29,11 @@ import app.logdate.feature.core.settings.ui.RecommendationSettingsScreen
 import app.logdate.feature.core.settings.ui.SettingsOverviewScreen
 import app.logdate.feature.core.settings.ui.SyncSettingsScreen
 import app.logdate.feature.core.settings.ui.devices.DevicesScreen
+import app.logdate.feature.core.settings.ui.watch.WatchNotificationSettingsScreen
+import app.logdate.feature.core.settings.ui.watch.WatchSettingsScreen
+import app.logdate.feature.core.settings.ui.watch.WatchSettingsViewModel
+import app.logdate.feature.core.settings.ui.watch.WatchSyncSettingsScreen
+import app.logdate.feature.core.settings.ui.watch.WatchTroubleshootingScreen
 import app.logdate.feature.location.timeline.ui.LocationTimelineBottomSheet
 import app.logdate.navigation.MainAppNavigator
 import app.logdate.navigation.routes.core.AccountSettingsRoute
@@ -48,8 +53,13 @@ import app.logdate.navigation.routes.core.PrivacySettingsRoute
 import app.logdate.navigation.routes.core.RecommendationSettingsRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.routes.core.SyncSettingsRoute
+import app.logdate.navigation.routes.core.WatchNotificationSettingsRoute
+import app.logdate.navigation.routes.core.WatchSettingsRoute
+import app.logdate.navigation.routes.core.WatchSyncSettingsRoute
+import app.logdate.navigation.routes.core.WatchTroubleshootingRoute
 import app.logdate.navigation.scenes.SettingsEmptyDetailPane
 import io.github.aakira.napier.Napier
+import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * Resets the app by safely clearing the back stack and navigating to the onboarding start screen.
@@ -185,6 +195,34 @@ fun MainAppNavigator.openBirthdaySettings() {
 }
 
 /**
+ * Opens the watch settings hub screen.
+ */
+fun MainAppNavigator.openWatchSettings() {
+    backStack.add(WatchSettingsRoute)
+}
+
+/**
+ * Opens the watch sync settings detail screen.
+ */
+fun MainAppNavigator.openWatchSyncSettings() {
+    backStack.add(WatchSyncSettingsRoute)
+}
+
+/**
+ * Opens the watch notification settings detail screen.
+ */
+fun MainAppNavigator.openWatchNotificationSettings() {
+    backStack.add(WatchNotificationSettingsRoute)
+}
+
+/**
+ * Opens the watch troubleshooting detail screen.
+ */
+fun MainAppNavigator.openWatchTroubleshooting() {
+    backStack.add(WatchTroubleshootingRoute)
+}
+
+/**
  * Provides the navigation routes for app settings-related screens.
  *
  * Uses Navigation3's [ListDetailSceneStrategy] for adaptive list-detail layouts.
@@ -198,6 +236,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToProfile: () -> Unit,
     onNavigateToAccount: () -> Unit,
     onNavigateToDevices: () -> Unit,
+    onNavigateToWatch: () -> Unit,
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
@@ -212,6 +251,9 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToLocationInterval: () -> Unit,
     onNavigateToLocationAdvanced: () -> Unit,
     onNavigateToBirthday: () -> Unit,
+    onNavigateToWatchSync: () -> Unit,
+    onNavigateToWatchNotifications: () -> Unit,
+    onNavigateToWatchTroubleshooting: () -> Unit,
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
 ) {
@@ -227,6 +269,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onNavigateToProfile = onNavigateToProfile,
             onNavigateToAccount = onNavigateToAccount,
             onNavigateToDevices = onNavigateToDevices,
+            onNavigateToWatch = onNavigateToWatch,
             onNavigateToDangerZone = onNavigateToDangerZone,
             onNavigateToLocation = onNavigateToLocation,
             onNavigateToPrivacy = onNavigateToPrivacy,
@@ -420,6 +463,51 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     ) { _ ->
         AdvancedSettingsScreen(
             onBack = onBack,
+        )
+    }
+
+    // Watch settings hub screen
+    routeEntry<WatchSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        WatchSettingsScreen(
+            onBack = onBack,
+            onNavigateToSync = onNavigateToWatchSync,
+            onNavigateToNotifications = onNavigateToWatchNotifications,
+            onNavigateToTroubleshooting = onNavigateToWatchTroubleshooting,
+        )
+    }
+
+    // Watch sync settings detail screen
+    routeEntry<WatchSyncSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        val viewModel: WatchSettingsViewModel = koinViewModel()
+        WatchSyncSettingsScreen(
+            onBack = onBack,
+            viewModel = viewModel,
+        )
+    }
+
+    // Watch notification settings detail screen
+    routeEntry<WatchNotificationSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        val viewModel: WatchSettingsViewModel = koinViewModel()
+        WatchNotificationSettingsScreen(
+            onBack = onBack,
+            viewModel = viewModel,
+        )
+    }
+
+    // Watch troubleshooting detail screen
+    routeEntry<WatchTroubleshootingRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        val viewModel: WatchSettingsViewModel = koinViewModel()
+        WatchTroubleshootingScreen(
+            onBack = onBack,
+            viewModel = viewModel,
         )
     }
 }

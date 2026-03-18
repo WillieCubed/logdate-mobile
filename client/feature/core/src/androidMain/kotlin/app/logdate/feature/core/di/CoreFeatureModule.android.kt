@@ -42,6 +42,7 @@ actual val coreFeatureModule: Module =
         includes(accountModule)
         includes(devicesModule)
         includes(locationSettingsModule)
+        includes(watchSettingsModule)
 
         // TODO: Refactor to separate auth module
         single { AndroidBiometricGatekeeper() }

@@ -132,6 +132,10 @@ import app.logdate.navigation.routes.openSettings
 import app.logdate.navigation.routes.openShareJournal
 import app.logdate.navigation.routes.openSyncSettings
 import app.logdate.navigation.routes.openTimelineDetail
+import app.logdate.navigation.routes.openWatchNotificationSettings
+import app.logdate.navigation.routes.openWatchSettings
+import app.logdate.navigation.routes.openWatchSyncSettings
+import app.logdate.navigation.routes.openWatchTroubleshooting
 import app.logdate.navigation.routes.resetApp
 import app.logdate.navigation.routes.rewindRoutes
 import app.logdate.navigation.routes.routeClass
@@ -654,6 +658,7 @@ fun MainNavigationRoot(
                             onNavigateToProfile = mainAppNavigator::openProfile,
                             onNavigateToAccount = mainAppNavigator::openAccountSettings,
                             onNavigateToDevices = mainAppNavigator::openDevicesSettings,
+                            onNavigateToWatch = mainAppNavigator::openWatchSettings,
                             onNavigateToDangerZone = mainAppNavigator::openDangerZoneSettings,
                             onNavigateToLocation = mainAppNavigator::openLocationSettings,
                             onNavigateToPrivacy = mainAppNavigator::openPrivacySettings,
@@ -668,6 +673,9 @@ fun MainNavigationRoot(
                             onNavigateToLocationInterval = mainAppNavigator::openLocationInterval,
                             onNavigateToLocationAdvanced = mainAppNavigator::openLocationAdvanced,
                             onNavigateToBirthday = mainAppNavigator::openBirthdaySettings,
+                            onNavigateToWatchSync = mainAppNavigator::openWatchSyncSettings,
+                            onNavigateToWatchNotifications = mainAppNavigator::openWatchNotificationSettings,
+                            onNavigateToWatchTroubleshooting = mainAppNavigator::openWatchTroubleshooting,
                             onNavigateToCloudAccountCreation = {
                                 mainAppNavigator.backStack.add(CloudAccountSetupFlowRoute())
                             },

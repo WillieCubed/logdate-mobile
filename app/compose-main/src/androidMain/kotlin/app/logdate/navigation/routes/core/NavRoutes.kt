@@ -244,3 +244,27 @@ data object LocationAdvancedRoute : NavKey
  */
 @Serializable
 data object BirthdaySettingsRoute : NavKey
+
+/**
+ * Navigation route for the watch settings hub screen.
+ */
+@Serializable
+data object WatchSettingsRoute : NavKey
+
+/**
+ * Navigation route for watch sync settings detail screen.
+ */
+@Serializable
+data object WatchSyncSettingsRoute : NavKey
+
+/**
+ * Navigation route for watch notification settings detail screen.
+ */
+@Serializable
+data object WatchNotificationSettingsRoute : NavKey
+
+/**
+ * Navigation route for watch troubleshooting detail screen.
+ */
+@Serializable
+data object WatchTroubleshootingRoute : NavKey

@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedButton
@@ -76,6 +77,8 @@ import logdate.client.feature.core.generated.resources.sync_and_backup
 import logdate.client.feature.core.generated.resources.sync_and_backup_description
 import logdate.client.feature.core.generated.resources.sync_promotion_description
 import logdate.client.feature.core.generated.resources.sync_promotion_title
+import logdate.client.feature.core.generated.resources.watch_settings
+import logdate.client.feature.core.generated.resources.watch_settings_description
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Instant
@@ -92,6 +95,7 @@ fun SettingsOverviewScreen(
     onNavigateToProfile: () -> Unit,
     onNavigateToAccount: () -> Unit,
     onNavigateToDevices: () -> Unit,
+    onNavigateToWatch: () -> Unit,
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
@@ -111,6 +115,7 @@ fun SettingsOverviewScreen(
         onNavigateToProfile = onNavigateToProfile,
         onNavigateToAccount = onNavigateToAccount,
         onNavigateToDevices = onNavigateToDevices,
+        onNavigateToWatch = onNavigateToWatch,
         onNavigateToDangerZone = onNavigateToDangerZone,
         onNavigateToLocation = onNavigateToLocation,
         onNavigateToPrivacy = onNavigateToPrivacy,
@@ -137,6 +142,7 @@ fun SettingsOverviewContent(
     onNavigateToProfile: () -> Unit,
     onNavigateToAccount: () -> Unit,
     onNavigateToDevices: () -> Unit,
+    onNavigateToWatch: () -> Unit = {},
     onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
@@ -222,6 +228,12 @@ fun SettingsOverviewContent(
                     description = stringResource(Res.string.location_settings_description),
                     icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
                     onClick = onNavigateToLocation,
+                )
+                SettingsNavigationItem(
+                    title = stringResource(Res.string.watch_settings),
+                    description = stringResource(Res.string.watch_settings_description),
+                    icon = { Icon(Icons.Default.Watch, contentDescription = null) },
+                    onClick = onNavigateToWatch,
                 )
             }
         }

@@ -125,6 +125,7 @@ kotlin {
             implementation(libs.coil.compose)
             implementation(libs.coil.video)
             implementation(libs.play.services.wearable)
+            implementation(libs.wear.remote.interactions)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)

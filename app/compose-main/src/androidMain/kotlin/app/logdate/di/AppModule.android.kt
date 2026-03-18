@@ -15,6 +15,8 @@ import app.logdate.client.media.di.audioModule
 import app.logdate.client.networking.di.networkingModule
 import app.logdate.client.sensor.di.sensorModule
 import app.logdate.client.updates.PlayInAppUpdateController
+import app.logdate.client.watch.AndroidWatchConnectionManager
+import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -48,6 +50,9 @@ actual val appModule: Module =
 
         single { PlayInAppUpdateController(androidContext(), get()) }
         single<AppUpdateController> { get<PlayInAppUpdateController>() }
+
+        // Watch connection manager for Wear OS settings
+        single<WatchConnectionManager> { AndroidWatchConnectionManager(androidContext()) }
     }
 
 /**

@@ -441,4 +441,59 @@
     <string name="smart_recall">Smart recall</string>
     <string name="smart_recall_description">Surface more relevant past memories beyond simple date matching</string>
     <string name="recommendations_privacy_note">Recommendations are generated entirely on your device. No data leaves your phone.</string>
+
+    <!-- Watch settings -->
+    <string name="watch_settings">Watch</string>
+    <string name="watch_settings_description">Manage your Wear OS watch connection and sync</string>
+    <string name="watch_loading">Looking for your watch\u2026</string>
+    <string name="watch_no_paired">No watch connected</string>
+    <string name="watch_no_paired_description">Pair a Wear OS watch with your phone to capture voice notes, mood check-ins, and more from your wrist.</string>
+    <string name="watch_app_not_installed">Install LogDate on your watch</string>
+    <string name="watch_app_not_installed_description">Your %1$s is connected but doesn\'t have LogDate yet.</string>
+    <string name="watch_install_on_watch">Install on Watch</string>
+    <string name="watch_connected">Connected</string>
+    <string name="watch_out_of_range">Out of range</string>
+    <string name="watch_sync">Sync</string>
+    <string name="watch_sync_now">Sync Now</string>
+    <string name="watch_sync_settings">Sync settings</string>
+    <string name="watch_sync_settings_description">Choose what syncs between phone and watch</string>
+    <string name="watch_sync_up_to_date">Up to date</string>
+    <string name="watch_sync_not_yet">Not yet synced</string>
+    <string name="watch_sync_pending">%1$d entries waiting to sync</string>
+    <string name="watch_sync_last_connected">Last synced while connected</string>
+    <string name="watch_notifications">Notifications</string>
+    <string name="watch_notifications_title">Watch notifications</string>
+    <string name="watch_notifications_description">Alerts when entries arrive from your watch</string>
+    <string name="watch_troubleshooting">Troubleshooting</string>
+    <string name="watch_troubleshooting_description">Fix connection issues, reinstall, reset sync</string>
+    <string name="watch_privacy_title">Your data stays on your devices</string>
+    <string name="watch_privacy_description">Entries captured on your watch sync directly to this phone over Bluetooth. Nothing is sent to the cloud unless you enable cloud sync separately.</string>
+
+    <!-- Watch sync settings detail -->
+    <string name="watch_sync_what_syncs">What syncs</string>
+    <string name="watch_sync_voice_notes">Voice notes</string>
+    <string name="watch_sync_voice_notes_description">Sync voice recordings captured on your watch</string>
+    <string name="watch_sync_text_entries">Text entries</string>
+    <string name="watch_sync_text_entries_description">Quick text and dictated notes</string>
+    <string name="watch_sync_mood_checkins">Mood check-ins</string>
+    <string name="watch_sync_mood_checkins_description">Mood emoji and attached voice notes</string>
+    <string name="watch_sync_health_data">Health data</string>
+    <string name="watch_sync_health_data_description">Heart rate, steps, and other sensor data</string>
+    <string name="watch_sync_behavior">Behavior</string>
+    <string name="watch_sync_auto">Auto-sync</string>
+    <string name="watch_sync_auto_description">Sync automatically whenever your watch is in range</string>
+
+    <!-- Watch notification settings detail -->
+    <string name="watch_notification_entry_section">Entry notifications</string>
+    <string name="watch_notification_show">Show notifications for new entries</string>
+    <string name="watch_notification_show_description">Get notified when a voice note or entry arrives from your watch</string>
+    <string name="watch_notification_audio_preview">Include audio preview</string>
+    <string name="watch_notification_audio_preview_description">Show transcription preview in notification</string>
+
+    <!-- Watch troubleshooting detail -->
+    <string name="watch_troubleshooting_watch_app">Watch app</string>
+    <string name="watch_troubleshooting_install">Install or update on watch</string>
+    <string name="watch_troubleshooting_open">Open LogDate on watch</string>
+    <string name="watch_troubleshooting_common_issues">Common issues</string>
+    <string name="watch_troubleshooting_tips">• Make sure Bluetooth is enabled on both devices\n• Keep your watch and phone within range of each other\n• Check that battery saver is not restricting LogDate\n• Restart both devices if sync seems stuck</string>
 </resources>
