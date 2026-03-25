@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_name_on_this_day">Memories</string>
+    <string name="widget_description_on_this_day">Rediscover moments from your past</string>
+    <string name="widget_header">MEMORIES</string>
+    <string name="widget_loading_message">Looking for memories…</string>
+    <string name="widget_new_user_message">Keep journaling to unlock past memories</string>
+    <string name="widget_empty_message">Nothing to revisit today</string>
+    <string name="widget_open_app">Open LogDate</string>
+    <string name="widget_view_memory">View</string>
+    <string name="widget_fallback_summary">A memory from this day</string>
+</resources>

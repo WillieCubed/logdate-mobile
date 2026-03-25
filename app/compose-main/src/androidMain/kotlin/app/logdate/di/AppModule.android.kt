@@ -7,6 +7,7 @@ import app.logdate.client.domain.di.accountDomainModule
 import app.logdate.client.domain.di.domainModule
 import app.logdate.client.domain.di.locationDomainModule
 import app.logdate.client.domain.di.quotaDomainModule
+import app.logdate.client.feature.widgets.di.widgetModule
 import app.logdate.client.health.di.androidHealthModule
 import app.logdate.client.health.di.healthModule
 import app.logdate.client.intelligence.di.intelligenceModule
@@ -49,6 +50,7 @@ actual val appModule: Module =
         includes(locationModule)
         includes(audioModule)
         includes(windowingModule)
+        includes(widgetModule)
 
         single { PlayInAppUpdateController(androidContext(), get()) }
         single<AppUpdateController> { get<PlayInAppUpdateController>() }

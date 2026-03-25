@@ -442,6 +442,18 @@
     <string name="smart_recall_description">Surface more relevant past memories beyond simple date matching</string>
     <string name="recommendations_privacy_note">Recommendations are generated entirely on your device. No data leaves your phone.</string>
 
+    <!-- Widget settings -->
+    <string name="widget_settings">Widget</string>
+    <string name="recall_mode">Recall mode</string>
+    <string name="recall_mode_on_this_day">On This Day</string>
+    <string name="recall_mode_on_this_day_description">Surface entries near today\'s date from prior years</string>
+    <string name="recall_mode_rediscover">Rediscover</string>
+    <string name="recall_mode_rediscover_description">Surface interesting past entries regardless of date</string>
+    <string name="widget_content_types">Content to show</string>
+    <string name="widget_content_type_text">Text notes</string>
+    <string name="widget_content_type_photos">Photos</string>
+    <string name="widget_content_type_audio">Audio notes</string>
+
     <!-- Watch settings -->
     <string name="watch_settings">Watch</string>
     <string name="watch_settings_description">Manage your Wear OS watch connection and sync</string>

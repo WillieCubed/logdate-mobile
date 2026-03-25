@@ -82,6 +82,7 @@ androidxBiometric = "1.4.0-alpha02"
 androidxAnnotation = "1.9.1"
 androidxCoreKtx = "1.16.0"
 androidxCoreSplashScreen = "1.2.0"
+androidxGlance = "1.1.1"
 androidxWork = "2.11.1"
 healthConnect = "1.2.0-alpha02"
 healthServicesClient = "1.1.0-rc01"
@@ -270,6 +271,10 @@ androidx-camera-view = { group = "androidx.camera", name = "camera-view", versio
 androidx-camera-viewfinder-compose = { group = "androidx.camera", name = "camera-viewfinder-compose", version.ref = "androidxCameraViewfinderCompose" }
 androidx-camera-extensions = { group = "androidx.camera", name = "camera-extensions", version.ref = "androidxCamera" }
 androidx-biometric = { group = "androidx.biometric", name = "biometric-ktx", version.ref = "androidxBiometric" }
+
+## AndroidX Glance
+androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "androidxGlance" }
+androidx-glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "androidxGlance" }
 
 ## AndroidX Work
 androidx-work-runtime = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "androidxWork" }

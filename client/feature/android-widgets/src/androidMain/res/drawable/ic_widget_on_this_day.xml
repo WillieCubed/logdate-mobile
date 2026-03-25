@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material Symbols: history (rounded, 24dp) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960"
+    android:tint="?attr/colorOnSurfaceVariant">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M480,840Q328,840 214,726T100,480h80q0,125 87.5,212.5T480,780q125,0 212.5,-87.5T780,480q0,-125 -87.5,-212.5T480,180q-72,0 -133.5,32T240,300h120v80H80V120h80v94q57,-70 137,-112T480,60q83,0 156,31.5t127,86 86,127T880,461q0,83 -31.5,156t-86,127 -127,86T480,840ZM592,648 440,496V280h80v184l128,128 -56,56Z" />
+</vector>

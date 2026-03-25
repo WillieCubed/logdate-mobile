@@ -23,6 +23,8 @@ import app.logdate.client.database.DatabaseStartupMonitor
 import app.logdate.client.database.DatabaseStartupState
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.restore.PostRestoreType
+import app.logdate.client.feature.widgets.EXTRA_WIDGET_TARGET_DATE
+import app.logdate.client.feature.widgets.NAV_SOURCE_ON_THIS_DAY_WIDGET
 import app.logdate.client.launch.LaunchBootstrapState
 import app.logdate.client.launch.LaunchStage
 import app.logdate.client.launch.LaunchStageSnapshot
@@ -51,6 +53,7 @@ import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.navigation.routes.core.LocationRoute
 import app.logdate.navigation.routes.core.NoteViewerRoute
+import app.logdate.navigation.routes.core.TimelineDetail
 import io.github.aakira.napier.Napier
 import io.github.vinceglb.filekit.core.FileKit
 import kotlinx.coroutines.delay
@@ -422,13 +425,18 @@ class MainActivity : FragmentActivity() {
 //    }
 }
 
-/** Resolves the optional deep-link destination used when audio playback re-enters the app. */
+/** Resolves the optional deep-link destination from intent extras. */
 private fun resolveNavKey(intent: Intent?): NavKey? {
     if (intent == null) return null
     return when {
         intent.getStringExtra(EXTRA_NAV_SOURCE) == NAV_SOURCE_AUDIO_PLAYBACK -> {
             val noteId = intent.getStringExtra(EXTRA_NOTE_ID) ?: return null
             runCatching { NoteViewerRoute(Uuid.parse(noteId)) }.getOrNull()
+        }
+
+        intent.getStringExtra(EXTRA_NAV_SOURCE) == NAV_SOURCE_ON_THIS_DAY_WIDGET -> {
+            val dateStr = intent.getStringExtra(EXTRA_WIDGET_TARGET_DATE) ?: return null
+            runCatching { TimelineDetail(kotlinx.datetime.LocalDate.parse(dateStr)) }.getOrNull()
         }
 
         intent.getStringExtra(EXTRA_LOCATION_NAV_SOURCE) == NAV_SOURCE_LOCATION_HISTORY -> {

@@ -77,6 +77,7 @@ include(":client:feature:location-timeline") // TODO: Probably consolidate into 
 include(":client:feature:onboarding")
 include(":client:feature:search")
 include(":client:feature:library")
+include(":client:feature:android-widgets")
 include(":client:feature:remotedisplay")
 include(":client:feature:speechrecognition")
 // Shared cross-platform modules

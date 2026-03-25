@@ -15,4 +15,8 @@ interface MemoriesSettingsRepository {
     suspend fun setContextualRecommendationsEnabled(enabled: Boolean)
 
     suspend fun setAiRecallEnabled(enabled: Boolean)
+
+    suspend fun setRecallMode(mode: RecallMode)
+
+    suspend fun setWidgetContentTypes(types: Set<WidgetContentType>)
 }

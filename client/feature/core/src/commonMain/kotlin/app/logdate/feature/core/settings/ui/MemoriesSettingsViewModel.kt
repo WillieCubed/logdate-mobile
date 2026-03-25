@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
+import app.logdate.client.domain.recommendation.RecallMode
+import app.logdate.client.domain.recommendation.WidgetContentType
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -47,6 +49,31 @@ class MemoriesSettingsViewModel(
                 settingsRepository.setAiRecallEnabled(enabled)
             } catch (e: Exception) {
                 Napier.e("Failed to toggle AI recall", e)
+            }
+        }
+    }
+
+    fun setRecallMode(mode: RecallMode) {
+        viewModelScope.launch {
+            try {
+                settingsRepository.setRecallMode(mode)
+            } catch (e: Exception) {
+                Napier.e("Failed to set recall mode", e)
+            }
+        }
+    }
+
+    fun toggleWidgetContentType(
+        type: WidgetContentType,
+        enabled: Boolean,
+    ) {
+        viewModelScope.launch {
+            try {
+                val current = settingsRepository.getSettings().widgetContentTypes
+                val updated = if (enabled) current + type else (current - type).ifEmpty { setOf(type) }
+                settingsRepository.setWidgetContentTypes(updated)
+            } catch (e: Exception) {
+                Napier.e("Failed to toggle widget content type", e)
             }
         }
     }
