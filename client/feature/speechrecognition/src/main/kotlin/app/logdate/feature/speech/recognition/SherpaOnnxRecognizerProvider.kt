@@ -1,4 +1,4 @@
-package app.logdate.client.media.audio.transcription
+package app.logdate.feature.speech.recognition
 
 import android.content.Context
 import com.k2fsa.sherpa.onnx.EndpointConfig
@@ -25,8 +25,6 @@ import kotlinx.coroutines.withContext
  * initialization, and punctuation initialization. It exposes thin delegates
  * over [OnlineRecognizer] so callers don't need to hold direct references
  * to the native objects.
- *
- * Designed to be a Koin singleton so models are loaded once and shared.
  */
 class SherpaOnnxRecognizerProvider(
     private val context: Context,

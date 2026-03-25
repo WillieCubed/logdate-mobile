@@ -1,8 +1,8 @@
 package app.logdate.client.networking
 
-import app.logdate.client.sensor.network.NetworkConnectionType
-import app.logdate.client.sensor.network.NetworkSaverModeProvider
-import app.logdate.client.sensor.network.NetworkSaverState
+import app.logdate.client.networking.saver.NetworkConnectionType
+import app.logdate.client.networking.saver.NetworkSaverModeProvider
+import app.logdate.client.networking.saver.NetworkSaverState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 

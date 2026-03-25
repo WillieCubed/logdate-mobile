@@ -50,7 +50,6 @@ kotlin {
             implementation(projects.shared.model)
             implementation(projects.shared.config)
             implementation(projects.client.util)
-            implementation(projects.client.sensor)
             // External dependencies
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.json)

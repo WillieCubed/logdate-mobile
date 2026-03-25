@@ -1,4 +1,4 @@
-package app.logdate.client.media.audio.transcription
+package app.logdate.feature.speech.recognition
 
 import android.content.Context
 import io.github.aakira.napier.Napier

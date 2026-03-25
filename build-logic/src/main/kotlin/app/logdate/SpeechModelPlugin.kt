@@ -1,5 +1,6 @@
 package app.logdate
 
+import com.android.build.api.variant.DynamicFeatureAndroidComponentsExtension
 import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream
@@ -153,6 +154,18 @@ class SpeechModelPlugin : Plugin<Project> {
         project.pluginManager.withPlugin("com.android.kotlin.multiplatform.library") {
             val androidComponents = project.extensions
                 .getByType(KotlinMultiplatformAndroidComponentsExtension::class.java)
+
+            androidComponents.onVariants(androidComponents.selector().all()) { variant ->
+                variant.sources.assets?.addGeneratedSourceDirectory(
+                    downloadTask,
+                    DownloadSpeechModelTask::outputDirectory,
+                )
+            }
+        }
+
+        project.pluginManager.withPlugin("com.android.dynamic-feature") {
+            val androidComponents = project.extensions
+                .getByType(DynamicFeatureAndroidComponentsExtension::class.java)
 
             androidComponents.onVariants(androidComponents.selector().all()) { variant ->
                 variant.sources.assets?.addGeneratedSourceDirectory(

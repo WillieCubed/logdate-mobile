@@ -1,0 +1,2 @@
+-keep class com.k2fsa.sherpa.onnx.** { *; }
+-keep class app.logdate.feature.speech.recognition.SpeechRecognitionProvider { *; }

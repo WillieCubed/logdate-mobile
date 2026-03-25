@@ -122,6 +122,7 @@ kotlin {
             implementation(libs.koin.androidx.workmanager)
             implementation(libs.material)
             implementation(libs.play.app.update.ktx)
+            implementation(libs.play.feature.delivery.ktx)
             implementation(libs.coil.compose)
             implementation(libs.coil.video)
             implementation(libs.play.services.wearable)

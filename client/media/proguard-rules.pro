@@ -1,2 +1,1 @@
 -keep class app.logdate.client.media.** { *; }
--keep class com.k2fsa.sherpa.onnx.** { *; }

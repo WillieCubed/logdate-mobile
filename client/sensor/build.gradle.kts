@@ -44,7 +44,7 @@ kotlin {
         }
         commonMain.dependencies {
             // Project dependencies
-
+            implementation(projects.client.networking)
             // External dependencies
             implementation(libs.kotlinx.coroutines.core)
 

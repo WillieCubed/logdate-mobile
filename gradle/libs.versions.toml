@@ -79,6 +79,8 @@ androidx-window = "1.6.0-alpha01"
 androidxCamera = "1.6.0-rc01"
 androidxCameraViewfinderCompose = "1.0.0-alpha02"
 androidxBiometric = "1.4.0-alpha02"
+androidxAnnotation = "1.9.1"
+androidxCoreKtx = "1.16.0"
 androidxCoreSplashScreen = "1.2.0"
 androidxWork = "2.11.1"
 healthConnect = "1.2.0-alpha02"
@@ -254,6 +256,8 @@ turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine
 
 # Android Dependencies
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
+androidx-annotation = { group = "androidx.annotation", name = "annotation", version.ref = "androidxAnnotation" }
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidxCoreKtx" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "androidxCoreSplashScreen" }
 androidx-window = { group = "androidx.window", name = "window", version.ref = "androidx-window" }
 

@@ -1,8 +1,8 @@
 package app.logdate.client.networking
 
-import app.logdate.client.sensor.network.NetworkConnectionType
-import app.logdate.client.sensor.network.NetworkSaverState
-import app.logdate.client.sensor.network.StubNetworkSaverModeProvider
+import app.logdate.client.networking.saver.NetworkConnectionType
+import app.logdate.client.networking.saver.NetworkSaverState
+import app.logdate.client.networking.saver.StubNetworkSaverModeProvider
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test

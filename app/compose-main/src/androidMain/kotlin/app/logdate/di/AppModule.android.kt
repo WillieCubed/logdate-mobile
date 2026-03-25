@@ -16,6 +16,8 @@ import app.logdate.client.networking.di.networkingModule
 import app.logdate.client.sensor.di.sensorModule
 import app.logdate.client.updates.PlayInAppUpdateController
 import app.logdate.client.watch.AndroidWatchConnectionManager
+import app.logdate.dynamic.DynamicFeatureLoader
+import app.logdate.dynamic.PlayDynamicFeatureLoader
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import org.koin.android.ext.koin.androidContext
@@ -50,6 +52,8 @@ actual val appModule: Module =
 
         single { PlayInAppUpdateController(androidContext(), get()) }
         single<AppUpdateController> { get<PlayInAppUpdateController>() }
+
+        single<DynamicFeatureLoader> { PlayDynamicFeatureLoader(androidContext()) }
 
         // Watch connection manager for Wear OS settings
         single<WatchConnectionManager> { AndroidWatchConnectionManager(androidContext()) }

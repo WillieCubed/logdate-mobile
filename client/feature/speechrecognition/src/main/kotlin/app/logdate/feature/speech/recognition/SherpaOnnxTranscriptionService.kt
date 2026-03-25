@@ -1,4 +1,4 @@
-package app.logdate.client.media.audio.transcription
+package app.logdate.feature.speech.recognition
 
 import android.Manifest
 import android.content.Context
@@ -8,6 +8,9 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
+import app.logdate.client.media.audio.transcription.TranscriptAccumulator
+import app.logdate.client.media.audio.transcription.TranscriptionResult
+import app.logdate.client.media.audio.transcription.TranscriptionService
 import com.k2fsa.sherpa.onnx.OnlineStream
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope

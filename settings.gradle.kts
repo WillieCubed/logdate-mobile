@@ -78,6 +78,7 @@ include(":client:feature:onboarding")
 include(":client:feature:search")
 include(":client:feature:library")
 include(":client:feature:remotedisplay")
+include(":client:feature:speechrecognition")
 // Shared cross-platform modules
 include(":shared:activitypub")
 include(":shared:atproto-crypto")
