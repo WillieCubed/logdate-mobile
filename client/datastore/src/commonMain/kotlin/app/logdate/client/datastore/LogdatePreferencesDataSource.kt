@@ -90,6 +90,15 @@ class LogdatePreferencesDataSource(
     }
 
     /**
+     * Observes the user's preferred day start hour.
+     * Returns null when the user hasn't set a preference.
+     */
+    fun observeDayStartHour(): Flow<Int?> =
+        userPreferences.data.map { prefs ->
+            prefs[DAY_START_HOUR]
+        }
+
+    /**
      * Observes the persisted journal layout mode preference.
      */
     fun observeJournalLayoutMode(): Flow<String> =

@@ -65,15 +65,19 @@ interface LocalFirstHealthRepository : HealthDataRepository {
     /**
      * Determines the semantic day bounds for a specific date.
      *
-     * This uses sleep data or user preferences to determine when a "day"
-     * starts and ends for the user, which may not align with calendar days.
+     * A "semantic day" starts when the user wakes up and ends when they fall
+     * asleep. When [sleepBasedBoundariesEnabled] is true, actual sleep session
+     * data is used. When false or unavailable, falls back to user preferences
+     * or a default boundary.
      *
-     * @param date The date to get bounds for
+     * @param date The calendar date to resolve bounds for
      * @param timeZone The user's current time zone
-     * @return DayBounds containing start and end Instants for the semantic day
+     * @param sleepBasedBoundariesEnabled Whether to query Health Connect sleep sessions
+     * @return DayBounds with `start` (wake-up) and `end` (bedtime) as Instants
      */
     suspend fun getDayBoundsForDate(
         date: LocalDate,
         timeZone: TimeZone,
+        sleepBasedBoundariesEnabled: Boolean = true,
     ): DayBounds
 }

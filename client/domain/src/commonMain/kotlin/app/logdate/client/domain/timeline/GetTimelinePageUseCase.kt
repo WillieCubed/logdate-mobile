@@ -21,6 +21,7 @@ data class TimelinePage(
 
 class GetTimelinePageUseCase(
     private val notesRepository: JournalNotesRepository,
+    private val groupNotesByDayBoundsUseCase: GroupNotesByDayBoundsUseCase,
 ) {
     suspend operator fun invoke(request: TimelinePageRequest = TimelinePageRequest()): TimelinePage {
         val candidateNotes =
@@ -36,9 +37,13 @@ class GetTimelinePageUseCase(
         }
 
         val pageDates = candidateNotes.map(JournalNote::timelineDate).toSet()
+        val allNotesForDates = pageDates.flatMap { notesRepository.getNotesForDay(it) }
+        val notesByDay = groupNotesByDayBoundsUseCase(allNotesForDates)
         val timelineDays =
-            pageDates.mapNotNull { pageDate ->
-                notesRepository.getNotesForDay(pageDate).takeIf { it.isNotEmpty() }?.let { entries ->
+            notesByDay.mapNotNull { (_, entries) ->
+                if (entries.isEmpty()) {
+                    null
+                } else {
                     createBasicTimeline(entries, request.sortOrder).days.firstOrNull()
                 }
             }

@@ -7,7 +7,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformLatest
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
 
@@ -35,6 +37,7 @@ sealed interface StreamingTimelineRequest {
 class GetStreamingTimelineUseCase(
     private val notesRepository: JournalNotesRepository,
     private val getTimelineDayUseCase: GetTimelineDayUseCase,
+    private val groupNotesByDayBoundsUseCase: GroupNotesByDayBoundsUseCase,
 ) {
     /**
      * Gets streaming timeline based on the request type
@@ -80,10 +83,7 @@ class GetStreamingTimelineUseCase(
         notesRepository
             .observeNotesInRange(start, end)
             .map { notesInRange ->
-                val notesByDay =
-                    notesInRange.groupBy { note ->
-                        note.creationTimestamp.toLocalDateTime(TimeZone.currentSystemDefault()).date
-                    }
+                val notesByDay = groupNotesByDayBoundsUseCase(notesInRange)
 
                 val timelineDays =
                     notesByDay.map { (date, entries) ->
@@ -138,13 +138,16 @@ class GetStreamingTimelineUseCase(
             fallbackNotes.groupBy { note ->
                 note.creationTimestamp.toLocalDateTime(TimeZone.currentSystemDefault()).date
             }
-        val allNotesByDay =
-            allNotes
-                .filter { note ->
-                    note.creationTimestamp.toLocalDateTime(TimeZone.currentSystemDefault()).date in recentDates
-                }.groupBy { note ->
-                    note.creationTimestamp.toLocalDateTime(TimeZone.currentSystemDefault()).date
+        val expandedDates =
+            recentDates +
+                recentDates.mapNotNull { date ->
+                    date.minus(1, DateTimeUnit.DAY).takeIf { it !in recentDates }
                 }
+        val relevantNotes =
+            allNotes.filter { note ->
+                note.creationTimestamp.toLocalDateTime(TimeZone.currentSystemDefault()).date in expandedDates
+            }
+        val allNotesByDay = groupNotesByDayBoundsUseCase(relevantNotes)
 
         val days =
             recentDates.mapNotNull { date ->

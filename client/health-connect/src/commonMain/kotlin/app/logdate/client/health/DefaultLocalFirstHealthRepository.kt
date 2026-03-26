@@ -14,9 +14,10 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 /**
@@ -171,19 +172,27 @@ class DefaultLocalFirstHealthRepository(
             }
         }
 
+    /**
+     * ## Fallback cascade
+     *
+     * 1. **Per-day sleep data** (if [sleepBasedBoundariesEnabled]): actual sleep
+     *    sessions that bracket this date. Day starts at wake-up, ends at bedtime.
+     * 2. **User preferences**: configured `dayStartHour` / `dayEndHour`.
+     * 3. **Default**: [DEFAULT_DAY_START_HOUR] to next-day [DEFAULT_DAY_START_HOUR].
+     */
     override suspend fun getDayBoundsForDate(
         date: LocalDate,
         timeZone: TimeZone,
+        sleepBasedBoundariesEnabled: Boolean,
     ): DayBounds =
         withContext(ioDispatcher) {
             try {
-                // Try to determine bounds from sleep data
-                val sleepBasedBounds = getSleepBasedBounds(date, timeZone)
-                if (sleepBasedBounds != null) {
-                    return@withContext sleepBasedBounds
+                if (sleepBasedBoundariesEnabled) {
+                    val perDayBounds = getPerDaySleepBounds(date, timeZone)
+                    if (perDayBounds != null) {
+                        return@withContext perDayBounds
+                    }
                 }
-
-                // Fall back to user preferences or default bounds
                 getUserPreferredBounds(date, timeZone)
             } catch (e: Exception) {
                 Napier.e("Error getting day bounds", e)
@@ -192,125 +201,99 @@ class DefaultLocalFirstHealthRepository(
         }
 
     /**
-     * Attempts to determine day bounds from sleep data.
+     * Determines day bounds from actual per-day sleep session data.
+     *
+     * Uses a single query spanning D-1 18:00 to D+1 14:00, then splits results
+     * into wake-up candidates (ending before D 14:00) and bedtime candidates
+     * (starting after D 14:00). Each boundary falls back independently.
      */
-    private suspend fun getSleepBasedBounds(
+    private suspend fun getPerDaySleepBounds(
         date: LocalDate,
         timeZone: TimeZone,
     ): DayBounds? {
         if (!hasSleepPermissions()) {
-            Napier.d("Sleep permissions not granted, using default day bounds")
+            Napier.d("Sleep permissions not granted, skipping per-day sleep bounds")
             return null
         }
 
-        try {
-            // Check if we have average sleep/wake times
-            val avgWakeUpTime = getAverageWakeUpTime(timeZone)
-            val avgSleepTime = getAverageSleepTime(timeZone)
+        val previousDay = date.minus(1, DateTimeUnit.DAY)
+        val nextDay = date.plus(1, DateTimeUnit.DAY)
+        val windowStart = LocalDateTime(previousDay, LocalTime(18, 0)).toInstant(timeZone)
+        val windowEnd = LocalDateTime(nextDay, LocalTime(14, 0)).toInstant(timeZone)
+        val allSessions = getSleepSessions(windowStart, windowEnd)
 
-            // If no valid averages, use default bounds
-            if (avgWakeUpTime == null || avgSleepTime == null) {
-                return null
-            }
+        val midday = LocalDateTime(date, LocalTime(14, 0)).toInstant(timeZone)
+        val wakeUpSession = findPrimarySleepSession(allSessions.filter { it.endTime <= midday })
+        val bedtimeSession = findPrimarySleepSession(allSessions.filter { it.startTime >= midday })
 
-            // Use the earlier of avgWakeUpTime or avgWakeUpTime - 1 hour (with a minimum of 4am)
-            val wakeUpTimeToUse = avgWakeUpTime.minusHours(1)
+        val dayStart = wakeUpSession?.endTime
+        val dayEnd = bedtimeSession?.startTime
 
-            // Ensure we don't set the start too early (before 4am)
-            val fourAM = TimeOfDay.of(4, 0)
-            val finalWakeUpTime = if (wakeUpTimeToUse.isBefore(fourAM)) fourAM else wakeUpTimeToUse
-
-            // Day starts at adjusted wake-up time
-            val startDateTime =
-                LocalDateTime(
-                    date,
-                    LocalTime(finalWakeUpTime.hour, finalWakeUpTime.minute, finalWakeUpTime.second),
-                )
-            val dayStart = startDateTime.toInstant(timeZone)
-
-            // Day ends at sleep time (which might be on the next day)
-            val sleepDate =
-                if (avgSleepTime.isBefore(finalWakeUpTime)) {
-                    date.plus(1, DateTimeUnit.DAY)
-                } else {
-                    date
-                }
-
-            val endDateTime =
-                LocalDateTime(
-                    sleepDate,
-                    LocalTime(avgSleepTime.hour, avgSleepTime.minute, avgSleepTime.second),
-                )
-            val dayEnd = endDateTime.toInstant(timeZone)
-
-            val dayStartInstant = dayStart
-            val dayEndInstant = dayEnd
-            return DayBounds(start = dayStartInstant, end = dayEndInstant)
-        } catch (e: Exception) {
-            Napier.e("Error getting sleep data", e)
+        if (dayStart == null && dayEnd == null) {
             return null
         }
+
+        val fallbackBounds = getUserPreferredBounds(date, timeZone)
+        return DayBounds(
+            start = dayStart ?: fallbackBounds.start,
+            end = dayEnd ?: fallbackBounds.end,
+        )
     }
 
     /**
-     * Gets day bounds based on user preferences, or defaults to reasonable hours.
+     * Selects the primary sleep session from a list, filtering out naps.
+     * Sessions of 3+ hours are primary candidates; the longest wins.
+     */
+    private fun findPrimarySleepSession(sessions: List<SleepSession>): SleepSession? {
+        if (sessions.isEmpty()) return null
+
+        fun SleepSession.duration() = endTime - startTime
+        val longSessions = sessions.filter { it.duration() >= 3.hours }
+        return (longSessions.ifEmpty { sessions }).maxByOrNull { it.duration() }
+    }
+
+    /**
+     * Gets day bounds from user preferences, falling back to [DEFAULT_DAY_START_HOUR].
      */
     private suspend fun getUserPreferredBounds(
         date: LocalDate,
         timeZone: TimeZone,
     ): DayBounds {
-        // Check for user preferences first
         val preferences = preferencesDataSource.getPreferences()
+        val startHour = preferences.dayStartHour ?: DEFAULT_DAY_START_HOUR
+        val endHour = preferences.dayEndHour
 
-        // If user has set specific preferences, use those
-        val userDayStartHour = preferences.dayStartHour
-        val userDayEndHour = preferences.dayEndHour
+        val dayStart = LocalDateTime(date, LocalTime(startHour, 0)).toInstant(timeZone)
 
-        if (userDayStartHour != null && userDayEndHour != null) {
-            // Day starts at user's preferred hour
-            val startDateTime = LocalDateTime(date, LocalTime(userDayStartHour, 0))
-            val dayStart = startDateTime.toInstant(timeZone)
-
-            // If end hour is before start hour, it must be for the next day
-            // We know userDayStartHour and userDayEndHour are not null at this point
-            val startHour = userDayStartHour
-            val endHour = userDayEndHour
-
-            val endDate =
-                if (endHour < startHour) {
-                    date.plus(1, DateTimeUnit.DAY)
-                } else {
-                    date
-                }
-
-            val endDateTime = LocalDateTime(endDate, LocalTime(userDayEndHour, 0))
-            val dayEnd = endDateTime.toInstant(timeZone)
-
-            val dayStartInstant = dayStart
-            val dayEndInstant = dayEnd
-            return DayBounds(start = dayStartInstant, end = dayEndInstant)
+        if (endHour != null) {
+            val endDate = if (endHour < startHour) date.plus(1, DateTimeUnit.DAY) else date
+            val dayEnd = LocalDateTime(endDate, LocalTime(endHour, 0)).toInstant(timeZone)
+            return DayBounds(start = dayStart, end = dayEnd)
         }
 
-        return getDefaultDayBounds(date, timeZone)
+        val nextDay = date.plus(1, DateTimeUnit.DAY)
+        val dayEnd = LocalDateTime(nextDay, LocalTime(startHour, 0)).toInstant(timeZone)
+        return DayBounds(start = dayStart, end = dayEnd)
     }
 
     /**
-     * Gets default day bounds (5am to midnight next day).
+     * Last-resort fallback using [DEFAULT_DAY_START_HOUR].
      */
     private fun getDefaultDayBounds(
         date: LocalDate,
         timeZone: TimeZone,
     ): DayBounds {
-        // Default day is 5am to midnight (next day) to accommodate early risers
-        val startOfDay = date.atStartOfDayIn(timeZone)
-        val dayStart = Instant.fromEpochSeconds(startOfDay.epochSeconds + 5 * 60 * 60)
-
-        // Default day ends at midnight (next day)
+        val dayStart = LocalDateTime(date, LocalTime(DEFAULT_DAY_START_HOUR, 0)).toInstant(timeZone)
         val nextDay = date.plus(1, DateTimeUnit.DAY)
-        val dayEnd = nextDay.atStartOfDayIn(timeZone)
+        val dayEnd = LocalDateTime(nextDay, LocalTime(DEFAULT_DAY_START_HOUR, 0)).toInstant(timeZone)
+        return DayBounds(start = dayStart, end = dayEnd)
+    }
 
-        val dayStartInstant = dayStart
-        val dayEndInstant = dayEnd
-        return DayBounds(start = dayStartInstant, end = dayEndInstant)
+    companion object {
+        /**
+         * Initial default hour for day boundaries when no sleep data or user
+         * preference exists. Configurable in Settings > Timeline > Day boundaries.
+         */
+        const val DEFAULT_DAY_START_HOUR = 4
     }
 }

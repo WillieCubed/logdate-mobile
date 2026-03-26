@@ -30,7 +30,7 @@ class GetTimelinePageUseCaseTest {
                 )
 
             val result =
-                GetTimelinePageUseCase(repository)(
+                GetTimelinePageUseCase(repository, calendarDateGrouper())(
                     TimelinePageRequest(
                         pageSize = 3,
                     ),
@@ -59,7 +59,7 @@ class GetTimelinePageUseCaseTest {
                             textNote("Jan 1", "2025-01-01T18:00:00Z"),
                         ),
                 )
-            val useCase = GetTimelinePageUseCase(repository)
+            val useCase = GetTimelinePageUseCase(repository, calendarDateGrouper())
 
             val firstPage = useCase(TimelinePageRequest(pageSize = 3))
             val secondPage =
@@ -91,7 +91,7 @@ class GetTimelinePageUseCaseTest {
                             textNote("Only day early", "2025-01-03T15:00:00Z"),
                         ),
                 )
-            val useCase = GetTimelinePageUseCase(repository)
+            val useCase = GetTimelinePageUseCase(repository, calendarDateGrouper())
 
             val firstPage = useCase(TimelinePageRequest(pageSize = 1))
             val secondPage =

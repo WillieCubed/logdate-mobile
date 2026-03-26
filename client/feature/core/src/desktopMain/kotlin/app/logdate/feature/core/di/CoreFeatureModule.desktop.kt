@@ -23,6 +23,7 @@ import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.MemoriesSettingsViewModel
 import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
 import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
+import app.logdate.feature.core.settings.ui.TimelineSettingsViewModel
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import app.logdate.feature.core.settings.updates.UnsupportedAppUpdateController
 import org.koin.core.module.Module
@@ -83,7 +84,7 @@ actual val coreFeatureModule: Module =
             )
         }
         viewModel { UserDataExportViewModel(get(), get()) }
-        viewModel { UserDataRestoreViewModel(get()) }
+        viewModel { UserDataRestoreViewModel(get(), get()) }
         viewModel { AdvancedSettingsViewModel(get(), get()) }
         viewModel {
             DangerZoneSettingsViewModel(
@@ -105,5 +106,6 @@ actual val coreFeatureModule: Module =
         // TODO(desktop): Wire location settings UX and platform permissions; keep settings storage available for now.
         viewModel { LocationSettingsViewModel(get()) }
         viewModel { MemoriesSettingsViewModel(get()) }
+        viewModel { TimelineSettingsViewModel(get(), get(), get()) }
         viewModel { ProfileViewModel(get(), get(), get(), get()) }
     }

@@ -1,6 +1,8 @@
 package app.logdate.client.domain.di
 
 import app.logdate.client.domain.app.GetAppInfoUseCase
+import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
+import app.logdate.client.domain.dayboundary.DefaultDayBoundarySettingsRepository
 import app.logdate.client.domain.di.StubIndexedMediaRepository
 import app.logdate.client.domain.di.healthDomainModule
 import app.logdate.client.domain.di.locationDomainModule
@@ -39,6 +41,7 @@ import app.logdate.client.domain.recommendation.DefaultMemoriesSettingsRepositor
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
+import app.logdate.client.domain.restore.PreviewArchiveUseCase
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.domain.rewind.GenerateBasicRewindUseCase
 import app.logdate.client.domain.rewind.GenerateRewindTitleUseCase
@@ -51,6 +54,7 @@ import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
 import app.logdate.client.domain.timeline.GetTimelineDayUseCase
 import app.logdate.client.domain.timeline.GetTimelinePageUseCase
 import app.logdate.client.domain.timeline.GetTimelineUseCase
+import app.logdate.client.domain.timeline.GroupNotesByDayBoundsUseCase
 import app.logdate.client.domain.timeline.InferMomentsUseCase
 import app.logdate.client.domain.timeline.SummarizeJournalEntriesUseCase
 import app.logdate.client.repository.media.IndexedMediaRepository
@@ -76,6 +80,7 @@ val domainModule: Module =
         factory { ExportUserDataUseCase(get(), get(), get(), get(), get(), get()) }
         factory { GetExportCountsUseCase(get(), get(), get()) }
         factory { RestoreUserDataUseCase(get(), get(), get()) }
+        factory { PreviewArchiveUseCase() }
 
         // Notes
         factory {
@@ -128,9 +133,10 @@ val domainModule: Module =
 
         // Timeline
         factory { GetMediaUrisUseCase(get()) }
-        factory { GetTimelineUseCase(get(), get()) }
-        factory { GetStreamingTimelineUseCase(get(), get()) }
-        factory { GetTimelinePageUseCase(get()) }
+        factory { GroupNotesByDayBoundsUseCase(get(), get()) }
+        factory { GetTimelineUseCase(get(), get(), get()) }
+        factory { GetStreamingTimelineUseCase(get(), get(), get()) }
+        factory { GetTimelinePageUseCase(get(), get()) }
         factory { InferMomentsUseCase(get()) }
         factory { GetTimelineDayUseCase(get(), get(), get(), get()) }
         factory { SummarizeJournalEntriesUseCase(get()) }
@@ -168,4 +174,7 @@ val domainModule: Module =
         factory { GetMemoryRecallUseCase(get(), getOrNull()) }
         factory { GetHomeRecommendationUseCase(get(), get(), get(), get(), get(), get()) }
         single<MemoriesSettingsRepository> { DefaultMemoriesSettingsRepository(get()) }
+
+        // Day boundaries
+        single<DayBoundarySettingsRepository> { DefaultDayBoundarySettingsRepository(get()) }
     }

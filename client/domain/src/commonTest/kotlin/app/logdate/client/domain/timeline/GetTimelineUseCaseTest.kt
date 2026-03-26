@@ -55,6 +55,7 @@ class GetTimelineUseCaseTest {
             GetTimelineUseCase(
                 notesRepository = mockNotesRepository,
                 getTimelineDayUseCase = getTimelineDayUseCase,
+                groupNotesByDayBoundsUseCase = calendarDateGrouper(),
             )
     }
 

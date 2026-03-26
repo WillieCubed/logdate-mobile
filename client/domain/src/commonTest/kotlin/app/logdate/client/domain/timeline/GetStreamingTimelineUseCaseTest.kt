@@ -60,6 +60,7 @@ class GetStreamingTimelineUseCaseTest {
             GetStreamingTimelineUseCase(
                 notesRepository = mockNotesRepository,
                 getTimelineDayUseCase = getTimelineDayUseCase,
+                groupNotesByDayBoundsUseCase = calendarDateGrouper(),
             )
     }
 
@@ -540,7 +541,7 @@ class GetStreamingTimelineUseCaseTest {
 
                     override suspend fun getNoteById(noteId: Uuid): JournalNote? = null
                 }
-            val reactiveUseCase = GetStreamingTimelineUseCase(reactiveRepository, buildTimelineDayUseCase())
+            val reactiveUseCase = GetStreamingTimelineUseCase(reactiveRepository, buildTimelineDayUseCase(), calendarDateGrouper())
 
             // When - collect the initial and updated day counts deterministically
             val dayCounts =

@@ -289,6 +289,8 @@
     <string name="sync_now">Sync Now</string>
     <string name="sync_status">Sync Status</string>
     <string name="syncing">Syncing...</string>
+    <string name="timeline_settings">Timeline</string>
+    <string name="timeline_settings_description">How your days are organized</string>
     <string name="tell_others_about_yourself">Tell others about yourself...</string>
     <string name="tell_others_about_yourself_2">Tell others about yourself</string>
     <string name="terms_of_service">Terms of Service</string>

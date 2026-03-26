@@ -16,6 +16,7 @@ import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.core.profile.ui.ProfileViewModel
 import app.logdate.feature.core.restore.AndroidRestoreLauncher
 import app.logdate.feature.core.restore.RestoreLauncher
+import app.logdate.feature.core.restore.RestoreWorker
 import app.logdate.feature.core.restore.UserDataRestoreViewModel
 import app.logdate.feature.core.settings.ui.AccountSettingsViewModel
 import app.logdate.feature.core.settings.ui.AdvancedSettingsViewModel
@@ -25,6 +26,7 @@ import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.MemoriesSettingsViewModel
 import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
 import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
+import app.logdate.feature.core.settings.ui.TimelineSettingsViewModel
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.workmanager.dsl.workerOf
@@ -58,6 +60,7 @@ actual val coreFeatureModule: Module =
         workerOf(::ExportWorker)
         single { AndroidRestoreLauncher(androidContext()) }
         single<RestoreLauncher> { get<AndroidRestoreLauncher>() }
+        workerOf(::RestoreWorker)
 
         factory { ServerConfigurationCoordinator(get(), get(), get()) }
 
@@ -95,7 +98,7 @@ actual val coreFeatureModule: Module =
             )
         }
         viewModel { UserDataExportViewModel(get(), get()) }
-        viewModel { UserDataRestoreViewModel(get()) }
+        viewModel { UserDataRestoreViewModel(get(), get()) }
         viewModel { AdvancedSettingsViewModel(get(), get<AppUpdateController>()) }
         viewModel {
             DangerZoneSettingsViewModel(
@@ -116,6 +119,7 @@ actual val coreFeatureModule: Module =
         viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get()) }
         viewModel { LocationSettingsViewModel(get()) }
         viewModel { MemoriesSettingsViewModel(get()) }
+        viewModel { TimelineSettingsViewModel(get(), get(), get()) }
         viewModel { ProfileViewModel(get(), get(), get(), get()) }
     }
 

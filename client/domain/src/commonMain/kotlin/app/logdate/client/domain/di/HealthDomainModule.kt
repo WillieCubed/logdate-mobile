@@ -1,5 +1,6 @@
 package app.logdate.client.domain.di
 
+import app.logdate.client.domain.dayboundary.ObserveHealthConnectStatusUseCase
 import app.logdate.client.domain.timeline.GetDayBoundsUseCase
 import org.koin.dsl.module
 
@@ -10,6 +11,7 @@ val healthDomainModule =
     module {
         // Provide use cases that depend on health repositories
         factory {
-            GetDayBoundsUseCase(healthRepository = get())
+            GetDayBoundsUseCase(healthRepository = get(), dayBoundarySettingsRepository = get())
         }
+        factory { ObserveHealthConnectStatusUseCase(get()) }
     }

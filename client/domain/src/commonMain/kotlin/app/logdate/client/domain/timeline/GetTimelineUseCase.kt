@@ -23,30 +23,18 @@ import kotlin.time.Instant
 class GetTimelineUseCase(
     private val notesRepository: JournalNotesRepository,
     private val getTimelineDayUseCase: GetTimelineDayUseCase,
+    private val groupNotesByDayBoundsUseCase: GroupNotesByDayBoundsUseCase,
 ) {
     operator fun invoke(sortOrder: TimelineSortOrder = TimelineSortOrder.REVERSE_CHRONOLOGICAL): Flow<Timeline> =
         notesRepository.allNotesObserved
             .transform { allNotes ->
-                // Group notes by day using string components for more reliable grouping
-                val improvedNotesByDay = mutableMapOf<LocalDate, MutableList<JournalNote>>()
+                val notesByDay = groupNotesByDayBoundsUseCase(allNotes)
 
-                allNotes.forEach { note ->
-                    val noteDateTime = note.creationTimestamp.toLocalDateTime(TimeZone.currentSystemDefault())
-                    val noteDate = noteDateTime.date
-
-                    if (!improvedNotesByDay.containsKey(noteDate)) {
-                        improvedNotesByDay[noteDate] = mutableListOf()
-                    }
-
-                    improvedNotesByDay[noteDate]?.add(note)
-                }
-                // Process each day's entries
                 val timelineDays =
-                    improvedNotesByDay.map { (date, entries) ->
+                    notesByDay.map { (date, entries) ->
                         getTimelineDayUseCase(date, entries)
                     }
 
-                // Apply sorting based on the requested order
                 val sortedDays =
                     when (sortOrder) {
                         TimelineSortOrder.CHRONOLOGICAL -> timelineDays.sortedBy { it.date }
