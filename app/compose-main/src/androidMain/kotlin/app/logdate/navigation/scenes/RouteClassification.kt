@@ -4,7 +4,7 @@ import androidx.navigation3.runtime.NavKey
 import app.logdate.navigation.routes.CloudAccountSetupFlowRoute
 import app.logdate.navigation.routes.core.AccountSettingsRoute
 import app.logdate.navigation.routes.core.AdvancedSettingsRoute
-import app.logdate.navigation.routes.core.DangerZoneSettingsRoute
+import app.logdate.navigation.routes.core.ClearDataSettingsRoute
 import app.logdate.navigation.routes.core.DataSettingsRoute
 import app.logdate.navigation.routes.core.DevicesSettingsRoute
 import app.logdate.navigation.routes.core.EntryEditor
@@ -25,6 +25,8 @@ import app.logdate.navigation.routes.core.OnboardingSignIn
 import app.logdate.navigation.routes.core.OnboardingStart
 import app.logdate.navigation.routes.core.OnboardingWelcomeBackRoute
 import app.logdate.navigation.routes.core.PrivacySettingsRoute
+import app.logdate.navigation.routes.core.ResetAppSettingsRoute
+import app.logdate.navigation.routes.core.ResetSettingsRoute
 import app.logdate.navigation.routes.core.RewindDetailRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.routes.core.SyncSettingsRoute
@@ -112,7 +114,6 @@ object RouteConfig {
             PrivacySettingsRoute::class,
             DataSettingsRoute::class,
             DevicesSettingsRoute::class,
-            DangerZoneSettingsRoute::class,
             LocationSettingsRoute::class,
             LocationTrackingOptionsRoute::class,
             LocationIntervalRoute::class,
@@ -120,6 +121,9 @@ object RouteConfig {
             AdvancedSettingsRoute::class,
             SyncSettingsRoute::class,
             ExportSettingsRoute::class,
+            ResetSettingsRoute::class,
+            ClearDataSettingsRoute::class,
+            ResetAppSettingsRoute::class,
             -> return RouteClassification.Excluded
 
             // Cloud account setup flow

@@ -22,8 +22,9 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -51,8 +52,6 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_and_sign_in
 import logdate.client.feature.core.generated.resources.account_settings_description
 import logdate.client.feature.core.generated.resources.create_account
-import logdate.client.feature.core.generated.resources.danger_zone
-import logdate.client.feature.core.generated.resources.danger_zone_description
 import logdate.client.feature.core.generated.resources.devices
 import logdate.client.feature.core.generated.resources.devices_settings_description
 import logdate.client.feature.core.generated.resources.edit_profile
@@ -68,6 +67,8 @@ import logdate.client.feature.core.generated.resources.privacy_and_security
 import logdate.client.feature.core.generated.resources.privacy_security_description
 import logdate.client.feature.core.generated.resources.profile
 import logdate.client.feature.core.generated.resources.profile_settings_description
+import logdate.client.feature.core.generated.resources.reset
+import logdate.client.feature.core.generated.resources.reset_description
 import logdate.client.feature.core.generated.resources.screen_title_settings
 import logdate.client.feature.core.generated.resources.settings_group_data_storage
 import logdate.client.feature.core.generated.resources.settings_group_personal
@@ -77,6 +78,8 @@ import logdate.client.feature.core.generated.resources.sync_and_backup
 import logdate.client.feature.core.generated.resources.sync_and_backup_description
 import logdate.client.feature.core.generated.resources.sync_promotion_description
 import logdate.client.feature.core.generated.resources.sync_promotion_title
+import logdate.client.feature.core.generated.resources.timeline_settings
+import logdate.client.feature.core.generated.resources.timeline_settings_description
 import logdate.client.feature.core.generated.resources.watch_settings
 import logdate.client.feature.core.generated.resources.watch_settings_description
 import org.jetbrains.compose.resources.stringResource
@@ -96,11 +99,12 @@ fun SettingsOverviewScreen(
     onNavigateToAccount: () -> Unit,
     onNavigateToDevices: () -> Unit,
     onNavigateToWatch: () -> Unit,
-    onNavigateToDangerZone: () -> Unit,
+    onNavigateToReset: () -> Unit,
     onNavigateToLocation: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
     onNavigateToLibrarySettings: () -> Unit,
     onNavigateToMemories: () -> Unit,
+    onNavigateToTimeline: () -> Unit,
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
     onNavigateToCloudAccountCreation: () -> Unit = {},
@@ -116,11 +120,12 @@ fun SettingsOverviewScreen(
         onNavigateToAccount = onNavigateToAccount,
         onNavigateToDevices = onNavigateToDevices,
         onNavigateToWatch = onNavigateToWatch,
-        onNavigateToDangerZone = onNavigateToDangerZone,
+        onNavigateToReset = onNavigateToReset,
         onNavigateToLocation = onNavigateToLocation,
         onNavigateToPrivacy = onNavigateToPrivacy,
         onNavigateToLibrarySettings = onNavigateToLibrarySettings,
         onNavigateToMemories = onNavigateToMemories,
+        onNavigateToTimeline = onNavigateToTimeline,
         onNavigateToSync = onNavigateToSync,
         onNavigateToExport = onNavigateToExport,
         onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
@@ -143,10 +148,11 @@ fun SettingsOverviewContent(
     onNavigateToAccount: () -> Unit,
     onNavigateToDevices: () -> Unit,
     onNavigateToWatch: () -> Unit = {},
-    onNavigateToDangerZone: () -> Unit,
+    onNavigateToReset: () -> Unit,
     onNavigateToLocation: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
     onNavigateToMemories: () -> Unit,
+    onNavigateToTimeline: () -> Unit = {},
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
     onNavigateToCloudAccountCreation: () -> Unit = {},
@@ -187,6 +193,12 @@ fun SettingsOverviewContent(
                     description = stringResource(Res.string.memories_description),
                     icon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
                     onClick = onNavigateToMemories,
+                )
+                SettingsNavigationItem(
+                    title = stringResource(Res.string.timeline_settings),
+                    description = stringResource(Res.string.timeline_settings_description),
+                    icon = { Icon(Icons.Default.Timeline, contentDescription = null) },
+                    onClick = onNavigateToTimeline,
                 )
                 SettingsNavigationItem(
                     title = "Your library",
@@ -265,11 +277,10 @@ fun SettingsOverviewContent(
                     onClick = onNavigateToExport,
                 )
                 SettingsNavigationItem(
-                    title = stringResource(Res.string.danger_zone),
-                    description = stringResource(Res.string.danger_zone_description),
-                    icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                    onClick = onNavigateToDangerZone,
-                    isDangerous = true,
+                    title = stringResource(Res.string.reset),
+                    description = stringResource(Res.string.reset_description),
+                    icon = { Icon(Icons.Default.RestartAlt, contentDescription = null) },
+                    onClick = onNavigateToReset,
                 )
             }
         }
@@ -327,14 +338,10 @@ private fun SettingsNavigationItem(
     description: String,
     icon: @Composable () -> Unit,
     onClick: () -> Unit,
-    isDangerous: Boolean = false,
 ) {
     ListItem(
         headlineContent = {
-            Text(
-                text = title,
-                color = if (isDangerous) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-            )
+            Text(text = title)
         },
         supportingContent = {
             Text(
@@ -446,7 +453,7 @@ private fun SettingsOverviewScreenPreview() {
         onNavigateToProfile = {},
         onNavigateToAccount = {},
         onNavigateToDevices = {},
-        onNavigateToDangerZone = {},
+        onNavigateToReset = {},
         onNavigateToLocation = {},
         onNavigateToPrivacy = {},
         onNavigateToMemories = {},
@@ -469,7 +476,7 @@ private fun SettingsOverviewScreenPreviewNotSignedIn() {
         onNavigateToProfile = {},
         onNavigateToAccount = {},
         onNavigateToDevices = {},
-        onNavigateToDangerZone = {},
+        onNavigateToReset = {},
         onNavigateToLocation = {},
         onNavigateToPrivacy = {},
         onNavigateToMemories = {},

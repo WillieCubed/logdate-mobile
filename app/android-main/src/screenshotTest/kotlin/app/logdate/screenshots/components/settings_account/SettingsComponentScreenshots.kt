@@ -19,7 +19,6 @@ import app.logdate.feature.core.settings.ui.AccountIdentityState
 import app.logdate.feature.core.settings.ui.AccountSettingsContent
 import app.logdate.feature.core.settings.ui.AdvancedSettingsContent
 import app.logdate.feature.core.settings.ui.ConflictsState
-import app.logdate.feature.core.settings.ui.DangerZoneSettingsContent
 import app.logdate.feature.core.settings.ui.DataSettingsContent
 import app.logdate.feature.core.settings.ui.IntegrityState
 import app.logdate.feature.core.settings.ui.LocationSettingsContent
@@ -77,7 +76,7 @@ fun SettingsOverview() {
             onNavigateToProfile = {},
             onNavigateToAccount = {},
             onNavigateToDevices = {},
-            onNavigateToDangerZone = {},
+            onNavigateToReset = {},
             onNavigateToLocation = {},
             onNavigateToPrivacy = {},
             onNavigateToMemories = {},
@@ -98,7 +97,7 @@ fun SettingsOverview_Dark() {
             onNavigateToProfile = {},
             onNavigateToAccount = {},
             onNavigateToDevices = {},
-            onNavigateToDangerZone = {},
+            onNavigateToReset = {},
             onNavigateToLocation = {},
             onNavigateToPrivacy = {},
             onNavigateToMemories = {},
@@ -177,7 +176,9 @@ fun DataSettings() {
             onBrowseExport = {},
             restoreState = RestoreState.Idle,
             onShowRestoreSheet = {},
-            onConfirmRestore = {},
+            onSelectRestoreFile = {},
+            onUpdateImportOptions = {},
+            onConfirmImport = {},
             onCancelRestore = {},
             onRetryRestore = {},
             onDismissRestore = {},
@@ -266,21 +267,6 @@ fun AdvancedSettings_UpdateAvailableImmediate() {
     }
 }
 
-// ─── Danger Zone ────────────────────────────────────────────────────────────────
-
-@PreviewTest
-@Preview(showBackground = true, device = PHONE)
-@Composable
-fun DangerZoneSettings() {
-    ScreenshotTheme {
-        DangerZoneSettingsContent(
-            onBack = {},
-            onAppReset = {},
-            onClearData = { _, _ -> },
-        )
-    }
-}
-
 // ─── Dialogs ────────────────────────────────────────────────────────────────────
 
 @PreviewTest
@@ -323,7 +309,7 @@ fun SettingsListDetail_Landscape_Account() {
                 onNavigateToProfile = {},
                 onNavigateToAccount = {},
                 onNavigateToDevices = {},
-                onNavigateToDangerZone = {},
+                onNavigateToReset = {},
                 onNavigateToLocation = {},
                 onNavigateToPrivacy = {},
                 onNavigateToMemories = {},
@@ -370,7 +356,7 @@ fun SettingsListDetail_Tablet_Account() {
                 onNavigateToProfile = {},
                 onNavigateToAccount = {},
                 onNavigateToDevices = {},
-                onNavigateToDangerZone = {},
+                onNavigateToReset = {},
                 onNavigateToLocation = {},
                 onNavigateToPrivacy = {},
                 onNavigateToMemories = {},

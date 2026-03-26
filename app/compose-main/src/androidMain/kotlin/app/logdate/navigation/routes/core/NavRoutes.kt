@@ -197,11 +197,29 @@ data object LibrarySettingsRoute : NavKey
 @Serializable
 data object RecommendationSettingsRoute : NavKey
 
+@Serializable
+data object TimelineSettingsRoute : NavKey
+
+@Serializable
+data object DayBoundarySettingsRoute : NavKey
+
 /**
- * Navigation route for destructive actions like resetting the app or deleting data.
+ * Navigation route for the reset settings hub screen.
  */
 @Serializable
-data object DangerZoneSettingsRoute : NavKey
+data object ResetSettingsRoute : NavKey
+
+/**
+ * Navigation route for the clear data detail screen.
+ */
+@Serializable
+data object ClearDataSettingsRoute : NavKey
+
+/**
+ * Navigation route for the reset app detail screen.
+ */
+@Serializable
+data object ResetAppSettingsRoute : NavKey
 
 /**
  * Navigation route for advanced settings (server configuration, developer options).

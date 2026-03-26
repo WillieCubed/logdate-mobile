@@ -18,7 +18,6 @@ import app.logdate.feature.core.settings.ui.AccountIdentityState
 import app.logdate.feature.core.settings.ui.AccountSettingsContent
 import app.logdate.feature.core.settings.ui.AdvancedSettingsContent
 import app.logdate.feature.core.settings.ui.ConflictsState
-import app.logdate.feature.core.settings.ui.DangerZoneSettingsContent
 import app.logdate.feature.core.settings.ui.DataSettingsContent
 import app.logdate.feature.core.settings.ui.IntegrityState
 import app.logdate.feature.core.settings.ui.LocationSettingsContent
@@ -121,7 +120,7 @@ fun S01_SettingsOverviewDefault() {
             onNavigateToProfile = {},
             onNavigateToAccount = {},
             onNavigateToDevices = {},
-            onNavigateToDangerZone = {},
+            onNavigateToReset = {},
             onNavigateToLocation = {},
             onNavigateToPrivacy = {},
             onNavigateToMemories = {},
@@ -143,7 +142,7 @@ fun S02_SettingsOverviewEmptyDetail() {
                 onNavigateToProfile = {},
                 onNavigateToAccount = {},
                 onNavigateToDevices = {},
-                onNavigateToDangerZone = {},
+                onNavigateToReset = {},
                 onNavigateToLocation = {},
                 onNavigateToPrivacy = {},
                 onNavigateToMemories = {},
@@ -170,7 +169,7 @@ fun S02b_SettingsOverviewUnauthenticated() {
             onNavigateToProfile = {},
             onNavigateToAccount = {},
             onNavigateToDevices = {},
-            onNavigateToDangerZone = {},
+            onNavigateToReset = {},
             onNavigateToLocation = {},
             onNavigateToPrivacy = {},
             onNavigateToMemories = {},
@@ -271,7 +270,9 @@ fun S07_DataSettingsSignedOut() {
             onBrowseExport = {},
             restoreState = RestoreState.Idle,
             onShowRestoreSheet = {},
-            onConfirmRestore = {},
+            onSelectRestoreFile = {},
+            onUpdateImportOptions = {},
+            onConfirmImport = {},
             onCancelRestore = {},
             onRetryRestore = {},
             onDismissRestore = {},
@@ -313,7 +314,9 @@ fun S08_DataSettingsSignedIn() {
             onBrowseExport = {},
             restoreState = RestoreState.Idle,
             onShowRestoreSheet = {},
-            onConfirmRestore = {},
+            onSelectRestoreFile = {},
+            onUpdateImportOptions = {},
+            onConfirmImport = {},
             onCancelRestore = {},
             onRetryRestore = {},
             onDismissRestore = {},
@@ -355,7 +358,9 @@ fun S10_DataSettingsConflicts() {
             onBrowseExport = {},
             restoreState = RestoreState.Idle,
             onShowRestoreSheet = {},
-            onConfirmRestore = {},
+            onSelectRestoreFile = {},
+            onUpdateImportOptions = {},
+            onConfirmImport = {},
             onCancelRestore = {},
             onRetryRestore = {},
             onDismissRestore = {},
@@ -378,19 +383,6 @@ fun S10_DataSettingsConflicts() {
             onBackgroundSyncEnabledChange = {},
             onNavigateToCloudAccountCreation = {},
             onNavigateToSignIn = {},
-        )
-    }
-}
-
-@PreviewTest
-@ScreenshotPreviewMatrix
-@Composable
-fun S11_DangerZoneSettingsDefault() {
-    ScreenshotTheme {
-        DangerZoneSettingsContent(
-            onBack = {},
-            onAppReset = {},
-            onClearData = { _, _ -> },
         )
     }
 }

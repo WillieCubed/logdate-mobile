@@ -3,20 +3,27 @@
 package app.logdate.navigation.routes
 
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.health.connect.client.PermissionController
+import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.core.profile.ui.ProfileScreen
 import app.logdate.feature.core.settings.ui.AccountSettingsScreen
 import app.logdate.feature.core.settings.ui.AdvancedSettingsScreen
 import app.logdate.feature.core.settings.ui.BirthdaySettingsScreen
-import app.logdate.feature.core.settings.ui.DangerZoneSettingsScreen
+import app.logdate.feature.core.settings.ui.ClearDataSettingsScreen
+import app.logdate.feature.core.settings.ui.DayBoundarySettingsScreen
 import app.logdate.feature.core.settings.ui.ExportSettingsScreen
 import app.logdate.feature.core.settings.ui.LibrarySettingsScreen
 import app.logdate.feature.core.settings.ui.LocationAdvancedScreen
@@ -26,8 +33,11 @@ import app.logdate.feature.core.settings.ui.LocationTrackingOptionsScreen
 import app.logdate.feature.core.settings.ui.MemoriesSettingsScreen
 import app.logdate.feature.core.settings.ui.PrivacySettingsScreen
 import app.logdate.feature.core.settings.ui.RecommendationSettingsScreen
+import app.logdate.feature.core.settings.ui.ResetAppSettingsScreen
+import app.logdate.feature.core.settings.ui.ResetSettingsScreen
 import app.logdate.feature.core.settings.ui.SettingsOverviewScreen
 import app.logdate.feature.core.settings.ui.SyncSettingsScreen
+import app.logdate.feature.core.settings.ui.TimelineSettingsScreen
 import app.logdate.feature.core.settings.ui.devices.DevicesScreen
 import app.logdate.feature.core.settings.ui.watch.WatchNotificationSettingsScreen
 import app.logdate.feature.core.settings.ui.watch.WatchSettingsScreen
@@ -39,7 +49,8 @@ import app.logdate.navigation.MainAppNavigator
 import app.logdate.navigation.routes.core.AccountSettingsRoute
 import app.logdate.navigation.routes.core.AdvancedSettingsRoute
 import app.logdate.navigation.routes.core.BirthdaySettingsRoute
-import app.logdate.navigation.routes.core.DangerZoneSettingsRoute
+import app.logdate.navigation.routes.core.ClearDataSettingsRoute
+import app.logdate.navigation.routes.core.DayBoundarySettingsRoute
 import app.logdate.navigation.routes.core.DevicesSettingsRoute
 import app.logdate.navigation.routes.core.ExportSettingsRoute
 import app.logdate.navigation.routes.core.LibrarySettingsRoute
@@ -51,8 +62,11 @@ import app.logdate.navigation.routes.core.MemoriesSettingsRoute
 import app.logdate.navigation.routes.core.OnboardingStart
 import app.logdate.navigation.routes.core.PrivacySettingsRoute
 import app.logdate.navigation.routes.core.RecommendationSettingsRoute
+import app.logdate.navigation.routes.core.ResetAppSettingsRoute
+import app.logdate.navigation.routes.core.ResetSettingsRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.routes.core.SyncSettingsRoute
+import app.logdate.navigation.routes.core.TimelineSettingsRoute
 import app.logdate.navigation.routes.core.WatchNotificationSettingsRoute
 import app.logdate.navigation.routes.core.WatchSettingsRoute
 import app.logdate.navigation.routes.core.WatchSyncSettingsRoute
@@ -118,13 +132,6 @@ fun MainAppNavigator.openDevicesSettings() {
 }
 
 /**
- * Opens the danger zone settings screen with destructive actions.
- */
-fun MainAppNavigator.openDangerZoneSettings() {
-    backStack.add(DangerZoneSettingsRoute)
-}
-
-/**
  * Opens the library settings screen.
  */
 fun MainAppNavigator.openLibrarySettings() {
@@ -139,10 +146,39 @@ fun MainAppNavigator.openMemoriesSettings() {
 }
 
 /**
+ * Opens the reset settings hub screen.
+ */
+fun MainAppNavigator.openResetSettings() {
+    backStack.add(ResetSettingsRoute)
+}
+
+/**
+ * Opens the clear data detail screen.
+ */
+fun MainAppNavigator.openClearDataSettings() {
+    backStack.add(ClearDataSettingsRoute)
+}
+
+/**
+ * Opens the reset app detail screen.
+ */
+fun MainAppNavigator.openResetAppSettings() {
+    backStack.add(ResetAppSettingsRoute)
+}
+
+/**
  * Opens the recommendations detail settings screen.
  */
 fun MainAppNavigator.openRecommendationSettings() {
     backStack.add(RecommendationSettingsRoute)
+}
+
+fun MainAppNavigator.openTimelineSettings() {
+    backStack.add(TimelineSettingsRoute)
+}
+
+fun MainAppNavigator.openDayBoundarySettings() {
+    backStack.add(DayBoundarySettingsRoute)
 }
 
 /**
@@ -237,16 +273,20 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToAccount: () -> Unit,
     onNavigateToDevices: () -> Unit,
     onNavigateToWatch: () -> Unit,
-    onNavigateToDangerZone: () -> Unit,
     onNavigateToLocation: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
     onOpenLocationTimeline: () -> Unit,
     onNavigateToLibrarySettings: () -> Unit,
     onNavigateToMemories: () -> Unit,
     onNavigateToRecommendations: () -> Unit,
+    onNavigateToTimeline: () -> Unit,
+    onNavigateToDayBoundary: () -> Unit,
     onNavigateToAdvanced: () -> Unit,
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
+    onNavigateToReset: () -> Unit,
+    onNavigateToClearData: () -> Unit,
+    onNavigateToResetApp: () -> Unit,
     onNavigateToLocationTrackingOptions: () -> Unit,
     onNavigateToLocationInterval: () -> Unit,
     onNavigateToLocationAdvanced: () -> Unit,
@@ -270,13 +310,14 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onNavigateToAccount = onNavigateToAccount,
             onNavigateToDevices = onNavigateToDevices,
             onNavigateToWatch = onNavigateToWatch,
-            onNavigateToDangerZone = onNavigateToDangerZone,
             onNavigateToLocation = onNavigateToLocation,
             onNavigateToPrivacy = onNavigateToPrivacy,
             onNavigateToLibrarySettings = onNavigateToLibrarySettings,
             onNavigateToMemories = onNavigateToMemories,
+            onNavigateToTimeline = onNavigateToTimeline,
             onNavigateToSync = onNavigateToSync,
             onNavigateToExport = onNavigateToExport,
+            onNavigateToReset = onNavigateToReset,
             onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
             onNavigateToSignIn = onNavigateToSignIn,
         )
@@ -362,11 +403,31 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
         )
     }
 
-    // Danger zone settings screen with destructive actions (detail pane)
-    routeEntry<DangerZoneSettingsRoute>(
+    // Reset settings hub (detail pane)
+    routeEntry<ResetSettingsRoute>(
         metadata = ListDetailSceneStrategy.detailPane(),
     ) { _ ->
-        DangerZoneSettingsScreen(
+        ResetSettingsScreen(
+            onBack = onBack,
+            onNavigateToClearData = onNavigateToClearData,
+            onNavigateToResetApp = onNavigateToResetApp,
+        )
+    }
+
+    // Clear data detail screen (detail pane)
+    routeEntry<ClearDataSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        ClearDataSettingsScreen(
+            onBack = onBack,
+        )
+    }
+
+    // Reset app detail screen (detail pane)
+    routeEntry<ResetAppSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        ResetAppSettingsScreen(
             onBack = onBack,
             onAppReset = onAppReset,
         )
@@ -457,6 +518,25 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
         )
     }
 
+    routeEntry<TimelineSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        TimelineSettingsScreen(
+            onBack = onBack,
+            onNavigateToDayBoundary = onNavigateToDayBoundary,
+        )
+    }
+
+    routeEntry<DayBoundarySettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        val permissionLauncher = rememberHealthConnectPermissionLauncher()
+        DayBoundarySettingsScreen(
+            onBack = onBack,
+            onRequestHealthPermissions = { permissionLauncher() },
+        )
+    }
+
     // Advanced settings screen (hidden from main settings overview)
     routeEntry<AdvancedSettingsRoute>(
         metadata = ListDetailSceneStrategy.detailPane(),
@@ -509,5 +589,25 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onBack = onBack,
             viewModel = viewModel,
         )
+    }
+}
+
+/**
+ * Creates a launcher for Health Connect sleep permission requests.
+ * Returns a function that, when called, launches the system permission flow.
+ */
+@Composable
+private fun rememberHealthConnectPermissionLauncher(): () -> Unit {
+    val sleepPermissions =
+        remember {
+            setOf(HealthPermission.getReadPermission(SleepSessionRecord::class))
+        }
+    val launcher =
+        rememberLauncherForActivityResult(
+            contract = PermissionController.createRequestPermissionResultContract(),
+        ) { /* Result handled by ViewModel.refreshHealthStatus() on resume */ }
+
+    return remember(launcher) {
+        { launcher.launch(sleepPermissions) }
     }
 }

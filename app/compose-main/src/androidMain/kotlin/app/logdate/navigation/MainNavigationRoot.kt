@@ -111,7 +111,8 @@ import app.logdate.navigation.routes.onboarding
 import app.logdate.navigation.routes.openAccountSettings
 import app.logdate.navigation.routes.openAdvancedSettings
 import app.logdate.navigation.routes.openBirthdaySettings
-import app.logdate.navigation.routes.openDangerZoneSettings
+import app.logdate.navigation.routes.openClearDataSettings
+import app.logdate.navigation.routes.openDayBoundarySettings
 import app.logdate.navigation.routes.openDevicesSettings
 import app.logdate.navigation.routes.openExportSettings
 import app.logdate.navigation.routes.openJournalDetail
@@ -127,11 +128,14 @@ import app.logdate.navigation.routes.openMemoriesSettings
 import app.logdate.navigation.routes.openPrivacySettings
 import app.logdate.navigation.routes.openProfile
 import app.logdate.navigation.routes.openRecommendationSettings
+import app.logdate.navigation.routes.openResetAppSettings
+import app.logdate.navigation.routes.openResetSettings
 import app.logdate.navigation.routes.openSearch
 import app.logdate.navigation.routes.openSettings
 import app.logdate.navigation.routes.openShareJournal
 import app.logdate.navigation.routes.openSyncSettings
 import app.logdate.navigation.routes.openTimelineDetail
+import app.logdate.navigation.routes.openTimelineSettings
 import app.logdate.navigation.routes.openWatchNotificationSettings
 import app.logdate.navigation.routes.openWatchSettings
 import app.logdate.navigation.routes.openWatchSyncSettings
@@ -659,16 +663,20 @@ fun MainNavigationRoot(
                             onNavigateToAccount = mainAppNavigator::openAccountSettings,
                             onNavigateToDevices = mainAppNavigator::openDevicesSettings,
                             onNavigateToWatch = mainAppNavigator::openWatchSettings,
-                            onNavigateToDangerZone = mainAppNavigator::openDangerZoneSettings,
                             onNavigateToLocation = mainAppNavigator::openLocationSettings,
                             onNavigateToPrivacy = mainAppNavigator::openPrivacySettings,
                             onOpenLocationTimeline = mainAppNavigator::openLocationTimeline,
                             onNavigateToLibrarySettings = mainAppNavigator::openLibrarySettings,
                             onNavigateToMemories = mainAppNavigator::openMemoriesSettings,
                             onNavigateToRecommendations = mainAppNavigator::openRecommendationSettings,
+                            onNavigateToTimeline = mainAppNavigator::openTimelineSettings,
+                            onNavigateToDayBoundary = mainAppNavigator::openDayBoundarySettings,
                             onNavigateToAdvanced = mainAppNavigator::openAdvancedSettings,
                             onNavigateToSync = mainAppNavigator::openSyncSettings,
                             onNavigateToExport = mainAppNavigator::openExportSettings,
+                            onNavigateToReset = mainAppNavigator::openResetSettings,
+                            onNavigateToClearData = mainAppNavigator::openClearDataSettings,
+                            onNavigateToResetApp = mainAppNavigator::openResetAppSettings,
                             onNavigateToLocationTrackingOptions = mainAppNavigator::openLocationTrackingOptions,
                             onNavigateToLocationInterval = mainAppNavigator::openLocationInterval,
                             onNavigateToLocationAdvanced = mainAppNavigator::openLocationAdvanced,

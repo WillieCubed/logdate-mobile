@@ -26,7 +26,4 @@ data object DataSettingsRoute
 data object LocationSettingsRoute
 
 @Serializable
-data object DangerZoneSettingsRoute
-
-@Serializable
 data object AdvancedSettingsRoute
