@@ -4,9 +4,23 @@
     <string name="widget_description_on_this_day">Rediscover moments from your past</string>
     <string name="widget_header">MEMORIES</string>
     <string name="widget_loading_message">Looking for memories…</string>
-    <string name="widget_new_user_message">Keep journaling to unlock past memories</string>
-    <string name="widget_empty_message">Nothing to revisit today</string>
-    <string name="widget_open_app">Open LogDate</string>
+    <string name="widget_new_user_message">Your memories will appear here once you\'ve been journaling for a while.</string>
+    <string name="widget_new_user_cta">Start journaling</string>
+    <string name="widget_empty_message">Nothing to revisit today.</string>
+    <string name="widget_empty_cta">Write something</string>
     <string name="widget_view_memory">View</string>
-    <string name="widget_fallback_summary">A memory from this day</string>
+    <string name="widget_fallback_summary">A memory from your past</string>
+
+    <!-- Configuration activity -->
+    <string name="widget_config_title">Set up Memories</string>
+    <string name="widget_config_done">Done</string>
+    <string name="widget_config_recall_mode">How should we find memories?</string>
+    <string name="widget_config_recall_on_this_day">On This Day</string>
+    <string name="widget_config_recall_on_this_day_desc">Entries near today\'s date from prior years</string>
+    <string name="widget_config_recall_rediscover">Rediscover</string>
+    <string name="widget_config_recall_rediscover_desc">Interesting past entries regardless of date</string>
+    <string name="widget_config_content_types">What to show</string>
+    <string name="widget_config_content_text">Text notes</string>
+    <string name="widget_config_content_photos">Photos</string>
+    <string name="widget_config_content_audio">Audio notes</string>
 </resources>

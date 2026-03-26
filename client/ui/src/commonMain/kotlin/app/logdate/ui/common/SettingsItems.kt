@@ -71,7 +71,7 @@ fun SimpleSettingsItem(
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         },
@@ -151,7 +151,7 @@ fun LinkedToggleSettingsItem(
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -416,6 +416,28 @@
     <string name="restore_complete_title">Import complete</string>
     <string name="restore_complete_description">Your data has been restored.</string>
     <string name="restore_failed_title">Import failed</string>
+    <string name="restore_preview_description">Review what\&apos;s in this archive.</string>
+    <string name="restore_import_options_label">Import options</string>
+    <string name="restore_confirm_import">Import</string>
+    <string name="restore_stage_preparing">Preparing restore\u2026</string>
+    <string name="restore_stage_copying">Copying archive\u2026</string>
+    <string name="restore_stage_opening">Opening archive\u2026</string>
+    <string name="restore_stage_reading">Reading archive contents\u2026</string>
+    <string name="restore_stage_journals">Restoring journals\u2026</string>
+    <string name="restore_stage_notes">Restoring notes\u2026</string>
+    <string name="restore_stage_links">Restoring journal links\u2026</string>
+    <string name="restore_stage_drafts">Restoring drafts\u2026</string>
+    <string name="restore_stage_media">Importing media\u2026</string>
+    <string name="restore_error_invalid_archive">The selected file doesn\&apos;t appear to be a valid LogDate export archive.</string>
+    <string name="restore_error_missing_source">No file was selected for restore.</string>
+    <string name="restore_error_file_not_accessible">Unable to access the selected file.</string>
+    <string name="restore_error_file_picker_unavailable">A file picker is required to select a backup.</string>
+    <string name="restore_error_file_picker_failed">Could not open the file picker.</string>
+    <string name="restore_error_invalid_summary">Restore completed, but the result could not be read.</string>
+    <string name="restore_error_no_summary">Restore completed, but no summary was returned.</string>
+    <string name="restore_error_ios_requires_folder">Restore on this device requires a folder export.</string>
+    <string name="restore_error_generic">Something went wrong during restore.</string>
+    <string name="restore_integrity_mismatch">Expected %1$d %2$s but found %3$d in archive</string>
     <string name="restore_warnings_title">Warnings</string>
     <string name="action_retry">Retry</string>
     <string name="action_done">Done</string>
@@ -467,8 +489,11 @@
     <string name="recall_mode_rediscover_description">Surface interesting past entries regardless of date</string>
     <string name="widget_content_types">Content to show</string>
     <string name="widget_content_type_text">Text notes</string>
+    <string name="widget_content_type_text_description">Written entries and journal text</string>
     <string name="widget_content_type_photos">Photos</string>
+    <string name="widget_content_type_photos_description">Images attached to your entries</string>
     <string name="widget_content_type_audio">Audio notes</string>
+    <string name="widget_content_type_audio_description">Voice recordings and audio clips</string>
 
     <!-- Watch settings -->
     <string name="watch_settings">Watch</string>

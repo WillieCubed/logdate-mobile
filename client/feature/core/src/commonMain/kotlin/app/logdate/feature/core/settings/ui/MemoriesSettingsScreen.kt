@@ -2,14 +2,12 @@
 
 package app.logdate.feature.core.settings.ui
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -18,8 +16,10 @@ import androidx.compose.ui.Modifier
 import app.logdate.client.domain.recommendation.RecallMode
 import app.logdate.client.domain.recommendation.WidgetContentType
 import app.logdate.ui.common.LinkedToggleSettingsItem
+import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.SettingsScaffold
-import app.logdate.ui.common.SettingsSection
+import app.logdate.ui.common.SimpleSettingsItem
+import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.memories
@@ -33,8 +33,11 @@ import logdate.client.feature.core.generated.resources.recommendations_privacy_n
 import logdate.client.feature.core.generated.resources.recommendations_summary_off
 import logdate.client.feature.core.generated.resources.recommendations_summary_on
 import logdate.client.feature.core.generated.resources.widget_content_type_audio
+import logdate.client.feature.core.generated.resources.widget_content_type_audio_description
 import logdate.client.feature.core.generated.resources.widget_content_type_photos
+import logdate.client.feature.core.generated.resources.widget_content_type_photos_description
 import logdate.client.feature.core.generated.resources.widget_content_type_text
+import logdate.client.feature.core.generated.resources.widget_content_type_text_description
 import logdate.client.feature.core.generated.resources.widget_content_types
 import logdate.client.feature.core.generated.resources.widget_settings
 import org.jetbrains.compose.resources.stringResource
@@ -82,74 +85,110 @@ fun MemoriesSettingsContent(
         onBack = onBack,
         modifier = modifier,
     ) {
+        // Recommendations section
         item {
-            SettingsSection(
-                title = stringResource(Res.string.recommendations),
-                modifier = Modifier.padding(horizontal = Spacing.lg),
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                LinkedToggleSettingsItem(
-                    title = stringResource(Res.string.recommendations),
-                    description =
-                        stringResource(
-                            if (contextualRecommendationsEnabled) {
-                                Res.string.recommendations_summary_on
-                            } else {
-                                Res.string.recommendations_summary_off
-                            },
-                        ),
-                    checked = contextualRecommendationsEnabled,
-                    onCheckedChange = onToggleContextualRecommendations,
-                    onNavigate = onNavigateToRecommendations,
+                Text(
+                    text = stringResource(Res.string.recommendations),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(vertical = Spacing.sm),
                 )
-            }
-        }
 
-        item {
-            SettingsSection(
-                title = stringResource(Res.string.widget_settings),
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            ) {
-                Column {
-                    Text(
-                        text = stringResource(Res.string.recall_mode),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-                    )
-                    RecallModeOption(
-                        title = stringResource(Res.string.recall_mode_on_this_day),
-                        description = stringResource(Res.string.recall_mode_on_this_day_description),
-                        selected = recallMode == RecallMode.ON_THIS_DAY,
-                        onClick = { onSetRecallMode(RecallMode.ON_THIS_DAY) },
-                    )
-                    RecallModeOption(
-                        title = stringResource(Res.string.recall_mode_rediscover),
-                        description = stringResource(Res.string.recall_mode_rediscover_description),
-                        selected = recallMode == RecallMode.REDISCOVER,
-                        onClick = { onSetRecallMode(RecallMode.REDISCOVER) },
+                MaterialContainer {
+                    LinkedToggleSettingsItem(
+                        title = stringResource(Res.string.recommendations),
+                        description =
+                            stringResource(
+                                if (contextualRecommendationsEnabled) {
+                                    Res.string.recommendations_summary_on
+                                } else {
+                                    Res.string.recommendations_summary_off
+                                },
+                            ),
+                        checked = contextualRecommendationsEnabled,
+                        onCheckedChange = onToggleContextualRecommendations,
+                        onNavigate = onNavigateToRecommendations,
                     )
                 }
             }
         }
 
+        // Widget section
         item {
-            SettingsSection(
-                title = stringResource(Res.string.widget_content_types),
-                modifier = Modifier.padding(horizontal = Spacing.lg),
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                Column {
-                    ContentTypeCheckbox(
+                Text(
+                    text = stringResource(Res.string.widget_settings),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(vertical = Spacing.sm),
+                )
+
+                // Recall mode
+                Text(
+                    text = stringResource(Res.string.recall_mode),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                MaterialContainer {
+                    SimpleSettingsItem(
+                        title = stringResource(Res.string.recall_mode_on_this_day),
+                        description = stringResource(Res.string.recall_mode_on_this_day_description),
+                        onClick = { onSetRecallMode(RecallMode.ON_THIS_DAY) },
+                    ) {
+                        RadioButton(
+                            selected = recallMode == RecallMode.ON_THIS_DAY,
+                            onClick = { onSetRecallMode(RecallMode.ON_THIS_DAY) },
+                        )
+                    }
+
+                    SimpleSettingsItem(
+                        title = stringResource(Res.string.recall_mode_rediscover),
+                        description = stringResource(Res.string.recall_mode_rediscover_description),
+                        onClick = { onSetRecallMode(RecallMode.REDISCOVER) },
+                    ) {
+                        RadioButton(
+                            selected = recallMode == RecallMode.REDISCOVER,
+                            onClick = { onSetRecallMode(RecallMode.REDISCOVER) },
+                        )
+                    }
+                }
+
+                // Content types
+                Text(
+                    text = stringResource(Res.string.widget_content_types),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = Spacing.sm),
+                )
+
+                MaterialContainer {
+                    ToggleSettingsItem(
                         title = stringResource(Res.string.widget_content_type_text),
+                        description = stringResource(Res.string.widget_content_type_text_description),
                         checked = WidgetContentType.TEXT in widgetContentTypes,
                         onCheckedChange = { onToggleContentType(WidgetContentType.TEXT, it) },
                     )
-                    ContentTypeCheckbox(
+                    ToggleSettingsItem(
                         title = stringResource(Res.string.widget_content_type_photos),
+                        description = stringResource(Res.string.widget_content_type_photos_description),
                         checked = WidgetContentType.PHOTOS in widgetContentTypes,
                         onCheckedChange = { onToggleContentType(WidgetContentType.PHOTOS, it) },
                     )
-                    ContentTypeCheckbox(
+                    ToggleSettingsItem(
                         title = stringResource(Res.string.widget_content_type_audio),
+                        description = stringResource(Res.string.widget_content_type_audio_description),
                         checked = WidgetContentType.AUDIO in widgetContentTypes,
                         onCheckedChange = { onToggleContentType(WidgetContentType.AUDIO, it) },
                     )
@@ -159,54 +198,12 @@ fun MemoriesSettingsContent(
 
         // Privacy note
         item {
-            Surface(
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            ) {
-                Text(
-                    text = stringResource(Res.string.recommendations_privacy_note),
-                    modifier = Modifier.padding(Spacing.lg),
-                )
-            }
+            Text(
+                text = stringResource(Res.string.recommendations_privacy_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            )
         }
     }
-}
-
-@Composable
-private fun RecallModeOption(
-    title: String,
-    description: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = { Text(description) },
-        leadingContent = {
-            RadioButton(
-                selected = selected,
-                onClick = null,
-            )
-        },
-        modifier = modifier.clickable(onClick = onClick),
-    )
-}
-
-@Composable
-private fun ContentTypeCheckbox(
-    title: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    ListItem(
-        headlineContent = { Text(title) },
-        leadingContent = {
-            Checkbox(
-                checked = checked,
-                onCheckedChange = null,
-            )
-        },
-        modifier = modifier.clickable { onCheckedChange(!checked) },
-    )
 }

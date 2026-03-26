@@ -4,6 +4,7 @@ import app.logdate.client.datastore.KeyValueStorage
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 
 /**
  * Default implementation of [MemoriesSettingsRepository] using [KeyValueStorage].
@@ -32,12 +33,14 @@ class DefaultMemoriesSettingsRepository(
         combine(
             keyValueStorage.observeBoolean(KEY_CONTEXTUAL_RECOMMENDATIONS_ENABLED, true),
             keyValueStorage.observeBoolean(KEY_AI_RECALL_ENABLED, false),
-        ) { contextualEnabled, aiEnabled ->
+            keyValueStorage.observeString(KEY_RECALL_MODE).map { parseRecallMode(it) },
+            keyValueStorage.observeString(KEY_WIDGET_CONTENT_TYPES).map { parseContentTypes(it) },
+        ) { contextualEnabled, aiEnabled, recallMode, contentTypes ->
             MemoriesSettings(
                 contextualRecommendationsEnabled = contextualEnabled,
                 aiRecallEnabled = aiEnabled,
-                recallMode = loadRecallMode(),
-                widgetContentTypes = loadWidgetContentTypes(),
+                recallMode = recallMode,
+                widgetContentTypes = contentTypes,
             )
         }
 
@@ -50,36 +53,42 @@ class DefaultMemoriesSettingsRepository(
     }
 
     override suspend fun setContextualRecommendationsEnabled(enabled: Boolean) {
-        Napier.i("Setting contextual recommendations enabled: $enabled")
         keyValueStorage.putBoolean(KEY_CONTEXTUAL_RECOMMENDATIONS_ENABLED, enabled)
     }
 
     override suspend fun setAiRecallEnabled(enabled: Boolean) {
-        Napier.i("Setting AI recall enabled: $enabled")
         keyValueStorage.putBoolean(KEY_AI_RECALL_ENABLED, enabled)
     }
 
     override suspend fun setRecallMode(mode: RecallMode) {
-        Napier.i("Setting recall mode: $mode")
         keyValueStorage.putString(KEY_RECALL_MODE, mode.name)
     }
 
     override suspend fun setWidgetContentTypes(types: Set<WidgetContentType>) {
-        Napier.i("Setting widget content types: $types")
         keyValueStorage.putString(KEY_WIDGET_CONTENT_TYPES, types.joinToString(",") { it.name })
     }
 
     private suspend fun loadRecallMode(): RecallMode {
         val stored = keyValueStorage.getString(KEY_RECALL_MODE) ?: return RecallMode.ON_THIS_DAY
-        return runCatching { RecallMode.valueOf(stored) }.getOrDefault(RecallMode.ON_THIS_DAY)
+        return parseRecallMode(stored)
     }
 
     private suspend fun loadWidgetContentTypes(): Set<WidgetContentType> {
         val stored = keyValueStorage.getString(KEY_WIDGET_CONTENT_TYPES) ?: return WidgetContentType.ALL
-        return stored
-            .split(",")
-            .mapNotNull { name -> runCatching { WidgetContentType.valueOf(name.trim()) }.getOrNull() }
-            .toSet()
-            .ifEmpty { WidgetContentType.ALL }
+        return parseContentTypes(stored)
     }
+}
+
+private fun parseRecallMode(stored: String?): RecallMode {
+    if (stored == null) return RecallMode.ON_THIS_DAY
+    return runCatching { RecallMode.valueOf(stored) }.getOrDefault(RecallMode.ON_THIS_DAY)
+}
+
+private fun parseContentTypes(stored: String?): Set<WidgetContentType> {
+    if (stored == null) return WidgetContentType.ALL
+    return stored
+        .split(",")
+        .mapNotNull { name -> runCatching { WidgetContentType.valueOf(name.trim()) }.getOrNull() }
+        .toSet()
+        .ifEmpty { WidgetContentType.ALL }
 }

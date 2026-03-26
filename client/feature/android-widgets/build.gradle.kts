@@ -58,6 +58,14 @@ kotlin {
             implementation(libs.androidx.glance.appwidget)
             implementation(libs.androidx.glance.material3)
 
+            // Compose (for config Activity — regular Compose, not Glance)
+            implementation(projects.client.theme)
+            implementation(libs.compose.ui)
+            implementation(libs.compose.material3)
+            implementation(libs.compose.foundation)
+            implementation(libs.compose.material.icons.extended)
+            implementation(libs.androidx.activity.compose)
+
             // WorkManager
             implementation(libs.androidx.work.runtime)
 

@@ -9,22 +9,29 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
+import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.action.actionStartActivity
-import androidx.glance.appwidget.components.Scaffold
-import androidx.glance.appwidget.components.TitleBar
+import androidx.glance.appwidget.components.FilledButton
+import androidx.glance.appwidget.cornerRadius
+import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
+import androidx.glance.layout.ColumnScope
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
+import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
+import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 
 @Composable
@@ -53,104 +60,143 @@ private fun createWidgetLaunchIntent(dateIso: String? = null): Intent =
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
     }
 
+/**
+ * Shared widget shell with rounded background and adaptive padding.
+ */
+@Composable
+private fun WidgetContainer(
+    modifier: GlanceModifier = GlanceModifier,
+    onClick: Intent? = null,
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val size = LocalSize.current
+    val isCompact = size.height < 120.dp
+    val verticalPadding = if (isCompact) 12.dp else 16.dp
+    val horizontalPadding = if (isCompact) 16.dp else 20.dp
+
+    val baseModifier =
+        modifier
+            .fillMaxSize()
+            .cornerRadius(24.dp)
+            .background(GlanceTheme.colors.widgetBackground)
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding)
+
+    val finalModifier =
+        if (onClick != null) {
+            baseModifier.clickable(actionStartActivity(onClick))
+        } else {
+            baseModifier
+        }
+
+    Column(
+        modifier = finalModifier,
+        horizontalAlignment = horizontalAlignment,
+    ) {
+        content()
+    }
+}
+
+// region Memory state — left-aligned editorial layout
+
 @Composable
 private fun MemoryContent(state: OnThisDayWidgetState.HasMemory) {
     val context = LocalContext.current
     val launchIntent = createWidgetLaunchIntent(dateIso = state.dateIso)
+    val size = LocalSize.current
+    val isCompact = size.height < 120.dp
 
-    Scaffold(
-        titleBar = {
-            TitleBar(
-                startIcon = ImageProvider(R.drawable.ic_widget_on_this_day),
-                title = context.getString(R.string.widget_header),
-            )
-        },
-        modifier =
-            GlanceModifier
-                .fillMaxSize()
-                .clickable(actionStartActivity(launchIntent)),
-    ) {
-        Column(
-            modifier =
-                GlanceModifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
+    WidgetContainer(onClick = launchIntent) {
+        // Header
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = GlanceModifier.fillMaxWidth(),
         ) {
+            Image(
+                provider = ImageProvider(R.drawable.ic_widget_on_this_day),
+                contentDescription = null,
+                modifier = GlanceModifier.size(16.dp),
+            )
+            Spacer(modifier = GlanceModifier.width(6.dp))
             Text(
-                text = state.dateFormatted,
+                text = context.getString(R.string.widget_header),
                 style =
                     TextStyle(
                         color = GlanceTheme.colors.onSurfaceVariant,
                         fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
                     ),
             )
-
-            Spacer(modifier = GlanceModifier.height(8.dp))
-
+            Spacer(modifier = GlanceModifier.defaultWeight())
             Text(
-                text = state.summary,
+                text = state.dateFormatted,
                 style =
                     TextStyle(
-                        color = GlanceTheme.colors.onSurface,
-                        fontSize = 14.sp,
+                        color = GlanceTheme.colors.primary,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                     ),
-                maxLines = 3,
             )
+        }
 
-            Spacer(modifier = GlanceModifier.defaultWeight())
+        Spacer(modifier = GlanceModifier.height(if (isCompact) 8.dp else 12.dp))
 
-            Row(
-                modifier = GlanceModifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.End,
-            ) {
-                Text(
-                    text = context.getString(R.string.widget_view_memory),
-                    style =
-                        TextStyle(
-                            color = GlanceTheme.colors.primary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                        ),
-                    modifier =
-                        GlanceModifier
-                            .padding(vertical = 8.dp)
-                            .clickable(actionStartActivity(launchIntent)),
-                )
-            }
+        // Summary
+        Text(
+            text = state.summary,
+            style =
+                TextStyle(
+                    color = GlanceTheme.colors.onSurface,
+                    fontSize = if (isCompact) 14.sp else 16.sp,
+                ),
+            maxLines = if (isCompact) 2 else 4,
+        )
+
+        Spacer(modifier = GlanceModifier.defaultWeight())
+
+        // Action
+        Row(
+            modifier = GlanceModifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.End,
+        ) {
+            FilledButton(
+                text = context.getString(R.string.widget_view_memory),
+                onClick = actionStartActivity(launchIntent),
+            )
         }
     }
 }
+
+// endregion
+
+// region Empty states — centered layout with icon anchor
 
 @Composable
 private fun LoadingContent() {
     val context = LocalContext.current
 
-    Scaffold(
-        titleBar = {
-            TitleBar(
-                startIcon = ImageProvider(R.drawable.ic_widget_on_this_day),
-                title = context.getString(R.string.widget_header),
-            )
-        },
-        modifier = GlanceModifier.fillMaxSize(),
-    ) {
-        Column(
-            modifier =
-                GlanceModifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = context.getString(R.string.widget_loading_message),
-                style =
-                    TextStyle(
-                        color = GlanceTheme.colors.onSurfaceVariant,
-                        fontSize = 14.sp,
-                    ),
-            )
-        }
+    WidgetContainer(horizontalAlignment = Alignment.CenterHorizontally) {
+        Spacer(modifier = GlanceModifier.defaultWeight())
+
+        Image(
+            provider = ImageProvider(R.drawable.ic_widget_on_this_day),
+            contentDescription = null,
+            modifier = GlanceModifier.size(32.dp),
+        )
+
+        Spacer(modifier = GlanceModifier.height(8.dp))
+
+        Text(
+            text = context.getString(R.string.widget_loading_message),
+            style =
+                TextStyle(
+                    color = GlanceTheme.colors.onSurfaceVariant,
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center,
+                ),
+        )
+
+        Spacer(modifier = GlanceModifier.defaultWeight())
     }
 }
 
@@ -159,49 +205,27 @@ private fun NewUserContent() {
     val context = LocalContext.current
     val launchIntent = createWidgetLaunchIntent()
 
-    Scaffold(
-        titleBar = {
-            TitleBar(
-                startIcon = ImageProvider(R.drawable.ic_widget_on_this_day),
-                title = context.getString(R.string.widget_header),
-            )
-        },
-        modifier =
-            GlanceModifier
-                .fillMaxSize()
-                .clickable(actionStartActivity(launchIntent)),
+    WidgetContainer(
+        onClick = launchIntent,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Column(
-            modifier =
-                GlanceModifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = context.getString(R.string.widget_new_user_message),
-                style =
-                    TextStyle(
-                        color = GlanceTheme.colors.onSurfaceVariant,
-                        fontSize = 14.sp,
-                    ),
-            )
+        Spacer(modifier = GlanceModifier.defaultWeight())
 
-            Spacer(modifier = GlanceModifier.height(12.dp))
+        Image(
+            provider = ImageProvider(R.drawable.ic_widget_on_this_day),
+            contentDescription = null,
+            modifier = GlanceModifier.size(32.dp),
+        )
 
-            Text(
-                text = context.getString(R.string.widget_open_app),
-                style =
-                    TextStyle(
-                        color = GlanceTheme.colors.primary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                    ),
-                modifier =
-                    GlanceModifier
-                        .clickable(actionStartActivity(launchIntent)),
-            )
-        }
+        Spacer(modifier = GlanceModifier.height(8.dp))
+
+        EmptyStateBody(
+            message = context.getString(R.string.widget_new_user_message),
+            ctaText = context.getString(R.string.widget_new_user_cta),
+            ctaIntent = launchIntent,
+        )
+
+        Spacer(modifier = GlanceModifier.defaultWeight())
     }
 }
 
@@ -210,48 +234,57 @@ private fun NoMemoryTodayContent() {
     val context = LocalContext.current
     val launchIntent = createWidgetLaunchIntent()
 
-    Scaffold(
-        titleBar = {
-            TitleBar(
-                startIcon = ImageProvider(R.drawable.ic_widget_on_this_day),
-                title = context.getString(R.string.widget_header),
-            )
-        },
-        modifier =
-            GlanceModifier
-                .fillMaxSize()
-                .clickable(actionStartActivity(launchIntent)),
+    WidgetContainer(
+        onClick = launchIntent,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Column(
-            modifier =
-                GlanceModifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = context.getString(R.string.widget_empty_message),
-                style =
-                    TextStyle(
-                        color = GlanceTheme.colors.onSurfaceVariant,
-                        fontSize = 14.sp,
-                    ),
-            )
+        Spacer(modifier = GlanceModifier.defaultWeight())
 
-            Spacer(modifier = GlanceModifier.height(12.dp))
+        Image(
+            provider = ImageProvider(R.drawable.ic_widget_on_this_day),
+            contentDescription = null,
+            modifier = GlanceModifier.size(32.dp),
+        )
 
-            Text(
-                text = context.getString(R.string.widget_open_app),
-                style =
-                    TextStyle(
-                        color = GlanceTheme.colors.primary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                    ),
-                modifier =
-                    GlanceModifier
-                        .clickable(actionStartActivity(launchIntent)),
-            )
-        }
+        Spacer(modifier = GlanceModifier.height(8.dp))
+
+        EmptyStateBody(
+            message = context.getString(R.string.widget_empty_message),
+            ctaText = context.getString(R.string.widget_empty_cta),
+            ctaIntent = launchIntent,
+        )
+
+        Spacer(modifier = GlanceModifier.defaultWeight())
     }
 }
+
+@Composable
+private fun EmptyStateBody(
+    message: String,
+    ctaText: String,
+    ctaIntent: Intent,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = GlanceModifier.width(260.dp),
+    ) {
+        Text(
+            text = message,
+            style =
+                TextStyle(
+                    color = GlanceTheme.colors.onSurface,
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center,
+                ),
+        )
+
+        Spacer(modifier = GlanceModifier.height(12.dp))
+
+        FilledButton(
+            text = ctaText,
+            onClick = actionStartActivity(ctaIntent),
+        )
+    }
+}
+
+// endregion
