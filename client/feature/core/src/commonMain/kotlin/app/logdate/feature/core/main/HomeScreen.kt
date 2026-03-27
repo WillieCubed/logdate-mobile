@@ -46,6 +46,7 @@ import app.logdate.feature.rewind.ui.RewindOverviewScreen
 import app.logdate.shared.model.Person
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.location.PlaceUiState
+import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.profiles.toUiState
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.HomeTimelineUiState
@@ -463,7 +464,7 @@ class HomeViewModel(
         val noteUiStates = overrideNotes.toUiState()
         val placeUiStates = placesVisited.map { place -> place.toUiState() }
         val peopleUiStates = people.map(Person::toUiState)
-        val momentUiStates = moments.toMomentUiStates()
+        val momentUiStates = moments.toMomentUiStates(peopleUiStates)
 
         return createSemanticTimelineDayUiState(
             summary = tldr,
@@ -477,16 +478,21 @@ class HomeViewModel(
         )
     }
 
-    private fun List<Moment>.toMomentUiStates(): List<MomentUiState> {
+    private fun List<Moment>.toMomentUiStates(dayPeople: List<PersonUiState>): List<MomentUiState> {
         val heroIndex =
             indices.maxByOrNull { i ->
                 val m = this[i]
                 m.media.size * 3 + m.textFragments.size * 2 + m.audio.size
             } ?: 0
-        return mapIndexed { index, moment -> moment.toMomentUiState(isHero = index == heroIndex) }
+        return mapIndexed { index, moment ->
+            moment.toMomentUiState(isHero = index == heroIndex, dayPeople = dayPeople)
+        }
     }
 
-    private fun Moment.toMomentUiState(isHero: Boolean): MomentUiState {
+    private fun Moment.toMomentUiState(
+        isHero: Boolean,
+        dayPeople: List<PersonUiState>,
+    ): MomentUiState {
         val timezone = TimeZone.currentSystemDefault()
         val startLocal = estimatedStart.toLocalDateTime(timezone)
         val timeOfDay =
@@ -495,15 +501,22 @@ class HomeViewModel(
                 in 12..17 -> "afternoon"
                 else -> "evening"
             }
+        val resolvedPeople =
+            people.mapNotNull { name ->
+                dayPeople.find { it.name.equals(name, ignoreCase = true) }
+            }
         return MomentUiState(
             id = id.toString(),
             label = label,
             timeOfDay = timeOfDay,
-            textSnippet = textFragments.firstOrNull()?.text?.take(140),
+            textSnippet = textFragments.firstOrNull()?.text,
             media = media.map { MomentMediaUiState(uri = it.uri, isVideo = it.isVideo) },
-            audio = audio.firstOrNull()?.let { MomentAudioUiState(uri = it.uri, durationMs = it.durationMs) },
+            audio =
+                audio.firstOrNull()?.let {
+                    MomentAudioUiState(uri = it.uri, durationMs = it.durationMs, noteId = it.sourceNoteId)
+                },
             places = places.map { PlaceUiState(id = it.id, title = it.name, latitude = it.latitude, longitude = it.longitude) },
-            people = people,
+            people = resolvedPeople,
             isHero = isHero,
         )
     }

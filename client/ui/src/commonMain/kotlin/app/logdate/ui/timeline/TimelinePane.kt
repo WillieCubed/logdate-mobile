@@ -44,6 +44,7 @@ import logdate.client.ui.generated.resources.*
 import logdate.client.ui.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 data class TimelineUiState(
     val items: List<TimelineDayUiState> = emptyList(),
@@ -59,6 +60,7 @@ fun TimelinePane(
     uiState: TimelineUiState,
     onNewEntry: () -> Unit,
     onOpenDay: (LocalDate) -> Unit,
+    onVisibleAudioNoteIdsChanged: (Set<Uuid>) -> Unit = {},
     onLoadMoreOlder: () -> Unit = {},
     timelineSuggestion: TimelineSuggestionBlock? = null,
     listState: LazyListState = rememberLazyListState(),
@@ -105,22 +107,23 @@ fun TimelinePane(
                     .padding(paddingValues),
         ) {
             TimelineList(
-                items = uiState.items,
-                loadingState = uiState.loadingState,
-                isLoadingMore = uiState.isLoadingMore,
-                hasMoreOlderContent = uiState.hasMoreOlderContent,
-                appendError = uiState.appendError,
-                onOpenDay = onOpenDay,
-                onLoadMoreOlder = onLoadMoreOlder,
-                timelineSuggestion = timelineSuggestion,
-                onStartWriting = onStartWriting,
-                onOpenDraft = onOpenDraft,
-                onViewMemoryDay = onOpenDay,
-                onShareMemory = onShareMemory,
-                onImportBackup = onImportBackup,
-                modifier = Modifier.consumeWindowInsets(paddingValues),
-                endOfTimelineState = endOfTimelineState,
-                listState = listState,
+                uiState.items,
+                endOfTimelineState,
+                onOpenDay,
+                Modifier.consumeWindowInsets(paddingValues),
+                uiState.loadingState,
+                uiState.isLoadingMore,
+                uiState.hasMoreOlderContent,
+                uiState.appendError,
+                onLoadMoreOlder,
+                timelineSuggestion,
+                onStartWriting,
+                onOpenDraft,
+                onOpenDay,
+                onShareMemory,
+                onVisibleAudioNoteIdsChanged,
+                onImportBackup,
+                listState,
             )
 
             ScrollToTopButton(
@@ -178,6 +181,7 @@ private fun TimelinePanePreview() {
         uiState = TimelineUiState(),
         onOpenDay = {},
         onNewEntry = {},
+        onVisibleAudioNoteIdsChanged = {},
         timelineSuggestion =
             TimelineSuggestionBlock.EmptyDay(
                 message = "What's going on?",

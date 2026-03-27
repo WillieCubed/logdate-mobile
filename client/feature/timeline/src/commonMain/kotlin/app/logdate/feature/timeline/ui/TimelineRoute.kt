@@ -57,6 +57,7 @@ fun TimelineRoute(
             onNewEntry = onNewEntry,
             onDismissSnackbar = { viewModel.dismissSnackbar() },
             onSetSelectedDay = { date -> viewModel.setSelectedDay(date) },
+            onVisibleAudioNoteIdsChanged = viewModel::updateVisibleAudioNoteIds,
             birthday = viewModel.birthday.collectAsState().value,
             modifier = modifier,
         )
@@ -69,6 +70,7 @@ internal fun TimelineScreen(
     onNewEntry: () -> Unit,
     onDismissSnackbar: () -> Unit,
     onSetSelectedDay: (LocalDate) -> Unit,
+    onVisibleAudioNoteIdsChanged: (Set<Uuid>) -> Unit,
     birthday: Instant?,
     modifier: Modifier = Modifier,
 ) {
@@ -94,6 +96,7 @@ internal fun TimelineScreen(
             onNewEntry = onNewEntry,
             onShareMemory = { /* Handle share memory */ },
             onOpenDay = { date -> onSetSelectedDay(date) },
+            onVisibleAudioNoteIdsChanged = onVisibleAudioNoteIdsChanged,
             birthday = birthday,
             modifier = modifier.padding(paddingValues),
         )
@@ -108,6 +111,7 @@ private fun TimelineScreenPreview() {
         onNewEntry = {},
         onDismissSnackbar = {},
         onSetSelectedDay = {},
+        onVisibleAudioNoteIdsChanged = {},
         birthday = null,
     )
 }

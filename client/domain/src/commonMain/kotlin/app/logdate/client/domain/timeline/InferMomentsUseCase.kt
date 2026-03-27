@@ -93,11 +93,9 @@ internal fun inferMomentsHeuristically(
         .sortedWith(compareBy({ it.key.bucket.ordinal }, { it.key.placeId }))
         .map { (key, notes) ->
             val place = key.placeId?.let { id -> places.find { it.id == id } }
-            val label =
-                when {
-                    place != null -> "At ${place.name}"
-                    else -> key.bucket.label
-                }
+            // Only place-based labels are shown. Bare time-of-day labels
+            // are always suppressed — they don't add semantic value.
+            val label = if (place != null) "At ${place.name}" else ""
 
             buildMomentFromNotes(
                 label = label,

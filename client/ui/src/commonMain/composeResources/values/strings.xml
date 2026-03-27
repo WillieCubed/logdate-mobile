@@ -32,11 +32,14 @@
     <string name="suggestion_label_memory">Memory</string>
     <string name="suggestion_near_location">Near %1$s</string>
     <string name="suggestion_media_item">Memory photo</string>
+    <string name="preview_transcript">Preview Transcript</string>
+    <string name="hide_transcript">Hide Transcript</string>
     <string name="simple_container_item_1">Simple container item 1</string>
     <string name="simple_container_item_2">Simple container item 2</string>
     <string name="text_10_places">10 places</string>
     <string name="text_2_people">2 people</string>
     <string name="timeline">Timeline</string>
+    <string name="voice_note">Voice Note</string>
     <string name="youve_reached_the_end">You&apos;ve reached the end</string>
     <string name="journey_days_count">You&apos;ve been on this journey for %1$d days.</string>
     <string name="post_restore_welcome_back">Welcome back</string>

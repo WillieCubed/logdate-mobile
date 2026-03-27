@@ -13,10 +13,14 @@ import app.logdate.client.domain.timeline.StreamingTimelineRequest
 import app.logdate.client.domain.timeline.TimelineDay
 import app.logdate.client.domain.timeline.TimelinePlaceVisit
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.transcription.TranscriptionData
+import app.logdate.client.repository.transcription.TranscriptionRepository
+import app.logdate.client.repository.transcription.TranscriptionStatus
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.Person
 import app.logdate.ui.audio.TranscriptionState
 import app.logdate.ui.location.PlaceUiState
+import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.profiles.toUiState
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.HomeTimelineUiState
@@ -32,12 +36,16 @@ import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.VideoNoteUiState
 import app.logdate.ui.timeline.createSemanticTimelineDayUiState
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
@@ -48,45 +56,43 @@ import kotlin.uuid.Uuid
 /**
  * A view model for the timeline overview screen.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class TimelineViewModel(
     getStreamingTimeline: GetStreamingTimelineUseCase,
     private val getHomeRecommendation: GetHomeRecommendationUseCase,
     private val removeNoteUseCase: RemoveNoteUseCase,
     private val userStateRepository: UserStateRepository,
+    private val transcriptionRepository: TranscriptionRepository,
 ) : ViewModel() {
-    // Transcription state
-    private val _transcriptionState =
-        MutableStateFlow(
-            TranscriptionState(
-                requestTranscription = { noteId ->
-                    // Example implementation
-                    viewModelScope.launch {
-                        Napier.d("Requesting transcription for note: $noteId")
-                        // Here we would call the actual transcription service
-                        // For now, we'll simulate it with delay
-                        kotlinx.coroutines.delay(2000)
-                    }
-                },
-                getTranscriptionText = { noteId ->
-                    // Simulate some example transcriptions
-                    when {
-                        noteId.toString().contains("1") -> "This is a sample transcription."
-                        noteId.toString().contains("5") -> "Another example transcription text."
-                        else -> null
-                    }
-                },
-                isTranscriptionInProgress = { noteId ->
-                    // Simulate in progress for certain IDs
-                    noteId.toString().contains("2")
-                },
-                getTranscriptionError = { noteId ->
-                    // Simulate errors for certain IDs
-                    if (noteId.toString().contains("3")) "Service unavailable" else null
-                },
-            ),
-        )
+    private val visibleAudioNoteIds = MutableStateFlow<Set<Uuid>>(emptySet())
+    private val transcriptionCache = MutableStateFlow<Map<Uuid, TranscriptionData?>>(emptyMap())
+    private val autoRequestedNoteIds = mutableSetOf<Uuid>()
 
-    val transcriptionState: StateFlow<TranscriptionState> = _transcriptionState.asStateFlow()
+    val transcriptionState: StateFlow<TranscriptionState> =
+        transcriptionCache
+            .map { cache ->
+                TranscriptionState(
+                    requestTranscription = ::requestTranscription,
+                    getTranscriptionText = { noteId ->
+                        cache[noteId]
+                            ?.text
+                            ?.trim()
+                            ?.takeIf(String::isNotEmpty)
+                    },
+                    isTranscriptionInProgress = { noteId ->
+                        cache[noteId]?.status in setOf(TranscriptionStatus.PENDING, TranscriptionStatus.IN_PROGRESS)
+                    },
+                    getTranscriptionError = { noteId ->
+                        cache[noteId]
+                            ?.takeIf { it.status == TranscriptionStatus.FAILED }
+                            ?.errorMessage
+                    },
+                )
+            }.stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                TranscriptionState(requestTranscription = ::requestTranscription),
+            )
 
     private val selectedItemUiState =
         MutableStateFlow<TimelineDaySelection>(TimelineDaySelection.NotSelected)
@@ -109,6 +115,17 @@ class TimelineViewModel(
     }
 
     private val snackbarMessageState = MutableStateFlow<String?>(null)
+
+    init {
+        viewModelScope.launch {
+            visibleAudioNoteIds
+                .flatMapLatest(::observeVisibleTranscriptions)
+                .onEach { transcriptions ->
+                    transcriptionCache.value = transcriptions
+                    requestMissingVisibleTranscriptions(transcriptions)
+                }.collect {}
+        }
+    }
 
     // Collect the user data and map to the birthday value
     val birthday =
@@ -188,6 +205,10 @@ class TimelineViewModel(
         snackbarMessageState.value = null
     }
 
+    fun updateVisibleAudioNoteIds(noteIds: Set<Uuid>) {
+        visibleAudioNoteIds.value = noteIds
+    }
+
     private fun TimelinePlaceVisit.toUiState(): PlaceUiState =
         PlaceUiState(
             id = id,
@@ -200,7 +221,7 @@ class TimelineViewModel(
         val noteUiStates = entries.toUiState()
         val placeUiStates = placesVisited.map { place -> place.toUiState() }
         val peopleUiStates = people.map(Person::toUiState)
-        val momentUiStates = moments.toMomentUiStates()
+        val momentUiStates = moments.toMomentUiStates(peopleUiStates)
 
         return createSemanticTimelineDayUiState(
             summary = tldr,
@@ -214,12 +235,17 @@ class TimelineViewModel(
         )
     }
 
-    private fun List<Moment>.toMomentUiStates(): List<MomentUiState> {
+    private fun List<Moment>.toMomentUiStates(dayPeople: List<PersonUiState>): List<MomentUiState> {
         val heroIndex = selectHeroIndex(this)
-        return mapIndexed { index, moment -> moment.toMomentUiState(isHero = index == heroIndex) }
+        return mapIndexed { index, moment ->
+            moment.toMomentUiState(isHero = index == heroIndex, dayPeople = dayPeople)
+        }
     }
 
-    private fun Moment.toMomentUiState(isHero: Boolean): MomentUiState {
+    private fun Moment.toMomentUiState(
+        isHero: Boolean,
+        dayPeople: List<PersonUiState>,
+    ): MomentUiState {
         val timezone = TimeZone.currentSystemDefault()
         val startLocal = estimatedStart.toLocalDateTime(timezone)
         val timeOfDay =
@@ -228,15 +254,22 @@ class TimelineViewModel(
                 in 12..17 -> "afternoon"
                 else -> "evening"
             }
+        val resolvedPeople =
+            people.mapNotNull { name ->
+                dayPeople.find { it.name.equals(name, ignoreCase = true) }
+            }
         return MomentUiState(
             id = id.toString(),
             label = label,
             timeOfDay = timeOfDay,
-            textSnippet = textFragments.firstOrNull()?.text?.take(140),
+            textSnippet = textFragments.firstOrNull()?.text,
             media = media.map { MomentMediaUiState(uri = it.uri, isVideo = it.isVideo) },
-            audio = audio.firstOrNull()?.let { MomentAudioUiState(uri = it.uri, durationMs = it.durationMs) },
+            audio =
+                audio.firstOrNull()?.let {
+                    MomentAudioUiState(uri = it.uri, durationMs = it.durationMs, noteId = it.sourceNoteId)
+                },
             places = places.map { PlaceUiState(id = it.id, title = it.name, latitude = it.latitude, longitude = it.longitude) },
-            people = people,
+            people = resolvedPeople,
             isHero = isHero,
         )
     }
@@ -307,4 +340,47 @@ class TimelineViewModel(
                     )
             }
         }
+
+    private fun observeVisibleTranscriptions(noteIds: Set<Uuid>): Flow<Map<Uuid, TranscriptionData?>> {
+        val sortedIds = noteIds.sorted()
+        if (sortedIds.isEmpty()) {
+            return flowOf(emptyMap())
+        }
+
+        return combine(
+            sortedIds.map { noteId ->
+                transcriptionRepository.observeTranscription(noteId).map { transcription ->
+                    noteId to transcription
+                }
+            },
+        ) { notePairs ->
+            notePairs.toMap()
+        }
+    }
+
+    private fun requestTranscription(noteId: Uuid) {
+        viewModelScope.launch {
+            Napier.d("Requesting transcription for note: $noteId")
+            transcriptionRepository.requestTranscription(noteId)
+        }
+    }
+
+    private fun requestMissingVisibleTranscriptions(transcriptions: Map<Uuid, TranscriptionData?>) {
+        val noteIdsToRequest =
+            autoRequestableNoteIds(
+                visibleNoteIds = visibleAudioNoteIds.value,
+                transcriptions = transcriptions,
+                alreadyRequestedNoteIds = autoRequestedNoteIds,
+            )
+
+        noteIdsToRequest.forEach { noteId ->
+            autoRequestedNoteIds.add(noteId)
+            viewModelScope.launch {
+                val queued = transcriptionRepository.requestTranscription(noteId)
+                if (!queued) {
+                    autoRequestedNoteIds.remove(noteId)
+                }
+            }
+        }
+    }
 }

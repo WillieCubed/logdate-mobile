@@ -130,9 +130,9 @@ data class MomentUiState(
      */
     val places: List<PlaceUiState> = emptyList(),
     /**
-     * People mentioned in this moment.
+     * People mentioned in this moment, with avatar and identity info.
      */
-    val people: List<String> = emptyList(),
+    val people: List<PersonUiState> = emptyList(),
     /**
      * Whether this is the hero (most significant) moment in the day.
      */
@@ -147,6 +147,15 @@ data class MomentMediaUiState(
 data class MomentAudioUiState(
     val uri: String,
     val durationMs: Long = 0,
+    /**
+     * Transcript text if available. When present, this is the primary
+     * content and the audio player becomes secondary.
+     */
+    val transcript: String? = null,
+    /**
+     * The note ID for this audio, used to look up transcription state.
+     */
+    val noteId: Uuid? = null,
 )
 
 // endregion

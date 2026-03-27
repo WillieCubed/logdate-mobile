@@ -59,9 +59,10 @@ class InferMomentsUseCaseTest {
             val moments = useCase(date, listOf(morningNote, afternoonNote, eveningNote), emptyList())
 
             assertEquals(3, moments.size)
-            assertEquals("Morning", moments[0].label)
-            assertEquals("Afternoon", moments[1].label)
-            assertEquals("Evening", moments[2].label)
+            // Bare time-of-day labels are suppressed — only place-based labels are shown
+            assertEquals("", moments[0].label)
+            assertEquals("", moments[1].label)
+            assertEquals("", moments[2].label)
         }
 
     @Test
@@ -74,7 +75,7 @@ class InferMomentsUseCaseTest {
             val moments = useCase(date, listOf(note1, note2), emptyList())
 
             assertEquals(1, moments.size)
-            assertEquals("Morning", moments[0].label)
+            assertEquals("", moments[0].label)
             assertEquals(2, moments[0].sourceNotes.size)
             assertEquals(2, moments[0].textFragments.size)
         }

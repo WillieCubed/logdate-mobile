@@ -45,6 +45,9 @@ import app.logdate.ui.timeline.MomentUiState
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelineMediaItemUiState
 import coil3.compose.AsyncImage
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.voice_note
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun SemanticTimelineDayHeader(
@@ -259,7 +262,7 @@ private fun SupportingMomentContainer(
                     verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                     modifier = Modifier.weight(1f - imageWeight),
                 ) {
-                    TextQuoteContainer(text = moment.textSnippet ?: "", maxLines = 5)
+                    TextQuoteContainer(text = moment.textSnippet.orEmpty(), maxLines = 5)
                     PersonAvatarRow(people = moment.people)
                 }
             }
@@ -410,17 +413,10 @@ private fun AudioMomentCard(
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             modifier = Modifier.padding(Spacing.md),
         ) {
-            audio.transcript?.let { transcript ->
-                Text(
-                    text = transcript,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md),
                 verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Box(
                     modifier =
@@ -437,13 +433,26 @@ private fun AudioMomentCard(
                         modifier = Modifier.size(20.dp),
                     )
                 }
-                AudioWaveBars(accentColor = style.accentColor, modifier = Modifier.weight(1f))
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(
+                        text = stringResource(Res.string.voice_note),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
                 Text(
                     text = audio.durationMs.toDurationLabel(),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            TimelineTranscriptPreview(
+                noteId = audio.noteId,
+                fallbackTranscript = audio.transcript,
+            )
+            AudioWaveBars(accentColor = style.accentColor, modifier = Modifier.fillMaxWidth())
         }
     }
 }
