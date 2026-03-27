@@ -80,6 +80,9 @@ class TimelineSettingsViewModel(
         viewModelScope.launch {
             observeHealthConnectStatus().collect { status ->
                 healthStatus.value = status
+                if (status == HealthConnectStatus.NOT_AVAILABLE) {
+                    settingsRepository.setSleepBasedBoundariesEnabled(false)
+                }
             }
         }
     }

@@ -65,6 +65,7 @@ import kotlin.time.Clock
 fun DayBoundarySettingsScreen(
     onBack: () -> Unit,
     onRequestHealthPermissions: () -> Unit = {},
+    onEnableSleepBasedWithPermissions: () -> Unit = onRequestHealthPermissions,
     modifier: Modifier = Modifier,
     viewModel: TimelineSettingsViewModel = koinViewModel(),
 ) {
@@ -76,9 +77,12 @@ fun DayBoundarySettingsScreen(
         healthConnectStatus = uiState.healthConnectStatus,
         onBack = onBack,
         onToggleSleepBased = { enabled ->
-            viewModel.toggleSleepBasedBoundaries(enabled)
-            if (enabled && uiState.healthConnectStatus == HealthConnectStatus.PERMISSIONS_NEEDED) {
-                onRequestHealthPermissions()
+            when {
+                !enabled -> viewModel.toggleSleepBasedBoundaries(false)
+                uiState.healthConnectStatus == HealthConnectStatus.CONNECTED -> viewModel.toggleSleepBasedBoundaries(true)
+                uiState.healthConnectStatus == HealthConnectStatus.PERMISSIONS_NEEDED -> onEnableSleepBasedWithPermissions()
+                uiState.healthConnectStatus == HealthConnectStatus.NOT_AVAILABLE -> Unit
+                uiState.healthConnectStatus == HealthConnectStatus.CHECKING -> Unit
             }
         },
         onSetFallbackHour = viewModel::setFallbackStartHour,
@@ -122,6 +126,7 @@ fun DayBoundarySettingsContent(
                 label = stringResource(Res.string.use_sleep_schedule),
                 checked = sleepBasedEnabled,
                 onCheckedChange = onToggleSleepBased,
+                enabled = healthConnectStatus != HealthConnectStatus.NOT_AVAILABLE,
                 modifier = Modifier.padding(horizontal = Spacing.lg),
             )
         }
@@ -132,8 +137,8 @@ fun DayBoundarySettingsContent(
                 modifier = Modifier.padding(horizontal = Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                // Health Connect status (only when toggle is on)
-                if (sleepBasedEnabled) {
+                // Health Connect status
+                if (sleepBasedEnabled || healthConnectStatus == HealthConnectStatus.NOT_AVAILABLE) {
                     MaterialContainer {
                         HealthConnectStatusRow(
                             status = healthConnectStatus,

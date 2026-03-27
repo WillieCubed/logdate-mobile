@@ -8,5 +8,5 @@ package app.logdate.client.domain.dayboundary
  * or when no sleep data is available, falls back to user preference or a 4 AM default.
  */
 data class DayBoundarySettings(
-    val sleepBasedBoundariesEnabled: Boolean = true,
+    val sleepBasedBoundariesEnabled: Boolean = false,
 )

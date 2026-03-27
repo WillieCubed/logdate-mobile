@@ -3,21 +3,18 @@
 package app.logdate.navigation.routes
 
 import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.health.connect.client.PermissionController
-import androidx.health.connect.client.permission.HealthPermission
-import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
+import app.logdate.client.permissions.rememberHealthConnectPermissionState
 import app.logdate.feature.core.profile.ui.ProfileScreen
 import app.logdate.feature.core.settings.ui.AccountSettingsScreen
 import app.logdate.feature.core.settings.ui.AdvancedSettingsScreen
@@ -38,6 +35,7 @@ import app.logdate.feature.core.settings.ui.ResetSettingsScreen
 import app.logdate.feature.core.settings.ui.SettingsOverviewScreen
 import app.logdate.feature.core.settings.ui.SyncSettingsScreen
 import app.logdate.feature.core.settings.ui.TimelineSettingsScreen
+import app.logdate.feature.core.settings.ui.TimelineSettingsViewModel
 import app.logdate.feature.core.settings.ui.devices.DevicesScreen
 import app.logdate.feature.core.settings.ui.watch.WatchNotificationSettingsScreen
 import app.logdate.feature.core.settings.ui.watch.WatchSettingsScreen
@@ -530,10 +528,46 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     routeEntry<DayBoundarySettingsRoute>(
         metadata = ListDetailSceneStrategy.detailPane(),
     ) { _ ->
-        val permissionLauncher = rememberHealthConnectPermissionLauncher()
+        val viewModel: TimelineSettingsViewModel = koinViewModel()
+        val uiState by viewModel.uiState.collectAsState()
+        val healthConnectPermissionState = rememberHealthConnectPermissionState()
+        var enableAfterPermission by rememberSaveable { mutableStateOf(false) }
+
+        LaunchedEffect(healthConnectPermissionState.completedRequestCount) {
+            if (healthConnectPermissionState.completedRequestCount > 0) {
+                viewModel.refreshHealthStatus()
+            }
+        }
+
+        LaunchedEffect(enableAfterPermission, healthConnectPermissionState.completedRequestCount, uiState.healthConnectStatus) {
+            if (!enableAfterPermission || healthConnectPermissionState.completedRequestCount == 0) {
+                return@LaunchedEffect
+            }
+
+            when (uiState.healthConnectStatus) {
+                app.logdate.client.domain.dayboundary.HealthConnectStatus.CONNECTED -> {
+                    viewModel.toggleSleepBasedBoundaries(true)
+                    enableAfterPermission = false
+                }
+
+                app.logdate.client.domain.dayboundary.HealthConnectStatus.PERMISSIONS_NEEDED,
+                app.logdate.client.domain.dayboundary.HealthConnectStatus.NOT_AVAILABLE,
+                -> {
+                    enableAfterPermission = false
+                }
+
+                app.logdate.client.domain.dayboundary.HealthConnectStatus.CHECKING -> Unit
+            }
+        }
+
         DayBoundarySettingsScreen(
             onBack = onBack,
-            onRequestHealthPermissions = { permissionLauncher() },
+            viewModel = viewModel,
+            onRequestHealthPermissions = healthConnectPermissionState.requestPermission,
+            onEnableSleepBasedWithPermissions = {
+                enableAfterPermission = true
+                healthConnectPermissionState.requestPermission()
+            },
         )
     }
 
@@ -589,25 +623,5 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onBack = onBack,
             viewModel = viewModel,
         )
-    }
-}
-
-/**
- * Creates a launcher for Health Connect sleep permission requests.
- * Returns a function that, when called, launches the system permission flow.
- */
-@Composable
-private fun rememberHealthConnectPermissionLauncher(): () -> Unit {
-    val sleepPermissions =
-        remember {
-            setOf(HealthPermission.getReadPermission(SleepSessionRecord::class))
-        }
-    val launcher =
-        rememberLauncherForActivityResult(
-            contract = PermissionController.createRequestPermissionResultContract(),
-        ) { /* Result handled by ViewModel.refreshHealthStatus() on resume */ }
-
-    return remember(launcher) {
-        { launcher.launch(sleepPermissions) }
     }
 }

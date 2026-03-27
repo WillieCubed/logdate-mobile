@@ -1,5 +1,7 @@
 package app.logdate.feature.core.main
 
+import app.logdate.client.domain.dayboundary.DayBoundarySettings
+import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
 import app.logdate.client.domain.notes.HasNotesForTodayUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.places.PlaceResolutionCache
@@ -8,9 +10,17 @@ import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
 import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
+import app.logdate.client.domain.recommendation.RecallMode
+import app.logdate.client.domain.recommendation.WidgetContentType
+import app.logdate.client.domain.timeline.GetDayBoundsUseCase
 import app.logdate.client.domain.timeline.GetTimelinePageUseCase
+import app.logdate.client.domain.timeline.GroupNotesByDayBoundsUseCase
 import app.logdate.client.domain.timeline.Timeline
 import app.logdate.client.domain.timeline.TimelinePageRequest
+import app.logdate.client.health.LocalFirstHealthRepository
+import app.logdate.client.health.model.DayBounds
+import app.logdate.client.health.model.SleepSession
+import app.logdate.client.health.model.TimeOfDay
 import app.logdate.client.location.places.StubExternalPlacesProvider
 import app.logdate.client.location.places.StubLocationProvider
 import app.logdate.client.location.places.StubReverseGeocodingProvider
@@ -34,6 +44,11 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.plus
+import kotlinx.datetime.toInstant
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -122,7 +137,19 @@ class HomeViewModelTest {
         }
 
     private suspend fun createViewModel(notesRepository: ReactiveJournalNotesRepository): HomeViewModel {
-        val pageUseCase = GetTimelinePageUseCase(notesRepository)
+        val dayBoundarySettingsRepository = FakeDayBoundarySettingsRepository()
+        val pageUseCase =
+            GetTimelinePageUseCase(
+                notesRepository,
+                GroupNotesByDayBoundsUseCase(
+                    getDayBoundsUseCase =
+                        GetDayBoundsUseCase(
+                            healthRepository = FakeHealthRepository(),
+                            dayBoundarySettingsRepository = dayBoundarySettingsRepository,
+                        ),
+                    dayBoundarySettingsRepository = dayBoundarySettingsRepository,
+                ),
+            )
         val recentTimelineFlow =
             MutableStateFlow(
                 Timeline(
@@ -305,6 +332,57 @@ class HomeViewModelTest {
 
         override suspend fun setAiRecallEnabled(enabled: Boolean) {
             settings.value = settings.value.copy(aiRecallEnabled = enabled)
+        }
+
+        override suspend fun setRecallMode(mode: RecallMode) {
+            settings.value = settings.value.copy(recallMode = mode)
+        }
+
+        override suspend fun setWidgetContentTypes(types: Set<WidgetContentType>) {
+            settings.value = settings.value.copy(widgetContentTypes = types)
+        }
+    }
+
+    private class FakeDayBoundarySettingsRepository : DayBoundarySettingsRepository {
+        override suspend fun getSettings(): DayBoundarySettings = DayBoundarySettings()
+
+        override fun observeSettings(): Flow<DayBoundarySettings> = flowOf(DayBoundarySettings())
+
+        override suspend fun setSleepBasedBoundariesEnabled(enabled: Boolean) {}
+    }
+
+    private class FakeHealthRepository : LocalFirstHealthRepository {
+        override suspend fun hasSleepPermissions(): Boolean = true
+
+        override suspend fun requestSleepPermissions(): Boolean = true
+
+        override suspend fun getSleepSessions(
+            start: Instant,
+            end: Instant,
+        ): List<SleepSession> = emptyList()
+
+        override suspend fun getAverageWakeUpTime(
+            timeZone: TimeZone,
+            days: Int,
+        ): TimeOfDay? = null
+
+        override suspend fun getAverageSleepTime(
+            timeZone: TimeZone,
+            days: Int,
+        ): TimeOfDay? = null
+
+        override suspend fun isHealthDataAvailable(): Boolean = true
+
+        override suspend fun getAvailableDataTypes(): List<String> = emptyList()
+
+        override suspend fun getDayBoundsForDate(
+            date: LocalDate,
+            timeZone: TimeZone,
+            sleepBasedBoundariesEnabled: Boolean,
+        ): DayBounds {
+            val start = LocalDateTime(date, LocalTime(4, 0)).toInstant(timeZone)
+            val end = LocalDateTime(date.plus(1, kotlinx.datetime.DateTimeUnit.DAY), LocalTime(4, 0)).toInstant(timeZone)
+            return DayBounds(start = start, end = end)
         }
     }
 }
