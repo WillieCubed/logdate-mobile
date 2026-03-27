@@ -77,6 +77,7 @@ kotlin {
             implementation(projects.client.location)
             implementation(projects.client.sensor)
             implementation(projects.client.media)
+            implementation(projects.client.permissions)
             implementation(projects.client.sharing)
             implementation(projects.client.sync)
             implementation(projects.client.healthConnect)

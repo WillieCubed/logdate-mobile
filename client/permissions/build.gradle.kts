@@ -62,6 +62,7 @@ kotlin {
             implementation(libs.androidx.credentials)
             implementation(libs.androidx.credentials.play.services)
             implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.health.connect)
             implementation(libs.koin.android)
         }
     }

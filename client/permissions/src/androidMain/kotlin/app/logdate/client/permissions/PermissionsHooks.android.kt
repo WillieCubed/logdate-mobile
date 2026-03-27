@@ -12,6 +12,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.health.connect.client.PermissionController
+import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.SleepSessionRecord
 
 @Composable
 actual fun rememberNotificationPermissionState(): NotificationPermissionState {
@@ -54,6 +57,28 @@ actual fun rememberNotificationPermissionState(): NotificationPermissionState {
         permissionRequested = permissionRequested,
         requestPermission = {
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        },
+    )
+}
+
+@Composable
+actual fun rememberHealthConnectPermissionState(): HealthConnectPermissionState {
+    var completedRequestCount by remember { mutableStateOf(0) }
+    val sleepPermissions =
+        remember {
+            setOf(HealthPermission.getReadPermission(SleepSessionRecord::class))
+        }
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = PermissionController.createRequestPermissionResultContract(),
+        ) {
+            completedRequestCount += 1
+        }
+
+    return HealthConnectPermissionState(
+        completedRequestCount = completedRequestCount,
+        requestPermission = {
+            permissionLauncher.launch(sleepPermissions)
         },
     )
 }

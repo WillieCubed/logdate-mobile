@@ -10,3 +10,10 @@ actual fun rememberNotificationPermissionState(): NotificationPermissionState =
         permissionRequested = false,
         requestPermission = {},
     )
+
+@Composable
+actual fun rememberHealthConnectPermissionState(): HealthConnectPermissionState =
+    HealthConnectPermissionState(
+        completedRequestCount = 0,
+        requestPermission = {},
+    )
