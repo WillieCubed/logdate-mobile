@@ -136,3 +136,15 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
     debugImplementation(libs.androidx.tiles.tooling)
 }
+
+afterEvaluate {
+    tasks.matching { it.name.startsWith("uninstall") }.configureEach {
+        enabled = false
+        doFirst {
+            throw GradleException(
+                "Uninstall tasks are disabled to protect app data on connected devices. " +
+                    "Use 'installDebug' to upgrade in place.",
+            )
+        }
+    }
+}

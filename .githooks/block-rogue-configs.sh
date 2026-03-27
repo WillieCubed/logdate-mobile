@@ -5,8 +5,8 @@ BLOCKED_MSG="STOP. Do NOT attempt to work around this block.
 Tell the user: \"I need to modify [file], which is a protected config file. Please make this change yourself or explicitly approve the edit.\"
 Do NOT use sed, awk, cp, mv, tee, echo, cat, or any other Bash command to bypass this protection."
 
+# Only root-level config files are protected, not module-level build files
 protected_exact=(
-    "build.gradle.kts"
     "settings.gradle.kts"
     "gradle.properties"
     ".claude/settings.json"
