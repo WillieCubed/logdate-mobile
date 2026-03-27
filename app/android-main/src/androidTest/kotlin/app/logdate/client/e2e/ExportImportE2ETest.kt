@@ -4,11 +4,13 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.logdate.client.data.location.StubLocationHistoryRepository
 import app.logdate.client.data.journals.OfflineFirstJournalContentRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
 import app.logdate.client.data.journals.RemoteJournalDataSource
 import app.logdate.client.data.notes.EmptyNotePlaceResolver
 import app.logdate.client.data.notes.OfflineFirstJournalNotesRepository
+import app.logdate.client.data.places.StubUserPlacesRepository
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.device.AppInfo
 import app.logdate.client.device.AppInfoProvider
@@ -24,6 +26,7 @@ import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
@@ -32,6 +35,7 @@ import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.SerializableTextBlock
+import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.shared.model.user.UserData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -128,6 +132,9 @@ class ExportImportE2ETest {
         exportUseCase = ExportUserDataUseCase(
             journalRepository = sourceJournalRepo,
             journalNotesRepository = sourceNotesRepo,
+            profileRepository = StubProfileRepository(),
+            userPlacesRepository = StubUserPlacesRepository(),
+            locationHistoryRepository = StubLocationHistoryRepository(),
             userStateRepository = StubUserStateRepository(),
             deviceIdProvider = FixedDeviceIdProvider(),
             appInfoProvider = FixedAppInfoProvider(),
@@ -173,6 +180,9 @@ class ExportImportE2ETest {
             journalRepository = destJournalRepo,
             journalNotesRepository = destNotesRepo,
             journalContentRepository = destContentRepo,
+            profileRepository = StubProfileRepository(),
+            userPlacesRepository = StubUserPlacesRepository(),
+            locationHistoryRepository = StubLocationHistoryRepository(),
         )
     }
 
@@ -573,6 +583,42 @@ class ExportImportE2ETest {
         override suspend fun addJournal(journal: Journal): String = journal.id.toString()
         override suspend fun editJournal(journal: Journal) {}
         override suspend fun deleteJournal(journalId: String) {}
+    }
+
+    private class StubProfileRepository : ProfileRepository {
+        private val profile = MutableStateFlow(LogDateProfile())
+
+        override val currentProfile: Flow<LogDateProfile> = profile
+
+        override suspend fun updateDisplayName(displayName: String): Result<LogDateProfile> =
+            Result.success(profile.value.copy(displayName = displayName)).also { result ->
+                result.getOrNull()?.let { profile.value = it }
+            }
+
+        override suspend fun updateBirthday(birthday: Instant?): Result<LogDateProfile> =
+            Result.success(profile.value.copy(birthday = birthday)).also { result ->
+                result.getOrNull()?.let { profile.value = it }
+            }
+
+        override suspend fun updateProfilePhoto(profilePhotoUri: String?): Result<LogDateProfile> =
+            Result.success(profile.value.copy(profilePhotoUri = profilePhotoUri)).also { result ->
+                result.getOrNull()?.let { profile.value = it }
+            }
+
+        override suspend fun updateBio(
+            bio: String?,
+            originalBio: String?,
+        ): Result<LogDateProfile> =
+            Result.success(profile.value.copy(bio = bio, originalBio = originalBio)).also { result ->
+                result.getOrNull()?.let { profile.value = it }
+            }
+
+        override suspend fun getCurrentProfile(): LogDateProfile = profile.value
+
+        override suspend fun clearProfile(): Result<Unit> =
+            Result.success(Unit).also {
+                profile.value = LogDateProfile()
+            }
     }
 
     private class FixedDeviceIdProvider : DeviceIdProvider {

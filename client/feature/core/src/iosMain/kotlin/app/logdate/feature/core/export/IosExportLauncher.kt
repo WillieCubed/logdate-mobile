@@ -2,13 +2,15 @@
 
 package app.logdate.feature.core.export
 
+import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.export.ExportMediaFile
 import app.logdate.client.domain.export.ExportProgress
 import app.logdate.client.domain.export.ExportResult
 import app.logdate.client.domain.export.ExportUserDataUseCase
+import app.logdate.client.domain.export.ZipArchiveEntry
+import app.logdate.client.domain.export.ZipArchiveWriter
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.autoreleasepool
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -21,16 +23,12 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
+import okio.Path.Companion.toPath
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import platform.Foundation.NSFileManager
-import platform.Foundation.NSString
 import platform.Foundation.NSTemporaryDirectory
 import platform.Foundation.NSURL
-import platform.Foundation.NSUTF8StringEncoding
-import platform.Foundation.create
-import platform.Foundation.dataUsingEncoding
-import platform.Foundation.writeToFile
 import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIViewController
 import kotlin.time.Clock
@@ -38,8 +36,8 @@ import kotlin.time.Clock
 /**
  * iOS-specific implementation for launching data export.
  *
- * This implementation creates a temporary directory and presents the iOS share sheet
- * to let the user choose where to save it.
+ * This implementation creates a temporary ZIP archive and presents the iOS share sheet
+ * to let the user save or share it.
  */
 @OptIn(ExperimentalForeignApi::class)
 class IosExportLauncher(
@@ -47,6 +45,7 @@ class IosExportLauncher(
 ) : ExportLauncher,
     KoinComponent {
     private val exportUserDataUseCase: ExportUserDataUseCase by inject()
+    private val zipArchiveWriter = ZipArchiveWriter()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var currentExportJob: Job? = null
     private var completionCallback: ((String?) -> Unit)? = null
@@ -110,9 +109,9 @@ class IosExportLauncher(
 
                                 is ExportProgress.Completed -> {
                                     try {
-                                        val exportDirPath = createExportDirectoryPath()
-                                        saveExportFiles(exportDirPath, progress.result)
-                                        presentShareSheet(exportDirPath)
+                                        val exportFilePath = createExportFilePath()
+                                        saveExportArchive(exportFilePath, progress.result)
+                                        presentShareSheet(exportFilePath)
 
                                         Napier.i("iOS: Export completed and share sheet presented")
                                         updateProgress(
@@ -120,11 +119,11 @@ class IosExportLauncher(
                                                 isActive = false,
                                                 progressPercent = 100,
                                                 message = "Export completed",
-                                                completedFilePath = exportDirPath,
+                                                completedFilePath = exportFilePath,
                                                 stats = progress.result.stats,
                                             ),
                                         )
-                                        completionCallback?.invoke(exportDirPath)
+                                        completionCallback?.invoke(exportFilePath)
                                     } catch (e: Exception) {
                                         Napier.e("iOS: Failed to save or share export", e)
                                         showAlert(
@@ -163,7 +162,7 @@ class IosExportLauncher(
         Napier.i("iOS: Export cancelled")
     }
 
-    private fun createExportDirectoryPath(): String {
+    private fun createExportFilePath(): String {
         val timestamp =
             Clock.System
                 .now()
@@ -173,92 +172,70 @@ class IosExportLauncher(
                         "${it.hour.toString().padStart(2, '0')}-${it.minute.toString().padStart(2, '0')}"
                 }
         val basePath = NSTemporaryDirectory().trimEnd('/')
-        val exportDirPath = "$basePath/logdate_export_$timestamp"
-        NSFileManager.defaultManager.createDirectoryAtPath(
-            exportDirPath,
-            withIntermediateDirectories = true,
-            attributes = null,
-            error = null,
-        )
-        return exportDirPath
+        return "$basePath/logdate_export_$timestamp.zip"
     }
 
-    @OptIn(ExperimentalForeignApi::class)
-    private fun saveExportFiles(
-        exportDirPath: String,
+    private fun saveExportArchive(
+        exportFilePath: String,
         result: ExportResult,
     ) {
-        writeJsonFile(exportDirPath, "metadata.json", result.metadata)
-        writeJsonFile(exportDirPath, "journals.json", result.journals)
-        writeJsonFile(exportDirPath, "notes.json", result.notes)
-        writeJsonFile(exportDirPath, "journal_notes.json", result.journalNotes)
-        writeJsonFile(exportDirPath, "drafts.json", result.drafts)
-        result.mediaManifest?.let { manifest ->
-            writeJsonFile(exportDirPath, "media_manifest.json", manifest)
-        }
+        val structure = ExportFileStructure()
+        val entries =
+            buildList {
+                addJsonEntry(structure.metadataFile, result.metadata)
+                addJsonEntry(structure.journalsFile, result.journals)
+                addJsonEntry(structure.notesFile, result.notes)
+                addJsonEntry(structure.journalNotesFile, result.journalNotes)
+                addJsonEntry(structure.draftsFile, result.drafts)
+                result.profile?.let { addJsonEntry(structure.profileFile, it) }
+                result.places?.let { addJsonEntry(structure.placesFile, it) }
+                result.locationHistory?.let { addJsonEntry(structure.locationHistoryFile, it) }
+                result.mediaManifest?.let { addJsonEntry(structure.mediaManifestFile, it) }
+                result.mediaFiles.forEach { mediaFile ->
+                    add(buildMediaEntry(mediaFile))
+                }
+            }
 
-        result.mediaFiles.forEach { mediaFile ->
-            copyMediaFile(exportDirPath, mediaFile)
-        }
+        zipArchiveWriter.write(exportFilePath.toPath(), entries)
     }
 
-    @OptIn(ExperimentalForeignApi::class)
-    private fun writeJsonFile(
-        directoryPath: String,
+    private fun MutableList<ZipArchiveEntry>.addJsonEntry(
         fileName: String,
         contents: String,
     ) {
-        val filePath = "$directoryPath/$fileName"
-        autoreleasepool {
-            val nsString = NSString.create(string = contents)
-            val data = nsString.dataUsingEncoding(NSUTF8StringEncoding) ?: return@autoreleasepool
-            data.writeToFile(filePath, true)
-        }
+        add(
+            ZipArchiveEntry.Bytes(
+                path = fileName,
+                bytes = contents.encodeToByteArray(),
+            ),
+        )
     }
 
-    private fun copyMediaFile(
-        exportDirPath: String,
-        mediaFile: ExportMediaFile,
-    ) {
+    private fun buildMediaEntry(mediaFile: ExportMediaFile): ZipArchiveEntry.File {
         val sourceUri = mediaFile.sourceUri
-        if (sourceUri.contains("://") && !sourceUri.startsWith("file://")) {
-            Napier.w("iOS: Skipping media export for unsupported URI: $sourceUri")
-            return
+        val sourcePath =
+            when {
+                sourceUri.startsWith("file://") -> sourceUri.removePrefix("file://")
+                sourceUri.startsWith("/") -> sourceUri
+                else -> throw IllegalStateException("Unsupported media URI for iOS export: $sourceUri")
+            }
+
+        require(sourcePath.isNotBlank()) {
+            "Media source path is empty for export entry ${mediaFile.exportPath}"
         }
 
-        val sourcePath = sourceUri.removePrefix("file://")
-        if (sourcePath.isBlank()) {
-            Napier.w("iOS: Skipping media export for empty source path")
-            return
+        if (!NSFileManager.defaultManager.fileExistsAtPath(sourcePath)) {
+            throw IllegalStateException("Media file missing at $sourcePath")
         }
 
-        val destinationPath = "$exportDirPath/${mediaFile.exportPath}"
-        ensureParentDirectory(destinationPath)
-
-        val fileManager = NSFileManager.defaultManager
-        if (!fileManager.fileExistsAtPath(sourcePath)) {
-            Napier.w("iOS: Media file missing at $sourcePath")
-            return
-        }
-
-        fileManager.copyItemAtPath(sourcePath, destinationPath, error = null)
-    }
-
-    private fun ensureParentDirectory(filePath: String) {
-        val directoryPath = filePath.substringBeforeLast("/", missingDelimiterValue = "")
-        if (directoryPath.isBlank()) {
-            return
-        }
-        NSFileManager.defaultManager.createDirectoryAtPath(
-            directoryPath,
-            withIntermediateDirectories = true,
-            attributes = null,
-            error = null,
+        return ZipArchiveEntry.File(
+            path = mediaFile.exportPath,
+            sourcePath = sourcePath.toPath(),
         )
     }
 
     /**
-     * Presents the iOS share sheet with the exported files directory.
+     * Presents the iOS share sheet with the exported ZIP archive.
      */
     private fun presentShareSheet(path: String) {
         val fileURL = NSURL.fileURLWithPath(path)

@@ -30,8 +30,6 @@ class GetExportCountsUseCase(
         val journals = journalRepository.allJournalsObserved.first()
         val notes = journalNotesRepository.allNotesObserved.first()
         val drafts = journalRepository.getAllDrafts()
-        val audioNotes = getAllAudioNotesUseCase().first()
-
         val notesWithMedia =
             notes.count { note ->
                 when (note) {
@@ -46,7 +44,7 @@ class GetExportCountsUseCase(
             journalCount = journals.size,
             noteCount = notes.size,
             draftCount = drafts.size,
-            mediaCount = notesWithMedia + audioNotes.size,
+            mediaCount = notesWithMedia,
         )
     }
 }

@@ -16,11 +16,26 @@ import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
+import app.logdate.client.repository.location.LocationCapturePipeline
+import app.logdate.client.repository.location.LocationCaptureSource
+import app.logdate.client.repository.location.LocationHistoryItem
+import app.logdate.client.repository.location.LocationHistoryRepository
+import app.logdate.client.repository.location.LocationLogRecord
+import app.logdate.client.repository.places.UserPlacesRepository
+import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
+import app.logdate.shared.model.Location
+import app.logdate.shared.model.LocationAltitude
+import app.logdate.shared.model.Place
+import app.logdate.shared.model.SerializableAudioBlock
 import app.logdate.shared.model.SerializableCameraBlock
+import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
+import app.logdate.shared.model.SerializableVideoBlock
+import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.shared.model.user.UserData
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,11 +63,17 @@ class ExportImportRoundTripTest {
     // Source repositories (populated with test data, used by export)
     private lateinit var sourceJournalRepo: RoundTripJournalRepository
     private lateinit var sourceNotesRepo: RoundTripJournalNotesRepository
+    private lateinit var sourceProfileRepo: RoundTripProfileRepository
+    private lateinit var sourcePlacesRepo: RoundTripUserPlacesRepository
+    private lateinit var sourceLocationHistoryRepo: RoundTripLocationHistoryRepository
 
     // Destination repositories (empty, used by import)
     private lateinit var destJournalRepo: RoundTripJournalRepository
     private lateinit var destNotesRepo: RoundTripJournalNotesRepository
     private lateinit var destContentRepo: RoundTripJournalContentRepository
+    private lateinit var destProfileRepo: RoundTripProfileRepository
+    private lateinit var destPlacesRepo: RoundTripUserPlacesRepository
+    private lateinit var destLocationHistoryRepo: RoundTripLocationHistoryRepository
 
     private lateinit var exportUseCase: ExportUserDataUseCase
     private lateinit var importUseCase: RestoreUserDataUseCase
@@ -75,10 +96,16 @@ class ExportImportRoundTripTest {
     fun setUp() {
         sourceJournalRepo = RoundTripJournalRepository()
         sourceNotesRepo = RoundTripJournalNotesRepository()
+        sourceProfileRepo = RoundTripProfileRepository()
+        sourcePlacesRepo = RoundTripUserPlacesRepository()
+        sourceLocationHistoryRepo = RoundTripLocationHistoryRepository()
 
         destJournalRepo = RoundTripJournalRepository()
         destNotesRepo = RoundTripJournalNotesRepository()
         destContentRepo = RoundTripJournalContentRepository()
+        destProfileRepo = RoundTripProfileRepository()
+        destPlacesRepo = RoundTripUserPlacesRepository()
+        destLocationHistoryRepo = RoundTripLocationHistoryRepository()
 
         val deviceIdProvider = StubDeviceIdProvider(Uuid.random())
         val appInfoProvider =
@@ -94,6 +121,9 @@ class ExportImportRoundTripTest {
             ExportUserDataUseCase(
                 journalRepository = sourceJournalRepo,
                 journalNotesRepository = sourceNotesRepo,
+                profileRepository = sourceProfileRepo,
+                userPlacesRepository = sourcePlacesRepo,
+                locationHistoryRepository = sourceLocationHistoryRepo,
                 userStateRepository = StubUserStateRepository(),
                 deviceIdProvider = deviceIdProvider,
                 appInfoProvider = appInfoProvider,
@@ -105,6 +135,9 @@ class ExportImportRoundTripTest {
                 journalRepository = destJournalRepo,
                 journalNotesRepository = destNotesRepo,
                 journalContentRepository = destContentRepo,
+                profileRepository = destProfileRepo,
+                userPlacesRepository = destPlacesRepo,
+                locationHistoryRepository = destLocationHistoryRepo,
             )
     }
 
@@ -220,6 +253,24 @@ class ExportImportRoundTripTest {
                 draft.blocks.any { it is SerializableTextBlock && it.content.contains("work in progress") },
                 "Draft text block should be preserved",
             )
+            assertTrue(draft.blocks.any { it is SerializableImageBlock }, "Image draft block should be preserved")
+            assertTrue(draft.blocks.any { it is SerializableVideoBlock }, "Video draft block should be preserved")
+            assertTrue(draft.blocks.any { it is SerializableAudioBlock }, "Audio draft block should be preserved")
+        }
+
+    @Test
+    fun `full round-trip preserves note sync versions`() =
+        runTest {
+            seedSourceData()
+            exportThenImport()
+
+            val text = destNotesRepo.getNoteById(noteText)
+            assertTrue(text is JournalNote.Text)
+            assertEquals(7, text.syncVersion)
+
+            val image = destNotesRepo.getNoteById(noteImage)
+            assertTrue(image is JournalNote.Image)
+            assertEquals(11, image.syncVersion)
         }
 
     @Test
@@ -231,7 +282,23 @@ class ExportImportRoundTripTest {
             assertEquals(2, result.metadata.stats.journalCount)
             assertEquals(5, result.metadata.stats.noteCount)
             assertEquals(1, result.metadata.stats.draftCount)
+            assertEquals(1, result.metadata.stats.placeCount)
+            assertEquals(1, result.metadata.stats.locationHistoryCount)
+            assertTrue(result.metadata.stats.hasProfile)
             assertTrue(result.warnings.isEmpty(), "Round-trip should produce no warnings, got: ${result.warnings}")
+        }
+
+    @Test
+    fun `full round-trip preserves profile places and location history`() =
+        runTest {
+            seedSourceData()
+            exportThenImport()
+
+            assertEquals("Willie", destProfileRepo.profile.displayName)
+            assertEquals(1, destPlacesRepo.places.size)
+            assertEquals("Home Base", (destPlacesRepo.places.first() as Place.UserDefined).displayName)
+            assertEquals(1, destLocationHistoryRepo.entries.size)
+            assertEquals("sample-1", destLocationHistoryRepo.entries.first().sampleId)
         }
 
     @Test
@@ -366,6 +433,45 @@ class ExportImportRoundTripTest {
             assertTrue(linkedJournals.contains(journalTravel), "Should be linked to Travel journal")
         }
 
+    @Test
+    fun `round-trip preserves audio note duration`() =
+        runTest {
+            seedSourceData()
+            exportThenImport()
+
+            val audio = destNotesRepo.getNoteById(noteAudio)
+            assertTrue(audio is JournalNote.Audio, "Should be audio note")
+            assertEquals(45000L, audio.durationMs, "Audio duration should survive round-trip")
+        }
+
+    @Test
+    fun `round-trip preserves location altitude and accuracy`() =
+        runTest {
+            seedSourceData()
+            exportThenImport()
+
+            val note = destNotesRepo.getNoteById(noteTextWithLocation)
+            assertTrue(note is JournalNote.Text, "Should be text note")
+            val coords = note.location?.coordinates
+            assertNotNull(coords, "Coordinates should be preserved")
+            assertEquals(52.3, coords.altitude, "Altitude should survive round-trip")
+            assertEquals(8.5f, coords.accuracy, "Accuracy should survive round-trip")
+        }
+
+    @Test
+    fun `round-trip preserves draft with multiple journal associations`() =
+        runTest {
+            seedSourceData()
+            exportThenImport()
+
+            val drafts = destJournalRepo.getAllDrafts()
+            assertEquals(1, drafts.size, "Should have one draft")
+            val draft = drafts.first()
+            assertEquals(2, draft.selectedJournalIds.size, "Draft should keep both journal IDs")
+            assertTrue(draft.selectedJournalIds.contains(journalDaily))
+            assertTrue(draft.selectedJournalIds.contains(journalTravel))
+        }
+
     // endregion
 
     // region Helpers
@@ -392,7 +498,13 @@ class ExportImportRoundTripTest {
 
         val sfLocation =
             NoteLocation(
-                coordinates = NoteCoordinates(latitude = 37.7749, longitude = -122.4194),
+                coordinates =
+                    NoteCoordinates(
+                        latitude = 37.7749,
+                        longitude = -122.4194,
+                        altitude = 52.3,
+                        accuracy = 8.5f,
+                    ),
                 place =
                     NotePlace(
                         id = Uuid.random(),
@@ -419,6 +531,7 @@ class ExportImportRoundTripTest {
                 creationTimestamp = now - 7.days,
                 lastUpdated = now - 7.days,
                 content = "Today I learned about export pipelines. Fascinating stuff!",
+                syncVersion = 7,
             )
         val imageNote =
             JournalNote.Image(
@@ -428,6 +541,7 @@ class ExportImportRoundTripTest {
                 mediaRef = "file:///storage/photos/sunset.jpg",
                 caption = "Golden hour at Ocean Beach",
                 location = laLocation,
+                syncVersion = 11,
             )
         val videoNote =
             JournalNote.Video(
@@ -436,6 +550,7 @@ class ExportImportRoundTripTest {
                 lastUpdated = now - 3.days,
                 mediaRef = "file:///storage/videos/waves.mp4",
                 caption = "Waves crashing on the shore",
+                syncVersion = 13,
             )
         val audioNote =
             JournalNote.Audio(
@@ -444,6 +559,7 @@ class ExportImportRoundTripTest {
                 lastUpdated = now - 2.days,
                 mediaRef = "file:///storage/audio/voice_memo.m4a",
                 durationMs = 45000,
+                syncVersion = 17,
             )
         val textWithLocationNote =
             JournalNote.Text(
@@ -452,6 +568,7 @@ class ExportImportRoundTripTest {
                 lastUpdated = now - 1.days,
                 content = "Sitting in Dolores Park writing in my journal",
                 location = sfLocation,
+                syncVersion = 19,
             )
 
         sourceNotesRepo.testNotes = listOf(textNote, imageNote, videoNote, audioNote, textWithLocationNote)
@@ -459,6 +576,45 @@ class ExportImportRoundTripTest {
             mapOf(
                 journalDaily to listOf(textNote, audioNote, textWithLocationNote),
                 journalTravel to listOf(imageNote, videoNote, textWithLocationNote),
+            )
+        sourceProfileRepo.profile =
+            LogDateProfile(
+                displayName = "Willie",
+                bio = "Keeps travel journals",
+                createdAt = now - 30.days,
+                lastUpdatedAt = now - 1.days,
+            )
+        sourcePlacesRepo.places =
+            listOf(
+                Place.UserDefined(
+                    id = Uuid.random(),
+                    displayName = "Home Base",
+                    lat = 37.7749,
+                    lng = -122.4194,
+                    radiusMeters = 150.0,
+                    description = "Apartment",
+                ),
+            )
+        sourceLocationHistoryRepo.entries =
+            listOf(
+                LocationHistoryItem(
+                    sampleId = "sample-1",
+                    userId = "test-user",
+                    deviceId = "device-1",
+                    timestamp = now - 1.days,
+                    loggedAt = now - 1.days,
+                    location =
+                        Location(
+                            latitude = 37.7749,
+                            longitude = -122.4194,
+                            altitude = LocationAltitude(12.0, AltitudeUnit.METERS),
+                        ),
+                    confidence = 0.85f,
+                    isGenuine = true,
+                    capturePipeline = LocationCapturePipeline.HIGH_DETAIL,
+                    captureSource = LocationCaptureSource.MANUAL,
+                    accuracyMeters = 6.0f,
+                ),
             )
 
         val draft =
@@ -478,8 +634,28 @@ class ExportImportRoundTripTest {
                             timestamp = now,
                             uri = "file:///storage/photos/draft_photo.jpg",
                         ),
+                        SerializableImageBlock(
+                            id = Uuid.random(),
+                            timestamp = now,
+                            uri = "file:///storage/photos/draft_image.jpg",
+                            caption = "Draft image",
+                        ),
+                        SerializableVideoBlock(
+                            id = Uuid.random(),
+                            timestamp = now,
+                            uri = "file:///storage/videos/draft_video.mp4",
+                            thumbnailUri = "file:///storage/videos/draft_video_thumb.jpg",
+                            caption = "Draft video",
+                        ),
+                        SerializableAudioBlock(
+                            id = Uuid.random(),
+                            timestamp = now,
+                            uri = "file:///storage/audio/draft_audio.m4a",
+                            duration = 1234L,
+                            transcription = "draft audio",
+                        ),
                     ),
-                selectedJournalIds = listOf(journalDaily),
+                selectedJournalIds = listOf(journalDaily, journalTravel),
                 createdAt = now - 1.hours,
                 lastModifiedAt = now,
             )
@@ -500,6 +676,9 @@ class ExportImportRoundTripTest {
             notesJson = result.notes,
             journalNotesJson = result.journalNotes,
             draftsJson = result.drafts,
+            profileJson = result.profile,
+            placesJson = result.places,
+            locationHistoryJson = result.locationHistory,
             mediaManifestJson = result.mediaManifest,
         )
 
@@ -702,6 +881,137 @@ class ExportImportRoundTripTest {
         override suspend fun setBiometricEnabled(isEnabled: Boolean) {}
 
         override suspend fun addFavoriteNote(vararg noteId: String) {}
+    }
+
+    private class RoundTripProfileRepository : ProfileRepository {
+        var profile: LogDateProfile = LogDateProfile()
+
+        override val currentProfile: Flow<LogDateProfile> = flowOf(profile)
+
+        override suspend fun updateDisplayName(displayName: String): Result<LogDateProfile> {
+            profile = profile.copy(displayName = displayName)
+            return Result.success(profile)
+        }
+
+        override suspend fun updateBirthday(birthday: Instant?): Result<LogDateProfile> {
+            profile = profile.copy(birthday = birthday)
+            return Result.success(profile)
+        }
+
+        override suspend fun updateProfilePhoto(profilePhotoUri: String?): Result<LogDateProfile> {
+            profile = profile.copy(profilePhotoUri = profilePhotoUri)
+            return Result.success(profile)
+        }
+
+        override suspend fun updateBio(
+            bio: String?,
+            originalBio: String?,
+        ): Result<LogDateProfile> {
+            profile = profile.copy(bio = bio, originalBio = originalBio)
+            return Result.success(profile)
+        }
+
+        override suspend fun getCurrentProfile(): LogDateProfile = profile
+
+        override suspend fun clearProfile(): Result<Unit> {
+            profile = LogDateProfile()
+            return Result.success(Unit)
+        }
+    }
+
+    private class RoundTripUserPlacesRepository : UserPlacesRepository {
+        var places: List<Place> = emptyList()
+
+        override suspend fun getAllPlaces(): List<Place> = places
+
+        override fun observeAllPlaces(): Flow<List<Place>> = flowOf(places)
+
+        override suspend fun getPlacesNear(
+            latitude: Double,
+            longitude: Double,
+            radiusMeters: Double,
+        ): List<Place> = places
+
+        override suspend fun getPlaceById(placeId: String): Place? = places.find { it.uid.toString() == placeId }
+
+        override suspend fun createPlace(place: Place): Result<Place> {
+            places = places + place
+            return Result.success(place)
+        }
+
+        override suspend fun updatePlace(place: Place): Result<Place> {
+            places = places.filterNot { it.uid == place.uid } + place
+            return Result.success(place)
+        }
+
+        override suspend fun deletePlace(placeId: String): Result<Unit> {
+            places = places.filterNot { it.uid.toString() == placeId }
+            return Result.success(Unit)
+        }
+
+        override suspend fun searchPlaces(query: String): List<Place> = places.filter { it.name.contains(query, ignoreCase = true) }
+    }
+
+    private class RoundTripLocationHistoryRepository : LocationHistoryRepository {
+        var entries: List<LocationHistoryItem> = emptyList()
+
+        override suspend fun getAllLocationHistory(): List<LocationHistoryItem> = entries
+
+        override fun observeLocationHistory(): Flow<List<LocationHistoryItem>> = flowOf(entries)
+
+        override suspend fun getRecentLocationHistory(limit: Int): List<LocationHistoryItem> = entries.take(limit)
+
+        override suspend fun getLocationHistoryBetween(
+            startTime: Instant,
+            endTime: Instant,
+        ): List<LocationHistoryItem> = entries.filter { it.timestamp in startTime..endTime }
+
+        override suspend fun getLastLocation(): LocationHistoryItem? = entries.maxByOrNull { it.timestamp }
+
+        override fun observeLastLocation(): Flow<LocationHistoryItem?> = flowOf(entries.maxByOrNull { it.timestamp })
+
+        override suspend fun logLocation(
+            location: Location,
+            userId: String,
+            deviceId: String,
+            confidence: Float,
+            isGenuine: Boolean,
+        ): Result<Unit> = Result.success(Unit)
+
+        override suspend fun logLocation(record: LocationLogRecord): Result<Unit> {
+            entries =
+                entries +
+                LocationHistoryItem(
+                    sampleId = record.sampleId,
+                    userId = record.userId,
+                    deviceId = record.deviceId,
+                    timestamp = record.timestamp,
+                    loggedAt = record.loggedAt,
+                    location = record.location,
+                    confidence = record.confidence,
+                    isGenuine = record.isGenuine,
+                    capturePipeline = record.capturePipeline,
+                    captureSource = record.captureSource,
+                    accuracyMeters = record.accuracyMeters,
+                    speedMetersPerSecond = record.speedMetersPerSecond,
+                    bearingDegrees = record.bearingDegrees,
+                    isMock = record.isMock,
+                )
+            return Result.success(Unit)
+        }
+
+        override suspend fun deleteLocationEntry(
+            userId: String,
+            deviceId: String,
+            timestamp: Instant,
+        ): Result<Unit> = Result.success(Unit)
+
+        override suspend fun deleteLocationsBetween(
+            startTime: Instant,
+            endTime: Instant,
+        ): Result<Unit> = Result.success(Unit)
+
+        override suspend fun getLocationCount(): Int = entries.size
     }
 
     // endregion

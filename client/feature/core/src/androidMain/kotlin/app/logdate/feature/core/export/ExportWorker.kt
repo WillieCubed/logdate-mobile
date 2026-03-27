@@ -8,6 +8,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.export.ExportProgress
 import app.logdate.client.domain.export.ExportResult
 import app.logdate.client.domain.export.ExportUserDataUseCase
@@ -214,50 +215,24 @@ class ExportWorker(
         exportData: ExportResult,
         uri: Uri,
     ): String {
+        val structure = ExportFileStructure()
         context.contentResolver.openOutputStream(uri)?.use { outputStream ->
             ZipOutputStream(outputStream).use { zipOut ->
-                zipOut.putNextEntry(ZipEntry("metadata.json"))
-                zipOut.write(exportData.metadata.toByteArray())
-                zipOut.closeEntry()
-
-                zipOut.putNextEntry(ZipEntry("journals.json"))
-                zipOut.write(exportData.journals.toByteArray())
-                zipOut.closeEntry()
-
-                zipOut.putNextEntry(ZipEntry("notes.json"))
-                zipOut.write(exportData.notes.toByteArray())
-                zipOut.closeEntry()
-
-                zipOut.putNextEntry(ZipEntry("journal_notes.json"))
-                zipOut.write(exportData.journalNotes.toByteArray())
-                zipOut.closeEntry()
-
-                zipOut.putNextEntry(ZipEntry("drafts.json"))
-                zipOut.write(exportData.drafts.toByteArray())
-                zipOut.closeEntry()
+                writeJsonEntry(zipOut, structure.metadataFile, exportData.metadata)
+                writeJsonEntry(zipOut, structure.journalsFile, exportData.journals)
+                writeJsonEntry(zipOut, structure.notesFile, exportData.notes)
+                writeJsonEntry(zipOut, structure.journalNotesFile, exportData.journalNotes)
+                writeJsonEntry(zipOut, structure.draftsFile, exportData.drafts)
+                exportData.profile?.let { writeJsonEntry(zipOut, structure.profileFile, it) }
+                exportData.places?.let { writeJsonEntry(zipOut, structure.placesFile, it) }
+                exportData.locationHistory?.let { writeJsonEntry(zipOut, structure.locationHistoryFile, it) }
 
                 exportData.mediaManifest?.let { manifest ->
-                    zipOut.putNextEntry(ZipEntry("media_manifest.json"))
-                    zipOut.write(manifest.toByteArray())
-                    zipOut.closeEntry()
+                    writeJsonEntry(zipOut, structure.mediaManifestFile, manifest)
                 }
 
                 exportData.mediaFiles.forEach { mediaFile ->
-                    try {
-                        zipOut.putNextEntry(ZipEntry(mediaFile.exportPath))
-                        val sourceUri = mediaFile.sourceUri
-                        if (sourceUri.startsWith("/") || sourceUri.startsWith("file://")) {
-                            val file = java.io.File(sourceUri.removePrefix("file://"))
-                            file.inputStream().use { it.copyTo(zipOut) }
-                        } else {
-                            context.contentResolver.openInputStream(sourceUri.toUri())?.use { inputStream ->
-                                inputStream.copyTo(zipOut)
-                            }
-                        }
-                        zipOut.closeEntry()
-                    } catch (e: Exception) {
-                        Napier.e("Failed to add media file to ZIP: ${mediaFile.sourceUri}", e)
-                    }
+                    writeMediaEntry(zipOut, mediaFile)
                 }
             }
         } ?: throw IllegalStateException("Could not open output stream for URI: $uri")
@@ -269,6 +244,7 @@ class ExportWorker(
      * Fall back method to save to the Downloads directory if no URI was selected
      */
     private fun saveToDownloads(exportData: ExportResult): String {
+        val structure = ExportFileStructure()
         val timestamp =
             Clock.System
                 .now()
@@ -282,52 +258,60 @@ class ExportWorker(
 
         FileOutputStream(file).use { fileOut ->
             ZipOutputStream(fileOut).use { zipOut ->
-                zipOut.putNextEntry(ZipEntry("metadata.json"))
-                zipOut.write(exportData.metadata.toByteArray())
-                zipOut.closeEntry()
-
-                zipOut.putNextEntry(ZipEntry("journals.json"))
-                zipOut.write(exportData.journals.toByteArray())
-                zipOut.closeEntry()
-
-                zipOut.putNextEntry(ZipEntry("notes.json"))
-                zipOut.write(exportData.notes.toByteArray())
-                zipOut.closeEntry()
-
-                zipOut.putNextEntry(ZipEntry("journal_notes.json"))
-                zipOut.write(exportData.journalNotes.toByteArray())
-                zipOut.closeEntry()
-
-                zipOut.putNextEntry(ZipEntry("drafts.json"))
-                zipOut.write(exportData.drafts.toByteArray())
-                zipOut.closeEntry()
+                writeJsonEntry(zipOut, structure.metadataFile, exportData.metadata)
+                writeJsonEntry(zipOut, structure.journalsFile, exportData.journals)
+                writeJsonEntry(zipOut, structure.notesFile, exportData.notes)
+                writeJsonEntry(zipOut, structure.journalNotesFile, exportData.journalNotes)
+                writeJsonEntry(zipOut, structure.draftsFile, exportData.drafts)
+                exportData.profile?.let { writeJsonEntry(zipOut, structure.profileFile, it) }
+                exportData.places?.let { writeJsonEntry(zipOut, structure.placesFile, it) }
+                exportData.locationHistory?.let { writeJsonEntry(zipOut, structure.locationHistoryFile, it) }
 
                 exportData.mediaManifest?.let { manifest ->
-                    zipOut.putNextEntry(ZipEntry("media_manifest.json"))
-                    zipOut.write(manifest.toByteArray())
-                    zipOut.closeEntry()
+                    writeJsonEntry(zipOut, structure.mediaManifestFile, manifest)
                 }
 
                 exportData.mediaFiles.forEach { mediaFile ->
-                    try {
-                        zipOut.putNextEntry(ZipEntry(mediaFile.exportPath))
-                        val sourceUri = mediaFile.sourceUri
-                        if (sourceUri.startsWith("/") || sourceUri.startsWith("file://")) {
-                            val file = java.io.File(sourceUri.removePrefix("file://"))
-                            file.inputStream().use { it.copyTo(zipOut) }
-                        } else {
-                            context.contentResolver.openInputStream(sourceUri.toUri())?.use { inputStream ->
-                                inputStream.copyTo(zipOut)
-                            }
-                        }
-                        zipOut.closeEntry()
-                    } catch (e: Exception) {
-                        Napier.e("Failed to add media file to ZIP: ${mediaFile.sourceUri}", e)
-                    }
+                    writeMediaEntry(zipOut, mediaFile)
                 }
             }
         }
 
         return file.absolutePath
+    }
+
+    private fun writeJsonEntry(
+        zipOut: ZipOutputStream,
+        entryName: String,
+        content: String,
+    ) {
+        zipOut.putNextEntry(ZipEntry(entryName))
+        zipOut.write(content.toByteArray())
+        zipOut.closeEntry()
+    }
+
+    private fun writeMediaEntry(
+        zipOut: ZipOutputStream,
+        mediaFile: app.logdate.client.domain.export.ExportMediaFile,
+    ) {
+        zipOut.putNextEntry(ZipEntry(mediaFile.exportPath))
+        try {
+            val sourceUri = mediaFile.sourceUri
+            if (sourceUri.startsWith("/") || sourceUri.startsWith("file://")) {
+                val file = java.io.File(sourceUri.removePrefix("file://"))
+                require(file.exists()) { "Media file missing at ${file.absolutePath}" }
+                file.inputStream().use { it.copyTo(zipOut) }
+            } else {
+                val inputStream =
+                    context.contentResolver.openInputStream(sourceUri.toUri())
+                        ?: error("Unable to open media URI: $sourceUri")
+                inputStream.use { it.copyTo(zipOut) }
+            }
+        } catch (e: Exception) {
+            Napier.e("Failed to add media file to ZIP: ${mediaFile.sourceUri}", e)
+            throw IllegalStateException("Failed to include media file: ${mediaFile.sourceUri}", e)
+        } finally {
+            zipOut.closeEntry()
+        }
     }
 }

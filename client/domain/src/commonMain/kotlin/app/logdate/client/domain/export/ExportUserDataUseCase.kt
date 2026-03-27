@@ -7,13 +7,20 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.location.LocationHistoryItem
+import app.logdate.client.repository.location.LocationHistoryRepository
+import app.logdate.client.repository.places.UserPlacesRepository
+import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.EditorDraft
+import app.logdate.shared.model.Place
 import app.logdate.shared.model.SerializableAudioBlock
 import app.logdate.shared.model.SerializableCameraBlock
+import app.logdate.shared.model.SerializableEntryBlock
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.SerializableVideoBlock
+import app.logdate.shared.model.profile.LogDateProfile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -29,9 +36,13 @@ import kotlin.time.Duration.Companion.days
 class ExportUserDataUseCase(
     private val journalRepository: JournalRepository,
     private val journalNotesRepository: JournalNotesRepository,
+    private val profileRepository: ProfileRepository,
+    private val userPlacesRepository: UserPlacesRepository,
+    private val locationHistoryRepository: LocationHistoryRepository,
     private val userStateRepository: UserStateRepository,
     private val deviceIdProvider: DeviceIdProvider,
     private val appInfoProvider: AppInfoProvider,
+    @Suppress("unused")
     private val getAllAudioNotesUseCase: GetAllAudioNotesUseCase,
 ) {
     private val json =
@@ -62,7 +73,6 @@ class ExportUserDataUseCase(
             emit(ExportProgress.Starting)
 
             try {
-                // Gather journals (always fully exported if included — they're containers, not time-bound)
                 emit(ExportProgress.InProgress(0.1f, "Collecting journals..."))
                 val journals =
                     if (includeJournals) {
@@ -71,7 +81,6 @@ class ExportUserDataUseCase(
                         emptyList()
                     }
 
-                // Gather notes, filtered by date range if specified
                 emit(ExportProgress.InProgress(0.3f, "Collecting notes..."))
                 val notes =
                     if (includeNotes) {
@@ -85,20 +94,6 @@ class ExportUserDataUseCase(
                         emptyList()
                     }
 
-                // Gather audio notes for media export
-                val audioNotes =
-                    if (includeMedia && includeNotes) {
-                        val allAudio = getAllAudioNotesUseCase().first()
-                        if (dateRangeCutoff != null) {
-                            allAudio.filter { it.creationTimestamp >= dateRangeCutoff }
-                        } else {
-                            allAudio
-                        }
-                    } else {
-                        emptyList()
-                    }
-
-                // Gather drafts, filtered by date range if specified
                 emit(ExportProgress.InProgress(0.5f, "Collecting drafts..."))
                 val drafts =
                     if (includeDrafts) {
@@ -112,15 +107,24 @@ class ExportUserDataUseCase(
                         emptyList()
                     }
 
-                // Get app info and user ID
                 val appInfo = appInfoProvider.getAppInfo()
-                val userId = deviceIdProvider.getDeviceId().value.toString()
                 val deviceId = deviceIdProvider.getDeviceId().value.toString()
+                val userId =
+                    userStateRepository
+                        .userData
+                        .first()
+                        .displayName
+                        .trim()
+                        .ifBlank { "local-user" }
+                val profile = profileRepository.getCurrentProfile()
+                val places = userPlacesRepository.getAllPlaces()
+                val locationHistory =
+                    locationHistoryRepository
+                        .getAllLocationHistory()
+                        .filter { item -> dateRangeCutoff == null || item.timestamp >= dateRangeCutoff }
 
-                // Create export data structure
                 emit(ExportProgress.InProgress(0.7f, "Preparing export data..."))
 
-                // Map repository data to export models
                 val exportNotes =
                     notes.map { note ->
                         when (note) {
@@ -132,6 +136,7 @@ class ExportUserDataUseCase(
                                     createdAt = note.creationTimestamp,
                                     updatedAt = note.lastUpdated,
                                     location = note.location?.toExportLocation(),
+                                    syncVersion = note.syncVersion,
                                 )
                             is JournalNote.Image ->
                                 ExportNote(
@@ -142,15 +147,18 @@ class ExportUserDataUseCase(
                                     createdAt = note.creationTimestamp,
                                     updatedAt = note.lastUpdated,
                                     location = note.location?.toExportLocation(),
+                                    syncVersion = note.syncVersion,
                                 )
                             is JournalNote.Audio ->
                                 ExportNote(
                                     id = note.uid.toString(),
                                     type = "audio",
                                     mediaPath = note.mediaRef,
+                                    durationMs = note.durationMs,
                                     createdAt = note.creationTimestamp,
                                     updatedAt = note.lastUpdated,
                                     location = note.location?.toExportLocation(),
+                                    syncVersion = note.syncVersion,
                                 )
                             is JournalNote.Video ->
                                 ExportNote(
@@ -161,11 +169,14 @@ class ExportUserDataUseCase(
                                     createdAt = note.creationTimestamp,
                                     updatedAt = note.lastUpdated,
                                     location = note.location?.toExportLocation(),
+                                    syncVersion = note.syncVersion,
                                 )
                         }
                     }
 
                 val exportDrafts = drafts.map { it.toExportDraft() }
+                val exportPlaces = places.mapNotNull { it.toExportPlaceOrNull() }
+                val exportLocationHistory = locationHistory.map { it.toExportLocationHistoryItem() }
                 val exportRelations =
                     if (includeJournals && includeNotes) {
                         journals.flatMap { journal ->
@@ -178,6 +189,7 @@ class ExportUserDataUseCase(
                                         journalId = journal.id.toString(),
                                         noteId = note.uid.toString(),
                                         addedAt = note.creationTimestamp,
+                                        syncVersion = note.syncVersion,
                                     )
                                 }
                         }
@@ -185,10 +197,9 @@ class ExportUserDataUseCase(
                         emptyList()
                     }
 
-                // Calculate actual stats
                 val mediaFiles =
                     if (includeMedia) {
-                        getMediaFilesToExport(exportNotes, exportDrafts, audioNotes)
+                        getMediaFilesToExport(exportNotes, exportDrafts)
                     } else {
                         emptyList()
                     }
@@ -199,6 +210,9 @@ class ExportUserDataUseCase(
                         noteCount = notes.size,
                         draftCount = exportDrafts.size,
                         mediaCount = mediaFiles.size,
+                        placeCount = exportPlaces.size,
+                        locationHistoryCount = exportLocationHistory.size,
+                        hasProfile = profile != LogDateProfile(),
                     )
 
                 val exportMetadata =
@@ -210,37 +224,47 @@ class ExportUserDataUseCase(
                         stats = stats,
                     )
 
-                // Create the separate export files
                 val metadataJson = json.encodeToString(exportMetadata)
                 val journalsJson = json.encodeToString(mapOf("journals" to journals))
                 val notesJson = json.encodeToString(mapOf("notes" to exportNotes))
                 val draftsJson = json.encodeToString(mapOf("drafts" to exportDrafts))
                 val journalNotesJson = json.encodeToString(mapOf("journal_notes" to exportRelations))
-
                 val mediaManifestJson = json.encodeToString(ExportMediaManifest(mediaFiles))
+                val profileJson =
+                    profile.takeIf { it != LogDateProfile() }?.let {
+                        json.encodeToString(ProfilePayload(profile = it))
+                    }
+                val placesJson =
+                    exportPlaces
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { json.encodeToString(PlacesPayload(places = it)) }
+                val locationHistoryJson =
+                    exportLocationHistory
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { json.encodeToString(LocationHistoryPayload(locationHistory = it)) }
 
-                // Create the final export data
-                val exportData =
-                    ExportResult(
-                        metadata = metadataJson,
-                        journals = journalsJson,
-                        notes = notesJson,
-                        journalNotes = journalNotesJson,
-                        drafts = draftsJson,
-                        mediaFiles = mediaFiles,
-                        mediaManifest = mediaManifestJson,
-                        stats = stats,
-                    )
-
-                emit(ExportProgress.Completed(exportData))
+                emit(
+                    ExportProgress.Completed(
+                        ExportResult(
+                            metadata = metadataJson,
+                            journals = journalsJson,
+                            notes = notesJson,
+                            journalNotes = journalNotesJson,
+                            drafts = draftsJson,
+                            profile = profileJson,
+                            places = placesJson,
+                            locationHistory = locationHistoryJson,
+                            mediaFiles = mediaFiles,
+                            mediaManifest = mediaManifestJson,
+                            stats = stats,
+                        ),
+                    ),
+                )
             } catch (exception: Exception) {
                 emit(ExportProgress.Failed(exception.message ?: "Unknown error occurred"))
             }
         }
 
-    /**
-     * Resolves an [ExportDateRange] to a cutoff [Instant], or null for [ExportDateRange.AllTime].
-     */
     companion object {
         fun resolveDateRangeCutoff(dateRange: String): kotlin.time.Instant? {
             val now = Clock.System.now()
@@ -254,64 +278,99 @@ class ExportUserDataUseCase(
         }
     }
 
-    /**
-     * Creates a standardized media path for export according to the specification.
-     */
     private fun createMediaPath(
         uri: String,
+        seed: String,
         timestamp: kotlin.time.Instant,
     ): String {
+        val structure = ExportFileStructure()
         val year = timestamp.toString().substring(0, 4)
         val formattedTimestamp = timestamp.toString().replace(":", "-")
-        val id = uri.substringAfterLast("/")
-        val extension = uri.substringAfterLast(".", "")
+        val rawFileName =
+            uri
+                .substringAfterLast("/")
+                .substringBefore("?")
+                .ifBlank { "media" }
+        val extension =
+            rawFileName
+                .substringAfterLast(".", "")
+                .takeIf { rawFileName.contains(".") && it.isNotBlank() }
+                ?.sanitizePathSegment()
+        val baseName = rawFileName.substringBeforeLast(".", rawFileName).sanitizePathSegment().ifBlank { "media" }
+        val uniqueSuffix = seed.sanitizePathSegment().ifBlank { uri.stableSuffix() }
+        val fileName =
+            if (extension != null) {
+                "${formattedTimestamp}_${baseName}_$uniqueSuffix.$extension"
+            } else {
+                "${formattedTimestamp}_${baseName}_$uniqueSuffix"
+            }
 
-        return if (extension.isNotEmpty()) {
-            "$year/${formattedTimestamp}_$id.$extension"
-        } else {
-            "$year/${formattedTimestamp}_$id"
-        }
+        return "${structure.mediaFolder}/$year/$fileName"
     }
 
     private fun getMediaFilesToExport(
         notes: List<ExportNote>,
         drafts: List<ExportDraft>,
-        audioNotes: List<JournalNote.Audio> = emptyList(),
     ): List<ExportMediaFile> {
-        val mediaFilesByPath = linkedMapOf<String, String>()
+        val mediaFilesBySource = linkedMapOf<String, ExportMediaFile>()
 
-        // Process regular notes with media
         notes.forEach { note ->
-            if (note.mediaPath != null) {
-                val exportPath = createMediaPath(note.mediaPath, note.createdAt)
-                mediaFilesByPath[exportPath] = note.mediaPath
+            val mediaPath = note.mediaPath ?: return@forEach
+            mediaFilesBySource.getOrPut(mediaPath) {
+                ExportMediaFile(
+                    exportPath = createMediaPath(mediaPath, note.id, note.createdAt),
+                    sourceUri = mediaPath,
+                )
             }
         }
 
-        // Process draft media references
         drafts.forEach { draft ->
-            draft.mediaReferences.forEach { mediaRef ->
-                val exportPath = createMediaPath(mediaRef, draft.createdAt)
-                mediaFilesByPath[exportPath] = mediaRef
+            draft.mediaReferences.forEachIndexed { index, mediaRef ->
+                mediaFilesBySource.getOrPut(mediaRef) {
+                    ExportMediaFile(
+                        exportPath = createMediaPath(mediaRef, "${draft.id}_$index", draft.createdAt),
+                        sourceUri = mediaRef,
+                    )
+                }
             }
         }
 
-        // Process audio notes
-        audioNotes.forEach { audioNote ->
-            val exportPath = createMediaPath(audioNote.mediaRef, audioNote.creationTimestamp)
-            mediaFilesByPath[exportPath] = audioNote.mediaRef
-        }
+        return mediaFilesBySource.values.toList()
+    }
 
-        return mediaFilesByPath.map { (exportPath, sourceUri) ->
-            ExportMediaFile(exportPath, sourceUri)
-        }
+    private fun String.sanitizePathSegment(maxLength: Int = 48): String =
+        replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .trim('_')
+            .take(maxLength)
+
+    private fun String.stableSuffix(): String {
+        val hash =
+            fold(17) { acc, char ->
+                (acc * 31) + char.code
+            }
+        return hash.toUInt().toString(16)
     }
 
     private fun NoteLocation.toExportLocation(): ExportLocation? {
         val lat = effectiveLatitude ?: return null
         val lng = effectiveLongitude ?: return null
-        return ExportLocation(lat, lng, displayName)
+        return ExportLocation(
+            latitude = lat,
+            longitude = lng,
+            placeName = displayName,
+            altitude = coordinates?.altitude,
+            accuracy = coordinates?.accuracy,
+        )
     }
+
+    private fun SerializableEntryBlock.toMediaReferences(): List<String> =
+        when (this) {
+            is SerializableImageBlock -> listOfNotNull(uri)
+            is SerializableVideoBlock -> listOfNotNull(uri, thumbnailUri)
+            is SerializableAudioBlock -> listOfNotNull(uri)
+            is SerializableCameraBlock -> listOfNotNull(uri)
+            is SerializableTextBlock -> emptyList()
+        }
 
     private fun EditorDraft.toExportDraft(): ExportDraft {
         val location =
@@ -322,6 +381,7 @@ class ExportUserDataUseCase(
                     ExportLocation(
                         latitude = latitude,
                         longitude = longitude,
+                        altitude = block.altitude,
                     )
                 } else {
                     null
@@ -334,78 +394,50 @@ class ExportUserDataUseCase(
                 .joinToString("\n") { it.content }
 
         val mediaReferences =
-            buildList {
-                blocks
-                    .filterIsInstance<SerializableImageBlock>()
-                    .mapNotNullTo(this) { it.uri }
-                blocks.filterIsInstance<SerializableVideoBlock>().forEach { block ->
-                    listOfNotNull(block.uri, block.thumbnailUri).forEach { uri ->
-                        add(uri)
-                    }
-                }
-                blocks
-                    .filterIsInstance<SerializableAudioBlock>()
-                    .mapNotNullTo(this) { it.uri }
-                blocks
-                    .filterIsInstance<SerializableCameraBlock>()
-                    .mapNotNullTo(this) { it.uri }
-            }.distinct()
-
-        val journalId = selectedJournalIds.firstOrNull()?.toString()
+            blocks
+                .flatMap { it.toMediaReferences() }
+                .distinct()
 
         return ExportDraft(
             id = id.toString(),
-            journalId = journalId,
+            journalId = selectedJournalIds.firstOrNull()?.toString(),
+            journalIds = selectedJournalIds.map { it.toString() },
             content = content,
             createdAt = createdAt,
             updatedAt = lastModifiedAt,
             location = location,
             mediaReferences = mediaReferences,
+            blocks = blocks,
         )
     }
 }
 
-/**
- * Represents the progress of the export operation.
- */
 sealed class ExportProgress {
-    /**
-     * Export operation is starting.
-     */
     data object Starting : ExportProgress()
 
-    /**
-     * Export operation is in progress.
-     */
     data class InProgress(
         val percentage: Float,
         val message: String,
     ) : ExportProgress()
 
-    /**
-     * Export operation completed successfully.
-     */
     data class Completed(
         val result: ExportResult,
     ) : ExportProgress()
 
-    /**
-     * Export operation failed.
-     */
     data class Failed(
         val reason: String,
     ) : ExportProgress()
 }
 
-/**
- * Result of a successful export operation.
- */
 data class ExportResult(
     val metadata: String,
     val journals: String,
     val notes: String,
     val journalNotes: String,
     val drafts: String,
+    val profile: String? = null,
+    val places: String? = null,
+    val locationHistory: String? = null,
     val mediaFiles: List<ExportMediaFile>,
     val mediaManifest: String? = null,
     val stats: ExportStats,
@@ -419,3 +451,36 @@ data class ExportMediaFile(
     val exportPath: String,
     val sourceUri: String,
 )
+
+private fun Place.toExportPlaceOrNull(): ExportPlace? =
+    when (this) {
+        is Place.UserDefined ->
+            ExportPlace(
+                id = id.toString(),
+                displayName = displayName,
+                latitude = lat,
+                longitude = lng,
+                radiusMeters = radiusMeters,
+                description = description,
+            )
+    }
+
+private fun LocationHistoryItem.toExportLocationHistoryItem(): ExportLocationHistoryItem =
+    ExportLocationHistoryItem(
+        sampleId = sampleId,
+        userId = userId,
+        deviceId = deviceId,
+        timestamp = timestamp,
+        loggedAt = loggedAt,
+        latitude = location.latitude,
+        longitude = location.longitude,
+        altitudeMeters = location.altitude.value,
+        confidence = confidence,
+        isGenuine = isGenuine,
+        capturePipeline = capturePipeline.name,
+        captureSource = captureSource.name,
+        accuracyMeters = accuracyMeters,
+        speedMetersPerSecond = speedMetersPerSecond,
+        bearingDegrees = bearingDegrees,
+        isMock = isMock,
+    )

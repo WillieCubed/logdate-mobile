@@ -9,13 +9,26 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.location.LocationCapturePipeline
+import app.logdate.client.repository.location.LocationCaptureSource
+import app.logdate.client.repository.location.LocationHistoryItem
+import app.logdate.client.repository.location.LocationHistoryRepository
+import app.logdate.client.repository.location.LocationLogRecord
+import app.logdate.client.repository.places.UserPlacesRepository
+import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
+import app.logdate.shared.model.Location
+import app.logdate.shared.model.LocationAltitude
+import app.logdate.shared.model.Place
 import app.logdate.shared.model.SerializableAudioBlock
+import app.logdate.shared.model.SerializableCameraBlock
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.SerializableVideoBlock
+import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.shared.model.user.UserData
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +51,9 @@ class ExportUserDataUseCaseTest {
     private lateinit var deviceIdProvider: FakeDeviceIdProvider
     private lateinit var appInfoProvider: FakeAppInfoProvider
     private lateinit var userStateRepository: FakeUserStateRepository
+    private lateinit var profileRepository: FakeProfileRepository
+    private lateinit var userPlacesRepository: FakeUserPlacesRepository
+    private lateinit var locationHistoryRepository: FakeLocationHistoryRepository
     private lateinit var useCase: ExportUserDataUseCase
 
     @BeforeTest
@@ -54,11 +70,17 @@ class ExportUserDataUseCaseTest {
                 ),
             )
         userStateRepository = FakeUserStateRepository()
+        profileRepository = FakeProfileRepository()
+        userPlacesRepository = FakeUserPlacesRepository()
+        locationHistoryRepository = FakeLocationHistoryRepository()
 
         useCase =
             ExportUserDataUseCase(
                 journalRepository = mockJournalRepository,
                 journalNotesRepository = mockNotesRepository,
+                profileRepository = profileRepository,
+                userPlacesRepository = userPlacesRepository,
+                locationHistoryRepository = locationHistoryRepository,
                 userStateRepository = userStateRepository,
                 deviceIdProvider = deviceIdProvider,
                 appInfoProvider = appInfoProvider,
@@ -127,7 +149,7 @@ class ExportUserDataUseCaseTest {
             val json = Json { ignoreUnknownKeys = true }
             val metadata = json.decodeFromString<ExportMetadata>(result.metadata)
 
-            assertEquals(deviceIdProvider.getDeviceId().value.toString(), metadata.userId)
+            assertEquals("Test User", metadata.userId)
             assertEquals(deviceIdProvider.getDeviceId().value.toString(), metadata.deviceId)
             assertEquals(appInfoProvider.getAppInfo().versionName, metadata.appVersion)
             assertEquals(1, metadata.stats.journalCount)
@@ -141,6 +163,7 @@ class ExportUserDataUseCaseTest {
 
             val uniquePaths = result.mediaFiles.map { it.exportPath }.toSet()
             assertEquals(uniquePaths.size, result.mediaFiles.size, "Media export paths should be unique")
+            assertTrue(result.mediaFiles.all { it.exportPath.startsWith("media/") }, "Media should export under media/")
 
             val relationsPayload = json.decodeFromString<Map<String, List<ExportJournalNoteRelation>>>(result.journalNotes)
             val relations = relationsPayload.getValue("journal_notes")
@@ -232,6 +255,127 @@ class ExportUserDataUseCaseTest {
             assertTrue(exportDraft.mediaReferences.contains("file:///audio.m4a"), "Draft should include audio reference")
             assertTrue(exportDraft.mediaReferences.contains("file:///video.mp4"), "Draft should include video reference")
             assertTrue(exportDraft.mediaReferences.contains("file:///video-thumb.jpg"), "Draft should include video thumbnail reference")
+            assertEquals(4, exportDraft.blocks.size, "Draft blocks should be exported losslessly")
+        }
+
+    @Test
+    fun `exportUserData preserves sync versions and normalized media paths`() =
+        runTest {
+            val note =
+                JournalNote.Image(
+                    uid = Uuid.random(),
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                    mediaRef = "file:///storage/photos/sunset.jpg",
+                    caption = "Sunset",
+                    syncVersion = 42,
+                )
+            val draft =
+                EditorDraft(
+                    id = Uuid.random(),
+                    blocks =
+                        listOf(
+                            SerializableCameraBlock(
+                                id = Uuid.random(),
+                                timestamp = Clock.System.now(),
+                                uri = "file:///storage/photos/sunset.jpg",
+                            ),
+                        ),
+                )
+
+            mockNotesRepository.testNotes = listOf(note)
+            mockJournalRepository.testDrafts = listOf(draft)
+
+            val progressUpdates = useCase.exportUserData().toList()
+            val result = (progressUpdates.last() as ExportProgress.Completed).result
+
+            val json = Json { ignoreUnknownKeys = true }
+            val exportedNote = json.decodeFromString<Map<String, List<ExportNote>>>(result.notes).getValue("notes").single()
+            val relationList =
+                json
+                    .decodeFromString<Map<String, List<ExportJournalNoteRelation>>>(result.journalNotes)
+                    .getValue("journal_notes")
+
+            assertEquals(42, exportedNote.syncVersion)
+            assertTrue(
+                result.mediaFiles
+                    .single()
+                    .exportPath
+                    .startsWith("media/"),
+            )
+            assertTrue(
+                !result.mediaFiles
+                    .single()
+                    .exportPath
+                    .contains(".jpg.jpg"),
+            )
+            assertTrue(relationList.isEmpty())
+        }
+
+    @Test
+    fun `exportUserData includes profile places and location history payloads`() =
+        runTest {
+            val placeId = Uuid.random()
+            val oldTimestamp = Clock.System.now() - 90.days
+            val recentTimestamp = Clock.System.now() - 2.days
+
+            profileRepository.profile =
+                LogDateProfile(
+                    displayName = "Willie",
+                    bio = "Writes a lot of journal entries",
+                    createdAt = oldTimestamp,
+                    lastUpdatedAt = recentTimestamp,
+                )
+            userPlacesRepository.places =
+                listOf(
+                    Place.UserDefined(
+                        id = placeId,
+                        displayName = "Home",
+                        lat = 37.7749,
+                        lng = -122.4194,
+                        radiusMeters = 125.0,
+                        description = "SF apartment",
+                    ),
+                )
+            locationHistoryRepository.entries =
+                listOf(
+                    LocationHistoryItem(
+                        sampleId = "sample-1",
+                        userId = "test-user",
+                        deviceId = "device-1",
+                        timestamp = recentTimestamp,
+                        loggedAt = recentTimestamp,
+                        location =
+                            Location(
+                                latitude = 37.7749,
+                                longitude = -122.4194,
+                                altitude = LocationAltitude(12.0, AltitudeUnit.METERS),
+                            ),
+                        confidence = 0.8f,
+                        isGenuine = true,
+                        capturePipeline = LocationCapturePipeline.HIGH_DETAIL,
+                        captureSource = LocationCaptureSource.MANUAL,
+                        accuracyMeters = 6.5f,
+                    ),
+                )
+
+            val progressUpdates = useCase.exportUserData().toList()
+            val result = (progressUpdates.last() as ExportProgress.Completed).result
+
+            val json = Json { ignoreUnknownKeys = true }
+            val metadata = json.decodeFromString<ExportMetadata>(result.metadata)
+            val exportedProfile = json.decodeFromString<ProfilePayload>(result.profile.orEmpty()).profile
+            val exportedPlaces = json.decodeFromString<PlacesPayload>(result.places.orEmpty()).places
+            val exportedLocationHistory =
+                json.decodeFromString<LocationHistoryPayload>(result.locationHistory.orEmpty()).locationHistory
+
+            assertTrue(metadata.stats.hasProfile)
+            assertEquals(1, metadata.stats.placeCount)
+            assertEquals(1, metadata.stats.locationHistoryCount)
+            assertEquals("Willie", exportedProfile.displayName)
+            assertEquals(placeId.toString(), exportedPlaces.single().id)
+            assertEquals("sample-1", exportedLocationHistory.single().sampleId)
+            assertEquals("HIGH_DETAIL", exportedLocationHistory.single().capturePipeline)
         }
 
     @Test
@@ -737,7 +881,7 @@ class ExportUserDataUseCaseTest {
         }
 
     private class FakeUserStateRepository : UserStateRepository {
-        override val userData: Flow<UserData> = flowOf(UserData())
+        override val userData: Flow<UserData> = flowOf(UserData(displayName = "Test User"))
 
         override suspend fun setBirthday(birthday: Instant) {}
 
@@ -746,6 +890,137 @@ class ExportUserDataUseCaseTest {
         override suspend fun setBiometricEnabled(isEnabled: Boolean) {}
 
         override suspend fun addFavoriteNote(vararg noteId: String) {}
+    }
+
+    private class FakeProfileRepository : ProfileRepository {
+        var profile: LogDateProfile = LogDateProfile()
+
+        override val currentProfile: Flow<LogDateProfile> = flowOf(profile)
+
+        override suspend fun updateDisplayName(displayName: String): Result<LogDateProfile> {
+            profile = profile.copy(displayName = displayName)
+            return Result.success(profile)
+        }
+
+        override suspend fun updateBirthday(birthday: Instant?): Result<LogDateProfile> {
+            profile = profile.copy(birthday = birthday)
+            return Result.success(profile)
+        }
+
+        override suspend fun updateProfilePhoto(profilePhotoUri: String?): Result<LogDateProfile> {
+            profile = profile.copy(profilePhotoUri = profilePhotoUri)
+            return Result.success(profile)
+        }
+
+        override suspend fun updateBio(
+            bio: String?,
+            originalBio: String?,
+        ): Result<LogDateProfile> {
+            profile = profile.copy(bio = bio, originalBio = originalBio)
+            return Result.success(profile)
+        }
+
+        override suspend fun getCurrentProfile(): LogDateProfile = profile
+
+        override suspend fun clearProfile(): Result<Unit> {
+            profile = LogDateProfile()
+            return Result.success(Unit)
+        }
+    }
+
+    private class FakeUserPlacesRepository : UserPlacesRepository {
+        var places: List<Place> = emptyList()
+
+        override suspend fun getAllPlaces(): List<Place> = places
+
+        override fun observeAllPlaces(): Flow<List<Place>> = flowOf(places)
+
+        override suspend fun getPlacesNear(
+            latitude: Double,
+            longitude: Double,
+            radiusMeters: Double,
+        ): List<Place> = places
+
+        override suspend fun getPlaceById(placeId: String): Place? = places.find { it.uid.toString() == placeId }
+
+        override suspend fun createPlace(place: Place): Result<Place> {
+            places = places + place
+            return Result.success(place)
+        }
+
+        override suspend fun updatePlace(place: Place): Result<Place> {
+            places = places.filterNot { it.uid == place.uid } + place
+            return Result.success(place)
+        }
+
+        override suspend fun deletePlace(placeId: String): Result<Unit> {
+            places = places.filterNot { it.uid.toString() == placeId }
+            return Result.success(Unit)
+        }
+
+        override suspend fun searchPlaces(query: String): List<Place> = places.filter { it.name.contains(query, ignoreCase = true) }
+    }
+
+    private class FakeLocationHistoryRepository : LocationHistoryRepository {
+        var entries: List<LocationHistoryItem> = emptyList()
+
+        override suspend fun getAllLocationHistory(): List<LocationHistoryItem> = entries
+
+        override fun observeLocationHistory(): Flow<List<LocationHistoryItem>> = flowOf(entries)
+
+        override suspend fun getRecentLocationHistory(limit: Int): List<LocationHistoryItem> = entries.take(limit)
+
+        override suspend fun getLocationHistoryBetween(
+            startTime: Instant,
+            endTime: Instant,
+        ): List<LocationHistoryItem> = entries.filter { it.timestamp in startTime..endTime }
+
+        override suspend fun getLastLocation(): LocationHistoryItem? = entries.maxByOrNull { it.timestamp }
+
+        override fun observeLastLocation(): Flow<LocationHistoryItem?> = flowOf(entries.maxByOrNull { it.timestamp })
+
+        override suspend fun logLocation(
+            location: Location,
+            userId: String,
+            deviceId: String,
+            confidence: Float,
+            isGenuine: Boolean,
+        ): Result<Unit> = Result.success(Unit)
+
+        override suspend fun logLocation(record: LocationLogRecord): Result<Unit> {
+            entries =
+                entries +
+                LocationHistoryItem(
+                    sampleId = record.sampleId,
+                    userId = record.userId,
+                    deviceId = record.deviceId,
+                    timestamp = record.timestamp,
+                    loggedAt = record.loggedAt,
+                    location = record.location,
+                    confidence = record.confidence,
+                    isGenuine = record.isGenuine,
+                    capturePipeline = record.capturePipeline,
+                    captureSource = record.captureSource,
+                    accuracyMeters = record.accuracyMeters,
+                    speedMetersPerSecond = record.speedMetersPerSecond,
+                    bearingDegrees = record.bearingDegrees,
+                    isMock = record.isMock,
+                )
+            return Result.success(Unit)
+        }
+
+        override suspend fun deleteLocationEntry(
+            userId: String,
+            deviceId: String,
+            timestamp: Instant,
+        ): Result<Unit> = Result.success(Unit)
+
+        override suspend fun deleteLocationsBetween(
+            startTime: Instant,
+            endTime: Instant,
+        ): Result<Unit> = Result.success(Unit)
+
+        override suspend fun getLocationCount(): Int = entries.size
     }
 
     private class FakeDeviceIdProvider(

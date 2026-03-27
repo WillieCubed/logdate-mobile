@@ -49,6 +49,7 @@ import app.logdate.client.domain.rewind.GetPastRewindsUseCase
 import app.logdate.client.domain.rewind.GetRewindUseCase
 import app.logdate.client.domain.rewind.GetWeekRewindUseCase
 import app.logdate.client.domain.search.SearchEntriesUseCase
+import app.logdate.client.domain.search.SearchJournalsUseCase
 import app.logdate.client.domain.timeline.GetMediaUrisUseCase
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
 import app.logdate.client.domain.timeline.GetTimelineDayUseCase
@@ -77,9 +78,9 @@ val domainModule: Module =
         factory { GetAppInfoUseCase(get()) }
 
         // Export
-        factory { ExportUserDataUseCase(get(), get(), get(), get(), get(), get()) }
+        factory { ExportUserDataUseCase(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
         factory { GetExportCountsUseCase(get(), get(), get()) }
-        factory { RestoreUserDataUseCase(get(), get(), get()) }
+        factory { RestoreUserDataUseCase(get(), get(), get(), get(), get(), get()) }
         factory { PreviewArchiveUseCase() }
 
         // Notes
@@ -169,6 +170,7 @@ val domainModule: Module =
 
         // Search
         factory { SearchEntriesUseCase(get()) }
+        factory { SearchJournalsUseCase(get()) }
 
         // Recommendations
         factory { GetMemoryRecallUseCase(get(), getOrNull()) }
@@ -176,5 +178,5 @@ val domainModule: Module =
         single<MemoriesSettingsRepository> { DefaultMemoriesSettingsRepository(get()) }
 
         // Day boundaries
-        single<DayBoundarySettingsRepository> { DefaultDayBoundarySettingsRepository(get()) }
+        single<DayBoundarySettingsRepository> { DefaultDayBoundarySettingsRepository(get(), get()) }
     }

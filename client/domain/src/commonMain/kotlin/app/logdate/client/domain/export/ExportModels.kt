@@ -1,6 +1,9 @@
 package app.logdate.client.domain.export
 
 import app.logdate.shared.model.Journal
+import app.logdate.shared.model.SerializableEntryBlock
+import app.logdate.shared.model.profile.LogDateProfile
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
@@ -13,6 +16,9 @@ data class LogDateExport(
     val journals: List<Journal>,
     val notes: List<ExportNote>,
     val drafts: List<ExportDraft>,
+    val profile: LogDateProfile? = null,
+    val places: List<ExportPlace> = emptyList(),
+    val locationHistory: List<ExportLocationHistoryItem> = emptyList(),
 )
 
 /**
@@ -20,7 +26,7 @@ data class LogDateExport(
  */
 @Serializable
 data class ExportMetadata(
-    val version: String = "1.0",
+    val version: ExportSchemaVersion = ExportSchemaVersion.CURRENT,
     val exportDate: Instant,
     val userId: String,
     val deviceId: String,
@@ -37,6 +43,9 @@ data class ExportStats(
     val noteCount: Int,
     val draftCount: Int,
     val mediaCount: Int,
+    val placeCount: Int = 0,
+    val locationHistoryCount: Int = 0,
+    val hasProfile: Boolean = false,
 )
 
 /**
@@ -52,11 +61,13 @@ data class ExportNote(
     val content: String? = null, // Text content for text notes
     val caption: String? = null, // Caption for media notes
     val mediaPath: String? = null, // Path to media file
+    val durationMs: Long? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
     val location: ExportLocation? = null,
     val tags: List<String> = emptyList(),
     val people: List<String> = emptyList(),
+    val syncVersion: Long = 0,
 )
 
 /**
@@ -65,12 +76,14 @@ data class ExportNote(
 @Serializable
 data class ExportDraft(
     val id: String,
-    val journalId: String? = null, // Optional journal ID
+    val journalId: String? = null, // Kept for backwards compatibility with older archives
+    val journalIds: List<String> = emptyList(),
     val content: String,
     val createdAt: Instant,
     val updatedAt: Instant,
     val location: ExportLocation? = null,
     val mediaReferences: List<String> = emptyList(),
+    val blocks: List<SerializableEntryBlock> = emptyList(),
 )
 
 /**
@@ -81,6 +94,8 @@ data class ExportLocation(
     val latitude: Double,
     val longitude: Double,
     val placeName: String? = null,
+    val altitude: Double? = null,
+    val accuracy: Float? = null,
 )
 
 /**
@@ -93,6 +108,37 @@ data class ExportJournalNoteRelation(
     val journalId: String,
     val noteId: String,
     val addedAt: Instant,
+    val syncVersion: Long = 0,
+)
+
+@Serializable
+data class ExportPlace(
+    val id: String,
+    val displayName: String,
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Double = 100.0,
+    val description: String? = null,
+)
+
+@Serializable
+data class ExportLocationHistoryItem(
+    val sampleId: String,
+    val userId: String,
+    val deviceId: String,
+    val timestamp: Instant,
+    val loggedAt: Instant,
+    val latitude: Double,
+    val longitude: Double,
+    val altitudeMeters: Double,
+    val confidence: Float,
+    val isGenuine: Boolean,
+    val capturePipeline: String,
+    val captureSource: String,
+    val accuracyMeters: Float? = null,
+    val speedMetersPerSecond: Float? = null,
+    val bearingDegrees: Float? = null,
+    val isMock: Boolean = false,
 )
 
 /**
@@ -129,8 +175,27 @@ data class ExportFileStructure(
     val notesFile: String = "notes.json",
     val journalNotesFile: String = "journal_notes.json",
     val draftsFile: String = "drafts.json",
+    val profileFile: String = "profile.json",
+    val placesFile: String = "places.json",
+    val locationHistoryFile: String = "location_history.json",
     val mediaManifestFile: String = "media_manifest.json",
     val mediaFolder: String = "media",
+)
+
+@Serializable
+data class ProfilePayload(
+    val profile: LogDateProfile,
+)
+
+@Serializable
+data class PlacesPayload(
+    val places: List<ExportPlace>,
+)
+
+@Serializable
+data class LocationHistoryPayload(
+    @SerialName("location_history")
+    val locationHistory: List<ExportLocationHistoryItem>,
 )
 
 @Serializable

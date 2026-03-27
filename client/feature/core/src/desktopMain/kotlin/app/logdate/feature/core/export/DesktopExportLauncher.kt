@@ -1,5 +1,6 @@
 package app.logdate.feature.core.export
 
+import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.export.ExportProgress
 import app.logdate.client.domain.export.ExportResult
 import app.logdate.client.domain.export.ExportUserDataUseCase
@@ -22,6 +23,7 @@ import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
 import java.io.FileOutputStream
+import java.net.URI
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.time.Clock
@@ -184,6 +186,7 @@ class DesktopExportLauncher :
         file: File,
         exportResult: ExportResult,
     ) {
+        val structure = ExportFileStructure()
         // Create a zip file
         val zipFile =
             if (!file.name.endsWith(".zip")) {
@@ -196,29 +199,22 @@ class DesktopExportLauncher :
 
         // Create zip output stream
         ZipOutputStream(FileOutputStream(zipFile)).use { zipOutputStream ->
-            // Add metadata.json
-            addZipEntry(zipOutputStream, "metadata.json", exportResult.metadata)
-
-            // Add journals.json
-            addZipEntry(zipOutputStream, "journals.json", exportResult.journals)
-
-            // Add notes.json
-            addZipEntry(zipOutputStream, "notes.json", exportResult.notes)
-
-            // Add journal_notes.json
-            addZipEntry(zipOutputStream, "journal_notes.json", exportResult.journalNotes)
-
-            // Add drafts.json
-            addZipEntry(zipOutputStream, "drafts.json", exportResult.drafts)
+            addZipEntry(zipOutputStream, structure.metadataFile, exportResult.metadata)
+            addZipEntry(zipOutputStream, structure.journalsFile, exportResult.journals)
+            addZipEntry(zipOutputStream, structure.notesFile, exportResult.notes)
+            addZipEntry(zipOutputStream, structure.journalNotesFile, exportResult.journalNotes)
+            addZipEntry(zipOutputStream, structure.draftsFile, exportResult.drafts)
+            exportResult.profile?.let { addZipEntry(zipOutputStream, structure.profileFile, it) }
+            exportResult.places?.let { addZipEntry(zipOutputStream, structure.placesFile, it) }
+            exportResult.locationHistory?.let { addZipEntry(zipOutputStream, structure.locationHistoryFile, it) }
 
             exportResult.mediaManifest?.let { manifest ->
-                addZipEntry(zipOutputStream, "media_manifest.json", manifest)
+                addZipEntry(zipOutputStream, structure.mediaManifestFile, manifest)
             }
 
-            // Add media files if available
-            // This would involve downloading files from their source URIs and adding them to the zip
-            // For now we'll skip this as it would require implementing a media download mechanism
-            // which is not part of this fix
+            exportResult.mediaFiles.forEach { mediaFile ->
+                addMediaEntry(zipOutputStream, mediaFile)
+            }
         }
     }
 
@@ -231,6 +227,36 @@ class DesktopExportLauncher :
         zipOutputStream.putNextEntry(entry)
         zipOutputStream.write(content.toByteArray())
         zipOutputStream.closeEntry()
+    }
+
+    private fun addMediaEntry(
+        zipOutputStream: ZipOutputStream,
+        mediaFile: app.logdate.client.domain.export.ExportMediaFile,
+    ) {
+        zipOutputStream.putNextEntry(ZipEntry(mediaFile.exportPath))
+        try {
+            val sourceUri = mediaFile.sourceUri
+            when {
+                sourceUri.startsWith("/") || sourceUri.startsWith("file://") -> {
+                    val file =
+                        if (sourceUri.startsWith("file://")) {
+                            File(URI(sourceUri))
+                        } else {
+                            File(sourceUri)
+                        }
+                    require(file.exists()) { "Media file missing at ${file.absolutePath}" }
+                    file.inputStream().use { it.copyTo(zipOutputStream) }
+                }
+                else -> {
+                    URI(sourceUri).toURL().openStream().use { it.copyTo(zipOutputStream) }
+                }
+            }
+        } catch (e: Exception) {
+            Napier.e("Desktop: Failed to add media file to ZIP: ${mediaFile.sourceUri}", e)
+            throw IllegalStateException("Failed to include media file: ${mediaFile.sourceUri}", e)
+        } finally {
+            zipOutputStream.closeEntry()
+        }
     }
 
     private fun showExportSuccessDialog(filePath: String) {

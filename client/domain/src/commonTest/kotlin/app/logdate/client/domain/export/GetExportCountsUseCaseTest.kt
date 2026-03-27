@@ -60,8 +60,7 @@ class GetExportCountsUseCaseTest {
             assertEquals(2, counts.journalCount, "Should count 2 journals")
             assertEquals(4, counts.noteCount, "Should count 4 notes")
             assertEquals(1, counts.draftCount, "Should count 1 draft")
-            // mediaCount = 3 (Image + Audio + Video from notesWithMedia) + 1 (Audio from getAllAudioNotesUseCase)
-            assertEquals(4, counts.mediaCount, "Should count 4 media items (3 media notes + 1 audio note)")
+            assertEquals(3, counts.mediaCount, "Should count 3 media items (image, audio, video)")
         }
 
     @Test
@@ -100,7 +99,7 @@ class GetExportCountsUseCaseTest {
         }
 
     @Test
-    fun `counts audio notes from GetAllAudioNotesUseCase separately from note media`() =
+    fun `counts audio notes once as media`() =
         runTest {
             val now = Clock.System.now()
             // Only audio notes - no image or video
@@ -112,14 +111,11 @@ class GetExportCountsUseCaseTest {
 
             val counts = useCase()
 
-            // notesWithMedia = 2 (both Audio notes count as media in the when-block)
-            // audioNotes from GetAllAudioNotesUseCase = 2 (same Audio notes filtered from allNotesObserved)
-            // mediaCount = 2 + 2 = 4
-            assertEquals(4, counts.mediaCount, "Audio notes are counted in both notesWithMedia and audioNotes")
+            assertEquals(2, counts.mediaCount, "Audio notes should be counted once")
         }
 
     @Test
-    fun `audio notes appearing in both allNotesObserved and getAllAudioNotesUseCase are double-counted`() =
+    fun `single audio note is not double-counted`() =
         runTest {
             val now = Clock.System.now()
             val audioNote =
@@ -133,10 +129,7 @@ class GetExportCountsUseCaseTest {
 
             val counts = useCase()
 
-            // The audio note is counted once as media in notesWithMedia (is JournalNote.Audio -> true)
-            // AND once from getAllAudioNotesUseCase which filters the same allNotesObserved flow
-            // So mediaCount = 1 + 1 = 2
-            assertEquals(2, counts.mediaCount, "A single audio note is counted twice: once as media note, once as audio note")
+            assertEquals(1, counts.mediaCount, "A single audio note should count once")
             assertEquals(1, counts.noteCount, "Note count should still be 1")
         }
 
@@ -190,11 +183,7 @@ class GetExportCountsUseCaseTest {
             assertEquals(noteCount, counts.noteCount)
             assertEquals(draftCount, counts.draftCount)
 
-            // 2000 notes: 500 text (i%4==0), 500 image (i%4==1), 500 audio (i%4==2), 500 video (i%4==3)
-            // notesWithMedia = 1500 (image + audio + video)
-            // audioNotes from GetAllAudioNotesUseCase = 500
-            // mediaCount = 1500 + 500 = 2000
-            assertEquals(2000, counts.mediaCount, "Media count should include all media notes plus audio notes")
+            assertEquals(1500, counts.mediaCount, "Media count should include image, audio, and video notes once")
         }
 
     private class MockJournalRepository : JournalRepository {
