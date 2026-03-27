@@ -8,6 +8,8 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
 import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
+import app.logdate.client.domain.recommendation.RecallMode
+import app.logdate.client.domain.recommendation.WidgetContentType
 import app.logdate.client.feature.widgets.OnThisDayWidgetRefreshWorker
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -104,14 +106,79 @@ class OnThisDayWidgetRefreshWorkerTest {
         assertEquals(ListenableWorker.Result.success(), result)
     }
 
+    @Test
+    fun workerSucceeds_withArchiveMode() = runTest {
+        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+        val archiveDay = today.minus(45, DateTimeUnit.DAY)
+        val timestamp = archiveDay.atStartOfDayIn(TimeZone.currentSystemDefault())
+
+        setupKoin(
+            notesForDay = listOf(
+                JournalNote.Image(
+                    uid = Uuid.random(),
+                    mediaRef = "content://media/archive-photo",
+                    creationTimestamp = timestamp,
+                    lastUpdated = timestamp,
+                    location = NoteLocation(),
+                ),
+            ),
+            contextualRecommendationsEnabled = true,
+            recallMode = RecallMode.REDISCOVER,
+        )
+
+        val worker = TestListenableWorkerBuilder<OnThisDayWidgetRefreshWorker>(context).build()
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+    }
+
+    @Test
+    fun workerSucceeds_withPhotosOnlyContentFilter() = runTest {
+        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+        val oneYearAgo = today.minus(1, DateTimeUnit.YEAR)
+        val timestamp = oneYearAgo.atStartOfDayIn(TimeZone.currentSystemDefault())
+
+        setupKoin(
+            notesForDay = listOf(
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    content = "Text note",
+                    creationTimestamp = timestamp,
+                    lastUpdated = timestamp,
+                    location = NoteLocation(),
+                ),
+                JournalNote.Image(
+                    uid = Uuid.random(),
+                    mediaRef = "content://media/photo-only",
+                    creationTimestamp = timestamp,
+                    lastUpdated = timestamp,
+                    location = NoteLocation(),
+                ),
+            ),
+            contextualRecommendationsEnabled = true,
+            widgetContentTypes = setOf(WidgetContentType.PHOTOS),
+        )
+
+        val worker = TestListenableWorkerBuilder<OnThisDayWidgetRefreshWorker>(context).build()
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+    }
+
     private fun setupKoin(
         notesForDay: List<JournalNote>,
         contextualRecommendationsEnabled: Boolean,
+        recallMode: RecallMode = RecallMode.ON_THIS_DAY,
+        widgetContentTypes: Set<WidgetContentType> = WidgetContentType.ALL,
     ) {
         val fakeRepo = FakeJournalNotesRepository(notesForDay)
         val getMemoryRecall = GetMemoryRecallUseCase(fakeRepo)
         val settings = FakeMemoriesSettingsRepository(
-            MemoriesSettings(contextualRecommendationsEnabled = contextualRecommendationsEnabled),
+            MemoriesSettings(
+                contextualRecommendationsEnabled = contextualRecommendationsEnabled,
+                recallMode = recallMode,
+                widgetContentTypes = widgetContentTypes,
+            ),
         )
 
         startKoin {
@@ -119,6 +186,7 @@ class OnThisDayWidgetRefreshWorkerTest {
                 module {
                     factory { getMemoryRecall }
                     single<MemoriesSettingsRepository> { settings }
+                    single<JournalNotesRepository> { fakeRepo }
                 },
             )
         }
@@ -133,6 +201,8 @@ private class FakeMemoriesSettingsRepository(
     override suspend fun updateSettings(settings: MemoriesSettings) {}
     override suspend fun setContextualRecommendationsEnabled(enabled: Boolean) {}
     override suspend fun setAiRecallEnabled(enabled: Boolean) {}
+    override suspend fun setRecallMode(mode: RecallMode) {}
+    override suspend fun setWidgetContentTypes(types: Set<WidgetContentType>) {}
 }
 
 private class FakeJournalNotesRepository(

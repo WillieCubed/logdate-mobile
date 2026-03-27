@@ -4,6 +4,7 @@ package app.logdate.client.feature.widgets
 
 import android.content.ComponentName
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -105,6 +106,7 @@ private fun MemoryContent(state: OnThisDayWidgetState.HasMemory) {
     val launchIntent = createWidgetLaunchIntent(dateIso = state.dateIso)
     val size = LocalSize.current
     val isCompact = size.height < 120.dp
+    val hasThumbnail = state.thumbnailUri != null
 
     WidgetContainer(onClick = launchIntent) {
         // Header
@@ -141,16 +143,43 @@ private fun MemoryContent(state: OnThisDayWidgetState.HasMemory) {
 
         Spacer(modifier = GlanceModifier.height(if (isCompact) 8.dp else 12.dp))
 
-        // Summary
-        Text(
-            text = state.summary,
-            style =
-                TextStyle(
-                    color = GlanceTheme.colors.onSurface,
-                    fontSize = if (isCompact) 14.sp else 16.sp,
-                ),
-            maxLines = if (isCompact) 2 else 4,
-        )
+        if (hasThumbnail) {
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Image(
+                    provider = androidx.glance.appwidget.ImageProvider(Uri.parse(state.thumbnailUri)),
+                    contentDescription = null,
+                    contentScale = androidx.glance.layout.ContentScale.Crop,
+                    modifier =
+                        GlanceModifier
+                            .size(if (isCompact) 56.dp else 64.dp)
+                            .cornerRadius(12.dp),
+                )
+                Spacer(modifier = GlanceModifier.width(12.dp))
+                Text(
+                    text = state.summary,
+                    style =
+                        TextStyle(
+                            color = GlanceTheme.colors.onSurface,
+                            fontSize = if (isCompact) 13.sp else 15.sp,
+                        ),
+                    maxLines = if (isCompact) 2 else 3,
+                    modifier = GlanceModifier.defaultWeight(),
+                )
+            }
+        } else {
+            Text(
+                text = state.summary,
+                style =
+                    TextStyle(
+                        color = GlanceTheme.colors.onSurface,
+                        fontSize = if (isCompact) 14.sp else 16.sp,
+                    ),
+                maxLines = if (isCompact) 2 else 4,
+            )
+        }
 
         Spacer(modifier = GlanceModifier.defaultWeight())
 

@@ -22,6 +22,7 @@ These are the main scopes for user-facing features. **Prefer these scopes** for 
 | `client/feature/rewind/` | `rewind` |
 | `client/feature/search/` | `search` |
 | `client/feature/timeline/` | `timeline` |
+| `client/feature/android-widgets/` | `android-widget` |
 
 ## Apps Scopes
 

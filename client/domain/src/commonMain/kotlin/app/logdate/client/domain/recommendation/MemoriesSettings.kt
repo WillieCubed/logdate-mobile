@@ -17,7 +17,7 @@ enum class RecallMode {
     /** Date-based: entries near today's date from prior years. */
     ON_THIS_DAY,
 
-    /** Broader: surfaces interesting past entries regardless of date. */
+    /** Archive-based: surfaces notable older entries regardless of date. */
     REDISCOVER,
 }
 

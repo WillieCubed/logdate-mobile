@@ -46,7 +46,12 @@ class OnThisDayWidgetRefreshWorker(
                 if (!settings.contextualRecommendationsEnabled) {
                     OnThisDayWidgetState.NoMemoryToday
                 } else {
-                    val recallData = getMemoryRecall(aiEnabled = settings.aiRecallEnabled).firstOrNull()
+                    val recallData =
+                        getMemoryRecall(
+                            aiEnabled = settings.aiRecallEnabled,
+                            recallMode = settings.recallMode,
+                            contentTypes = settings.widgetContentTypes,
+                        ).firstOrNull()
                     if (recallData != null) {
                         val fallback = context.getString(R.string.widget_fallback_summary)
                         recallData.toWidgetState(fallbackSummary = fallback)
