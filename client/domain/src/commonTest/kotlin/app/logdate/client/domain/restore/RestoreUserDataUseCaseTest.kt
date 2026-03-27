@@ -1,19 +1,39 @@
 package app.logdate.client.domain.restore
 
+import app.logdate.client.domain.export.ExportDraft
 import app.logdate.client.domain.export.ExportJournalNoteRelation
 import app.logdate.client.domain.export.ExportLocation
+import app.logdate.client.domain.export.ExportLocationHistoryItem
 import app.logdate.client.domain.export.ExportMediaFile
 import app.logdate.client.domain.export.ExportMediaManifest
 import app.logdate.client.domain.export.ExportNote
+import app.logdate.client.domain.export.ExportPlace
+import app.logdate.client.domain.export.ExportSchemaVersion
 import app.logdate.client.domain.export.ExportStats
+import app.logdate.client.domain.export.LocationHistoryPayload
+import app.logdate.client.domain.export.PlacesPayload
+import app.logdate.client.domain.export.ProfilePayload
+import app.logdate.client.domain.restore.IntegrityCategory
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.location.LocationCapturePipeline
+import app.logdate.client.repository.location.LocationHistoryItem
+import app.logdate.client.repository.location.LocationHistoryRepository
+import app.logdate.client.repository.location.LocationLogRecord
+import app.logdate.client.repository.places.UserPlacesRepository
+import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
+import app.logdate.shared.model.Location
+import app.logdate.shared.model.Place
+import app.logdate.shared.model.SerializableAudioBlock
 import app.logdate.shared.model.SerializableCameraBlock
+import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
+import app.logdate.shared.model.SerializableVideoBlock
+import app.logdate.shared.model.profile.LogDateProfile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -22,6 +42,7 @@ import kotlinx.serialization.json.Json
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -32,6 +53,9 @@ class RestoreUserDataUseCaseTest {
     private lateinit var journalRepo: FakeJournalRepository
     private lateinit var notesRepo: FakeJournalNotesRepository
     private lateinit var contentRepo: FakeJournalContentRepository
+    private lateinit var profileRepo: FakeProfileRepository
+    private lateinit var placesRepo: FakeUserPlacesRepository
+    private lateinit var locationHistoryRepo: FakeLocationHistoryRepository
     private lateinit var useCase: RestoreUserDataUseCase
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -42,7 +66,10 @@ class RestoreUserDataUseCaseTest {
         journalRepo = FakeJournalRepository()
         notesRepo = FakeJournalNotesRepository()
         contentRepo = FakeJournalContentRepository()
-        useCase = RestoreUserDataUseCase(journalRepo, notesRepo, contentRepo)
+        profileRepo = FakeProfileRepository()
+        placesRepo = FakeUserPlacesRepository()
+        locationHistoryRepo = FakeLocationHistoryRepository()
+        useCase = RestoreUserDataUseCase(journalRepo, notesRepo, contentRepo, profileRepo, placesRepo, locationHistoryRepo)
     }
 
     // region Happy path
@@ -181,6 +208,197 @@ class RestoreUserDataUseCaseTest {
             val saved = journalRepo.savedDrafts.first()
             assertTrue(saved.blocks.any { it is SerializableTextBlock })
             assertTrue(saved.blocks.any { it is SerializableCameraBlock })
+        }
+
+    @Test
+    fun `restore preserves sync version on notes`() =
+        runTest {
+            val noteId = Uuid.random()
+            val bundle =
+                buildBundle(
+                    notes =
+                        listOf(
+                            ExportNote(
+                                id = noteId.toString(),
+                                type = "text",
+                                content = "Sync aware note",
+                                createdAt = now,
+                                updatedAt = now,
+                                syncVersion = 99,
+                            ),
+                        ),
+                )
+
+            useCase.restore(bundle)
+
+            val restored = notesRepo.created.first()
+            assertIs<JournalNote.Text>(restored)
+            assertEquals(99, restored.syncVersion)
+        }
+
+    @Test
+    fun `restore uses full draft blocks payload when present`() =
+        runTest {
+            val draftId = Uuid.random()
+            val bundle =
+                buildBundle(
+                    drafts =
+                        listOf(
+                            ExportDraft(
+                                id = draftId.toString(),
+                                content = "Legacy fallback",
+                                createdAt = now,
+                                updatedAt = now,
+                                blocks =
+                                    listOf(
+                                        SerializableTextBlock(
+                                            id = Uuid.random(),
+                                            timestamp = now,
+                                            content = "Rich text",
+                                        ),
+                                        SerializableImageBlock(
+                                            id = Uuid.random(),
+                                            timestamp = now,
+                                            uri = "file:///photo.jpg",
+                                            caption = "Caption",
+                                        ),
+                                        SerializableVideoBlock(
+                                            id = Uuid.random(),
+                                            timestamp = now,
+                                            uri = "file:///clip.mp4",
+                                            thumbnailUri = "file:///thumb.jpg",
+                                            caption = "Clip",
+                                        ),
+                                        SerializableAudioBlock(
+                                            id = Uuid.random(),
+                                            timestamp = now,
+                                            uri = "file:///memo.m4a",
+                                            duration = 1234L,
+                                            transcription = "Memo",
+                                        ),
+                                    ),
+                            ),
+                        ),
+                )
+
+            useCase.restore(bundle)
+
+            val saved = journalRepo.savedDrafts.first()
+            assertEquals(4, saved.blocks.size)
+            assertTrue(saved.blocks.any { it is SerializableImageBlock })
+            assertTrue(saved.blocks.any { it is SerializableVideoBlock })
+            assertTrue(saved.blocks.any { it is SerializableAudioBlock })
+        }
+
+    @Test
+    fun `restore imports profile places and location history from optional payloads`() =
+        runTest {
+            val placeId = Uuid.random()
+            val profile =
+                LogDateProfile(
+                    displayName = "Willie",
+                    bio = "Writes a lot",
+                    birthday = now - 10.days,
+                )
+            val bundle =
+                buildBundle(
+                    profile = profile,
+                    places =
+                        listOf(
+                            ExportPlace(
+                                id = placeId.toString(),
+                                displayName = "Home",
+                                latitude = 37.7749,
+                                longitude = -122.4194,
+                                radiusMeters = 125.0,
+                                description = "Apartment",
+                            ),
+                        ),
+                    locationHistory =
+                        listOf(
+                            ExportLocationHistoryItem(
+                                sampleId = "sample-1",
+                                userId = "user-1",
+                                deviceId = "device-1",
+                                timestamp = now,
+                                loggedAt = now,
+                                latitude = 37.7749,
+                                longitude = -122.4194,
+                                altitudeMeters = 12.0,
+                                confidence = 0.8f,
+                                isGenuine = true,
+                                capturePipeline = "HIGH_DETAIL",
+                                captureSource = "MANUAL",
+                                accuracyMeters = 6.5f,
+                            ),
+                        ),
+                )
+
+            useCase.restore(bundle)
+
+            assertEquals("Willie", profileRepo.profile.displayName)
+            assertEquals("Writes a lot", profileRepo.profile.bio)
+            assertEquals(1, placesRepo.places.size)
+            assertEquals(placeId, (placesRepo.places.first() as Place.UserDefined).id)
+            assertEquals(1, locationHistoryRepo.entries.size)
+            assertEquals("sample-1", locationHistoryRepo.entries.first().sampleId)
+            assertEquals(LocationCapturePipeline.HIGH_DETAIL, locationHistoryRepo.entries.first().capturePipeline)
+        }
+
+    @Test
+    fun `restore location history does not scan all existing history before import`() =
+        runTest {
+            locationHistoryRepo.throwOnGetAllLocationHistory = true
+
+            val bundle =
+                buildBundle(
+                    locationHistory =
+                        listOf(
+                            ExportLocationHistoryItem(
+                                sampleId = "sample-1",
+                                userId = "user-1",
+                                deviceId = "device-1",
+                                timestamp = now,
+                                loggedAt = now,
+                                latitude = 37.7749,
+                                longitude = -122.4194,
+                                altitudeMeters = 12.0,
+                                confidence = 0.8f,
+                                isGenuine = true,
+                                capturePipeline = "HIGH_DETAIL",
+                                captureSource = "MANUAL",
+                            ),
+                        ),
+                )
+
+            val result = useCase.restore(bundle)
+
+            assertEquals(0, locationHistoryRepo.getAllLocationHistoryCallCount)
+            assertEquals(1, locationHistoryRepo.logLocationCallCount)
+            assertEquals(1, locationHistoryRepo.entries.size)
+            assertTrue(result.warnings.isEmpty())
+        }
+
+    @Test
+    fun `restore profile skips unchanged updates`() =
+        runTest {
+            val profile =
+                LogDateProfile(
+                    displayName = "Willie",
+                    bio = "Writes a lot",
+                    originalBio = "Writes a lot",
+                    birthday = now - 10.days,
+                    lastUpdatedAt = now,
+                )
+            profileRepo.profile = profile
+
+            val result = useCase.restore(buildBundle(profile = profile))
+
+            assertEquals(0, profileRepo.updateDisplayNameCallCount)
+            assertEquals(0, profileRepo.updateBirthdayCallCount)
+            assertEquals(0, profileRepo.updateProfilePhotoCallCount)
+            assertEquals(0, profileRepo.updateBioCallCount)
+            assertTrue(result.warnings.isEmpty())
         }
 
     // endregion
@@ -453,6 +671,41 @@ class RestoreUserDataUseCaseTest {
             assertEquals(importedUri, restored.mediaRef)
         }
 
+    @Test
+    fun `restore warns when archived media cannot be imported`() =
+        runTest {
+            val sourceUri = "content://media/external/images/123"
+            val exportPath = "media/2026/photo_abc123.jpg"
+            val bundle =
+                buildBundle(
+                    notes =
+                        listOf(
+                            ExportNote(
+                                id = Uuid.random().toString(),
+                                type = "image",
+                                mediaPath = sourceUri,
+                                createdAt = now,
+                                updatedAt = now,
+                            ),
+                        ),
+                    mediaManifest =
+                        ExportMediaManifest(
+                            files =
+                                listOf(
+                                    ExportMediaFile(
+                                        sourceUri = sourceUri,
+                                        exportPath = exportPath,
+                                    ),
+                                ),
+                        ),
+                )
+
+            val result = useCase.restore(bundle, mediaImporter = FakeMediaImporter())
+
+            assertEquals(0, result.notesImported)
+            assertTrue(result.warnings.any { it.contains("Missing media reference") })
+        }
+
     // endregion
 
     // region Caption preservation
@@ -647,6 +900,239 @@ class RestoreUserDataUseCaseTest {
 
     // endregion
 
+    // region Data coverage: audio duration, location precision, draft multi-journal
+
+    @Test
+    fun `restore preserves audio duration from ExportNote`() =
+        runTest {
+            val noteId = Uuid.random()
+            val bundle =
+                buildBundle(
+                    notes =
+                        listOf(
+                            ExportNote(
+                                id = noteId.toString(),
+                                type = "audio",
+                                mediaPath = "media/audio.m4a",
+                                durationMs = 42_500L,
+                                createdAt = now,
+                                updatedAt = now,
+                            ),
+                        ),
+                )
+
+            val result = useCase.restore(bundle)
+
+            assertEquals(1, result.notesImported)
+            val restored = notesRepo.created.first()
+            assertIs<JournalNote.Audio>(restored)
+            assertEquals(42_500L, restored.durationMs)
+        }
+
+    @Test
+    fun `restore preserves location altitude and accuracy`() =
+        runTest {
+            val noteId = Uuid.random()
+            val bundle =
+                buildBundle(
+                    notes =
+                        listOf(
+                            ExportNote(
+                                id = noteId.toString(),
+                                type = "text",
+                                content = "At the summit",
+                                createdAt = now,
+                                updatedAt = now,
+                                location =
+                                    ExportLocation(
+                                        latitude = 37.7749,
+                                        longitude = -122.4194,
+                                        placeName = "Twin Peaks",
+                                        altitude = 282.0,
+                                        accuracy = 4.5f,
+                                    ),
+                            ),
+                        ),
+                )
+
+            val result = useCase.restore(bundle)
+
+            assertEquals(1, result.notesImported)
+            val restored = notesRepo.created.first()
+            assertIs<JournalNote.Text>(restored)
+            val coords = restored.location?.coordinates
+            assertEquals(282.0, coords?.altitude)
+            assertEquals(4.5f, coords?.accuracy)
+        }
+
+    @Test
+    fun `restore preserves draft with multiple journal IDs`() =
+        runTest {
+            val journalId1 = Uuid.random()
+            val journalId2 = Uuid.random()
+            val draftId = Uuid.random()
+
+            val bundle =
+                buildBundle(
+                    journals = listOf(testJournal(journalId1), testJournal(journalId2)),
+                    drafts =
+                        listOf(
+                            ExportDraft(
+                                id = draftId.toString(),
+                                journalIds = listOf(journalId1.toString(), journalId2.toString()),
+                                content = "Cross-journal draft",
+                                createdAt = now,
+                                updatedAt = now,
+                            ),
+                        ),
+                )
+
+            val result = useCase.restore(bundle)
+
+            assertEquals(1, result.draftsImported)
+            val saved = journalRepo.savedDrafts.first()
+            assertEquals(2, saved.selectedJournalIds.size)
+            assertTrue(saved.selectedJournalIds.contains(journalId1))
+            assertTrue(saved.selectedJournalIds.contains(journalId2))
+        }
+
+    @Test
+    fun `restore falls back to journalId when journalIds is empty`() =
+        runTest {
+            val journalId = Uuid.random()
+            val draftId = Uuid.random()
+
+            val bundle =
+                buildBundle(
+                    journals = listOf(testJournal(journalId)),
+                    drafts =
+                        listOf(
+                            ExportDraft(
+                                id = draftId.toString(),
+                                journalId = journalId.toString(),
+                                content = "Legacy draft",
+                                createdAt = now,
+                                updatedAt = now,
+                            ),
+                        ),
+                )
+
+            val result = useCase.restore(bundle)
+
+            assertEquals(1, result.draftsImported)
+            val saved = journalRepo.savedDrafts.first()
+            assertEquals(1, saved.selectedJournalIds.size)
+            assertTrue(saved.selectedJournalIds.contains(journalId))
+        }
+
+    @Test
+    fun `restore remains compatible with V1_1 backups`() =
+        runTest {
+            val journalId = Uuid.random()
+            val draftId = Uuid.random()
+            val metadata =
+                app.logdate.client.domain.export.ExportMetadata(
+                    version = ExportSchemaVersion.V1_1,
+                    exportDate = now,
+                    userId = "test-user",
+                    deviceId = "test-device",
+                    appVersion = "1.0.0",
+                    stats = ExportStats(journalCount = 0, noteCount = 0, draftCount = 1, mediaCount = 0),
+                )
+            val bundle =
+                RestoreBundle(
+                    metadataJson = json.encodeToString(metadata),
+                    journalsJson = json.encodeToString(mapOf("journals" to emptyList<Journal>())),
+                    notesJson = json.encodeToString(mapOf("notes" to emptyList<ExportNote>())),
+                    journalNotesJson = json.encodeToString(mapOf("journal_notes" to emptyList<ExportJournalNoteRelation>())),
+                    draftsJson =
+                        json.encodeToString(
+                            mapOf(
+                                "drafts" to
+                                    listOf(
+                                        ExportDraft(
+                                            id = draftId.toString(),
+                                            journalId = journalId.toString(),
+                                            content = "Legacy draft",
+                                            createdAt = now,
+                                            updatedAt = now,
+                                        ),
+                                    ),
+                            ),
+                        ),
+                )
+
+            val result = useCase.restore(bundle)
+
+            assertEquals(1, result.draftsImported)
+            assertTrue(
+                journalRepo.savedDrafts
+                    .first()
+                    .selectedJournalIds
+                    .contains(journalId),
+            )
+        }
+
+    // endregion
+
+    // region Metadata integrity validation
+
+    @Test
+    fun `restore reports mismatches when metadata stats do not match actual archive contents`() =
+        runTest {
+            val journalId = Uuid.random()
+            val noteId = Uuid.random()
+
+            // Metadata claims 5 journals and 10 notes, but archive only has 1 of each
+            val bundle =
+                buildBundleWithCustomStats(
+                    journals = listOf(testJournal(journalId)),
+                    notes = listOf(testTextNote(noteId)),
+                    stats = ExportStats(journalCount = 5, noteCount = 10, draftCount = 0, mediaCount = 0),
+                )
+
+            val result = useCase.restore(bundle)
+
+            assertEquals(2, result.integrityMismatches.size)
+            val journalMismatch = result.integrityMismatches.first { it.category == IntegrityCategory.JOURNALS }
+            assertEquals(5, journalMismatch.expected)
+            assertEquals(1, journalMismatch.actual)
+            val noteMismatch = result.integrityMismatches.first { it.category == IntegrityCategory.NOTES }
+            assertEquals(10, noteMismatch.expected)
+            assertEquals(1, noteMismatch.actual)
+        }
+
+    @Test
+    fun `restore produces no integrity mismatches when stats match`() =
+        runTest {
+            val journalId = Uuid.random()
+
+            val bundle =
+                buildBundle(
+                    journals = listOf(testJournal(journalId)),
+                )
+
+            val result = useCase.restore(bundle)
+
+            assertTrue(result.integrityMismatches.isEmpty())
+        }
+
+    @Test
+    fun `restore rejects archive with unsupported major version`() =
+        runTest {
+            val bundle = buildBundleWithVersion(ExportSchemaVersion(99, 0))
+
+            val exception =
+                kotlin
+                    .runCatching { useCase.restore(bundle) }
+                    .exceptionOrNull()
+
+            assertTrue(exception is UnsupportedExportVersionException)
+            assertEquals(99, exception.archiveVersion.major)
+        }
+
+    // endregion
+
     // region Test data builders
 
     private fun testJournal(
@@ -693,11 +1179,14 @@ class RestoreUserDataUseCaseTest {
         notes: List<ExportNote> = emptyList(),
         relations: List<ExportJournalNoteRelation> = emptyList(),
         drafts: List<app.logdate.client.domain.export.ExportDraft> = emptyList(),
+        profile: LogDateProfile? = null,
+        places: List<ExportPlace> = emptyList(),
+        locationHistory: List<ExportLocationHistoryItem> = emptyList(),
         mediaManifest: ExportMediaManifest? = null,
     ): RestoreBundle {
         val metadata =
             app.logdate.client.domain.export.ExportMetadata(
-                version = "1.0",
+                version = ExportSchemaVersion.CURRENT,
                 exportDate = now,
                 userId = "test-user",
                 deviceId = "test-device",
@@ -708,6 +1197,9 @@ class RestoreUserDataUseCaseTest {
                         noteCount = notes.size,
                         draftCount = drafts.size,
                         mediaCount = 0,
+                        placeCount = places.size,
+                        locationHistoryCount = locationHistory.size,
+                        hasProfile = profile != null,
                     ),
             )
         return RestoreBundle(
@@ -716,7 +1208,59 @@ class RestoreUserDataUseCaseTest {
             notesJson = json.encodeToString(mapOf("notes" to notes)),
             journalNotesJson = json.encodeToString(mapOf("journal_notes" to relations)),
             draftsJson = json.encodeToString(mapOf("drafts" to drafts)),
+            profileJson = profile?.let { json.encodeToString(ProfilePayload(it)) },
+            placesJson = places.takeIf { it.isNotEmpty() }?.let { json.encodeToString(PlacesPayload(it)) },
+            locationHistoryJson =
+                locationHistory.takeIf { it.isNotEmpty() }?.let {
+                    json.encodeToString(LocationHistoryPayload(it))
+                },
             mediaManifestJson = mediaManifest?.let { json.encodeToString(it) },
+        )
+    }
+
+    private fun buildBundleWithCustomStats(
+        journals: List<Journal> = emptyList(),
+        notes: List<ExportNote> = emptyList(),
+        relations: List<ExportJournalNoteRelation> = emptyList(),
+        drafts: List<app.logdate.client.domain.export.ExportDraft> = emptyList(),
+        mediaManifest: ExportMediaManifest? = null,
+        stats: ExportStats,
+    ): RestoreBundle {
+        val metadata =
+            app.logdate.client.domain.export.ExportMetadata(
+                version = ExportSchemaVersion.CURRENT,
+                exportDate = now,
+                userId = "test-user",
+                deviceId = "test-device",
+                appVersion = "1.0.0",
+                stats = stats,
+            )
+        return RestoreBundle(
+            metadataJson = json.encodeToString(metadata),
+            journalsJson = json.encodeToString(mapOf("journals" to journals)),
+            notesJson = json.encodeToString(mapOf("notes" to notes)),
+            journalNotesJson = json.encodeToString(mapOf("journal_notes" to relations)),
+            draftsJson = json.encodeToString(mapOf("drafts" to drafts)),
+            mediaManifestJson = mediaManifest?.let { json.encodeToString(it) },
+        )
+    }
+
+    private fun buildBundleWithVersion(version: ExportSchemaVersion): RestoreBundle {
+        val metadata =
+            app.logdate.client.domain.export.ExportMetadata(
+                version = version,
+                exportDate = now,
+                userId = "test-user",
+                deviceId = "test-device",
+                appVersion = "1.0.0",
+                stats = ExportStats(journalCount = 0, noteCount = 0, draftCount = 0, mediaCount = 0),
+            )
+        return RestoreBundle(
+            metadataJson = json.encodeToString(metadata),
+            journalsJson = json.encodeToString(mapOf("journals" to emptyList<Journal>())),
+            notesJson = json.encodeToString(mapOf("notes" to emptyList<ExportNote>())),
+            journalNotesJson = json.encodeToString(mapOf("journal_notes" to emptyList<ExportJournalNoteRelation>())),
+            draftsJson = json.encodeToString(mapOf("drafts" to emptyList<ExportDraft>())),
         )
     }
 
@@ -869,6 +1413,155 @@ class RestoreUserDataUseCaseTest {
         private val mappings: Map<String, String> = emptyMap(),
     ) : MediaImporter {
         override suspend fun importMedia(exportPath: String): String? = mappings[exportPath]
+    }
+
+    private class FakeProfileRepository : ProfileRepository {
+        var profile: LogDateProfile = LogDateProfile()
+        var updateDisplayNameCallCount = 0
+        var updateBirthdayCallCount = 0
+        var updateProfilePhotoCallCount = 0
+        var updateBioCallCount = 0
+
+        override val currentProfile: Flow<LogDateProfile> = flowOf(profile)
+
+        override suspend fun updateDisplayName(displayName: String): Result<LogDateProfile> {
+            updateDisplayNameCallCount++
+            profile = profile.copy(displayName = displayName)
+            return Result.success(profile)
+        }
+
+        override suspend fun updateBirthday(birthday: Instant?): Result<LogDateProfile> {
+            updateBirthdayCallCount++
+            profile = profile.copy(birthday = birthday)
+            return Result.success(profile)
+        }
+
+        override suspend fun updateProfilePhoto(profilePhotoUri: String?): Result<LogDateProfile> {
+            updateProfilePhotoCallCount++
+            profile = profile.copy(profilePhotoUri = profilePhotoUri)
+            return Result.success(profile)
+        }
+
+        override suspend fun updateBio(
+            bio: String?,
+            originalBio: String?,
+        ): Result<LogDateProfile> {
+            updateBioCallCount++
+            profile = profile.copy(bio = bio, originalBio = originalBio)
+            return Result.success(profile)
+        }
+
+        override suspend fun getCurrentProfile(): LogDateProfile = profile
+
+        override suspend fun clearProfile(): Result<Unit> {
+            profile = LogDateProfile()
+            return Result.success(Unit)
+        }
+    }
+
+    private class FakeUserPlacesRepository : UserPlacesRepository {
+        var places = emptyList<Place>()
+
+        override suspend fun getAllPlaces(): List<Place> = places
+
+        override fun observeAllPlaces(): Flow<List<Place>> = flowOf(places)
+
+        override suspend fun getPlacesNear(
+            latitude: Double,
+            longitude: Double,
+            radiusMeters: Double,
+        ): List<Place> = places
+
+        override suspend fun getPlaceById(placeId: String): Place? = places.find { it.uid.toString() == placeId }
+
+        override suspend fun createPlace(place: Place): Result<Place> {
+            places = places + place
+            return Result.success(place)
+        }
+
+        override suspend fun updatePlace(place: Place): Result<Place> {
+            places = places.filterNot { it.uid == place.uid } + place
+            return Result.success(place)
+        }
+
+        override suspend fun deletePlace(placeId: String): Result<Unit> {
+            places = places.filterNot { it.uid.toString() == placeId }
+            return Result.success(Unit)
+        }
+
+        override suspend fun searchPlaces(query: String): List<Place> = places.filter { it.name.contains(query, ignoreCase = true) }
+    }
+
+    private class FakeLocationHistoryRepository : LocationHistoryRepository {
+        var entries = emptyList<LocationHistoryItem>()
+        var getAllLocationHistoryCallCount = 0
+        var logLocationCallCount = 0
+        var throwOnGetAllLocationHistory = false
+
+        override suspend fun getAllLocationHistory(): List<LocationHistoryItem> {
+            getAllLocationHistoryCallCount++
+            if (throwOnGetAllLocationHistory) {
+                error("getAllLocationHistory should not be called during restore")
+            }
+            return entries
+        }
+
+        override fun observeLocationHistory(): Flow<List<LocationHistoryItem>> = flowOf(entries)
+
+        override suspend fun getRecentLocationHistory(limit: Int): List<LocationHistoryItem> = entries.take(limit)
+
+        override suspend fun getLocationHistoryBetween(
+            startTime: Instant,
+            endTime: Instant,
+        ): List<LocationHistoryItem> = entries.filter { it.timestamp in startTime..endTime }
+
+        override suspend fun getLastLocation(): LocationHistoryItem? = entries.maxByOrNull { it.timestamp }
+
+        override fun observeLastLocation(): Flow<LocationHistoryItem?> = flowOf(entries.maxByOrNull { it.timestamp })
+
+        override suspend fun logLocation(
+            location: Location,
+            userId: String,
+            deviceId: String,
+            confidence: Float,
+            isGenuine: Boolean,
+        ): Result<Unit> = Result.success(Unit)
+
+        override suspend fun logLocation(record: LocationLogRecord): Result<Unit> {
+            logLocationCallCount++
+            entries =
+                entries +
+                LocationHistoryItem(
+                    sampleId = record.sampleId,
+                    userId = record.userId,
+                    deviceId = record.deviceId,
+                    timestamp = record.timestamp,
+                    loggedAt = record.loggedAt,
+                    location = record.location,
+                    confidence = record.confidence,
+                    isGenuine = record.isGenuine,
+                    capturePipeline = record.capturePipeline,
+                    captureSource = record.captureSource,
+                    accuracyMeters = record.accuracyMeters,
+                    speedMetersPerSecond = record.speedMetersPerSecond,
+                    bearingDegrees = record.bearingDegrees,
+                    isMock = record.isMock,
+                )
+            return Result.success(Unit)
+        }
+
+        override suspend fun deleteLocationEntry(
+            userId: String,
+            deviceId: String,
+            timestamp: Instant,
+        ): Result<Unit> = Result.success(Unit)
+
+        override suspend fun deleteLocationsBetween(
+            startTime: Instant,
+            endTime: Instant,
+        ): Result<Unit> = Result.success(Unit)
+
+        override suspend fun getLocationCount(): Int = entries.size
     }
 
     // endregion

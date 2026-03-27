@@ -37,12 +37,22 @@ class ExportMigrationRunner(
         sourceVersion: ExportSchemaVersion,
         bundle: ParsedExportBundle,
     ): ParsedExportBundle {
-        var current = bundle
-        for (migration in migrations) {
-            if (sourceVersion <= migration.from) {
-                current = migration.migrate(current)
-            }
+        if (sourceVersion > ExportSchemaVersion.CURRENT) {
+            return bundle
         }
+
+        val migrationMap = migrations.associateBy { it.from }
+        var currentVersion = sourceVersion
+        var current = bundle
+
+        while (currentVersion < ExportSchemaVersion.CURRENT) {
+            val migration =
+                migrationMap[currentVersion]
+                    ?: error("Missing export migration from $currentVersion to ${ExportSchemaVersion.CURRENT}")
+            current = migration.migrate(current)
+            currentVersion = migration.to
+        }
+
         return current
     }
 }
@@ -56,6 +66,7 @@ class ExportMigrationRunner(
 val exportMigrations: List<ExportMigration> =
     listOf(
         V1_0ToV1_1Migration(),
+        V1_1ToV1_2Migration(),
     )
 
 /**
@@ -77,4 +88,15 @@ class V1_0ToV1_1Migration : ExportMigration {
                     }
                 },
         )
+}
+
+/**
+ * v1.1 -> v1.2 is additive-only. Draft blocks and sync metadata deserialize via
+ * default values, so no structural rewrite is needed beyond explicit version advancement.
+ */
+class V1_1ToV1_2Migration : ExportMigration {
+    override val from = ExportSchemaVersion.V1_1
+    override val to = ExportSchemaVersion.V1_2
+
+    override fun migrate(bundle: ParsedExportBundle): ParsedExportBundle = bundle
 }
