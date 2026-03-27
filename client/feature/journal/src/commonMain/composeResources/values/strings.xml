@@ -66,4 +66,10 @@
     <string name="filter_shared">Shared</string>
     <string name="cd_switch_to_grid">Switch to grid view</string>
     <string name="cd_switch_to_carousel">Switch to carousel view</string>
+    <string name="search_journals">Search journals</string>
+    <string name="cd_clear_search">Clear search</string>
+    <string name="cd_close_search">Close search</string>
+    <string name="search_no_results">No results for \"%1$s\"</string>
+    <string name="search_section_journals">Journals</string>
+    <string name="search_section_entries">Entries</string>
 </resources>

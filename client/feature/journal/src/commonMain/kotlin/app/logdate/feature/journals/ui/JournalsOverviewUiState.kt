@@ -14,6 +14,7 @@ data class JournalsOverviewUiState(
     val layoutMode: JournalLayoutMode = JournalLayoutMode.CAROUSEL,
     val sortOption: JournalSortOption = JournalSortOption.LAST_UPDATED,
     val activeFilters: Set<JournalFilter> = emptySet(),
+    val searchQuery: String = "",
 )
 
 /**

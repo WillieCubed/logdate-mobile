@@ -15,6 +15,7 @@ import app.logdate.navigation.routes.core.NewJournalRoute
 import app.logdate.navigation.routes.core.ShareJournal
 import app.logdate.navigation.routes.routeEntry
 import app.logdate.navigation.scenes.HomeScene
+import kotlinx.datetime.LocalDate
 import kotlin.uuid.Uuid
 
 fun MainAppNavigator.openJournalDetail(
@@ -67,6 +68,7 @@ fun EntryProviderScope<NavKey>.journalRoutes(
     onBrowseJournals: () -> Unit,
     onJournalDeleted: () -> Unit,
     onNavigateToNoteDetail: (Uuid) -> Unit,
+    onNavigateToDay: (LocalDate) -> Unit,
     onNavigateToJournalSettings: (Uuid) -> Unit = {},
     onNavigateToShareJournal: (Uuid) -> Unit = {},
     onJournalCreated: (Uuid) -> Unit = {},
@@ -78,6 +80,7 @@ fun EntryProviderScope<NavKey>.journalRoutes(
             onOpenJournal = onOpenJournalDetail,
             onBrowseJournals = onBrowseJournals,
             onCreateJournal = onCreateJournal,
+            onNavigateToDay = onNavigateToDay,
             onNavigationClick = { /* TODO: Handle navigation menu click */ },
         )
     }

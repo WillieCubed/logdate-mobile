@@ -610,6 +610,7 @@ fun MainNavigationRoot(
                             onNavigateToNoteDetail = { noteId ->
                                 mainAppNavigator.backStack.add(NoteViewerRoute(noteId))
                             },
+                            onNavigateToDay = mainAppNavigator::openTimelineDetail,
                             onNavigateToJournalSettings = mainAppNavigator::openJournalSettings,
                             onNavigateToShareJournal = mainAppNavigator::openShareJournal,
                             onJournalCreated = mainAppNavigator::finishJournalCreation,

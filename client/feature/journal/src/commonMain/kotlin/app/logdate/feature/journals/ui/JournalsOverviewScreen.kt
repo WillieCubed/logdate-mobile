@@ -14,7 +14,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.logdate.client.repository.search.SearchResult
 import app.logdate.ui.theme.Spacing
+import kotlinx.datetime.LocalDate
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -25,21 +27,27 @@ fun JournalsOverviewScreen(
     onOpenJournal: JournalClickCallback,
     onBrowseJournals: () -> Unit,
     onCreateJournal: () -> Unit,
+    onNavigateToDay: (LocalDate) -> Unit = {},
     onNavigationClick: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: JournalsOverviewViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val entryResults by viewModel.entrySearchResults.collectAsStateWithLifecycle()
 
     JournalsOverviewScreenContent(
         journals = state.journals,
         layoutMode = state.layoutMode,
         sortOption = state.sortOption,
         activeFilters = state.activeFilters,
+        searchQuery = state.searchQuery,
+        entryResults = entryResults,
         onOpenJournal = onOpenJournal,
         onBrowseJournals = onBrowseJournals,
         onCreateJournal = onCreateJournal,
+        onNavigateToDay = onNavigateToDay,
         onNavigationClick = onNavigationClick,
+        onQueryChange = viewModel::updateSearchQuery,
         onToggleLayoutMode = viewModel::toggleLayoutMode,
         onSortOptionSelected = viewModel::setSortOption,
         onToggleFilter = viewModel::toggleFilter,
@@ -59,9 +67,13 @@ fun JournalsOverviewScreenContent(
     layoutMode: JournalLayoutMode,
     sortOption: JournalSortOption,
     activeFilters: Set<JournalFilter>,
+    searchQuery: String,
+    entryResults: List<SearchResult>,
     onOpenJournal: JournalClickCallback,
     onBrowseJournals: () -> Unit,
     onCreateJournal: () -> Unit,
+    onNavigateToDay: (LocalDate) -> Unit,
+    onQueryChange: (String) -> Unit,
     onToggleLayoutMode: () -> Unit,
     onSortOptionSelected: (JournalSortOption) -> Unit,
     onToggleFilter: (JournalFilter) -> Unit,
@@ -74,7 +86,12 @@ fun JournalsOverviewScreenContent(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             JournalSearchToolbar(
-                onNavigationClick = onNavigationClick,
+                searchQuery = searchQuery,
+                filteredJournals = journals,
+                entryResults = entryResults,
+                onQueryChange = onQueryChange,
+                onOpenJournal = onOpenJournal,
+                onNavigateToDay = onNavigateToDay,
                 modifier = Modifier.fillMaxWidth(),
             )
         },
