@@ -1,10 +1,16 @@
 package app.logdate.feature.onboarding.navigation
 
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.navigation
+import app.logdate.client.domain.dayboundary.HealthConnectStatus
 import app.logdate.feature.core.account.CloudAccountOnboardingScreen
 import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.feature.onboarding.ui.MemoriesImportInfoScreen
@@ -12,11 +18,13 @@ import app.logdate.feature.onboarding.ui.MemorySelectionScreen
 import app.logdate.feature.onboarding.ui.MemorySelectionViewModel
 import app.logdate.feature.onboarding.ui.OnboardingBirthdayScreen
 import app.logdate.feature.onboarding.ui.OnboardingCompletionScreen
+import app.logdate.feature.onboarding.ui.OnboardingDayBoundariesScreen
 import app.logdate.feature.onboarding.ui.OnboardingLocationScreen
 import app.logdate.feature.onboarding.ui.OnboardingNotificationsScreen
 import app.logdate.feature.onboarding.ui.OnboardingOverviewScreen
 import app.logdate.feature.onboarding.ui.OnboardingRecommendationsScreen
 import app.logdate.feature.onboarding.ui.OnboardingStartScreen
+import app.logdate.feature.onboarding.ui.OnboardingViewModel
 import app.logdate.feature.onboarding.ui.PersonalIntroScreen
 import app.logdate.feature.onboarding.ui.WelcomeBackScreen
 import kotlinx.serialization.Serializable
@@ -62,6 +70,9 @@ data object BirthdayIntro : OnboardingBaseRoute
 
 @Serializable
 data object FeatureRecommendations : OnboardingBaseRoute
+
+@Serializable
+data object FeatureDayBoundaries : OnboardingBaseRoute
 
 @Serializable
 data object FeatureLocationTimeline : OnboardingBaseRoute
@@ -166,7 +177,45 @@ fun NavGraphBuilder.onboardingGraph(
             )
         }
         composable<FeatureRecommendations> {
+            val viewModel = koinViewModel<OnboardingViewModel>()
+            val healthConnectStatus by viewModel.healthConnectStatus.collectAsState()
+            var pendingNextRoute by rememberSaveable { mutableStateOf(false) }
+
+            LaunchedEffect(pendingNextRoute, healthConnectStatus) {
+                if (!pendingNextRoute || healthConnectStatus == HealthConnectStatus.CHECKING) {
+                    return@LaunchedEffect
+                }
+
+                pendingNextRoute = false
+                onGoToItem(
+                    if (healthConnectStatus == HealthConnectStatus.NOT_AVAILABLE) {
+                        FeatureLocationTimeline
+                    } else {
+                        FeatureDayBoundaries
+                    },
+                )
+            }
+
             OnboardingRecommendationsScreen(
+                viewModel = viewModel,
+                onBack = onNavigateBack,
+                onNext = {
+                    if (healthConnectStatus == HealthConnectStatus.CHECKING) {
+                        pendingNextRoute = true
+                    } else {
+                        onGoToItem(
+                            if (healthConnectStatus == HealthConnectStatus.NOT_AVAILABLE) {
+                                FeatureLocationTimeline
+                            } else {
+                                FeatureDayBoundaries
+                            },
+                        )
+                    }
+                },
+            )
+        }
+        composable<FeatureDayBoundaries> {
+            OnboardingDayBoundariesScreen(
                 onBack = onNavigateBack,
                 onNext = {
                     onGoToItem(FeatureLocationTimeline)

@@ -83,6 +83,7 @@ kotlin {
         }
 
         commonTest.dependencies {
+            implementation(projects.client.healthConnect)
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
         }

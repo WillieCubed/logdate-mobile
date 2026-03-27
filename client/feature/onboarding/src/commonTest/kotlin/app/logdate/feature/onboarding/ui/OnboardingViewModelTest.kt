@@ -1,7 +1,17 @@
 package app.logdate.feature.onboarding.ui
 
+import app.logdate.client.domain.dayboundary.DayBoundarySettings
+import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
+import app.logdate.client.domain.dayboundary.HealthConnectStatus
+import app.logdate.client.domain.dayboundary.ObserveHealthConnectStatusUseCase
 import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
+import app.logdate.client.domain.recommendation.RecallMode
+import app.logdate.client.domain.recommendation.WidgetContentType
+import app.logdate.client.health.LocalFirstHealthRepository
+import app.logdate.client.health.model.DayBounds
+import app.logdate.client.health.model.SleepSession
+import app.logdate.client.health.model.TimeOfDay
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.repository.journals.JournalNote
@@ -18,6 +28,8 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -33,6 +45,8 @@ class OnboardingViewModelTest {
     private lateinit var fakeUserStateRepository: FakeUserStateRepository
     private lateinit var fakeMemoriesSettingsRepository: FakeMemoriesSettingsRepository
     private lateinit var fakeLocationSettingsRepository: FakeLocationTrackingSettingsRepository
+    private lateinit var fakeDayBoundarySettingsRepository: FakeDayBoundarySettingsRepository
+    private lateinit var fakeHealthRepository: FakeLocalFirstHealthRepository
     private lateinit var viewModel: OnboardingViewModel
 
     @BeforeTest
@@ -42,14 +56,20 @@ class OnboardingViewModelTest {
         fakeUserStateRepository = FakeUserStateRepository()
         fakeMemoriesSettingsRepository = FakeMemoriesSettingsRepository()
         fakeLocationSettingsRepository = FakeLocationTrackingSettingsRepository()
-        viewModel =
-            OnboardingViewModel(
-                journalNotesRepository = fakeNotesRepository,
-                userStateRepository = fakeUserStateRepository,
-                memoriesSettingsRepository = fakeMemoriesSettingsRepository,
-                locationTrackingSettingsRepository = fakeLocationSettingsRepository,
-            )
+        fakeDayBoundarySettingsRepository = FakeDayBoundarySettingsRepository()
+        fakeHealthRepository = FakeLocalFirstHealthRepository()
+        viewModel = createViewModel()
     }
+
+    private fun createViewModel(): OnboardingViewModel =
+        OnboardingViewModel(
+            journalNotesRepository = fakeNotesRepository,
+            userStateRepository = fakeUserStateRepository,
+            memoriesSettingsRepository = fakeMemoriesSettingsRepository,
+            locationTrackingSettingsRepository = fakeLocationSettingsRepository,
+            dayBoundarySettingsRepository = fakeDayBoundarySettingsRepository,
+            observeHealthConnectStatus = ObserveHealthConnectStatusUseCase(fakeHealthRepository),
+        )
 
     @AfterTest
     fun tearDown() {
@@ -92,6 +112,39 @@ class OnboardingViewModelTest {
             advanceUntilIdle()
 
             assertTrue(fakeLocationSettingsRepository.backgroundTrackingEnabled)
+        }
+
+    @Test
+    fun enableSleepBasedDayBoundaries_delegatesToRepository() =
+        runTest {
+            fakeDayBoundarySettingsRepository.setSleepBasedBoundariesEnabled(false)
+
+            viewModel.enableSleepBasedDayBoundaries()
+            advanceUntilIdle()
+
+            assertTrue(fakeDayBoundarySettingsRepository.sleepBasedBoundariesEnabled)
+        }
+
+    @Test
+    fun disableSleepBasedDayBoundaries_delegatesToRepository() =
+        runTest {
+            viewModel.disableSleepBasedDayBoundaries()
+            advanceUntilIdle()
+
+            assertEquals(false, fakeDayBoundarySettingsRepository.sleepBasedBoundariesEnabled)
+        }
+
+    @Test
+    fun refreshHealthStatus_whenUnavailable_disablesSleepBasedDayBoundaries() =
+        runTest {
+            fakeHealthRepository.isAvailable = false
+            fakeDayBoundarySettingsRepository.setSleepBasedBoundariesEnabled(true)
+
+            viewModel = createViewModel()
+            advanceUntilIdle()
+
+            assertEquals(HealthConnectStatus.NOT_AVAILABLE, viewModel.healthConnectStatus.value)
+            assertEquals(false, fakeDayBoundarySettingsRepository.sleepBasedBoundariesEnabled)
         }
 
     @Test
@@ -185,6 +238,14 @@ private class FakeMemoriesSettingsRepository : MemoriesSettingsRepository {
     override suspend fun setAiRecallEnabled(enabled: Boolean) {
         _settings.value = _settings.value.copy(aiRecallEnabled = enabled)
     }
+
+    override suspend fun setRecallMode(mode: RecallMode) {
+        _settings.value = _settings.value.copy(recallMode = mode)
+    }
+
+    override suspend fun setWidgetContentTypes(types: Set<WidgetContentType>) {
+        _settings.value = _settings.value.copy(widgetContentTypes = types)
+    }
 }
 
 private class FakeLocationTrackingSettingsRepository : LocationTrackingSettingsRepository {
@@ -204,6 +265,55 @@ private class FakeLocationTrackingSettingsRepository : LocationTrackingSettingsR
         backgroundTrackingEnabled = enabled
         _settings.value = _settings.value.copy(backgroundTrackingEnabled = enabled)
     }
+}
+
+private class FakeDayBoundarySettingsRepository : DayBoundarySettingsRepository {
+    var sleepBasedBoundariesEnabled: Boolean = false
+        private set
+    private val _settings = MutableStateFlow(DayBoundarySettings())
+
+    override suspend fun getSettings(): DayBoundarySettings = _settings.value
+
+    override fun observeSettings(): Flow<DayBoundarySettings> = _settings
+
+    override suspend fun setSleepBasedBoundariesEnabled(enabled: Boolean) {
+        sleepBasedBoundariesEnabled = enabled
+        _settings.value = _settings.value.copy(sleepBasedBoundariesEnabled = enabled)
+    }
+}
+
+private class FakeLocalFirstHealthRepository : LocalFirstHealthRepository {
+    var isAvailable: Boolean = true
+    var hasPermissions: Boolean = true
+
+    override suspend fun isHealthDataAvailable(): Boolean = isAvailable
+
+    override suspend fun getAvailableDataTypes(): List<String> = emptyList()
+
+    override suspend fun hasSleepPermissions(): Boolean = hasPermissions
+
+    override suspend fun requestSleepPermissions(): Boolean = hasPermissions
+
+    override suspend fun getSleepSessions(
+        start: Instant,
+        end: Instant,
+    ): List<SleepSession> = emptyList()
+
+    override suspend fun getAverageWakeUpTime(
+        timeZone: TimeZone,
+        days: Int,
+    ): TimeOfDay? = null
+
+    override suspend fun getAverageSleepTime(
+        timeZone: TimeZone,
+        days: Int,
+    ): TimeOfDay? = null
+
+    override suspend fun getDayBoundsForDate(
+        date: LocalDate,
+        timeZone: TimeZone,
+        sleepBasedBoundariesEnabled: Boolean,
+    ): DayBounds = error("Not used in onboarding tests")
 }
 
 // endregion

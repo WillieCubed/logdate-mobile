@@ -102,6 +102,23 @@
     <string name="onboarding_recommendations_turn_off">Turn off</string>
     <string name="onboarding_recommendations_privacy">Suggestions are generated entirely on your device.</string>
 
+    <!-- Day boundaries screen -->
+    <string name="onboarding_day_boundaries_title">Keep late nights on the right day</string>
+    <string name="onboarding_day_boundaries_body">When you&apos;re up past midnight, LogDate can use your sleep data from Health Connect so an entry still lands on the day you meant.</string>
+    <string name="onboarding_day_boundaries_card_title">Your day ends when you actually sleep</string>
+    <string name="onboarding_day_boundaries_card_description">A 1 AM journal entry can still count as &quot;today&quot; if you haven&apos;t gone to bed yet.</string>
+    <string name="onboarding_day_boundaries_status_connected_title">Sleep access is ready</string>
+    <string name="onboarding_day_boundaries_status_connected_description">LogDate can use Health Connect to place late-night entries on the day you were still living.</string>
+    <string name="onboarding_day_boundaries_status_permissions_title">Use sleep data for better journaling boundaries</string>
+    <string name="onboarding_day_boundaries_status_permissions_description">Grant access to sleep sessions so LogDate can tell when one journaling day actually ends and the next begins.</string>
+    <string name="onboarding_day_boundaries_status_checking_title">Checking Health Connect</string>
+    <string name="onboarding_day_boundaries_status_checking_description">We&apos;re seeing whether sleep-based day boundaries are available on this device.</string>
+    <string name="onboarding_day_boundaries_privacy_title">Private by default</string>
+    <string name="onboarding_day_boundaries_privacy">Sleep data is only used to place your entries on the right day. LogDate isn&apos;t trying to track or coach your sleep.</string>
+    <string name="onboarding_day_boundaries_enable">Use sleep for day boundaries</string>
+    <string name="onboarding_day_boundaries_grant_access">Grant sleep access</string>
+    <string name="onboarding_day_boundaries_not_now">Not now</string>
+
     <!-- Location screen -->
     <string name="onboarding_location_title">Your places, your timeline</string>
     <string name="onboarding_location_body">LogDate can remember the places that matter to you \u2014 the coffee shop where you had that great conversation, the park where you watched the sunset. Build a timeline of everywhere you&apos;ve been.</string>

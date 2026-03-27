@@ -3,6 +3,9 @@ package app.logdate.feature.onboarding.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.billing.model.LogDateBackupPlanOption
+import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
+import app.logdate.client.domain.dayboundary.HealthConnectStatus
+import app.logdate.client.domain.dayboundary.ObserveHealthConnectStatusUseCase
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.repository.journals.JournalNote
@@ -26,11 +29,16 @@ class OnboardingViewModel(
     private val userStateRepository: UserStateRepository,
     private val memoriesSettingsRepository: MemoriesSettingsRepository,
     private val locationTrackingSettingsRepository: LocationTrackingSettingsRepository,
+    private val dayBoundarySettingsRepository: DayBoundarySettingsRepository,
+    private val observeHealthConnectStatus: ObserveHealthConnectStatusUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(OnboardingUiState())
+    private val _healthConnectStatus = MutableStateFlow(HealthConnectStatus.CHECKING)
 
     val uiState: StateFlow<OnboardingUiState> =
         _uiState.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), OnboardingUiState())
+
+    val healthConnectStatus: StateFlow<HealthConnectStatus> = _healthConnectStatus
 
     /**
      * Whether contextual recommendations are currently enabled.
@@ -42,6 +50,10 @@ class OnboardingViewModel(
             .observeSettings()
             .map { it.contextualRecommendationsEnabled }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(), true)
+
+    init {
+        refreshHealthStatus()
+    }
 
     /**
      * Creates a new journal entry.
@@ -101,6 +113,29 @@ class OnboardingViewModel(
     fun enableLocationTracking() {
         viewModelScope.launch {
             locationTrackingSettingsRepository.setBackgroundTrackingEnabled(true)
+        }
+    }
+
+    fun enableSleepBasedDayBoundaries() {
+        viewModelScope.launch {
+            dayBoundarySettingsRepository.setSleepBasedBoundariesEnabled(true)
+        }
+    }
+
+    fun disableSleepBasedDayBoundaries() {
+        viewModelScope.launch {
+            dayBoundarySettingsRepository.setSleepBasedBoundariesEnabled(false)
+        }
+    }
+
+    fun refreshHealthStatus() {
+        viewModelScope.launch {
+            observeHealthConnectStatus().collect { status ->
+                _healthConnectStatus.value = status
+                if (status == HealthConnectStatus.NOT_AVAILABLE) {
+                    dayBoundarySettingsRepository.setSleepBasedBoundariesEnabled(false)
+                }
+            }
         }
     }
 
