@@ -32,10 +32,8 @@ private val results =
 fun S01_SearchEmpty() {
     ScreenshotTheme {
         SearchScreenContent(
-            query = "",
             searchResults = emptyList(),
             onQueryChange = {},
-            onClearSearch = {},
             onNavigateToDay = {},
             onGoBack = {},
         )
@@ -48,10 +46,8 @@ fun S01_SearchEmpty() {
 fun S02_SearchNoResults() {
     ScreenshotTheme {
         SearchScreenContent(
-            query = "rewind",
             searchResults = emptyList(),
             onQueryChange = {},
-            onClearSearch = {},
             onNavigateToDay = {},
             onGoBack = {},
         )
@@ -64,10 +60,8 @@ fun S02_SearchNoResults() {
 fun S03_SearchWithResults() {
     ScreenshotTheme {
         SearchScreenContent(
-            query = "route",
             searchResults = results,
             onQueryChange = {},
-            onClearSearch = {},
             onNavigateToDay = {},
             onGoBack = {},
         )

@@ -157,10 +157,8 @@ fun A04_CloudAccountIntro() {
 fun A05_SearchWithResults() {
     ScreenshotTheme {
         SearchScreenContent(
-            query = "window",
             searchResults = auditSearchResults,
             onQueryChange = {},
-            onClearSearch = {},
             onNavigateToDay = {},
             onGoBack = {},
         )

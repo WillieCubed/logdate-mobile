@@ -3,6 +3,7 @@ package app.logdate.feature.search.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.search.SearchEntriesUseCase
+import app.logdate.client.domain.search.SearchQuery
 import app.logdate.client.repository.search.SearchResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,8 +20,8 @@ import kotlinx.coroutines.flow.update
 class SearchViewModel(
     searchEntriesUseCase: SearchEntriesUseCase,
 ) : ViewModel() {
-    private val _query = MutableStateFlow("")
-    val query: StateFlow<String> = _query.asStateFlow()
+    private val _query = MutableStateFlow(SearchQuery.Empty)
+    val query: StateFlow<SearchQuery> = _query.asStateFlow()
 
     /**
      * Search results from the use case, automatically updated when query changes.
@@ -40,13 +41,13 @@ class SearchViewModel(
      * This will trigger a new search after the debounce period.
      */
     fun updateQuery(newQuery: String) {
-        _query.update { newQuery }
+        _query.update { SearchQuery(newQuery) }
     }
 
     /**
      * Clears the search query and results.
      */
     fun clearSearch() {
-        _query.update { "" }
+        _query.update { SearchQuery.Empty }
     }
 }

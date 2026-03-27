@@ -112,6 +112,7 @@ configurations.all {
 
 dependencies {
     implementation(projects.app.composeMain)
+    implementation(projects.client.location)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.androidx.work.runtime)
 
@@ -164,8 +165,10 @@ dependencies {
     androidTestImplementation(projects.client.feature.androidWidgets)
     androidTestImplementation(libs.koin.test)
     androidTestImplementation(projects.client.feature.library)
+    androidTestImplementation(projects.client.feature.search)
     androidTestImplementation(projects.client.theme)
     androidTestImplementation(projects.client.ui)
+    androidTestImplementation(libs.compose.material.icons.extended)
 
     screenshotTestImplementation(libs.androidx.ui.tooling)
     screenshotTestImplementation(libs.screenshot.validation.api)
@@ -195,4 +198,16 @@ dependencies {
     screenshotTestImplementation(projects.shared.model)
     screenshotTestImplementation(libs.kotlinx.datetime)
     screenshotTestImplementation(libs.androidx.navigation3.runtime)
+}
+
+afterEvaluate {
+    tasks.matching { it.name.startsWith("uninstall") }.configureEach {
+        enabled = false
+        doFirst {
+            throw GradleException(
+                "Uninstall tasks are disabled to protect app data on connected devices. " +
+                    "Use 'installDebug' to upgrade in place.",
+            )
+        }
+    }
 }

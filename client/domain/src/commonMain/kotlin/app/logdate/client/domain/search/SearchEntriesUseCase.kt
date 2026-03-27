@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 
 /**
  * Use case for searching across all journal entries.
@@ -33,15 +34,16 @@ class SearchEntriesUseCase(
      * @param queryFlow Flow of search queries from the UI
      * @return Flow of search results
      */
-    operator fun invoke(queryFlow: Flow<String>): Flow<List<SearchResult>> =
+    operator fun invoke(queryFlow: Flow<SearchQuery>): Flow<List<SearchResult>> =
         queryFlow
+            .map { it.text }
             .debounce(searchDebounceMs)
             .distinctUntilChanged()
-            .flatMapLatest { query ->
-                if (query.isBlank()) {
+            .flatMapLatest { queryText ->
+                if (queryText.isBlank()) {
                     flowOf(emptyList())
                 } else {
-                    searchRepository.searchWithSnippets(query)
+                    searchRepository.searchWithSnippets(queryText)
                 }
             }
 
@@ -53,17 +55,18 @@ class SearchEntriesUseCase(
      * @return Flow of limited search results
      */
     fun searchWithLimit(
-        queryFlow: Flow<String>,
+        queryFlow: Flow<SearchQuery>,
         limit: Int,
     ): Flow<List<SearchResult>> =
         queryFlow
+            .map { it.text }
             .debounce(searchDebounceMs)
             .distinctUntilChanged()
-            .flatMapLatest { query ->
-                if (query.isBlank()) {
+            .flatMapLatest { queryText ->
+                if (queryText.isBlank()) {
                     flowOf(emptyList())
                 } else {
-                    searchRepository.searchWithLimit(query, limit)
+                    searchRepository.searchWithLimit(queryText, limit)
                 }
             }
 }
