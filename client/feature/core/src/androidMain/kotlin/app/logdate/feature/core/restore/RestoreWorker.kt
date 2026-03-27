@@ -35,29 +35,37 @@ class RestoreWorker(
     companion object {
         const val WORK_NAME = "restore_user_data"
         const val SOURCE_URI_KEY = "restore_source_uri"
+        const val INCLUDE_DRAFTS_KEY = "restore_include_drafts"
+        const val INCLUDE_MEDIA_KEY = "restore_include_media"
         const val SUMMARY_JSON_KEY = "restore_summary_json"
         const val ERROR_KEY = "restore_error"
     }
 
     private val restoreUserDataUseCase: RestoreUserDataUseCase by inject()
     private val mediaManager: MediaManager by inject()
+    private val restoreLauncher: RestoreLauncher by inject()
     private val json = Json { ignoreUnknownKeys = true }
     private val notificationHelper = RestoreNotificationHelper(context, id)
 
     private val sourceUri: Uri? = inputData.getString(SOURCE_URI_KEY)?.toUri()
+    private val includeDrafts: Boolean = inputData.getBoolean(INCLUDE_DRAFTS_KEY, true)
+    private val includeMedia: Boolean = inputData.getBoolean(INCLUDE_MEDIA_KEY, true)
 
     override suspend fun doWork(): Result {
-        setForeground(notificationHelper.createForegroundInfo("Preparing restore..."))
+        emitProgress(RestoreStage.PREPARING, 0)
 
         val restoreUri =
             sourceUri
                 ?: return failure("Missing restore source")
 
         val sourceLabel = resolveDisplayName(restoreUri) ?: restoreUri.toString()
+
+        emitProgress(RestoreStage.COPYING_ARCHIVE, 5)
         val tempFile =
             copyToCache(restoreUri)
                 ?: return failure("Unable to read restore archive")
 
+        emitProgress(RestoreStage.OPENING_ARCHIVE, 10)
         val zipFile =
             runCatching { ZipFile(tempFile) }
                 .getOrElse { error ->
@@ -66,6 +74,8 @@ class RestoreWorker(
                 }
 
         return try {
+            emitProgress(RestoreStage.READING_CONTENTS, 20)
+
             val structure = ExportFileStructure()
             val bundle =
                 RestoreBundle(
@@ -74,38 +84,46 @@ class RestoreWorker(
                     notesJson = readRequiredEntry(zipFile, structure.notesFile),
                     journalNotesJson = readRequiredEntry(zipFile, structure.journalNotesFile),
                     draftsJson = readRequiredEntry(zipFile, structure.draftsFile),
+                    profileJson = readOptionalEntry(zipFile, structure.profileFile),
+                    placesJson = readOptionalEntry(zipFile, structure.placesFile),
+                    locationHistoryJson = readOptionalEntry(zipFile, structure.locationHistoryFile),
                     mediaManifestJson = readOptionalEntry(zipFile, structure.mediaManifestFile),
                 )
 
-            setForeground(notificationHelper.createForegroundInfo("Restoring entries..."))
+            emitProgress(RestoreStage.RESTORING_JOURNALS, 40)
 
             val mediaImporter =
-                object : MediaImporter {
-                    override suspend fun importMedia(exportPath: String): String? = this@RestoreWorker.importMedia(zipFile, exportPath)
+                if (includeMedia) {
+                    object : MediaImporter {
+                        override suspend fun importMedia(exportPath: String): String? = this@RestoreWorker.importMedia(zipFile, exportPath)
+                    }
+                } else {
+                    null
                 }
+
+            val options =
+                RestoreOptions(
+                    includeDrafts = includeDrafts,
+                    includeMedia = includeMedia,
+                )
 
             val result =
                 restoreUserDataUseCase.restore(
                     bundle = bundle,
-                    options = RestoreOptions(),
+                    options = options,
                     mediaImporter = mediaImporter,
+                    onProgress = { phase ->
+                        val info = phase.toProgressInfo()
+                        restoreLauncher.updateProgress(info)
+                        if (info is RestoreProgressInfo.Active) {
+                            setForeground(notificationHelper.createForegroundInfo(info.stage))
+                        }
+                    },
                 )
 
-            val summary =
-                RestoreSummary(
-                    source = sourceLabel,
-                    exportDate = result.metadata.exportDate,
-                    appVersion = result.metadata.appVersion,
-                    deviceId = result.metadata.deviceId,
-                    journalsImported = result.journalsImported,
-                    notesImported = result.notesImported,
-                    draftsImported = result.draftsImported,
-                    journalLinksImported = result.journalLinksImported,
-                    mediaImported = result.mediaImported,
-                    warnings = result.warnings,
-                )
+            val summary = result.toSummary(source = sourceLabel)
 
-            setForeground(notificationHelper.createCompletionInfo("Restore completed"))
+            setForeground(notificationHelper.createCompletionInfo())
 
             Result.success(
                 workDataOf(
@@ -117,9 +135,18 @@ class RestoreWorker(
             setForeground(notificationHelper.createErrorInfo(e.message ?: "Restore failed"))
             failure(e.message ?: "Restore failed")
         } finally {
+            restoreLauncher.updateProgress(RestoreProgressInfo.Idle)
             zipFile.close()
             tempFile.delete()
         }
+    }
+
+    private suspend fun emitProgress(
+        stage: RestoreStage,
+        percent: Int,
+    ) {
+        restoreLauncher.updateProgress(stage.toProgressInfo(percent))
+        setForeground(notificationHelper.createForegroundInfo(stage))
     }
 
     private fun failure(message: String): Result = Result.failure(workDataOf(ERROR_KEY to message))
@@ -148,7 +175,7 @@ class RestoreWorker(
             zipFile.getEntry(entryName)
                 ?: throw IllegalStateException("Missing required file: $entryName")
         return zipFile.getInputStream(entry).use { input ->
-            input.readBytes().toString(Charsets.UTF_8)
+            input.bufferedReader(Charsets.UTF_8).readText()
         }
     }
 
@@ -158,7 +185,7 @@ class RestoreWorker(
     ): String? {
         val entry = zipFile.getEntry(entryName) ?: return null
         return zipFile.getInputStream(entry).use { input ->
-            input.readBytes().toString(Charsets.UTF_8)
+            input.bufferedReader(Charsets.UTF_8).readText()
         }
     }
 

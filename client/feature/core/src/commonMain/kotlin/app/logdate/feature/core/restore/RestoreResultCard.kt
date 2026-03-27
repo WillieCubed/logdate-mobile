@@ -26,7 +26,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.logdate.client.domain.restore.IntegrityCategory
 import app.logdate.ui.theme.Spacing
+import app.logdate.util.toReadableDateShort
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.action_done
 import logdate.client.feature.core.generated.resources.action_retry
@@ -38,8 +40,10 @@ import logdate.client.feature.core.generated.resources.export_category_notes
 import logdate.client.feature.core.generated.resources.restore_complete_description
 import logdate.client.feature.core.generated.resources.restore_complete_title
 import logdate.client.feature.core.generated.resources.restore_failed_title
+import logdate.client.feature.core.generated.resources.restore_integrity_mismatch
 import logdate.client.feature.core.generated.resources.restore_warnings_title
 import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Instant
 
 @Composable
 internal fun RestoreSuccessCard(
@@ -77,18 +81,86 @@ internal fun RestoreSuccessCard(
 
         Spacer(modifier = Modifier.height(Spacing.lg))
 
+        ArchiveMetadataRow(
+            fileName = summary.source,
+            exportDate = summary.exportDate,
+            appVersion = summary.appVersion,
+        )
+
+        Spacer(modifier = Modifier.height(Spacing.lg))
+
         RestoreStatsGrid(summary = summary)
 
-        if (summary.warnings.isNotEmpty()) {
+        val allWarnings =
+            buildList {
+                addAll(
+                    summary.integrityMismatches.map { mismatch ->
+                        val categoryName =
+                            when (mismatch.category) {
+                                IntegrityCategory.JOURNALS -> stringResource(Res.string.export_category_journals)
+                                IntegrityCategory.NOTES -> stringResource(Res.string.export_category_notes)
+                                IntegrityCategory.DRAFTS -> stringResource(Res.string.export_category_drafts)
+                                IntegrityCategory.MEDIA -> stringResource(Res.string.export_category_media)
+                                IntegrityCategory.PROFILE -> "Profile"
+                                IntegrityCategory.PLACES -> "Places"
+                                IntegrityCategory.LOCATION_HISTORY -> "Location History"
+                            }
+                        stringResource(
+                            Res.string.restore_integrity_mismatch,
+                            mismatch.expected,
+                            categoryName,
+                            mismatch.actual,
+                        )
+                    },
+                )
+                addAll(summary.warnings)
+            }
+
+        if (allWarnings.isNotEmpty()) {
             Spacer(modifier = Modifier.height(Spacing.lg))
 
-            RestoreWarningsSection(warnings = summary.warnings)
+            RestoreWarningsSection(warnings = allWarnings)
         }
 
         Spacer(modifier = Modifier.height(Spacing.xl))
 
         TextButton(onClick = onDismiss) {
             Text(stringResource(Res.string.action_done))
+        }
+    }
+}
+
+@Composable
+private fun ArchiveMetadataRow(
+    fileName: String,
+    exportDate: Instant?,
+    appVersion: String?,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        tonalElevation = 1.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(Spacing.md),
+        ) {
+            Text(
+                text = fileName,
+                style = MaterialTheme.typography.labelLarge,
+            )
+            val details =
+                buildList {
+                    exportDate?.let { add("Exported ${it.toReadableDateShort()}") }
+                    appVersion?.let { add("v$it") }
+                }.joinToString(" \u00B7 ")
+            if (details.isNotEmpty()) {
+                Text(
+                    text = details,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

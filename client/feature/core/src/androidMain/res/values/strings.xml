@@ -15,4 +15,17 @@
     <string name="restore_title_progress">Restoring Data</string>
     <string name="restore_title_complete">Restore Complete</string>
     <string name="restore_title_failed">Restore Failed</string>
+    <string name="restore_notification_complete_message">Your data has been restored.</string>
+    <string name="restore_notification_stage_preparing">Preparing restore...</string>
+    <string name="restore_notification_stage_copying">Copying archive...</string>
+    <string name="restore_notification_stage_opening">Opening archive...</string>
+    <string name="restore_notification_stage_reading">Reading archive contents...</string>
+    <string name="restore_notification_stage_journals">Restoring journals...</string>
+    <string name="restore_notification_stage_notes">Restoring notes...</string>
+    <string name="restore_notification_stage_links">Restoring journal links...</string>
+    <string name="restore_notification_stage_drafts">Restoring drafts...</string>
+    <string name="restore_notification_stage_profile">Restoring profile...</string>
+    <string name="restore_notification_stage_places">Restoring places...</string>
+    <string name="restore_notification_stage_location_history">Restoring location history...</string>
+    <string name="restore_notification_stage_media">Importing media...</string>
 </resources>

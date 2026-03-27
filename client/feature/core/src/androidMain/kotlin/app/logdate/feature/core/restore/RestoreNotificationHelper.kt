@@ -26,7 +26,7 @@ class RestoreNotificationHelper(
         createNotificationChannel()
     }
 
-    fun createForegroundInfo(message: String): ForegroundInfo {
+    fun createForegroundInfo(stage: RestoreStage): ForegroundInfo {
         val cancelIntent =
             WorkManager
                 .getInstance(context)
@@ -36,7 +36,7 @@ class RestoreNotificationHelper(
             NotificationCompat
                 .Builder(context, CHANNEL_ID)
                 .setContentTitle(context.getString(R.string.restore_title_progress))
-                .setContentText(message)
+                .setContentText(resolveStageMessage(stage))
                 .setSmallIcon(android.R.drawable.stat_sys_download)
                 .setOngoing(true)
                 .setSilent(true)
@@ -53,12 +53,12 @@ class RestoreNotificationHelper(
         )
     }
 
-    fun createCompletionInfo(message: String): ForegroundInfo {
+    fun createCompletionInfo(): ForegroundInfo {
         val notification =
             NotificationCompat
                 .Builder(context, CHANNEL_ID)
                 .setContentTitle(context.getString(R.string.restore_title_complete))
-                .setContentText(message)
+                .setContentText(context.getString(R.string.restore_notification_complete_message))
                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
                 .setAutoCancel(true)
                 .setSilent(true)
@@ -87,6 +87,23 @@ class RestoreNotificationHelper(
             android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
         )
     }
+
+    private fun resolveStageMessage(stage: RestoreStage): String =
+        when (stage) {
+            RestoreStage.IDLE -> context.getString(R.string.restore_notification_stage_preparing)
+            RestoreStage.PREPARING -> context.getString(R.string.restore_notification_stage_preparing)
+            RestoreStage.COPYING_ARCHIVE -> context.getString(R.string.restore_notification_stage_copying)
+            RestoreStage.OPENING_ARCHIVE -> context.getString(R.string.restore_notification_stage_opening)
+            RestoreStage.READING_CONTENTS -> context.getString(R.string.restore_notification_stage_reading)
+            RestoreStage.RESTORING_JOURNALS -> context.getString(R.string.restore_notification_stage_journals)
+            RestoreStage.RESTORING_NOTES -> context.getString(R.string.restore_notification_stage_notes)
+            RestoreStage.RESTORING_LINKS -> context.getString(R.string.restore_notification_stage_links)
+            RestoreStage.RESTORING_DRAFTS -> context.getString(R.string.restore_notification_stage_drafts)
+            RestoreStage.RESTORING_PROFILE -> context.getString(R.string.restore_notification_stage_profile)
+            RestoreStage.RESTORING_PLACES -> context.getString(R.string.restore_notification_stage_places)
+            RestoreStage.RESTORING_LOCATION_HISTORY -> context.getString(R.string.restore_notification_stage_location_history)
+            RestoreStage.IMPORTING_MEDIA -> context.getString(R.string.restore_notification_stage_media)
+        }
 
     private fun createNotificationChannel() {
         val channel =

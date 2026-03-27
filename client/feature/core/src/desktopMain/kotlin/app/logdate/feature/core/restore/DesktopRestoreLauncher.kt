@@ -12,6 +12,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -22,7 +25,7 @@ import java.net.URLConnection
 import java.util.zip.ZipFile
 
 /**
- * Desktop-specific implementation for launching data restore using AWT FileDialog.
+ * Desktop-specific implementation for restoring LogDate ZIP exports.
  */
 class DesktopRestoreLauncher :
     RestoreLauncher,
@@ -32,42 +35,82 @@ class DesktopRestoreLauncher :
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var currentRestoreJob: Job? = null
     private var completionCallback: ((RestoreOutcome) -> Unit)? = null
+    private var fileSelectedCallback: ((ArchiveFileInfo?) -> Unit)? = null
+    private var selectedFile: File? = null
+
+    private val _restoreProgress = MutableStateFlow<RestoreProgressInfo>(RestoreProgressInfo.Idle)
+    override val restoreProgress: StateFlow<RestoreProgressInfo> = _restoreProgress.asStateFlow()
 
     override fun setRestoreCompletionCallback(callback: (RestoreOutcome) -> Unit) {
         completionCallback = callback
     }
 
-    override fun startRestore() {
+    override fun setFileSelectedCallback(callback: (ArchiveFileInfo?) -> Unit) {
+        fileSelectedCallback = callback
+    }
+
+    override fun updateProgress(info: RestoreProgressInfo) {
+        _restoreProgress.value = info
+    }
+
+    override fun startFileSelection() {
+        currentRestoreJob?.cancel()
+        currentRestoreJob =
+            scope.launch {
+                val fileDialog = createOpenDialog()
+                val file =
+                    fileDialog.directory?.let { dir ->
+                        val fileName = fileDialog.file ?: return@let null
+                        File(dir, fileName)
+                    }
+
+                if (file == null) {
+                    Napier.i("Desktop: Restore cancelled by user")
+                    fileSelectedCallback?.invoke(null)
+                    return@launch
+                }
+
+                selectedFile = file
+                val metadataJson = extractMetadata(file)
+                if (metadataJson == null) {
+                    fileSelectedCallback?.invoke(null)
+                    completionCallback?.invoke(
+                        RestoreOutcome.Failure(RestoreError.INVALID_ARCHIVE),
+                    )
+                    return@launch
+                }
+
+                fileSelectedCallback?.invoke(
+                    ArchiveFileInfo(
+                        displayName = file.name,
+                        uri = file.absolutePath,
+                        metadataJson = metadataJson,
+                    ),
+                )
+            }
+    }
+
+    override fun startRestore(options: ImportOptions) {
+        val file =
+            selectedFile ?: run {
+                completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.MISSING_SOURCE))
+                return
+            }
+
         currentRestoreJob?.cancel()
         currentRestoreJob =
             scope.launch {
                 try {
-                    val fileDialog = createOpenDialog()
-                    val selectedFile =
-                        fileDialog.directory?.let { dir ->
-                            val fileName = fileDialog.file ?: return@let null
-                            File(dir, fileName)
-                        }
-
-                    if (selectedFile == null) {
-                        Napier.i("Desktop: Restore cancelled by user")
-                        completionCallback?.invoke(RestoreOutcome.Cancelled)
-                        return@launch
-                    }
-
                     completionCallback?.invoke(RestoreOutcome.Started)
+                    _restoreProgress.value = RestoreProgressInfo.Idle
 
-                    val summary =
-                        if (selectedFile.isDirectory) {
-                            restoreFromDirectory(selectedFile)
-                        } else {
-                            restoreFromZip(selectedFile)
-                        }
-
+                    val summary = restoreFromZip(file, options)
+                    _restoreProgress.value = RestoreProgressInfo.Idle
                     completionCallback?.invoke(RestoreOutcome.Success(summary))
                 } catch (e: Exception) {
                     Napier.e("Desktop: Restore failed", e)
-                    completionCallback?.invoke(RestoreOutcome.Failure("Restore failed: ${e.message}"))
+                    _restoreProgress.value = RestoreProgressInfo.Idle
+                    completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
                 }
             }
     }
@@ -75,13 +118,37 @@ class DesktopRestoreLauncher :
     override fun cancelRestore() {
         currentRestoreJob?.cancel()
         currentRestoreJob = null
+        selectedFile = null
+        _restoreProgress.value = RestoreProgressInfo.Idle
         completionCallback?.invoke(RestoreOutcome.Cancelled)
         Napier.i("Desktop: Restore cancelled")
     }
 
-    private suspend fun restoreFromZip(file: File): RestoreSummary {
+    private fun extractMetadata(file: File): String? {
+        return try {
+            ZipFile(file).use { zip ->
+                val structure = ExportFileStructure()
+                val entry = zip.getEntry(structure.metadataFile) ?: return null
+                zip.getInputStream(entry).use { input ->
+                    input.bufferedReader(Charsets.UTF_8).readText()
+                }
+            }
+        } catch (e: Exception) {
+            Napier.e("Desktop: Failed to extract metadata", e)
+            null
+        }
+    }
+
+    private suspend fun restoreFromZip(
+        file: File,
+        options: ImportOptions,
+    ): RestoreSummary {
         ZipFile(file).use { zipFile ->
+            updateProgress(RestoreStage.PREPARING.toProgressInfo())
+            updateProgress(RestoreStage.OPENING_ARCHIVE.toProgressInfo())
+
             val structure = ExportFileStructure()
+            updateProgress(RestoreStage.READING_CONTENTS.toProgressInfo())
             val bundle =
                 RestoreBundle(
                     metadataJson = readRequiredEntry(zipFile, structure.metadataFile),
@@ -89,60 +156,37 @@ class DesktopRestoreLauncher :
                     notesJson = readRequiredEntry(zipFile, structure.notesFile),
                     journalNotesJson = readRequiredEntry(zipFile, structure.journalNotesFile),
                     draftsJson = readRequiredEntry(zipFile, structure.draftsFile),
+                    profileJson = readOptionalEntry(zipFile, structure.profileFile),
+                    placesJson = readOptionalEntry(zipFile, structure.placesFile),
+                    locationHistoryJson = readOptionalEntry(zipFile, structure.locationHistoryFile),
                     mediaManifestJson = readOptionalEntry(zipFile, structure.mediaManifestFile),
                 )
 
             val mediaImporter =
-                object : MediaImporter {
-                    override suspend fun importMedia(exportPath: String): String? = importMedia(zipFile, exportPath)
+                if (options.includeMedia) {
+                    object : MediaImporter {
+                        override suspend fun importMedia(exportPath: String): String? =
+                            this@DesktopRestoreLauncher.importMedia(zipFile, exportPath)
+                    }
+                } else {
+                    null
                 }
 
-            val result = restoreUserDataUseCase.restore(bundle, RestoreOptions(), mediaImporter)
-            return RestoreSummary(
-                source = file.absolutePath,
-                exportDate = result.metadata.exportDate,
-                appVersion = result.metadata.appVersion,
-                deviceId = result.metadata.deviceId,
-                journalsImported = result.journalsImported,
-                notesImported = result.notesImported,
-                draftsImported = result.draftsImported,
-                journalLinksImported = result.journalLinksImported,
-                mediaImported = result.mediaImported,
-                warnings = result.warnings,
-            )
+            val restoreOptions =
+                RestoreOptions(
+                    includeDrafts = options.includeDrafts,
+                    includeMedia = options.includeMedia,
+                )
+
+            val result =
+                restoreUserDataUseCase.restore(
+                    bundle = bundle,
+                    options = restoreOptions,
+                    mediaImporter = mediaImporter,
+                    onProgress = { phase -> updateProgress(phase.toProgressInfo()) },
+                )
+            return result.toSummary(source = file.name)
         }
-    }
-
-    private suspend fun restoreFromDirectory(directory: File): RestoreSummary {
-        val structure = ExportFileStructure()
-        val bundle =
-            RestoreBundle(
-                metadataJson = readRequiredFile(directory, structure.metadataFile),
-                journalsJson = readRequiredFile(directory, structure.journalsFile),
-                notesJson = readRequiredFile(directory, structure.notesFile),
-                journalNotesJson = readRequiredFile(directory, structure.journalNotesFile),
-                draftsJson = readRequiredFile(directory, structure.draftsFile),
-                mediaManifestJson = readOptionalFile(directory, structure.mediaManifestFile),
-            )
-
-        val mediaImporter =
-            object : MediaImporter {
-                override suspend fun importMedia(exportPath: String): String? = importMedia(directory, exportPath)
-            }
-
-        val result = restoreUserDataUseCase.restore(bundle, RestoreOptions(), mediaImporter)
-        return RestoreSummary(
-            source = directory.absolutePath,
-            exportDate = result.metadata.exportDate,
-            appVersion = result.metadata.appVersion,
-            deviceId = result.metadata.deviceId,
-            journalsImported = result.journalsImported,
-            notesImported = result.notesImported,
-            draftsImported = result.draftsImported,
-            journalLinksImported = result.journalLinksImported,
-            mediaImported = result.mediaImported,
-            warnings = result.warnings,
-        )
     }
 
     private fun readRequiredEntry(
@@ -167,28 +211,6 @@ class DesktopRestoreLauncher :
         }
     }
 
-    private fun readRequiredFile(
-        directory: File,
-        fileName: String,
-    ): String {
-        val file = File(directory, fileName)
-        if (!file.exists()) {
-            throw IllegalStateException("Missing required file: $fileName")
-        }
-        return file.readText()
-    }
-
-    private fun readOptionalFile(
-        directory: File,
-        fileName: String,
-    ): String? {
-        val file = File(directory, fileName)
-        if (!file.exists()) {
-            return null
-        }
-        return file.readText()
-    }
-
     private suspend fun importMedia(
         zipFile: ZipFile,
         exportPath: String,
@@ -204,28 +226,6 @@ class DesktopRestoreLauncher :
             MediaPayload(
                 fileName = fileName,
                 mimeType = resolveMimeType(fileName),
-                sizeBytes = data.size.toLong(),
-                data = data,
-            )
-        return runCatching { mediaManager.saveMedia(payload) }
-            .onFailure { Napier.e("Desktop: Failed to import media", it) }
-            .getOrNull()
-    }
-
-    private suspend fun importMedia(
-        directory: File,
-        exportPath: String,
-    ): String? {
-        val normalizedPath = exportPath.trimStart('/')
-        val file = File(directory, normalizedPath)
-        if (!file.exists() || file.isDirectory) {
-            return null
-        }
-        val data = file.readBytes()
-        val payload =
-            MediaPayload(
-                fileName = file.name,
-                mimeType = resolveMimeType(file.name),
                 sizeBytes = data.size.toLong(),
                 data = data,
             )

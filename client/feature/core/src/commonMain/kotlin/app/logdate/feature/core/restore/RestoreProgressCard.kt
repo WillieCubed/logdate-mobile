@@ -2,54 +2,99 @@
 
 package app.logdate.feature.core.restore
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.cancel
-import logdate.client.feature.core.generated.resources.restore_progress_description
 import logdate.client.feature.core.generated.resources.restore_progress_title
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun RestoreProgressCard(
+    progressPercent: Int,
+    message: String,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    Surface(
         modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        shape = RoundedCornerShape(12.dp),
+        tonalElevation = 1.dp,
     ) {
-        Text(
-            text = stringResource(Res.string.restore_progress_title),
-            style = MaterialTheme.typography.titleMedium,
-        )
+        Column(
+            modifier = Modifier.padding(Spacing.lg),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(Res.string.restore_progress_title),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = "$progressPercent%",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
 
-        Spacer(modifier = Modifier.height(Spacing.lg))
+            Spacer(modifier = Modifier.height(Spacing.sm))
 
-        CircularProgressIndicator()
+            LinearProgressIndicator(
+                progress = { progressPercent / 100f },
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(4.dp)),
+            )
 
-        Spacer(modifier = Modifier.height(Spacing.lg))
+            AnimatedVisibility(
+                visible = message.isNotEmpty(),
+                enter = expandVertically(),
+                exit = shrinkVertically(),
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
 
-        Text(
-            text = stringResource(Res.string.restore_progress_description),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+            Spacer(modifier = Modifier.height(Spacing.sm))
 
-        Spacer(modifier = Modifier.height(Spacing.xl))
-
-        TextButton(onClick = onCancel) {
-            Text(stringResource(Res.string.cancel))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onCancel) {
+                    Text(stringResource(Res.string.cancel))
+                }
+            }
         }
     }
 }

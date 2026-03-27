@@ -3,6 +3,7 @@ package app.logdate.feature.core.restore
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.activity.result.ActivityResultLauncher
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -12,10 +13,16 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.export.ExportFormat
 import io.github.aakira.napier.Napier
-import kotlinx.serialization.decodeFromString
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
+import java.io.File
+import java.io.FileOutputStream
+import java.util.zip.ZipFile
 
 /**
  * Android-specific implementation for launching data restore using Storage Access Framework and WorkManager.
@@ -25,10 +32,13 @@ class AndroidRestoreLauncher(
 ) : RestoreLauncher {
     private val json = Json { ignoreUnknownKeys = true }
 
-    private var pendingRestoreCallback: (() -> Unit)? = null
     private var lastSelectedUri: Uri? = null
     private var completionCallback: ((RestoreOutcome) -> Unit)? = null
+    private var fileSelectedCallback: ((ArchiveFileInfo?) -> Unit)? = null
     private var workInfoObserver: Observer<List<WorkInfo>>? = null
+
+    private val _restoreProgress = MutableStateFlow<RestoreProgressInfo>(RestoreProgressInfo.Idle)
+    override val restoreProgress: StateFlow<RestoreProgressInfo> = _restoreProgress.asStateFlow()
 
     private var openDocumentLauncher: ActivityResultLauncher<Intent>? = null
 
@@ -59,6 +69,7 @@ class AndroidRestoreLauncher(
 
                 when (workInfo.state) {
                     WorkInfo.State.SUCCEEDED -> {
+                        _restoreProgress.value = RestoreProgressInfo.Idle
                         val summaryJson = workInfo.outputData.getString(RestoreWorker.SUMMARY_JSON_KEY)
                         if (summaryJson != null) {
                             val summary =
@@ -67,17 +78,18 @@ class AndroidRestoreLauncher(
                             if (summary != null) {
                                 completionCallback?.invoke(RestoreOutcome.Success(summary))
                             } else {
-                                completionCallback?.invoke(RestoreOutcome.Failure("Restore completed, but summary was invalid"))
+                                completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.INVALID_SUMMARY))
                             }
                         } else {
-                            completionCallback?.invoke(RestoreOutcome.Failure("Restore completed, but no summary was returned"))
+                            completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.NO_SUMMARY_RETURNED))
                         }
                     }
                     WorkInfo.State.FAILED -> {
-                        val error = workInfo.outputData.getString(RestoreWorker.ERROR_KEY)
-                        completionCallback?.invoke(RestoreOutcome.Failure(error ?: "Restore failed"))
+                        _restoreProgress.value = RestoreProgressInfo.Idle
+                        completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
                     }
                     WorkInfo.State.CANCELLED -> {
+                        _restoreProgress.value = RestoreProgressInfo.Idle
                         completionCallback?.invoke(RestoreOutcome.Cancelled)
                     }
                     else -> {
@@ -98,7 +110,15 @@ class AndroidRestoreLauncher(
         completionCallback = callback
     }
 
-    override fun startRestore() {
+    override fun setFileSelectedCallback(callback: (ArchiveFileInfo?) -> Unit) {
+        fileSelectedCallback = callback
+    }
+
+    override fun updateProgress(info: RestoreProgressInfo) {
+        _restoreProgress.value = info
+    }
+
+    override fun startFileSelection() {
         val intent =
             Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
@@ -107,66 +127,33 @@ class AndroidRestoreLauncher(
             }
 
         try {
-            pendingRestoreCallback = {
-                val uri = lastSelectedUri
-                if (uri != null) {
-                    startRestoreWorker(uri)
-                } else {
-                    Napier.w("No URI selected for restore")
-                    completionCallback?.invoke(RestoreOutcome.Cancelled)
-                }
-            }
-
             openDocumentLauncher?.launch(intent) ?: run {
                 Napier.w("No document launcher available for restore")
-                completionCallback?.invoke(RestoreOutcome.Failure("Restore requires a file picker"))
+                completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.FILE_PICKER_UNAVAILABLE))
             }
         } catch (e: Exception) {
             Napier.e("Error launching restore file picker", e)
-            completionCallback?.invoke(RestoreOutcome.Failure("Failed to launch restore picker"))
+            completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.FILE_PICKER_FAILED))
         }
     }
 
-    override fun cancelRestore() {
-        pendingRestoreCallback = null
-        WorkManager.getInstance(context).cancelUniqueWork(RestoreWorker.WORK_NAME)
-        completionCallback?.invoke(RestoreOutcome.Cancelled)
-        Napier.i("Restore cancelled")
-    }
-
-    /**
-     * Called when the user has selected a restore archive or cancelled the dialog.
-     */
-    fun onRestoreSourceSelected(uri: Uri?) {
-        lastSelectedUri = uri
-
-        if (uri != null) {
-            try {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                )
-                Napier.i("User selected restore source: $uri")
-                pendingRestoreCallback?.invoke()
-            } catch (e: Exception) {
-                Napier.e("Failed to take persistent URI permission", e)
-                completionCallback?.invoke(RestoreOutcome.Failure("Unable to access selected file"))
+    override fun startRestore(options: ImportOptions) {
+        val uri =
+            lastSelectedUri ?: run {
+                Napier.w("No URI selected for restore")
+                completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.MISSING_SOURCE))
+                return
             }
-        } else {
-            Napier.i("User cancelled restore source selection")
-            completionCallback?.invoke(RestoreOutcome.Cancelled)
-        }
 
-        pendingRestoreCallback = null
-    }
-
-    private fun startRestoreWorker(uri: Uri) {
         completionCallback?.invoke(RestoreOutcome.Started)
+        _restoreProgress.value = RestoreProgressInfo.Idle
 
         val inputData =
             Data
                 .Builder()
                 .putString(RestoreWorker.SOURCE_URI_KEY, uri.toString())
+                .putBoolean(RestoreWorker.INCLUDE_DRAFTS_KEY, options.includeDrafts)
+                .putBoolean(RestoreWorker.INCLUDE_MEDIA_KEY, options.includeMedia)
                 .build()
 
         val workRequest =
@@ -183,5 +170,99 @@ class AndroidRestoreLauncher(
             )
 
         Napier.i("Restore work enqueued with WorkManager")
+    }
+
+    override fun cancelRestore() {
+        lastSelectedUri = null
+        WorkManager.getInstance(context).cancelUniqueWork(RestoreWorker.WORK_NAME)
+        _restoreProgress.value = RestoreProgressInfo.Idle
+        completionCallback?.invoke(RestoreOutcome.Cancelled)
+        Napier.i("Restore cancelled")
+    }
+
+    /**
+     * Called when the user has selected a restore archive or cancelled the dialog.
+     *
+     * Instead of immediately starting a restore, this extracts the archive's
+     * metadata and delivers it to the file-selected callback for preview.
+     */
+    fun onRestoreSourceSelected(uri: Uri?) {
+        if (uri == null) {
+            Napier.i("User cancelled restore source selection")
+            fileSelectedCallback?.invoke(null)
+            return
+        }
+
+        try {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+        } catch (e: Exception) {
+            Napier.e("Failed to take persistent URI permission", e)
+            completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.FILE_NOT_ACCESSIBLE))
+            return
+        }
+
+        lastSelectedUri = uri
+        val displayName = resolveDisplayName(uri) ?: uri.lastPathSegment ?: "archive"
+
+        val metadataJson = extractMetadata(uri)
+        if (metadataJson == null) {
+            Napier.w("Could not extract metadata from selected archive")
+            fileSelectedCallback?.invoke(null)
+            completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.INVALID_ARCHIVE))
+            return
+        }
+
+        fileSelectedCallback?.invoke(
+            ArchiveFileInfo(
+                displayName = displayName,
+                uri = uri.toString(),
+                metadataJson = metadataJson,
+            ),
+        )
+    }
+
+    /**
+     * Extracts only the `metadata.json` entry from the archive for preview.
+     */
+    private fun extractMetadata(uri: Uri): String? {
+        val tempFile = File.createTempFile("logdate_preview", ".zip", context.cacheDir)
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(tempFile).use { output ->
+                    input.copyTo(output)
+                }
+            } ?: return null
+
+            val zipFile = runCatching { ZipFile(tempFile) }.getOrNull() ?: return null
+            zipFile.use { zip ->
+                val structure = ExportFileStructure()
+                val entry = zip.getEntry(structure.metadataFile) ?: return null
+                zip.getInputStream(entry).use { input ->
+                    input.bufferedReader(Charsets.UTF_8).readText()
+                }
+            }
+        } catch (e: Exception) {
+            Napier.e("Failed to extract metadata from archive", e)
+            null
+        } finally {
+            tempFile.delete()
+        }
+    }
+
+    private fun resolveDisplayName(uri: Uri): String? {
+        val resolver = context.contentResolver
+        val cursor = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+        cursor?.use {
+            if (it.moveToFirst()) {
+                val index = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (index >= 0) {
+                    return it.getString(index)
+                }
+            }
+        }
+        return null
     }
 }

@@ -115,8 +115,8 @@
     <string name="day_schedule_health_connected">Health Connect is providing sleep data</string>
     <string name="day_schedule_health_permissions_needed">LogDate needs permission to read your sleep data</string>
     <string name="day_schedule_health_grant_access">Grant sleep access</string>
-    <string name="day_schedule_health_not_available">Health Connect is not available on this device</string>
-    <string name="day_schedule_health_not_available_detail">Install Health Connect from the Play Store to use sleep-based day scheduling.</string>
+    <string name="day_schedule_health_not_available">Sleep-based day boundaries are unavailable on this device</string>
+    <string name="day_schedule_health_not_available_detail">LogDate will use your default start time instead.</string>
     <string name="day_schedule_health_checking">Checking Health Connect\u2026</string>
     <string name="day_schedule_fallback_time">Default start time</string>
     <string name="day_schedule_fallback_time_description">Used when sleep data isn\&apos;t available</string>
@@ -427,6 +427,9 @@
     <string name="restore_stage_notes">Restoring notes\u2026</string>
     <string name="restore_stage_links">Restoring journal links\u2026</string>
     <string name="restore_stage_drafts">Restoring drafts\u2026</string>
+    <string name="restore_stage_profile">Restoring profile\u2026</string>
+    <string name="restore_stage_places">Restoring places\u2026</string>
+    <string name="restore_stage_location_history">Restoring location history\u2026</string>
     <string name="restore_stage_media">Importing media\u2026</string>
     <string name="restore_error_invalid_archive">The selected file doesn\&apos;t appear to be a valid LogDate export archive.</string>
     <string name="restore_error_missing_source">No file was selected for restore.</string>
@@ -436,6 +439,7 @@
     <string name="restore_error_invalid_summary">Restore completed, but the result could not be read.</string>
     <string name="restore_error_no_summary">Restore completed, but no summary was returned.</string>
     <string name="restore_error_ios_requires_folder">Restore on this device requires a folder export.</string>
+    <string name="restore_error_unsupported_version">This archive was created by a newer version of LogDate. Update the app to import it.</string>
     <string name="restore_error_generic">Something went wrong during restore.</string>
     <string name="restore_integrity_mismatch">Expected %1$d %2$s but found %3$d in archive</string>
     <string name="restore_warnings_title">Warnings</string>
@@ -485,8 +489,8 @@
     <string name="recall_mode">Recall mode</string>
     <string name="recall_mode_on_this_day">On This Day</string>
     <string name="recall_mode_on_this_day_description">Surface entries near today\'s date from prior years</string>
-    <string name="recall_mode_rediscover">Rediscover</string>
-    <string name="recall_mode_rediscover_description">Surface interesting past entries regardless of date</string>
+    <string name="recall_mode_rediscover">From the archive</string>
+    <string name="recall_mode_rediscover_description">Surface the most recent notable older memory, regardless of date</string>
     <string name="widget_content_types">Content to show</string>
     <string name="widget_content_type_text">Text notes</string>
     <string name="widget_content_type_text_description">Written entries and journal text</string>

@@ -36,6 +36,7 @@ import app.logdate.feature.core.export.ExportBottomSheet
 import app.logdate.feature.core.export.ExportOptions
 import app.logdate.feature.core.export.ExportState
 import app.logdate.feature.core.export.UserDataExportViewModel
+import app.logdate.feature.core.restore.ImportOptions
 import app.logdate.feature.core.restore.RestoreBottomSheet
 import app.logdate.feature.core.restore.RestoreState
 import app.logdate.feature.core.restore.UserDataRestoreViewModel
@@ -129,7 +130,9 @@ fun DataSettingsScreen(
         restoreState = restoreState,
         isRestoreSheetVisible = isRestoreSheetVisible,
         onShowRestoreSheet = restoreViewModel::showRestoreSheet,
-        onConfirmRestore = restoreViewModel::confirmRestore,
+        onSelectRestoreFile = restoreViewModel::selectFile,
+        onUpdateImportOptions = restoreViewModel::updateImportOptions,
+        onConfirmImport = restoreViewModel::confirmImport,
         onCancelRestore = restoreViewModel::cancelRestore,
         onRetryRestore = restoreViewModel::retryRestore,
         onDismissRestore = restoreViewModel::dismissSheet,
@@ -167,7 +170,9 @@ fun DataSettingsContent(
     restoreState: RestoreState,
     isRestoreSheetVisible: Boolean = restoreState !is RestoreState.Idle,
     onShowRestoreSheet: () -> Unit,
-    onConfirmRestore: () -> Unit,
+    onSelectRestoreFile: () -> Unit,
+    onUpdateImportOptions: (ImportOptions) -> Unit,
+    onConfirmImport: () -> Unit,
     onCancelRestore: () -> Unit,
     onRetryRestore: () -> Unit,
     onDismissRestore: () -> Unit,
@@ -201,7 +206,9 @@ fun DataSettingsContent(
     if (isRestoreSheetVisible) {
         RestoreBottomSheet(
             restoreState = restoreState,
-            onConfirm = onConfirmRestore,
+            onSelectFile = onSelectRestoreFile,
+            onUpdateOptions = onUpdateImportOptions,
+            onConfirmImport = onConfirmImport,
             onCancel = onCancelRestore,
             onRetry = onRetryRestore,
             onDismiss = onDismissRestore,
@@ -671,7 +678,9 @@ private fun DataSettingsScreenPreview() {
         onBrowseExport = {},
         restoreState = RestoreState.Idle,
         onShowRestoreSheet = {},
-        onConfirmRestore = {},
+        onSelectRestoreFile = {},
+        onUpdateImportOptions = {},
+        onConfirmImport = {},
         onCancelRestore = {},
         onRetryRestore = {},
         onDismissRestore = {},
