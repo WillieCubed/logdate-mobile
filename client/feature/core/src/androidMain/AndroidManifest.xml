@@ -1,4 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- WorkManager will handle background export tasks -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Biometric authentication for journal lock screen -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+
+    <!-- WorkManager foreground service type for export/restore background tasks -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <application>
+        <!--
+            Declare foregroundServiceType="dataSync" on WorkManager's SystemForegroundService.
+            tools:node="merge" adds the attribute to WorkManager's own manifest entry so that
+            ExportWorker and RestoreWorker can run as foreground services.
+        -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+    </application>
+
 </manifest>

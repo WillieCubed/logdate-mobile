@@ -20,6 +20,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" tools:node="remove" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" tools:node="remove" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" tools:node="remove" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" tools:node="remove" />
 
     <!-- Remove OpenGL ES requirement merged from Google Maps SDK -->
@@ -80,6 +81,12 @@
             tools:node="remove" />
         <receiver
             android:name="app.logdate.client.location.tracking.LocationTrackingBootReceiver"
+            tools:node="remove" />
+        <service
+            android:name="app.logdate.client.location.tracking.ActivityAwareLocationService"
+            tools:node="remove" />
+        <receiver
+            android:name="app.logdate.client.location.tracking.ActivityTransitionReceiver"
             tools:node="remove" />
 
         <!-- Remove Google Places SDK activities (not used on Wear OS) -->
