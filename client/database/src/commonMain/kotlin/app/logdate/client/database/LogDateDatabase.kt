@@ -19,7 +19,9 @@ import app.logdate.client.database.dao.JournalNotesDao
 import app.logdate.client.database.dao.LocationHistoryDao
 import app.logdate.client.database.dao.MediaCaptionDao
 import app.logdate.client.database.dao.PlaceDao
+import app.logdate.client.database.dao.PostcardDao
 import app.logdate.client.database.dao.SearchDao
+import app.logdate.client.database.dao.StickerDao
 import app.logdate.client.database.dao.StorageMetadataDao
 import app.logdate.client.database.dao.TextNoteDao
 import app.logdate.client.database.dao.TranscriptionDao
@@ -42,6 +44,8 @@ import app.logdate.client.database.entities.JournalNoteCrossRef
 import app.logdate.client.database.entities.LocationLogEntity
 import app.logdate.client.database.entities.MediaCaptionEntity
 import app.logdate.client.database.entities.PlaceEntity
+import app.logdate.client.database.entities.PostcardEntity
+import app.logdate.client.database.entities.StickerEntity
 import app.logdate.client.database.entities.StorageMetadataEntity
 import app.logdate.client.database.entities.TextNoteEntity
 import app.logdate.client.database.entities.TranscriptionEntity
@@ -82,6 +86,8 @@ import app.logdate.client.database.migrations.MIGRATION_27_28
 import app.logdate.client.database.migrations.MIGRATION_28_29
 import app.logdate.client.database.migrations.MIGRATION_29_30
 import app.logdate.client.database.migrations.MIGRATION_2_3
+import app.logdate.client.database.migrations.MIGRATION_30_31
+import app.logdate.client.database.migrations.MIGRATION_31_32
 import app.logdate.client.database.migrations.MIGRATION_3_4
 import app.logdate.client.database.migrations.MIGRATION_4_5
 import app.logdate.client.database.migrations.MIGRATION_5_6
@@ -134,8 +140,11 @@ import kotlinx.coroutines.IO
         MediaCaptionEntity::class,
         MediaExifMetadataEntity::class,
         HealthSnapshotEntity::class,
+        // Postcards
+        PostcardEntity::class,
+        StickerEntity::class,
     ],
-    version = 30,
+    version = 32,
     exportSchema = true,
 )
 @TypeConverters(
@@ -192,6 +201,10 @@ abstract class LogDateDatabase : RoomDatabase() {
     abstract fun mediaExifDao(): MediaExifDao
 
     abstract fun healthSnapshotDao(): HealthSnapshotDao
+
+    abstract fun postcardDao(): PostcardDao
+
+    abstract fun stickerDao(): StickerDao
 }
 
 /**
@@ -257,6 +270,8 @@ fun getRoomDatabase(
                 MIGRATION_27_28,
                 MIGRATION_28_29,
                 MIGRATION_29_30,
+                MIGRATION_30_31,
+                MIGRATION_31_32,
             ).fallbackToDestructiveMigration(destroyTablesOnUpgrade)
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)
             .setQueryCoroutineContext(dispatcher)

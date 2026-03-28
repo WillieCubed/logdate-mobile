@@ -50,6 +50,7 @@ import app.logdate.client.domain.rewind.GetRewindUseCase
 import app.logdate.client.domain.rewind.GetWeekRewindUseCase
 import app.logdate.client.domain.search.SearchEntriesUseCase
 import app.logdate.client.domain.search.SearchJournalsUseCase
+import app.logdate.client.domain.timeline.GetJournalMembershipUseCase
 import app.logdate.client.domain.timeline.GetMediaUrisUseCase
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
 import app.logdate.client.domain.timeline.GetTimelineDayUseCase
@@ -133,6 +134,7 @@ val domainModule: Module =
         factory { GenerateBasicRewindUseCase(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 
         // Timeline
+        factory { GetJournalMembershipUseCase(get()) }
         factory { GetMediaUrisUseCase(get()) }
         factory { GroupNotesByDayBoundsUseCase(get(), get()) }
         factory { GetTimelineUseCase(get(), get(), get()) }
