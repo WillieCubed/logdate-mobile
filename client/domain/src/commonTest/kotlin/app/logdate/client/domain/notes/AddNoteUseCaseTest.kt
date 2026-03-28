@@ -387,6 +387,8 @@ class AddNoteUseCaseTest {
         }
 
         override suspend fun removeContentFromAllJournals(contentId: Uuid) = Unit
+
+        override fun observeJournalsForContents(contentIds: Set<Uuid>): Flow<Map<Uuid, List<Journal>>> = flowOf(emptyMap())
     }
 
     private class MockErrorJournalContentRepository(
@@ -430,6 +432,8 @@ class AddNoteUseCaseTest {
         }
 
         override suspend fun removeContentFromAllJournals(contentId: Uuid) = Unit
+
+        override fun observeJournalsForContents(contentIds: Set<Uuid>): Flow<Map<Uuid, List<Journal>>> = flowOf(emptyMap())
     }
 
     private class MockLogLocationUseCase {

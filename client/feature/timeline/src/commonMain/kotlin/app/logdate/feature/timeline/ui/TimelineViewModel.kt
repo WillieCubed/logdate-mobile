@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.notes.RemoveNoteUseCase
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.HomeRecommendation
+import app.logdate.client.domain.timeline.GetJournalMembershipUseCase
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
 import app.logdate.client.domain.timeline.Moment
 import app.logdate.client.domain.timeline.StreamingTimelineRequest
@@ -17,6 +18,7 @@ import app.logdate.client.repository.transcription.TranscriptionData
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.transcription.TranscriptionStatus
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.shared.model.Journal
 import app.logdate.shared.model.Person
 import app.logdate.ui.audio.TranscriptionState
 import app.logdate.ui.location.PlaceUiState
@@ -25,6 +27,7 @@ import app.logdate.ui.profiles.toUiState
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.HomeTimelineUiState
 import app.logdate.ui.timeline.ImageNoteUiState
+import app.logdate.ui.timeline.JournalBadgeUiState
 import app.logdate.ui.timeline.MomentAudioUiState
 import app.logdate.ui.timeline.MomentMediaUiState
 import app.logdate.ui.timeline.MomentUiState
@@ -63,6 +66,7 @@ class TimelineViewModel(
     private val removeNoteUseCase: RemoveNoteUseCase,
     private val userStateRepository: UserStateRepository,
     private val transcriptionRepository: TranscriptionRepository,
+    private val getJournalMembership: GetJournalMembershipUseCase,
 ) : ViewModel() {
     private val visibleAudioNoteIds = MutableStateFlow<Set<Uuid>>(emptySet())
     private val transcriptionCache = MutableStateFlow<Map<Uuid, TranscriptionData?>>(emptyMap())
@@ -141,8 +145,16 @@ class TimelineViewModel(
     val uiState: StateFlow<HomeTimelineUiState> =
         getStreamingTimeline(
             StreamingTimelineRequest.RecentTimeline(),
-        ).combine(selectedItemUiState) { timeline, selection ->
-            val items = timeline.days.map { day -> day.toUiState() }
+        ).flatMapLatest { timeline ->
+            val allNoteIds =
+                timeline.days
+                    .flatMap { day -> day.entries.map { it.uid } }
+                    .toSet()
+            getJournalMembership(allNoteIds).map { membershipMap ->
+                timeline to membershipMap
+            }
+        }.combine(selectedItemUiState) { (timeline, membershipMap), selection ->
+            val items = timeline.days.map { day -> day.toUiState(membershipMap) }
             val loadingState = if (items.isEmpty()) TimelineLoadingState.InitialLoading else TimelineLoadingState.Loaded
 
             HomeTimelineUiState(
@@ -217,11 +229,11 @@ class TimelineViewModel(
             longitude = longitude,
         )
 
-    private fun TimelineDay.toUiState(): TimelineDayUiState {
-        val noteUiStates = entries.toUiState()
+    private fun TimelineDay.toUiState(membershipMap: Map<Uuid, List<Journal>> = emptyMap()): TimelineDayUiState {
+        val noteUiStates = entries.toUiState(membershipMap)
         val placeUiStates = placesVisited.map { place -> place.toUiState() }
         val peopleUiStates = people.map(Person::toUiState)
-        val momentUiStates = moments.toMomentUiStates(peopleUiStates)
+        val momentUiStates = moments.toMomentUiStates(peopleUiStates, membershipMap)
 
         return createSemanticTimelineDayUiState(
             summary = tldr,
@@ -235,16 +247,20 @@ class TimelineViewModel(
         )
     }
 
-    private fun List<Moment>.toMomentUiStates(dayPeople: List<PersonUiState>): List<MomentUiState> {
+    private fun List<Moment>.toMomentUiStates(
+        dayPeople: List<PersonUiState>,
+        membershipMap: Map<Uuid, List<Journal>> = emptyMap(),
+    ): List<MomentUiState> {
         val heroIndex = selectHeroIndex(this)
         return mapIndexed { index, moment ->
-            moment.toMomentUiState(isHero = index == heroIndex, dayPeople = dayPeople)
+            moment.toMomentUiState(isHero = index == heroIndex, dayPeople = dayPeople, membershipMap = membershipMap)
         }
     }
 
     private fun Moment.toMomentUiState(
         isHero: Boolean,
         dayPeople: List<PersonUiState>,
+        membershipMap: Map<Uuid, List<Journal>> = emptyMap(),
     ): MomentUiState {
         val timezone = TimeZone.currentSystemDefault()
         val startLocal = estimatedStart.toLocalDateTime(timezone)
@@ -308,14 +324,21 @@ class TimelineViewModel(
             HomeRecommendation.None -> null
         }
 
-    private fun List<JournalNote>.toUiState(): List<app.logdate.ui.timeline.NoteUiState> =
+    private fun List<JournalNote>.toUiState(
+        membershipMap: Map<Uuid, List<Journal>> = emptyMap(),
+    ): List<app.logdate.ui.timeline.NoteUiState> =
         sortedByDescending { note -> note.creationTimestamp }.map { note ->
+            val noteJournals =
+                membershipMap[note.uid]
+                    .orEmpty()
+                    .map { JournalBadgeUiState(journalId = it.id, title = it.title) }
             when (note) {
                 is JournalNote.Text ->
                     TextNoteUiState(
                         noteId = note.uid,
                         text = note.content,
                         timestamp = note.creationTimestamp,
+                        journals = noteJournals,
                     )
                 is JournalNote.Image ->
                     ImageNoteUiState(
@@ -323,6 +346,7 @@ class TimelineViewModel(
                         uri = note.mediaRef,
                         timestamp = note.creationTimestamp,
                         caption = note.caption,
+                        journals = noteJournals,
                     )
                 is JournalNote.Audio ->
                     AudioNoteUiState(
@@ -330,6 +354,7 @@ class TimelineViewModel(
                         uri = note.mediaRef,
                         timestamp = note.creationTimestamp,
                         duration = note.durationMs,
+                        journals = noteJournals,
                     )
                 is JournalNote.Video ->
                     VideoNoteUiState(
@@ -337,6 +362,7 @@ class TimelineViewModel(
                         uri = note.mediaRef,
                         timestamp = note.creationTimestamp,
                         caption = note.caption,
+                        journals = noteJournals,
                     )
             }
         }

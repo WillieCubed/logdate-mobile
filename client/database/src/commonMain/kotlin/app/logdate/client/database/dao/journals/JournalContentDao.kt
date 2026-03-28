@@ -47,6 +47,12 @@ interface JournalContentDao {
     suspend fun removeContentFromAllJournals(contentId: Uuid)
 
     /**
+     * Gets all journal associations for a batch of content IDs in a single query.
+     */
+    @Query("SELECT * FROM journal_content_links WHERE content_id IN (:contentIds)")
+    fun getJournalsForContents(contentIds: List<Uuid>): Flow<List<JournalContentEntityLink>>
+
+    /**
      * Checks if a piece of content is associated with a journal.
      */
     @Query("SELECT EXISTS(SELECT 1 FROM journal_content_links WHERE journal_id = :journalId AND content_id = :contentId)")

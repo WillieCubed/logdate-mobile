@@ -47,6 +47,7 @@ fun TimelineDayDetailPanel(
     visitedLocations: List<DayLocation> = listOf(),
     onOpenLocations: (() -> Unit)? = null,
     onOpenRewind: () -> Unit = {},
+    onJournalClick: (Uuid) -> Unit = {},
     scrollState: LazyListState = rememberLazyListState(),
     modifier: Modifier = Modifier,
 ) {
@@ -121,6 +122,7 @@ fun TimelineDayDetailPanel(
 
                 NotesListSection(
                     notes = uiState.notes,
+                    onJournalClick = onJournalClick,
                 )
             }
 //            item {

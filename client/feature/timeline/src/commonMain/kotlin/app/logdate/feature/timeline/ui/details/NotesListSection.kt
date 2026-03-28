@@ -22,6 +22,7 @@ import app.logdate.ui.common.noteDragSource
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.ImageNoteUiState
+import app.logdate.ui.timeline.JournalBadgeRow
 import app.logdate.ui.timeline.NoteUiState
 import app.logdate.ui.timeline.TextNoteUiState
 import app.logdate.ui.timeline.VideoNoteUiState
@@ -30,10 +31,12 @@ import coil3.compose.AsyncImage
 import logdate.client.feature.timeline.generated.resources.*
 import logdate.client.feature.timeline.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
+import kotlin.uuid.Uuid
 
 @Composable
 internal fun NotesListSection(
     notes: List<NoteUiState>,
+    onJournalClick: (Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -42,17 +45,18 @@ internal fun NotesListSection(
     ) {
         Text(stringResource(Res.string.notes), style = MaterialTheme.typography.titleSmall)
         notes.forEach { note ->
-            when (note) {
-                is TextNoteUiState -> TextNoteSnippet(note)
-                is ImageNoteUiState -> ImageNoteSnippet(note)
-                is AudioNoteUiState -> {
-                    // Just use the AudioNoteSnippet without any DI or service injection
-                    // The AudioNoteSnippet already uses LocalAudioPlaybackState internally
-                    AudioNoteSnippet(
-                        uiState = note,
-                    )
+            Column {
+                when (note) {
+                    is TextNoteUiState -> TextNoteSnippet(note)
+                    is ImageNoteUiState -> ImageNoteSnippet(note)
+                    is AudioNoteUiState -> {
+                        AudioNoteSnippet(
+                            uiState = note,
+                        )
+                    }
+                    is VideoNoteUiState -> VideoNoteSnippet(note)
                 }
-                is VideoNoteUiState -> VideoNoteSnippet(note)
+                JournalBadgeRow(journals = note.journals, onJournalClick = onJournalClick)
             }
         }
     }

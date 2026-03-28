@@ -180,12 +180,15 @@ val DEMO_PEOPLE =
         PersonUiState(Uuid.random(), "Alice"),
     )
 
-sealed interface NoteUiState
+sealed interface NoteUiState {
+    val journals: List<JournalBadgeUiState>
+}
 
 data class TextNoteUiState(
     val noteId: Uuid,
     val text: String,
     val timestamp: Instant,
+    override val journals: List<JournalBadgeUiState> = emptyList(),
 ) : NoteUiState
 
 data class ImageNoteUiState(
@@ -193,6 +196,7 @@ data class ImageNoteUiState(
     val uri: String,
     val timestamp: Instant,
     val caption: String = "",
+    override val journals: List<JournalBadgeUiState> = emptyList(),
 ) : NoteUiState
 
 data class AudioNoteUiState(
@@ -200,6 +204,7 @@ data class AudioNoteUiState(
     val uri: String,
     val timestamp: Instant,
     val duration: Long = 0, // Duration in milliseconds
+    override val journals: List<JournalBadgeUiState> = emptyList(),
 ) : NoteUiState
 
 data class VideoNoteUiState(
@@ -209,4 +214,10 @@ data class VideoNoteUiState(
     val thumbnailUri: String? = null,
     val duration: Long = 0, // Duration in milliseconds
     val caption: String = "",
+    override val journals: List<JournalBadgeUiState> = emptyList(),
 ) : NoteUiState
+
+data class JournalBadgeUiState(
+    val journalId: Uuid,
+    val title: String,
+)

@@ -853,6 +853,8 @@ class ExportImportRoundTripTest {
         override suspend fun removeContentFromAllJournals(contentId: Uuid) {
             links.removeAll { it.first == contentId }
         }
+
+        override fun observeJournalsForContents(contentIds: Set<Uuid>): Flow<Map<Uuid, List<Journal>>> = flowOf(emptyMap())
     }
 
     private class StubDeviceIdProvider(

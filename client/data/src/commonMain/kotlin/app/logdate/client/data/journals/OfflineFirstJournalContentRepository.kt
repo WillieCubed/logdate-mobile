@@ -18,6 +18,7 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.withContext
 import kotlin.uuid.Uuid
 
@@ -114,6 +115,20 @@ class OfflineFirstJournalContentRepository(
             // Remove from the journal content links table using Uuid
             journalContentDao.removeContentFromAllJournals(contentId)
         }
+
+    override fun observeJournalsForContents(contentIds: Set<Uuid>): Flow<Map<Uuid, List<Journal>>> {
+        if (contentIds.isEmpty()) return flowOf(emptyMap())
+        return journalContentDao
+            .getJournalsForContents(contentIds.toList())
+            .combine(journalRepository.allJournalsObserved) { links, allJournals ->
+                val journalMap = allJournals.associateBy { it.id }
+                links
+                    .groupBy(
+                        keySelector = { it.contentId },
+                        valueTransform = { journalMap[it.journalId] },
+                    ).mapValues { (_, journals) -> journals.filterNotNull() }
+            }
+    }
 
     override suspend fun addContentToJournalFromSync(
         contentId: Uuid,

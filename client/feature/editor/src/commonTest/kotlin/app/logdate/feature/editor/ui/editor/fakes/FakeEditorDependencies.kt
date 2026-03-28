@@ -112,6 +112,8 @@ class FakeJournalContentRepository : JournalContentRepository {
     override suspend fun removeContentFromAllJournals(contentId: Uuid) {
         // No-op for tests
     }
+
+    override fun observeJournalsForContents(contentIds: Set<Uuid>): Flow<Map<Uuid, List<Journal>>> = flowOf(emptyMap())
 }
 
 class FakeJournalRepository : JournalRepository {

@@ -48,4 +48,10 @@ interface JournalContentRepository {
      * Removes content from all journals.
      */
     suspend fun removeContentFromAllJournals(contentId: Uuid)
+
+    /**
+     * Observes journal membership for multiple content IDs in a single query.
+     * Returns a map from content ID to the list of journals it belongs to.
+     */
+    fun observeJournalsForContents(contentIds: Set<Uuid>): Flow<Map<Uuid, List<Journal>>>
 }

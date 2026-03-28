@@ -33,7 +33,7 @@ import kotlin.uuid.Uuid
 class JournalDetailViewModel(
     private val repository: JournalRepository,
     private val sharingLauncher: SharingLauncher,
-    journalContentRepository: JournalContentRepository,
+    private val journalContentRepository: JournalContentRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     // Simple MutableStateFlow to store the journal ID
@@ -149,6 +149,20 @@ class JournalDetailViewModel(
         viewModelScope.launch {
             journalIdState.value?.let { journalId ->
                 sharingLauncher.shareJournalToInstagram(journalId)
+            }
+        }
+    }
+
+    /**
+     * Removes a note from the current journal without deleting the note itself.
+     */
+    fun removeNoteFromJournal(noteId: Uuid) {
+        viewModelScope.launch {
+            journalIdState.value?.let { journalId ->
+                journalContentRepository.removeContentFromJournal(
+                    contentId = noteId,
+                    journalId = journalId,
+                )
             }
         }
     }

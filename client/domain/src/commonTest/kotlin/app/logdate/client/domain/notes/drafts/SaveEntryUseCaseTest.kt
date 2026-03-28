@@ -261,6 +261,9 @@ class SaveEntryUseCaseTest {
         ) {}
 
         override suspend fun removeContentFromAllJournals(contentId: Uuid) {}
+
+        override fun observeJournalsForContents(contentIds: Set<Uuid>): Flow<Map<Uuid, List<app.logdate.shared.model.Journal>>> =
+            flowOf(emptyMap())
     }
 
     private class FakeMediaManager : MediaManager {

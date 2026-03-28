@@ -72,6 +72,7 @@ import app.logdate.shared.model.PasskeyCredential
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -772,6 +773,8 @@ class FakeJournalContentRepository : JournalContentRepository {
     ) {}
 
     override suspend fun removeContentFromAllJournals(contentId: Uuid) {}
+
+    override fun observeJournalsForContents(contentIds: Set<Uuid>): Flow<Map<Uuid, List<Journal>>> = flowOf(emptyMap())
 }
 
 class TrackingJournalContentRepository : JournalContentRepository {
@@ -812,6 +815,8 @@ class TrackingJournalContentRepository : JournalContentRepository {
     override suspend fun removeContentFromAllJournals(contentId: Uuid) {
         associations.removeAll { it.contentId == contentId }
     }
+
+    override fun observeJournalsForContents(contentIds: Set<Uuid>): Flow<Map<Uuid, List<Journal>>> = flowOf(emptyMap())
 
     fun hasAssociation(
         contentId: Uuid,

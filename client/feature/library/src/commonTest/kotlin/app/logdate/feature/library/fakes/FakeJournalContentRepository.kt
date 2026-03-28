@@ -5,6 +5,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlin.uuid.Uuid
 
@@ -58,4 +59,6 @@ class FakeJournalContentRepository : JournalContentRepository {
     override suspend fun removeContentFromAllJournals(contentId: Uuid) {
         links.value = links.value - contentId
     }
+
+    override fun observeJournalsForContents(contentIds: Set<Uuid>): Flow<Map<Uuid, List<Journal>>> = flowOf(emptyMap())
 }

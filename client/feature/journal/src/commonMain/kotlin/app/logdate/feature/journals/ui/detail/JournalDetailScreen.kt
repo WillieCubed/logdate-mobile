@@ -25,11 +25,15 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -87,6 +91,7 @@ fun JournalDetailScreen(
 
     val state by viewModel.uiState.collectAsState()
     var openDeleteConfirmation by rememberSaveable { mutableStateOf(false) }
+    var noteToRemove by rememberSaveable { mutableStateOf<String?>(null) }
     JournalDetailScreenContent(
         uiState = state,
         onGoBack = onGoBack,
@@ -100,6 +105,13 @@ fun JournalDetailScreen(
         onConfirmDelete = {
             viewModel.deleteJournal(onJournalDeleted)
             openDeleteConfirmation = false
+        },
+        onRemoveNoteFromJournal = { noteId -> noteToRemove = noteId.toString() },
+        showRemoveNoteConfirmation = noteToRemove != null,
+        onDismissRemoveNoteConfirmation = { noteToRemove = null },
+        onConfirmRemoveNote = {
+            noteToRemove?.let { viewModel.removeNoteFromJournal(Uuid.parse(it)) }
+            noteToRemove = null
         },
         modifier = modifier,
     )
@@ -117,6 +129,10 @@ fun JournalDetailScreenContent(
     showDeleteConfirmation: Boolean = false,
     onDismissDeleteConfirmation: () -> Unit = {},
     onConfirmDelete: () -> Unit = {},
+    onRemoveNoteFromJournal: (noteId: Uuid) -> Unit = {},
+    showRemoveNoteConfirmation: Boolean = false,
+    onDismissRemoveNoteConfirmation: () -> Unit = {},
+    onConfirmRemoveNote: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
@@ -271,6 +287,7 @@ fun JournalDetailScreenContent(
                                             content = entry.content,
                                             timestamp = entry.timestamp,
                                             onClick = { onNavigateToNoteDetail(entry.id) },
+                                            onRemoveFromJournal = { onRemoveNoteFromJournal(entry.id) },
                                         )
                                     }
                                 }
@@ -284,6 +301,13 @@ fun JournalDetailScreenContent(
                 DeleteConfirmationDialog(
                     onDismissRequest = onDismissDeleteConfirmation,
                     onConfirmation = onConfirmDelete,
+                )
+            }
+
+            if (showRemoveNoteConfirmation) {
+                RemoveNoteFromJournalDialog(
+                    onDismissRequest = onDismissRemoveNoteConfirmation,
+                    onConfirmation = onConfirmRemoveNote,
                 )
             }
         }
@@ -340,13 +364,44 @@ internal fun JournalDetailPlaceholder() {
 }
 
 @Composable
+private fun RemoveNoteFromJournalDialog(
+    onDismissRequest: () -> Unit,
+    onConfirmation: () -> Unit,
+) {
+    AlertDialog(
+        icon = {
+            Icon(Icons.Default.WarningAmber, contentDescription = null)
+        },
+        title = {
+            Text(text = stringResource(Res.string.remove_from_journal_title))
+        },
+        text = {
+            Text(text = stringResource(Res.string.remove_from_journal_description))
+        },
+        onDismissRequest = onDismissRequest,
+        confirmButton = {
+            TextButton(onClick = onConfirmation) {
+                Text(stringResource(Res.string.action_remove))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text(stringResource(Res.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
 private fun JournalEntryItem(
     content: String,
     timestamp: kotlin.time.Instant,
     onClick: () -> Unit,
+    onRemoveFromJournal: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
 
     Column(modifier = modifier) {
         // Display date and time above the card
@@ -367,8 +422,9 @@ private fun JournalEntryItem(
             },
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
+            Row(
+                modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 16.dp, end = 4.dp),
+                verticalAlignment = Alignment.Top,
             ) {
                 Text(
                     text = content,
@@ -377,10 +433,33 @@ private fun JournalEntryItem(
                     overflow = if (expanded) TextOverflow.Visible else TextOverflow.Ellipsis,
                     modifier =
                         Modifier
-                            .fillMaxWidth()
+                            .weight(1f)
                             .animateContentSize()
                             .heightIn(min = 40.dp),
                 )
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            contentDescription = stringResource(Res.string.journal_settings_2),
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.remove_from_journal)) },
+                            onClick = {
+                                showMenu = false
+                                onRemoveFromJournal()
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.RemoveCircleOutline, contentDescription = null)
+                            },
+                        )
+                    }
+                }
             }
         }
     }
