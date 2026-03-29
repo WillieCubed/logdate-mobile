@@ -7,8 +7,10 @@ import app.logdate.feature.journals.di.journalsFeatureModule
 import app.logdate.feature.library.di.libraryFeatureModule
 import app.logdate.feature.location.timeline.di.locationTimelineModule
 import app.logdate.feature.onboarding.di.onboardingFeatureModule
+import app.logdate.feature.postcards.di.postcardsFeatureModule
 import app.logdate.feature.rewind.di.rewindFeatureModule
 import app.logdate.feature.search.di.searchFeatureModule
+import app.logdate.feature.stickers.di.stickersFeatureModule
 import app.logdate.feature.timeline.di.timelineFeatureModule
 import org.koin.core.module.Module
 
@@ -39,4 +41,6 @@ internal val defaultModules: Set<Module> =
         libraryFeatureModule,
         locationTimelineModule,
         searchFeatureModule,
+        postcardsFeatureModule,
+        stickersFeatureModule,
     )

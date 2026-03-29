@@ -107,6 +107,8 @@ import app.logdate.navigation.routes.finishJournalCreation
 import app.logdate.navigation.routes.journalRoutes
 import app.logdate.navigation.routes.libraryRoutes
 import app.logdate.navigation.routes.locationRoutes
+import app.logdate.navigation.routes.navigateToPostcardEditor
+import app.logdate.navigation.routes.navigateToPostcardViewer
 import app.logdate.navigation.routes.onboarding
 import app.logdate.navigation.routes.openAccountSettings
 import app.logdate.navigation.routes.openAdvancedSettings
@@ -140,6 +142,7 @@ import app.logdate.navigation.routes.openWatchNotificationSettings
 import app.logdate.navigation.routes.openWatchSettings
 import app.logdate.navigation.routes.openWatchSyncSettings
 import app.logdate.navigation.routes.openWatchTroubleshooting
+import app.logdate.navigation.routes.postcardRoutes
 import app.logdate.navigation.routes.resetApp
 import app.logdate.navigation.routes.rewindRoutes
 import app.logdate.navigation.routes.routeClass
@@ -655,6 +658,18 @@ fun MainNavigationRoot(
                                         id,
                                     ),
                                 )
+                            },
+                        )
+                        postcardRoutes(
+                            onBack = mainAppNavigator::goBack,
+                            onOpenPostcard = { id ->
+                                mainAppNavigator.navigateToPostcardViewer(id)
+                            },
+                            onEditPostcard = { id ->
+                                mainAppNavigator.navigateToPostcardEditor(id)
+                            },
+                            onNavigateToMoment = { momentId ->
+                                // TODO: Navigate to moment detail
                             },
                         )
                         appSettingsRoutes(

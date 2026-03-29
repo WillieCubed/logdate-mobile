@@ -64,6 +64,8 @@ kotlin {
             implementation(projects.client.feature.rewind)
             implementation(projects.client.feature.locationTimeline)
             implementation(projects.client.feature.search)
+            implementation(projects.client.feature.postcards)
+            implementation(projects.client.feature.stickers)
             implementation(projects.client.data)
             implementation(projects.client.database)
             implementation(projects.client.ui)

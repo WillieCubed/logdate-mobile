@@ -132,6 +132,26 @@ data class LibraryMediaDetailRoute(
 ) : NavKey
 
 /**
+ * Routes for the postcards feature
+ */
+@Serializable
+data object PostcardsCollectionRoute : NavKey
+
+@Serializable
+data class PostcardEditorRoute(
+    @Serializable(with = UuidSerializer::class)
+    val postcardId: Uuid? = null,
+    @Serializable(with = UuidSerializer::class)
+    val sourceMomentRef: Uuid? = null,
+) : NavKey
+
+@Serializable
+data class PostcardViewerRoute(
+    @Serializable(with = UuidSerializer::class)
+    val postcardId: Uuid,
+) : NavKey
+
+/**
  * Routes for the rewind feature
  */
 @Serializable

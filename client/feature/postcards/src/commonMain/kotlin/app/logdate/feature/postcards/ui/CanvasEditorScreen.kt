@@ -45,6 +45,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.postcards.model.InkTool
+import app.logdate.feature.postcards.model.ShapeKind
 import coil3.compose.AsyncImage
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -102,9 +104,42 @@ fun CanvasEditorScreen(
                     CanvasRenderer(document = state.document)
                 }
 
-                // Element selection overlay
-                if (state.activeTool == CanvasTool.SELECT && state.selectedElementId != null) {
-                    // Transform handles would be rendered here
+                // Tool overlays — rendered on top of the viewport
+                when (state.activeTool) {
+                    CanvasTool.INK -> {
+                        InkCaptureOverlay(
+                            tool = InkTool.PEN,
+                            color = DEFAULT_STROKE_COLOR,
+                            strokeWidth = DEFAULT_INK_WIDTH,
+                            onStrokeComplete = { points ->
+                                viewModel.addInkStroke(
+                                    points = points,
+                                    tool = InkTool.PEN,
+                                    color = DEFAULT_STROKE_COLOR,
+                                    strokeWidth = DEFAULT_INK_WIDTH,
+                                )
+                            },
+                        )
+                    }
+                    CanvasTool.SHAPE -> {
+                        ShapeCaptureOverlay(
+                            shapeKind = ShapeKind.RECTANGLE,
+                            color = DEFAULT_STROKE_COLOR,
+                            strokeWidth = DEFAULT_SHAPE_WIDTH,
+                            onShapeComplete = { draft ->
+                                viewModel.addShape(
+                                    shapeKind = draft.kind,
+                                    x = draft.x,
+                                    y = draft.y,
+                                    width = draft.width,
+                                    height = draft.height,
+                                    color = DEFAULT_STROKE_COLOR,
+                                    strokeWidth = DEFAULT_SHAPE_WIDTH,
+                                )
+                            },
+                        )
+                    }
+                    else -> { /* SELECT, TEXT, STICKER handled elsewhere */ }
                 }
             }
 
@@ -388,3 +423,7 @@ private fun ToolButton(
         )
     }
 }
+
+private const val DEFAULT_STROKE_COLOR = "#333333"
+private const val DEFAULT_INK_WIDTH = 4f
+private const val DEFAULT_SHAPE_WIDTH = 3f
