@@ -80,6 +80,8 @@ include(":client:feature:library")
 include(":client:feature:android-widgets")
 include(":client:feature:remotedisplay")
 include(":client:feature:speechrecognition")
+include(":client:feature:postcards")
+include(":client:feature:stickers")
 // Shared cross-platform modules
 include(":shared:activitypub")
 include(":shared:atproto-crypto")

@@ -61,6 +61,9 @@ webauthn4j = "0.31.0.RELEASE"
 jwtKt = "1.2.1"
 bouncycastle = "1.83"
 
+# MLKit
+mlkit-subject-segmentation = "16.0.0-beta1"
+
 # Database Dependencies
 exposed = "0.57.0"
 postgresql = "42.7.10"
@@ -339,6 +342,7 @@ androidx-credentials-play-services = { group = "androidx.credentials", name = "c
 
 versioning-plugin = { module = "org.jetbrains.dokka:versioning-plugin", version.ref = "versioningPlugin" }
 play-services-wearable = { group = "com.google.android.gms", name = "play-services-wearable", version.ref = "playServicesWearable" }
+mlkit-subject-segmentation = { group = "com.google.android.gms", name = "play-services-mlkit-subject-segmentation", version.ref = "mlkit-subject-segmentation" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }

@@ -31,4 +31,6 @@ val daosModule: Module =
         single { get<LogDateDatabase>().mediaCaptionDao() }
         single { get<LogDateDatabase>().mediaExifDao() }
         single { get<LogDateDatabase>().healthSnapshotDao() }
+        single { get<LogDateDatabase>().postcardDao() }
+        single { get<LogDateDatabase>().stickerDao() }
     }

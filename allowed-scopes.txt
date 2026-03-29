@@ -16,6 +16,8 @@ onboarding  # First-run experience and app introduction
 rewind  # Year-in-review and memory highlights
 search  # Search across journals and entries
 timeline  # Main timeline feed of entries
+postcards  # Postcard creation, editing, viewing, and collection
+stickers  # Sticker extraction from photos, personal sticker library
 android-widget  # Home screen widgets (Memories, On This Day)
 
 # App scopes
