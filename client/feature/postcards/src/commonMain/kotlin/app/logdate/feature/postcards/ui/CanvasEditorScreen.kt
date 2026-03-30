@@ -101,11 +101,31 @@ fun CanvasEditorScreen(
                 CanvasViewport(
                     state = viewportState,
                 ) {
-                    CanvasRenderer(document = state.document)
+                    CanvasRenderer(
+                        document = state.document,
+                        selectedElementId = state.selectedElementId,
+                        onElementTap = { elementId ->
+                            viewModel.selectElement(elementId)
+                        },
+                    )
                 }
 
                 // Tool overlays — rendered on top of the viewport
                 when (state.activeTool) {
+                    CanvasTool.SELECT -> {
+                        val selectedId = state.selectedElementId
+                        if (selectedId != null) {
+                            SelectionOverlay(
+                                selectedElementId = selectedId,
+                                viewportScale = viewportState.scale,
+                                onBeginDrag = viewModel::beginDrag,
+                                onMoveElement = viewModel::moveElement,
+                                onEndDrag = viewModel::endDrag,
+                                onTransformElement = viewModel::transformElement,
+                                onDeselect = { viewModel.selectElement(null) },
+                            )
+                        }
+                    }
                     CanvasTool.INK -> {
                         InkCaptureOverlay(
                             tool = InkTool.PEN,
@@ -139,7 +159,7 @@ fun CanvasEditorScreen(
                             },
                         )
                     }
-                    else -> { /* SELECT, TEXT, STICKER handled elsewhere */ }
+                    else -> { /* TEXT, STICKER handled in later phases */ }
                 }
             }
 

@@ -159,7 +159,16 @@ class CanvasEditorViewModel(
     }
 
     /**
-     * Moves the selected element by the given delta.
+     * Pushes undo state once at the start of a drag gesture.
+     * Call this before the first [moveElement] in a drag sequence.
+     */
+    fun beginDrag() {
+        pushUndo()
+    }
+
+    /**
+     * Moves an element by the given delta.
+     * Does not push undo — call [beginDrag] once at the start of the gesture.
      */
     fun moveElement(
         elementId: Uuid,
@@ -183,6 +192,13 @@ class CanvasEditorViewModel(
                     },
             )
         }
+    }
+
+    /**
+     * Signals the end of a drag gesture. No-op currently — undo was pushed in [beginDrag].
+     */
+    fun endDrag() {
+        // Intentionally empty. Undo snapshot was captured in beginDrag().
     }
 
     /**
