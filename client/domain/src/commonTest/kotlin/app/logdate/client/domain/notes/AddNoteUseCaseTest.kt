@@ -308,6 +308,8 @@ class AddNoteUseCaseTest {
         override fun observeNotesStream(pageSize: Int) = flowOf(emptyList<JournalNote>())
 
         override fun observeRecentNotes(limit: Int) = flowOf(emptyList<JournalNote>())
+
+        override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
     }
 
     /**

@@ -540,6 +540,8 @@ class GetStreamingTimelineUseCaseTest {
                     ) = Unit
 
                     override suspend fun getNoteById(noteId: Uuid): JournalNote? = null
+
+                    override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
                 }
             val reactiveUseCase = GetStreamingTimelineUseCase(reactiveRepository, buildTimelineDayUseCase(), calendarDateGrouper())
 
@@ -680,6 +682,8 @@ class GetStreamingTimelineUseCaseTest {
         ) = Unit
 
         override suspend fun getNoteById(noteId: Uuid): JournalNote? = null
+
+        override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
     }
 
     private class FakeGenerativeAICache : GenerativeAICache {

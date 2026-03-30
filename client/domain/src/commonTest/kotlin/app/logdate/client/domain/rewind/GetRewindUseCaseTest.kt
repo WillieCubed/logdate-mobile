@@ -420,6 +420,8 @@ class GetRewindUseCaseTest {
         ) {}
 
         override suspend fun getNoteById(noteId: Uuid): JournalNote? = null
+
+        override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
     }
 
     private class FakeIndexedMediaRepository : IndexedMediaRepository {

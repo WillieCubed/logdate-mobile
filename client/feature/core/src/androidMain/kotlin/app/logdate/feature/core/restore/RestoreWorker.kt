@@ -14,7 +14,6 @@ import app.logdate.client.domain.restore.RestoreBundle
 import app.logdate.client.domain.restore.RestoreOptions
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.media.MediaManager
-import app.logdate.client.media.MediaPayload
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -212,18 +211,25 @@ class RestoreWorker(
         if (entry.isDirectory) {
             return null
         }
-        val data = zipFile.getInputStream(entry).use { input -> input.readBytes() }
         val fileName = normalizedPath.substringAfterLast('/')
-        val payload =
-            MediaPayload(
+        val tempFile = File.createTempFile("logdate_media_", "_$fileName", context.cacheDir)
+        try {
+            zipFile.getInputStream(entry).use { input ->
+                FileOutputStream(tempFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            return mediaManager.saveMediaFromFile(
+                sourceFilePath = tempFile.absolutePath,
                 fileName = fileName,
                 mimeType = resolveMimeType(fileName),
-                sizeBytes = data.size.toLong(),
-                data = data,
             )
-        return runCatching { mediaManager.saveMedia(payload) }
-            .onFailure { Napier.e("Failed to import media during restore", it) }
-            .getOrNull()
+        } catch (e: Exception) {
+            Napier.e("Failed to import media during restore", e)
+            return null
+        } finally {
+            tempFile.delete()
+        }
     }
 
     private fun resolveMimeType(fileName: String): String {
