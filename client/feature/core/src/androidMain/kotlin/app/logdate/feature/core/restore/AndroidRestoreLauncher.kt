@@ -19,9 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
-import java.io.File
-import java.io.FileOutputStream
-import java.util.zip.ZipFile
+import java.util.zip.ZipInputStream
 
 /**
  * Android-specific implementation for launching data restore using Storage Access Framework and WorkManager.
@@ -225,28 +223,27 @@ class AndroidRestoreLauncher(
 
     /**
      * Extracts only the `metadata.json` entry from the archive for preview.
+     *
+     * Uses [java.util.zip.ZipInputStream] to read sequentially from the content
+     * URI stream, avoiding a full archive copy to disk.
      */
-    private fun extractMetadata(uri: Uri): String? {
-        val tempFile = File.createTempFile("logdate_preview", ".zip", context.cacheDir)
-        return try {
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                FileOutputStream(tempFile).use { output ->
-                    input.copyTo(output)
-                }
-            } ?: return null
-
-            val zipFile = runCatching { ZipFile(tempFile) }.getOrNull() ?: return null
-            zipFile.use { zip ->
-                val entry = zip.getEntry(ExportFileStructure.METADATA_FILE) ?: return null
-                zip.getInputStream(entry).use { input ->
-                    input.bufferedReader(Charsets.UTF_8).readText()
+    private fun extractMetadata(uri: Uri): String? =
+        try {
+            context.contentResolver.openInputStream(uri)?.use { rawInput ->
+                ZipInputStream(rawInput).use { zipInput ->
+                    var entry = zipInput.nextEntry
+                    while (entry != null) {
+                        if (entry.name == ExportFileStructure.METADATA_FILE) {
+                            return@use zipInput.bufferedReader(Charsets.UTF_8).readText()
+                        }
+                        zipInput.closeEntry()
+                        entry = zipInput.nextEntry
+                    }
+                    null
                 }
             }
         } catch (e: Exception) {
             Napier.e("Failed to extract metadata from archive", e)
             null
-        } finally {
-            tempFile.delete()
         }
-    }
 }
