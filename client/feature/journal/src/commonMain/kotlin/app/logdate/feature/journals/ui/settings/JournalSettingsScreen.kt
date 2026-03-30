@@ -95,6 +95,7 @@ fun JournalSettingsScreen(
         uiState = state,
         onGoBack = onGoBack,
         onNameChange = viewModel::updateJournalName,
+        onDescriptionChange = viewModel::updateJournalDescription,
         onSaveChanges = { viewModel.saveJournalChanges { onGoBack() } },
         onShareJournal = viewModel::shareJournal,
         onRequestDelete = { openDeleteConfirmation = true },
@@ -115,6 +116,7 @@ fun JournalSettingsScreenContent(
     uiState: JournalSettingsUiState,
     onGoBack: () -> Unit,
     onNameChange: (String) -> Unit = {},
+    onDescriptionChange: (String) -> Unit = {},
     onSaveChanges: () -> Unit = {},
     onShareJournal: () -> Unit = {},
     onRequestDelete: () -> Unit = {},
@@ -220,6 +222,15 @@ fun JournalSettingsScreenContent(
                         JournalNameField(
                             journalName = uiState.editedName,
                             onNameChange = onNameChange,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+
+                    // Journal description section
+                    item {
+                        JournalDescriptionField(
+                            description = uiState.editedDescription,
+                            onDescriptionChange = onDescriptionChange,
                             modifier = Modifier.padding(horizontal = Spacing.lg),
                         )
                     }
@@ -400,6 +411,25 @@ private fun JournalNameField(
         singleLine = true,
         supportingText = {
             Text(stringResource(Res.string.enter_a_descriptive_name_for_your_journal))
+        },
+    )
+}
+
+@Composable
+private fun JournalDescriptionField(
+    description: String,
+    onDescriptionChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedTextField(
+        value = description,
+        onValueChange = { onDescriptionChange(it) },
+        label = { Text(stringResource(Res.string.description)) },
+        textStyle = MaterialTheme.typography.bodyLarge,
+        modifier = modifier.fillMaxWidth(),
+        minLines = 2,
+        supportingText = {
+            Text(stringResource(Res.string.journal_description_hint))
         },
     )
 }

@@ -36,6 +36,7 @@
     <string name="delete_journal">Delete Journal</string>
     <string name="delete_journal_2">Delete journal</string>
     <string name="description">Description</string>
+    <string name="journal_description_hint">What is this journal about?</string>
     <string name="enter_a_descriptive_name_for_your_journal">Enter a descriptive name for your journal</string>
     <string name="error">Error</string>
     <string name="failed_to_load_journal">Failed to load journal</string>

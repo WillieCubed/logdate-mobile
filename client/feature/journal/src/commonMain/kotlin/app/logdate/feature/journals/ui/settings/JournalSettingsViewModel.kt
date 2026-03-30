@@ -34,24 +34,27 @@ class JournalSettingsViewModel(
 ) : ViewModel() {
     private val journalIdState = MutableStateFlow<Uuid?>(null)
 
-    // State to track the currently edited name
     private val editedNameState = MutableStateFlow<String?>(null)
+    private val editedDescriptionState = MutableStateFlow<String?>(null)
 
-    // Combine the journal data with edited name to produce UI state
     val uiState: StateFlow<JournalSettingsUiState> =
         journalIdState
             .filterNotNull()
             .flatMapLatest { id ->
-                getJournalByIdUseCase(id).combine(editedNameState) { journal, editedName ->
-                    val nameToUse = editedName ?: journal.title
-                    val hasChanges = nameToUse != journal.title
+                getJournalByIdUseCase(id)
+                    .combine(editedNameState) { journal, editedName -> journal to editedName }
+                    .combine(editedDescriptionState) { (journal, editedName), editedDesc ->
+                        val nameToUse = editedName ?: journal.title
+                        val descToUse = editedDesc ?: journal.description
+                        val hasChanges = nameToUse != journal.title || descToUse != journal.description
 
-                    JournalSettingsUiState.Loaded(
-                        journal = journal,
-                        editedName = nameToUse,
-                        hasUnsavedChanges = hasChanges,
-                    )
-                }
+                        JournalSettingsUiState.Loaded(
+                            journal = journal,
+                            editedName = nameToUse,
+                            editedDescription = descToUse,
+                            hasUnsavedChanges = hasChanges,
+                        )
+                    }
             }.stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5000),
@@ -89,6 +92,10 @@ class JournalSettingsViewModel(
         editedNameState.value = newName
     }
 
+    fun updateJournalDescription(newDescription: String) {
+        editedDescriptionState.value = newDescription
+    }
+
     /**
      * Saves the current journal name using the update use case.
      *
@@ -105,14 +112,14 @@ class JournalSettingsViewModel(
                 val updatedJournal =
                     currentState.journal.copy(
                         title = currentState.editedName,
+                        description = currentState.editedDescription,
                     )
 
-                // Save using use case
                 val success = updateJournalUseCase(updatedJournal)
 
                 if (success) {
-                    // Reset edited name to null so it will use the new title from the repository
                     editedNameState.value = null
+                    editedDescriptionState.value = null
                     onSuccess()
                 } else {
                     Napier.e("Failed to update journal name")
@@ -158,6 +165,7 @@ sealed class JournalSettingsUiState {
     data class Loaded(
         val journal: Journal,
         val editedName: String = journal.title,
+        val editedDescription: String = journal.description,
         val hasUnsavedChanges: Boolean = false,
     ) : JournalSettingsUiState()
 
