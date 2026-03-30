@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.database.dao.PostcardDao
 import app.logdate.client.database.entities.PostcardEntity
+import app.logdate.client.repository.media.IndexedMedia
+import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.feature.postcards.model.CanvasBackground
 import app.logdate.feature.postcards.model.CanvasElement
 import app.logdate.feature.postcards.model.ElementTransform
@@ -58,6 +60,7 @@ data class CanvasEditorState(
     val isTextEditorVisible: Boolean = false,
     val shelfStickers: List<StickerShelfItem> = emptyList(),
     val stickerUriMap: Map<Uuid, String> = emptyMap(),
+    val browsePhotos: List<ShelfPhoto> = emptyList(),
 )
 
 /**
@@ -86,6 +89,7 @@ class CanvasEditorViewModel(
     savedStateHandle: SavedStateHandle,
     private val postcardDao: PostcardDao,
     private val stickerRepository: StickerRepository,
+    private val indexedMediaRepository: IndexedMediaRepository,
 ) : ViewModel() {
     private val postcardId: Uuid? =
         savedStateHandle
@@ -110,6 +114,7 @@ class CanvasEditorViewModel(
             loadExistingPostcard(postcardId)
         }
         loadStickers()
+        loadBrowsePhotos()
     }
 
     private fun loadStickers() {
@@ -126,6 +131,29 @@ class CanvasEditorViewModel(
                     }
                 val uriMap = entities.associate { it.id to it.imageUri }
                 _state.update { it.copy(shelfStickers = items, stickerUriMap = uriMap) }
+            }.launchIn(viewModelScope)
+    }
+
+    private fun loadBrowsePhotos() {
+        indexedMediaRepository
+            .observeAllMedia()
+            .onEach { mediaList ->
+                val photos =
+                    mediaList
+                        .filterIsInstance<IndexedMedia.Image>()
+                        .map { image ->
+                            ShelfPhoto(
+                                mediaUri = image.uri,
+                                momentRef = image.uid,
+                            )
+                        }
+                _state.update {
+                    it.copy(
+                        browsePhotos = photos,
+                        // Auto-populate the Photos shelf if it's empty (first load)
+                        shelfPhotos = it.shelfPhotos.ifEmpty { photos },
+                    )
+                }
             }.launchIn(viewModelScope)
     }
 

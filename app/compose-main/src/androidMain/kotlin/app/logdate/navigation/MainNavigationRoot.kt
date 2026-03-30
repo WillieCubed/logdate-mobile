@@ -633,6 +633,7 @@ fun MainNavigationRoot(
                                 onOpenLocationTimeline = mainAppNavigator::openLocationTimeline,
                                 onOpenSearch = mainAppNavigator::openSearch,
                                 onImportBackup = mainAppNavigator::openExportSettings,
+                                onDecorate = { mainAppNavigator.navigateToPostcardEditor() },
                                 homeViewModel = safeHomeViewModel,
                             )
                         }

@@ -48,6 +48,7 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
     onOpenLocationTimeline: () -> Unit,
     onOpenSearch: () -> Unit,
     onImportBackup: () -> Unit,
+    onDecorate: () -> Unit = {},
     homeViewModel: HomeViewModel,
 ) {
     // The home screen
@@ -74,6 +75,7 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
         TimelineDetailScreen(
             onClose = onCloseTimelineDetail,
             onOpenLocations = onOpenLocationTimeline,
+            onDecorate = onDecorate,
             viewModel = homeViewModel,
         )
     }
@@ -84,6 +86,7 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
 fun TimelineDetailScreen(
     onClose: () -> Unit,
     onOpenLocations: (() -> Unit)? = null,
+    onDecorate: (() -> Unit)? = null,
     viewModel: HomeViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -94,6 +97,7 @@ fun TimelineDetailScreen(
             uiState = selectedDay,
             onExit = onClose,
             onOpenLocations = onOpenLocations,
+            onDecorate = onDecorate,
         )
     } ?: TimelineDetailPlaceholder()
 }

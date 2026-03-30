@@ -197,6 +197,7 @@ fun CanvasEditorScreen(
             Shelf(
                 mode = state.shelfMode,
                 photos = state.shelfPhotos,
+                browsePhotos = state.browsePhotos,
                 stickers = state.shelfStickers,
                 onModeChange = viewModel::setShelfMode,
                 onPhotoDrag = { photo, x, y ->
@@ -264,6 +265,7 @@ private fun EditorTopBar(
 private fun Shelf(
     mode: ShelfMode,
     photos: List<ShelfPhoto>,
+    browsePhotos: List<ShelfPhoto>,
     stickers: List<StickerShelfItem>,
     onModeChange: (ShelfMode) -> Unit,
     onPhotoDrag: (ShelfPhoto, Float, Float) -> Unit,
@@ -315,20 +317,10 @@ private fun Shelf(
                 )
             }
             is ShelfMode.Browse -> {
-                // Moment browser — will be fully implemented in Phase 3b
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(80.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        "Browse moments",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                ShelfPhotoStrip(
+                    photos = browsePhotos,
+                    onPhotoDrag = onPhotoDrag,
+                )
             }
         }
     }

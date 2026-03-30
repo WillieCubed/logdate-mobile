@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -47,6 +48,7 @@ fun TimelineDayDetailPanel(
     visitedLocations: List<DayLocation> = listOf(),
     onOpenLocations: (() -> Unit)? = null,
     onOpenRewind: () -> Unit = {},
+    onDecorate: (() -> Unit)? = null,
     onJournalClick: (Uuid) -> Unit = {},
     scrollState: LazyListState = rememberLazyListState(),
     modifier: Modifier = Modifier,
@@ -87,6 +89,11 @@ fun TimelineDayDetailPanel(
                         containerColor = Color.Transparent,
                     ),
                 actions = {
+                    if (onDecorate != null) {
+                        IconButton(onClick = onDecorate) {
+                            Icon(Icons.Default.Brush, contentDescription = "Decorate")
+                        }
+                    }
                     IconButton(onClick = {
                         onOpenRewind()
                     }) {
