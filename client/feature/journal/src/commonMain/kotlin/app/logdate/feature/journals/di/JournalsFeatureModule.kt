@@ -29,10 +29,13 @@ val journalsFeatureModule: Module =
                 savedStateHandle = get(),
             )
         }
-        viewModel { (noteId: Uuid) ->
+        viewModel { (noteId: Uuid, journalId: Uuid?) ->
             NoteViewerViewModel(
                 noteId = noteId,
+                journalId = journalId,
                 notesRepository = get(),
+                journalRepository = get(),
+                journalContentRepository = get(),
                 removeNoteUseCase = get(),
             )
         }

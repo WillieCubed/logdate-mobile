@@ -6,18 +6,25 @@
 package app.logdate.feature.journals.ui.detail
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -26,19 +33,28 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.feature.editor.ui.audio.expansion.ImmersiveAudioScreen
 import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
+import app.logdate.feature.journals.ui.deriveCoverColor
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.common.transitions.TransitionKeys.EDITOR_TRANSITION
@@ -48,12 +64,10 @@ import coil3.compose.AsyncImage
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.back
 import logdate.client.feature.journal.generated.resources.error
-import logdate.client.feature.journal.generated.resources.image
 import logdate.client.feature.journal.generated.resources.image_note
 import logdate.client.feature.journal.generated.resources.location
 import logdate.client.feature.journal.generated.resources.open_in_locations
 import logdate.client.feature.journal.generated.resources.pinned_location
-import logdate.client.feature.journal.generated.resources.video
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -63,16 +77,21 @@ import kotlin.uuid.Uuid
 
 /**
  * Viewer screen that renders notes with type-specific presentation.
+ *
+ * When [journalId] is provided, the viewer connects to the journal with
+ * an accent color spine, the journal title in the toolbar, and prev/next navigation.
  */
 @Composable
 fun NoteViewerScreen(
     noteId: Uuid,
     onGoBack: () -> Unit,
+    journalId: Uuid? = null,
     onOpenLocationTimeline: () -> Unit = {},
+    onNavigateToNote: (Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: NoteViewerViewModel =
         koinViewModel(
-            parameters = { parametersOf(noteId) },
+            parameters = { parametersOf(noteId, journalId) },
         ),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -99,11 +118,12 @@ fun NoteViewerScreen(
                 shared = state.shared,
                 onGoBack = onGoBack,
                 onOpenLocationTimeline = onOpenLocationTimeline,
+                onNavigateToNote = onNavigateToNote,
                 modifier = modifier,
             ) {
-                Text(
+                TextNoteViewer(
                     text = state.text,
-                    style = MaterialTheme.typography.bodyLarge,
+                    shared = state.shared,
                 )
             }
         }
@@ -112,9 +132,13 @@ fun NoteViewerScreen(
                 shared = state.shared,
                 onGoBack = onGoBack,
                 onOpenLocationTimeline = onOpenLocationTimeline,
+                onNavigateToNote = onNavigateToNote,
                 modifier = modifier,
             ) {
-                NoteViewerImageContent(mediaRef = state.mediaRef)
+                ImageNoteViewer(
+                    mediaRef = state.mediaRef,
+                    shared = state.shared,
+                )
             }
         }
         is NoteViewerUiState.VideoContent -> {
@@ -122,58 +146,153 @@ fun NoteViewerScreen(
                 shared = state.shared,
                 onGoBack = onGoBack,
                 onOpenLocationTimeline = onOpenLocationTimeline,
+                onNavigateToNote = onNavigateToNote,
                 modifier = modifier,
             ) {
-                NoteViewerVideoContent(mediaRef = state.mediaRef)
+                VideoNoteViewer(mediaRef = state.mediaRef)
             }
         }
     }
 }
 
+// region Type-specific viewers
+
+/**
+ * Text note rendered as a page with generous typography and a journal spine accent.
+ */
 @Composable
-fun NoteViewerImageContent(
-    mediaRef: String,
+private fun TextNoteViewer(
+    text: String,
+    shared: NoteViewerShared,
     modifier: Modifier = Modifier,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        Text(
-            text = stringResource(Res.string.image),
-            style = MaterialTheme.typography.titleMedium,
-        )
+    val journalContext = shared.journalContext
+    val accentColor =
+        journalContext?.let {
+            remember(it.journalId) { deriveCoverColor(it.journalId) }
+        }
+
+    Surface(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .heightIn(min = 300.dp),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 1.dp,
+    ) {
+        Row {
+            if (accentColor != null) {
+                Box(
+                    modifier =
+                        Modifier
+                            .width(3.dp)
+                            .fillMaxHeight()
+                            .background(accentColor),
+                )
+            }
+
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(Spacing.xl),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = text,
+                    style =
+                        MaterialTheme.typography.bodyLarge.copy(
+                            lineHeight = 28.sp,
+                        ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+
+                Spacer(modifier = Modifier.height(Spacing.xl))
+
+                Text(
+                    text = shared.createdAt.toReadableDateTimeShort(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Image note rendered edge-to-edge with shadow and a journal accent bar.
+ */
+@Composable
+private fun ImageNoteViewer(
+    mediaRef: String,
+    shared: NoteViewerShared,
+    modifier: Modifier = Modifier,
+) {
+    val journalContext = shared.journalContext
+    val accentColor =
+        journalContext?.let {
+            remember(it.journalId) { deriveCoverColor(it.journalId) }
+        }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         AsyncImage(
             model = mediaRef,
             contentDescription = stringResource(Res.string.image_note),
             modifier =
-                modifier
+                Modifier
                     .fillMaxWidth()
-                    .heightIn(min = Spacing.xxl * 4),
-            contentScale = ContentScale.Crop,
+                    .shadow(4.dp, MaterialTheme.shapes.large)
+                    .clip(MaterialTheme.shapes.large),
+            contentScale = ContentScale.Fit,
         )
-    }
-}
 
-@Composable
-fun NoteViewerVideoContent(
-    mediaRef: String,
-    modifier: Modifier = Modifier,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        if (accentColor != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .background(accentColor),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(Spacing.lg))
+
         Text(
-            text = stringResource(Res.string.video),
-            style = MaterialTheme.typography.titleMedium,
-        )
-        VideoPlayerContent(
-            uri = mediaRef,
-            modifier =
-                modifier
-                    .fillMaxWidth()
-                    .heightIn(min = Spacing.xxl * 4),
+            text = shared.createdAt.toReadableDateTimeShort(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
         )
     }
 }
 
 /**
- * Audio note presentation for the viewer.
+ * Video note rendered as a player filling the width.
+ */
+@Composable
+private fun VideoNoteViewer(
+    mediaRef: String,
+    modifier: Modifier = Modifier,
+) {
+    VideoPlayerContent(
+        uri = mediaRef,
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.large),
+    )
+}
+
+// endregion
+
+// region Audio viewer
+
+/**
+ * Audio note presentation delegated to the immersive audio screen.
  */
 @Composable
 private fun AudioNoteViewerEntry(
@@ -197,16 +316,22 @@ private fun AudioNoteViewerEntry(
     )
 }
 
+// endregion
+
+// region Scaffold and toolbar
+
 /**
- * Shared layout for non-audio note presentations.
+ * Shared immersive layout for non-audio note presentations.
+ * Provides the toolbar with journal context and wraps content in [ImmersiveEditorLayout].
  */
 @Composable
 fun NoteViewerScaffoldContent(
     shared: NoteViewerShared,
     onGoBack: () -> Unit,
     onOpenLocationTimeline: () -> Unit = {},
+    onNavigateToNote: (Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
+    noteContent: @Composable () -> Unit,
 ) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
@@ -222,15 +347,26 @@ fun NoteViewerScaffoldContent(
             Modifier
         }
 
+    val journalContext = shared.journalContext
+    val accentColor =
+        journalContext?.let {
+            remember(it.journalId) { deriveCoverColor(it.journalId) }
+        }
+
     ImmersiveEditorLayout(
         topBarContent = {
-            NoteViewerToolbar(onGoBack = onGoBack)
+            NoteViewerToolbar(
+                onGoBack = onGoBack,
+                journalContext = journalContext,
+                accentColor = accentColor,
+                onNavigateToNote = onNavigateToNote,
+            )
         },
         editorContent = {
             NoteViewerContent(
                 shared = shared,
                 onOpenLocationTimeline = onOpenLocationTimeline,
-                content = content,
+                noteContent = noteContent,
             )
         },
         bottomContent = {
@@ -241,10 +377,15 @@ fun NoteViewerScaffoldContent(
 }
 
 /**
- * Navigation toolbar for the note viewer.
+ * Navigation toolbar with journal context and prev/next navigation.
  */
 @Composable
-private fun NoteViewerToolbar(onGoBack: () -> Unit) {
+private fun NoteViewerToolbar(
+    onGoBack: () -> Unit,
+    journalContext: JournalContext? = null,
+    accentColor: Color? = null,
+    onNavigateToNote: (Uuid) -> Unit = {},
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
@@ -257,31 +398,60 @@ private fun NoteViewerToolbar(onGoBack: () -> Unit) {
                 contentDescription = stringResource(Res.string.back),
             )
         }
+
+        if (journalContext != null) {
+            Spacer(modifier = Modifier.weight(1f))
+
+            Text(
+                text = journalContext.journalTitle,
+                style = MaterialTheme.typography.labelMedium,
+                color = accentColor ?: MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            IconButton(
+                onClick = { journalContext.previousNoteId?.let(onNavigateToNote) },
+                enabled = journalContext.hasPrevious,
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    contentDescription = "Previous entry",
+                )
+            }
+            IconButton(
+                onClick = { journalContext.nextNoteId?.let(onNavigateToNote) },
+                enabled = journalContext.hasNext,
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = "Next entry",
+                )
+            }
+        }
     }
 }
 
 /**
- * Note body content for non-audio presentations.
+ * Note body wrapper — handles location card and content placement.
+ * No Card/Surface wrapper; each type-specific viewer handles its own surface treatment.
  */
 @Composable
 fun NoteViewerContent(
     shared: NoteViewerShared,
     onOpenLocationTimeline: () -> Unit = {},
-    content: @Composable () -> Unit,
+    noteContent: @Composable () -> Unit,
 ) {
     Column(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(Spacing.lg),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Text(
-            text = shared.createdAt.toReadableDateTimeShort(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
         shared.location?.let { location ->
             NoteLocationCard(
                 location = location,
@@ -289,29 +459,13 @@ fun NoteViewerContent(
             )
         }
 
-        Card(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight(),
-            colors =
-                CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                ),
-        ) {
-            Surface(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight()
-                        .padding(Spacing.lg),
-                color = MaterialTheme.colorScheme.surface,
-            ) {
-                content()
-            }
-        }
+        noteContent()
     }
 }
+
+// endregion
+
+// region Supporting components
 
 @Composable
 private fun NoteLocationCard(
@@ -335,7 +489,7 @@ private fun NoteLocationCard(
         modifier = modifier.fillMaxWidth(),
         colors =
             CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             ),
     ) {
         Row(
@@ -381,9 +535,6 @@ private fun NoteLocationCard(
     }
 }
 
-/**
- * Loading state for note viewing.
- */
 @Composable
 fun NoteViewerLoadingContent(modifier: Modifier = Modifier) {
     Box(
@@ -394,9 +545,6 @@ fun NoteViewerLoadingContent(modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * Error state for note viewing.
- */
 @Composable
 fun NoteViewerErrorContent(
     message: String,
@@ -434,9 +582,10 @@ private fun Double.formatCoordinate(): String {
     return "$sign$wholePart.$fractionPart"
 }
 
-/**
- * Audio note presentation for note viewer previews and route rendering.
- */
+// endregion
+
+// region Audio viewer content
+
 @Composable
 fun AudioNoteViewerContent(
     uiState: AudioNoteViewerUiState,
@@ -479,3 +628,5 @@ fun AudioNoteViewerContent(
         }
     }
 }
+
+// endregion

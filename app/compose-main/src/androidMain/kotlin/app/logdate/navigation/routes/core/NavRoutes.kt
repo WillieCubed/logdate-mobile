@@ -112,11 +112,18 @@ data class EntryEditor(
 
 /**
  * Navigation route for opening a note by its ID.
+ *
+ * @param id The note's unique identifier.
+ * @param journalId The journal the note was opened from, or null when opened
+ *   from a non-journal context (e.g. timeline, search). When present, the
+ *   viewer shows the journal's accent color and prev/next navigation.
  */
 @Serializable
 data class NoteViewerRoute(
     @Serializable(with = UuidSerializer::class)
     val id: Uuid,
+    @Serializable(with = UuidSerializer::class)
+    val journalId: Uuid? = null,
 ) : NavKey
 
 /**

@@ -3,30 +3,67 @@ package app.logdate.feature.journals.ui.detail
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.notes.RemoveNoteUseCase
+import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.NoteLocation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
  * ViewModel that loads a note and exposes a type-safe viewer state.
+ *
+ * When [journalId] is provided, the viewer shows journal-connected context:
+ * the journal's accent color, title, and prev/next sibling navigation.
  */
 class NoteViewerViewModel(
     private val noteId: Uuid,
+    private val journalId: Uuid?,
     private val notesRepository: JournalNotesRepository,
+    private val journalRepository: JournalRepository,
+    private val journalContentRepository: JournalContentRepository,
     private val removeNoteUseCase: RemoveNoteUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<NoteViewerUiState>(NoteViewerUiState.Loading)
     val uiState: StateFlow<NoteViewerUiState> = _uiState.asStateFlow()
 
+    private var journalContext: JournalContext? = null
+
     init {
+        if (journalId != null) {
+            loadJournalContext(journalId)
+        }
         observeNote()
+    }
+
+    private fun loadJournalContext(journalId: Uuid) {
+        viewModelScope.launch {
+            val journal = journalRepository.observeJournalById(journalId).firstOrNull() ?: return@launch
+            val siblingNotes = journalContentRepository.observeContentForJournal(journalId).firstOrNull() ?: return@launch
+            val sortedIds = siblingNotes.sortedByDescending { it.creationTimestamp }.map { it.uid }
+            val currentIndex = sortedIds.indexOf(noteId).coerceAtLeast(0)
+
+            journalContext =
+                JournalContext(
+                    journalId = journalId,
+                    journalTitle = journal.title,
+                    siblingNoteIds = sortedIds,
+                    currentIndex = currentIndex,
+                )
+
+            // Re-emit current state with journal context if note is already loaded
+            val current = _uiState.value
+            if (current is NoteViewerUiState.Content) {
+                _uiState.value = current.withJournalContext(journalContext)
+            }
+        }
     }
 
     private fun observeNote() {
@@ -55,26 +92,20 @@ class NoteViewerViewModel(
                 createdAt = note.creationTimestamp,
                 lastUpdated = note.lastUpdated,
                 location = note.location,
+                journalContext = journalContext,
             )
-        when (note) {
-            is JournalNote.Text -> {
-                _uiState.value = NoteViewerUiState.TextContent(shared, note.content)
-            }
-            is JournalNote.Image -> {
-                _uiState.value = NoteViewerUiState.ImageContent(shared, note.mediaRef)
-            }
-            is JournalNote.Video -> {
-                _uiState.value = NoteViewerUiState.VideoContent(shared, note.mediaRef)
-            }
-            is JournalNote.Audio -> {
-                _uiState.value =
+        _uiState.value =
+            when (note) {
+                is JournalNote.Text -> NoteViewerUiState.TextContent(shared, note.content)
+                is JournalNote.Image -> NoteViewerUiState.ImageContent(shared, note.mediaRef)
+                is JournalNote.Video -> NoteViewerUiState.VideoContent(shared, note.mediaRef)
+                is JournalNote.Audio ->
                     NoteViewerUiState.AudioContent(
                         shared = shared,
                         mediaRef = note.mediaRef,
                         durationMs = note.durationMs,
                     )
             }
-        }
     }
 
     /**
@@ -101,7 +132,24 @@ data class NoteViewerShared(
     val createdAt: Instant,
     val lastUpdated: Instant,
     val location: NoteLocation?,
+    val journalContext: JournalContext? = null,
 )
+
+/**
+ * Context connecting the viewed note to the journal it was opened from.
+ * Enables accent color, journal title display, and prev/next navigation.
+ */
+data class JournalContext(
+    val journalId: Uuid,
+    val journalTitle: String,
+    val siblingNoteIds: List<Uuid>,
+    val currentIndex: Int,
+) {
+    val hasPrevious: Boolean get() = currentIndex > 0
+    val hasNext: Boolean get() = currentIndex < siblingNoteIds.size - 1
+    val previousNoteId: Uuid? get() = if (hasPrevious) siblingNoteIds[currentIndex - 1] else null
+    val nextNoteId: Uuid? get() = if (hasNext) siblingNoteIds[currentIndex + 1] else null
+}
 
 /**
  * Type-safe UI state for note viewing.
@@ -118,38 +166,36 @@ sealed interface NoteViewerUiState {
      */
     sealed interface Content : NoteViewerUiState {
         val shared: NoteViewerShared
+
+        fun withJournalContext(context: JournalContext?): Content
     }
 
-    /**
-     * Content state for text notes.
-     */
     data class TextContent(
         override val shared: NoteViewerShared,
         val text: String,
-    ) : Content
+    ) : Content {
+        override fun withJournalContext(context: JournalContext?) = copy(shared = shared.copy(journalContext = context))
+    }
 
-    /**
-     * Content state for image notes.
-     */
     data class ImageContent(
         override val shared: NoteViewerShared,
         val mediaRef: String,
-    ) : Content
+    ) : Content {
+        override fun withJournalContext(context: JournalContext?) = copy(shared = shared.copy(journalContext = context))
+    }
 
-    /**
-     * Content state for video notes.
-     */
     data class VideoContent(
         override val shared: NoteViewerShared,
         val mediaRef: String,
-    ) : Content
+    ) : Content {
+        override fun withJournalContext(context: JournalContext?) = copy(shared = shared.copy(journalContext = context))
+    }
 
-    /**
-     * Content state for audio notes.
-     */
     data class AudioContent(
         override val shared: NoteViewerShared,
         val mediaRef: String,
         val durationMs: Long,
-    ) : Content
+    ) : Content {
+        override fun withJournalContext(context: JournalContext?) = copy(shared = shared.copy(journalContext = context))
+    }
 }
