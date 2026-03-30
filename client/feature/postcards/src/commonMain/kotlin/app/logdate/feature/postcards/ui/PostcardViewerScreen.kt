@@ -18,6 +18,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,23 +34,19 @@ import kotlin.uuid.Uuid
  *
  * Renders the Postcard with ambient parallax and allows two-finger pan/zoom.
  * Photo elements are tappable to navigate to the source moment (intertextuality).
- *
- * @param viewModel The viewer ViewModel providing document state.
- * @param onNavigateBack Callback to navigate back.
- * @param onEditPostcard Callback to open the editor for this Postcard.
- * @param onExportPostcard Callback to open the export sheet.
- * @param onNavigateToMoment Callback when a photo element is tapped, navigating to its source moment.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostcardViewerScreen(
     viewModel: PostcardViewerViewModel = koinViewModel(),
+    exportViewModel: ExportViewModel = koinViewModel(),
     onNavigateBack: () -> Unit = {},
     onEditPostcard: (Uuid) -> Unit = {},
-    onExportPostcard: (Uuid) -> Unit = {},
+    onShareUri: (String) -> Unit = {},
     onNavigateToMoment: (Uuid) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showExportSheet by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -67,8 +66,11 @@ fun PostcardViewerScreen(
                         IconButton(onClick = { onEditPostcard(loaded.document.id) }) {
                             Icon(Icons.Filled.Edit, contentDescription = "Edit")
                         }
-                        IconButton(onClick = { onExportPostcard(loaded.document.id) }) {
-                            Icon(Icons.Filled.Share, contentDescription = "Export")
+                        IconButton(onClick = {
+                            exportViewModel.startExport()
+                            showExportSheet = true
+                        }) {
+                            Icon(Icons.Filled.Share, contentDescription = "Share")
                         }
                     }
                 },
@@ -98,6 +100,18 @@ fun PostcardViewerScreen(
                             onNavigateToMoment(photo.momentRef)
                         },
                     )
+
+                    if (showExportSheet) {
+                        ExportSheet(
+                            document = state.document,
+                            viewModel = exportViewModel,
+                            onShareResult = { uri ->
+                                showExportSheet = false
+                                onShareUri(uri)
+                            },
+                            onDismiss = { showExportSheet = false },
+                        )
+                    }
                 }
                 is PostcardViewerUiState.Error -> {
                     Text("Could not load Postcard")

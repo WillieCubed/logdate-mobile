@@ -68,6 +68,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavEntry
@@ -513,6 +514,7 @@ fun MainNavigationRoot(
     sharingLauncher: SharingLauncher,
 ) {
     val preferencesDataSource: LogdatePreferencesDataSource = org.koin.compose.koinInject()
+    val appContext = LocalContext.current.applicationContext
     val hasTimelineRoute =
         mainAppNavigator.backStack.any { route ->
             route is TimelineListRoute || route is TimelineDetail
@@ -580,8 +582,13 @@ fun MainNavigationRoot(
                         routeEntry<NoteViewerRoute> { route ->
                             NoteViewerScreen(
                                 noteId = route.id,
+                                journalId = route.journalId,
                                 onGoBack = mainAppNavigator::goBack,
                                 onOpenLocationTimeline = mainAppNavigator::openLocationTimeline,
+                                onNavigateToNote = { newNoteId ->
+                                    mainAppNavigator.backStack.removeLastOrNull()
+                                    mainAppNavigator.backStack.add(NoteViewerRoute(newNoteId, route.journalId))
+                                },
                             )
                         }
                         onboarding(
@@ -610,8 +617,8 @@ fun MainNavigationRoot(
                             onCreateJournal = { mainAppNavigator.backStack.add(NewJournalRoute) },
                             onBrowseJournals = mainAppNavigator::openSearch,
                             onJournalDeleted = { mainAppNavigator.backStack.removeLastOrNull() },
-                            onNavigateToNoteDetail = { noteId ->
-                                mainAppNavigator.backStack.add(NoteViewerRoute(noteId))
+                            onNavigateToNoteDetail = { noteId, journalId ->
+                                mainAppNavigator.backStack.add(NoteViewerRoute(noteId, journalId))
                             },
                             onNavigateToDay = mainAppNavigator::openTimelineDetail,
                             onNavigateToJournalSettings = mainAppNavigator::openJournalSettings,
@@ -672,6 +679,16 @@ fun MainNavigationRoot(
                             },
                             onNavigateToMoment = { momentId ->
                                 // TODO: Navigate to moment detail
+                            },
+                            onShareUri = { uri ->
+                                val shareIntent =
+                                    android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                        type = "image/png"
+                                        putExtra(android.content.Intent.EXTRA_STREAM, android.net.Uri.parse(uri))
+                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                appContext.startActivity(android.content.Intent.createChooser(shareIntent, null))
                             },
                         )
                         appSettingsRoutes(

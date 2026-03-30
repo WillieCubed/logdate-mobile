@@ -35,6 +35,7 @@ fun EntryProviderScope<NavKey>.postcardRoutes(
     onOpenPostcard: (Uuid) -> Unit,
     onEditPostcard: (Uuid?) -> Unit,
     onNavigateToMoment: (Uuid) -> Unit,
+    onShareUri: (String) -> Unit = {},
 ) {
     routeEntry<PostcardsCollectionRoute> { _ ->
         PostcardsCollectionScreen(
@@ -54,6 +55,7 @@ fun EntryProviderScope<NavKey>.postcardRoutes(
         PostcardViewerScreen(
             onNavigateBack = onBack,
             onEditPostcard = { onEditPostcard(it) },
+            onShareUri = onShareUri,
             onNavigateToMoment = onNavigateToMoment,
         )
     }
