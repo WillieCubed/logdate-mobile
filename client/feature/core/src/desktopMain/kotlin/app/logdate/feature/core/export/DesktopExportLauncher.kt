@@ -14,9 +14,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.number
-import kotlinx.datetime.toLocalDateTime
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.awt.FileDialog
@@ -26,7 +23,6 @@ import java.io.FileOutputStream
 import java.net.URI
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
-import kotlin.time.Clock
 
 /**
  * Desktop-specific implementation for launching data export using AWT FileDialog.
@@ -58,22 +54,7 @@ class DesktopExportLauncher :
         currentExportJob =
             scope.launch {
                 try {
-                    // Generate default filename with timestamp
-                    val timestamp =
-                        Clock.System
-                            .now()
-                            .toLocalDateTime(TimeZone.currentSystemDefault())
-                            .let {
-                                "${it.year}-${it.month.number.toString().padStart(
-                                    2,
-                                    '0',
-                                )}-${it.day.toString().padStart(
-                                    2,
-                                    '0',
-                                )}_${it.hour.toString().padStart(2, '0')}-${it.minute.toString().padStart(2, '0')}"
-                            }
-
-                    val defaultFileName = "logdate_export_$timestamp.zip"
+                    val defaultFileName = generateExportFileName()
 
                     // Show file save dialog on the main thread
                     val fileDialog = createSaveDialog(defaultFileName)

@@ -20,9 +20,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.number
-import kotlinx.datetime.toLocalDateTime
 import okio.Path.Companion.toPath
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -31,7 +28,6 @@ import platform.Foundation.NSTemporaryDirectory
 import platform.Foundation.NSURL
 import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIViewController
-import kotlin.time.Clock
 
 /**
  * iOS-specific implementation for launching data export.
@@ -163,16 +159,8 @@ class IosExportLauncher(
     }
 
     private fun createExportFilePath(): String {
-        val timestamp =
-            Clock.System
-                .now()
-                .toLocalDateTime(TimeZone.currentSystemDefault())
-                .let {
-                    "${it.year}-${it.month.number.toString().padStart(2, '0')}-${it.day.toString().padStart(2, '0')}_" +
-                        "${it.hour.toString().padStart(2, '0')}-${it.minute.toString().padStart(2, '0')}"
-                }
         val basePath = NSTemporaryDirectory().trimEnd('/')
-        return "$basePath/logdate_export_$timestamp.zip"
+        return "$basePath/${generateExportFileName()}"
     }
 
     private fun saveExportArchive(
