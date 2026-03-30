@@ -63,16 +63,8 @@ class UserDataExportViewModel(
                     _exportState.update { ExportState.Idle }
                     _isSheetVisible.value = false
                 }
-            } else {
-                val fileName = path.substringAfterLast("/").substringAfterLast(":")
-                _exportState.update {
-                    ExportState.Completed(
-                        path = path,
-                        fileName = fileName,
-                    )
-                }
-                _isSheetVisible.value = true
             }
+            // Success is handled by the exportProgress flow which carries stats
         }
 
         viewModelScope.launch {
