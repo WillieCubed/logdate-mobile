@@ -121,18 +121,39 @@ class JournalDetailViewModel(
     }
 
     /**
-     * Converts a JournalNote to an EntryDisplayData
+     * Converts a JournalNote to the appropriate EntryDisplayData subtype,
+     * preserving media references for rich rendering.
      */
-    private fun JournalNote.toDisplayData(): EntryDisplayData {
-        val content =
-            when (this) {
-                is JournalNote.Text -> content
-                is JournalNote.Image -> "Image"
-                is JournalNote.Video -> "Video"
-                is JournalNote.Audio -> "Audio"
-            }
-        return EntryDisplayData(uid, content, creationTimestamp)
-    }
+    private fun JournalNote.toDisplayData(): EntryDisplayData =
+        when (this) {
+            is JournalNote.Text ->
+                EntryDisplayData.TextEntry(
+                    id = uid,
+                    timestamp = creationTimestamp,
+                    content = content,
+                )
+            is JournalNote.Image ->
+                EntryDisplayData.ImageEntry(
+                    id = uid,
+                    timestamp = creationTimestamp,
+                    mediaRef = mediaRef,
+                    caption = caption,
+                )
+            is JournalNote.Video ->
+                EntryDisplayData.VideoEntry(
+                    id = uid,
+                    timestamp = creationTimestamp,
+                    mediaRef = mediaRef,
+                    caption = caption,
+                )
+            is JournalNote.Audio ->
+                EntryDisplayData.AudioEntry(
+                    id = uid,
+                    timestamp = creationTimestamp,
+                    mediaRef = mediaRef,
+                    durationMs = durationMs,
+                )
+        }
 
     /**
      * Sets the selected journal ID.
