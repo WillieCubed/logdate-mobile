@@ -87,6 +87,23 @@ class DesktopMediaManager : MediaManager {
         return "file://${filePath.pathString}"
     }
 
+    override suspend fun saveMediaFromFile(
+        sourceFilePath: String,
+        fileName: String,
+        mimeType: String,
+    ): String {
+        val directory = ensureMediaDir()
+        val sanitizedName =
+            fileName
+                .replace("..", "_")
+                .replace("/", "_")
+                .replace("\\", "_")
+        val destFileName = "${Uuid.random()}-$sanitizedName"
+        val destPath = directory.resolve(destFileName)
+        Files.copy(Path.of(sourceFilePath), destPath)
+        return destPath.toUri().toString()
+    }
+
     private fun resolvePath(uri: String): Path =
         if (uri.startsWith("file://")) {
             Path.of(URI(uri))

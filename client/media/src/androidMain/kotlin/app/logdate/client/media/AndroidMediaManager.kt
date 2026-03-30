@@ -460,6 +460,33 @@ class AndroidMediaManager(
             "file://${file.absolutePath}"
         }
 
+    override suspend fun saveMediaFromFile(
+        sourceFilePath: String,
+        fileName: String,
+        mimeType: String,
+    ): String =
+        withContext(ioDispatcher) {
+            val directory = File(filesDir, "user_media")
+            if (!directory.exists()) {
+                directory.mkdirs()
+            }
+            val sanitizedName =
+                fileName
+                    .replace("..", "_")
+                    .replace("/", "_")
+                    .replace("\\", "_")
+            val destFileName = "${Uuid.random()}-$sanitizedName"
+            val destFile = File(directory, destFileName)
+            val sourceFile = File(sourceFilePath)
+            try {
+                sourceFile.copyTo(destFile, overwrite = true)
+            } catch (e: Exception) {
+                Napier.e("Failed to save media file to local storage", e)
+                throw e
+            }
+            Uri.fromFile(destFile).toString()
+        }
+
     private suspend fun copyMediaToAppStorage(
         uri: Uri,
         destinationPath: String,

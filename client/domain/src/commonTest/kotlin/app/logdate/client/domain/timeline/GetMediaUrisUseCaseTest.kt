@@ -228,5 +228,11 @@ class GetMediaUrisUseCaseTest {
             )
 
         override suspend fun saveMedia(payload: MediaPayload): String = "file://stub/${payload.fileName}"
+
+        override suspend fun saveMediaFromFile(
+            sourceFilePath: String,
+            fileName: String,
+            mimeType: String,
+        ): String = "file:///tmp/$fileName"
     }
 }

@@ -1,7 +1,9 @@
 package app.logdate.client.media.audio
 
+import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlin.time.Duration
 
 /**
@@ -34,6 +36,11 @@ interface AudioRecordingManager {
      * Gets a flow of transcription text if available
      */
     fun getTranscriptionFlow(): Flow<String?>
+
+    /**
+     * Gets structured transcription updates when timing metadata is available.
+     */
+    fun getStructuredTranscriptionFlow(): Flow<TranscriptionResult> = emptyFlow()
 
     /**
      * Sets the transcription service to use for speech recognition

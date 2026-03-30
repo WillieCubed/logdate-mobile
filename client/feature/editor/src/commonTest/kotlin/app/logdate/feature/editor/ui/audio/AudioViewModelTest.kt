@@ -4,6 +4,9 @@ import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.media.audio.AudioRecordingManager
+import app.logdate.client.media.audio.transcription.TimedTranscript
+import app.logdate.client.media.audio.transcription.TimedUtterance
+import app.logdate.client.media.audio.transcription.TimedWord
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +15,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -22,6 +26,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -122,7 +127,85 @@ class AudioViewModelTest {
                 transcriptionState is AudioUiState.TranscriptionState.Success,
                 "Should update transcription state on new text",
             )
-            assertEquals("Hello world", (transcriptionState as AudioUiState.TranscriptionState.Success).text)
+            val successState = transcriptionState
+            assertEquals("Hello world", successState.text)
+        }
+
+    @Test
+    fun structuredTranscriptionPreservesTimedTranscript() =
+        runTest(dispatcher) {
+            val recordingManager =
+                FakeAudioRecordingManager(
+                    outputUri = "file:///test/audio.m4a",
+                    initialDuration = 1.seconds,
+                    initialLevel = 0.1f,
+                )
+            val viewModel =
+                AudioViewModel(
+                    audioRecordingManager = recordingManager,
+                    audioPlaybackManager = FakeAudioPlaybackManager(),
+                    audioDurationResolver = FakeAudioDurationResolver(),
+                    transcriptionService = FakeTranscriptionService(),
+                )
+
+            viewModel.startRecording()
+            advanceUntilIdle()
+
+            val timedTranscript =
+                TimedTranscript(
+                    utterances =
+                        listOf(
+                            TimedUtterance(
+                                text = "Hello world.",
+                                startMs = 0,
+                                endMs = 1000,
+                                words =
+                                    listOf(
+                                        TimedWord("Hello", "hello", 0, 500),
+                                        TimedWord("world", "world", 500, 1000),
+                                    ),
+                            ),
+                        ),
+                )
+
+            recordingManager.emitStructuredTranscription(
+                TranscriptionResult.Success(
+                    text = timedTranscript.plainText,
+                    timedTranscript = timedTranscript,
+                    isFinal = true,
+                ),
+            )
+            advanceUntilIdle()
+
+            val transcriptionState = viewModel.uiState.value.transcriptionState
+            val successState = assertNotNull(transcriptionState as? AudioUiState.TranscriptionState.Success)
+            assertEquals(timedTranscript, successState.timedTranscript)
+            assertTrue(successState.isFinal)
+        }
+
+    @Test
+    fun seekToPositionMsUsesAbsoluteSeekAndUpdatesPlaybackProgress() =
+        runTest(dispatcher) {
+            val playbackManager = FakeAudioPlaybackManager()
+            val viewModel =
+                AudioViewModel(
+                    audioRecordingManager =
+                        FakeAudioRecordingManager(
+                            outputUri = "file:///test/audio.m4a",
+                            initialDuration = 4.seconds,
+                            initialLevel = 0.1f,
+                        ),
+                    audioPlaybackManager = playbackManager,
+                    audioDurationResolver = FakeAudioDurationResolver(),
+                    transcriptionService = FakeTranscriptionService(),
+                )
+
+            viewModel.seekToPositionMs(positionMs = 2_500L, durationMs = 10_000L)
+            advanceUntilIdle()
+
+            assertEquals(2_500L, playbackManager.lastSeekPositionMs)
+            assertEquals(10_000L, playbackManager.lastSeekDurationMs)
+            assertEquals(0.25f, viewModel.uiState.value.playbackProgress)
         }
 }
 
@@ -134,6 +217,7 @@ private class FakeAudioRecordingManager(
     private val audioLevelFlow = MutableStateFlow(initialLevel)
     private val durationFlow = MutableStateFlow(initialDuration)
     private val transcriptionFlow = MutableStateFlow<String?>(null)
+    private val structuredFlow = MutableSharedFlow<TranscriptionResult>(replay = 1)
 
     override var isRecording: Boolean = false
         private set
@@ -154,8 +238,14 @@ private class FakeAudioRecordingManager(
 
     override fun getTranscriptionFlow(): Flow<String?> = transcriptionFlow
 
+    override fun getStructuredTranscriptionFlow(): Flow<TranscriptionResult> = structuredFlow.asSharedFlow()
+
     fun emitTranscription(text: String?) {
         transcriptionFlow.value = text
+    }
+
+    suspend fun emitStructuredTranscription(result: TranscriptionResult) {
+        structuredFlow.emit(result)
     }
 
     override fun setTranscriptionService(service: TranscriptionService) {
@@ -168,6 +258,10 @@ private class FakeAudioRecordingManager(
 }
 
 private class FakeAudioPlaybackManager : AudioPlaybackManager {
+    var lastSeekRatio: Float? = null
+    var lastSeekPositionMs: Long? = null
+    var lastSeekDurationMs: Long? = null
+
     override fun startPlayback(
         uri: String,
         metadata: AudioPlaybackMetadata?,
@@ -181,7 +275,17 @@ private class FakeAudioPlaybackManager : AudioPlaybackManager {
 
     override fun stopPlayback() = Unit
 
-    override fun seekTo(position: Float) = Unit
+    override fun seekTo(position: Float) {
+        lastSeekRatio = position
+    }
+
+    override fun seekTo(
+        positionMs: Long,
+        durationMs: Long,
+    ) {
+        lastSeekPositionMs = positionMs
+        lastSeekDurationMs = durationMs
+    }
 
     override fun release() = Unit
 }

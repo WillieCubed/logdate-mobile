@@ -182,6 +182,20 @@ class IosMediaManager(
             return@withContext "file://$path"
         }
 
+    override suspend fun saveMediaFromFile(
+        sourceFilePath: String,
+        fileName: String,
+        mimeType: String,
+    ): String =
+        withContext(Dispatchers.Default) {
+            ensureMediaDir()
+            val sanitizedName = fileName.sanitizeForPath()
+            val destFileName = "${Uuid.random()}-$sanitizedName"
+            val destPath = buildMediaPath(destFileName)
+            fileManager.copyItemAtPath(sourceFilePath, destPath, error = null)
+            return@withContext NSURL.fileURLWithPath(destPath).absoluteString ?: "file://$destPath"
+        }
+
     suspend fun resolvePhotoLibraryImageUri(localIdentifier: String): String? {
         val asset = fetchPhotoLibraryAsset(localIdentifier) ?: return null
         if (asset.mediaType != PHAssetMediaTypeImage) {

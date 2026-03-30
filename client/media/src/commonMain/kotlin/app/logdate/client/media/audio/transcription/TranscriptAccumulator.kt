@@ -9,10 +9,17 @@ package app.logdate.client.media.audio.transcription
  */
 class TranscriptAccumulator {
     private val segments = mutableListOf<String>()
+    private val utterances = mutableListOf<TimedUtterance>()
     private var partial: String = ""
 
-    fun addSegment(text: String) {
+    fun addSegment(
+        text: String,
+        utterance: TimedUtterance? = null,
+    ) {
         segments.add(text)
+        if (utterance != null) {
+            utterances += utterance
+        }
         partial = ""
     }
 
@@ -29,8 +36,14 @@ class TranscriptAccumulator {
         }
     }
 
+    fun buildTimedTranscript(): TimedTranscript? =
+        utterances
+            .takeIf { it.isNotEmpty() }
+            ?.let(::TimedTranscript)
+
     fun reset() {
         segments.clear()
+        utterances.clear()
         partial = ""
     }
 }

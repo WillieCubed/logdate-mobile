@@ -14,6 +14,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,7 +26,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Pause
@@ -34,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
@@ -53,12 +57,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.logdate.client.media.audio.transcription.TimedTranscript
+import app.logdate.client.media.audio.transcription.TimedUtterance
 import app.logdate.feature.editor.audio.AudioContextProcessor
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.formatMediaDuration
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.audio_recording
 import logdate.client.feature.editor.generated.resources.delete
-import logdate.client.feature.editor.generated.resources.no_audio_recorded_yet_use_the_microphone_button_to_begin_recording
+import logdate.client.feature.editor.generated.resources.no_audio_recorded_yet
+import logdate.client.feature.editor.generated.resources.pause_audio
+import logdate.client.feature.editor.generated.resources.play_audio
+import logdate.client.feature.editor.generated.resources.search_transcript
 import logdate.client.feature.editor.generated.resources.text_00_00
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
@@ -80,7 +90,8 @@ private const val EXPANDED_WAVEFORM_BARS = 60
  * @param isExpanded Whether the audio block is in expanded mode
  * @param onPlayPauseClicked Called when the play/pause button is clicked
  * @param onDeleteClicked Called when the delete button is clicked
- * @param onSeekPositionChanged Called when the playback position is changed by the user
+ * @param onSeekPositionChanged Called when the playback slider position is changed by the user
+ * @param onSeekTimestampClicked Called when the user jumps to a timed transcript position
  * @param playbackProgress Current playback progress (0.0f to 1.0f)
  * @param modifier Modifier for the root component
  */
@@ -91,9 +102,11 @@ fun AudioBlockContent(
     block: AudioBlockUiState,
     isExpanded: Boolean,
     isPlaying: Boolean,
+    timedTranscript: TimedTranscript? = null,
     onPlayPauseClicked: () -> Unit,
     onDeleteClicked: () -> Unit,
     onSeekPositionChanged: (Float) -> Unit,
+    onSeekTimestampClicked: (Long) -> Unit,
     playbackProgress: Float = 0f,
     modifier: Modifier = Modifier,
 ) {
@@ -185,9 +198,11 @@ fun AudioBlockContent(
                     block = block,
                     isPlaying = isPlaying,
                     progress = playbackProgress,
+                    timedTranscript = timedTranscript,
                     onPlayPauseClicked = onPlayPauseClicked,
                     onDeleteClicked = onDeleteClicked,
                     onProgressChanged = onSeekPositionChanged,
+                    onSeekTimestampClicked = onSeekTimestampClicked,
                     playButtonScale = playButtonScale,
                     waveformAmplitudes = waveformAmplitudes,
                     animatedVisibilityScope = this@AnimatedContent,
@@ -305,9 +320,11 @@ private fun ExpandedAudioContent(
     block: AudioBlockUiState,
     isPlaying: Boolean,
     progress: Float,
+    timedTranscript: TimedTranscript?,
     onPlayPauseClicked: () -> Unit,
     onDeleteClicked: () -> Unit,
     onProgressChanged: (Float) -> Unit,
+    onSeekTimestampClicked: (Long) -> Unit,
     playButtonScale: Float,
     waveformAmplitudes: List<Float>,
     sharedTransitionScope: SharedTransitionScope,
@@ -315,6 +332,7 @@ private fun ExpandedAudioContent(
     modifier: Modifier = Modifier,
 ) {
     with(sharedTransitionScope) {
+        val audioRecordingTitle = stringResource(Res.string.audio_recording)
         Column(
             modifier =
                 modifier
@@ -331,7 +349,7 @@ private fun ExpandedAudioContent(
             ) {
                 // Audio title or caption
                 Text(
-                    text = block.caption.ifEmpty { "Audio Recording" },
+                    text = block.caption.ifEmpty { audioRecordingTitle },
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -460,7 +478,7 @@ private fun ExpandedAudioContent(
                 } else {
                     // Placeholder when no audio exists
                     Text(
-                        text = stringResource(Res.string.no_audio_recorded_yet_use_the_microphone_button_to_begin_recording),
+                        text = stringResource(Res.string.no_audio_recorded_yet),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
@@ -469,8 +487,14 @@ private fun ExpandedAudioContent(
                 }
             }
 
-            // Transcription if available
-            if (block.transcription.isNotBlank()) {
+            if (timedTranscript != null) {
+                TimedTranscriptPanel(
+                    timedTranscript = timedTranscript,
+                    durationMs = block.duration,
+                    progress = progress,
+                    onSeekTimestampClicked = onSeekTimestampClicked,
+                )
+            } else if (block.transcription.isNotBlank()) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant,
@@ -492,6 +516,149 @@ private fun ExpandedAudioContent(
     }
 }
 
+@Suppress("ktlint:standard:function-naming")
+@Composable
+private fun TimedTranscriptPanel(
+    timedTranscript: TimedTranscript,
+    durationMs: Long,
+    progress: Float,
+    onSeekTimestampClicked: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var query by remember { mutableStateOf("") }
+    val normalizedQuery = remember(query) { normalizeSearchQuery(query) }
+    val currentPositionMs = (durationMs * progress).toLong()
+    val filteredUtterances =
+        remember(timedTranscript, normalizedQuery) {
+            timedTranscript.utterances.filter { utterance ->
+                normalizedQuery.isEmpty() || utteranceMatchesQuery(utterance, normalizedQuery)
+            }
+        }
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(stringResource(Res.string.search_transcript)) },
+            )
+
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 120.dp, max = 240.dp)
+                        .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                filteredUtterances.forEach { utterance ->
+                    val isActive = currentPositionMs in utterance.startMs..utterance.endMs
+                    val targetStartMs = resolveSeekTargetMs(utterance, normalizedQuery)
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color =
+                            if (isActive) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surface
+                            },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (durationMs > 0) onSeekTimestampClicked(targetStartMs)
+                                },
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(
+                                text = formatMediaDuration(utterance.startMs, true),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = utterance.text,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun resolveSeekTargetMs(
+    utterance: TimedUtterance,
+    normalizedQuery: String,
+): Long {
+    if (normalizedQuery.isBlank()) return utterance.startMs
+    val queryWords =
+        normalizedQuery
+            .split(' ')
+            .map(String::trim)
+            .filter(String::isNotBlank)
+    if (queryWords.isEmpty()) return utterance.startMs
+
+    val utteranceWords = utterance.words.map { it.normalizedText }
+    val matchIndex =
+        utteranceWords.indices.firstOrNull { startIndex ->
+            queryWords.indices.all { offset ->
+                utteranceWords.getOrNull(startIndex + offset) == queryWords[offset]
+            }
+        }
+
+    return if (matchIndex != null) {
+        utterance.words[matchIndex].startMs
+    } else {
+        utterance.words.firstOrNull { it.normalizedText.contains(normalizedQuery) }?.startMs ?: utterance.startMs
+    }
+}
+
+private fun utteranceMatchesQuery(
+    utterance: TimedUtterance,
+    normalizedQuery: String,
+): Boolean {
+    if (normalizedQuery.isBlank()) return true
+    val queryWords =
+        normalizedQuery
+            .split(' ')
+            .map(String::trim)
+            .filter(String::isNotBlank)
+    if (queryWords.isEmpty()) return true
+
+    val utteranceWords = utterance.words.map { it.normalizedText }
+    val exactMatch =
+        utteranceWords.indices.any { startIndex ->
+            queryWords.indices.all { offset ->
+                utteranceWords.getOrNull(startIndex + offset) == queryWords[offset]
+            }
+        }
+
+    return exactMatch || utterance.words.any { it.normalizedText.contains(normalizedQuery) }
+}
+
+private fun normalizeSearchQuery(query: String): String =
+    query
+        .trim()
+        .lowercase()
+        .filter { it.isLetterOrDigit() || it == '\'' || it == ' ' }
+
 // AnimatedPlayPauseButton moved to its own file
 
 /**
@@ -511,7 +678,12 @@ private fun PlayPauseAnimatedIcon(
 ) {
     Icon(
         imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-        contentDescription = if (isPlaying) "Pause" else "Play",
+        contentDescription =
+            if (isPlaying) {
+                stringResource(Res.string.pause_audio)
+            } else {
+                stringResource(Res.string.play_audio)
+            },
         modifier = modifier.size(iconSize),
     )
 }

@@ -8,6 +8,7 @@
     <string name="add_a_video_to_your_entry">Add a video to your entry</string>
     <string name="add_an_image_to_your_entry">Add an image to your entry</string>
     <string name="add_audio">Add Audio</string>
+    <string name="audio_recording">Audio Recording</string>
     <string name="add_image">Add Image</string>
     <string name="add_photo_from_gallery">Add photo from gallery</string>
     <string name="add_text">Add Text</string>
@@ -55,7 +56,7 @@
     <string name="manage_drafts">Manage drafts</string>
     <string name="microphone_access">Microphone Access</string>
     <string name="more_options">More options</string>
-    <string name="no_audio_recorded_yet_use_the_microphone_button_to_begin_recording">No audio recorded yet. Use the microphone button to begin recording.</string>
+    <string name="no_audio_recorded_yet">No audio recorded yet. Use the microphone button to begin recording.</string>
     <string name="no_drafts_found">No drafts found</string>
     <string name="no_recent_photos_found">No recent photos found.</string>
     <string name="not_now">Not Now</string>
@@ -63,12 +64,14 @@
     <string name="permission_permanently_denied_camera">Camera access was permanently denied. In the permissions screen, tap Camera and set it to Allow.</string>
     <string name="permission_permanently_denied_gallery">Photo access was permanently denied. In the permissions screen, tap Photos and set it to Allow.</string>
     <string name="permission_permanently_denied_microphone">Microphone access was permanently denied. In the permissions screen, tap Microphone and set it to Allow.</string>
+    <string name="pause_audio">Pause audio</string>
     <string name="pause_video">Pause video</string>
     <string name="permission_required">Permission Required</string>
     <string name="photo">Photo</string>
     <string name="photo_library">Photo Library</string>
     <string name="photo_or_video">Photo or video</string>
     <string name="pick_from_your_library_or_browse_all_your_photos">Pick from your library or browse all your photos.</string>
+    <string name="play_audio">Play audio</string>
     <string name="play_video">Play video</string>
     <string name="previous_drafts">Drafts</string>
     <string name="clear_all">Clear all</string>
@@ -81,6 +84,7 @@
     <string name="save_draft">Save Draft</string>
     <string name="save_entry">Save entry</string>
     <string name="saving">Saving...</string>
+    <string name="search_transcript">Search transcript</string>
     <string name="select_image">Select image</string>
     <string name="select_image_2">Select Image</string>
     <string name="skip_back_10_seconds">Skip back 10 seconds</string>

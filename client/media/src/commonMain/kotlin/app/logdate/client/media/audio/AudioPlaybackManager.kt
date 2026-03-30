@@ -37,6 +37,23 @@ interface AudioPlaybackManager {
     fun seekTo(position: Float)
 
     /**
+     * Seeks to an absolute position in the audio file.
+     *
+     * The default implementation keeps existing playback managers source-compatible by
+     * converting the timestamp to a normalized progress ratio.
+     *
+     * @param positionMs Absolute position in milliseconds.
+     * @param durationMs Total audio duration in milliseconds.
+     */
+    fun seekTo(
+        positionMs: Long,
+        durationMs: Long,
+    ) {
+        if (durationMs <= 0L) return
+        seekTo((positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f))
+    }
+
+    /**
      * Cleans up any resources.
      */
     fun release()

@@ -8,9 +8,12 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
+import app.logdate.client.media.audio.transcription.TimedTranscriptBuilder
+import app.logdate.client.media.audio.transcription.TimedUtterance
 import app.logdate.client.media.audio.transcription.TranscriptAccumulator
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
+import com.k2fsa.sherpa.onnx.OnlineRecognizerResult
 import com.k2fsa.sherpa.onnx.OnlineStream
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
@@ -45,6 +48,9 @@ class SherpaOnnxTranscriptionService(
     private var stream: OnlineStream? = null
     private var audioRecord: AudioRecord? = null
     private var recognitionJob: Job? = null
+    private var totalAcceptedSamples: Long = 0L
+    private var currentStreamStartMs: Long = 0L
+    private var currentStreamAcceptedSamples: Long = 0L
 
     @Volatile
     private var isListening = false
@@ -98,7 +104,7 @@ class SherpaOnnxTranscriptionService(
                     stream = s
 
                     for (samples in preBuffer) {
-                        s.acceptWaveform(samples, SherpaOnnxRecognizerProvider.SAMPLE_RATE)
+                        acceptWaveform(s, samples)
                         while (recognizerProvider.isReady(s)) {
                             recognizerProvider.decode(s)
                         }
@@ -111,7 +117,7 @@ class SherpaOnnxTranscriptionService(
                         val shortsRead = ar.read(shortBuffer, 0, shortBuffer.size)
                         if (shortsRead <= 0) continue
 
-                        s.acceptWaveform(shortsToFloats(shortBuffer, shortsRead), SherpaOnnxRecognizerProvider.SAMPLE_RATE)
+                        acceptWaveform(s, shortsToFloats(shortBuffer, shortsRead))
 
                         while (recognizerProvider.isReady(s)) {
                             recognizerProvider.decode(s)
@@ -150,13 +156,23 @@ class SherpaOnnxTranscriptionService(
                 val result = recognizerProvider.getResult(s)
                 if (result.text.isNotBlank()) {
                     val punctuated = recognizerProvider.addPunctuation(result.text)
-                    accumulator.addSegment(punctuated)
-                    _transcriptionFlow.emit(TranscriptionResult.Success(accumulator.build()))
+                    val utterance = buildTimedUtterance(result, punctuated)
+                    accumulator.addSegment(punctuated, utterance)
+                    _transcriptionFlow.emit(
+                        TranscriptionResult.Success(
+                            text = accumulator.build(),
+                            timedTranscript = accumulator.buildTimedTranscript(),
+                            isFinal = true,
+                        ),
+                    )
                 }
             }
         } catch (e: Exception) {
             Napier.e("Error getting final transcription result", e)
         }
+
+        currentStreamStartMs = samplesToMs(totalAcceptedSamples)
+        currentStreamAcceptedSamples = 0L
 
         releaseStream()
     }
@@ -184,6 +200,9 @@ class SherpaOnnxTranscriptionService(
 
     override suspend fun resetTranscription() {
         accumulator.reset()
+        totalAcceptedSamples = 0L
+        currentStreamStartMs = 0L
+        currentStreamAcceptedSamples = 0L
 
         if (isListening) {
             stopLiveTranscription()
@@ -199,6 +218,9 @@ class SherpaOnnxTranscriptionService(
         stopAudioRecord()
         releaseStream()
         accumulator.reset()
+        totalAcceptedSamples = 0L
+        currentStreamStartMs = 0L
+        currentStreamAcceptedSamples = 0L
     }
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
@@ -235,15 +257,55 @@ class SherpaOnnxTranscriptionService(
         if (recognizerProvider.isEndpoint(s)) {
             if (result.text.isNotBlank()) {
                 val punctuated = recognizerProvider.addPunctuation(result.text)
-                accumulator.addSegment(punctuated)
-                _transcriptionFlow.emit(TranscriptionResult.Success(accumulator.build()))
+                val utterance = buildTimedUtterance(result, punctuated)
+                accumulator.addSegment(punctuated, utterance)
+                _transcriptionFlow.emit(
+                    TranscriptionResult.Success(
+                        text = accumulator.build(),
+                        timedTranscript = accumulator.buildTimedTranscript(),
+                        isFinal = true,
+                    ),
+                )
             }
+            currentStreamStartMs = samplesToMs(totalAcceptedSamples)
+            currentStreamAcceptedSamples = 0L
             recognizerProvider.reset(s)
         } else if (result.text.isNotBlank()) {
             accumulator.setPartial(result.text.lowercase())
-            _transcriptionFlow.emit(TranscriptionResult.Success(accumulator.build()))
+            _transcriptionFlow.emit(
+                TranscriptionResult.Success(
+                    text = accumulator.build(),
+                    timedTranscript = accumulator.buildTimedTranscript(),
+                    isFinal = false,
+                ),
+            )
         }
     }
+
+    private fun acceptWaveform(
+        stream: OnlineStream,
+        samples: FloatArray,
+    ) {
+        if (samples.isEmpty()) return
+        stream.acceptWaveform(samples, SherpaOnnxRecognizerProvider.SAMPLE_RATE)
+        totalAcceptedSamples += samples.size.toLong()
+        currentStreamAcceptedSamples += samples.size.toLong()
+    }
+
+    private fun buildTimedUtterance(
+        result: OnlineRecognizerResult,
+        punctuatedText: String,
+    ): TimedUtterance? =
+        TimedTranscriptBuilder.buildUtterance(
+            text = punctuatedText,
+            utteranceStartMs = currentStreamStartMs,
+            utteranceConsumedMs = samplesToMs(currentStreamAcceptedSamples),
+            tokens = result.tokens,
+            timestampsSeconds = result.timestamps,
+        )
+
+    private fun samplesToMs(sampleCount: Long): Long =
+        ((sampleCount * 1000L) / SherpaOnnxRecognizerProvider.SAMPLE_RATE).coerceAtLeast(0L)
 
     private fun shortsToFloats(
         shorts: ShortArray,

@@ -49,6 +49,26 @@ class TranscriptAccumulatorTest {
     }
 
     @Test
+    fun buildTimedTranscriptReturnsAccumulatedUtterances() {
+        val accumulator = TranscriptAccumulator()
+        val utterance =
+            TimedUtterance(
+                text = "Hello world.",
+                startMs = 0,
+                endMs = 1000,
+                words =
+                    listOf(
+                        TimedWord("Hello", "hello", 0, 500),
+                        TimedWord("world", "world", 500, 1000),
+                    ),
+            )
+
+        accumulator.addSegment("Hello world.", utterance)
+
+        assertEquals(listOf(utterance), accumulator.buildTimedTranscript()?.utterances)
+    }
+
+    @Test
     fun resetClearsEverything() {
         val accumulator = TranscriptAccumulator()
         accumulator.addSegment("Hello world.")

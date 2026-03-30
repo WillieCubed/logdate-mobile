@@ -15,6 +15,9 @@ import app.logdate.feature.editor.ui.editor.RecordingState
 import app.logdate.util.formatDateLocalized
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.audio_recording
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -37,6 +40,7 @@ fun AudioBlockEditor(
     onDeleteRequested: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val audioRecordingTitle = stringResource(Res.string.audio_recording)
     // Get the ViewModel at this level, not in child composables
     val audioViewModel: AudioViewModel = koinViewModel()
     // Collect audio state from ViewModel
@@ -59,7 +63,7 @@ fun AudioBlockEditor(
         remember(block) {
             val subtitle = formatDateLocalized(block.timestamp.toLocalDateTime(TimeZone.currentSystemDefault()).date)
             AudioPlaybackMetadata(
-                title = block.caption.ifBlank { "Audio Recording" },
+                title = block.caption.ifBlank { audioRecordingTitle },
                 subtitle = subtitle,
                 noteId = block.id,
             )
@@ -71,6 +75,7 @@ fun AudioBlockEditor(
             block.copy(
                 uri = uri,
                 duration = audioUiState.duration.inWholeMilliseconds,
+                transcription = audioUiState.transcription ?: block.transcription,
             ),
         )
     }
@@ -80,6 +85,13 @@ fun AudioBlockEditor(
         if (recordedUri != null && block.uri == null) {
             handleSaveRecording(recordedUri)
             audioViewModel.clearRecordedAudio()
+        }
+    }
+
+    LaunchedEffect(audioUiState.transcription, block.uri, block.transcription) {
+        val latestTranscript = audioUiState.transcription?.trim().orEmpty()
+        if (block.uri != null && latestTranscript.isNotBlank() && latestTranscript != block.transcription) {
+            onBlockUpdated(block.copy(transcription = latestTranscript))
         }
     }
 
@@ -102,12 +114,16 @@ fun AudioBlockEditor(
                     block = block,
                     isExpanded = true,
                     isPlaying = audioUiState.isPlaying,
+                    timedTranscript = audioUiState.timedTranscript,
                     playbackProgress = audioUiState.playbackProgress,
                     onPlayPauseClicked = {
                         audioViewModel.togglePlayback(block.uri, playbackMetadata)
                     },
                     onSeekPositionChanged = { position ->
                         audioViewModel.seekTo(position)
+                    },
+                    onSeekTimestampClicked = { positionMs ->
+                        audioViewModel.seekToPositionMs(positionMs, block.duration)
                     },
                     onDeleteClicked = onDeleteRequested,
                     modifier = Modifier.fillMaxSize(),

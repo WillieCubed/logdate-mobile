@@ -16,6 +16,8 @@ sealed class TranscriptionResult {
      */
     data class Success(
         val text: String,
+        val timedTranscript: TimedTranscript? = null,
+        val isFinal: Boolean = false,
     ) : TranscriptionResult()
 
     /**

@@ -15,6 +15,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
@@ -31,6 +32,7 @@ class AndroidAudioRecordingManager(
     private val audioLevelFlow = MutableStateFlow(0f)
     private val durationFlow = MutableStateFlow(0L)
     private val transcriptionFlow = MutableStateFlow<String?>(null)
+    private val structuredTranscriptionFlow = MutableStateFlow<TranscriptionResult?>(null)
     private var transcriptionService: TranscriptionService? = null
     private var recordingTarget: AudioRecordingTarget? = null
 
@@ -103,12 +105,15 @@ class AndroidAudioRecordingManager(
                 when (result) {
                     is TranscriptionResult.Success -> {
                         transcriptionFlow.value = result.text
+                        structuredTranscriptionFlow.value = result
                     }
                     is TranscriptionResult.Error -> {
                         Napier.e("Transcription error: ${result.message}")
+                        structuredTranscriptionFlow.value = result
                     }
                     is TranscriptionResult.InProgress -> {
                         // Just wait for the text
+                        structuredTranscriptionFlow.value = result
                     }
                 }
             }
@@ -124,6 +129,8 @@ class AndroidAudioRecordingManager(
         startRequested = true
         try {
             recordingTarget = audioStorage.createRecordingTarget()
+            transcriptionFlow.value = null
+            structuredTranscriptionFlow.value = null
             // Start foreground service for recording
             context.startAudioRecordingService(recordingTarget?.path)
 
@@ -134,6 +141,7 @@ class AndroidAudioRecordingManager(
             // Start live transcription in parallel with recording.
             // SherpaOnnxTranscriptionService uses AudioRecord (no audio focus) so music keeps playing.
             transcriptionService?.let { service ->
+                service.resetTranscription()
                 if (service.supportsLiveTranscription) {
                     scope.launch { service.startLiveTranscription() }
                 }
@@ -200,6 +208,7 @@ class AndroidAudioRecordingManager(
                         if (result is TranscriptionResult.Success) {
                             transcriptionFlow.value = result.text
                         }
+                        structuredTranscriptionFlow.value = result
                     }
                 }
             }
@@ -259,6 +268,7 @@ class AndroidAudioRecordingManager(
     override suspend fun resetTranscription() {
         transcriptionService?.resetTranscription()
         transcriptionFlow.value = null
+        structuredTranscriptionFlow.value = null
     }
 
     override fun getAudioLevelFlow(): Flow<Float> = audioLevelFlow
@@ -266,6 +276,8 @@ class AndroidAudioRecordingManager(
     override fun getRecordingDurationFlow(): Flow<Duration> = recordingDurationFlow
 
     override fun getTranscriptionFlow(): Flow<String?> = transcriptionFlow
+
+    override fun getStructuredTranscriptionFlow(): Flow<TranscriptionResult> = structuredTranscriptionFlow.filterNotNull()
 
     override fun release() {
         serviceStateJob?.cancel()
@@ -289,5 +301,7 @@ class AndroidAudioRecordingManager(
         // Release transcription service
         transcriptionService?.release()
         recordingTarget = null
+        transcriptionFlow.value = null
+        structuredTranscriptionFlow.value = null
     }
 }

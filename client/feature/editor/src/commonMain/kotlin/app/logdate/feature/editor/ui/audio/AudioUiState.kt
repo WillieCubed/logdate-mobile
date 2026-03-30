@@ -1,5 +1,6 @@
 package app.logdate.feature.editor.ui.audio
 
+import app.logdate.client.media.audio.transcription.TimedTranscript
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.ZERO
 
@@ -46,6 +47,8 @@ data class AudioUiState(
          */
         data class Success(
             val text: String,
+            val timedTranscript: TimedTranscript? = null,
+            val isFinal: Boolean = false,
         ) : TranscriptionState()
 
         /**
@@ -61,6 +64,13 @@ data class AudioUiState(
         get() =
             when (val state = transcriptionState) {
                 is TranscriptionState.Success -> state.text
+                else -> null
+            }
+
+    val timedTranscript: TimedTranscript?
+        get() =
+            when (val state = transcriptionState) {
+                is TranscriptionState.Success -> state.timedTranscript
                 else -> null
             }
 

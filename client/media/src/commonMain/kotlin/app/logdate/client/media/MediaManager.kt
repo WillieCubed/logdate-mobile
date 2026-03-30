@@ -60,6 +60,24 @@ interface MediaManager {
      * @return A URI pointing to the saved media asset
      */
     suspend fun saveMedia(payload: MediaPayload): String
+
+    /**
+     * Saves a media file already on disk to managed storage.
+     *
+     * Preferred over [saveMedia] for large files since the platform
+     * implementation can move or copy the file without loading it
+     * entirely into memory.
+     *
+     * @param sourceFilePath Absolute path to the source file on disk
+     * @param fileName Display name for the saved file
+     * @param mimeType MIME type of the media
+     * @return A URI pointing to the saved media asset
+     */
+    suspend fun saveMediaFromFile(
+        sourceFilePath: String,
+        fileName: String,
+        mimeType: String,
+    ): String
 }
 
 data class MediaPayload(

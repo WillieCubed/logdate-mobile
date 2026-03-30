@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackMetadata
+import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
@@ -35,6 +36,7 @@ class AudioViewModel(
     private var audioLevelJob: Job? = null
     private var durationJob: Job? = null
     private var transcriptionJob: Job? = null
+    private var structuredTranscriptionJob: Job? = null
 
     init {
         audioRecordingManager.setTranscriptionService(transcriptionService)
@@ -294,6 +296,31 @@ class AudioViewModel(
     }
 
     /**
+     * Seeks to an absolute position in milliseconds.
+     */
+    fun seekToPositionMs(
+        positionMs: Long,
+        durationMs: Long,
+    ) {
+        viewModelScope.launch {
+            Napier.d("AudioViewModel: Seeking to ${positionMs}ms")
+            try {
+                audioPlaybackManager.seekTo(positionMs, durationMs)
+                if (durationMs > 0L) {
+                    _uiState.update {
+                        it.copy(
+                            playbackProgress =
+                                (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f),
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Napier.e("Failed to seek to ${positionMs}ms: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
      * Clean up resources when ViewModel is cleared.
      */
     override fun onCleared() {
@@ -302,6 +329,7 @@ class AudioViewModel(
         try {
             stopRecordingCollectors()
             transcriptionJob?.cancel()
+            structuredTranscriptionJob?.cancel()
             audioRecordingManager.release()
             audioPlaybackManager.release()
         } catch (e: Exception) {
@@ -367,18 +395,65 @@ class AudioViewModel(
         audioLevelJob?.cancel()
         durationJob?.cancel()
         transcriptionJob?.cancel()
+        structuredTranscriptionJob?.cancel()
         audioLevelJob = null
         durationJob = null
         transcriptionJob = null
+        structuredTranscriptionJob = null
     }
 
     private fun startTranscriptionCollector() {
-        if (transcriptionJob != null) return
+        if (transcriptionJob != null || structuredTranscriptionJob != null) return
         transcriptionJob =
             viewModelScope.launch {
                 audioRecordingManager.getTranscriptionFlow().collect { text ->
                     if (!text.isNullOrBlank()) {
-                        _uiState.update { it.copy(transcriptionState = AudioUiState.TranscriptionState.Success(text)) }
+                        _uiState.update { state ->
+                            val existingSuccess = state.transcriptionState as? AudioUiState.TranscriptionState.Success
+                            state.copy(
+                                transcriptionState =
+                                    AudioUiState.TranscriptionState.Success(
+                                        text = text,
+                                        timedTranscript = existingSuccess?.timedTranscript,
+                                        isFinal = existingSuccess?.isFinal == true,
+                                    ),
+                            )
+                        }
+                    }
+                }
+            }
+        structuredTranscriptionJob =
+            viewModelScope.launch {
+                audioRecordingManager.getStructuredTranscriptionFlow().collect { result ->
+                    when (result) {
+                        is TranscriptionResult.Success -> {
+                            _uiState.update {
+                                it.copy(
+                                    transcriptionState =
+                                        AudioUiState.TranscriptionState.Success(
+                                            text = result.text,
+                                            timedTranscript = result.timedTranscript,
+                                            isFinal = result.isFinal,
+                                        ),
+                                )
+                            }
+                        }
+                        is TranscriptionResult.Error -> {
+                            _uiState.update {
+                                it.copy(
+                                    transcriptionState = AudioUiState.TranscriptionState.Error(result.message),
+                                )
+                            }
+                        }
+                        is TranscriptionResult.InProgress -> {
+                            _uiState.update {
+                                if (it.transcriptionState is AudioUiState.TranscriptionState.Success) {
+                                    it
+                                } else {
+                                    it.copy(transcriptionState = AudioUiState.TranscriptionState.InProgress)
+                                }
+                            }
+                        }
                     }
                 }
             }
