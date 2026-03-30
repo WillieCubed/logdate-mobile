@@ -12,6 +12,7 @@ import app.logdate.client.repository.places.UserPlacesRepository
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.EditorDraft
+import app.logdate.shared.model.Journal
 import app.logdate.shared.model.Place
 import app.logdate.shared.model.SerializableAudioBlock
 import app.logdate.shared.model.SerializableCameraBlock
@@ -20,6 +21,8 @@ import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.SerializableVideoBlock
 import app.logdate.shared.model.profile.LogDateProfile
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -27,7 +30,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.days
 
 /**
  * Use case for exporting all user data to JSON format according to the LogDate export specification.
@@ -70,38 +72,61 @@ class ExportUserDataUseCase(
             emit(ExportProgress.Starting)
 
             try {
-                emit(ExportProgress.InProgress(0.1f, "Collecting journals..."))
-                val journals =
-                    if (includeJournals) {
-                        journalRepository.allJournalsObserved.first()
-                    } else {
-                        emptyList()
-                    }
+                emit(ExportProgress.InProgress(0.1f, "Collecting data..."))
 
-                emit(ExportProgress.InProgress(0.3f, "Collecting notes..."))
-                val notes =
-                    if (includeNotes) {
-                        val allNotes = journalNotesRepository.allNotesObserved.first()
-                        if (dateRangeCutoff != null) {
-                            allNotes.filter { it.creationTimestamp >= dateRangeCutoff }
-                        } else {
-                            allNotes
-                        }
-                    } else {
-                        emptyList()
-                    }
+                val (journals, notes, drafts, profile, places, locationHistory) =
+                    coroutineScope {
+                        val journalsDeferred =
+                            async {
+                                if (includeJournals) {
+                                    journalRepository.allJournalsObserved.first()
+                                } else {
+                                    emptyList()
+                                }
+                            }
+                        val notesDeferred =
+                            async {
+                                if (includeNotes) {
+                                    val allNotes = journalNotesRepository.allNotesObserved.first()
+                                    if (dateRangeCutoff != null) {
+                                        allNotes.filter { it.creationTimestamp >= dateRangeCutoff }
+                                    } else {
+                                        allNotes
+                                    }
+                                } else {
+                                    emptyList()
+                                }
+                            }
+                        val draftsDeferred =
+                            async {
+                                if (includeDrafts) {
+                                    val allDrafts = journalRepository.getAllDrafts()
+                                    if (dateRangeCutoff != null) {
+                                        allDrafts.filter { it.createdAt >= dateRangeCutoff }
+                                    } else {
+                                        allDrafts
+                                    }
+                                } else {
+                                    emptyList()
+                                }
+                            }
+                        val profileDeferred = async { profileRepository.getCurrentProfile() }
+                        val placesDeferred = async { userPlacesRepository.getAllPlaces() }
+                        val locationHistoryDeferred =
+                            async {
+                                locationHistoryRepository
+                                    .getAllLocationHistory()
+                                    .filter { item -> dateRangeCutoff == null || item.timestamp >= dateRangeCutoff }
+                            }
 
-                emit(ExportProgress.InProgress(0.5f, "Collecting drafts..."))
-                val drafts =
-                    if (includeDrafts) {
-                        val allDrafts = journalRepository.getAllDrafts()
-                        if (dateRangeCutoff != null) {
-                            allDrafts.filter { it.createdAt >= dateRangeCutoff }
-                        } else {
-                            allDrafts
-                        }
-                    } else {
-                        emptyList()
+                        ExportCollectionResult(
+                            journals = journalsDeferred.await(),
+                            notes = notesDeferred.await(),
+                            drafts = draftsDeferred.await(),
+                            profile = profileDeferred.await(),
+                            places = placesDeferred.await(),
+                            locationHistory = locationHistoryDeferred.await(),
+                        )
                     }
 
                 val appInfo = appInfoProvider.getAppInfo()
@@ -113,12 +138,6 @@ class ExportUserDataUseCase(
                         .displayName
                         .trim()
                         .ifBlank { "local-user" }
-                val profile = profileRepository.getCurrentProfile()
-                val places = userPlacesRepository.getAllPlaces()
-                val locationHistory =
-                    locationHistoryRepository
-                        .getAllLocationHistory()
-                        .filter { item -> dateRangeCutoff == null || item.timestamp >= dateRangeCutoff }
 
                 emit(ExportProgress.InProgress(0.7f, "Preparing export data..."))
 
@@ -176,20 +195,21 @@ class ExportUserDataUseCase(
                 val exportLocationHistory = locationHistory.map { it.toExportLocationHistoryItem() }
                 val exportRelations =
                     if (includeJournals && includeNotes) {
-                        journals.flatMap { journal ->
-                            journalNotesRepository
-                                .observeNotesInJournal(journal.id)
-                                .first()
-                                .filter { note -> dateRangeCutoff == null || note.creationTimestamp >= dateRangeCutoff }
-                                .map { note ->
-                                    ExportJournalNoteRelation(
-                                        journalId = journal.id.toString(),
-                                        noteId = note.uid.toString(),
-                                        addedAt = note.creationTimestamp,
-                                        syncVersion = note.syncVersion,
-                                    )
-                                }
-                        }
+                        val journalIds = journals.map { it.id }.toSet()
+                        val notesByUid = notes.associateBy { it.uid }
+                        journalNotesRepository
+                            .getAllJournalNoteLinks()
+                            .filter { (journalId, noteId) ->
+                                journalId in journalIds && noteId in notesByUid
+                            }.mapNotNull { (journalId, noteId) ->
+                                val note = notesByUid[noteId] ?: return@mapNotNull null
+                                ExportJournalNoteRelation(
+                                    journalId = journalId.toString(),
+                                    noteId = noteId.toString(),
+                                    addedAt = note.creationTimestamp,
+                                    syncVersion = note.syncVersion,
+                                )
+                            }
                     } else {
                         emptyList()
                     }
@@ -261,19 +281,6 @@ class ExportUserDataUseCase(
                 emit(ExportProgress.Failed(exception.message ?: "Unknown error occurred"))
             }
         }
-
-    companion object {
-        fun resolveDateRangeCutoff(dateRange: String): kotlin.time.Instant? {
-            val now = Clock.System.now()
-            return when (dateRange) {
-                "all_time" -> null
-                "last_30_days" -> now - 30.days
-                "last_90_days" -> now - 90.days
-                "last_year" -> now - 365.days
-                else -> null
-            }
-        }
-    }
 
     private fun createMediaPath(
         uri: String,
@@ -480,3 +487,12 @@ private fun LocationHistoryItem.toExportLocationHistoryItem(): ExportLocationHis
         bearingDegrees = bearingDegrees,
         isMock = isMock,
     )
+
+private data class ExportCollectionResult(
+    val journals: List<Journal>,
+    val notes: List<JournalNote>,
+    val drafts: List<EditorDraft>,
+    val profile: LogDateProfile,
+    val places: List<Place>,
+    val locationHistory: List<LocationHistoryItem>,
+)

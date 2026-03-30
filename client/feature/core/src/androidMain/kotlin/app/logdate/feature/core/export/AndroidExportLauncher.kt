@@ -17,10 +17,8 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.number
-import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 
 /**
  * Android-specific implementation for launching data export using Storage Access Framework and WorkManager.
@@ -109,22 +107,7 @@ class AndroidExportLauncher(
 
     override fun startExport(options: ExportOptions) {
         pendingExportOptions = options
-        // Generate default filename with timestamp
-        val timestamp =
-            Clock.System
-                .now()
-                .toLocalDateTime(TimeZone.currentSystemDefault())
-                .let {
-                    "${it.year}-${it.month.number.toString().padStart(
-                        2,
-                        '0',
-                    )}-${it.day.toString().padStart(
-                        2,
-                        '0',
-                    )}_${it.hour.toString().padStart(2, '0')}-${it.minute.toString().padStart(2, '0')}"
-                }
-
-        val defaultFileName = "logdate_export_$timestamp.${ExportFormat.FILE_EXTENSION}"
+        val defaultFileName = generateExportFileName()
 
         // Create an intent to show the file picker
         val intent =
@@ -201,16 +184,20 @@ class AndroidExportLauncher(
     }
 
     /**
-     * Converts an [ExportDateRange] to a string key for WorkManager input data.
+     * Resolves an [ExportDateRange] to a cutoff epoch millis value, or -1 for no cutoff.
      */
-    private fun ExportDateRange.toKey(): String =
-        when (this) {
-            is ExportDateRange.AllTime -> "all_time"
-            is ExportDateRange.Last30Days -> "last_30_days"
-            is ExportDateRange.Last90Days -> "last_90_days"
-            is ExportDateRange.LastYear -> "last_year"
-            is ExportDateRange.Custom -> "all_time" // Custom ranges resolved at call site
-        }
+    private fun ExportDateRange.toCutoffEpochMillis(): Long {
+        val now = Clock.System.now()
+        val cutoff =
+            when (this) {
+                is ExportDateRange.AllTime -> null
+                is ExportDateRange.Last30Days -> now - 30.days
+                is ExportDateRange.Last90Days -> now - 90.days
+                is ExportDateRange.LastYear -> now - 365.days
+                is ExportDateRange.Custom -> start
+            }
+        return cutoff?.toEpochMilliseconds() ?: -1L
+    }
 
     /**
      * Starts the export worker with the provided URI
@@ -231,7 +218,7 @@ class AndroidExportLauncher(
                 .putBoolean(ExportWorker.INCLUDE_NOTES_KEY, pendingExportOptions.includeNotes)
                 .putBoolean(ExportWorker.INCLUDE_DRAFTS_KEY, pendingExportOptions.includeDrafts)
                 .putBoolean(ExportWorker.INCLUDE_MEDIA_KEY, pendingExportOptions.includeMedia)
-                .putString(ExportWorker.DATE_RANGE_KEY, pendingExportOptions.dateRange.toKey())
+                .putLong(ExportWorker.DATE_CUTOFF_MILLIS_KEY, pendingExportOptions.dateRange.toCutoffEpochMillis())
 
         if (uri != null) {
             dataBuilder.putString(ExportWorker.DESTINATION_URI_KEY, uri.toString())

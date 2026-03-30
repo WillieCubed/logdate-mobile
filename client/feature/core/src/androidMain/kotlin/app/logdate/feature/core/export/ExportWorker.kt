@@ -14,16 +14,13 @@ import app.logdate.client.domain.export.ExportResult
 import app.logdate.client.domain.export.ExportUserDataUseCase
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.catch
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.number
-import kotlinx.datetime.toLocalDateTime
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
-import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
  * WorkManager worker for exporting user data according to the LogDate export specification.
@@ -44,7 +41,7 @@ class ExportWorker(
         const val INCLUDE_NOTES_KEY = "include_notes"
         const val INCLUDE_DRAFTS_KEY = "include_drafts"
         const val INCLUDE_MEDIA_KEY = "include_media"
-        const val DATE_RANGE_KEY = "date_range"
+        const val DATE_CUTOFF_MILLIS_KEY = "date_cutoff_millis"
     }
 
     private val exportUserDataUseCase: ExportUserDataUseCase by inject()
@@ -56,10 +53,11 @@ class ExportWorker(
     private val includeNotes: Boolean = inputData.getBoolean(INCLUDE_NOTES_KEY, true)
     private val includeDrafts: Boolean = inputData.getBoolean(INCLUDE_DRAFTS_KEY, true)
     private val includeMedia: Boolean = inputData.getBoolean(INCLUDE_MEDIA_KEY, true)
-    private val dateRangeCutoff =
-        ExportUserDataUseCase.resolveDateRangeCutoff(
-            inputData.getString(DATE_RANGE_KEY) ?: "all_time",
-        )
+    private val dateRangeCutoff: Instant? =
+        inputData
+            .getLong(DATE_CUTOFF_MILLIS_KEY, -1L)
+            .takeIf { it >= 0 }
+            ?.let { Instant.fromEpochMilliseconds(it) }
 
     override suspend fun doWork(): Result {
         // Try to promote to foreground service — if this fails (e.g. missing
@@ -219,13 +217,7 @@ class ExportWorker(
     }
 
     private fun saveToDownloads(exportData: ExportResult): String {
-        val timestamp =
-            Clock.System
-                .now()
-                .toLocalDateTime(TimeZone.currentSystemDefault())
-                .let { "${it.year}-${it.month.number.toString().padStart(2, '0')}-${it.day.toString().padStart(2, '0')}" }
-
-        val fileName = "logdate-export-$timestamp.zip"
+        val fileName = generateExportFileName()
 
         val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         val file = File(downloadsDir, fileName)
