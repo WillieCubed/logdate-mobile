@@ -52,6 +52,7 @@ internal fun Context.shareJournalLink(
             pendingIntent.intentSender,
         )
     }.also {
+        it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         startActivity(it)
     }
 

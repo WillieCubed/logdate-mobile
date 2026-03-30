@@ -68,7 +68,11 @@ class AndroidSharingLauncher(
                 cover.toUri(),
                 Intent.FLAG_GRANT_READ_URI_PERMISSION,
             )
-            context.startActivity(createInstagramStoryIntent(cover.toUri(), background.toUri()))
+            context.startActivity(
+                createInstagramStoryIntent(cover.toUri(), background.toUri()).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                },
+            )
         }
     }
 
@@ -103,7 +107,11 @@ class AndroidSharingLauncher(
                 throw IllegalArgumentException("Photo with ID $photoId does not exist")
             }
             try {
-                context.startActivity(createInstagramImageShareIntent(getUriFromMedia(photoId)))
+                context.startActivity(
+                    createInstagramImageShareIntent(getUriFromMedia(photoId)).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    },
+                )
             } catch (e: Exception) {
                 throw IllegalArgumentException("Photo with ID $photoId does not exist")
             }
@@ -124,7 +132,11 @@ class AndroidSharingLauncher(
                 throw IllegalArgumentException("Video with ID $videoId does not exist")
             }
             try {
-                context.startActivity(createInstagramVideoShareIntent(getUriFromMedia(videoId)))
+                context.startActivity(
+                    createInstagramVideoShareIntent(getUriFromMedia(videoId)).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    },
+                )
             } catch (e: Exception) {
                 throw IllegalArgumentException("Video with ID $videoId does not exist")
             }
