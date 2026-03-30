@@ -58,7 +58,7 @@
     <string name="video_note">Video note</string>
     <string name="what_is_this_for">What is this for?</string>
     <string name="you_dont_have_any_journals_yet">You don&apos;t have any journals yet.</string>
-    <string name="state_journals_empty_cta">Create one below!</string>
+    <string name="state_journals_empty_cta">Start your first journal</string>
     <string name="state_journals_empty_description">Journals are collections of memories from your timeline, like stories.</string>
     <string name="state_journals_empty_title">No journals</string>
     <string name="label_sorting_by">Sorting by %1$s</string>

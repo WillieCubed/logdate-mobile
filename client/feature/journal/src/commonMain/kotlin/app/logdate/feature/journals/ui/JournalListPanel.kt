@@ -115,7 +115,7 @@ fun JournalListPanel(
                 exit = fadeOut(animationSpec = tween(200)),
             ) {
                 if (journals.isEmpty()) {
-                    NoJournalsScreen()
+                    NoJournalsScreen(onCreateJournal = onCreateJournal)
                 } else {
                     JournalListContent(
                         journals = journals,
