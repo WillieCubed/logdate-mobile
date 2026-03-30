@@ -5,6 +5,7 @@ package app.logdate.feature.journals.ui.detail
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,6 +68,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.journals.ui.deriveCoverColor
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.common.AspectRatios
@@ -396,37 +398,96 @@ private fun JournalEntryItem(
     entry: EntryDisplayData,
     onClick: () -> Unit,
     onRemoveFromJournal: () -> Unit,
+    onNavigateToJournal: (Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    when (entry) {
-        is EntryDisplayData.TextEntry ->
-            TextEntryCard(
-                entry = entry,
-                onClick = onClick,
-                onRemoveFromJournal = onRemoveFromJournal,
-                modifier = modifier,
+    Column(modifier = modifier) {
+        when (entry) {
+            is EntryDisplayData.TextEntry ->
+                TextEntryCard(
+                    entry = entry,
+                    onClick = onClick,
+                    onRemoveFromJournal = onRemoveFromJournal,
+                )
+            is EntryDisplayData.ImageEntry ->
+                ImageEntryCard(
+                    entry = entry,
+                    onClick = onClick,
+                    onRemoveFromJournal = onRemoveFromJournal,
+                )
+            is EntryDisplayData.VideoEntry ->
+                VideoEntryCard(
+                    entry = entry,
+                    onClick = onClick,
+                    onRemoveFromJournal = onRemoveFromJournal,
+                )
+            is EntryDisplayData.AudioEntry ->
+                AudioEntryCard(
+                    entry = entry,
+                    onClick = onClick,
+                    onRemoveFromJournal = onRemoveFromJournal,
+                )
+        }
+
+        if (entry.otherJournals.isNotEmpty()) {
+            JournalMembershipBadges(
+                journals = entry.otherJournals,
+                onNavigateToJournal = onNavigateToJournal,
+                modifier = Modifier.padding(top = Spacing.xs),
             )
-        is EntryDisplayData.ImageEntry ->
-            ImageEntryCard(
-                entry = entry,
-                onClick = onClick,
-                onRemoveFromJournal = onRemoveFromJournal,
-                modifier = modifier,
-            )
-        is EntryDisplayData.VideoEntry ->
-            VideoEntryCard(
-                entry = entry,
-                onClick = onClick,
-                onRemoveFromJournal = onRemoveFromJournal,
-                modifier = modifier,
-            )
-        is EntryDisplayData.AudioEntry ->
-            AudioEntryCard(
-                entry = entry,
-                onClick = onClick,
-                onRemoveFromJournal = onRemoveFromJournal,
-                modifier = modifier,
-            )
+        }
+    }
+}
+
+/**
+ * Row of small pills showing the other journals this entry appears in.
+ * Each pill shows the journal's derived color and title, and is tappable.
+ */
+@Composable
+private fun JournalMembershipBadges(
+    journals: List<JournalReference>,
+    onNavigateToJournal: (Uuid) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        Text(
+            text = "Also in",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.align(Alignment.CenterVertically),
+        )
+        journals.forEach { journal ->
+            val color = remember(journal.id) { deriveCoverColor(journal.id) }
+            Surface(
+                onClick = { onNavigateToJournal(journal.id) },
+                shape = MaterialTheme.shapes.small,
+                color = color.copy(alpha = 0.2f),
+                modifier = Modifier.heightIn(max = 24.dp),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(8.dp)
+                                .background(color, MaterialTheme.shapes.extraSmall),
+                    )
+                    Text(
+                        text = journal.title,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
     }
 }
 

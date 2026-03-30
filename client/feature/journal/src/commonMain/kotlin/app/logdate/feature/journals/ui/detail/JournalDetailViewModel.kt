@@ -6,6 +6,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import app.logdate.client.domain.timeline.GetJournalMembershipUseCase
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalRepository
@@ -34,6 +35,7 @@ class JournalDetailViewModel(
     private val repository: JournalRepository,
     private val sharingLauncher: SharingLauncher,
     private val journalContentRepository: JournalContentRepository,
+    private val getJournalMembership: GetJournalMembershipUseCase,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     // Simple MutableStateFlow to store the journal ID
@@ -78,22 +80,40 @@ class JournalDetailViewModel(
                         journal to notes
                     }.combine(sortOrderState) { journalToNotes, sortOrder ->
                         Triple(journalToNotes.first, journalToNotes.second, sortOrder)
-                    }.map { (journal, notes, sortOrder) ->
-                        val displayData = notes.map { it.toDisplayData() }
-
-                        // Sort based on the current sort order
-                        val sortedEntries =
-                            when (sortOrder) {
-                                SortOrder.NEWEST_FIRST -> displayData.sortedByDescending { it.timestamp }
-                                SortOrder.OLDEST_FIRST -> displayData.sortedBy { it.timestamp }
-                            }
-
-                        JournalDetailUiState.Success(
-                            journal.id,
-                            journal.title,
-                            sortedEntries,
-                            sortOrder,
-                        )
+                    }.flatMapLatest { (journal, notes, sortOrder) ->
+                        val noteIds = notes.map { it.uid }.toSet()
+                        if (noteIds.isEmpty()) {
+                            return@flatMapLatest flowOf(
+                                JournalDetailUiState.Success(
+                                    journal.id,
+                                    journal.title,
+                                    emptyList(),
+                                    sortOrder,
+                                ),
+                            )
+                        }
+                        getJournalMembership(noteIds).map { membershipMap ->
+                            val displayData =
+                                notes.map { note ->
+                                    val otherJournals =
+                                        membershipMap[note.uid]
+                                            .orEmpty()
+                                            .filter { it.id != journalId }
+                                            .map { JournalReference(it.id, it.title) }
+                                    note.toDisplayData(otherJournals)
+                                }
+                            val sortedEntries =
+                                when (sortOrder) {
+                                    SortOrder.NEWEST_FIRST -> displayData.sortedByDescending { it.timestamp }
+                                    SortOrder.OLDEST_FIRST -> displayData.sortedBy { it.timestamp }
+                                }
+                            JournalDetailUiState.Success(
+                                journal.id,
+                                journal.title,
+                                sortedEntries,
+                                sortOrder,
+                            )
+                        }
                     }
             }.catch { e ->
                 emit(
@@ -124,13 +144,14 @@ class JournalDetailViewModel(
      * Converts a JournalNote to the appropriate EntryDisplayData subtype,
      * preserving media references for rich rendering.
      */
-    private fun JournalNote.toDisplayData(): EntryDisplayData =
+    private fun JournalNote.toDisplayData(otherJournals: List<JournalReference> = emptyList()): EntryDisplayData =
         when (this) {
             is JournalNote.Text ->
                 EntryDisplayData.TextEntry(
                     id = uid,
                     timestamp = creationTimestamp,
                     content = content,
+                    otherJournals = otherJournals,
                 )
             is JournalNote.Image ->
                 EntryDisplayData.ImageEntry(
@@ -138,6 +159,7 @@ class JournalDetailViewModel(
                     timestamp = creationTimestamp,
                     mediaRef = mediaRef,
                     caption = caption,
+                    otherJournals = otherJournals,
                 )
             is JournalNote.Video ->
                 EntryDisplayData.VideoEntry(
@@ -145,6 +167,7 @@ class JournalDetailViewModel(
                     timestamp = creationTimestamp,
                     mediaRef = mediaRef,
                     caption = caption,
+                    otherJournals = otherJournals,
                 )
             is JournalNote.Audio ->
                 EntryDisplayData.AudioEntry(
@@ -152,6 +175,7 @@ class JournalDetailViewModel(
                     timestamp = creationTimestamp,
                     mediaRef = mediaRef,
                     durationMs = durationMs,
+                    otherJournals = otherJournals,
                 )
         }
 

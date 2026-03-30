@@ -26,6 +26,7 @@ val journalsFeatureModule: Module =
                 repository = get(),
                 sharingLauncher = get(),
                 journalContentRepository = get(),
+                getJournalMembership = get(),
                 savedStateHandle = get(),
             )
         }
