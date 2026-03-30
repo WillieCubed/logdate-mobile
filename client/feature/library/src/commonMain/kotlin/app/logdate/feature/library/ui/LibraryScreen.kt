@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
@@ -28,6 +29,7 @@ import kotlin.uuid.Uuid
 @Composable
 fun LibraryScreen(
     onOpenMediaDetail: (Uuid) -> Unit,
+    onOpenSearch: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = koinViewModel(),
 ) {
@@ -45,6 +47,7 @@ fun LibraryScreen(
         state = state,
         columnCount = columnCount,
         onItemClick = onOpenMediaDetail,
+        onOpenSearch = onOpenSearch,
         modifier = modifier,
     )
 }
@@ -61,6 +64,7 @@ fun LibraryScreenContent(
     state: LibraryUiState,
     columnCount: Int,
     onItemClick: (Uuid) -> Unit,
+    onOpenSearch: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -68,7 +72,10 @@ fun LibraryScreenContent(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            LibraryTopBar(modifier = Modifier.fillMaxWidth())
+            LibraryTopBar(
+                onOpenSearch = onOpenSearch,
+                modifier = Modifier.fillMaxWidth().statusBarsPadding(),
+            )
         },
     ) { paddingValues ->
         Box(

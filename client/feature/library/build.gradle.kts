@@ -58,6 +58,7 @@ kotlin {
             implementation(libs.material3.adaptive)
             implementation(libs.compose.material3.adaptive.navigation.suite)
             implementation(libs.compose.ui)
+            implementation(libs.compose.components.resources)
             implementation(libs.compose.ui.tooling.preview)
             // Core
             implementation(libs.kotlinx.datetime)

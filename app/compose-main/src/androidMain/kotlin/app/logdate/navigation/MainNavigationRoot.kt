@@ -645,6 +645,7 @@ fun MainNavigationRoot(
                             onOpenMediaDetail = mainAppNavigator::openMediaDetail,
                             onBack = mainAppNavigator::goBack,
                             onNavigateToJournal = mainAppNavigator::openJournalDetail,
+                            onOpenSearch = { mainAppNavigator.openSearch() },
                         )
                         searchRoutes(
                             onBack = mainAppNavigator::goBack,

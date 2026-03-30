@@ -36,6 +36,7 @@ fun EntryProviderScope<NavKey>.libraryRoutes(
     onOpenMediaDetail: (Uuid) -> Unit,
     onBack: () -> Unit,
     onNavigateToJournal: (Uuid) -> Unit,
+    onOpenSearch: () -> Unit,
 ) {
     routeEntry<LibraryListRoute>(
         metadata = HomeScene.homeScene(),
@@ -44,7 +45,10 @@ fun EntryProviderScope<NavKey>.libraryRoutes(
             FeatureSharedTransitionScope provides NavigationSharedTransitionScope.current,
             LocalNavAnimatedVisibilityScope provides LocalNavAnimatedContentScope.current,
         ) {
-            LibraryScreen(onOpenMediaDetail = onOpenMediaDetail)
+            LibraryScreen(
+                onOpenMediaDetail = onOpenMediaDetail,
+                onOpenSearch = onOpenSearch,
+            )
         }
     }
 
