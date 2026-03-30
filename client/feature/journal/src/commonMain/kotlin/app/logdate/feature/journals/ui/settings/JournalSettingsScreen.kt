@@ -263,15 +263,19 @@ private fun JournalPrivacySettings(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Text(
-            text = stringResource(Res.string.privacy),
+            text = stringResource(Res.string.visibility),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary,
         )
 
-        // Privacy settings content would go here
         Text(
-            text = stringResource(Res.string.journal_privacy_settings_will_appear_here_in_future_updates),
+            text = stringResource(Res.string.journal_visibility_private),
             style = MaterialTheme.typography.bodyMedium,
+        )
+        Text(
+            text = stringResource(Res.string.journal_visibility_shared_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

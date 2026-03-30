@@ -46,6 +46,9 @@
     <string name="journal_entries">Journal Entries</string>
     <string name="journal_name">Journal Name</string>
     <string name="journal_privacy_settings_will_appear_here_in_future_updates">Journal privacy settings will appear here in future updates.</string>
+    <string name="visibility">Visibility</string>
+    <string name="journal_visibility_private">Only you can see this journal.</string>
+    <string name="journal_visibility_shared_hint">Use the Share button to give others access.</string>
     <string name="journal_settings">Journal Settings</string>
     <string name="journal_settings_2">Journal settings</string>
     <string name="loading">Loading...</string>
