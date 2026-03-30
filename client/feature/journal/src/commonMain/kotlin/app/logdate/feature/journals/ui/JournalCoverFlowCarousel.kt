@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -125,7 +124,6 @@ fun JournalCoverFlowCarousel(
                             JournalCover(
                                 journal = item.data,
                                 onClick = { onOpenJournal(item.data.id) },
-                                backgroundColor = MaterialTheme.colorScheme.tertiaryContainer,
                                 modifier =
                                     Modifier
                                         .width(carouselCardWidth)

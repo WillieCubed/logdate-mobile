@@ -49,12 +49,12 @@ private val auditSearchResults =
 
 private val auditJournalEntries =
     listOf(
-        EntryDisplayData(
+        EntryDisplayData.TextEntry(
             id = Uuid.parse("00000000-0000-0000-0000-000000000131"),
             content = "Moved the journal list into a deterministic audit harness for tablet and desktop previews.",
             timestamp = ScreenshotTestData.baseInstant,
         ),
-        EntryDisplayData(
+        EntryDisplayData.TextEntry(
             id = Uuid.parse("00000000-0000-0000-0000-000000000132"),
             content = "Trimmed excess horizontal padding so medium-width windows keep both context and readability.",
             timestamp = ScreenshotTestData.baseInstant - 3.hours,

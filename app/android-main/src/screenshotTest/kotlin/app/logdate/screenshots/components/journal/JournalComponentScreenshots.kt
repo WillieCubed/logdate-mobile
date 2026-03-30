@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.feature.journals.ui.creation.JournalCreationScreenContent
 import app.logdate.feature.journals.ui.detail.ConfirmEntryDeletionDialog
-import app.logdate.feature.journals.ui.detail.EntryDisplayData
 import app.logdate.feature.journals.ui.detail.JournalDetailUiState
 import app.logdate.feature.journals.ui.list.JournalsListDialog
 import app.logdate.screenshots.common.ScreenshotTestData

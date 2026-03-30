@@ -10,25 +10,32 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -54,21 +61,26 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.common.AspectRatios
+import app.logdate.ui.common.applyStandardContentWidth
 import app.logdate.ui.theme.Spacing
-import app.logdate.util.toReadableDateTimeShort
+import app.logdate.util.localTime
+import app.logdate.util.toReadableDateShort
+import coil3.compose.AsyncImage
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.journal.generated.resources.*
-import logdate.client.feature.journal.generated.resources.Res
-import logdate.client.feature.journal.generated.resources.action_delete
-import logdate.client.feature.journal.generated.resources.delete_journal_description
-import logdate.client.feature.journal.generated.resources.delete_journal_title
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -151,6 +163,8 @@ fun JournalDetailScreenContent(
         }
 
         is JournalDetailUiState.Success -> {
+            var showOverflowMenu by remember { mutableStateOf(false) }
+
             Scaffold(
                 modifier =
                     modifier
@@ -202,25 +216,48 @@ fun JournalDetailScreenContent(
                                 )
                             }
 
-                            IconButton(onClick = { onNavigateToShare(uiState.journalId) }) {
-                                Icon(
-                                    Icons.Default.Share,
-                                    contentDescription = stringResource(Res.string.share_journal_2),
-                                )
-                            }
-
-                            IconButton(onClick = { onNavigateToSettings(uiState.journalId) }) {
-                                Icon(
-                                    Icons.Default.Settings,
-                                    contentDescription = stringResource(Res.string.journal_settings_2),
-                                )
-                            }
-
-                            IconButton(onClick = onRequestDelete) {
-                                Icon(
-                                    Icons.Default.DeleteOutline,
-                                    contentDescription = stringResource(Res.string.delete_journal_2),
-                                )
+                            Box {
+                                IconButton(onClick = { showOverflowMenu = true }) {
+                                    Icon(
+                                        Icons.Default.MoreVert,
+                                        contentDescription = stringResource(Res.string.journal_settings_2),
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = showOverflowMenu,
+                                    onDismissRequest = { showOverflowMenu = false },
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(Res.string.share_journal_2)) },
+                                        onClick = {
+                                            showOverflowMenu = false
+                                            onNavigateToShare(uiState.journalId)
+                                        },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.Share, contentDescription = null)
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(Res.string.journal_settings_2)) },
+                                        onClick = {
+                                            showOverflowMenu = false
+                                            onNavigateToSettings(uiState.journalId)
+                                        },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.Settings, contentDescription = null)
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(Res.string.delete_journal_2)) },
+                                        onClick = {
+                                            showOverflowMenu = false
+                                            onRequestDelete()
+                                        },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.DeleteOutline, contentDescription = null)
+                                        },
+                                    )
+                                }
                             }
                         },
                     )
@@ -239,8 +276,8 @@ fun JournalDetailScreenContent(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
-                                .widthIn(max = 760.dp),
+                                .padding(vertical = Spacing.sm)
+                                .applyStandardContentWidth(),
                     ) {
                         if (uiState.entries.isEmpty()) {
                             Box(
@@ -250,6 +287,11 @@ fun JournalDetailScreenContent(
                                 Text(stringResource(Res.string.no_entries_in_this_journal_yet))
                             }
                         } else {
+                            val groupedEntries =
+                                remember(uiState.entries) {
+                                    groupEntriesByDay(uiState.entries)
+                                }
+
                             Column(
                                 modifier = Modifier.fillMaxSize(),
                             ) {
@@ -282,13 +324,19 @@ fun JournalDetailScreenContent(
                                         ),
                                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                                 ) {
-                                    items(uiState.entries) { entry ->
-                                        JournalEntryItem(
-                                            content = entry.content,
-                                            timestamp = entry.timestamp,
-                                            onClick = { onNavigateToNoteDetail(entry.id) },
-                                            onRemoveFromJournal = { onRemoveNoteFromJournal(entry.id) },
-                                        )
+                                    groupedEntries.forEach { (dateLabel, entries) ->
+                                        item(key = "header-$dateLabel") {
+                                            DaySectionHeader(dateLabel)
+                                        }
+                                        entries.forEach { entry ->
+                                            item(key = "entry-${entry.id}") {
+                                                JournalEntryItem(
+                                                    entry = entry,
+                                                    onClick = { onNavigateToNoteDetail(entry.id) },
+                                                    onRemoveFromJournal = { onRemoveNoteFromJournal(entry.id) },
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -313,6 +361,370 @@ fun JournalDetailScreenContent(
         }
     }
 }
+
+/**
+ * Groups a sorted list of entries by their calendar day, preserving order.
+ */
+private fun groupEntriesByDay(entries: List<EntryDisplayData>): List<Pair<String, List<EntryDisplayData>>> {
+    val tz = TimeZone.currentSystemDefault()
+    val grouped = linkedMapOf<String, MutableList<EntryDisplayData>>()
+    for (entry in entries) {
+        val date = entry.timestamp.toLocalDateTime(tz).date
+        val label = date.toReadableDateShort()
+        grouped.getOrPut(label) { mutableListOf() }.add(entry)
+    }
+    return grouped.map { (label, items) -> label to items.toList() }
+}
+
+@Composable
+private fun DaySectionHeader(
+    dateLabel: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = dateLabel,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(top = Spacing.md, bottom = Spacing.xs),
+    )
+}
+
+// region Entry type composables
+
+@Composable
+private fun JournalEntryItem(
+    entry: EntryDisplayData,
+    onClick: () -> Unit,
+    onRemoveFromJournal: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    when (entry) {
+        is EntryDisplayData.TextEntry ->
+            TextEntryCard(
+                entry = entry,
+                onClick = onClick,
+                onRemoveFromJournal = onRemoveFromJournal,
+                modifier = modifier,
+            )
+        is EntryDisplayData.ImageEntry ->
+            ImageEntryCard(
+                entry = entry,
+                onClick = onClick,
+                onRemoveFromJournal = onRemoveFromJournal,
+                modifier = modifier,
+            )
+        is EntryDisplayData.VideoEntry ->
+            VideoEntryCard(
+                entry = entry,
+                onClick = onClick,
+                onRemoveFromJournal = onRemoveFromJournal,
+                modifier = modifier,
+            )
+        is EntryDisplayData.AudioEntry ->
+            AudioEntryCard(
+                entry = entry,
+                onClick = onClick,
+                onRemoveFromJournal = onRemoveFromJournal,
+                modifier = modifier,
+            )
+    }
+}
+
+@Composable
+private fun TextEntryCard(
+    entry: EntryDisplayData.TextEntry,
+    onClick: () -> Unit,
+    onRemoveFromJournal: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    InlineEntryCardShell(
+        timestamp = entry.timestamp,
+        onClick = {
+            if (expanded) onClick() else expanded = true
+        },
+        onRemoveFromJournal = onRemoveFromJournal,
+        modifier = modifier,
+    ) {
+        Text(
+            text = entry.content,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = if (expanded) Int.MAX_VALUE else 4,
+            overflow = if (expanded) TextOverflow.Visible else TextOverflow.Ellipsis,
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .animateContentSize()
+                    .heightIn(min = 40.dp),
+        )
+    }
+}
+
+@Composable
+private fun ImageEntryCard(
+    entry: EntryDisplayData.ImageEntry,
+    onClick: () -> Unit,
+    onRemoveFromJournal: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    VerticalEntryCardShell(
+        timestamp = entry.timestamp,
+        onClick = onClick,
+        onRemoveFromJournal = onRemoveFromJournal,
+        modifier = modifier,
+    ) {
+        AsyncImage(
+            model = entry.mediaRef,
+            contentDescription = stringResource(Res.string.image_note),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(AspectRatios.RATIO_4_3)
+                    .clip(RoundedCornerShape(Spacing.sm)),
+            contentScale = ContentScale.Crop,
+        )
+        if (entry.caption.isNotBlank()) {
+            Text(
+                text = entry.caption,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = Spacing.sm),
+            )
+        }
+    }
+}
+
+@Composable
+private fun VideoEntryCard(
+    entry: EntryDisplayData.VideoEntry,
+    onClick: () -> Unit,
+    onRemoveFromJournal: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    VerticalEntryCardShell(
+        timestamp = entry.timestamp,
+        onClick = onClick,
+        onRemoveFromJournal = onRemoveFromJournal,
+        modifier = modifier,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(AspectRatios.RATIO_16_9)
+                    .clip(RoundedCornerShape(Spacing.sm)),
+        ) {
+            AsyncImage(
+                model = entry.mediaRef,
+                contentDescription = stringResource(Res.string.video_note),
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+            // Play indicator overlay
+            Icon(
+                Icons.Default.PlayArrow,
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .align(Alignment.Center)
+                        .size(48.dp),
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+            )
+            Icon(
+                Icons.Default.Videocam,
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(Spacing.sm)
+                        .size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            )
+        }
+        if (entry.caption.isNotBlank()) {
+            Text(
+                text = entry.caption,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = Spacing.sm),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AudioEntryCard(
+    entry: EntryDisplayData.AudioEntry,
+    onClick: () -> Unit,
+    onRemoveFromJournal: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    InlineEntryCardShell(
+        timestamp = entry.timestamp,
+        onClick = onClick,
+        onRemoveFromJournal = onRemoveFromJournal,
+        modifier = modifier,
+    ) {
+        Icon(
+            Icons.Default.GraphicEq,
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(Modifier.width(Spacing.sm))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(Res.string.audio_note),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (entry.durationMs > 0) {
+                Text(
+                    text = formatAudioDuration(entry.durationMs),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Formats milliseconds into a human-readable duration string (e.g. "1:23" or "0:05").
+ */
+private fun formatAudioDuration(ms: Long): String {
+    val totalSeconds = ms / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "$minutes:${seconds.toString().padStart(2, '0')}"
+}
+
+// endregion
+
+// region Entry card shell
+
+/**
+ * Card wrapper for entry types that display media content filling the width.
+ * Renders a timestamp label above the card, media content, and an overflow menu.
+ */
+@Composable
+private fun VerticalEntryCardShell(
+    timestamp: Instant,
+    onClick: () -> Unit,
+    onRemoveFromJournal: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    Column(modifier = modifier) {
+        Text(
+            text = timestamp.localTime,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 4.dp),
+        )
+
+        Card(
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(modifier = Modifier.padding(Spacing.md)) {
+                content()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    EntryOverflowMenu(
+                        showMenu = showMenu,
+                        onShowMenu = { showMenu = true },
+                        onDismiss = { showMenu = false },
+                        onRemoveFromJournal = {
+                            showMenu = false
+                            onRemoveFromJournal()
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Card wrapper for inline entry types (text, audio) displayed in a row
+ * alongside the overflow menu.
+ */
+@Composable
+private fun InlineEntryCardShell(
+    timestamp: Instant,
+    onClick: () -> Unit,
+    onRemoveFromJournal: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    Column(modifier = modifier) {
+        Text(
+            text = timestamp.localTime,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 4.dp),
+        )
+
+        Card(
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 16.dp, end = 4.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                content()
+                EntryOverflowMenu(
+                    showMenu = showMenu,
+                    onShowMenu = { showMenu = true },
+                    onDismiss = { showMenu = false },
+                    onRemoveFromJournal = {
+                        showMenu = false
+                        onRemoveFromJournal()
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EntryOverflowMenu(
+    showMenu: Boolean,
+    onShowMenu: () -> Unit,
+    onDismiss: () -> Unit,
+    onRemoveFromJournal: () -> Unit,
+) {
+    Box {
+        IconButton(onClick = onShowMenu) {
+            Icon(
+                Icons.Default.MoreVert,
+                contentDescription = stringResource(Res.string.journal_settings_2),
+            )
+        }
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = onDismiss,
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(Res.string.remove_from_journal)) },
+                onClick = onRemoveFromJournal,
+                leadingIcon = {
+                    Icon(Icons.Default.RemoveCircleOutline, contentDescription = null)
+                },
+            )
+        }
+    }
+}
+
+// endregion
+
+// region Dialogs
 
 @Composable
 fun DeleteConfirmationDialog(
@@ -392,75 +804,4 @@ private fun RemoveNoteFromJournalDialog(
     )
 }
 
-@Composable
-private fun JournalEntryItem(
-    content: String,
-    timestamp: kotlin.time.Instant,
-    onClick: () -> Unit,
-    onRemoveFromJournal: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    var showMenu by remember { mutableStateOf(false) }
-
-    Column(modifier = modifier) {
-        // Display date and time above the card
-        Text(
-            text = timestamp.toReadableDateTimeShort(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp),
-        )
-
-        Card(
-            onClick = {
-                if (expanded) {
-                    onClick()
-                } else {
-                    expanded = !expanded
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Row(
-                modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 16.dp, end = 4.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-                Text(
-                    text = content,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = if (expanded) Int.MAX_VALUE else 4,
-                    overflow = if (expanded) TextOverflow.Visible else TextOverflow.Ellipsis,
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .animateContentSize()
-                            .heightIn(min = 40.dp),
-                )
-                Box {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(
-                            Icons.Default.MoreVert,
-                            contentDescription = stringResource(Res.string.journal_settings_2),
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.remove_from_journal)) },
-                            onClick = {
-                                showMenu = false
-                                onRemoveFromJournal()
-                            },
-                            leadingIcon = {
-                                Icon(Icons.Default.RemoveCircleOutline, contentDescription = null)
-                            },
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
+// endregion

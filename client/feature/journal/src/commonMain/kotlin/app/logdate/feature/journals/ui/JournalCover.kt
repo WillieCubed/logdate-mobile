@@ -20,10 +20,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -34,6 +36,7 @@ import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
+import kotlin.math.abs
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -47,14 +50,22 @@ internal val JournalShape =
     )
 
 /**
+ * Derives a deterministic solid color from a journal's identity.
+ *
+ * Uses the journal ID's hash to pick a unique hue at a muted saturation
+ * and medium lightness. Every journal gets a distinct but tasteful color.
+ */
+internal fun deriveCoverColor(journalId: Uuid): Color {
+    val hue = abs(journalId.hashCode() % 360).toFloat()
+    return Color.hsl(hue, saturation = 0.50f, lightness = 0.80f)
+}
+
+/**
  * A journal cover that displays basic information about a journal.
  *
- * @param journal The journal to display.
- * @param onClick The callback to invoke when the journal is clicked.
- * @param modifier The modifier to apply to the journal cover.
- * @param enabled Whether interaction events are enabled for the journal cover.
- * @param backgroundColor The background color of the journal cover. This is shown when the journal's
- * image is loading or unavailable.
+ * The cover color is derived deterministically from the journal's ID,
+ * giving each journal a unique visual identity. Text color adapts
+ * based on background luminance.
  */
 @Composable
 fun JournalCover(
@@ -62,14 +73,13 @@ fun JournalCover(
     modifier: Modifier = Modifier,
     onClick: JournalClickCallback? = null,
     enabled: Boolean = true,
-    backgroundColor: Color = MaterialTheme.colorScheme.tertiaryContainer,
     elevation: Dp = 0.dp,
 ) {
-    // Get scopes for shared transitions, gracefully handling when they're not available
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
     val sharedTransitionScope = LocalSharedTransitionScope.current
 
-    // Use a standard Box without shared transitions when scopes aren't available
+    val coverColor = remember(journal.id) { deriveCoverColor(journal.id) }
+
     val baseModifier =
         modifier
             .aspectRatio(AspectRatios.JOURNAL_COVER)
@@ -77,7 +87,7 @@ fun JournalCover(
                 elevation = elevation,
                 shape = JournalShape,
             ).background(
-                color = backgroundColor,
+                color = coverColor,
                 shape = JournalShape,
             ).let { mod ->
                 if (onClick != null) {
@@ -87,7 +97,15 @@ fun JournalCover(
                 }
             }.widthIn(max = 256.dp)
 
-    // Apply shared element transition only when both scopes are available
+    val textColor =
+        remember(coverColor) {
+            if (coverColor.luminance() > 0.5f) {
+                Color.Black.copy(alpha = 0.87f)
+            } else {
+                Color.White.copy(alpha = 0.95f)
+            }
+        }
+
     if (animatedVisibilityScope != null && sharedTransitionScope != null) {
         with(sharedTransitionScope) {
             Box(
@@ -98,19 +116,21 @@ fun JournalCover(
                             animatedVisibilityScope,
                         ),
             ) {
-                JournalCoverContent(journal)
+                JournalCoverContent(journal, textColor)
             }
         }
     } else {
-        // Fallback when shared transitions aren't available
         Box(modifier = baseModifier) {
-            JournalCoverContent(journal)
+            JournalCoverContent(journal, textColor)
         }
     }
 }
 
 @Composable
-private fun BoxScope.JournalCoverContent(journal: Journal) {
+private fun BoxScope.JournalCoverContent(
+    journal: Journal,
+    textColor: Color,
+) {
     Column(
         modifier =
             Modifier
@@ -124,15 +144,14 @@ private fun BoxScope.JournalCoverContent(journal: Journal) {
             text = journal.title,
             modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onTertiaryContainer,
+            color = textColor,
         )
         Text(
             "Last updated ${journal.lastUpdated.toReadableDateShort()}",
             modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onTertiaryContainer,
+            color = textColor.copy(alpha = textColor.alpha * 0.7f),
         )
-        // TODO: Include people label
     }
 }
 

@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.QrCode
@@ -24,7 +26,6 @@ import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,14 +40,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.journals.ui.JournalShape
+import app.logdate.feature.journals.ui.deriveCoverColor
 import app.logdate.shared.model.Journal
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.applyStandardContentWidth
+import app.logdate.ui.theme.Spacing
+import app.logdate.util.toReadableDateShort
 import logdate.client.feature.journal.generated.resources.*
-import logdate.client.feature.journal.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
@@ -70,7 +77,6 @@ fun ShareJournalScreen(
             kotlin.uuid.Uuid.parse(journalId)
         }
 
-    // Set the journal ID in the ViewModel
     LaunchedEffect(parsedId) {
         viewModel.setJournalId(parsedId)
     }
@@ -112,7 +118,6 @@ fun ShareJournalScreenContent(
     ) { paddingValues ->
         when (val state = uiState) {
             is ShareJournalUiState.Loading -> {
-                // Show loading state
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
@@ -121,7 +126,6 @@ fun ShareJournalScreenContent(
                 }
             }
             is ShareJournalUiState.Error -> {
-                // Show error state
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
@@ -132,7 +136,6 @@ fun ShareJournalScreenContent(
             is ShareJournalUiState.Success -> {
                 ShareJournalContent(
                     journal = state.journal,
-                    lastUpdatedText = state.lastUpdatedDisplay,
                     onShareToInstagram = { onShareToInstagram(state.journal) },
                     onShareJournal = { onShareJournal(state.journal) },
                     modifier = Modifier.padding(paddingValues),
@@ -145,8 +148,9 @@ fun ShareJournalScreenContent(
 /**
  * Content of the share journal screen.
  *
+ * Displays a share-specific journal card alongside sharing actions.
+ *
  * @param journal Journal to be shared
- * @param lastUpdatedText Text showing when the journal was last updated
  * @param onShareToInstagram Callback when sharing to Instagram
  * @param onShareJournal Callback when using general share sheet
  * @param modifier Modifier for this composable
@@ -154,7 +158,6 @@ fun ShareJournalScreenContent(
 @Composable
 fun ShareJournalContent(
     journal: Journal,
-    lastUpdatedText: String,
     onShareToInstagram: () -> Unit,
     onShareJournal: () -> Unit,
     modifier: Modifier = Modifier,
@@ -163,26 +166,23 @@ fun ShareJournalContent(
         modifier =
             modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(Spacing.lg)
+                .applyStandardContentWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xl),
     ) {
-        // Journal preview
-        JournalPreview(
-            title = journal.title,
-            lastUpdatedText = lastUpdatedText,
-            modifier =
-                Modifier
-                    .width(240.dp)
-                    .aspectRatio(AspectRatios.RATIO_3_4),
+        ShareJournalCard(
+            journal = journal,
+            modifier = Modifier.widthIn(max = 240.dp),
         )
 
-        // Web availability text
+        // Web availability notice
         MaterialContainer {
             SurfaceItem {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
                 ) {
                     Icon(
                         Icons.Rounded.Public,
@@ -198,12 +198,11 @@ fun ShareJournalContent(
             }
         }
 
-        // Share buttons
+        // Share buttons — original layout preserved
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            // Instagram button
             Button(
                 onClick = onShareToInstagram,
                 modifier =
@@ -212,11 +211,10 @@ fun ShareJournalContent(
                         .height(56.dp),
                 colors =
                     ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFF5F5F5),
-                        contentColor = Color.Black,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
                     ),
             ) {
-                // Instagram icon
                 Icon(
                     imageVector = Icons.Default.QrCode,
                     contentDescription = null,
@@ -224,7 +222,6 @@ fun ShareJournalContent(
                 )
             }
 
-            // General share button
             Button(
                 onClick = onShareJournal,
                 modifier =
@@ -236,17 +233,17 @@ fun ShareJournalContent(
                     imageVector = Icons.Default.Share,
                     contentDescription = null,
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(Spacing.sm))
                 Text(text = stringResource(Res.string.share))
             }
         }
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Bottom info about nearby sharing
+        // Bottom nearby sharing info
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             Icon(
                 imageVector = Icons.Default.QrCode,
@@ -265,66 +262,67 @@ fun ShareJournalContent(
                 textAlign = TextAlign.Center,
             )
         }
-
-        // Bottom indicator
-        HorizontalDivider(
-            modifier =
-                Modifier
-                    .width(32.dp)
-                    .padding(vertical = 16.dp),
-            thickness = 4.dp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-        )
     }
 }
 
 /**
- * Journal preview card shown in the sharing screen.
- *
- * @param title Title of the journal
- * @param lastUpdatedText Text showing when the journal was last updated
- * @param modifier Modifier for this composable
+ * A share-specific journal card that renders the journal cover shape
+ * with an info strip below showing the title and last updated date.
  */
 @Composable
-private fun JournalPreview(
-    title: String,
-    lastUpdatedText: String,
+private fun ShareJournalCard(
+    journal: Journal,
     modifier: Modifier = Modifier,
 ) {
+    val coverColor = remember(journal.id) { deriveCoverColor(journal.id) }
+    val coverTextColor =
+        remember(coverColor) {
+            if (coverColor.luminance() > 0.5f) {
+                Color.Black.copy(alpha = 0.87f)
+            } else {
+                Color.White.copy(alpha = 0.95f)
+            }
+        }
+
     Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        shadowElevation = 4.dp,
+        modifier =
+            modifier.shadow(elevation = 4.dp, shape = JournalShape),
+        shape = JournalShape,
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Image preview (70% of height)
+        Column {
+            // Cover area with title overlay
             Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .weight(0.7f)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
+                        .aspectRatio(AspectRatios.JOURNAL_COVER)
+                        .background(coverColor),
+                contentAlignment = Alignment.BottomStart,
             ) {
-                // This would be the journal cover image
-                // For now we're using a placeholder color
+                Text(
+                    text = journal.title,
+                    modifier = Modifier.padding(Spacing.lg),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = coverTextColor,
+                )
             }
 
-            // Journal title and last updated (30% of height)
+            // Info strip below the cover
             Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .weight(0.3f)
-                        .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .padding(Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
                 Text(
-                    text = title.ifEmpty { "Untitled Journal" },
-                    style = MaterialTheme.typography.titleMedium,
+                    text = journal.title,
+                    style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = lastUpdatedText,
+                    text = stringResource(Res.string.last_updated_prefix, journal.lastUpdated.toReadableDateShort()),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

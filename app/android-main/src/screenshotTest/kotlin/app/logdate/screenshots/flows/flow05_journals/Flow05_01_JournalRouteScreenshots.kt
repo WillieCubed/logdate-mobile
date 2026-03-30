@@ -19,12 +19,12 @@ import kotlin.uuid.Uuid
 
 private val journalEntries =
     listOf(
-        EntryDisplayData(
+        EntryDisplayData.TextEntry(
             id = Uuid.parse("00000000-0000-0000-0000-000000000081"),
             content = "Finished wiring the route-level journal screenshots and trimmed the VM dependency surface.",
             timestamp = ScreenshotTestData.baseInstant,
         ),
-        EntryDisplayData(
+        EntryDisplayData.TextEntry(
             id = Uuid.parse("00000000-0000-0000-0000-000000000082"),
             content = "Still need to normalize settings and note viewer coverage before baseline generation.",
             timestamp = ScreenshotTestData.baseInstant - 1.hours,
