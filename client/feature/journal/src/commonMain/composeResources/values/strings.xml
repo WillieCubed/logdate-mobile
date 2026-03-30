@@ -52,6 +52,7 @@
     <string name="location">Location</string>
     <string name="new_journal">New Journal</string>
     <string name="no_entries_in_this_journal_yet">No entries in this journal yet</string>
+    <string name="journal_empty_hint">Add entries from your timeline or create new ones in the editor.</string>
     <string name="open_in_locations">Open in Locations</string>
     <string name="pinned_location">Pinned location</string>
     <string name="privacy">Privacy</string>
