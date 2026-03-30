@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.postcards.model.CanvasElement
 import app.logdate.feature.postcards.model.InkTool
 import app.logdate.feature.postcards.model.ShapeKind
 import coil3.compose.AsyncImage
@@ -105,7 +106,12 @@ fun CanvasEditorScreen(
                         document = state.document,
                         selectedElementId = state.selectedElementId,
                         onElementTap = { elementId ->
-                            viewModel.selectElement(elementId)
+                            val element = state.document.elements.find { it.id == elementId }
+                            if (element is CanvasElement.Text) {
+                                viewModel.startTextEditing(elementId)
+                            } else {
+                                viewModel.selectElement(elementId)
+                            }
                         },
                     )
                 }
@@ -159,8 +165,31 @@ fun CanvasEditorScreen(
                             },
                         )
                     }
-                    else -> { /* TEXT, STICKER handled in later phases */ }
+                    CanvasTool.TEXT -> {
+                        if (!state.isTextEditorVisible) {
+                            viewModel.startTextEditing()
+                        }
+                    }
+                    else -> { /* STICKER handled in later phases */ }
                 }
+            }
+
+            // Text editor overlay — shown above shelf when active
+            if (state.isTextEditorVisible) {
+                val editingElement =
+                    state.editingTextElementId?.let { id ->
+                        state.document.elements.find { it.id == id } as? CanvasElement.Text
+                    }
+                TextElementEditor(
+                    initialText = editingElement?.content ?: "",
+                    initialFont = editingElement?.fontFamily ?: FontChoice.CAVEAT.id,
+                    initialColor = editingElement?.color ?: DEFAULT_STROKE_COLOR,
+                    initialFontSize = editingElement?.fontSize ?: 24f,
+                    onConfirm = { content, fontFamily, color, fontSize ->
+                        viewModel.confirmTextEditing(content, fontFamily, color, fontSize)
+                    },
+                    onDismiss = viewModel::cancelTextEditing,
+                )
             }
 
             // Shelf

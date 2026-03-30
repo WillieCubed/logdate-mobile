@@ -7,7 +7,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
@@ -36,7 +42,7 @@ enum class FontChoice(
 /**
  * Inline editor for creating or modifying a text element.
  *
- * Shows a text input field with a font picker below it.
+ * Shows an action bar (cancel / confirm), a text input field, and a font picker.
  *
  * @param initialText The initial text content.
  * @param initialFont The initial font family ID.
@@ -68,6 +74,27 @@ fun TextElementEditor(
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .padding(16.dp),
     ) {
+        // Action bar
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Filled.Close, contentDescription = "Cancel")
+            }
+            IconButton(
+                onClick = {
+                    if (text.isNotBlank()) {
+                        onConfirm(text, selectedFont.id, initialColor, initialFontSize)
+                    }
+                },
+                enabled = text.isNotBlank(),
+            ) {
+                Icon(Icons.Filled.Check, contentDescription = "Confirm")
+            }
+        }
+
         BasicTextField(
             value = text,
             onValueChange = { text = it },

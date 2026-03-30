@@ -35,6 +35,11 @@ import app.logdate.feature.postcards.model.InkTool
 import app.logdate.feature.postcards.model.PostcardDocument
 import app.logdate.feature.postcards.model.ShapeKind
 import coil3.compose.AsyncImage
+import logdate.client.feature.postcards.generated.resources.Res
+import logdate.client.feature.postcards.generated.resources.caveat_regular
+import logdate.client.feature.postcards.generated.resources.dancing_script_regular
+import logdate.client.feature.postcards.generated.resources.patrick_hand_regular
+import org.jetbrains.compose.resources.Font
 import kotlin.uuid.Uuid
 
 /**
@@ -397,15 +402,14 @@ internal fun parseColor(hex: String): Color {
 }
 
 /**
- * Resolves a font family name from the document model to a Compose [FontFamily].
+ * Resolves a font family name from the document model to a Compose [FontFamily]
+ * using bundled font resources.
  */
-internal fun resolveFontFamily(name: String): FontFamily {
-    // Bundled personality fonts will be loaded from resources in a follow-up.
-    // For now, map to system defaults as placeholders.
-    return when (name) {
-        "caveat" -> FontFamily.Cursive
-        "dancing-script" -> FontFamily.Cursive
-        "patrick-hand" -> FontFamily.SansSerif
+@Composable
+internal fun resolveFontFamily(name: String): FontFamily =
+    when (name) {
+        "caveat" -> FontFamily(Font(Res.font.caveat_regular))
+        "dancing-script" -> FontFamily(Font(Res.font.dancing_script_regular))
+        "patrick-hand" -> FontFamily(Font(Res.font.patrick_hand_regular))
         else -> FontFamily.Default
     }
-}

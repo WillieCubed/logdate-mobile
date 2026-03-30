@@ -51,6 +51,8 @@ data class CanvasEditorState(
     val shelfPhotos: List<ShelfPhoto> = emptyList(),
     val isSaving: Boolean = false,
     val isNewPostcard: Boolean = true,
+    val editingTextElementId: Uuid? = null,
+    val isTextEditorVisible: Boolean = false,
 )
 
 /**
@@ -295,7 +297,55 @@ class CanvasEditorViewModel(
         updateDocument { doc -> doc.copy(elements = doc.elements + element) }
     }
 
-    // --- Text creation ---
+    // --- Text creation and editing ---
+
+    /**
+     * Opens the text editor. If [elementId] is non-null, edits that existing
+     * text element; otherwise creates a new one on confirm.
+     */
+    fun startTextEditing(elementId: Uuid? = null) {
+        _state.update {
+            it.copy(
+                editingTextElementId = elementId,
+                isTextEditorVisible = true,
+            )
+        }
+    }
+
+    /**
+     * Closes the text editor without applying changes.
+     */
+    fun cancelTextEditing() {
+        _state.update {
+            it.copy(
+                editingTextElementId = null,
+                isTextEditorVisible = false,
+            )
+        }
+    }
+
+    /**
+     * Confirms text from the editor. Creates a new element or updates an existing one.
+     */
+    fun confirmTextEditing(
+        content: String,
+        fontFamily: String,
+        color: String,
+        fontSize: Float,
+    ) {
+        val editingId = _state.value.editingTextElementId
+        if (editingId != null) {
+            updateTextElement(editingId, content, fontFamily, color, fontSize)
+        } else {
+            addTextElement(content, fontFamily, color, fontSize, x = 0f, y = 0f)
+        }
+        _state.update {
+            it.copy(
+                editingTextElementId = null,
+                isTextEditorVisible = false,
+            )
+        }
+    }
 
     /**
      * Adds a text element at the given position.
@@ -320,6 +370,36 @@ class CanvasEditorViewModel(
                 zIndex = nextZIndex(),
             )
         updateDocument { doc -> doc.copy(elements = doc.elements + element) }
+    }
+
+    /**
+     * Updates an existing text element's content and styling.
+     */
+    fun updateTextElement(
+        elementId: Uuid,
+        content: String,
+        fontFamily: String,
+        color: String,
+        fontSize: Float,
+    ) {
+        pushUndo()
+        updateDocument { doc ->
+            doc.copy(
+                elements =
+                    doc.elements.map { el ->
+                        if (el.id == elementId && el is CanvasElement.Text) {
+                            el.copy(
+                                content = content,
+                                fontFamily = fontFamily,
+                                color = color,
+                                fontSize = fontSize,
+                            )
+                        } else {
+                            el
+                        }
+                    },
+            )
+        }
     }
 
     // --- Tool selection ---
