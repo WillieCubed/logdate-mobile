@@ -16,6 +16,9 @@
     <string name="add_text_notes_label">Add text notes</string>
     <string name="add_text_notes_description">Add notes you\'ve already written</string>
     <string name="select_notes">Select notes</string>
+    <string name="add_to_journal">Add to journal</string>
+    <string name="done">Done</string>
+    <string name="no_other_journals">No other journals available</string>
     <string name="notes_selected">%1$d selected</string>
     <string name="all_journals">All Journals</string>
     <string name="also_sharing_to_nearby_logdate_contacts">Also sharing to nearby LogDate contacts.</string>
