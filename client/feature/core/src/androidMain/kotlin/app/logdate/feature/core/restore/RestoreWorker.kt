@@ -6,6 +6,7 @@ import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
+import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import app.logdate.client.domain.export.ExportFileStructure
@@ -51,7 +52,10 @@ class RestoreWorker(
     private val includeDrafts: Boolean = inputData.getBoolean(INCLUDE_DRAFTS_KEY, true)
     private val includeMedia: Boolean = inputData.getBoolean(INCLUDE_MEDIA_KEY, true)
 
+    override suspend fun getForegroundInfo(): ForegroundInfo = notificationHelper.createForegroundInfo(RestoreStage.PREPARING)
+
     override suspend fun doWork(): Result {
+        trySetForeground(getForegroundInfo())
         emitProgress(RestoreStage.PREPARING, 0)
 
         val restoreUri =
@@ -116,14 +120,14 @@ class RestoreWorker(
                         val info = phase.toProgressInfo()
                         restoreLauncher.updateProgress(info)
                         if (info is RestoreProgressInfo.Active) {
-                            setForeground(notificationHelper.createForegroundInfo(info.stage))
+                            trySetForeground(notificationHelper.createForegroundInfo(info.stage))
                         }
                     },
                 )
 
             val summary = result.toSummary(source = sourceLabel)
 
-            setForeground(notificationHelper.createCompletionInfo())
+            trySetForeground(notificationHelper.createCompletionInfo())
 
             Result.success(
                 workDataOf(
@@ -132,7 +136,7 @@ class RestoreWorker(
             )
         } catch (e: Exception) {
             Napier.e("Restore failed", e)
-            setForeground(notificationHelper.createErrorInfo(e.message ?: "Restore failed"))
+            trySetForeground(notificationHelper.createErrorInfo(e.message ?: "Restore failed"))
             failure(e.message ?: "Restore failed")
         } finally {
             restoreLauncher.updateProgress(RestoreProgressInfo.Idle)
@@ -146,7 +150,19 @@ class RestoreWorker(
         percent: Int,
     ) {
         restoreLauncher.updateProgress(stage.toProgressInfo(percent))
-        setForeground(notificationHelper.createForegroundInfo(stage))
+        trySetForeground(notificationHelper.createForegroundInfo(stage))
+    }
+
+    /**
+     * Attempts to set foreground notification. If it fails (e.g. missing
+     * POST_NOTIFICATIONS permission), the restore continues without notification.
+     */
+    private suspend fun trySetForeground(foregroundInfo: ForegroundInfo) {
+        try {
+            setForeground(foregroundInfo)
+        } catch (e: Exception) {
+            Napier.w("Could not show foreground notification, restore continues without it", e)
+        }
     }
 
     private fun failure(message: String): Result = Result.failure(workDataOf(ERROR_KEY to message))
