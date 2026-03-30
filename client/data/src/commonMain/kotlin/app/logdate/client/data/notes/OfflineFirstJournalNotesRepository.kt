@@ -89,6 +89,11 @@ class OfflineFirstJournalNotesRepository(
             }
     }
 
+    override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> =
+        journalContentDao
+            .getAllLinks()
+            .map { link -> link.journalId to link.contentId }
+
     override fun observeNotesInRange(
         start: Instant,
         end: Instant,

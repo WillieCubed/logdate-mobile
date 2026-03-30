@@ -196,6 +196,8 @@ class HomeRecommendationIntegrationTest {
             noteId: Uuid,
             journalId: Uuid,
         ) = Unit
+
+        override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
     }
 
     private class ReactiveDraftRepository(

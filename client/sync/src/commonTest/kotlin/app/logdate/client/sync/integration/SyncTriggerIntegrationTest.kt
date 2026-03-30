@@ -270,6 +270,8 @@ private class TestJournalNotesRepositoryWithSyncTriggers(
         // Trigger association sync like the real repository does
         syncManager.syncAssociations()
     }
+
+    override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
 }
 
 /**

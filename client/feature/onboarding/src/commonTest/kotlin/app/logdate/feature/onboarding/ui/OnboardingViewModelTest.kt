@@ -195,6 +195,8 @@ private class FakeJournalNotesRepository : JournalNotesRepository {
         noteId: Uuid,
         journalId: Uuid,
     ) {}
+
+    override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
 }
 
 private class FakeUserStateRepository : UserStateRepository {

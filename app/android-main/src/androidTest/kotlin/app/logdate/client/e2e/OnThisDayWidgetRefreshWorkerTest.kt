@@ -220,4 +220,5 @@ private class FakeJournalNotesRepository(
     override suspend fun removeById(noteId: Uuid) {}
     override suspend fun create(note: JournalNote, journalId: Uuid) {}
     override suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid) {}
+    override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
 }

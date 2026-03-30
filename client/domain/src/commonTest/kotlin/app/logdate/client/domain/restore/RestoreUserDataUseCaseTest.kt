@@ -1374,6 +1374,8 @@ class RestoreUserDataUseCaseTest {
             noteId: Uuid,
             journalId: Uuid,
         ) {}
+
+        override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
     }
 
     private class FakeJournalContentRepository : JournalContentRepository {

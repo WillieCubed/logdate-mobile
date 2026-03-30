@@ -131,6 +131,8 @@ private class FakeJournalNotesRepository : JournalNotesRepository {
         noteId: Uuid,
         journalId: Uuid,
     ) {}
+
+    override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
 }
 
 /**
@@ -192,6 +194,8 @@ private fun createFailingGetExportCountsUseCase(): GetExportCountsUseCase {
                 noteId: Uuid,
                 journalId: Uuid,
             ) = throw RuntimeException("Database error")
+
+            override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = throw RuntimeException("Database error")
         }
     val getAllAudioNotesUseCase = GetAllAudioNotesUseCase(failingNotesRepo)
     return GetExportCountsUseCase(journalRepo, failingNotesRepo, getAllAudioNotesUseCase)

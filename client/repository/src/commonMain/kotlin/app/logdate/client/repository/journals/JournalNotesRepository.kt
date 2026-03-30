@@ -16,6 +16,13 @@ interface JournalNotesRepository {
 
     fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>>
 
+    /**
+     * Returns all journal-to-note content links as (journalId, noteId) pairs.
+     *
+     * Intended for bulk operations like export where querying per-journal is wasteful.
+     */
+    suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>>
+
     fun observeNotesInRange(
         start: Instant,
         end: Instant,

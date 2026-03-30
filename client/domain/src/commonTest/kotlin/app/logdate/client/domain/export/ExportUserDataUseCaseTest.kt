@@ -91,22 +91,16 @@ class ExportUserDataUseCaseTest {
         runTest {
             val progressUpdates = useCase.exportUserData().toList()
 
-            assertEquals(6, progressUpdates.size, "Should emit 6 progress updates")
+            assertEquals(4, progressUpdates.size, "Should emit 4 progress updates")
             assertTrue(progressUpdates[0] is ExportProgress.Starting, "First emission should be Starting")
 
-            assertTrue(progressUpdates[1] is ExportProgress.InProgress, "Second emission should be InProgress")
+            assertTrue(progressUpdates[1] is ExportProgress.InProgress, "Second emission should be InProgress (collecting)")
             assertEquals(0.1f, (progressUpdates[1] as ExportProgress.InProgress).percentage)
 
-            assertTrue(progressUpdates[2] is ExportProgress.InProgress, "Third emission should be InProgress")
-            assertEquals(0.3f, (progressUpdates[2] as ExportProgress.InProgress).percentage)
+            assertTrue(progressUpdates[2] is ExportProgress.InProgress, "Third emission should be InProgress (preparing)")
+            assertEquals(0.7f, (progressUpdates[2] as ExportProgress.InProgress).percentage)
 
-            assertTrue(progressUpdates[3] is ExportProgress.InProgress, "Fourth emission should be InProgress")
-            assertEquals(0.5f, (progressUpdates[3] as ExportProgress.InProgress).percentage)
-
-            assertTrue(progressUpdates[4] is ExportProgress.InProgress, "Fifth emission should be InProgress")
-            assertEquals(0.7f, (progressUpdates[4] as ExportProgress.InProgress).percentage)
-
-            assertTrue(progressUpdates[5] is ExportProgress.Completed, "Final emission should be Completed")
+            assertTrue(progressUpdates[3] is ExportProgress.Completed, "Final emission should be Completed")
         }
 
     @Test
@@ -1120,5 +1114,10 @@ class ExportUserDataUseCaseTest {
         ) {}
 
         override suspend fun getNoteById(noteId: Uuid): JournalNote? = null
+
+        override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> =
+            notesByJournal.flatMap { (journalId, notes) ->
+                notes.map { note -> journalId to note.uid }
+            }
     }
 }

@@ -81,6 +81,8 @@ class FakeJournalNotesRepository : JournalNotesRepository {
     ) {
         // No-op for tests
     }
+
+    override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
 }
 
 class FakeJournalContentRepository : JournalContentRepository {

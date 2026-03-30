@@ -71,6 +71,8 @@ class FakeJournalNotesRepository(
         // No-op for tests.
     }
 
+    override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
+
     fun setNotes(notes: List<JournalNote>) {
         notesFlow.value = notes
     }

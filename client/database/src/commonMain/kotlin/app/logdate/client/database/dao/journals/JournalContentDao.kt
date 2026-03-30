@@ -53,6 +53,12 @@ interface JournalContentDao {
     fun getJournalsForContents(contentIds: List<Uuid>): Flow<List<JournalContentEntityLink>>
 
     /**
+     * Gets all journal-content links in a single query.
+     */
+    @Query("SELECT * FROM journal_content_links")
+    suspend fun getAllLinks(): List<JournalContentEntityLink>
+
+    /**
      * Checks if a piece of content is associated with a journal.
      */
     @Query("SELECT EXISTS(SELECT 1 FROM journal_content_links WHERE journal_id = :journalId AND content_id = :contentId)")

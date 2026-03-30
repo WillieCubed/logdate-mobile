@@ -272,6 +272,8 @@ class HomeViewModelTest {
             noteId: Uuid,
             journalId: Uuid,
         ) = Unit
+
+        override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
     }
 
     private object EmptyEntryDraftRepository : EntryDraftRepository {

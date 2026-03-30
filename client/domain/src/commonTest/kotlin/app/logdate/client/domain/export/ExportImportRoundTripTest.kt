@@ -813,6 +813,11 @@ class ExportImportRoundTripTest {
             noteId: Uuid,
             journalId: Uuid,
         ) {}
+
+        override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> =
+            notesByJournal.flatMap { (journalId, notes) ->
+                notes.map { note -> journalId to note.uid }
+            }
     }
 
     /**

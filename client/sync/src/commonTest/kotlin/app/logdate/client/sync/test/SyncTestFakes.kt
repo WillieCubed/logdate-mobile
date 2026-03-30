@@ -636,6 +636,8 @@ class FakeJournalNotesRepository : SyncableJournalNotesRepository {
 
     override suspend fun getNoteById(noteId: Uuid): JournalNote? = notes.find { it.uid == noteId }
 
+    override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
+
     override suspend fun createFromSync(note: JournalNote) {
         create(note)
     }

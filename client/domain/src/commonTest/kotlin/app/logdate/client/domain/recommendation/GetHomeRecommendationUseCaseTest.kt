@@ -301,6 +301,8 @@ class GetHomeRecommendationUseCaseTest {
             noteId: Uuid,
             journalId: Uuid,
         ) = Unit
+
+        override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
     }
 
     private class MockEntryDraftRepository : EntryDraftRepository {
