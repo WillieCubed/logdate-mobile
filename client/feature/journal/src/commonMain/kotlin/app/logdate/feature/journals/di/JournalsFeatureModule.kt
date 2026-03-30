@@ -20,7 +20,7 @@ val journalsFeatureModule: Module =
     module {
         includes(sharingModule)
         viewModel { JournalsOverviewViewModel(get(), get(), get(), get()) }
-        viewModel { JournalCreationViewModel(get(), get()) }
+        viewModel { JournalCreationViewModel(get(), get(), get(), get()) }
         viewModel {
             JournalDetailViewModel(
                 repository = get(),
