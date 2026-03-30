@@ -2,7 +2,6 @@ package app.logdate.feature.core.restore
 
 import android.content.Context
 import android.net.Uri
-import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
@@ -62,7 +61,7 @@ class RestoreWorker(
             sourceUri
                 ?: return failure("Missing restore source")
 
-        val sourceLabel = resolveDisplayName(restoreUri) ?: restoreUri.toString()
+        val sourceLabel = context.contentResolver.resolveDisplayName(restoreUri) ?: restoreUri.toString()
 
         emitProgress(RestoreStage.COPYING_ARCHIVE, 5)
         val tempFile =
@@ -80,18 +79,17 @@ class RestoreWorker(
         return try {
             emitProgress(RestoreStage.READING_CONTENTS, 20)
 
-            val structure = ExportFileStructure()
             val bundle =
                 RestoreBundle(
-                    metadataJson = readRequiredEntry(zipFile, structure.metadataFile),
-                    journalsJson = readRequiredEntry(zipFile, structure.journalsFile),
-                    notesJson = readRequiredEntry(zipFile, structure.notesFile),
-                    journalNotesJson = readRequiredEntry(zipFile, structure.journalNotesFile),
-                    draftsJson = readRequiredEntry(zipFile, structure.draftsFile),
-                    profileJson = readOptionalEntry(zipFile, structure.profileFile),
-                    placesJson = readOptionalEntry(zipFile, structure.placesFile),
-                    locationHistoryJson = readOptionalEntry(zipFile, structure.locationHistoryFile),
-                    mediaManifestJson = readOptionalEntry(zipFile, structure.mediaManifestFile),
+                    metadataJson = readRequiredEntry(zipFile, ExportFileStructure.METADATA_FILE),
+                    journalsJson = readRequiredEntry(zipFile, ExportFileStructure.JOURNALS_FILE),
+                    notesJson = readRequiredEntry(zipFile, ExportFileStructure.NOTES_FILE),
+                    journalNotesJson = readRequiredEntry(zipFile, ExportFileStructure.JOURNAL_NOTES_FILE),
+                    draftsJson = readRequiredEntry(zipFile, ExportFileStructure.DRAFTS_FILE),
+                    profileJson = readOptionalEntry(zipFile, ExportFileStructure.PROFILE_FILE),
+                    placesJson = readOptionalEntry(zipFile, ExportFileStructure.PLACES_FILE),
+                    locationHistoryJson = readOptionalEntry(zipFile, ExportFileStructure.LOCATION_HISTORY_FILE),
+                    mediaManifestJson = readOptionalEntry(zipFile, ExportFileStructure.MEDIA_MANIFEST_FILE),
                 )
 
             emitProgress(RestoreStage.RESTORING_JOURNALS, 40)
@@ -226,20 +224,6 @@ class RestoreWorker(
         return runCatching { mediaManager.saveMedia(payload) }
             .onFailure { Napier.e("Failed to import media during restore", it) }
             .getOrNull()
-    }
-
-    private fun resolveDisplayName(uri: Uri): String? {
-        val resolver = context.contentResolver
-        val cursor = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-        cursor?.use {
-            if (it.moveToFirst()) {
-                val index = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                if (index >= 0) {
-                    return it.getString(index)
-                }
-            }
-        }
-        return null
     }
 
     private fun resolveMimeType(fileName: String): String {

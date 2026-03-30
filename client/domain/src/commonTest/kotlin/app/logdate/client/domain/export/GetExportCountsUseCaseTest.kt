@@ -1,6 +1,5 @@
 package app.logdate.client.domain.export
 
-import app.logdate.client.domain.notes.GetAllAudioNotesUseCase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
@@ -30,7 +29,6 @@ class GetExportCountsUseCaseTest {
             GetExportCountsUseCase(
                 journalRepository = mockJournalRepository,
                 journalNotesRepository = mockNotesRepository,
-                getAllAudioNotesUseCase = GetAllAudioNotesUseCase(mockNotesRepository),
             )
     }
 

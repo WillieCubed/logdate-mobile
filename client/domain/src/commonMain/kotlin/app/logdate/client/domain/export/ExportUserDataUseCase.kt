@@ -2,7 +2,6 @@ package app.logdate.client.domain.export
 
 import app.logdate.client.device.AppInfoProvider
 import app.logdate.client.device.identity.DeviceIdProvider
-import app.logdate.client.domain.notes.GetAllAudioNotesUseCase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
@@ -42,8 +41,6 @@ class ExportUserDataUseCase(
     private val userStateRepository: UserStateRepository,
     private val deviceIdProvider: DeviceIdProvider,
     private val appInfoProvider: AppInfoProvider,
-    @Suppress("unused")
-    private val getAllAudioNotesUseCase: GetAllAudioNotesUseCase,
 ) {
     private val json =
         Json {
@@ -283,7 +280,6 @@ class ExportUserDataUseCase(
         seed: String,
         timestamp: kotlin.time.Instant,
     ): String {
-        val structure = ExportFileStructure()
         val year = timestamp.toString().substring(0, 4)
         val formattedTimestamp = timestamp.toString().replace(":", "-")
         val rawFileName =
@@ -305,7 +301,7 @@ class ExportUserDataUseCase(
                 "${formattedTimestamp}_${baseName}_$uniqueSuffix"
             }
 
-        return "${structure.mediaFolder}/$year/$fileName"
+        return "${ExportFileStructure.MEDIA_FOLDER}/$year/$fileName"
     }
 
     private fun getMediaFilesToExport(

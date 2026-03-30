@@ -42,9 +42,7 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.cancel
 import logdate.client.feature.core.generated.resources.export_category_drafts
 import logdate.client.feature.core.generated.resources.export_category_item_count
-import logdate.client.feature.core.generated.resources.export_category_journals
 import logdate.client.feature.core.generated.resources.export_category_media
-import logdate.client.feature.core.generated.resources.export_category_notes
 import logdate.client.feature.core.generated.resources.import_backup
 import logdate.client.feature.core.generated.resources.restore_choose_file
 import logdate.client.feature.core.generated.resources.restore_confirm_description
@@ -338,69 +336,13 @@ private fun PreviewStatsGrid(
     stats: ExportStats,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            PreviewStatCell(
-                label = stringResource(Res.string.export_category_journals),
-                count = stats.journalCount,
-                modifier = Modifier.weight(1f),
-            )
-            PreviewStatCell(
-                label = stringResource(Res.string.export_category_notes),
-                count = stats.noteCount,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            PreviewStatCell(
-                label = stringResource(Res.string.export_category_drafts),
-                count = stats.draftCount,
-                modifier = Modifier.weight(1f),
-            )
-            PreviewStatCell(
-                label = stringResource(Res.string.export_category_media),
-                count = stats.mediaCount,
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-@Composable
-private fun PreviewStatCell(
-    label: String,
-    count: Int,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
+    app.logdate.feature.core.common.DataStatsGrid(
+        journalCount = stats.journalCount,
+        noteCount = stats.noteCount,
+        draftCount = stats.draftCount,
+        mediaCount = stats.mediaCount,
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        tonalElevation = 2.dp,
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = Spacing.md, horizontal = Spacing.lg),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = count.toString(),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+    )
 }
 
 @Composable

@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
-import java.util.UUID
 import kotlin.time.Clock
 
 /**
@@ -32,7 +31,6 @@ class AndroidExportLauncher(
     private var pendingExportCallback: (() -> Unit)? = null
     private var lastSelectedUri: Uri? = null
     private var completionCallback: ((String?) -> Unit)? = null
-    private var currentWorkId: UUID? = null
     private var workInfoObserver: Observer<List<WorkInfo>>? = null
     private var pendingExportOptions: ExportOptions = ExportOptions()
 
@@ -245,8 +243,6 @@ class AndroidExportLauncher(
             OneTimeWorkRequestBuilder<ExportWorker>()
                 .setInputData(inputData)
                 .build()
-
-        currentWorkId = workRequest.id
 
         WorkManager
             .getInstance(context)

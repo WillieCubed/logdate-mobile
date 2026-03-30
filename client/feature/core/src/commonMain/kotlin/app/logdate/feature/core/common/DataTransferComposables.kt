@@ -1,0 +1,245 @@
+@file:Suppress("ktlint:standard:function-naming")
+
+package app.logdate.feature.core.common
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
+import app.logdate.ui.theme.Spacing
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.action_retry
+import logdate.client.feature.core.generated.resources.cancel
+import logdate.client.feature.core.generated.resources.dismiss
+import logdate.client.feature.core.generated.resources.export_category_drafts
+import logdate.client.feature.core.generated.resources.export_category_journals
+import logdate.client.feature.core.generated.resources.export_category_media
+import logdate.client.feature.core.generated.resources.export_category_notes
+import org.jetbrains.compose.resources.stringResource
+
+@Composable
+internal fun DataTransferProgressCard(
+    title: String,
+    progressPercent: Int,
+    message: String,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        tonalElevation = 1.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(Spacing.lg),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = "$progressPercent%",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(Spacing.sm))
+
+            LinearProgressIndicator(
+                progress = { progressPercent / 100f },
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(4.dp)),
+            )
+
+            AnimatedVisibility(
+                visible = message.isNotEmpty(),
+                enter = expandVertically(),
+                exit = shrinkVertically(),
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(Spacing.sm))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onCancel) {
+                    Text(stringResource(Res.string.cancel))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun DataStatsGrid(
+    journalCount: Int,
+    noteCount: Int,
+    draftCount: Int,
+    mediaCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            StatCell(
+                label = stringResource(Res.string.export_category_journals),
+                count = journalCount,
+                modifier = Modifier.weight(1f),
+            )
+            StatCell(
+                label = stringResource(Res.string.export_category_notes),
+                count = noteCount,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            StatCell(
+                label = stringResource(Res.string.export_category_drafts),
+                count = draftCount,
+                modifier = Modifier.weight(1f),
+            )
+            StatCell(
+                label = stringResource(Res.string.export_category_media),
+                count = mediaCount,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+internal fun StatCell(
+    label: String,
+    count: Int,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        tonalElevation = 2.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = Spacing.md, horizontal = Spacing.lg),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = count.toString(),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun OperationFailureCard(
+    title: String,
+    reason: String,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.errorContainer,
+    ) {
+        Column(
+            modifier = Modifier.padding(Spacing.lg),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.ErrorOutline,
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                )
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(Spacing.sm))
+
+            Text(
+                text = reason,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+
+            Spacer(modifier = Modifier.height(Spacing.md))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(Res.string.dismiss))
+                }
+                Button(
+                    onClick = onRetry,
+                    modifier = Modifier.padding(start = Spacing.sm),
+                ) {
+                    Text(stringResource(Res.string.action_retry))
+                }
+            }
+        }
+    }
+}

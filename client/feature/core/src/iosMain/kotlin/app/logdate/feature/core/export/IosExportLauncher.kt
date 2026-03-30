@@ -179,18 +179,17 @@ class IosExportLauncher(
         exportFilePath: String,
         result: ExportResult,
     ) {
-        val structure = ExportFileStructure()
         val entries =
             buildList {
-                addJsonEntry(structure.metadataFile, result.metadata)
-                addJsonEntry(structure.journalsFile, result.journals)
-                addJsonEntry(structure.notesFile, result.notes)
-                addJsonEntry(structure.journalNotesFile, result.journalNotes)
-                addJsonEntry(structure.draftsFile, result.drafts)
-                result.profile?.let { addJsonEntry(structure.profileFile, it) }
-                result.places?.let { addJsonEntry(structure.placesFile, it) }
-                result.locationHistory?.let { addJsonEntry(structure.locationHistoryFile, it) }
-                result.mediaManifest?.let { addJsonEntry(structure.mediaManifestFile, it) }
+                addJsonEntry(ExportFileStructure.METADATA_FILE, result.metadata)
+                addJsonEntry(ExportFileStructure.JOURNALS_FILE, result.journals)
+                addJsonEntry(ExportFileStructure.NOTES_FILE, result.notes)
+                addJsonEntry(ExportFileStructure.JOURNAL_NOTES_FILE, result.journalNotes)
+                addJsonEntry(ExportFileStructure.DRAFTS_FILE, result.drafts)
+                result.profile?.let { addJsonEntry(ExportFileStructure.PROFILE_FILE, it) }
+                result.places?.let { addJsonEntry(ExportFileStructure.PLACES_FILE, it) }
+                result.locationHistory?.let { addJsonEntry(ExportFileStructure.LOCATION_HISTORY_FILE, it) }
+                result.mediaManifest?.let { addJsonEntry(ExportFileStructure.MEDIA_MANIFEST_FILE, it) }
                 result.mediaFiles.forEach { mediaFile ->
                     add(buildMediaEntry(mediaFile))
                 }

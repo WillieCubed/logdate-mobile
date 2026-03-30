@@ -3,7 +3,6 @@ package app.logdate.feature.core.restore
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.provider.OpenableColumns
 import androidx.activity.result.ActivityResultLauncher
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -205,7 +204,7 @@ class AndroidRestoreLauncher(
         }
 
         lastSelectedUri = uri
-        val displayName = resolveDisplayName(uri) ?: uri.lastPathSegment ?: "archive"
+        val displayName = context.contentResolver.resolveDisplayName(uri) ?: uri.lastPathSegment ?: "archive"
 
         val metadataJson = extractMetadata(uri)
         if (metadataJson == null) {
@@ -238,8 +237,7 @@ class AndroidRestoreLauncher(
 
             val zipFile = runCatching { ZipFile(tempFile) }.getOrNull() ?: return null
             zipFile.use { zip ->
-                val structure = ExportFileStructure()
-                val entry = zip.getEntry(structure.metadataFile) ?: return null
+                val entry = zip.getEntry(ExportFileStructure.METADATA_FILE) ?: return null
                 zip.getInputStream(entry).use { input ->
                     input.bufferedReader(Charsets.UTF_8).readText()
                 }
@@ -250,19 +248,5 @@ class AndroidRestoreLauncher(
         } finally {
             tempFile.delete()
         }
-    }
-
-    private fun resolveDisplayName(uri: Uri): String? {
-        val resolver = context.contentResolver
-        val cursor = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-        cursor?.use {
-            if (it.moveToFirst()) {
-                val index = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                if (index >= 0) {
-                    return it.getString(index)
-                }
-            }
-        }
-        return null
     }
 }

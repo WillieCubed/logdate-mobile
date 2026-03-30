@@ -186,7 +186,6 @@ class DesktopExportLauncher :
         file: File,
         exportResult: ExportResult,
     ) {
-        val structure = ExportFileStructure()
         // Create a zip file
         val zipFile =
             if (!file.name.endsWith(".zip")) {
@@ -199,17 +198,17 @@ class DesktopExportLauncher :
 
         // Create zip output stream
         ZipOutputStream(FileOutputStream(zipFile)).use { zipOutputStream ->
-            addZipEntry(zipOutputStream, structure.metadataFile, exportResult.metadata)
-            addZipEntry(zipOutputStream, structure.journalsFile, exportResult.journals)
-            addZipEntry(zipOutputStream, structure.notesFile, exportResult.notes)
-            addZipEntry(zipOutputStream, structure.journalNotesFile, exportResult.journalNotes)
-            addZipEntry(zipOutputStream, structure.draftsFile, exportResult.drafts)
-            exportResult.profile?.let { addZipEntry(zipOutputStream, structure.profileFile, it) }
-            exportResult.places?.let { addZipEntry(zipOutputStream, structure.placesFile, it) }
-            exportResult.locationHistory?.let { addZipEntry(zipOutputStream, structure.locationHistoryFile, it) }
+            addZipEntry(zipOutputStream, ExportFileStructure.METADATA_FILE, exportResult.metadata)
+            addZipEntry(zipOutputStream, ExportFileStructure.JOURNALS_FILE, exportResult.journals)
+            addZipEntry(zipOutputStream, ExportFileStructure.NOTES_FILE, exportResult.notes)
+            addZipEntry(zipOutputStream, ExportFileStructure.JOURNAL_NOTES_FILE, exportResult.journalNotes)
+            addZipEntry(zipOutputStream, ExportFileStructure.DRAFTS_FILE, exportResult.drafts)
+            exportResult.profile?.let { addZipEntry(zipOutputStream, ExportFileStructure.PROFILE_FILE, it) }
+            exportResult.places?.let { addZipEntry(zipOutputStream, ExportFileStructure.PLACES_FILE, it) }
+            exportResult.locationHistory?.let { addZipEntry(zipOutputStream, ExportFileStructure.LOCATION_HISTORY_FILE, it) }
 
             exportResult.mediaManifest?.let { manifest ->
-                addZipEntry(zipOutputStream, structure.mediaManifestFile, manifest)
+                addZipEntry(zipOutputStream, ExportFileStructure.MEDIA_MANIFEST_FILE, manifest)
             }
 
             exportResult.mediaFiles.forEach { mediaFile ->

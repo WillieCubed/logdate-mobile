@@ -13,9 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Warning
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -27,12 +25,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.restore.IntegrityCategory
+import app.logdate.feature.core.common.DataStatsGrid
+import app.logdate.feature.core.common.OperationFailureCard
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.action_done
-import logdate.client.feature.core.generated.resources.action_retry
-import logdate.client.feature.core.generated.resources.dismiss
 import logdate.client.feature.core.generated.resources.export_category_drafts
 import logdate.client.feature.core.generated.resources.export_category_journals
 import logdate.client.feature.core.generated.resources.export_category_media
@@ -89,7 +87,12 @@ internal fun RestoreSuccessCard(
 
         Spacer(modifier = Modifier.height(Spacing.lg))
 
-        RestoreStatsGrid(summary = summary)
+        DataStatsGrid(
+            journalCount = summary.journalsImported,
+            noteCount = summary.notesImported,
+            draftCount = summary.draftsImported,
+            mediaCount = summary.mediaImported,
+        )
 
         val allWarnings =
             buildList {
@@ -166,76 +169,6 @@ private fun ArchiveMetadataRow(
 }
 
 @Composable
-private fun RestoreStatsGrid(
-    summary: RestoreSummary,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            StatCell(
-                label = stringResource(Res.string.export_category_journals),
-                count = summary.journalsImported,
-                modifier = Modifier.weight(1f),
-            )
-            StatCell(
-                label = stringResource(Res.string.export_category_notes),
-                count = summary.notesImported,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            StatCell(
-                label = stringResource(Res.string.export_category_drafts),
-                count = summary.draftsImported,
-                modifier = Modifier.weight(1f),
-            )
-            StatCell(
-                label = stringResource(Res.string.export_category_media),
-                count = summary.mediaImported,
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-@Composable
-private fun StatCell(
-    label: String,
-    count: Int,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        tonalElevation = 2.dp,
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = Spacing.md, horizontal = Spacing.lg),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = count.toString(),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
 private fun RestoreWarningsSection(
     warnings: List<String>,
     modifier: Modifier = Modifier,
@@ -286,55 +219,11 @@ internal fun RestoreFailureCard(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.errorContainer,
-    ) {
-        Column(
-            modifier = Modifier.padding(Spacing.lg),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.ErrorOutline,
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.onErrorContainer,
-                )
-                Text(
-                    text = stringResource(Res.string.restore_failed_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(Spacing.sm))
-
-            Text(
-                text = reason,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-            )
-
-            Spacer(modifier = Modifier.height(Spacing.md))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(Res.string.dismiss))
-                }
-                Button(
-                    onClick = onRetry,
-                    modifier = Modifier.padding(start = Spacing.sm),
-                ) {
-                    Text(stringResource(Res.string.action_retry))
-                }
-            }
-        }
-    }
+    OperationFailureCard(
+        title = stringResource(Res.string.restore_failed_title),
+        reason = reason,
+        onRetry = onRetry,
+        onDismiss = onDismiss,
+        modifier = modifier,
+    )
 }

@@ -51,10 +51,7 @@ class ExportWorker(
     private val exportLauncher: ExportLauncher by inject()
     private val notificationHelper = ExportNotificationHelper(context, id)
 
-    // Get destination URI from input data if available
     private val destinationUri: Uri? = inputData.getString(DESTINATION_URI_KEY)?.toUri()
-
-    // Read export options from input data
     private val includeJournals: Boolean = inputData.getBoolean(INCLUDE_JOURNALS_KEY, true)
     private val includeNotes: Boolean = inputData.getBoolean(INCLUDE_NOTES_KEY, true)
     private val includeDrafts: Boolean = inputData.getBoolean(INCLUDE_DRAFTS_KEY, true)
@@ -208,43 +205,20 @@ class ExportWorker(
             message = "Starting export...",
         )
 
-    /**
-     * Save export data to a ZIP file at the content URI that the user selected
-     */
     private fun saveToUri(
         exportData: ExportResult,
         uri: Uri,
     ): String {
-        val structure = ExportFileStructure()
         context.contentResolver.openOutputStream(uri)?.use { outputStream ->
             ZipOutputStream(outputStream).use { zipOut ->
-                writeJsonEntry(zipOut, structure.metadataFile, exportData.metadata)
-                writeJsonEntry(zipOut, structure.journalsFile, exportData.journals)
-                writeJsonEntry(zipOut, structure.notesFile, exportData.notes)
-                writeJsonEntry(zipOut, structure.journalNotesFile, exportData.journalNotes)
-                writeJsonEntry(zipOut, structure.draftsFile, exportData.drafts)
-                exportData.profile?.let { writeJsonEntry(zipOut, structure.profileFile, it) }
-                exportData.places?.let { writeJsonEntry(zipOut, structure.placesFile, it) }
-                exportData.locationHistory?.let { writeJsonEntry(zipOut, structure.locationHistoryFile, it) }
-
-                exportData.mediaManifest?.let { manifest ->
-                    writeJsonEntry(zipOut, structure.mediaManifestFile, manifest)
-                }
-
-                exportData.mediaFiles.forEach { mediaFile ->
-                    writeMediaEntry(zipOut, mediaFile)
-                }
+                writeExportToZip(zipOut, exportData)
             }
         } ?: throw IllegalStateException("Could not open output stream for URI: $uri")
 
         return uri.toString()
     }
 
-    /**
-     * Fall back method to save to the Downloads directory if no URI was selected
-     */
     private fun saveToDownloads(exportData: ExportResult): String {
-        val structure = ExportFileStructure()
         val timestamp =
             Clock.System
                 .now()
@@ -258,26 +232,33 @@ class ExportWorker(
 
         FileOutputStream(file).use { fileOut ->
             ZipOutputStream(fileOut).use { zipOut ->
-                writeJsonEntry(zipOut, structure.metadataFile, exportData.metadata)
-                writeJsonEntry(zipOut, structure.journalsFile, exportData.journals)
-                writeJsonEntry(zipOut, structure.notesFile, exportData.notes)
-                writeJsonEntry(zipOut, structure.journalNotesFile, exportData.journalNotes)
-                writeJsonEntry(zipOut, structure.draftsFile, exportData.drafts)
-                exportData.profile?.let { writeJsonEntry(zipOut, structure.profileFile, it) }
-                exportData.places?.let { writeJsonEntry(zipOut, structure.placesFile, it) }
-                exportData.locationHistory?.let { writeJsonEntry(zipOut, structure.locationHistoryFile, it) }
-
-                exportData.mediaManifest?.let { manifest ->
-                    writeJsonEntry(zipOut, structure.mediaManifestFile, manifest)
-                }
-
-                exportData.mediaFiles.forEach { mediaFile ->
-                    writeMediaEntry(zipOut, mediaFile)
-                }
+                writeExportToZip(zipOut, exportData)
             }
         }
 
         return file.absolutePath
+    }
+
+    private fun writeExportToZip(
+        zipOut: ZipOutputStream,
+        exportData: ExportResult,
+    ) {
+        writeJsonEntry(zipOut, ExportFileStructure.METADATA_FILE, exportData.metadata)
+        writeJsonEntry(zipOut, ExportFileStructure.JOURNALS_FILE, exportData.journals)
+        writeJsonEntry(zipOut, ExportFileStructure.NOTES_FILE, exportData.notes)
+        writeJsonEntry(zipOut, ExportFileStructure.JOURNAL_NOTES_FILE, exportData.journalNotes)
+        writeJsonEntry(zipOut, ExportFileStructure.DRAFTS_FILE, exportData.drafts)
+        exportData.profile?.let { writeJsonEntry(zipOut, ExportFileStructure.PROFILE_FILE, it) }
+        exportData.places?.let { writeJsonEntry(zipOut, ExportFileStructure.PLACES_FILE, it) }
+        exportData.locationHistory?.let { writeJsonEntry(zipOut, ExportFileStructure.LOCATION_HISTORY_FILE, it) }
+
+        exportData.mediaManifest?.let { manifest ->
+            writeJsonEntry(zipOut, ExportFileStructure.MEDIA_MANIFEST_FILE, manifest)
+        }
+
+        exportData.mediaFiles.forEach { mediaFile ->
+            writeMediaEntry(zipOut, mediaFile)
+        }
     }
 
     private fun writeJsonEntry(

@@ -169,18 +169,18 @@ object ExportFormat {
 /**
  * Export file structure definition.
  */
-data class ExportFileStructure(
-    val metadataFile: String = "metadata.json",
-    val journalsFile: String = "journals.json",
-    val notesFile: String = "notes.json",
-    val journalNotesFile: String = "journal_notes.json",
-    val draftsFile: String = "drafts.json",
-    val profileFile: String = "profile.json",
-    val placesFile: String = "places.json",
-    val locationHistoryFile: String = "location_history.json",
-    val mediaManifestFile: String = "media_manifest.json",
-    val mediaFolder: String = "media",
-)
+object ExportFileStructure {
+    const val METADATA_FILE: String = "metadata.json"
+    const val JOURNALS_FILE: String = "journals.json"
+    const val NOTES_FILE: String = "notes.json"
+    const val JOURNAL_NOTES_FILE: String = "journal_notes.json"
+    const val DRAFTS_FILE: String = "drafts.json"
+    const val PROFILE_FILE: String = "profile.json"
+    const val PLACES_FILE: String = "places.json"
+    const val LOCATION_HISTORY_FILE: String = "location_history.json"
+    const val MEDIA_MANIFEST_FILE: String = "media_manifest.json"
+    const val MEDIA_FOLDER: String = "media"
+}
 
 @Serializable
 data class ProfilePayload(

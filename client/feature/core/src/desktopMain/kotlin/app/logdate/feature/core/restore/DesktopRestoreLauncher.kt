@@ -127,8 +127,7 @@ class DesktopRestoreLauncher :
     private fun extractMetadata(file: File): String? {
         return try {
             ZipFile(file).use { zip ->
-                val structure = ExportFileStructure()
-                val entry = zip.getEntry(structure.metadataFile) ?: return null
+                val entry = zip.getEntry(ExportFileStructure.METADATA_FILE) ?: return null
                 zip.getInputStream(entry).use { input ->
                     input.bufferedReader(Charsets.UTF_8).readText()
                 }
@@ -147,19 +146,18 @@ class DesktopRestoreLauncher :
             updateProgress(RestoreStage.PREPARING.toProgressInfo())
             updateProgress(RestoreStage.OPENING_ARCHIVE.toProgressInfo())
 
-            val structure = ExportFileStructure()
             updateProgress(RestoreStage.READING_CONTENTS.toProgressInfo())
             val bundle =
                 RestoreBundle(
-                    metadataJson = readRequiredEntry(zipFile, structure.metadataFile),
-                    journalsJson = readRequiredEntry(zipFile, structure.journalsFile),
-                    notesJson = readRequiredEntry(zipFile, structure.notesFile),
-                    journalNotesJson = readRequiredEntry(zipFile, structure.journalNotesFile),
-                    draftsJson = readRequiredEntry(zipFile, structure.draftsFile),
-                    profileJson = readOptionalEntry(zipFile, structure.profileFile),
-                    placesJson = readOptionalEntry(zipFile, structure.placesFile),
-                    locationHistoryJson = readOptionalEntry(zipFile, structure.locationHistoryFile),
-                    mediaManifestJson = readOptionalEntry(zipFile, structure.mediaManifestFile),
+                    metadataJson = readRequiredEntry(zipFile, ExportFileStructure.METADATA_FILE),
+                    journalsJson = readRequiredEntry(zipFile, ExportFileStructure.JOURNALS_FILE),
+                    notesJson = readRequiredEntry(zipFile, ExportFileStructure.NOTES_FILE),
+                    journalNotesJson = readRequiredEntry(zipFile, ExportFileStructure.JOURNAL_NOTES_FILE),
+                    draftsJson = readRequiredEntry(zipFile, ExportFileStructure.DRAFTS_FILE),
+                    profileJson = readOptionalEntry(zipFile, ExportFileStructure.PROFILE_FILE),
+                    placesJson = readOptionalEntry(zipFile, ExportFileStructure.PLACES_FILE),
+                    locationHistoryJson = readOptionalEntry(zipFile, ExportFileStructure.LOCATION_HISTORY_FILE),
+                    mediaManifestJson = readOptionalEntry(zipFile, ExportFileStructure.MEDIA_MANIFEST_FILE),
                 )
 
             val mediaImporter =

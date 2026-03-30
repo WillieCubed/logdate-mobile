@@ -3,7 +3,6 @@ package app.logdate.client.domain.export
 import app.logdate.client.device.AppInfo
 import app.logdate.client.device.AppInfoProvider
 import app.logdate.client.device.identity.DeviceIdProvider
-import app.logdate.client.domain.notes.GetAllAudioNotesUseCase
 import app.logdate.client.domain.restore.MediaImporter
 import app.logdate.client.domain.restore.RestoreBundle
 import app.logdate.client.domain.restore.RestoreOptions
@@ -127,7 +126,6 @@ class ExportImportRoundTripTest {
                 userStateRepository = StubUserStateRepository(),
                 deviceIdProvider = deviceIdProvider,
                 appInfoProvider = appInfoProvider,
-                getAllAudioNotesUseCase = GetAllAudioNotesUseCase(sourceNotesRepo),
             )
 
         importUseCase =

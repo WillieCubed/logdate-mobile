@@ -3,7 +3,6 @@ package app.logdate.client.domain.export
 import app.logdate.client.device.AppInfo
 import app.logdate.client.device.AppInfoProvider
 import app.logdate.client.device.identity.DeviceIdProvider
-import app.logdate.client.domain.notes.GetAllAudioNotesUseCase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
@@ -84,7 +83,6 @@ class ExportUserDataUseCaseTest {
                 userStateRepository = userStateRepository,
                 deviceIdProvider = deviceIdProvider,
                 appInfoProvider = appInfoProvider,
-                getAllAudioNotesUseCase = GetAllAudioNotesUseCase(mockNotesRepository),
             )
     }
 

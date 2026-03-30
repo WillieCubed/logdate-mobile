@@ -1,6 +1,5 @@
 package app.logdate.client.domain.export
 
-import app.logdate.client.domain.notes.GetAllAudioNotesUseCase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
@@ -24,7 +23,6 @@ data class ExportCounts(
 class GetExportCountsUseCase(
     private val journalRepository: JournalRepository,
     private val journalNotesRepository: JournalNotesRepository,
-    private val getAllAudioNotesUseCase: GetAllAudioNotesUseCase,
 ) {
     suspend operator fun invoke(): ExportCounts {
         val journals = journalRepository.allJournalsObserved.first()
