@@ -93,6 +93,7 @@ fun PostcardViewerScreen(
                 is PostcardViewerUiState.Loaded -> {
                     PostcardViewerContent(
                         document = state.document,
+                        stickerUriMap = state.stickerUriMap,
                         onPhotoTap = { photo ->
                             onNavigateToMoment(photo.momentRef)
                         },
@@ -109,6 +110,7 @@ fun PostcardViewerScreen(
 @Composable
 private fun PostcardViewerContent(
     document: PostcardDocument,
+    stickerUriMap: Map<Uuid, String>,
     onPhotoTap: (CanvasElement.Photo) -> Unit,
 ) {
     val viewportState = rememberCanvasViewportState()
@@ -119,6 +121,7 @@ private fun PostcardViewerContent(
     ) {
         CanvasRenderer(
             document = document,
+            stickerUriMap = stickerUriMap,
             onPhotoTap = onPhotoTap,
         )
     }

@@ -105,6 +105,7 @@ fun CanvasEditorScreen(
                     CanvasRenderer(
                         document = state.document,
                         selectedElementId = state.selectedElementId,
+                        stickerUriMap = state.stickerUriMap,
                         onElementTap = { elementId ->
                             val element = state.document.elements.find { it.id == elementId }
                             if (element is CanvasElement.Text) {
@@ -196,9 +197,13 @@ fun CanvasEditorScreen(
             Shelf(
                 mode = state.shelfMode,
                 photos = state.shelfPhotos,
+                stickers = state.shelfStickers,
                 onModeChange = viewModel::setShelfMode,
                 onPhotoDrag = { photo, x, y ->
                     viewModel.addPhotoElement(photo, x, y)
+                },
+                onStickerTap = { sticker ->
+                    viewModel.addStickerElement(sticker.id, 0f, 0f)
                 },
             )
 
@@ -259,8 +264,10 @@ private fun EditorTopBar(
 private fun Shelf(
     mode: ShelfMode,
     photos: List<ShelfPhoto>,
+    stickers: List<StickerShelfItem>,
     onModeChange: (ShelfMode) -> Unit,
     onPhotoDrag: (ShelfPhoto, Float, Float) -> Unit,
+    onStickerTap: (StickerShelfItem) -> Unit,
 ) {
     Column(
         modifier =
@@ -302,20 +309,10 @@ private fun Shelf(
                 )
             }
             is ShelfMode.Stickers -> {
-                // Sticker shelf — will be implemented in Phase 5
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(80.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        "No stickers yet",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                StickerShelfStrip(
+                    stickers = stickers,
+                    onStickerTap = onStickerTap,
+                )
             }
             is ShelfMode.Browse -> {
                 // Moment browser — will be fully implemented in Phase 3b
@@ -391,6 +388,47 @@ private fun ShelfPhotoItem(
                 .clip(RoundedCornerShape(8.dp))
                 .clickable(onClick = onTap),
     )
+}
+
+@Composable
+private fun StickerShelfStrip(
+    stickers: List<StickerShelfItem>,
+    onStickerTap: (StickerShelfItem) -> Unit,
+) {
+    if (stickers.isEmpty()) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(80.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "No stickers yet",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(stickers, key = { it.id.toString() }) { sticker ->
+            AsyncImage(
+                model = sticker.imageUri,
+                contentDescription = sticker.label,
+                contentScale = ContentScale.Fit,
+                modifier =
+                    Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onStickerTap(sticker) },
+            )
+        }
+    }
 }
 
 // --- Tool Palette ---

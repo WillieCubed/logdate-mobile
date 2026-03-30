@@ -9,9 +9,12 @@ import app.logdate.feature.postcards.model.CanvasBackground
 import app.logdate.feature.postcards.model.CanvasElement
 import app.logdate.feature.postcards.model.ElementTransform
 import app.logdate.feature.postcards.model.PostcardDocument
+import app.logdate.feature.stickers.ui.StickerRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -53,6 +56,8 @@ data class CanvasEditorState(
     val isNewPostcard: Boolean = true,
     val editingTextElementId: Uuid? = null,
     val isTextEditorVisible: Boolean = false,
+    val shelfStickers: List<StickerShelfItem> = emptyList(),
+    val stickerUriMap: Map<Uuid, String> = emptyMap(),
 )
 
 /**
@@ -64,6 +69,15 @@ data class ShelfPhoto(
 )
 
 /**
+ * A sticker available on the shelf for placement onto the canvas.
+ */
+data class StickerShelfItem(
+    val id: Uuid,
+    val imageUri: String,
+    val label: String?,
+)
+
+/**
  * ViewModel for the canvas editor screen.
  *
  * Manages the document state, undo/redo history, tool selection, and shelf content.
@@ -71,6 +85,7 @@ data class ShelfPhoto(
 class CanvasEditorViewModel(
     savedStateHandle: SavedStateHandle,
     private val postcardDao: PostcardDao,
+    private val stickerRepository: StickerRepository,
 ) : ViewModel() {
     private val postcardId: Uuid? =
         savedStateHandle
@@ -94,6 +109,24 @@ class CanvasEditorViewModel(
         if (postcardId != null) {
             loadExistingPostcard(postcardId)
         }
+        loadStickers()
+    }
+
+    private fun loadStickers() {
+        stickerRepository
+            .getAllStickers()
+            .onEach { entities ->
+                val items =
+                    entities.map { entity ->
+                        StickerShelfItem(
+                            id = entity.id,
+                            imageUri = entity.imageUri,
+                            label = entity.label,
+                        )
+                    }
+                val uriMap = entities.associate { it.id to it.imageUri }
+                _state.update { it.copy(shelfStickers = items, stickerUriMap = uriMap) }
+            }.launchIn(viewModelScope)
     }
 
     private fun createInitialState(): CanvasEditorState {
@@ -400,6 +433,27 @@ class CanvasEditorViewModel(
                     },
             )
         }
+    }
+
+    // --- Sticker creation ---
+
+    /**
+     * Adds a sticker element from the shelf onto the canvas.
+     */
+    fun addStickerElement(
+        stickerRef: Uuid,
+        x: Float,
+        y: Float,
+    ) {
+        pushUndo()
+        val element =
+            CanvasElement.Sticker(
+                id = Uuid.random(),
+                stickerRef = stickerRef,
+                transform = ElementTransform(x = x, y = y),
+                zIndex = nextZIndex(),
+            )
+        updateDocument { doc -> doc.copy(elements = doc.elements + element) }
     }
 
     // --- Tool selection ---

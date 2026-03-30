@@ -59,6 +59,7 @@ fun CanvasRenderer(
     document: PostcardDocument,
     modifier: Modifier = Modifier,
     selectedElementId: Uuid? = null,
+    stickerUriMap: Map<Uuid, String> = emptyMap(),
     onElementTap: ((Uuid) -> Unit)? = null,
     onPhotoTap: ((CanvasElement.Photo) -> Unit)? = null,
 ) {
@@ -80,7 +81,7 @@ fun CanvasRenderer(
                     is CanvasElement.Text -> TextElementRenderer(element)
                     is CanvasElement.Ink -> InkElementRenderer(element)
                     is CanvasElement.Shape -> ShapeElementRenderer(element)
-                    is CanvasElement.Sticker -> StickerElementRenderer(element)
+                    is CanvasElement.Sticker -> StickerElementRenderer(element, stickerUriMap)
                 }
             }
         }
@@ -371,22 +372,41 @@ private fun ShapeElementRenderer(element: CanvasElement.Shape) {
 }
 
 @Composable
-private fun StickerElementRenderer(element: CanvasElement.Sticker) {
+private fun StickerElementRenderer(
+    element: CanvasElement.Sticker,
+    stickerUriMap: Map<Uuid, String>,
+) {
     val transform = element.transform
-    // Stickers are loaded from the sticker library by reference.
-    // For now, render a placeholder — the actual URI resolution will be
-    // wired up when the sticker repository is integrated.
-    Box(
-        modifier =
-            Modifier
-                .offset(x = transform.x.dp, y = transform.y.dp)
-                .size(80.dp)
-                .graphicsLayer {
-                    rotationZ = transform.rotation
-                    scaleX = transform.scaleX
-                    scaleY = transform.scaleY
-                },
-    )
+    val imageUri = stickerUriMap[element.stickerRef]
+
+    if (imageUri != null) {
+        AsyncImage(
+            model = imageUri,
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier =
+                Modifier
+                    .offset(x = transform.x.dp, y = transform.y.dp)
+                    .size(80.dp)
+                    .graphicsLayer {
+                        rotationZ = transform.rotation
+                        scaleX = transform.scaleX
+                        scaleY = transform.scaleY
+                    },
+        )
+    } else {
+        Box(
+            modifier =
+                Modifier
+                    .offset(x = transform.x.dp, y = transform.y.dp)
+                    .size(80.dp)
+                    .graphicsLayer {
+                        rotationZ = transform.rotation
+                        scaleX = transform.scaleX
+                        scaleY = transform.scaleY
+                    },
+        )
+    }
 }
 
 /**
