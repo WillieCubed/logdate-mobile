@@ -4,10 +4,10 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import app.logdate.feature.stickers.ui.StickerSubjectExtractor
-import com.google.android.gms.mlkit.subject.segmentation.SubjectSegmentation
-import com.google.android.gms.mlkit.subject.segmentation.SubjectSegmentationResult
-import com.google.android.gms.mlkit.subject.segmentation.SubjectSegmenterOptions
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
+import com.google.mlkit.vision.segmentation.subject.SubjectSegmentationResult
+import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
