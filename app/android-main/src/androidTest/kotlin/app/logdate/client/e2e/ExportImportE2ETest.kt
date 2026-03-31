@@ -18,7 +18,6 @@ import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.domain.export.ExportProgress
 import app.logdate.client.domain.export.ExportResult
 import app.logdate.client.domain.export.ExportUserDataUseCase
-import app.logdate.client.domain.notes.GetAllAudioNotesUseCase
 import app.logdate.client.domain.restore.RestoreBundle
 import app.logdate.client.domain.restore.RestoreOptions
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
@@ -127,8 +126,6 @@ class ExportImportE2ETest {
             dispatcher = dispatcher,
         )
 
-        val audioUseCase = GetAllAudioNotesUseCase(sourceNotesRepo)
-
         exportUseCase = ExportUserDataUseCase(
             journalRepository = sourceJournalRepo,
             journalNotesRepository = sourceNotesRepo,
@@ -138,7 +135,6 @@ class ExportImportE2ETest {
             userStateRepository = StubUserStateRepository(),
             deviceIdProvider = FixedDeviceIdProvider(),
             appInfoProvider = FixedAppInfoProvider(),
-            getAllAudioNotesUseCase = audioUseCase,
         )
 
         // Destination-side wiring
@@ -208,12 +204,12 @@ class ExportImportE2ETest {
         val export = result.result
 
         val bundle = RestoreBundle(
-            metadataJson = export.metadata,
-            journalsJson = export.journals,
-            notesJson = export.notes,
-            journalNotesJson = export.journalNotes,
-            draftsJson = export.drafts,
-            mediaManifestJson = export.mediaManifest,
+            metadataJson = export.serializeMetadata(),
+            journalsJson = export.serializeJournals(),
+            notesJson = export.serializeNotes(),
+            journalNotesJson = export.serializeJournalNotes(),
+            draftsJson = export.serializeDrafts(),
+            mediaManifestJson = export.serializeMediaManifest(),
         )
         restoreUseCase.restore(bundle, options)
         return export
@@ -333,8 +329,7 @@ class ExportImportE2ETest {
         val restored = destNotesRepo.getNoteById(note.uid) as? JournalNote.Audio
         assertNotNull(restored, "Audio note should exist in destination")
         assertEquals(note.mediaRef, restored.mediaRef)
-        // durationMs is not preserved in the export format (known limitation)
-        assertEquals(0L, restored.durationMs)
+        assertEquals(note.durationMs, restored.durationMs)
     }
 
     @Test
@@ -502,7 +497,7 @@ class ExportImportE2ETest {
         val result = exportUseCase.exportUserData().last()
         check(result is ExportProgress.Completed) { "Export should complete but was $result" }
 
-        val metadata = result.result.metadata
+        val metadata = result.result.serializeMetadata()
         assertTrue(metadata.contains("00000000-0000-0000-0000-000000000001"), "Metadata should contain device ID")
         assertTrue(metadata.contains("1.0.0-test"), "Metadata should contain app version")
     }

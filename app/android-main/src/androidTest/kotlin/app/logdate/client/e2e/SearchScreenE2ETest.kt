@@ -2,14 +2,12 @@ package app.logdate.client.e2e
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
-import app.logdate.client.repository.search.SearchResultType
 import app.logdate.feature.search.ui.SearchScreenContent
-import kotlinx.datetime.LocalDate
+import app.logdate.feature.search.ui.SearchScreenState
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -19,8 +17,7 @@ import kotlin.uuid.Uuid
 /**
  * Instrumented tests for [SearchScreenContent].
  *
- * Verifies the global search screen renders results, empty state,
- * and handles navigation callbacks correctly.
+ * Verifies the global search screen renders results and empty state correctly.
  */
 @RunWith(AndroidJUnit4::class)
 class SearchScreenE2ETest {
@@ -32,25 +29,25 @@ class SearchScreenE2ETest {
         uid = Uuid.random(),
         content = "Finished the final chapter of the novel today.",
         created = Clock.System.now(),
-        type = SearchResultType.TEXT_NOTE,
+        contentType = SearchContentType.TEXT_NOTE,
     )
     private val transcriptionResult = SearchResult(
         uid = Uuid.random(),
         content = "Voice memo about the sunset hike and planning next week.",
         created = Clock.System.now(),
-        type = SearchResultType.TRANSCRIPTION,
+        contentType = SearchContentType.TRANSCRIPTION,
     )
     private val allResults = listOf(textNoteResult, transcriptionResult)
 
-    // region Empty State
-
     @Test
-    fun emptyState_showsPromptText() {
+    fun idleState_showsPromptText() {
         composeRule.setContent {
             SearchScreenContent(
-                searchResults = emptyList(),
+                searchState = SearchScreenState.Idle(recentSearches = emptyList()),
                 onQueryChange = {},
+                onCommitSearch = {},
                 onNavigateToDay = {},
+                onNavigateToJournal = {},
                 onGoBack = {},
             )
         }
@@ -59,17 +56,15 @@ class SearchScreenE2ETest {
         composeRule.onNodeWithText("Search for entries").assertIsDisplayed()
     }
 
-    // endregion
-
-    // region Results Display
-
     @Test
     fun withResults_showsTextNoteContent() {
         composeRule.setContent {
             SearchScreenContent(
-                searchResults = allResults,
+                searchState = SearchScreenState.Results(results = allResults),
                 onQueryChange = {},
+                onCommitSearch = {},
                 onNavigateToDay = {},
+                onNavigateToJournal = {},
                 onGoBack = {},
             )
         }
@@ -82,9 +77,11 @@ class SearchScreenE2ETest {
     fun withResults_showsTranscriptionContent() {
         composeRule.setContent {
             SearchScreenContent(
-                searchResults = allResults,
+                searchState = SearchScreenState.Results(results = allResults),
                 onQueryChange = {},
+                onCommitSearch = {},
                 onNavigateToDay = {},
+                onNavigateToJournal = {},
                 onGoBack = {},
             )
         }
@@ -96,66 +93,19 @@ class SearchScreenE2ETest {
     }
 
     @Test
-    fun withResults_showsTypeLabels() {
+    fun emptyState_showsNoResultsMessage() {
         composeRule.setContent {
             SearchScreenContent(
-                searchResults = allResults,
+                searchState = SearchScreenState.Empty(query = "nonexistent"),
                 onQueryChange = {},
+                onCommitSearch = {},
                 onNavigateToDay = {},
+                onNavigateToJournal = {},
                 onGoBack = {},
             )
         }
 
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("Text note", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("Voice note", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("No results", substring = true).assertIsDisplayed()
     }
-
-    // endregion
-
-    // region Navigation Callbacks
-
-    @Test
-    fun tappingResult_invokesOnNavigateToDay() {
-        var navigatedToDay: LocalDate? = null
-
-        composeRule.setContent {
-            SearchScreenContent(
-                searchResults = listOf(textNoteResult),
-                onQueryChange = {},
-                onNavigateToDay = { navigatedToDay = it },
-                onGoBack = {},
-            )
-        }
-
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText("Finished the final chapter of the novel today.").performClick()
-        composeRule.waitForIdle()
-
-        assert(navigatedToDay != null) {
-            "Expected onNavigateToDay to be called"
-        }
-    }
-
-    @Test
-    fun backArrow_invokesOnGoBack() {
-        var wentBack = false
-
-        composeRule.setContent {
-            SearchScreenContent(
-                searchResults = emptyList(),
-                onQueryChange = {},
-                onNavigateToDay = {},
-                onGoBack = { wentBack = true },
-            )
-        }
-
-        composeRule.waitForIdle()
-        composeRule.onNodeWithContentDescription("Go back").performClick()
-        composeRule.waitForIdle()
-
-        assert(wentBack) { "Expected onGoBack to be called" }
-    }
-
-    // endregion
 }

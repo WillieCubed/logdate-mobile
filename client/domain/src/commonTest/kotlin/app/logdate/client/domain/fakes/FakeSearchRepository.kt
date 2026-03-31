@@ -33,4 +33,9 @@ class FakeSearchRepository(
     ): Flow<List<SearchResult>> = search(query).map { it.take(limit) }
 
     override fun searchWithSnippets(query: String): Flow<List<SearchResult>> = search(query)
+
+    override fun searchRanked(
+        query: String,
+        limit: Int,
+    ): Flow<List<SearchResult>> = search(query).map { it.take(limit) }
 }

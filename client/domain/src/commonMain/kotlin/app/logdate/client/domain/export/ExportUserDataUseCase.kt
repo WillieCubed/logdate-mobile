@@ -21,11 +21,9 @@ import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.SerializableVideoBlock
 import app.logdate.shared.model.profile.LogDateProfile
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -68,65 +66,42 @@ class ExportUserDataUseCase(
         includeMedia: Boolean = true,
         dateRangeCutoff: kotlin.time.Instant? = null,
     ): Flow<ExportProgress> =
-        channelFlow {
-            send(ExportProgress.Starting)
+        flow {
+            emit(ExportProgress.Starting)
 
             try {
-                send(ExportProgress.InProgress(0.1f, "Collecting data..."))
+                emit(ExportProgress.InProgress(0.1f, "Collecting journals..."))
+                val journals =
+                    if (includeJournals) {
+                        journalRepository.allJournalsObserved.first()
+                    } else {
+                        emptyList()
+                    }
 
-                val (journals, notes, drafts, profile, places, locationHistory) =
-                    coroutineScope {
-                        val journalsDeferred =
-                            async {
-                                if (includeJournals) {
-                                    journalRepository.allJournalsObserved.first()
-                                } else {
-                                    emptyList()
-                                }
-                            }
-                        val notesDeferred =
-                            async {
-                                if (includeNotes) {
-                                    val allNotes = journalNotesRepository.allNotesObserved.first()
-                                    if (dateRangeCutoff != null) {
-                                        allNotes.filter { it.creationTimestamp >= dateRangeCutoff }
-                                    } else {
-                                        allNotes
-                                    }
-                                } else {
-                                    emptyList()
-                                }
-                            }
-                        val draftsDeferred =
-                            async {
-                                if (includeDrafts) {
-                                    val allDrafts = journalRepository.getAllDrafts()
-                                    if (dateRangeCutoff != null) {
-                                        allDrafts.filter { it.createdAt >= dateRangeCutoff }
-                                    } else {
-                                        allDrafts
-                                    }
-                                } else {
-                                    emptyList()
-                                }
-                            }
-                        val profileDeferred = async { profileRepository.getCurrentProfile() }
-                        val placesDeferred = async { userPlacesRepository.getAllPlaces() }
-                        val locationHistoryDeferred =
-                            async {
-                                locationHistoryRepository
-                                    .getAllLocationHistory()
-                                    .filter { item -> dateRangeCutoff == null || item.timestamp >= dateRangeCutoff }
-                            }
+                emit(ExportProgress.InProgress(0.3f, "Collecting notes..."))
+                val notes =
+                    if (includeNotes) {
+                        val allNotes = journalNotesRepository.allNotesObserved.first()
+                        if (dateRangeCutoff != null) {
+                            allNotes.filter { it.creationTimestamp >= dateRangeCutoff }
+                        } else {
+                            allNotes
+                        }
+                    } else {
+                        emptyList()
+                    }
 
-                        ExportCollectionResult(
-                            journals = journalsDeferred.await(),
-                            notes = notesDeferred.await(),
-                            drafts = draftsDeferred.await(),
-                            profile = profileDeferred.await(),
-                            places = placesDeferred.await(),
-                            locationHistory = locationHistoryDeferred.await(),
-                        )
+                emit(ExportProgress.InProgress(0.5f, "Collecting drafts..."))
+                val drafts =
+                    if (includeDrafts) {
+                        val allDrafts = journalRepository.getAllDrafts()
+                        if (dateRangeCutoff != null) {
+                            allDrafts.filter { it.createdAt >= dateRangeCutoff }
+                        } else {
+                            allDrafts
+                        }
+                    } else {
+                        emptyList()
                     }
 
                 val appInfo = appInfoProvider.getAppInfo()
@@ -138,8 +113,14 @@ class ExportUserDataUseCase(
                         .displayName
                         .trim()
                         .ifBlank { "local-user" }
+                val profile = profileRepository.getCurrentProfile()
+                val places = userPlacesRepository.getAllPlaces()
+                val locationHistory =
+                    locationHistoryRepository
+                        .getAllLocationHistory()
+                        .filter { item -> dateRangeCutoff == null || item.timestamp >= dateRangeCutoff }
 
-                send(ExportProgress.InProgress(0.7f, "Preparing export data..."))
+                emit(ExportProgress.InProgress(0.7f, "Preparing export data..."))
 
                 val exportNotes =
                     notes.map { note ->
@@ -241,7 +222,7 @@ class ExportUserDataUseCase(
                         stats = stats,
                     )
 
-                send(
+                emit(
                     ExportProgress.Completed(
                         ExportResult(
                             json = json,
@@ -268,7 +249,7 @@ class ExportUserDataUseCase(
                     ),
                 )
             } catch (exception: Exception) {
-                send(ExportProgress.Failed(exception.message ?: "Unknown error occurred"))
+                emit(ExportProgress.Failed(exception.message ?: "Unknown error occurred"))
             }
         }
 
@@ -499,12 +480,3 @@ private fun LocationHistoryItem.toExportLocationHistoryItem(): ExportLocationHis
         bearingDegrees = bearingDegrees,
         isMock = isMock,
     )
-
-private data class ExportCollectionResult(
-    val journals: List<Journal>,
-    val notes: List<JournalNote>,
-    val drafts: List<EditorDraft>,
-    val profile: LogDateProfile,
-    val places: List<Place>,
-    val locationHistory: List<LocationHistoryItem>,
-)
