@@ -77,6 +77,7 @@ fun EntryProviderScope<NavKey>.libraryRoutes(
     onBack: () -> Unit,
     onNavigateToJournal: (Uuid) -> Unit,
     onOpenSearch: () -> Unit,
+    onOpenPostcards: () -> Unit = {},
 ) {
     routeEntry<LibraryListRoute>(
         metadata = HomeScene.homeScene(),
@@ -88,6 +89,7 @@ fun EntryProviderScope<NavKey>.libraryRoutes(
             LibraryScreen(
                 onOpenMediaDetail = onOpenMediaDetail,
                 onOpenSearch = onOpenSearch,
+                onOpenPostcards = onOpenPostcards,
             )
         }
     }

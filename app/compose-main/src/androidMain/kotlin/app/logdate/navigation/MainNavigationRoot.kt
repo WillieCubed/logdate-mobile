@@ -90,10 +90,6 @@ import app.logdate.navigation.routes.cloudAccountSetupFlow
 import app.logdate.navigation.routes.core.NavigationStart
 import app.logdate.navigation.routes.core.NewJournalRoute
 import app.logdate.navigation.routes.core.NoteViewerRoute
-import app.logdate.navigation.routes.core.OnboardingCompleteRoute
-import app.logdate.navigation.routes.core.OnboardingImportRoute
-import app.logdate.navigation.routes.core.OnboardingWelcomeBackRoute
-import app.logdate.navigation.routes.core.PersonalIntroRoute
 import app.logdate.navigation.routes.core.RewindDetailRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.routes.core.TimelineDetail
@@ -110,6 +106,7 @@ import app.logdate.navigation.routes.libraryRoutes
 import app.logdate.navigation.routes.locationRoutes
 import app.logdate.navigation.routes.navigateToPostcardEditor
 import app.logdate.navigation.routes.navigateToPostcardViewer
+import app.logdate.navigation.routes.navigateToPostcardsCollection
 import app.logdate.navigation.routes.onboarding
 import app.logdate.navigation.routes.openAccountSettings
 import app.logdate.navigation.routes.openAdvancedSettings
@@ -593,22 +590,7 @@ fun MainNavigationRoot(
                         }
                         onboarding(
                             onBack = mainAppNavigator::goBack,
-                            onStartOnboarding = { mainAppNavigator.backStack.add(PersonalIntroRoute) },
-                            onContinueToEntry = {
-                                mainAppNavigator.backStack.add(
-                                    OnboardingImportRoute,
-                                )
-                            },
-                            onImportCompleted = {
-                                mainAppNavigator.backStack.add(
-                                    OnboardingCompleteRoute,
-                                )
-                            },
-                            onWelcomeBack = {
-                                mainAppNavigator.backStack.add(
-                                    OnboardingWelcomeBackRoute,
-                                )
-                            },
+                            onNavigate = { route -> mainAppNavigator.backStack.add(route) },
                             onComplete = mainAppNavigator::navigateHomeFromOnboarding,
                         )
                         journalRoutes(
@@ -655,6 +637,7 @@ fun MainNavigationRoot(
                             onBack = mainAppNavigator::goBack,
                             onNavigateToJournal = mainAppNavigator::openJournalDetail,
                             onOpenSearch = { mainAppNavigator.openSearch() },
+                            onOpenPostcards = { mainAppNavigator.navigateToPostcardsCollection() },
                         )
                         searchRoutes(
                             onBack = mainAppNavigator::goBack,
@@ -678,8 +661,8 @@ fun MainNavigationRoot(
                             onEditPostcard = { id ->
                                 mainAppNavigator.navigateToPostcardEditor(id)
                             },
-                            onNavigateToMoment = { momentId ->
-                                // TODO: Navigate to moment detail
+                            onNavigateToMoment = {
+                                mainAppNavigator.goBack()
                             },
                             onShareUri = { uri ->
                                 val shareIntent =

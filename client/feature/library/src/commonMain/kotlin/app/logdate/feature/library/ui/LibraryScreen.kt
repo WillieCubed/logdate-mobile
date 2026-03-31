@@ -2,13 +2,21 @@
 
 package app.logdate.feature.library.ui
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,6 +38,7 @@ import kotlin.uuid.Uuid
 fun LibraryScreen(
     onOpenMediaDetail: (Uuid) -> Unit,
     onOpenSearch: () -> Unit = {},
+    onOpenPostcards: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = koinViewModel(),
 ) {
@@ -48,6 +57,7 @@ fun LibraryScreen(
         columnCount = columnCount,
         onItemClick = onOpenMediaDetail,
         onOpenSearch = onOpenSearch,
+        onOpenPostcards = onOpenPostcards,
         modifier = modifier,
     )
 }
@@ -65,6 +75,7 @@ fun LibraryScreenContent(
     columnCount: Int,
     onItemClick: (Uuid) -> Unit,
     onOpenSearch: () -> Unit = {},
+    onOpenPostcards: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -78,20 +89,44 @@ fun LibraryScreenContent(
             )
         },
     ) { paddingValues ->
-        Box(
+        Column(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(top = Spacing.sm),
-            contentAlignment = Alignment.Center,
+                    .padding(paddingValues),
         ) {
-            LibraryPanel(
-                state = state,
-                columnCount = columnCount,
-                onItemClick = onItemClick,
-                modifier = Modifier.fillMaxSize(),
-            )
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                AssistChip(
+                    onClick = onOpenPostcards,
+                    label = { Text("Postcards") },
+                    trailingIcon = {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                        )
+                    },
+                )
+            }
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(top = Spacing.sm),
+                contentAlignment = Alignment.Center,
+            ) {
+                LibraryPanel(
+                    state = state,
+                    columnCount = columnCount,
+                    onItemClick = onItemClick,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
     }
 }
