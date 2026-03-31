@@ -43,15 +43,21 @@ test|test:android|Run Android unit tests|./gradlew :app:android-main:testDebugUn
 test|test:server|Run server tests|./gradlew :server:test
 test|test:coverage|Generate test coverage report|./gradlew koverHtmlReport
 test|test:verify|Verify coverage meets threshold|./gradlew koverVerify
+test|test:bench:phone|Run managed phone macrobenchmarks|./gradlew managedPhoneBenchmark
+test|test:bench:wear|Run managed Wear OS macrobenchmarks|./gradlew managedWearBenchmark
+test|test:bench:micro|Run Android microbenchmarks|./gradlew :benchmark:micro:connectedCheck
 
 quality|lint|Run Android lint|./gradlew lint
 quality|lint:check|Check Kotlin code style|./gradlew ktlintCheck
 quality|lint:format|Auto-format Kotlin code|./gradlew ktlintFormat
 quality|lint:modules|Verify ktlint task coverage for all modules|./scripts/verify-ktlint-task-coverage.sh
 quality|check|Run all checks (tests + lint)|./gradlew check
+quality|perf:baseline:phone|Generate phone baseline profile|./gradlew generatePhoneBaselineProfile
+quality|perf:baseline:wear|Generate Wear baseline profile|./gradlew generateWearBaselineProfile
 
 docs|docs|Generate API documentation|./gradlew dokkaHtmlMultiModule
 docs|docs:open|Open generated documentation|open build/dokka/htmlMultiModule/index.html 2>/dev/null || xdg-open build/dokka/htmlMultiModule/index.html 2>/dev/null || echo "Open build/dokka/htmlMultiModule/index.html"
+docs|docs:performance|Open performance documentation index|open docs/performance/README.md 2>/dev/null || xdg-open docs/performance/README.md 2>/dev/null || echo "Open docs/performance/README.md"
 
 deploy|deploy:setup|One-time GCP infrastructure setup|./scripts/setup-gcp-deploy.sh
 deploy|deploy:cloud-run|Deploy server to Cloud Run|./scripts/deploy-cloud-run.sh

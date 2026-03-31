@@ -3,9 +3,15 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.androidx.baselineprofile)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.screenshot)
 }
+
+val baselineProfileRequested =
+    gradle.startParameter.taskNames.any { taskName ->
+        taskName.contains("BaselineProfile", ignoreCase = true)
+    }
 
 extensions.configure<ApplicationExtension> {
     namespace = "app.logdate.wear"
@@ -23,10 +29,20 @@ extensions.configure<ApplicationExtension> {
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (baselineProfileRequested) {
+                signingConfig = signingConfigs.getByName("debug")
+                isProfileable = true
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+        }
+        create("benchmark") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            signingConfig = signingConfigs.getByName("debug")
+            isProfileable = true
         }
     }
     buildFeatures {
@@ -51,6 +67,8 @@ kotlin {
 dependencies {
     // Core library desugaring for health-connect
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    implementation(libs.androidx.profileinstaller)
+    baselineProfile(project(":benchmark:wear-baselineprofile"))
 
     // Koin dependency injection
     implementation(project.dependencies.platform(libs.koin.bom))

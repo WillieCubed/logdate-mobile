@@ -9,6 +9,20 @@ plugins {
     alias(libs.plugins.screenshot)
 }
 
+val baselineProfileRequested =
+    gradle.startParameter.taskNames.any { taskName ->
+        taskName.contains("BaselineProfile", ignoreCase = true)
+    }
+
+if (baselineProfileRequested) {
+    apply(
+        plugin =
+            libs.plugins.androidx.baselineprofile
+                .get()
+                .pluginId,
+    )
+}
+
 extensions.configure<ApplicationExtension> {
     namespace = "app.logdate.client"
     compileSdk =
@@ -37,9 +51,23 @@ extensions.configure<ApplicationExtension> {
     }
 
     buildTypes {
+        getByName("debug") {
+            isTestCoverageEnabled = true
+        }
         getByName("release") {
             isMinifyEnabled = true
             isDebuggable = false
+            if (baselineProfileRequested) {
+                signingConfig = signingConfigs.getByName("debug")
+                isProfileable = true
+            }
+        }
+        create("benchmark") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
+            isProfileable = true
         }
     }
 
@@ -113,7 +141,11 @@ configurations.all {
 dependencies {
     implementation(projects.app.composeMain)
     implementation(projects.client.location)
+    implementation(libs.androidx.profileinstaller)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+    if (baselineProfileRequested) {
+        add("baselineProfile", project(":benchmark:phone-baselineprofile"))
+    }
     implementation(libs.androidx.work.runtime)
 
     debugImplementation(libs.compose.ui.tooling)
@@ -127,8 +159,11 @@ dependencies {
     testImplementation(libs.compose.runtime)
     testImplementation(libs.androidx.navigation3.runtime)
     testImplementation(libs.androidx.health.connect)
+    testImplementation(libs.play.services.wearable)
     testImplementation(projects.client.domain)
     testImplementation(projects.client.healthConnect)
+    testImplementation(projects.client.repository)
+    testImplementation(projects.client.sync)
 
     androidTestImplementation(projects.app.composeMain)
     androidTestImplementation(projects.client.feature.core)
@@ -150,6 +185,8 @@ dependencies {
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation("io.mockk:mockk-android:${libs.versions.mockk.get()}")
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.androidx.ui.test.junit4)
     androidTestImplementation(libs.androidx.activity.compose)

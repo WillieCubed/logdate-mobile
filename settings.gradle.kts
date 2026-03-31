@@ -46,6 +46,11 @@ dependencyResolutionManagement {
 include(":app:compose-main")
 include(":app:wear")
 include(":app:android-main")
+include(":benchmark:phone-macro")
+include(":benchmark:phone-baselineprofile")
+include(":benchmark:wear-macro")
+include(":benchmark:wear-baselineprofile")
+include(":benchmark:micro")
 // Core client modules
 include(":client:data")
 include(":client:ui")

@@ -3,21 +3,29 @@
 import com.android.build.api.dsl.ApplicationExtension
 import org.jlleitschuh.gradle.ktlint.KtlintExtension
 import org.gradle.api.Project
+import org.gradle.api.tasks.testing.Test
+import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
+import org.gradle.testing.jacoco.tasks.JacocoReport
 
 plugins {
     // this is necessary to avoid the plugins to be loaded multiple times
     // in each subproject's classloader
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.multiplatform) apply false
+    alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.android.test) apply false
     alias(libs.plugins.android.kmp.library) apply false
+    alias(libs.plugins.androidx.benchmark) apply false
+    alias(libs.plugins.androidx.baselineprofile) apply false
     alias(libs.plugins.composeMultiplatform) apply false
     alias(libs.plugins.compose.compiler) apply false
     alias(libs.plugins.dokka) apply false
     alias(libs.plugins.ktlint) apply false
     alias(libs.plugins.kover)
     alias(libs.plugins.benManesVersions)
+    jacoco
 }
 
 subprojects {
@@ -43,6 +51,25 @@ subprojects {
     pluginManager.withPlugin("com.android.application") {
         extensions.configure<ApplicationExtension> {
             configureManagedDevices(project)
+        }
+    }
+}
+
+private val featureCoverageModules =
+    setOf(
+        ":app:android-main",
+        ":app:wear",
+    )
+
+subprojects {
+    if (path in featureCoverageModules) {
+        apply(plugin = "jacoco")
+
+        tasks.withType<Test>().configureEach {
+            extensions.configure(JacocoTaskExtension::class) {
+                isIncludeNoLocationClasses = true
+                excludes = listOf("jdk.internal.*")
+            }
         }
     }
 }
@@ -90,6 +117,39 @@ tasks.register("managedWearDebugAndroidTest") {
     dependsOn(":app:wear:wearDevicesGroupDebugAndroidTest")
 }
 
+tasks.register("managedPhoneBenchmark") {
+    group = "verification"
+    description = "Run phone macrobenchmarks on the shared managed benchmark device."
+    dependsOn(":benchmark:phone-macro:phoneBenchmarkDevicesGroupBenchmarkAndroidTest")
+}
+
+tasks.register("managedWearBenchmark") {
+    group = "verification"
+    description = "Run Wear OS macrobenchmarks on the shared managed benchmark device."
+    dependsOn(":benchmark:wear-macro:wearBenchmarkDevicesGroupBenchmarkAndroidTest")
+}
+
+tasks.register("managedBenchmark") {
+    group = "verification"
+    description = "Run all managed phone and Wear benchmark suites."
+    dependsOn(
+        "managedPhoneBenchmark",
+        "managedWearBenchmark",
+    )
+}
+
+tasks.register("generatePhoneBaselineProfile") {
+    group = "verification"
+    description = "Generate and copy the phone app baseline profile."
+    dependsOn(":benchmark:phone-baselineprofile:collectNonMinifiedReleaseBaselineProfile")
+}
+
+tasks.register("generateWearBaselineProfile") {
+    group = "verification"
+    description = "Generate and copy the Wear app baseline profile."
+    dependsOn(":benchmark:wear-baselineprofile:collectNonMinifiedReleaseBaselineProfile")
+}
+
 tasks.register("managedDeviceDebugAndroidTest") {
     group = "verification"
     description = "Run all instrumented tests on the shared managed phone, tablet, and Wear OS device matrix."
@@ -97,6 +157,151 @@ tasks.register("managedDeviceDebugAndroidTest") {
         ":app:android-main:deviceMatrixGroupDebugAndroidTest",
         "managedWearDebugAndroidTest",
     )
+}
+
+tasks.register<JacocoReport>("featureCoverageReport") {
+    group = "verification"
+    description = "Generate coverage for the Wear synced-audio playback feature."
+
+    val wearProject = project(":app:wear")
+    val phoneProject = project(":app:android-main")
+    val composeProject = project(":app:compose-main")
+    val mediaProject = project(":client:media")
+
+    dependsOn(
+        ":app:wear:testDebugUnitTest",
+        ":app:android-main:testDebugUnitTest",
+    )
+
+    executionData.setFrom(
+        files(
+            wearProject.layout.buildDirectory.file("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec"),
+            phoneProject.layout.buildDirectory.file("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec"),
+        ),
+    )
+
+    classDirectories.setFrom(
+        files(
+            wearProject.fileTree(
+                wearProject.layout.buildDirectory
+                    .dir("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes")
+                    .get()
+                    .asFile,
+            ) {
+                include(
+                    "app/logdate/wear/playback/PhoneSyncedAudioResolver*.class",
+                    "app/logdate/wear/presentation/timeline/WearTimelineViewModel*.class",
+                    "app/logdate/wear/sync/GoogleWearDataLayerClient*.class",
+                )
+            },
+            composeProject.fileTree(
+                composeProject.layout.buildDirectory
+                    .dir("classes/kotlin/android/main")
+                    .get()
+                    .asFile,
+            ) {
+                include(
+                    "app/logdate/client/sync/PhoneDataLayerListenerService*.class",
+                    "app/logdate/client/sync/DefaultPhoneWearSyncBridge*.class",
+                    "app/logdate/client/sync/GooglePhoneWearTransport*.class",
+                    "app/logdate/client/sync/AndroidPhoneAudioStreamOpener*.class",
+                )
+            },
+            mediaProject.fileTree(
+                mediaProject.layout.buildDirectory
+                    .dir("classes/kotlin/android/main")
+                    .get()
+                    .asFile,
+            ) {
+                include("app/logdate/client/media/audio/AndroidAudioPlaybackManager*.class")
+            },
+        ),
+    )
+
+    sourceDirectories.setFrom(
+        files(
+            wearProject.layout.projectDirectory.dir("src/main/kotlin"),
+            composeProject.layout.projectDirectory.dir("src/androidMain/kotlin"),
+            mediaProject.layout.projectDirectory.dir("src/androidMain/kotlin"),
+        ),
+    )
+    additionalSourceDirs.setFrom(sourceDirectories)
+
+    reports {
+        xml.required.set(true)
+        xml.outputLocation.set(layout.buildDirectory.file("reports/jacoco/featureCoverageReport/featureCoverageReport.xml"))
+        html.required.set(true)
+        html.outputLocation.set(layout.buildDirectory.dir("reports/jacoco/featureCoverageReport/html"))
+        csv.required.set(false)
+    }
+
+    doFirst {
+        val missingExecFiles =
+            executionData.files.filterNot { it.exists() }
+        if (missingExecFiles.isNotEmpty()) {
+            throw GradleException(
+                "Missing JaCoCo execution data for feature coverage: " +
+                    missingExecFiles.joinToString { it.absolutePath },
+            )
+        }
+    }
+}
+
+tasks.register<JacocoReport>("mediaAndroidTestCoverageReport") {
+    group = "verification"
+    description = "Generate Android instrumentation coverage for AndroidMediaManager."
+
+    val appProject = project(":app:android-main")
+    val mediaProject = project(":client:media")
+
+    dependsOn(":app:android-main:connectedDebugAndroidTest")
+
+    executionData.setFrom(
+        files(
+            fileTree(appProject.layout.buildDirectory.dir("outputs/code_coverage/debugAndroidTest")) {
+                include("**/*.ec")
+            },
+        ),
+    )
+
+    classDirectories.setFrom(
+        files(
+            mediaProject.fileTree(
+                mediaProject.layout.buildDirectory
+                    .dir("classes/kotlin/android/main")
+                    .get()
+                    .asFile,
+            ) {
+                include("app/logdate/client/media/AndroidMediaManager*.class")
+            },
+        ),
+    )
+
+    sourceDirectories.setFrom(
+        files(
+            mediaProject.layout.projectDirectory.dir("src/androidMain/kotlin"),
+        ),
+    )
+    additionalSourceDirs.setFrom(sourceDirectories)
+
+    reports {
+        xml.required.set(true)
+        xml.outputLocation.set(layout.buildDirectory.file("reports/jacoco/mediaAndroidTestCoverageReport/mediaAndroidTestCoverageReport.xml"))
+        html.required.set(true)
+        html.outputLocation.set(layout.buildDirectory.dir("reports/jacoco/mediaAndroidTestCoverageReport/html"))
+        csv.required.set(false)
+    }
+
+    doFirst {
+        val missingExecFiles =
+            executionData.files.filterNot { it.exists() }
+        if (missingExecFiles.isNotEmpty()) {
+            throw GradleException(
+                "Missing Android instrumentation coverage data for media coverage: " +
+                    missingExecFiles.joinToString { it.absolutePath },
+            )
+        }
+    }
 }
 
 // Kover configuration for test coverage
