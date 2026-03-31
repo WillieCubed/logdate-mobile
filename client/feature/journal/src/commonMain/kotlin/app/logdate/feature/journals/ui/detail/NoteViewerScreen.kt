@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -40,7 +41,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,6 +57,7 @@ import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.feature.editor.ui.audio.expansion.ImmersiveAudioScreen
 import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
+import app.logdate.feature.journals.ui.AddToJournalPicker
 import app.logdate.feature.journals.ui.deriveCoverColor
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
@@ -95,6 +99,9 @@ fun NoteViewerScreen(
         ),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val allJournals by viewModel.allJournals.collectAsState()
+    val memberJournalIds by viewModel.memberJournalIds.collectAsState()
+    var showAddToJournal by remember { mutableStateOf(false) }
 
     when (val state = uiState) {
         NoteViewerUiState.Loading -> {
@@ -119,6 +126,7 @@ fun NoteViewerScreen(
                 onGoBack = onGoBack,
                 onOpenLocationTimeline = onOpenLocationTimeline,
                 onNavigateToNote = onNavigateToNote,
+                onShowAddToJournal = { showAddToJournal = true },
                 modifier = modifier,
             ) {
                 TextNoteViewer(
@@ -133,6 +141,7 @@ fun NoteViewerScreen(
                 onGoBack = onGoBack,
                 onOpenLocationTimeline = onOpenLocationTimeline,
                 onNavigateToNote = onNavigateToNote,
+                onShowAddToJournal = { showAddToJournal = true },
                 modifier = modifier,
             ) {
                 ImageNoteViewer(
@@ -147,11 +156,23 @@ fun NoteViewerScreen(
                 onGoBack = onGoBack,
                 onOpenLocationTimeline = onOpenLocationTimeline,
                 onNavigateToNote = onNavigateToNote,
+                onShowAddToJournal = { showAddToJournal = true },
                 modifier = modifier,
             ) {
                 VideoNoteViewer(mediaRef = state.mediaRef)
             }
         }
+    }
+
+    if (showAddToJournal) {
+        AddToJournalPicker(
+            noteId = noteId,
+            currentJournalId = journalId,
+            journals = allJournals,
+            memberJournalIds = memberJournalIds,
+            onToggleMembership = viewModel::toggleJournalMembership,
+            onDismiss = { showAddToJournal = false },
+        )
     }
 }
 
@@ -330,6 +351,7 @@ fun NoteViewerScaffoldContent(
     onGoBack: () -> Unit,
     onOpenLocationTimeline: () -> Unit = {},
     onNavigateToNote: (Uuid) -> Unit = {},
+    onShowAddToJournal: () -> Unit = {},
     modifier: Modifier = Modifier,
     noteContent: @Composable () -> Unit,
 ) {
@@ -360,6 +382,7 @@ fun NoteViewerScaffoldContent(
                 journalContext = journalContext,
                 accentColor = accentColor,
                 onNavigateToNote = onNavigateToNote,
+                onShowAddToJournal = onShowAddToJournal,
             )
         },
         editorContent = {
@@ -385,6 +408,7 @@ private fun NoteViewerToolbar(
     journalContext: JournalContext? = null,
     accentColor: Color? = null,
     onNavigateToNote: (Uuid) -> Unit = {},
+    onShowAddToJournal: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.xs),
@@ -409,9 +433,18 @@ private fun NoteViewerToolbar(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
 
-            Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.weight(1f))
 
+        IconButton(onClick = onShowAddToJournal) {
+            Icon(
+                Icons.Default.LibraryAdd,
+                contentDescription = stringResource(Res.string.add_to_journal),
+            )
+        }
+
+        if (journalContext != null) {
             IconButton(
                 onClick = { journalContext.previousNoteId?.let(onNavigateToNote) },
                 enabled = journalContext.hasPrevious,

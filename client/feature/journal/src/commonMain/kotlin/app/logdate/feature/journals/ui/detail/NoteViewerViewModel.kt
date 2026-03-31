@@ -8,11 +8,15 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -119,6 +123,38 @@ class NoteViewerViewModel(
                 onDeleted()
             }.onFailure { error ->
                 _uiState.value = NoteViewerUiState.Error("Failed to delete note: ${error.message}")
+            }
+        }
+    }
+
+    /**
+     * All journals available for the "Add to journal" picker.
+     */
+    val allJournals: StateFlow<List<Journal>> =
+        journalRepository.allJournalsObserved
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * IDs of journals this note currently belongs to.
+     */
+    val memberJournalIds: StateFlow<Set<Uuid>> =
+        journalContentRepository
+            .observeJournalsForContent(noteId)
+            .map { journals -> journals.map { it.id }.toSet() }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    /**
+     * Adds or removes this note from a journal.
+     */
+    fun toggleJournalMembership(
+        targetJournalId: Uuid,
+        add: Boolean,
+    ) {
+        viewModelScope.launch {
+            if (add) {
+                journalContentRepository.addContentToJournal(noteId, targetJournalId)
+            } else {
+                journalContentRepository.removeContentFromJournal(noteId, targetJournalId)
             }
         }
     }
