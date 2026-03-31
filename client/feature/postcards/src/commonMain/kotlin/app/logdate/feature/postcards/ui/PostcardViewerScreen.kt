@@ -105,6 +105,7 @@ fun PostcardViewerScreen(
                         ExportSheet(
                             document = state.document,
                             viewModel = exportViewModel,
+                            stickerUriMap = state.stickerUriMap,
                             onShareResult = { uri ->
                                 showExportSheet = false
                                 onShareUri(uri)

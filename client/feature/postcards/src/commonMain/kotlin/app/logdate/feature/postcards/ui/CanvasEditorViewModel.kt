@@ -56,6 +56,7 @@ data class CanvasEditorState(
     val shelfPhotos: List<ShelfPhoto> = emptyList(),
     val isSaving: Boolean = false,
     val isNewPostcard: Boolean = true,
+    val saveError: String? = null,
     val editingTextElementId: Uuid? = null,
     val isTextEditorVisible: Boolean = false,
     val shelfStickers: List<StickerShelfItem> = emptyList(),
@@ -545,27 +546,37 @@ class CanvasEditorViewModel(
      */
     fun save() {
         viewModelScope.launch {
-            _state.update { it.copy(isSaving = true) }
-            val doc =
-                _state.value.document.copy(
-                    modifiedAt = Clock.System.now(),
-                )
-            val entity =
-                PostcardEntity(
-                    id = doc.id,
-                    title = doc.title.ifEmpty { "Untitled" },
-                    createdAt = doc.createdAt,
-                    modifiedAt = doc.modifiedAt,
-                    sourceMomentRef = doc.sourceMomentRef,
-                    documentJson = json.encodeToString(PostcardDocument.serializer(), doc),
-                )
-            if (_state.value.isNewPostcard) {
-                postcardDao.insert(entity)
-            } else {
-                postcardDao.update(entity)
+            _state.update { it.copy(isSaving = true, saveError = null) }
+            try {
+                val doc =
+                    _state.value.document.copy(
+                        modifiedAt = Clock.System.now(),
+                    )
+                val entity =
+                    PostcardEntity(
+                        id = doc.id,
+                        title = doc.title.ifEmpty { "Untitled" },
+                        createdAt = doc.createdAt,
+                        modifiedAt = doc.modifiedAt,
+                        sourceMomentRef = doc.sourceMomentRef,
+                        documentJson = json.encodeToString(PostcardDocument.serializer(), doc),
+                    )
+                if (_state.value.isNewPostcard) {
+                    postcardDao.insert(entity)
+                } else {
+                    postcardDao.update(entity)
+                }
+                _state.update { it.copy(document = doc, isSaving = false, isNewPostcard = false) }
+            } catch (e: Exception) {
+                io.github.aakira.napier.Napier
+                    .e("Failed to save postcard", e)
+                _state.update { it.copy(isSaving = false, saveError = "Could not save postcard") }
             }
-            _state.update { it.copy(document = doc, isSaving = false, isNewPostcard = false) }
         }
+    }
+
+    fun clearSaveError() {
+        _state.update { it.copy(saveError = null) }
     }
 
     fun setTitle(title: String) {

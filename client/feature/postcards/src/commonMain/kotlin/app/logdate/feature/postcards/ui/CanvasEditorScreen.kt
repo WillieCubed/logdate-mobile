@@ -70,8 +70,17 @@ fun CanvasEditorScreen(
     onSaved: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
+    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+
+    androidx.compose.runtime.LaunchedEffect(state.saveError) {
+        state.saveError?.let { error ->
+            snackbarHostState.showSnackbar(error)
+            viewModel.clearSaveError()
+        }
+    }
 
     Scaffold(
+        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
         topBar = {
             EditorTopBar(
                 title = state.document.title,

@@ -39,6 +39,7 @@ class AndroidExportEngine(
         captureRegion: ExportCaptureRegion,
         preset: ExportPreset,
         targetWidthPx: Int,
+        stickerUriMap: Map<kotlin.uuid.Uuid, String>,
     ): ExportResult? =
         try {
             val aspectRatio = preset.widthRatio.toFloat() / preset.heightRatio.toFloat()
@@ -58,7 +59,7 @@ class AndroidExportEngine(
 
             val sortedElements = document.elements.sortedBy { it.zIndex }
             for (element in sortedElements) {
-                drawElement(canvas, element)
+                drawElement(canvas, element, stickerUriMap)
             }
 
             val file = saveBitmapToCache(bitmap)
@@ -84,6 +85,7 @@ class AndroidExportEngine(
     private fun drawElement(
         canvas: Canvas,
         element: CanvasElement,
+        stickerUriMap: Map<kotlin.uuid.Uuid, String> = emptyMap(),
     ) {
         val transform = element.transform
         canvas.save()
@@ -96,7 +98,7 @@ class AndroidExportEngine(
             is CanvasElement.Text -> drawText(canvas, element)
             is CanvasElement.Ink -> drawInk(canvas, element)
             is CanvasElement.Shape -> drawShape(canvas, element)
-            is CanvasElement.Sticker -> { /* Stickers require URI resolution — skipped in export for now */ }
+            is CanvasElement.Sticker -> drawSticker(canvas, element, stickerUriMap)
         }
 
         canvas.restore()
@@ -106,20 +108,66 @@ class AndroidExportEngine(
         canvas: Canvas,
         element: CanvasElement.Photo,
     ) {
+        val dest = RectF(0f, 0f, 200f, 200f)
         try {
             val inputStream =
                 context.contentResolver.openInputStream(Uri.parse(element.mediaUri))
-                    ?: return
-            val photoBitmap = BitmapFactory.decodeStream(inputStream)
-            inputStream.close()
-            if (photoBitmap != null) {
-                val dest = RectF(0f, 0f, 200f, 200f)
-                canvas.drawBitmap(photoBitmap, null, dest, null)
-                photoBitmap.recycle()
+            if (inputStream != null) {
+                val photoBitmap = BitmapFactory.decodeStream(inputStream)
+                inputStream.close()
+                if (photoBitmap != null) {
+                    canvas.drawBitmap(photoBitmap, null, dest, null)
+                    photoBitmap.recycle()
+                    return
+                }
             }
         } catch (e: Exception) {
             Napier.w("Could not load photo for export: ${element.mediaUri}", e)
         }
+        drawMissingPlaceholder(canvas, dest)
+    }
+
+    private fun drawSticker(
+        canvas: Canvas,
+        element: CanvasElement.Sticker,
+        stickerUriMap: Map<kotlin.uuid.Uuid, String>,
+    ) {
+        val imageUri = stickerUriMap[element.stickerRef] ?: return
+        val dest = RectF(0f, 0f, 80f, 80f)
+        try {
+            val inputStream = context.contentResolver.openInputStream(Uri.parse(imageUri))
+            if (inputStream != null) {
+                val stickerBitmap = BitmapFactory.decodeStream(inputStream)
+                inputStream.close()
+                if (stickerBitmap != null) {
+                    canvas.drawBitmap(stickerBitmap, null, dest, null)
+                    stickerBitmap.recycle()
+                    return
+                }
+            }
+        } catch (e: Exception) {
+            Napier.w("Could not load sticker for export: $imageUri", e)
+        }
+    }
+
+    private fun drawMissingPlaceholder(
+        canvas: Canvas,
+        rect: RectF,
+    ) {
+        val bgPaint =
+            Paint().apply {
+                color = android.graphics.Color.LTGRAY
+                style = Paint.Style.FILL
+            }
+        val xPaint =
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.DKGRAY
+                style = Paint.Style.STROKE
+                strokeWidth = 2f
+            }
+        canvas.drawRect(rect, bgPaint)
+        canvas.drawLine(rect.left, rect.top, rect.right, rect.bottom, xPaint)
+        canvas.drawLine(rect.right, rect.top, rect.left, rect.bottom, xPaint)
     }
 
     private fun drawText(

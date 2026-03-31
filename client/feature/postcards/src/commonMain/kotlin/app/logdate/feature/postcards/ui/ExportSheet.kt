@@ -39,6 +39,7 @@ import app.logdate.feature.postcards.model.PostcardDocument
 fun ExportSheet(
     document: PostcardDocument,
     viewModel: ExportViewModel,
+    stickerUriMap: Map<kotlin.uuid.Uuid, String> = emptyMap(),
     onShareResult: (uri: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -90,7 +91,7 @@ fun ExportSheet(
                     Spacer(Modifier.height(24.dp))
 
                     Button(
-                        onClick = { viewModel.render(document) },
+                        onClick = { viewModel.render(document, stickerUriMap) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text("Export & Share")

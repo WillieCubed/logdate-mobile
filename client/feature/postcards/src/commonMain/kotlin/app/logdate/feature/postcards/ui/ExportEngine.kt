@@ -64,5 +64,6 @@ interface ExportEngine {
         captureRegion: ExportCaptureRegion,
         preset: ExportPreset,
         targetWidthPx: Int = 1080,
+        stickerUriMap: Map<kotlin.uuid.Uuid, String> = emptyMap(),
     ): ExportResult?
 }

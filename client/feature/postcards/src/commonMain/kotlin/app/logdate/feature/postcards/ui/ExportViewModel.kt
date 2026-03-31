@@ -58,7 +58,10 @@ class ExportViewModel(
     /**
      * Renders the document to PNG and provides the result for sharing.
      */
-    fun render(document: PostcardDocument) {
+    fun render(
+        document: PostcardDocument,
+        stickerUriMap: Map<kotlin.uuid.Uuid, String> = emptyMap(),
+    ) {
         val preset = (_state.value as? ExportUiState.Ready)?.preset ?: ExportPreset.STORY
         _state.value = ExportUiState.Rendering
 
@@ -69,6 +72,7 @@ class ExportViewModel(
                     document = document,
                     captureRegion = captureRegion,
                     preset = preset,
+                    stickerUriMap = stickerUriMap,
                 )
             _state.value =
                 if (result != null) {

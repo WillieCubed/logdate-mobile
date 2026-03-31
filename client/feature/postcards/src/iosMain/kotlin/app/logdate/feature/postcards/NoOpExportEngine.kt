@@ -15,5 +15,6 @@ class NoOpExportEngine : ExportEngine {
         captureRegion: ExportCaptureRegion,
         preset: ExportPreset,
         targetWidthPx: Int,
+        stickerUriMap: Map<kotlin.uuid.Uuid, String>,
     ): ExportResult? = null
 }
