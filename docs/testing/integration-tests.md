@@ -213,6 +213,20 @@ class JournalApiTest {
 }
 ```
 
+## Android Platform Integration
+
+Use connected instrumentation tests when the behavior depends on Android platform services such as `MediaStore`, runtime permissions, or device-owned storage.
+
+The Android media library regression test lives at:
+
+`app/android-main/src/androidTest/kotlin/app/logdate/client/media/AndroidMediaManagerTest.kt`
+
+Run it with:
+
+```bash
+./gradlew :app:android-main:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.logdate.client.media.AndroidMediaManagerTest
+```
+
 ## Repository Integration Tests
 
 Test repository with real database and mocked network:

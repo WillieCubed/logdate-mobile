@@ -81,6 +81,7 @@ Learn how to write specific test types:
 - [Integration Tests Guide](./integration-tests.md) - Testing database and API interactions
 - [UI Tests Guide](./ui-tests.md) - Testing Compose components and user interactions
 - [Screenshot Tests Guide](./screenshot-tests.md) - Visual regression testing for screens
+- [Android Benchmarking](../performance/README.md) - Macrobenchmark, Baseline Profile, microbenchmark, CI policy, and triage runbooks
 - [Android In-App Updates](./android-in-app-updates.md) - Verifying Play-managed update flows locally and through Play tracks
 
 ## Reference: Test Types
@@ -125,6 +126,14 @@ Learn how to write specific test types:
 - **Coverage**: 10% - critical user journeys only
 - **Speed**: Slow (multiple seconds)
 - **Scope**: Complete workflows, data persistence, cross-feature interactions
+
+### Benchmarks
+- **Purpose**: Measure startup, frame timing, interaction latency, and hot-path CPU/allocation cost
+- **Technology**: Macrobenchmark, Baseline Profiles, Microbenchmark, Perfetto, Android vitals
+- **Location**: `benchmark/` modules and `docs/performance/`
+- **Coverage**: Release-critical user journeys and hot paths
+- **Speed**: Slow for macrobenchmarks, fast-to-moderate for microbenchmarks
+- **Scope**: Startup, scroll/jank, baseline profile generation, deterministic hot-path performance
 
 ## Test Organization
 
@@ -186,6 +195,21 @@ module/src/
 
 # Verify coverage meets threshold
 ./gradlew koverVerify
+```
+
+### Benchmarks
+
+```bash
+# Phone and Wear macrobenchmarks
+./gradlew managedPhoneBenchmark
+./gradlew managedWearBenchmark
+
+# Generate baseline profiles
+./gradlew generatePhoneBaselineProfile
+./gradlew generateWearBaselineProfile
+
+# Android microbenchmarks
+./gradlew :benchmark:micro:connectedCheck
 ```
 
 ## Reference: Testing Patterns

@@ -119,7 +119,7 @@ git commit -m "feat(sync): verify media E2EE wiring"
 ### Task 4: Document E2EE behavior
 
 **Files:**
-- Modify: `docs/storage-sync-production-readiness.md` (or relevant doc)
+- Modify: `docs/audits/storage-sync-production-readiness.md` (or relevant doc)
 
 **Step 1: Explain E2EE flow**
 
@@ -131,7 +131,7 @@ Document:
 **Step 2: Commit**
 
 ```bash
-git add docs/storage-sync-production-readiness.md
+git add docs/audits/storage-sync-production-readiness.md
 git commit -m "docs(sync): explain E2EE media flow"
 ```
 
