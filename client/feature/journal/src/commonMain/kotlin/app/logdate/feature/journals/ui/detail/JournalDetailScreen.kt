@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
@@ -44,6 +45,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
@@ -96,6 +98,7 @@ fun JournalDetailScreen(
     onGoBack: () -> Unit,
     onJournalDeleted: () -> Unit,
     onNavigateToNoteDetail: (noteId: Uuid) -> Unit = { _ -> },
+    onOpenEditor: () -> Unit = {},
     onNavigateToSettings: (journalId: Uuid) -> Unit = {},
     onNavigateToShare: (journalId: Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -112,6 +115,7 @@ fun JournalDetailScreen(
         uiState = state,
         onGoBack = onGoBack,
         onNavigateToNoteDetail = onNavigateToNoteDetail,
+        onOpenEditor = onOpenEditor,
         onNavigateToSettings = onNavigateToSettings,
         onNavigateToShare = onNavigateToShare,
         onToggleSortOrder = viewModel::toggleSortOrder,
@@ -138,6 +142,7 @@ fun JournalDetailScreenContent(
     uiState: JournalDetailUiState,
     onGoBack: () -> Unit,
     onNavigateToNoteDetail: (noteId: Uuid) -> Unit = { _ -> },
+    onOpenEditor: () -> Unit = {},
     onNavigateToSettings: (journalId: Uuid) -> Unit = {},
     onNavigateToShare: (journalId: Uuid) -> Unit = {},
     onToggleSortOrder: () -> Unit = {},
@@ -186,6 +191,11 @@ fun JournalDetailScreenContent(
                             }
                         },
                 contentWindowInsets = WindowInsets.navigationBars,
+                floatingActionButton = {
+                    FloatingActionButton(onClick = onOpenEditor) {
+                        Icon(Icons.Default.Edit, contentDescription = stringResource(Res.string.create_new_entry))
+                    }
+                },
                 topBar = {
                     LargeTopAppBar(
                         title = { Text(uiState.title) },
