@@ -96,6 +96,8 @@ fun CanvasEditorScreen(
                     .fillMaxSize()
                     .padding(paddingValues),
         ) {
+            val viewportState = rememberCanvasViewportState()
+
             // Canvas area
             Box(
                 modifier =
@@ -103,9 +105,12 @@ fun CanvasEditorScreen(
                         .weight(1f)
                         .fillMaxWidth(),
             ) {
-                val viewportState = rememberCanvasViewportState()
+                val viewportGesturesEnabled =
+                    state.activeTool != CanvasTool.INK &&
+                        state.activeTool != CanvasTool.SHAPE
                 CanvasViewport(
                     state = viewportState,
+                    gestureEnabled = viewportGesturesEnabled,
                 ) {
                     CanvasRenderer(
                         document = state.document,
@@ -194,7 +199,9 @@ fun CanvasEditorScreen(
                     initialColor = editingElement?.color ?: DEFAULT_STROKE_COLOR,
                     initialFontSize = editingElement?.fontSize ?: 24f,
                     onConfirm = { content, fontFamily, color, fontSize ->
-                        viewModel.confirmTextEditing(content, fontFamily, color, fontSize)
+                        val centerX = -viewportState.offset.x / viewportState.scale
+                        val centerY = -viewportState.offset.y / viewportState.scale
+                        viewModel.confirmTextEditing(content, fontFamily, color, fontSize, centerX, centerY)
                     },
                     onDismiss = viewModel::cancelTextEditing,
                 )

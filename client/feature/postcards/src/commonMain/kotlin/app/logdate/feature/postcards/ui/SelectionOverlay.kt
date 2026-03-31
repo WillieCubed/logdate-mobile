@@ -17,17 +17,9 @@ import kotlin.uuid.Uuid
  * Rendered on top of the viewport (in screen space). Converts screen-space gesture
  * deltas to canvas-space using the viewport scale factor.
  *
+ * - Two-finger pinch/rotate transforms the selected element.
  * - Single-finger drag moves the selected element.
- * - Two-finger pinch/rotate transforms the selected element (scale + rotation).
- * - Tap on empty space deselects.
- *
- * @param selectedElementId The ID of the currently selected element.
- * @param viewportScale The current viewport zoom level, used for coordinate conversion.
- * @param onBeginDrag Called once at the start of a drag gesture (for undo batching).
- * @param onMoveElement Called with (elementId, dx, dy) in canvas coordinates during drag.
- * @param onEndDrag Called when the drag gesture ends.
- * @param onTransformElement Called with (elementId, scaleDelta, rotationDelta) during pinch/rotate.
- * @param onDeselect Called when the user taps on the overlay (to deselect).
+ * - Single tap deselects.
  */
 @Composable
 fun SelectionOverlay(
@@ -45,21 +37,21 @@ fun SelectionOverlay(
         modifier =
             Modifier
                 .fillMaxSize()
+                // Two-finger transform gets highest priority
                 .pointerInput(selectedElementId) {
                     detectTransformGestures { _, pan, zoom, rotation ->
-                        // Two-finger gesture: transform the selected element
                         onTransformElement(selectedElementId, zoom, rotation)
-                        // Also apply the pan component as movement
                         val dxCanvas = pan.x / (viewportScale * density.density)
                         val dyCanvas = pan.y / (viewportScale * density.density)
                         onMoveElement(selectedElementId, dxCanvas, dyCanvas)
                     }
-                }.pointerInput(selectedElementId) {
+                }
+                // Single-finger drag for movement
+                .pointerInput(selectedElementId) {
                     detectDragGestures(
                         onDragStart = { onBeginDrag() },
                         onDrag = { change, dragAmount ->
                             change.consume()
-                            // Convert screen-space delta to canvas-space
                             val dxCanvas = dragAmount.x / (viewportScale * density.density)
                             val dyCanvas = dragAmount.y / (viewportScale * density.density)
                             onMoveElement(selectedElementId, dxCanvas, dyCanvas)
@@ -67,7 +59,9 @@ fun SelectionOverlay(
                         onDragEnd = { onEndDrag() },
                         onDragCancel = { onEndDrag() },
                     )
-                }.pointerInput(selectedElementId) {
+                }
+                // Tap to deselect — only fires when no drag/transform consumed the gesture
+                .pointerInput(selectedElementId) {
                     detectTapGestures {
                         onDeselect()
                     }

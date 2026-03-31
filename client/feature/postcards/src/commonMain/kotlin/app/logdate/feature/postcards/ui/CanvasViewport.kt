@@ -49,22 +49,31 @@ fun rememberCanvasViewportState(): CanvasViewportState = remember { CanvasViewpo
 fun CanvasViewport(
     state: CanvasViewportState,
     modifier: Modifier = Modifier,
+    gestureEnabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
+    val gestureModifier =
+        if (gestureEnabled) {
+            Modifier.pointerInput(Unit) {
+                detectTransformGestures { _, pan, zoom, _ ->
+                    state.scale =
+                        (state.scale * zoom).coerceIn(
+                            CanvasViewportState.MIN_SCALE,
+                            CanvasViewportState.MAX_SCALE,
+                        )
+                    state.offset += pan
+                }
+            }
+        } else {
+            Modifier
+        }
+
     Box(
         modifier =
             modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        state.scale =
-                            (state.scale * zoom).coerceIn(
-                                CanvasViewportState.MIN_SCALE,
-                                CanvasViewportState.MAX_SCALE,
-                            )
-                        state.offset += pan
-                    }
-                }.graphicsLayer {
+                .then(gestureModifier)
+                .graphicsLayer {
                     scaleX = state.scale
                     scaleY = state.scale
                     translationX = state.offset.x

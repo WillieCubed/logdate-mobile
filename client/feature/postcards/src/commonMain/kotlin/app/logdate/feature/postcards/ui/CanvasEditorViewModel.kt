@@ -393,12 +393,14 @@ class CanvasEditorViewModel(
         fontFamily: String,
         color: String,
         fontSize: Float,
+        x: Float = 0f,
+        y: Float = 0f,
     ) {
         val editingId = _state.value.editingTextElementId
         if (editingId != null) {
             updateTextElement(editingId, content, fontFamily, color, fontSize)
         } else {
-            addTextElement(content, fontFamily, color, fontSize, x = 0f, y = 0f)
+            addTextElement(content, fontFamily, color, fontSize, x = x, y = y)
         }
         _state.update {
             it.copy(
