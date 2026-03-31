@@ -65,6 +65,7 @@ fun OnboardingDayBoundariesScreen(
         }
     }
 
+    // Defensive: screen should not be reached when HC is unavailable, but navigate away if it is
     LaunchedEffect(healthConnectStatus) {
         if (healthConnectStatus == HealthConnectStatus.NOT_AVAILABLE) {
             viewModel.disableSleepBasedDayBoundaries()
@@ -72,6 +73,7 @@ fun OnboardingDayBoundariesScreen(
         }
     }
 
+    // Auto-advance once permission is granted and HC is confirmed connected
     LaunchedEffect(permissionState.completedRequestCount, healthConnectStatus) {
         if (permissionState.completedRequestCount > 0 && healthConnectStatus == HealthConnectStatus.CONNECTED) {
             viewModel.enableSleepBasedDayBoundaries()
@@ -88,13 +90,10 @@ fun OnboardingDayBoundariesScreen(
                     viewModel.enableSleepBasedDayBoundaries()
                     onNext()
                 }
-
                 HealthConnectStatus.PERMISSIONS_NEEDED -> permissionState.requestPermission()
-                HealthConnectStatus.CHECKING -> Unit
-                HealthConnectStatus.NOT_AVAILABLE -> {
-                    viewModel.disableSleepBasedDayBoundaries()
-                    onNext()
-                }
+                HealthConnectStatus.CHECKING,
+                HealthConnectStatus.NOT_AVAILABLE,
+                -> Unit
             }
         },
         onSkip = {
@@ -118,22 +117,25 @@ fun OnboardingDayBoundariesContent(
         when (healthConnectStatus) {
             HealthConnectStatus.CONNECTED -> stringResource(Res.string.onboarding_day_boundaries_enable)
             HealthConnectStatus.PERMISSIONS_NEEDED -> stringResource(Res.string.onboarding_day_boundaries_grant_access)
-            HealthConnectStatus.CHECKING -> stringResource(Res.string.onboarding_day_boundaries_status_checking_title)
-            HealthConnectStatus.NOT_AVAILABLE -> stringResource(Res.string.onboarding_day_boundaries_not_now)
+            HealthConnectStatus.CHECKING,
+            HealthConnectStatus.NOT_AVAILABLE,
+            -> stringResource(Res.string.onboarding_day_boundaries_status_checking_title)
         }
     val statusTitle =
         when (healthConnectStatus) {
             HealthConnectStatus.CONNECTED -> stringResource(Res.string.onboarding_day_boundaries_status_connected_title)
             HealthConnectStatus.PERMISSIONS_NEEDED -> stringResource(Res.string.onboarding_day_boundaries_status_permissions_title)
-            HealthConnectStatus.CHECKING -> stringResource(Res.string.onboarding_day_boundaries_status_checking_title)
-            HealthConnectStatus.NOT_AVAILABLE -> stringResource(Res.string.onboarding_day_boundaries_status_checking_title)
+            HealthConnectStatus.CHECKING,
+            HealthConnectStatus.NOT_AVAILABLE,
+            -> stringResource(Res.string.onboarding_day_boundaries_status_checking_title)
         }
     val statusDescription =
         when (healthConnectStatus) {
             HealthConnectStatus.CONNECTED -> stringResource(Res.string.onboarding_day_boundaries_status_connected_description)
             HealthConnectStatus.PERMISSIONS_NEEDED -> stringResource(Res.string.onboarding_day_boundaries_status_permissions_description)
-            HealthConnectStatus.CHECKING -> stringResource(Res.string.onboarding_day_boundaries_status_checking_description)
-            HealthConnectStatus.NOT_AVAILABLE -> stringResource(Res.string.onboarding_day_boundaries_status_checking_description)
+            HealthConnectStatus.CHECKING,
+            HealthConnectStatus.NOT_AVAILABLE,
+            -> stringResource(Res.string.onboarding_day_boundaries_status_checking_description)
         }
 
     Scaffold(

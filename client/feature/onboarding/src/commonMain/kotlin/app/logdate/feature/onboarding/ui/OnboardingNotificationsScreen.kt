@@ -10,11 +10,13 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,9 +28,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -38,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.permissions.rememberNotificationPermissionState
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
+import kotlinx.coroutines.launch
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
@@ -51,19 +57,52 @@ fun OnboardingNotificationsScreen(
 ) {
     val recommendationsEnabled by viewModel.recommendationsEnabled.collectAsState()
     val permissionState = rememberNotificationPermissionState()
-
-    // Auto-advance after permission dialog result
-    LaunchedEffect(permissionState.permissionRequested) {
-        if (permissionState.permissionRequested) {
-            onNext()
-        }
-    }
+    val coroutineScope = rememberCoroutineScope()
+    var isSaving by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val hasDecision = permissionState.hasPermission || permissionState.permissionRequested
 
     OnboardingNotificationsContent(
         onBack = onBack,
-        onEnable = permissionState.requestPermission,
-        onSkip = onNext,
+        onPrimaryAction = {
+            if (hasDecision) {
+                coroutineScope.launch {
+                    isSaving = true
+                    errorMessage = null
+                    viewModel
+                        .markNotificationsHandled()
+                        .onSuccess {
+                            isSaving = false
+                            onNext()
+                        }.onFailure {
+                            errorMessage = "We couldn't save your notification setup right now."
+                            isSaving = false
+                        }
+                }
+            } else {
+                permissionState.requestPermission()
+            }
+        },
+        onSkip = {
+            coroutineScope.launch {
+                isSaving = true
+                errorMessage = null
+                viewModel
+                    .markNotificationsHandled()
+                    .onSuccess {
+                        isSaving = false
+                        onNext()
+                    }.onFailure {
+                        errorMessage = "We couldn't save your notification setup right now."
+                        isSaving = false
+                    }
+            }
+        },
         recommendationsEnabled = recommendationsEnabled,
+        hasDecision = hasDecision,
+        hasPermission = permissionState.hasPermission,
+        isSaving = isSaving,
+        errorMessage = errorMessage,
     )
 }
 
@@ -71,9 +110,13 @@ fun OnboardingNotificationsScreen(
 @Composable
 fun OnboardingNotificationsContent(
     onBack: () -> Unit,
-    onEnable: () -> Unit,
+    onPrimaryAction: () -> Unit,
     onSkip: () -> Unit,
     recommendationsEnabled: Boolean,
+    hasDecision: Boolean,
+    hasPermission: Boolean,
+    isSaving: Boolean = false,
+    errorMessage: String? = null,
 ) {
     val scrollState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(scrollState)
@@ -83,6 +126,12 @@ fun OnboardingNotificationsContent(
             stringResource(Res.string.onboarding_notifications_body_with_recommendations)
         } else {
             stringResource(Res.string.onboarding_notifications_body_without_recommendations)
+        }
+    val primaryActionLabel =
+        if (hasDecision) {
+            stringResource(Res.string.`continue`)
+        } else {
+            stringResource(Res.string.onboarding_notifications_enable)
         }
 
     Scaffold(
@@ -129,13 +178,28 @@ fun OnboardingNotificationsContent(
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Button(
-                        onClick = onEnable,
+                        onClick = onPrimaryAction,
                         modifier = Modifier.fillMaxWidth(),
+                        enabled = !isSaving,
                     ) {
-                        Text(stringResource(Res.string.onboarding_notifications_enable))
+                        if (isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Text(primaryActionLabel)
+                        }
                     }
                     TextButton(onClick = onSkip) {
                         Text(stringResource(Res.string.onboarding_notifications_not_now))
+                    }
+                    errorMessage?.let { message ->
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
                     }
                 }
             }
@@ -149,9 +213,11 @@ private fun OnboardingNotificationsScreenPreview_WithRecommendations() {
     LogDateTheme {
         OnboardingNotificationsContent(
             onBack = {},
-            onEnable = {},
+            onPrimaryAction = {},
             onSkip = {},
             recommendationsEnabled = true,
+            hasDecision = false,
+            hasPermission = false,
         )
     }
 }
@@ -162,9 +228,11 @@ private fun OnboardingNotificationsScreenPreview_WithoutRecommendations() {
     LogDateTheme {
         OnboardingNotificationsContent(
             onBack = {},
-            onEnable = {},
+            onPrimaryAction = {},
             onSkip = {},
             recommendationsEnabled = false,
+            hasDecision = true,
+            hasPermission = false,
         )
     }
 }

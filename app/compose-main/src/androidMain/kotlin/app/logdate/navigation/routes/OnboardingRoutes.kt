@@ -1,22 +1,51 @@
 package app.logdate.navigation.routes
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
+import app.logdate.client.domain.dayboundary.HealthConnectStatus
+import app.logdate.feature.onboarding.flow.OnboardingEntryMode
+import app.logdate.feature.onboarding.flow.OnboardingProgressSnapshot
+import app.logdate.feature.onboarding.flow.OnboardingStep
+import app.logdate.feature.onboarding.flow.firstOnboardingStep
+import app.logdate.feature.onboarding.flow.nextOnboardingStepAfter
 import app.logdate.feature.onboarding.ui.CloudAccountSetupScreen
 import app.logdate.feature.onboarding.ui.MemoriesImportInfoScreen
+import app.logdate.feature.onboarding.ui.MemorySelectionScreen
+import app.logdate.feature.onboarding.ui.MemorySelectionViewModel
+import app.logdate.feature.onboarding.ui.OnboardingBirthdayScreen
 import app.logdate.feature.onboarding.ui.OnboardingCompletionScreen
+import app.logdate.feature.onboarding.ui.OnboardingDayBoundariesScreen
+import app.logdate.feature.onboarding.ui.OnboardingLocationScreen
+import app.logdate.feature.onboarding.ui.OnboardingNotificationsScreen
+import app.logdate.feature.onboarding.ui.OnboardingOverviewScreen
+import app.logdate.feature.onboarding.ui.OnboardingRecommendationsScreen
 import app.logdate.feature.onboarding.ui.OnboardingStartScreen
+import app.logdate.feature.onboarding.ui.OnboardingViewModel
 import app.logdate.feature.onboarding.ui.PersonalIntroScreen
 import app.logdate.feature.onboarding.ui.WelcomeBackScreen
 import app.logdate.navigation.MainAppNavigator
+import app.logdate.navigation.routes.core.OnboardingAccountCreationRoute
+import app.logdate.navigation.routes.core.OnboardingAppOverviewRoute
+import app.logdate.navigation.routes.core.OnboardingBirthdayRoute
 import app.logdate.navigation.routes.core.OnboardingCompleteRoute
-import app.logdate.navigation.routes.core.OnboardingEntryRoute
+import app.logdate.navigation.routes.core.OnboardingDayBoundariesRoute
 import app.logdate.navigation.routes.core.OnboardingImportRoute
-import app.logdate.navigation.routes.core.OnboardingSignIn
+import app.logdate.navigation.routes.core.OnboardingLocationTimelineRoute
+import app.logdate.navigation.routes.core.OnboardingMemorySelectionRoute
+import app.logdate.navigation.routes.core.OnboardingNotificationsRoute
+import app.logdate.navigation.routes.core.OnboardingRecommendationsRoute
 import app.logdate.navigation.routes.core.OnboardingStart
 import app.logdate.navigation.routes.core.OnboardingWelcomeBackRoute
 import app.logdate.navigation.routes.core.PersonalIntroRoute
-import app.logdate.navigation.routes.routeEntry
+import kotlinx.coroutines.launch
+import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * Navigates to the onboarding flow.
@@ -28,54 +57,262 @@ fun MainAppNavigator.startOnboarding() {
     safelyClearBackstack(OnboardingStart)
 }
 
-/**
- * Provides the navigation routes for the onboarding flow.
- *
- * @param onBack Callback to handle back navigation
- * @param onStartOnboarding Callback to start the onboarding process
- * @param onContinueToEntry Callback to continue to the entry screen
- * @param onImportCompleted Callback triggered when import is completed
- * @param onWelcomeBack Callback triggered when the user is welcomed back
- * @param onComplete Callback triggered when onboarding is complete
- */
 fun EntryProviderScope<NavKey>.onboarding(
     onBack: () -> Unit,
-    onStartOnboarding: () -> Unit,
-    onContinueToEntry: () -> Unit,
-    onImportCompleted: () -> Unit,
-    onWelcomeBack: () -> Unit,
+    onNavigate: (NavKey) -> Unit,
     onComplete: () -> Unit,
 ) {
     routeEntry<OnboardingStart> {
+        val viewModel = koinViewModel<OnboardingViewModel>()
+        val progressSnapshot by viewModel.progressSnapshot.collectAsState()
+        val coroutineScope = rememberCoroutineScope()
+
         OnboardingStartScreen(
-            onNext = onStartOnboarding,
-            onStartFromBackup = onStartOnboarding,
+            onNext = {
+                coroutineScope.launch {
+                    viewModel.setActiveEntryMode(OnboardingEntryMode.FRESH)
+                    onNavigate(routeForStep(firstOnboardingStep(OnboardingEntryMode.FRESH, progressSnapshot)))
+                }
+            },
+            onStartFromBackup = {
+                coroutineScope.launch {
+                    viewModel.setActiveEntryMode(OnboardingEntryMode.CONTINUE_SETUP)
+                    onNavigate(routeForStep(firstOnboardingStep(OnboardingEntryMode.CONTINUE_SETUP, progressSnapshot)))
+                }
+            },
         )
     }
     routeEntry<PersonalIntroRoute> {
+        val viewModel = koinViewModel<OnboardingViewModel>()
+        val progressSnapshot by viewModel.progressSnapshot.collectAsState()
+        val entryMode by viewModel.activeEntryMode.collectAsState()
+
         PersonalIntroScreen(
-            onNext = onContinueToEntry,
+            onNext = {
+                onNavigate(
+                    routeForNextStep(
+                        currentStep = OnboardingStep.PERSONAL_INTRO,
+                        entryMode = entryMode,
+                        snapshot = progressSnapshot.copy(hasPersonalIntro = true),
+                    ),
+                )
+            },
             onBack = onBack,
         )
     }
-    routeEntry<OnboardingSignIn> { _ ->
-        CloudAccountSetupScreen(
+    routeEntry<OnboardingAppOverviewRoute> {
+        val viewModel = koinViewModel<OnboardingViewModel>()
+        val progressSnapshot by viewModel.progressSnapshot.collectAsState()
+        val entryMode by viewModel.activeEntryMode.collectAsState()
+
+        OnboardingOverviewScreen(
             onBack = onBack,
-            onSkip = onContinueToEntry,
-            onContinue = onWelcomeBack,
+            onNext = {
+                onNavigate(
+                    routeForNextStep(
+                        currentStep = OnboardingStep.APP_OVERVIEW,
+                        entryMode = entryMode,
+                        snapshot = progressSnapshot,
+                    ),
+                )
+            },
         )
-    }
-    routeEntry<OnboardingEntryRoute> {
     }
     routeEntry<OnboardingImportRoute> {
+        val viewModel = koinViewModel<OnboardingViewModel>()
+        val progressSnapshot by viewModel.progressSnapshot.collectAsState()
+        val entryMode by viewModel.activeEntryMode.collectAsState()
+
         MemoriesImportInfoScreen(
             onBack = onBack,
-            onContinue = onImportCompleted,
+            onContinue = {
+                onNavigate(
+                    routeForNextStep(
+                        currentStep = OnboardingStep.MEMORY_IMPORT,
+                        entryMode = entryMode,
+                        snapshot = progressSnapshot,
+                    ),
+                )
+            },
+        )
+    }
+    routeEntry<OnboardingMemorySelectionRoute> {
+        val flowViewModel = koinViewModel<OnboardingViewModel>()
+        val progressSnapshot by flowViewModel.progressSnapshot.collectAsState()
+        val entryMode by flowViewModel.activeEntryMode.collectAsState()
+        val viewModel = koinViewModel<MemorySelectionViewModel>()
+        val uiState by viewModel.uiState.collectAsState()
+        val coroutineScope = rememberCoroutineScope()
+
+        MemorySelectionScreen(
+            uiState = uiState,
+            onBack = onBack,
+            onContinue = {
+                coroutineScope.launch {
+                    viewModel
+                        .processSelectedMemories()
+                        .onSuccess {
+                            onNavigate(
+                                routeForNextStep(
+                                    currentStep = OnboardingStep.MEMORY_SELECTION,
+                                    entryMode = entryMode,
+                                    snapshot = progressSnapshot,
+                                ),
+                            )
+                        }
+                }
+            },
+            onToggleMemorySelection = viewModel::toggleMemorySelection,
+            onLoadMoreMemories = viewModel::loadMoreMemories,
+            onRefreshMemories = viewModel::refreshMemories,
+        )
+    }
+    routeEntry<OnboardingAccountCreationRoute> {
+        val flowViewModel = koinViewModel<OnboardingViewModel>()
+        val progressSnapshot by flowViewModel.progressSnapshot.collectAsState()
+        val entryMode by flowViewModel.activeEntryMode.collectAsState()
+
+        CloudAccountSetupScreen(
+            onBack = onBack,
+            onContinue = {
+                onNavigate(
+                    routeForNextStep(
+                        currentStep = OnboardingStep.ACCOUNT,
+                        entryMode = entryMode,
+                        snapshot = progressSnapshot.copy(hasCloudAccount = true),
+                    ),
+                )
+            },
+            onSkip = {
+                onNavigate(
+                    routeForNextStep(
+                        currentStep = OnboardingStep.ACCOUNT,
+                        entryMode = entryMode,
+                        snapshot = progressSnapshot,
+                    ),
+                )
+            },
+        )
+    }
+    routeEntry<OnboardingBirthdayRoute> {
+        val viewModel = koinViewModel<OnboardingViewModel>()
+        val progressSnapshot by viewModel.progressSnapshot.collectAsState()
+        val entryMode by viewModel.activeEntryMode.collectAsState()
+
+        OnboardingBirthdayScreen(
+            onBack = onBack,
+            onNext = {
+                onNavigate(
+                    routeForNextStep(
+                        currentStep = OnboardingStep.BIRTHDAY,
+                        entryMode = entryMode,
+                        snapshot = progressSnapshot.copy(hasBirthday = true),
+                    ),
+                )
+            },
+        )
+    }
+    routeEntry<OnboardingRecommendationsRoute> {
+        val viewModel = koinViewModel<OnboardingViewModel>()
+        val progressSnapshot by viewModel.progressSnapshot.collectAsState()
+        val entryMode by viewModel.activeEntryMode.collectAsState()
+        var pendingNextRoute by rememberSaveable { mutableStateOf(false) }
+
+        LaunchedEffect(pendingNextRoute, progressSnapshot.healthConnectStatus) {
+            if (
+                !pendingNextRoute ||
+                progressSnapshot.healthConnectStatus == HealthConnectStatus.CHECKING
+            ) {
+                return@LaunchedEffect
+            }
+
+            pendingNextRoute = false
+            onNavigate(
+                routeForNextStep(
+                    currentStep = OnboardingStep.RECOMMENDATIONS,
+                    entryMode = entryMode,
+                    snapshot = progressSnapshot,
+                ),
+            )
+        }
+
+        OnboardingRecommendationsScreen(
+            onBack = onBack,
+            onNext = {
+                if (progressSnapshot.healthConnectStatus == HealthConnectStatus.CHECKING) {
+                    pendingNextRoute = true
+                } else {
+                    onNavigate(
+                        routeForNextStep(
+                            currentStep = OnboardingStep.RECOMMENDATIONS,
+                            entryMode = entryMode,
+                            snapshot = progressSnapshot,
+                        ),
+                    )
+                }
+            },
+        )
+    }
+    routeEntry<OnboardingDayBoundariesRoute> {
+        val viewModel = koinViewModel<OnboardingViewModel>()
+        val progressSnapshot by viewModel.progressSnapshot.collectAsState()
+        val entryMode by viewModel.activeEntryMode.collectAsState()
+
+        OnboardingDayBoundariesScreen(
+            onBack = onBack,
+            onNext = {
+                onNavigate(
+                    routeForNextStep(
+                        currentStep = OnboardingStep.DAY_BOUNDARIES,
+                        entryMode = entryMode,
+                        snapshot = progressSnapshot,
+                    ),
+                )
+            },
+        )
+    }
+    routeEntry<OnboardingLocationTimelineRoute> {
+        val viewModel = koinViewModel<OnboardingViewModel>()
+        val progressSnapshot by viewModel.progressSnapshot.collectAsState()
+        val entryMode by viewModel.activeEntryMode.collectAsState()
+
+        OnboardingLocationScreen(
+            onBack = onBack,
+            onNext = {
+                onNavigate(
+                    routeForNextStep(
+                        currentStep = OnboardingStep.LOCATION,
+                        entryMode = entryMode,
+                        snapshot = progressSnapshot,
+                    ),
+                )
+            },
+        )
+    }
+    routeEntry<OnboardingNotificationsRoute> {
+        val viewModel = koinViewModel<OnboardingViewModel>()
+        val progressSnapshot by viewModel.progressSnapshot.collectAsState()
+        val entryMode by viewModel.activeEntryMode.collectAsState()
+
+        OnboardingNotificationsScreen(
+            onBack = onBack,
+            onNext = {
+                onNavigate(
+                    routeForNextStep(
+                        currentStep = OnboardingStep.NOTIFICATIONS,
+                        entryMode = entryMode,
+                        snapshot = progressSnapshot.copy(notificationsHandledOnThisDevice = true),
+                    ),
+                )
+            },
         )
     }
     routeEntry<OnboardingCompleteRoute> {
         OnboardingCompletionScreen(
             onFinish = onComplete,
+            onRequirementsIncomplete = { step ->
+                onNavigate(routeForStep(step))
+            },
         )
     }
     routeEntry<OnboardingWelcomeBackRoute> {
@@ -84,3 +321,31 @@ fun EntryProviderScope<NavKey>.onboarding(
         )
     }
 }
+
+private fun routeForNextStep(
+    currentStep: OnboardingStep,
+    entryMode: OnboardingEntryMode,
+    snapshot: OnboardingProgressSnapshot,
+): NavKey = routeForStep(nextOnboardingStepAfter(currentStep, entryMode, snapshot) ?: terminalStepFor(entryMode))
+
+private fun routeForStep(step: OnboardingStep): NavKey =
+    when (step) {
+        OnboardingStep.PERSONAL_INTRO -> PersonalIntroRoute
+        OnboardingStep.APP_OVERVIEW -> OnboardingAppOverviewRoute
+        OnboardingStep.MEMORY_IMPORT -> OnboardingImportRoute
+        OnboardingStep.MEMORY_SELECTION -> OnboardingMemorySelectionRoute
+        OnboardingStep.ACCOUNT -> OnboardingAccountCreationRoute
+        OnboardingStep.BIRTHDAY -> OnboardingBirthdayRoute
+        OnboardingStep.RECOMMENDATIONS -> OnboardingRecommendationsRoute
+        OnboardingStep.DAY_BOUNDARIES -> OnboardingDayBoundariesRoute
+        OnboardingStep.LOCATION -> OnboardingLocationTimelineRoute
+        OnboardingStep.NOTIFICATIONS -> OnboardingNotificationsRoute
+        OnboardingStep.COMPLETE -> OnboardingCompleteRoute
+        OnboardingStep.WELCOME_BACK -> OnboardingWelcomeBackRoute
+    }
+
+private fun terminalStepFor(entryMode: OnboardingEntryMode): OnboardingStep =
+    when (entryMode) {
+        OnboardingEntryMode.FRESH -> OnboardingStep.COMPLETE
+        OnboardingEntryMode.CONTINUE_SETUP -> OnboardingStep.WELCOME_BACK
+    }

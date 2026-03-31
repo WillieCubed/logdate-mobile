@@ -35,6 +35,19 @@ import app.logdate.navigation.MainNavigationRoot
 import app.logdate.navigation.rememberMainAppNavigator
 import app.logdate.navigation.routes.core.ExportSettingsRoute
 import app.logdate.navigation.routes.core.NavigationStart
+import app.logdate.navigation.routes.core.OnboardingAccountCreationRoute
+import app.logdate.navigation.routes.core.OnboardingAppOverviewRoute
+import app.logdate.navigation.routes.core.OnboardingBirthdayRoute
+import app.logdate.navigation.routes.core.OnboardingCompleteRoute
+import app.logdate.navigation.routes.core.OnboardingDayBoundariesRoute
+import app.logdate.navigation.routes.core.OnboardingImportRoute
+import app.logdate.navigation.routes.core.OnboardingLocationTimelineRoute
+import app.logdate.navigation.routes.core.OnboardingMemorySelectionRoute
+import app.logdate.navigation.routes.core.OnboardingNotificationsRoute
+import app.logdate.navigation.routes.core.OnboardingRecommendationsRoute
+import app.logdate.navigation.routes.core.OnboardingStart
+import app.logdate.navigation.routes.core.OnboardingWelcomeBackRoute
+import app.logdate.navigation.routes.core.PersonalIntroRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.routes.core.navigateHomeFromLaunch
 import app.logdate.navigation.routes.openExportSettings
@@ -95,8 +108,9 @@ fun MainActivityUiRoot(
             return@LaunchedEffect
         }
         if (!appUiState.isOnboarded) {
-//        // Ensure that onboarding is completed before proceeding
-            mainAppNavigator.startOnboarding()
+            if (!mainAppNavigator.isShowingOnboardingRoute()) {
+                mainAppNavigator.startOnboarding()
+            }
             if (!hasReportedInitialNavigation) {
                 hasReportedInitialNavigation = true
                 onInitialNavigationReady()
@@ -249,3 +263,25 @@ fun MainActivityUiRoot(
         }
     }
 }
+
+private fun MainAppNavigator.isShowingOnboardingRoute(): Boolean = backStack.lastOrNull().isOnboardingRoute()
+
+private fun NavKey?.isOnboardingRoute(): Boolean =
+    when (this) {
+        OnboardingStart,
+        PersonalIntroRoute,
+        OnboardingAppOverviewRoute,
+        OnboardingImportRoute,
+        OnboardingMemorySelectionRoute,
+        OnboardingAccountCreationRoute,
+        OnboardingBirthdayRoute,
+        OnboardingRecommendationsRoute,
+        OnboardingDayBoundariesRoute,
+        OnboardingLocationTimelineRoute,
+        OnboardingNotificationsRoute,
+        OnboardingCompleteRoute,
+        OnboardingWelcomeBackRoute,
+        -> true
+
+        else -> false
+    }

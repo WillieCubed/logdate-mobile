@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Timeline
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,9 +37,11 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +54,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
+import kotlinx.coroutines.launch
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
@@ -63,13 +67,34 @@ fun OnboardingBirthdayScreen(
     onNext: () -> Unit,
     viewModel: OnboardingViewModel = koinViewModel(),
 ) {
+    val coroutineScope = rememberCoroutineScope()
+    var isSaving by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(errorMessage) {
+        if (errorMessage != null) {
+            isSaving = false
+        }
+    }
+
     OnboardingBirthdayContent(
         onBack = onBack,
         onBirthdaySelected = { birthday ->
-            viewModel.updateBirthday(birthday)
-            onNext()
+            coroutineScope.launch {
+                isSaving = true
+                errorMessage = null
+                viewModel
+                    .persistBirthday(birthday)
+                    .onSuccess {
+                        isSaving = false
+                        onNext()
+                    }.onFailure {
+                        errorMessage = "We couldn't save your birthday right now."
+                    }
+            }
         },
-        onSkip = onNext,
+        isSaving = isSaving,
+        errorMessage = errorMessage,
     )
 }
 
@@ -78,7 +103,8 @@ fun OnboardingBirthdayScreen(
 fun OnboardingBirthdayContent(
     onBack: () -> Unit,
     onBirthdaySelected: (Instant) -> Unit,
-    onSkip: () -> Unit,
+    isSaving: Boolean = false,
+    errorMessage: String? = null,
 ) {
     val scrollState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(scrollState)
@@ -180,11 +206,23 @@ fun OnboardingBirthdayContent(
                     Button(
                         onClick = { showDatePicker = true },
                         modifier = Modifier.fillMaxWidth(),
+                        enabled = !isSaving,
                     ) {
-                        Text(stringResource(Res.string.onboarding_birthday_set))
+                        if (isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Text(stringResource(Res.string.onboarding_birthday_set))
+                        }
                     }
-                    TextButton(onClick = onSkip) {
-                        Text(stringResource(Res.string.onboarding_birthday_skip))
+                    errorMessage?.let { message ->
+                        Text(
+                            text = message,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
                     }
                 }
             }
@@ -226,7 +264,6 @@ private fun OnboardingBirthdayScreenPreview() {
         OnboardingBirthdayContent(
             onBack = {},
             onBirthdaySelected = {},
-            onSkip = {},
         )
     }
 }

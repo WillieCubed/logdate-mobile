@@ -31,6 +31,30 @@ data object OnboardingEntryRoute : NavKey
 data object OnboardingImportRoute : NavKey
 
 @Serializable
+data object OnboardingAppOverviewRoute : NavKey
+
+@Serializable
+data object OnboardingMemorySelectionRoute : NavKey
+
+@Serializable
+data object OnboardingAccountCreationRoute : NavKey
+
+@Serializable
+data object OnboardingBirthdayRoute : NavKey
+
+@Serializable
+data object OnboardingRecommendationsRoute : NavKey
+
+@Serializable
+data object OnboardingDayBoundariesRoute : NavKey
+
+@Serializable
+data object OnboardingLocationTimelineRoute : NavKey
+
+@Serializable
+data object OnboardingNotificationsRoute : NavKey
+
+@Serializable
 data object OnboardingCompleteRoute : NavKey
 
 @Serializable

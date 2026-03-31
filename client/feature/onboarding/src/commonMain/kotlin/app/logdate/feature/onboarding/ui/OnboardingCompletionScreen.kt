@@ -26,13 +26,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.onboarding.flow.OnboardingStep
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.feature.onboarding.generated.resources.action_onboarding_continue
@@ -47,17 +50,28 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun OnboardingCompletionScreen(
     onFinish: () -> Unit,
+    onRequirementsIncomplete: (OnboardingStep) -> Unit = {},
     viewModel: OnboardingViewModel = koinViewModel(),
     modifier: Modifier = Modifier,
 ) {
     var shouldShowFinish by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     OnboardingCompletionContent(
         shouldShowFinish = shouldShowFinish,
         onContinue = { shouldShowFinish = true },
         onFinish = {
-            viewModel.completeOnboarding()
-            onFinish()
+            coroutineScope.launch {
+                viewModel
+                    .completeOnboardingIfEligible()
+                    .onSuccess {
+                        onFinish()
+                    }.onFailure {
+                        viewModel
+                            .firstIncompleteRequiredFreshStep()
+                            ?.let(onRequirementsIncomplete)
+                    }
+            }
         },
         modifier = modifier,
     )

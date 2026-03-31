@@ -15,6 +15,14 @@ import app.logdate.client.location.di.locationModule
 import app.logdate.client.media.di.audioModule
 import app.logdate.client.networking.di.networkingModule
 import app.logdate.client.sensor.di.sensorModule
+import app.logdate.client.sync.AndroidPhoneAudioStreamOpener
+import app.logdate.client.sync.DefaultPhoneWearSyncBridge
+import app.logdate.client.sync.GooglePhoneWearTransport
+import app.logdate.client.sync.PhoneAudioStreamOpener
+import app.logdate.client.sync.PhoneWearSyncBridge
+import app.logdate.client.sync.PhoneWearTransport
+import app.logdate.client.sync.WearSyncNotificationHelper
+import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.updates.PlayInAppUpdateController
 import app.logdate.client.watch.AndroidWatchConnectionManager
 import app.logdate.dynamic.DynamicFeatureLoader
@@ -51,6 +59,19 @@ actual val appModule: Module =
         includes(audioModule)
         includes(windowingModule)
         includes(widgetModule)
+
+        single { NoteDataMapper() }
+        single { WearSyncNotificationHelper(androidContext()) }
+        single<PhoneWearTransport> { GooglePhoneWearTransport(androidContext()) }
+        single<PhoneAudioStreamOpener> { AndroidPhoneAudioStreamOpener(androidContext()) }
+        single<PhoneWearSyncBridge> {
+            DefaultPhoneWearSyncBridge(
+                notesRepository = get(),
+                noteDataMapper = get(),
+                transport = get(),
+                audioStreamOpener = get(),
+            )
+        }
 
         single { PlayInAppUpdateController(androidContext(), get()) }
         single<AppUpdateController> { get<PlayInAppUpdateController>() }

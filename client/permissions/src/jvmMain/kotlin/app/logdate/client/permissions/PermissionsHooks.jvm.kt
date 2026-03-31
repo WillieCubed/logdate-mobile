@@ -17,3 +17,12 @@ actual fun rememberHealthConnectPermissionState(): HealthConnectPermissionState 
         completedRequestCount = 0,
         requestPermission = {},
     )
+
+@Composable
+actual fun rememberMediaLibraryPermissionState(): MediaLibraryPermissionState =
+    MediaLibraryPermissionState(
+        hasPermission = true,
+        shouldShowRationale = false,
+        permissionRequested = false,
+        requestPermission = {},
+    )

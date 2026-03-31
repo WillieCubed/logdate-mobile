@@ -10,6 +10,9 @@ expect fun rememberNotificationPermissionState(): NotificationPermissionState
 @Composable
 expect fun rememberHealthConnectPermissionState(): HealthConnectPermissionState
 
+@Composable
+expect fun rememberMediaLibraryPermissionState(): MediaLibraryPermissionState
+
 /**
  * Represents the state of notification permission.
  */
@@ -25,5 +28,15 @@ data class NotificationPermissionState(
  */
 data class HealthConnectPermissionState(
     val completedRequestCount: Int,
+    val requestPermission: () -> Unit,
+)
+
+/**
+ * Represents the state of photo and video library access.
+ */
+data class MediaLibraryPermissionState(
+    val hasPermission: Boolean,
+    val shouldShowRationale: Boolean,
+    val permissionRequested: Boolean,
     val requestPermission: () -> Unit,
 )

@@ -2,7 +2,6 @@
 <resources>
     <string name="action_onboarding_continue">Continue</string>
     <string name="about_you">About you</string>
-    <string name="account_creation_will_be_implemented_here">Account creation will be implemented here</string>
     <string name="all_memories">All memories</string>
     <string name="all_your_memories_are_stored_securely_on_your_device_by_default_sign_up_for_a_logdate_account_so_you_never_lose_your_memories">All your memories are stored securely on your device by default. Sign up for a LogDate Account so you never lose your memories.</string>
     <string name="back">Back</string>
@@ -12,8 +11,8 @@
     <string name="choose_memories_to_import">Choose memories to import</string>
     <string name="choose_your_storage_plan">Choose Your Storage Plan:</string>
     <string name="continue">Continue</string>
-    <string name="continue_mock">Continue (Mock)</string>
     <string name="continue_with_memories_count">Continue with %1$d memories</string>
+    <string name="continue_without_importing_memories">Continue without importing</string>
     <string name="continue_without_cloud_sync">Continue Without Cloud Sync</string>
     <string name="continue_without_notifications">Continue without notifications</string>
     <string name="create_account">Create Account</string>
@@ -33,6 +32,11 @@
     <string name="logdate_cloud">LogDate Cloud</string>
     <string name="memories_import">Memories Import</string>
     <string name="moments_that_might_matter_most">Moments that might matter most</string>
+    <string name="memory_access_needed">Allow photo and video access</string>
+    <string name="memory_access_needed_body">LogDate needs access to your photos and videos before it can suggest memories to import.</string>
+    <string name="memory_load_failed_body">We couldn&apos;t load your photos and videos right now.</string>
+    <string name="memory_no_recent_items_body">We couldn&apos;t find any photos or videos to import on this device.</string>
+    <string name="retry">Retry</string>
     <string name="no_passwords_to_remember_use_your_devices_biometric_authentication_face_id_touch_id_or_fingerprint_for_secure_convenient_access">No passwords to remember. Use your device&apos;s biometric authentication (Face ID, Touch ID, or fingerprint) for secure, convenient access.</string>
     <string name="now_lets_import_your_memories">Now let&apos;s import your memories.</string>
     <string name="one_more_thing">One more thing...</string>
@@ -45,10 +49,8 @@
     <string name="select_an_option_above_to_continue">Select an option above to continue</string>
     <string name="select_memories">Select Memories</string>
     <string name="selected">Selected</string>
-    <string name="setting_up_sync">Setting up sync...</string>
     <string name="setting_up_your_profile">Setting up your profile...</string>
     <string name="sign_in">Sign In</string>
-    <string name="sign_in_will_be_implemented_here">Sign in will be implemented here</string>
     <string name="tell_us_a_bit_about_yourself">Tell us a bit about yourself!</string>
     <string name="verify_and_continue">Verify &amp; Continue</string>
     <string name="verify_your_recovery_phrase">Verify Your Recovery Phrase</string>

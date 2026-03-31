@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,6 +32,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -38,6 +45,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
+import kotlinx.coroutines.launch
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
@@ -49,16 +57,44 @@ fun OnboardingRecommendationsScreen(
     onNext: () -> Unit,
     viewModel: OnboardingViewModel = koinViewModel(),
 ) {
+    val coroutineScope = rememberCoroutineScope()
+    var isSaving by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
     OnboardingRecommendationsContent(
         onBack = onBack,
         onKeepOn = {
-            viewModel.setRecommendationsEnabled(true)
-            onNext()
+            coroutineScope.launch {
+                isSaving = true
+                errorMessage = null
+                viewModel
+                    .persistRecommendationsEnabled(true)
+                    .onSuccess {
+                        isSaving = false
+                        onNext()
+                    }.onFailure {
+                        errorMessage = "We couldn't save your recommendations setting right now."
+                        isSaving = false
+                    }
+            }
         },
         onTurnOff = {
-            viewModel.setRecommendationsEnabled(false)
-            onNext()
+            coroutineScope.launch {
+                isSaving = true
+                errorMessage = null
+                viewModel
+                    .persistRecommendationsEnabled(false)
+                    .onSuccess {
+                        isSaving = false
+                        onNext()
+                    }.onFailure {
+                        errorMessage = "We couldn't save your recommendations setting right now."
+                        isSaving = false
+                    }
+            }
         },
+        isSaving = isSaving,
+        errorMessage = errorMessage,
     )
 }
 
@@ -68,6 +104,8 @@ fun OnboardingRecommendationsContent(
     onBack: () -> Unit,
     onKeepOn: () -> Unit,
     onTurnOff: () -> Unit,
+    isSaving: Boolean = false,
+    errorMessage: String? = null,
 ) {
     val scrollState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(scrollState)
@@ -154,11 +192,26 @@ fun OnboardingRecommendationsContent(
                     Button(
                         onClick = onKeepOn,
                         modifier = Modifier.fillMaxWidth(),
+                        enabled = !isSaving,
                     ) {
-                        Text(stringResource(Res.string.onboarding_recommendations_keep_on))
+                        if (isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Text(stringResource(Res.string.onboarding_recommendations_keep_on))
+                        }
                     }
                     TextButton(onClick = onTurnOff) {
                         Text(stringResource(Res.string.onboarding_recommendations_turn_off))
+                    }
+                    errorMessage?.let { message ->
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
                     }
                 }
             }

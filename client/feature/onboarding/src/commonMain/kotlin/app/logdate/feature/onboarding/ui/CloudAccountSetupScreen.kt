@@ -3,6 +3,7 @@
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,9 +36,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,34 +50,78 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.client.billing.model.LogDateBackupPlanOption
+import app.logdate.feature.core.account.CloudAccountOnboardingScreen
+import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.ui.AdaptiveLayout
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import app.logdate.feature.core.account.OnboardingStep as CloudAccountOnboardingStep
 
 @Composable
 fun CloudAccountSetupScreen(
     onBack: () -> Unit,
     onContinue: () -> Unit,
     onSkip: () -> Unit,
-    useCompactLayout: Boolean = false,
+    useCompactLayout: Boolean? = null,
     modifier: Modifier = Modifier,
     onboardingViewModel: OnboardingViewModel = koinViewModel(),
 ) {
-    var selectedOption by remember { mutableStateOf<CloudSetupOption?>(null) }
+    BoxWithConstraints(modifier = modifier) {
+        val resolvedUseCompactLayout = useCompactLayout ?: (maxWidth < 700.dp)
+        var selectedOption by remember { mutableStateOf<CloudSetupOption?>(null) }
+        var activeFlow by remember { mutableStateOf<CloudSetupFlow?>(null) }
+        val cloudAccountViewModel = koinViewModel<CloudAccountOnboardingViewModel>()
 
-    CloudAccountSetupContent(
-        useCompactLayout = useCompactLayout,
-        selectedOption = selectedOption,
-        onBack = onBack,
-        onOptionSelected = { selectedOption = it },
-        onContinue = onContinue,
-        onSkip = onSkip,
-        onPlanSelected = onboardingViewModel::selectPlan,
-        modifier = modifier,
-    )
+        LaunchedEffect(activeFlow) {
+            when (activeFlow) {
+                CloudSetupFlow.CREATE_ACCOUNT -> {
+                    cloudAccountViewModel.resetFlow()
+                    cloudAccountViewModel.setInitialStep(CloudAccountOnboardingStep.DisplayName)
+                }
+                CloudSetupFlow.SIGN_IN -> {
+                    cloudAccountViewModel.resetFlow()
+                    cloudAccountViewModel.setInitialStep(CloudAccountOnboardingStep.SignIn)
+                }
+                null -> Unit
+            }
+        }
+
+        if (activeFlow != null) {
+            CloudAccountOnboardingScreen(
+                viewModel = cloudAccountViewModel,
+                onAccountCreated = onContinue,
+                onSkipOnboarding = onSkip,
+                onBack = {
+                    cloudAccountViewModel.resetFlow()
+                    activeFlow = null
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+            return@BoxWithConstraints
+        }
+
+        CloudAccountSetupContent(
+            useCompactLayout = resolvedUseCompactLayout,
+            selectedOption = selectedOption,
+            onBack = onBack,
+            onOptionSelected = { selectedOption = it },
+            onContinue = {
+                when (selectedOption) {
+                    CloudSetupOption.CREATE_ACCOUNT -> activeFlow = CloudSetupFlow.CREATE_ACCOUNT
+                    CloudSetupOption.SIGN_IN -> activeFlow = CloudSetupFlow.SIGN_IN
+                    CloudSetupOption.SKIP -> onSkip()
+                    null,
+                    -> Unit
+                }
+            },
+            onSkip = onSkip,
+            onPlanSelected = onboardingViewModel::selectPlan,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,157 +138,81 @@ fun CloudAccountSetupContent(
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
-    when (selectedOption) {
-        CloudSetupOption.CREATE_ACCOUNT -> {
-            // TODO: Implement PasskeyAccountCreationScreen when core module is available
+    AdaptiveLayout(
+        useCompactLayout = useCompactLayout,
+        modifier = modifier,
+        supplementalContent = {
             Scaffold(
-                modifier = modifier,
                 topBar = {
-                    TopAppBar(
-                        title = { Text(stringResource(Res.string.create_account)) },
+                    LargeTopAppBar(
+                        title = { Text(stringResource(Res.string.backup_and_sync)) },
                         navigationIcon = {
-                            IconButton(onClick = { onOptionSelected(CloudSetupOption.SETUP_SYNC) }) {
-                                Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.back))
-                            }
-                        },
-                    )
-                },
-            ) { paddingValues ->
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues)
-                            .padding(Spacing.lg),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Text(
-                        text = stringResource(Res.string.account_creation_will_be_implemented_here),
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(modifier = Modifier.height(Spacing.md))
-                    Button(onClick = onContinue) {
-                        Text(stringResource(Res.string.continue_mock))
-                    }
-                }
-            }
-        }
-        CloudSetupOption.SIGN_IN -> {
-            // TODO: Implement PasskeyAuthenticationScreen when core module is available
-            Scaffold(
-                modifier = modifier,
-                topBar = {
-                    TopAppBar(
-                        title = { Text(stringResource(Res.string.sign_in)) },
-                        navigationIcon = {
-                            IconButton(onClick = { onOptionSelected(CloudSetupOption.SETUP_SYNC) }) {
-                                Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.back))
-                            }
-                        },
-                    )
-                },
-            ) { paddingValues ->
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues)
-                            .padding(Spacing.lg),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Text(
-                        text = stringResource(Res.string.sign_in_will_be_implemented_here),
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(modifier = Modifier.height(Spacing.md))
-                    Button(onClick = onContinue) {
-                        Text(stringResource(Res.string.continue_mock))
-                    }
-                }
-            }
-        }
-        else -> {
-            AdaptiveLayout(
-                useCompactLayout = useCompactLayout,
-                modifier = modifier,
-                supplementalContent = {
-                    Scaffold(
-                        topBar = {
-                            LargeTopAppBar(
-                                title = { Text(stringResource(Res.string.backup_and_sync)) },
-                                navigationIcon = {
-                                    IconButton(onClick = onBack) {
-                                        Icon(
-                                            Icons.AutoMirrored.Default.ArrowBack,
-                                            contentDescription = stringResource(Res.string.back),
-                                        )
-                                    }
-                                },
-                                colors =
-                                    TopAppBarDefaults.topAppBarColors().copy(
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                    ),
-                            )
-                        },
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    ) { contentPadding ->
-                        Column(
-                            modifier =
-                                Modifier
-                                    .padding(contentPadding)
-                                    .padding(Spacing.lg)
-                                    .verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                        ) {
-                            InfoSection()
-                        }
-                    }
-                },
-                mainContent = {
-                    if (useCompactLayout) {
-                        Scaffold(
-                            modifier = Modifier.fillMaxSize(),
-                            topBar = {
-                                LargeTopAppBar(
-                                    title = { Text(stringResource(Res.string.backup_and_sync)) },
-                                    navigationIcon = {
-                                        IconButton(onClick = onBack) {
-                                            Icon(
-                                                Icons.AutoMirrored.Default.ArrowBack,
-                                                contentDescription = stringResource(Res.string.back),
-                                            )
-                                        }
-                                    },
-                                    scrollBehavior = scrollBehavior,
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    Icons.AutoMirrored.Default.ArrowBack,
+                                    contentDescription = stringResource(Res.string.back),
                                 )
-                            },
-                        ) { contentPadding ->
-                            MainContent(
-                                selectedOption = selectedOption,
-                                onOptionSelected = onOptionSelected,
-                                onContinue = onContinue,
-                                onSkip = onSkip,
-                                onPlanSelected = onPlanSelected,
-                                modifier = Modifier.padding(contentPadding),
-                            )
-                        }
-                    } else {
-                        MainContent(
-                            selectedOption = selectedOption,
-                            onOptionSelected = onOptionSelected,
-                            onContinue = onContinue,
-                            onSkip = onSkip,
-                            onPlanSelected = onPlanSelected,
-                        )
-                    }
+                            }
+                        },
+                        colors =
+                            TopAppBarDefaults.topAppBarColors().copy(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            ),
+                    )
                 },
-            )
-        }
-    }
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ) { contentPadding ->
+                Column(
+                    modifier =
+                        Modifier
+                            .padding(contentPadding)
+                            .padding(Spacing.lg)
+                            .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
+                    InfoSection()
+                }
+            }
+        },
+        mainContent = {
+            if (useCompactLayout) {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    topBar = {
+                        LargeTopAppBar(
+                            title = { Text(stringResource(Res.string.backup_and_sync)) },
+                            navigationIcon = {
+                                IconButton(onClick = onBack) {
+                                    Icon(
+                                        Icons.AutoMirrored.Default.ArrowBack,
+                                        contentDescription = stringResource(Res.string.back),
+                                    )
+                                }
+                            },
+                            scrollBehavior = scrollBehavior,
+                        )
+                    },
+                ) { contentPadding ->
+                    MainContent(
+                        selectedOption = selectedOption,
+                        onOptionSelected = onOptionSelected,
+                        onContinue = onContinue,
+                        onSkip = onSkip,
+                        onPlanSelected = onPlanSelected,
+                        modifier = Modifier.padding(contentPadding),
+                    )
+                }
+            } else {
+                MainContent(
+                    selectedOption = selectedOption,
+                    onOptionSelected = onOptionSelected,
+                    onContinue = onContinue,
+                    onSkip = onSkip,
+                    onPlanSelected = onPlanSelected,
+                )
+            }
+        },
+    )
 }
 
 @Composable
@@ -413,7 +382,7 @@ private fun MainContent(
             when (selectedOption) {
                 CloudSetupOption.CREATE_ACCOUNT -> {
                     Button(
-                        onClick = { onOptionSelected(CloudSetupOption.CREATE_ACCOUNT) },
+                        onClick = onContinue,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Icon(
@@ -427,7 +396,7 @@ private fun MainContent(
                 }
                 CloudSetupOption.SIGN_IN -> {
                     Button(
-                        onClick = { onOptionSelected(CloudSetupOption.SIGN_IN) },
+                        onClick = onContinue,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Icon(
@@ -457,15 +426,6 @@ private fun MainContent(
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                }
-                CloudSetupOption.SETUP_SYNC -> {
-                    Text(
-                        text = stringResource(Res.string.setting_up_sync),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
                 }
                 null -> {
                     Text(
@@ -629,10 +589,14 @@ private fun PlanOptionCard(
 }
 
 enum class CloudSetupOption {
-    SETUP_SYNC,
     CREATE_ACCOUNT,
     SIGN_IN,
     SKIP,
+}
+
+private enum class CloudSetupFlow {
+    CREATE_ACCOUNT,
+    SIGN_IN,
 }
 
 @Preview

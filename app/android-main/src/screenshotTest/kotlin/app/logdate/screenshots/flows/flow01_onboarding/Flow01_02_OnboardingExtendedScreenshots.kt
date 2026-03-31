@@ -136,6 +136,7 @@ fun S08_MemorySelectionEmpty() {
             onContinue = {},
             onToggleMemorySelection = {},
             onLoadMoreMemories = {},
+            onRefreshMemories = {},
         )
     }
 }

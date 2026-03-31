@@ -18,12 +18,21 @@ import app.logdate.navigation.routes.core.LocationIntervalRoute
 import app.logdate.navigation.routes.core.LocationSettingsRoute
 import app.logdate.navigation.routes.core.LocationTrackingOptionsRoute
 import app.logdate.navigation.routes.core.NavigationStart
+import app.logdate.navigation.routes.core.OnboardingAccountCreationRoute
+import app.logdate.navigation.routes.core.OnboardingAppOverviewRoute
+import app.logdate.navigation.routes.core.OnboardingBirthdayRoute
 import app.logdate.navigation.routes.core.OnboardingCompleteRoute
+import app.logdate.navigation.routes.core.OnboardingDayBoundariesRoute
 import app.logdate.navigation.routes.core.OnboardingEntryRoute
 import app.logdate.navigation.routes.core.OnboardingImportRoute
+import app.logdate.navigation.routes.core.OnboardingLocationTimelineRoute
+import app.logdate.navigation.routes.core.OnboardingMemorySelectionRoute
+import app.logdate.navigation.routes.core.OnboardingNotificationsRoute
+import app.logdate.navigation.routes.core.OnboardingRecommendationsRoute
 import app.logdate.navigation.routes.core.OnboardingSignIn
 import app.logdate.navigation.routes.core.OnboardingStart
 import app.logdate.navigation.routes.core.OnboardingWelcomeBackRoute
+import app.logdate.navigation.routes.core.PersonalIntroRoute
 import app.logdate.navigation.routes.core.PrivacySettingsRoute
 import app.logdate.navigation.routes.core.ResetAppSettingsRoute
 import app.logdate.navigation.routes.core.ResetSettingsRoute
@@ -101,9 +110,18 @@ object RouteConfig {
 
             // Onboarding flows
             OnboardingStart::class,
+            PersonalIntroRoute::class,
+            OnboardingAppOverviewRoute::class,
             OnboardingSignIn::class,
             OnboardingEntryRoute::class,
             OnboardingImportRoute::class,
+            OnboardingMemorySelectionRoute::class,
+            OnboardingAccountCreationRoute::class,
+            OnboardingBirthdayRoute::class,
+            OnboardingRecommendationsRoute::class,
+            OnboardingDayBoundariesRoute::class,
+            OnboardingLocationTimelineRoute::class,
+            OnboardingNotificationsRoute::class,
             OnboardingCompleteRoute::class,
             OnboardingWelcomeBackRoute::class,
             -> return RouteClassification.Excluded

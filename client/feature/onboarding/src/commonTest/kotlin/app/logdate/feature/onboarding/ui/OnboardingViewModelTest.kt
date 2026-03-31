@@ -1,9 +1,12 @@
 package app.logdate.feature.onboarding.ui
 
+import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.datastore.UserSession
 import app.logdate.client.domain.dayboundary.DayBoundarySettings
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
 import app.logdate.client.domain.dayboundary.HealthConnectStatus
 import app.logdate.client.domain.dayboundary.ObserveHealthConnectStatusUseCase
+import app.logdate.client.domain.identity.ObserveUserIdentityUseCase
 import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.domain.recommendation.RecallMode
@@ -14,9 +17,16 @@ import app.logdate.client.health.model.SleepSession
 import app.logdate.client.health.model.TimeOfDay
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
+import app.logdate.client.repository.account.AccountRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.feature.onboarding.flow.OnboardingDeviceState
+import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
+import app.logdate.feature.onboarding.flow.OnboardingEntryMode
+import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.shared.model.user.UserData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -47,6 +57,10 @@ class OnboardingViewModelTest {
     private lateinit var fakeLocationSettingsRepository: FakeLocationTrackingSettingsRepository
     private lateinit var fakeDayBoundarySettingsRepository: FakeDayBoundarySettingsRepository
     private lateinit var fakeHealthRepository: FakeLocalFirstHealthRepository
+    private lateinit var fakeProfileRepository: FakeProfileRepository
+    private lateinit var fakeAccountRepository: FakeAccountRepository
+    private lateinit var fakeSessionStorage: FakeSessionStorage
+    private lateinit var fakeOnboardingDeviceStateRepository: FakeOnboardingDeviceStateRepository
     private lateinit var viewModel: OnboardingViewModel
 
     @BeforeTest
@@ -58,6 +72,10 @@ class OnboardingViewModelTest {
         fakeLocationSettingsRepository = FakeLocationTrackingSettingsRepository()
         fakeDayBoundarySettingsRepository = FakeDayBoundarySettingsRepository()
         fakeHealthRepository = FakeLocalFirstHealthRepository()
+        fakeProfileRepository = FakeProfileRepository()
+        fakeAccountRepository = FakeAccountRepository()
+        fakeSessionStorage = FakeSessionStorage()
+        fakeOnboardingDeviceStateRepository = FakeOnboardingDeviceStateRepository()
         viewModel = createViewModel()
     }
 
@@ -69,6 +87,14 @@ class OnboardingViewModelTest {
             locationTrackingSettingsRepository = fakeLocationSettingsRepository,
             dayBoundarySettingsRepository = fakeDayBoundarySettingsRepository,
             observeHealthConnectStatus = ObserveHealthConnectStatusUseCase(fakeHealthRepository),
+            observeUserIdentity =
+                ObserveUserIdentityUseCase(
+                    profileRepository = fakeProfileRepository,
+                    userStateRepository = fakeUserStateRepository,
+                    accountRepository = fakeAccountRepository,
+                    sessionStorage = fakeSessionStorage,
+                ),
+            onboardingDeviceStateRepository = fakeOnboardingDeviceStateRepository,
         )
 
     @AfterTest
@@ -150,10 +176,55 @@ class OnboardingViewModelTest {
     @Test
     fun completeOnboarding_delegatesToRepository() =
         runTest {
+            fakeProfileRepository.setProfile(
+                LogDateProfile(
+                    displayName = "Alex",
+                    bio = "Bio",
+                ),
+            )
+            fakeUserStateRepository.setBirthday(Instant.fromEpochMilliseconds(946684800000))
+            fakeOnboardingDeviceStateRepository.markNotificationsHandled()
+            advanceUntilIdle()
+
             viewModel.completeOnboarding()
             advanceUntilIdle()
 
             assertTrue(fakeUserStateRepository.isOnboardingComplete)
+        }
+
+    @Test
+    fun completeOnboardingIfEligible_fails_when_birthday_missing() =
+        runTest {
+            fakeProfileRepository.setProfile(
+                LogDateProfile(
+                    displayName = "Alex",
+                    bio = "Bio",
+                ),
+            )
+            fakeOnboardingDeviceStateRepository.markNotificationsHandled()
+
+            val result = viewModel.completeOnboardingIfEligible()
+
+            assertTrue(result.isFailure)
+            assertEquals(false, fakeUserStateRepository.isOnboardingComplete)
+        }
+
+    @Test
+    fun markNotificationsHandled_updatesProgressSnapshot() =
+        runTest {
+            viewModel.markNotificationsHandled()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.progressSnapshot.value.notificationsHandledOnThisDevice)
+        }
+
+    @Test
+    fun setActiveEntryMode_updatesState() =
+        runTest {
+            viewModel.setActiveEntryMode(OnboardingEntryMode.CONTINUE_SETUP)
+            advanceUntilIdle()
+
+            assertEquals(OnboardingEntryMode.CONTINUE_SETUP, viewModel.activeEntryMode.value)
         }
 }
 
@@ -200,7 +271,8 @@ private class FakeJournalNotesRepository : JournalNotesRepository {
 }
 
 private class FakeUserStateRepository : UserStateRepository {
-    override val userData: Flow<UserData> = flowOf(UserData())
+    private val state = MutableStateFlow(UserData())
+    override val userData: Flow<UserData> = state
     var lastBirthday: Instant? = null
         private set
     var isOnboardingComplete: Boolean = false
@@ -208,15 +280,105 @@ private class FakeUserStateRepository : UserStateRepository {
 
     override suspend fun setBirthday(birthday: Instant) {
         lastBirthday = birthday
+        state.value = state.value.copy(birthday = birthday)
     }
 
     override suspend fun setIsOnboardingComplete(isComplete: Boolean) {
         isOnboardingComplete = isComplete
+        state.value = state.value.copy(isOnboarded = isComplete)
     }
 
     override suspend fun setBiometricEnabled(isEnabled: Boolean) {}
 
     override suspend fun addFavoriteNote(vararg noteId: String) {}
+}
+
+private class FakeProfileRepository : ProfileRepository {
+    private val state = MutableStateFlow(LogDateProfile())
+    override val currentProfile: Flow<LogDateProfile> = state
+
+    override suspend fun updateDisplayName(displayName: String): Result<LogDateProfile> {
+        state.value = state.value.copy(displayName = displayName)
+        return Result.success(state.value)
+    }
+
+    override suspend fun updateBirthday(birthday: Instant?): Result<LogDateProfile> {
+        state.value = state.value.copy(birthday = birthday)
+        return Result.success(state.value)
+    }
+
+    override suspend fun updateProfilePhoto(profilePhotoUri: String?): Result<LogDateProfile> {
+        state.value = state.value.copy(profilePhotoUri = profilePhotoUri)
+        return Result.success(state.value)
+    }
+
+    override suspend fun updateBio(
+        bio: String?,
+        originalBio: String?,
+    ): Result<LogDateProfile> {
+        state.value = state.value.copy(bio = bio, originalBio = originalBio)
+        return Result.success(state.value)
+    }
+
+    override suspend fun getCurrentProfile(): LogDateProfile = state.value
+
+    override suspend fun clearProfile(): Result<Unit> {
+        state.value = LogDateProfile()
+        return Result.success(Unit)
+    }
+
+    fun setProfile(profile: LogDateProfile) {
+        state.value = profile
+    }
+}
+
+private class FakeAccountRepository : AccountRepository {
+    private val state = MutableStateFlow<LogDateAccount?>(null)
+    override val currentAccount: Flow<LogDateAccount?> = state
+
+    override suspend fun updateProfile(
+        displayName: String?,
+        username: String?,
+    ): Result<LogDateAccount> = Result.failure(NotImplementedError())
+
+    override suspend fun refreshAccount(): Result<LogDateAccount> = Result.failure(NotImplementedError())
+
+    override suspend fun checkUsernameAvailability(username: String): Result<Boolean> = Result.success(true)
+}
+
+private class FakeSessionStorage : SessionStorage {
+    private val state = MutableStateFlow<UserSession?>(null)
+
+    override fun getSession(): UserSession? = state.value
+
+    override fun getSessionFlow(): MutableStateFlow<UserSession?> = state
+
+    override suspend fun hasValidSession(): Boolean = state.value != null
+
+    override fun saveSession(session: UserSession) {
+        state.value = session
+    }
+
+    override fun clearSession() {
+        state.value = null
+    }
+}
+
+private class FakeOnboardingDeviceStateRepository : OnboardingDeviceStateRepository {
+    private val state = MutableStateFlow(OnboardingDeviceState())
+    override val deviceState: Flow<OnboardingDeviceState> = state
+
+    override suspend fun markNotificationsHandled() {
+        state.value = state.value.copy(notificationsHandledOnThisDevice = true)
+    }
+
+    override suspend fun setActiveEntryMode(entryMode: OnboardingEntryMode) {
+        state.value = state.value.copy(activeEntryMode = entryMode)
+    }
+
+    override suspend fun clear() {
+        state.value = OnboardingDeviceState()
+    }
 }
 
 private class FakeMemoriesSettingsRepository : MemoriesSettingsRepository {

@@ -82,3 +82,59 @@ actual fun rememberHealthConnectPermissionState(): HealthConnectPermissionState 
         },
     )
 }
+
+@Composable
+actual fun rememberMediaLibraryPermissionState(): MediaLibraryPermissionState {
+    val context = LocalContext.current
+    var permissionGranted by remember { mutableStateOf(hasMediaLibraryPermission(context)) }
+    var shouldShowRationale by remember { mutableStateOf(false) }
+    var permissionRequested by remember { mutableStateOf(false) }
+
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestMultiplePermissions(),
+        ) {
+            permissionGranted = hasMediaLibraryPermission(context)
+            permissionRequested = true
+            if (!permissionGranted) {
+                shouldShowRationale = true
+            }
+        }
+
+    return MediaLibraryPermissionState(
+        hasPermission = permissionGranted,
+        shouldShowRationale = shouldShowRationale,
+        permissionRequested = permissionRequested,
+        requestPermission = {
+            permissionLauncher.launch(mediaLibraryPermissions())
+        },
+    )
+}
+
+private fun hasMediaLibraryPermission(context: android.content.Context): Boolean {
+    val hasPermission = { permission: String ->
+        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+        hasPermission(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+    ) {
+        return true
+    }
+
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        hasPermission(Manifest.permission.READ_MEDIA_IMAGES) || hasPermission(Manifest.permission.READ_MEDIA_VIDEO)
+    } else {
+        hasPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
+    }
+}
+
+private fun mediaLibraryPermissions(): Array<String> =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        arrayOf(
+            Manifest.permission.READ_MEDIA_IMAGES,
+            Manifest.permission.READ_MEDIA_VIDEO,
+        )
+    } else {
+        arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+    }

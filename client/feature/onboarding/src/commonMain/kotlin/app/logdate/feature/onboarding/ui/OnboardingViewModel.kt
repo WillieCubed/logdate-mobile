@@ -6,15 +6,24 @@ import app.logdate.client.billing.model.LogDateBackupPlanOption
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
 import app.logdate.client.domain.dayboundary.HealthConnectStatus
 import app.logdate.client.domain.dayboundary.ObserveHealthConnectStatusUseCase
+import app.logdate.client.domain.identity.ObserveUserIdentityUseCase
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
+import app.logdate.feature.onboarding.flow.OnboardingEntryMode
+import app.logdate.feature.onboarding.flow.OnboardingProgressSnapshot
+import app.logdate.feature.onboarding.flow.OnboardingStep
+import app.logdate.feature.onboarding.flow.canCompleteFreshOnboarding
+import app.logdate.feature.onboarding.flow.firstIncompleteRequiredFreshStep
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -31,14 +40,48 @@ class OnboardingViewModel(
     private val locationTrackingSettingsRepository: LocationTrackingSettingsRepository,
     private val dayBoundarySettingsRepository: DayBoundarySettingsRepository,
     private val observeHealthConnectStatus: ObserveHealthConnectStatusUseCase,
+    observeUserIdentity: ObserveUserIdentityUseCase,
+    private val onboardingDeviceStateRepository: OnboardingDeviceStateRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(OnboardingUiState())
     private val _healthConnectStatus = MutableStateFlow(HealthConnectStatus.CHECKING)
+    private var healthStatusJob: Job? = null
 
     val uiState: StateFlow<OnboardingUiState> =
         _uiState.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), OnboardingUiState())
 
     val healthConnectStatus: StateFlow<HealthConnectStatus> = _healthConnectStatus
+
+    val activeEntryMode: StateFlow<OnboardingEntryMode> =
+        onboardingDeviceStateRepository.deviceState
+            .map { it.activeEntryMode }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.Eagerly,
+                initialValue = OnboardingEntryMode.FRESH,
+            )
+
+    val progressSnapshot: StateFlow<OnboardingProgressSnapshot> =
+        combine(
+            observeUserIdentity(),
+            onboardingDeviceStateRepository.deviceState,
+            healthConnectStatus,
+        ) { identity, deviceState, healthStatus ->
+            OnboardingProgressSnapshot(
+                hasPersonalIntro = identity.displayName.isNotBlank() && !identity.bio.isNullOrBlank(),
+                hasBirthday = identity.birthday != null,
+                hasCloudAccount =
+                    identity.isAuthenticated ||
+                        identity.cloudAccountId != null ||
+                        !identity.username.isNullOrBlank(),
+                notificationsHandledOnThisDevice = deviceState.notificationsHandledOnThisDevice,
+                healthConnectStatus = healthStatus,
+            )
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = OnboardingProgressSnapshot(),
+        )
 
     /**
      * Whether contextual recommendations are currently enabled.
@@ -94,49 +137,71 @@ class OnboardingViewModel(
 
     fun updateBirthday(birthday: Instant) {
         viewModelScope.launch {
-            userStateRepository.setBirthday(birthday)
+            persistBirthday(birthday)
         }
     }
+
+    suspend fun persistBirthday(birthday: Instant): Result<Unit> =
+        runCatching {
+            userStateRepository.setBirthday(birthday)
+        }
 
     /**
      * Enables or disables contextual recommendations.
      */
     fun setRecommendationsEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            memoriesSettingsRepository.setContextualRecommendationsEnabled(enabled)
+            persistRecommendationsEnabled(enabled)
         }
     }
+
+    suspend fun persistRecommendationsEnabled(enabled: Boolean): Result<Unit> =
+        runCatching {
+            memoriesSettingsRepository.setContextualRecommendationsEnabled(enabled)
+        }
 
     /**
      * Enables background location tracking after the user opts in.
      */
     fun enableLocationTracking() {
         viewModelScope.launch {
-            locationTrackingSettingsRepository.setBackgroundTrackingEnabled(true)
+            persistLocationTrackingEnabled()
         }
     }
 
+    suspend fun persistLocationTrackingEnabled(): Result<Unit> =
+        runCatching {
+            locationTrackingSettingsRepository.setBackgroundTrackingEnabled(true)
+        }
+
     fun enableSleepBasedDayBoundaries() {
         viewModelScope.launch {
-            dayBoundarySettingsRepository.setSleepBasedBoundariesEnabled(true)
+            persistSleepBasedDayBoundariesEnabled(enabled = true)
         }
     }
 
     fun disableSleepBasedDayBoundaries() {
         viewModelScope.launch {
-            dayBoundarySettingsRepository.setSleepBasedBoundariesEnabled(false)
+            persistSleepBasedDayBoundariesEnabled(enabled = false)
         }
     }
 
+    suspend fun persistSleepBasedDayBoundariesEnabled(enabled: Boolean): Result<Unit> =
+        runCatching {
+            dayBoundarySettingsRepository.setSleepBasedBoundariesEnabled(enabled)
+        }
+
     fun refreshHealthStatus() {
-        viewModelScope.launch {
-            observeHealthConnectStatus().collect { status ->
-                _healthConnectStatus.value = status
-                if (status == HealthConnectStatus.NOT_AVAILABLE) {
-                    dayBoundarySettingsRepository.setSleepBasedBoundariesEnabled(false)
+        healthStatusJob?.cancel()
+        healthStatusJob =
+            viewModelScope.launch {
+                observeHealthConnectStatus().collect { status ->
+                    _healthConnectStatus.value = status
+                    if (status == HealthConnectStatus.NOT_AVAILABLE) {
+                        dayBoundarySettingsRepository.setSleepBasedBoundariesEnabled(false)
+                    }
                 }
             }
-        }
     }
 
     /**
@@ -156,11 +221,32 @@ class OnboardingViewModel(
      */
     fun completeOnboarding() {
         viewModelScope.launch {
-            userStateRepository.setIsOnboardingComplete(true)
+            completeOnboardingIfEligible()
         }
     }
 
+    suspend fun markNotificationsHandled(): Result<Unit> =
+        runCatching {
+            onboardingDeviceStateRepository.markNotificationsHandled()
+        }
+
+    suspend fun setActiveEntryMode(entryMode: OnboardingEntryMode): Result<Unit> =
+        runCatching {
+            onboardingDeviceStateRepository.setActiveEntryMode(entryMode)
+        }
+
+    suspend fun completeOnboardingIfEligible(): Result<Unit> =
+        runCatching {
+            require(progressSnapshot.value.canCompleteFreshOnboarding()) {
+                "Required onboarding steps are still incomplete"
+            }
+            userStateRepository.setIsOnboardingComplete(true)
+        }
+
+    fun firstIncompleteRequiredFreshStep(): OnboardingStep? = progressSnapshot.value.firstIncompleteRequiredFreshStep()
+
     override fun onCleared() {
+        healthStatusJob?.cancel()
         super.onCleared()
     }
 }
