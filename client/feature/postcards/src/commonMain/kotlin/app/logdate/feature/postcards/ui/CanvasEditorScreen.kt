@@ -419,7 +419,7 @@ private fun ShelfPhotoStrip(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                "No photos available",
+                "Your photos will appear here",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -475,7 +475,7 @@ private fun StickerShelfStrip(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                "No stickers yet",
+                "Extract stickers from photos in your library",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
