@@ -13,7 +13,7 @@ import okio.buffer
  * consistently across Android, desktop, and iOS without a platform ZIP API.
  */
 class ZipArchiveWriter(
-    private val fileSystem: FileSystem = FileSystem.SYSTEM,
+    private val fileSystem: FileSystem,
 ) {
     fun write(
         outputPath: Path,

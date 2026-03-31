@@ -1,5 +1,6 @@
 package app.logdate.client.domain.export
 
+import okio.FileSystem
 import okio.Path.Companion.toPath
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -9,7 +10,7 @@ import java.nio.file.Files
 import java.util.zip.ZipFile
 
 class ZipArchiveWriterTest {
-    private val writer = ZipArchiveWriter()
+    private val writer = ZipArchiveWriter(FileSystem.SYSTEM)
 
     @Test
     fun `writer creates portable archive with json and media entries`() {

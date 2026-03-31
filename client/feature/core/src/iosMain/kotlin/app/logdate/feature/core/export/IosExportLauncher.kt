@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
+import okio.FileSystem
 import okio.Path.Companion.toPath
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -41,7 +42,7 @@ class IosExportLauncher(
 ) : ExportLauncher,
     KoinComponent {
     private val exportUserDataUseCase: ExportUserDataUseCase by inject()
-    private val zipArchiveWriter = ZipArchiveWriter()
+    private val zipArchiveWriter = ZipArchiveWriter(FileSystem.SYSTEM)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var currentExportJob: Job? = null
     private var completionCallback: ((String?) -> Unit)? = null
@@ -69,14 +70,7 @@ class IosExportLauncher(
                     Napier.i("iOS: Starting export process")
 
                     // Resolve date range cutoff
-                    val dateRangeCutoff =
-                        when (options.dateRange) {
-                            is ExportDateRange.AllTime -> null
-                            is ExportDateRange.Last30Days -> ExportUserDataUseCase.resolveDateRangeCutoff("last_30_days")
-                            is ExportDateRange.Last90Days -> ExportUserDataUseCase.resolveDateRangeCutoff("last_90_days")
-                            is ExportDateRange.LastYear -> ExportUserDataUseCase.resolveDateRangeCutoff("last_year")
-                            is ExportDateRange.Custom -> options.dateRange.start
-                        }
+                    val dateRangeCutoff = options.dateRange.toCutoffInstant()
 
                     exportUserDataUseCase
                         .exportUserData(
@@ -100,7 +94,7 @@ class IosExportLauncher(
 
                                 is ExportProgress.InProgress -> {
                                     val progressInt = (progress.percentage * 100).toInt()
-                                    Napier.d("iOS: Export progress: $progressInt% - ${progress.message}")
+                                    Napier.d("iOS: Export progress: $progressInt% - ${progress.stage.defaultMessage}")
                                 }
 
                                 is ExportProgress.Completed -> {
@@ -131,10 +125,11 @@ class IosExportLauncher(
                                 }
 
                                 is ExportProgress.Failed -> {
-                                    Napier.e("iOS: Export failed: ${progress.reason}")
+                                    val errorMessage = progress.error.defaultMessage
+                                    Napier.e("iOS: Export failed: $errorMessage")
                                     showAlert(
                                         title = "Export Failed",
-                                        message = progress.reason,
+                                        message = errorMessage,
                                     )
                                     completionCallback?.invoke(null)
                                 }
