@@ -51,7 +51,7 @@ class DefaultLocalFirstHealthRepository(
 
     override suspend fun isHealthDataAvailable(): Boolean =
         withContext(ioDispatcher) {
-            localDataSource.isAvailable() || remoteDataSource.isAvailable()
+            remoteDataSource.isAvailable()
         }
 
     override suspend fun hasSleepPermissions(): Boolean =

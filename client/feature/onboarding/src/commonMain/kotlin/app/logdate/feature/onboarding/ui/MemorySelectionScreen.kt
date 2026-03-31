@@ -61,9 +61,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.client.media.MediaObject
+import app.logdate.client.permissions.rememberMediaLibraryPermissionState
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
@@ -84,6 +86,7 @@ data class MemorySelectionUiState(
     val isLoading: Boolean = true,
     val hasMoreMemories: Boolean = true,
     val isLoadingMore: Boolean = false,
+    val loadFailed: Boolean = false,
 )
 
 /**
@@ -98,9 +101,17 @@ fun MemorySelectionScreen(
     onContinue: () -> Unit,
     onToggleMemorySelection: (String) -> Unit,
     onLoadMoreMemories: () -> Unit,
+    onRefreshMemories: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var expandedMemory by remember { mutableStateOf<MediaObject?>(null) }
+    val permissionState = rememberMediaLibraryPermissionState()
+
+    LaunchedEffect(permissionState.hasPermission) {
+        if (permissionState.hasPermission) {
+            onRefreshMemories()
+        }
+    }
 
     SharedTransitionLayout {
         val sharedTransitionScope = this
@@ -135,6 +146,9 @@ fun MemorySelectionScreen(
                             onToggleMemorySelection = onToggleMemorySelection,
                             onLoadMoreMemories = onLoadMoreMemories,
                             onContinue = onContinue,
+                            hasMediaPermission = permissionState.hasPermission,
+                            onRequestMediaPermission = permissionState.requestPermission,
+                            onRetryLoad = onRefreshMemories,
                             onMemoryLongPress = { memory -> expandedMemory = memory },
                             onMemoryLongPressEnd = { expandedMemory = null },
                             expandedMemory = expandedMemory,
@@ -179,6 +193,9 @@ private fun SharedTransitionScope.MemorySelectionContent(
     onToggleMemorySelection: (String) -> Unit,
     onLoadMoreMemories: () -> Unit,
     onContinue: () -> Unit,
+    hasMediaPermission: Boolean,
+    onRequestMediaPermission: () -> Unit,
+    onRetryLoad: () -> Unit,
     onMemoryLongPress: (MediaObject) -> Unit,
     onMemoryLongPressEnd: () -> Unit,
     expandedMemory: MediaObject?,
@@ -210,6 +227,66 @@ private fun SharedTransitionScope.MemorySelectionContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+
+        if (uiState.isLoading) {
+            item {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = Spacing.xl),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+            return@LazyColumn
+        }
+
+        if (!hasMediaPermission) {
+            item {
+                MemorySelectionStatusCard(
+                    title = stringResource(Res.string.memory_access_needed),
+                    body = stringResource(Res.string.memory_access_needed_body),
+                    actionLabel = stringResource(Res.string.enable),
+                    onAction = onRequestMediaPermission,
+                )
+            }
+            item {
+                ContinueMemoryImportButton(onContinue = onContinue)
+            }
+            return@LazyColumn
+        }
+
+        if (uiState.loadFailed) {
+            item {
+                MemorySelectionStatusCard(
+                    title = stringResource(Res.string.select_memories),
+                    body = stringResource(Res.string.memory_load_failed_body),
+                    actionLabel = stringResource(Res.string.retry),
+                    onAction = onRetryLoad,
+                )
+            }
+            item {
+                ContinueMemoryImportButton(onContinue = onContinue)
+            }
+            return@LazyColumn
+        }
+
+        if (uiState.aiCuratedMemories.isEmpty() && uiState.allMemories.isEmpty()) {
+            item {
+                MemorySelectionStatusCard(
+                    title = stringResource(Res.string.select_memories),
+                    body = stringResource(Res.string.memory_no_recent_items_body),
+                    actionLabel = stringResource(Res.string.retry),
+                    onAction = onRetryLoad,
+                )
+            }
+            item {
+                ContinueMemoryImportButton(onContinue = onContinue)
+            }
+            return@LazyColumn
         }
 
         // AI-curated section
@@ -255,22 +332,78 @@ private fun SharedTransitionScope.MemorySelectionContent(
 
         // Continue button
         item {
-            Button(
-                onClick = onContinue,
-                enabled = uiState.selectedMemoryIds.isNotEmpty(),
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = Spacing.lg),
-            ) {
-                Text(
-                    stringResource(
-                        Res.string.continue_with_memories_count,
-                        uiState.selectedMemoryIds.size,
-                    ),
-                )
+            ContinueMemoryImportButton(
+                onContinue = onContinue,
+                selectedCount = uiState.selectedMemoryIds.size,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MemorySelectionStatusCard(
+    title: String,
+    body: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            ),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(Spacing.lg),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Button(onClick = onAction) {
+                Text(actionLabel)
             }
         }
+    }
+}
+
+@Composable
+private fun ContinueMemoryImportButton(
+    onContinue: () -> Unit,
+    selectedCount: Int = 0,
+) {
+    Button(
+        onClick = onContinue,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = Spacing.lg),
+    ) {
+        Text(
+            if (selectedCount > 0) {
+                stringResource(
+                    Res.string.continue_with_memories_count,
+                    selectedCount,
+                )
+            } else {
+                stringResource(Res.string.continue_without_importing_memories)
+            },
+        )
     }
 }
 
@@ -711,6 +844,7 @@ private fun MemorySelectionScreenPreview() {
             onContinue = {},
             onToggleMemorySelection = {},
             onLoadMoreMemories = {},
+            onRefreshMemories = {},
         )
     }
 }

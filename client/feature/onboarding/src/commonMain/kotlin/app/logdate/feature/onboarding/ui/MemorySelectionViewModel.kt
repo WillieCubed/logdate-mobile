@@ -24,33 +24,24 @@ class MemorySelectionViewModel(
     private val mediaManager: MediaManager,
     private val aiClient: GenerativeAIChatClient,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(MemorySelectionUiState())
+    private val _uiState = MutableStateFlow(MemorySelectionUiState(isLoading = false, loadFailed = false))
     val uiState: StateFlow<MemorySelectionUiState> = _uiState.asStateFlow()
 
+    private var availableMemories: List<MediaObject> = emptyList()
     private val selectedMemoryIds = mutableSetOf<String>()
     private var currentPage = 0
     private val pageSize = 20
-
-    init {
-        loadInitialMemories()
-    }
 
     /**
      * Loads initial memories and AI-curated content.
      */
     private fun loadInitialMemories() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isLoading = true, loadFailed = false) }
 
             try {
-                // Load recent memories (last 6 months)
-                val sixMonthsAgo = Clock.System.now().minus(6, DateTimeUnit.MONTH, TimeZone.currentSystemDefault())
-                val recentMemories =
-                    mediaManager
-                        .queryMediaByDate(
-                            start = sixMonthsAgo,
-                            end = Clock.System.now(),
-                        ).first()
+                val recentMemories = loadAvailableMemories()
+                availableMemories = recentMemories
 
                 // Load first page of all memories
                 val initialMemories = recentMemories.take(pageSize)
@@ -64,10 +55,11 @@ class MemorySelectionViewModel(
                         aiCuratedMemories = aiCuratedMemories,
                         isLoading = false,
                         hasMoreMemories = recentMemories.size > pageSize,
+                        loadFailed = false,
                     )
                 }
 
-                currentPage = 1
+                currentPage = if (initialMemories.isEmpty()) 0 else 1
 
                 Napier.d(
                     tag = "MemorySelectionViewModel",
@@ -79,11 +71,39 @@ class MemorySelectionViewModel(
                     message = "Failed to load memories",
                     throwable = e,
                 )
+                availableMemories = emptyList()
+                currentPage = 0
                 _uiState.update {
-                    it.copy(isLoading = false, hasMoreMemories = false)
+                    it.copy(
+                        isLoading = false,
+                        hasMoreMemories = false,
+                        allMemories = emptyList(),
+                        aiCuratedMemories = emptyList(),
+                        loadFailed = true,
+                    )
                 }
             }
         }
+    }
+
+    fun refreshMemories() {
+        loadInitialMemories()
+    }
+
+    private suspend fun loadAvailableMemories(): List<MediaObject> {
+        val sixMonthsAgo = Clock.System.now().minus(6, DateTimeUnit.MONTH, TimeZone.currentSystemDefault())
+        val recentMemories =
+            mediaManager
+                .queryMediaByDate(
+                    start = sixMonthsAgo,
+                    end = Clock.System.now(),
+                ).first()
+
+        if (recentMemories.isNotEmpty()) {
+            return recentMemories
+        }
+
+        return mediaManager.getRecentMedia().first()
     }
 
     /**
@@ -129,13 +149,12 @@ class MemorySelectionViewModel(
             _uiState.update { it.copy(isLoadingMore = true) }
 
             try {
-                val sixMonthsAgo = Clock.System.now().minus(6, DateTimeUnit.MONTH, TimeZone.currentSystemDefault())
                 val allRecentMemories =
-                    mediaManager
-                        .queryMediaByDate(
-                            start = sixMonthsAgo,
-                            end = Clock.System.now(),
-                        ).first()
+                    if (availableMemories.isNotEmpty()) {
+                        availableMemories
+                    } else {
+                        loadAvailableMemories().also { availableMemories = it }
+                    }
 
                 val startIndex = currentPage * pageSize
                 val endIndex = (startIndex + pageSize).coerceAtMost(allRecentMemories.size)
@@ -207,8 +226,8 @@ class MemorySelectionViewModel(
     /**
      * Processes the selected memories for import.
      */
-    fun processSelectedMemories() {
-        viewModelScope.launch {
+    suspend fun processSelectedMemories(): Result<Unit> =
+        runCatching {
             val selectedMemories = getSelectedMemories()
 
             Napier.i(
@@ -216,23 +235,19 @@ class MemorySelectionViewModel(
                 message = "Processing ${selectedMemories.size} selected memories for import",
             )
 
-            try {
-                // Add selected memories to the default collection
-                selectedMemories.forEach { memory ->
-                    mediaManager.addToDefaultCollection(memory.uri)
-                }
-
-                Napier.i(
-                    tag = "MemorySelectionViewModel",
-                    message = "Successfully imported ${selectedMemories.size} memories",
-                )
-            } catch (e: Exception) {
-                Napier.e(
-                    tag = "MemorySelectionViewModel",
-                    message = "Failed to import selected memories",
-                    throwable = e,
-                )
+            selectedMemories.forEach { memory ->
+                mediaManager.addToDefaultCollection(memory.uri)
             }
+
+            Napier.i(
+                tag = "MemorySelectionViewModel",
+                message = "Successfully imported ${selectedMemories.size} memories",
+            )
+        }.onFailure { error ->
+            Napier.e(
+                tag = "MemorySelectionViewModel",
+                message = "Failed to import selected memories",
+                throwable = error,
+            )
         }
-    }
 }
