@@ -60,7 +60,7 @@ val wearDataModule = module {
     }
 
     // Data Layer sync: watch <-> phone via Wearable Data API
-    single<WearDataLayerClient> { GoogleWearDataLayerClient(get()) }
+    single<WearDataLayerClient> { GoogleWearDataLayerClient(get(), get()) }
     single { NoteDataMapper(get()) }
     single { JournalDataMapper(get()) }
     single { AssociationDataMapper() }

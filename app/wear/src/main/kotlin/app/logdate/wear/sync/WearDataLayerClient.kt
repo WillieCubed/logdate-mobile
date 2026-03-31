@@ -1,5 +1,7 @@
 package app.logdate.wear.sync
 
+import kotlin.uuid.Uuid
+
 /**
  * Abstraction over the Wear Data Layer API for testability.
  *
@@ -41,6 +43,16 @@ interface WearDataLayerClient {
      * Returns true if the message was delivered.
      */
     suspend fun sendMessage(path: String, data: ByteArray = byteArrayOf()): Boolean
+
+    /**
+     * Requests an audio file for [noteId] from the phone and writes it to [destinationPath].
+     *
+     * The watch only uses this to fetch bytes before starting its own local playback.
+     */
+    suspend fun downloadAudioFromPhone(
+        noteId: Uuid,
+        destinationPath: String,
+    ): Boolean
 
     companion object {
         const val PHONE_CAPABILITY = "logdate_phone_app"

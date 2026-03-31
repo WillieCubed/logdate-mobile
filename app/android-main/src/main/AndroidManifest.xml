@@ -138,6 +138,14 @@
                 <data
                     android:scheme="wear"
                     android:host="*"
+                    android:pathPrefix="/logdate/sync" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/logdate/notes" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
                     android:pathPrefix="/logdate/camera" />
             </intent-filter>
         </service>

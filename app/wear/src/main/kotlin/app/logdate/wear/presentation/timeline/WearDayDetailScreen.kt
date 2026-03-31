@@ -207,7 +207,9 @@ private fun NoteEntryCard(
  */
 private sealed interface AudioCardState {
     data object NoOutput : AudioCardState
+    data object Preparing : AudioCardState
     data class Playing(val progress: Float, val durationMs: Long) : AudioCardState
+    data object Error : AudioCardState
     data object Idle : AudioCardState
 }
 
@@ -228,7 +230,16 @@ private fun resolveAudioCardState(
                 AudioCardState.Idle
             }
         }
+        is WearPlaybackUiState.BlockedOutput -> {
+            if (playbackState.noteId == noteId) AudioCardState.NoOutput else AudioCardState.Idle
+        }
+        is WearPlaybackUiState.Error -> {
+            if (playbackState.noteId == noteId) AudioCardState.Error else AudioCardState.Idle
+        }
         is WearPlaybackUiState.Idle -> AudioCardState.Idle
+        is WearPlaybackUiState.Preparing -> {
+            if (playbackState.noteId == noteId) AudioCardState.Preparing else AudioCardState.Idle
+        }
     }
 }
 
@@ -247,7 +258,9 @@ private fun AudioNoteCard(
         onClick = {
             when (cardState) {
                 is AudioCardState.NoOutput -> onOpenBluetoothSettings()
+                is AudioCardState.Preparing -> onToggle()
                 is AudioCardState.Playing -> onToggle()
+                is AudioCardState.Error -> onToggle()
                 is AudioCardState.Idle -> onToggle()
             }
         },
@@ -270,6 +283,20 @@ private fun AudioNoteCard(
                         text = stringResource(R.string.wear_playback_connect_headphones),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                is AudioCardState.Preparing -> {
+                    Icon(
+                        Icons.Default.Mic,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        text = stringResource(R.string.wear_playback_preparing_audio),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
                     )
                 }
 
@@ -310,6 +337,20 @@ private fun AudioNoteCard(
                         modifier = Modifier.weight(1f),
                     )
                 }
+
+                is AudioCardState.Error -> {
+                    Icon(
+                        Icons.Default.Mic,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        text = stringResource(R.string.wear_playback_retry_download),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
 
@@ -323,6 +364,8 @@ private fun AudioNoteCard(
                 )
             }
             is AudioCardState.NoOutput,
+            is AudioCardState.Preparing,
+            is AudioCardState.Error,
             is AudioCardState.Idle -> {
                 Text(
                     text = timeLabel,

@@ -76,6 +76,8 @@
     <string name="wear_playback_play">Play voice note</string>
     <string name="wear_playback_stop">Stop</string>
     <string name="wear_playback_connect_headphones">Connect headphones to listen</string>
+    <string name="wear_playback_preparing_audio">Preparing audio…</string>
+    <string name="wear_playback_retry_download">Couldn’t load audio. Tap to retry</string>
 
     <!-- Journal Prompt Notifications -->
     <string name="wear_prompt_channel_name">Journal reminders</string>

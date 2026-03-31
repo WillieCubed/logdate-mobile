@@ -75,6 +75,7 @@ kotlin {
             implementation(projects.client.util)
         }
         androidMain.dependencies {
+            implementation(projects.client.database)
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.koin.android)
             implementation(libs.koin.androidx.workmanager)
@@ -87,6 +88,7 @@ kotlin {
             implementation(libs.firebase.firestore)
         }
         desktopMain.dependencies {
+            implementation(projects.client.database)
             implementation(libs.kotlinx.coroutines.swing)
         }
     }

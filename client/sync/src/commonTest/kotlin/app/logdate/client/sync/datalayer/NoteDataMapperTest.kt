@@ -468,6 +468,12 @@ class NoteDataMapperTest {
     }
 
     @Test
+    fun isDeletePathReturnsFalseForNonNoteDeletePaths() {
+        assertFalse(NoteDataMapper.isDeletePath("/logdate/journals/550e8400-e29b-41d4-a716-446655440000/delete"))
+        assertFalse(NoteDataMapper.isDeletePath("/logdate/associations/one::two/delete"))
+    }
+
+    @Test
     fun noteIdFromPathExtractsCorrectUuid() {
         val path = "/logdate/notes/550e8400-e29b-41d4-a716-446655440000"
         val extracted = NoteDataMapper.noteIdFromPath(path)

@@ -1,10 +1,16 @@
 package app.logdate.wear.presentation.timeline
 
 import app.logdate.client.media.audio.AudioPlaybackManager
+import app.logdate.client.media.audio.AudioPlaybackStatus
+import app.logdate.client.media.audio.AudioPlaybackStatusProvider
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.playback.AudioOutputState
+import app.logdate.wear.playback.WearSyncedAudioResolver
 import app.logdate.wear.playback.WearAudioOutputMonitor
+import app.logdate.wear.sync.WearDataLayerClient
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -34,15 +40,27 @@ class WearTimelineViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
 
     private lateinit var mockPlaybackManager: AudioPlaybackManager
+    private lateinit var mockPlaybackStatusProvider: AudioPlaybackStatusProvider
     private lateinit var mockOutputMonitor: WearAudioOutputMonitor
+    private lateinit var mockSyncedAudioResolver: WearSyncedAudioResolver
+    private lateinit var mockDataLayerClient: WearDataLayerClient
     private val outputStateFlow = MutableStateFlow<AudioOutputState>(AudioOutputState.SpeakerOnly)
+    private val playbackStatusFlow = MutableStateFlow(AudioPlaybackStatus())
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         mockPlaybackManager = mockk(relaxed = true)
+        mockPlaybackStatusProvider = mockk(relaxed = true)
         mockOutputMonitor = mockk(relaxed = true)
+        mockSyncedAudioResolver = mockk(relaxed = true)
+        mockDataLayerClient = mockk(relaxed = true)
         every { mockOutputMonitor.outputState } returns outputStateFlow
+        every { mockPlaybackStatusProvider.playbackStatus } returns playbackStatusFlow
+        coEvery { mockSyncedAudioResolver.resolvePlayableUri(any()) } answers {
+            Result.success((firstArg() as JournalNote.Audio).mediaRef)
+        }
+        coEvery { mockDataLayerClient.sendMessage(any(), any()) } returns true
     }
 
     @After
@@ -83,7 +101,14 @@ class WearTimelineViewModelTest {
         val repository = mockk<JournalNotesRepository>()
         every { repository.observeRecentNotes(any()) } returns flowOf(notes)
         every { repository.observeNotesForDay(any()) } returns flowOf(emptyList())
-        return WearTimelineViewModel(repository, mockPlaybackManager, mockOutputMonitor)
+        return WearTimelineViewModel(
+            repository,
+            mockPlaybackManager,
+            mockPlaybackStatusProvider,
+            mockOutputMonitor,
+            mockSyncedAudioResolver,
+            mockDataLayerClient,
+        )
     }
 
     // =======================================================================
@@ -94,7 +119,14 @@ class WearTimelineViewModelTest {
     fun `initial state shows loading`() = runTest {
         val repository = mockk<JournalNotesRepository>()
         every { repository.observeRecentNotes(any()) } returns MutableStateFlow(emptyList())
-        val vm = WearTimelineViewModel(repository, mockPlaybackManager, mockOutputMonitor)
+        val vm = WearTimelineViewModel(
+            repository,
+            mockPlaybackManager,
+            mockPlaybackStatusProvider,
+            mockOutputMonitor,
+            mockSyncedAudioResolver,
+            mockDataLayerClient,
+        )
 
         val state = vm.uiState.first()
         assertTrue(state.days.isEmpty())
@@ -246,7 +278,14 @@ class WearTimelineViewModelTest {
         )
         every { repository.observeNotesForDay(targetDate) } returns flowOf(dayNotes)
 
-        val vm = WearTimelineViewModel(repository, mockPlaybackManager, mockOutputMonitor)
+        val vm = WearTimelineViewModel(
+            repository,
+            mockPlaybackManager,
+            mockPlaybackStatusProvider,
+            mockOutputMonitor,
+            mockSyncedAudioResolver,
+            mockDataLayerClient,
+        )
         vm.selectDay(targetDate)
 
         val detail = vm.selectedDayState.first()
@@ -261,7 +300,14 @@ class WearTimelineViewModelTest {
         every { repository.observeRecentNotes(any()) } returns flowOf(emptyList())
         every { repository.observeNotesForDay(targetDate) } returns flowOf(emptyList())
 
-        val vm = WearTimelineViewModel(repository, mockPlaybackManager, mockOutputMonitor)
+        val vm = WearTimelineViewModel(
+            repository,
+            mockPlaybackManager,
+            mockPlaybackStatusProvider,
+            mockOutputMonitor,
+            mockSyncedAudioResolver,
+            mockDataLayerClient,
+        )
         vm.selectDay(targetDate)
         vm.clearSelection()
 
@@ -308,7 +354,7 @@ class WearTimelineViewModelTest {
         vm.toggleNote(audioNote)
 
         val state = vm.playbackState.first()
-        assertEquals(WearPlaybackUiState.Idle, state)
+        assertEquals(WearPlaybackUiState.BlockedOutput(audioNote.uid), state)
         verify(exactly = 0) { mockPlaybackManager.startPlayback(any(), any(), any(), any()) }
     }
 
@@ -344,5 +390,36 @@ class WearTimelineViewModelTest {
         val vm = createViewModel()
         val state = vm.playbackState.first()
         assertEquals(WearPlaybackUiState.Idle, state)
+    }
+
+    @Test
+    fun `toggleNote shows error when synced audio cannot be resolved`() = runTest {
+        val audioNote = createNote(type = "audio") as JournalNote.Audio
+        coEvery { mockSyncedAudioResolver.resolvePlayableUri(audioNote) } returns Result.failure(IllegalStateException("missing"))
+        val vm = createViewModel()
+
+        vm.toggleNote(audioNote)
+
+        assertEquals(WearPlaybackUiState.Error(audioNote.uid), vm.playbackState.first())
+        verify(exactly = 0) { mockPlaybackManager.startPlayback(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `playback suppression moves state to blocked output`() = runTest {
+        val audioNote = createNote(type = "audio") as JournalNote.Audio
+        val vm = createViewModel()
+
+        vm.toggleNote(audioNote)
+        playbackStatusFlow.value = AudioPlaybackStatus(isSuppressedForUnsuitableOutput = true)
+
+        assertEquals(WearPlaybackUiState.BlockedOutput(audioNote.uid), vm.playbackState.first())
+        verify { mockPlaybackManager.stopPlayback() }
+    }
+
+    @Test
+    fun `timeline requests phone sync on init`() = runTest {
+        createViewModel()
+
+        coVerify { mockDataLayerClient.sendMessage("/logdate/sync/request", any()) }
     }
 }

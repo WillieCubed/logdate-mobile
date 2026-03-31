@@ -15,6 +15,7 @@ import app.logdate.client.sync.datalayer.AssociationDataMapper
 import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
 import app.logdate.client.sync.datalayer.JournalDataMapper
 import app.logdate.client.sync.datalayer.NoteDataMapper
+import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
@@ -42,13 +43,12 @@ import kotlinx.coroutines.withContext
  * Koin resilience: If DI is not ready when data arrives, retries up to
  * [MAX_KOIN_RETRIES] times with a short delay before dropping the event.
  */
-class PhoneDataLayerListenerService : WearableListenerService() {
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+open class PhoneDataLayerListenerService : WearableListenerService() {
+    protected open val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val noteDataMapper = NoteDataMapper()
     private val journalDataMapper = JournalDataMapper()
     private val associationDataMapper = AssociationDataMapper()
     private val healthSnapshotDataMapper = HealthSnapshotDataMapper()
-    private val notificationHelper by lazy { WearSyncNotificationHelper(applicationContext) }
 
     companion object {
         private const val PATH_CAMERA_OPEN = "/logdate/camera/open"
@@ -59,79 +59,113 @@ class PhoneDataLayerListenerService : WearableListenerService() {
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
-        when (messageEvent.path) {
-            PATH_CAMERA_OPEN -> {
-                Napier.d("Watch requested camera open")
-                try {
-                    val cameraIntent =
-                        Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                    startActivity(cameraIntent)
-                } catch (e: Exception) {
-                    Napier.w("Failed to open camera from watch request", e)
+        serviceScope.launch {
+            when {
+                messageEvent.path == PATH_CAMERA_OPEN -> {
+                    Napier.d("Watch requested camera open")
+                    try {
+                        launchCamera()
+                    } catch (e: Exception) {
+                        Napier.w("Failed to open camera from watch request", e)
+                    }
                 }
-            }
-            PATH_CAMERA_CAPTURE -> {
-                Napier.d("Watch requested photo capture")
-            }
-            PATH_CAMERA_CLOSE -> {
-                Napier.d("Watch requested camera close")
-            }
-            else -> {
-                Napier.d("Unknown message path: ${messageEvent.path}")
+
+                messageEvent.path == PATH_CAMERA_CAPTURE -> {
+                    Napier.d("Watch requested photo capture")
+                }
+
+                messageEvent.path == PATH_CAMERA_CLOSE -> {
+                    Napier.d("Watch requested camera close")
+                }
+
+                messageEvent.path == WearAudioRequestPaths.SYNC_REQUEST_PATH -> {
+                    val syncBridge = resolvePhoneWearSyncBridge() ?: return@launch
+                    syncBridge.publishNotesToWatch(sourceNodeId = messageEvent.sourceNodeId)
+                }
+
+                WearAudioRequestPaths.isAudioRequestPath(messageEvent.path) -> {
+                    val syncBridge = resolvePhoneWearSyncBridge() ?: return@launch
+                    val noteId =
+                        runCatching {
+                            WearAudioRequestPaths.noteIdFromAudioRequestPath(messageEvent.path)
+                        }.getOrElse { error ->
+                            Napier.w("Invalid audio request path: ${messageEvent.path}", error)
+                            return@launch
+                        }
+                    syncBridge.streamAudioToWatch(
+                        noteId = noteId,
+                        sourceNodeId = messageEvent.sourceNodeId,
+                    )
+                }
+
+                else -> {
+                    Napier.d("Unknown message path: ${messageEvent.path}")
+                }
             }
         }
     }
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
         // Snapshot events before they are recycled by the system
-        val events = mutableListOf<SnapshotDataEvent>()
+        val events = mutableListOf<PhoneDataLayerSnapshotEvent>()
         for (event in dataEvents) {
             val path = event.dataItem.uri.path ?: continue
             val stringMap = extractStringMap(event)
-            events.add(SnapshotDataEvent(path, stringMap))
+            events.add(PhoneDataLayerSnapshotEvent(path, stringMap))
         }
 
         if (events.isEmpty()) return
 
         serviceScope.launch {
-            val koin = resolveKoin()
-            if (koin == null) {
-                Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries, dropping ${events.size} data events")
-                return@launch
-            }
-
-            val notesRepository = koin.get<JournalNotesRepository>()
-            val journalRepository = koin.get<JournalRepository>()
-
-            for (event in events) {
-                processEvent(event, koin, notesRepository, journalRepository)
-            }
+            processSnapshotEvents(events)
         }
+    }
+
+    protected open suspend fun processSnapshotEvents(events: List<PhoneDataLayerSnapshotEvent>) {
+        val dependencies = resolveSyncDependencies()
+        if (dependencies == null) {
+            Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries, dropping ${events.size} data events")
+            return
+        }
+
+        for (event in events) {
+            processSnapshotEvent(event, dependencies)
+        }
+    }
+
+    protected open suspend fun resolveSyncDependencies(): PhoneDataLayerSyncDependencies? {
+        val koin = resolveKoin() ?: return null
+        return PhoneDataLayerSyncDependencies(
+            notesRepository = koin.get(),
+            journalRepository = koin.get(),
+            notificationHelper = koin.get(),
+            contentRepository = koin.getOrNull(),
+            journalContentDao = koin.getOrNull(),
+            healthSnapshotDao = koin.get(),
+        )
     }
 
     /**
      * Processes a single data event. Runs inside [NonCancellable] to ensure
      * database writes complete even if the service is destroyed mid-flight.
      */
-    private suspend fun processEvent(
-        event: SnapshotDataEvent,
-        koin: org.koin.core.Koin,
-        notesRepository: JournalNotesRepository,
-        journalRepository: JournalRepository,
+    protected open suspend fun processSnapshotEvent(
+        event: PhoneDataLayerSnapshotEvent,
+        dependencies: PhoneDataLayerSyncDependencies,
     ) = withContext(NonCancellable) {
         val path = event.path
 
         try {
             when {
-                NoteDataMapper.isDeletePath(path) -> handleNoteDelete(path, notesRepository)
-                NoteDataMapper.isNotePath(path) -> handleNoteSync(event, path, notesRepository)
-                JournalDataMapper.isDeletePath(path) -> handleJournalDelete(path, journalRepository)
-                JournalDataMapper.isJournalPath(path) -> handleJournalSync(event, path, journalRepository)
-                AssociationDataMapper.isDeletePath(path) -> handleAssociationDelete(path, koin)
-                AssociationDataMapper.isAssociationPath(path) -> handleAssociationSync(event, path, koin)
-                HealthSnapshotDataMapper.isHealthPath(path) -> handleHealthSync(event, path, koin)
+                NoteDataMapper.isDeletePath(path) -> handleNoteDelete(path, dependencies.notesRepository)
+                NoteDataMapper.isNotePath(
+                    path,
+                ) -> handleNoteSync(event, path, dependencies.notesRepository, dependencies.notificationHelper)
+                JournalDataMapper.isDeletePath(path) -> handleJournalDelete(path, dependencies.journalRepository)
+                JournalDataMapper.isJournalPath(path) -> handleJournalSync(event, path, dependencies.journalRepository)
+                AssociationDataMapper.isDeletePath(path) -> handleAssociationDelete(path, dependencies)
+                AssociationDataMapper.isAssociationPath(path) -> handleAssociationSync(event, path, dependencies)
+                HealthSnapshotDataMapper.isHealthPath(path) -> handleHealthSync(event, path, dependencies.healthSnapshotDao)
             }
         } catch (e: Exception) {
             Napier.e("Unhandled error processing sync event at path: $path", e)
@@ -163,9 +197,10 @@ class PhoneDataLayerListenerService : WearableListenerService() {
     }
 
     private suspend fun handleNoteSync(
-        event: SnapshotDataEvent,
+        event: PhoneDataLayerSnapshotEvent,
         path: String,
         notesRepository: JournalNotesRepository,
+        notificationHelper: WearSyncNotificationHelper,
     ) {
         try {
             val note = noteDataMapper.fromDataMap(event.data)
@@ -206,7 +241,7 @@ class PhoneDataLayerListenerService : WearableListenerService() {
     }
 
     private suspend fun handleJournalSync(
-        event: SnapshotDataEvent,
+        event: PhoneDataLayerSnapshotEvent,
         path: String,
         journalRepository: JournalRepository,
     ) {
@@ -226,7 +261,7 @@ class PhoneDataLayerListenerService : WearableListenerService() {
 
     private suspend fun handleAssociationDelete(
         path: String,
-        koin: org.koin.core.Koin,
+        dependencies: PhoneDataLayerSyncDependencies,
     ) {
         val (journalId, contentId) =
             try {
@@ -238,11 +273,11 @@ class PhoneDataLayerListenerService : WearableListenerService() {
 
         Napier.d("Received association delete from watch: journal=$journalId, content=$contentId")
         try {
-            val contentRepo = koin.getOrNull<SyncableJournalContentRepository>()
+            val contentRepo = dependencies.contentRepository
             if (contentRepo != null) {
                 contentRepo.removeContentFromJournalFromSync(contentId, journalId)
             } else {
-                val dao = koin.get<JournalContentDao>()
+                val dao = requireNotNull(dependencies.journalContentDao) { "JournalContentDao unavailable" }
                 dao.removeContentFromJournal(journalId, contentId)
             }
         } catch (e: Exception) {
@@ -251,18 +286,18 @@ class PhoneDataLayerListenerService : WearableListenerService() {
     }
 
     private suspend fun handleAssociationSync(
-        event: SnapshotDataEvent,
+        event: PhoneDataLayerSnapshotEvent,
         path: String,
-        koin: org.koin.core.Koin,
+        dependencies: PhoneDataLayerSyncDependencies,
     ) {
         try {
             val (journalId, contentId) = associationDataMapper.fromDataMap(event.data)
             Napier.d("Received association from watch: journal=$journalId, content=$contentId")
-            val contentRepo = koin.getOrNull<SyncableJournalContentRepository>()
+            val contentRepo = dependencies.contentRepository
             if (contentRepo != null) {
                 contentRepo.addContentToJournalFromSync(contentId, journalId)
             } else {
-                val dao = koin.get<JournalContentDao>()
+                val dao = requireNotNull(dependencies.journalContentDao) { "JournalContentDao unavailable" }
                 dao.addContentToJournal(JournalContentEntityLink(journalId, contentId))
             }
         } catch (e: Exception) {
@@ -271,15 +306,14 @@ class PhoneDataLayerListenerService : WearableListenerService() {
     }
 
     private suspend fun handleHealthSync(
-        event: SnapshotDataEvent,
+        event: PhoneDataLayerSnapshotEvent,
         path: String,
-        koin: org.koin.core.Koin,
+        healthSnapshotDao: HealthSnapshotDao,
     ) {
         try {
             val syncData = healthSnapshotDataMapper.fromDataMap(event.data)
             Napier.d("Received health snapshot from watch: ${syncData.id}")
-            val dao = koin.get<HealthSnapshotDao>()
-            dao.insert(
+            healthSnapshotDao.insert(
                 HealthSnapshotEntity(
                     id = syncData.id,
                     noteId = syncData.noteId,
@@ -315,6 +349,16 @@ class PhoneDataLayerListenerService : WearableListenerService() {
         return null
     }
 
+    protected open suspend fun resolvePhoneWearSyncBridge(): PhoneWearSyncBridge? = resolveKoin()?.get()
+
+    protected open fun launchCamera() {
+        val cameraIntent =
+            Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        startActivity(cameraIntent)
+    }
+
     private fun extractStringMap(event: com.google.android.gms.wearable.DataEvent): Map<String, String> {
         val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap
         val stringMap = mutableMapOf<String, String>()
@@ -329,13 +373,22 @@ class PhoneDataLayerListenerService : WearableListenerService() {
         super.onDestroy()
         serviceScope.cancel()
     }
-
-    /**
-     * Snapshot of a data event's path and payload.
-     * Created before [DataEventBuffer] is recycled by the system.
-     */
-    private data class SnapshotDataEvent(
-        val path: String,
-        val data: Map<String, String>,
-    )
 }
+
+/**
+ * Snapshot of a data event's path and payload.
+ * Created before [DataEventBuffer] is recycled by the system.
+ */
+data class PhoneDataLayerSnapshotEvent(
+    val path: String,
+    val data: Map<String, String>,
+)
+
+data class PhoneDataLayerSyncDependencies(
+    val notesRepository: JournalNotesRepository,
+    val journalRepository: JournalRepository,
+    val notificationHelper: WearSyncNotificationHelper,
+    val contentRepository: SyncableJournalContentRepository? = null,
+    val journalContentDao: JournalContentDao? = null,
+    val healthSnapshotDao: HealthSnapshotDao,
+)

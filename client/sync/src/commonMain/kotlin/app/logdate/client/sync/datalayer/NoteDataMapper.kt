@@ -58,7 +58,7 @@ class NoteDataMapper(
         fun isNotePath(path: String): Boolean = path.startsWith(NOTES_PATH_PREFIX) && !path.endsWith("/delete")
 
         /** Returns true if [path] is a note deletion path. */
-        fun isDeletePath(path: String): Boolean = path.endsWith("/delete")
+        fun isDeletePath(path: String): Boolean = path.startsWith(NOTES_PATH_PREFIX) && path.endsWith("/delete")
 
         /** Extracts the note UUID from a note data path. */
         fun noteIdFromPath(path: String): Uuid {

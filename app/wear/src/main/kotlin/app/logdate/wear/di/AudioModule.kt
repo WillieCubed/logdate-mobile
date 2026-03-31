@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.os.VibratorManager
 import app.logdate.client.media.audio.AndroidAudioPlaybackManager
+import app.logdate.client.media.audio.AudioPlaybackStatusProvider
 import app.logdate.client.media.audio.AndroidAudioStorage
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioStorage
@@ -24,6 +25,8 @@ import app.logdate.wear.presentation.rewind.WearRewindViewModel
 import app.logdate.wear.presentation.settings.WearSettingsViewModel
 import app.logdate.wear.presentation.timeline.WearTimelineViewModel
 import app.logdate.wear.playback.WearAudioOutputMonitor
+import app.logdate.wear.playback.PhoneSyncedAudioResolver
+import app.logdate.wear.playback.WearSyncedAudioResolver
 import app.logdate.wear.recording.WearAudioRecordingManager
 import app.logdate.wear.sync.WearDataLayerClient
 import org.koin.core.module.dsl.viewModel
@@ -44,7 +47,17 @@ val wearAudioModule = module {
 
     // Audio playback — reuses the phone's AndroidAudioPlaybackManager + AudioPlaybackService
     single { WearAudioOutputMonitor(get()) }
-    single<AudioPlaybackManager> { AndroidAudioPlaybackManager(get()) }
+    single { AndroidAudioPlaybackManager(get(), get()) }
+    single<AudioPlaybackManager> { get<AndroidAudioPlaybackManager>() }
+    single<AudioPlaybackStatusProvider> { get<AndroidAudioPlaybackManager>() }
+    single<WearSyncedAudioResolver> {
+        PhoneSyncedAudioResolver(
+            context = get(),
+            audioStorage = get(),
+            dataLayerClient = get(),
+            notesRepository = get(),
+        )
+    }
     viewModel {
         AudioRecordingViewModel(
             get<Application>(),
@@ -80,7 +93,10 @@ val wearAudioModule = module {
         WearTimelineViewModel(
             get<JournalNotesRepository>(),
             get<AudioPlaybackManager>(),
+            get<AudioPlaybackStatusProvider>(),
             get<WearAudioOutputMonitor>(),
+            get<WearSyncedAudioResolver>(),
+            get<WearDataLayerClient>(),
         )
     }
     viewModel {
