@@ -73,14 +73,7 @@ class DesktopExportLauncher :
                     Napier.i("Desktop: Starting export to ${selectedFile.absolutePath}")
 
                     // Resolve date range cutoff
-                    val dateRangeCutoff =
-                        when (options.dateRange) {
-                            is ExportDateRange.AllTime -> null
-                            is ExportDateRange.Last30Days -> ExportUserDataUseCase.resolveDateRangeCutoff("last_30_days")
-                            is ExportDateRange.Last90Days -> ExportUserDataUseCase.resolveDateRangeCutoff("last_90_days")
-                            is ExportDateRange.LastYear -> ExportUserDataUseCase.resolveDateRangeCutoff("last_year")
-                            is ExportDateRange.Custom -> options.dateRange.start
-                        }
+                    val dateRangeCutoff = options.dateRange.toCutoffInstant()
 
                     // Collect and save the data
                     exportUserDataUseCase
@@ -102,7 +95,7 @@ class DesktopExportLauncher :
 
                                 is ExportProgress.InProgress -> {
                                     val progressInt = (progress.percentage * 100).toInt()
-                                    Napier.d("Desktop: Export progress: $progressInt% - ${progress.message}")
+                                    Napier.d("Desktop: Export progress: $progressInt% - ${progress.stage.defaultMessage}")
                                 }
 
                                 is ExportProgress.Completed -> {
@@ -136,8 +129,9 @@ class DesktopExportLauncher :
                                 }
 
                                 is ExportProgress.Failed -> {
-                                    Napier.e("Desktop: Export failed: ${progress.reason}")
-                                    showExportErrorDialog(progress.reason)
+                                    val errorMessage = progress.error.defaultMessage
+                                    Napier.e("Desktop: Export failed: $errorMessage")
+                                    showExportErrorDialog(errorMessage)
                                     completionCallback?.invoke(null)
                                 }
                             }

@@ -93,16 +93,18 @@ class ExportWorker(
 
                         is ExportProgress.InProgress -> {
                             val progressInt = (progress.percentage * 100).toInt()
-                            Napier.i("ExportWorker: Progress $progressInt% - ${progress.message}")
-                            trySetForeground(notificationHelper.createForegroundInfo(progressInt, progress.message))
-                            emitProgress(progressInt, progress.message)
+                            val stageMessage = progress.stage.defaultMessage
+                            Napier.i("ExportWorker: Progress $progressInt% - $stageMessage")
+                            trySetForeground(notificationHelper.createForegroundInfo(progressInt, stageMessage))
+                            emitProgress(progressInt, stageMessage)
                         }
 
                         is ExportProgress.Completed -> {
                             try {
                                 Napier.i("ExportWorker: Completed, saving file...")
-                                trySetForeground(notificationHelper.createForegroundInfo(90, "Creating ZIP archive..."))
-                                emitProgress(90, "Creating ZIP archive...")
+                                val archiveMessage = app.logdate.client.domain.export.ExportStage.WRITING_ARCHIVE.defaultMessage
+                                trySetForeground(notificationHelper.createForegroundInfo(90, archiveMessage))
+                                emitProgress(90, archiveMessage)
 
                                 val filePath =
                                     if (destinationUri != null) {
@@ -143,12 +145,13 @@ class ExportWorker(
                         }
 
                         is ExportProgress.Failed -> {
-                            Napier.e("ExportWorker: Failed - ${progress.reason}")
-                            trySetForeground(notificationHelper.createErrorInfo(progress.reason))
+                            val errorMessage = progress.error.defaultMessage
+                            Napier.e("ExportWorker: Failed - $errorMessage")
+                            trySetForeground(notificationHelper.createErrorInfo(errorMessage))
                             finalResult =
                                 Result.failure(
                                     workDataOf(
-                                        ERROR_KEY to progress.reason,
+                                        ERROR_KEY to errorMessage,
                                     ),
                                 )
                         }

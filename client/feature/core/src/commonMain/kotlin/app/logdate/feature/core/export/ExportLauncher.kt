@@ -1,7 +1,11 @@
 package app.logdate.feature.core.export
 
+import app.logdate.client.domain.export.ExportError
+import app.logdate.client.domain.export.ExportStage
 import app.logdate.client.domain.export.ExportStats
 import kotlinx.coroutines.flow.StateFlow
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
 /**
@@ -53,6 +57,22 @@ data class ExportProgressInfo(
     val stats: ExportStats? = null,
 )
 
+internal val ExportStage.defaultMessage: String
+    get() =
+        when (this) {
+            ExportStage.COLLECTING_JOURNALS -> "Collecting journals..."
+            ExportStage.COLLECTING_NOTES -> "Collecting notes..."
+            ExportStage.COLLECTING_DRAFTS -> "Collecting drafts..."
+            ExportStage.PREPARING_DATA -> "Preparing export data..."
+            ExportStage.WRITING_ARCHIVE -> "Creating ZIP archive..."
+        }
+
+internal val ExportError.defaultMessage: String
+    get() =
+        when (this) {
+            ExportError.UNKNOWN -> "Unknown error occurred"
+        }
+
 /**
  * Options controlling what data to include in the export.
  */
@@ -81,3 +101,12 @@ sealed class ExportDateRange {
         val end: Instant,
     ) : ExportDateRange()
 }
+
+internal fun ExportDateRange.toCutoffInstant(now: Instant = Clock.System.now()): Instant? =
+    when (this) {
+        is ExportDateRange.AllTime -> null
+        is ExportDateRange.Last30Days -> now - 30.days
+        is ExportDateRange.Last90Days -> now - 90.days
+        is ExportDateRange.LastYear -> now - 365.days
+        is ExportDateRange.Custom -> start
+    }

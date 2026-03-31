@@ -17,8 +17,6 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlin.time.Clock
-import kotlin.time.Duration.Companion.days
 
 /**
  * Android-specific implementation for launching data export using Storage Access Framework and WorkManager.
@@ -184,22 +182,6 @@ class AndroidExportLauncher(
     }
 
     /**
-     * Resolves an [ExportDateRange] to a cutoff epoch millis value, or -1 for no cutoff.
-     */
-    private fun ExportDateRange.toCutoffEpochMillis(): Long {
-        val now = Clock.System.now()
-        val cutoff =
-            when (this) {
-                is ExportDateRange.AllTime -> null
-                is ExportDateRange.Last30Days -> now - 30.days
-                is ExportDateRange.Last90Days -> now - 90.days
-                is ExportDateRange.LastYear -> now - 365.days
-                is ExportDateRange.Custom -> start
-            }
-        return cutoff?.toEpochMilliseconds() ?: -1L
-    }
-
-    /**
      * Starts the export worker with the provided URI
      */
     private fun startExportWorker(uri: Uri?) {
@@ -218,7 +200,10 @@ class AndroidExportLauncher(
                 .putBoolean(ExportWorker.INCLUDE_NOTES_KEY, pendingExportOptions.includeNotes)
                 .putBoolean(ExportWorker.INCLUDE_DRAFTS_KEY, pendingExportOptions.includeDrafts)
                 .putBoolean(ExportWorker.INCLUDE_MEDIA_KEY, pendingExportOptions.includeMedia)
-                .putLong(ExportWorker.DATE_CUTOFF_MILLIS_KEY, pendingExportOptions.dateRange.toCutoffEpochMillis())
+                .putLong(
+                    ExportWorker.DATE_CUTOFF_MILLIS_KEY,
+                    pendingExportOptions.dateRange.toCutoffInstant()?.toEpochMilliseconds() ?: -1L,
+                )
 
         if (uri != null) {
             dataBuilder.putString(ExportWorker.DESTINATION_URI_KEY, uri.toString())

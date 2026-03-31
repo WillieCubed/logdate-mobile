@@ -70,7 +70,7 @@ class ExportUserDataUseCase(
             emit(ExportProgress.Starting)
 
             try {
-                emit(ExportProgress.InProgress(0.1f, "Collecting journals..."))
+                emit(ExportProgress.InProgress(0.1f, ExportStage.COLLECTING_JOURNALS))
                 val journals =
                     if (includeJournals) {
                         journalRepository.allJournalsObserved.first()
@@ -78,7 +78,7 @@ class ExportUserDataUseCase(
                         emptyList()
                     }
 
-                emit(ExportProgress.InProgress(0.3f, "Collecting notes..."))
+                emit(ExportProgress.InProgress(0.3f, ExportStage.COLLECTING_NOTES))
                 val notes =
                     if (includeNotes) {
                         val allNotes = journalNotesRepository.allNotesObserved.first()
@@ -91,7 +91,7 @@ class ExportUserDataUseCase(
                         emptyList()
                     }
 
-                emit(ExportProgress.InProgress(0.5f, "Collecting drafts..."))
+                emit(ExportProgress.InProgress(0.5f, ExportStage.COLLECTING_DRAFTS))
                 val drafts =
                     if (includeDrafts) {
                         val allDrafts = journalRepository.getAllDrafts()
@@ -120,7 +120,7 @@ class ExportUserDataUseCase(
                         .getAllLocationHistory()
                         .filter { item -> dateRangeCutoff == null || item.timestamp >= dateRangeCutoff }
 
-                emit(ExportProgress.InProgress(0.7f, "Preparing export data..."))
+                emit(ExportProgress.InProgress(0.7f, ExportStage.PREPARING_DATA))
 
                 val exportNotes =
                     notes.map { note ->
@@ -249,7 +249,7 @@ class ExportUserDataUseCase(
                     ),
                 )
             } catch (exception: Exception) {
-                emit(ExportProgress.Failed(exception.message ?: "Unknown error occurred"))
+                emit(ExportProgress.Failed(ExportError.UNKNOWN))
             }
         }
 
@@ -391,7 +391,7 @@ sealed class ExportProgress {
 
     data class InProgress(
         val percentage: Float,
-        val message: String,
+        val stage: ExportStage,
     ) : ExportProgress()
 
     data class Completed(
@@ -399,8 +399,28 @@ sealed class ExportProgress {
     ) : ExportProgress()
 
     data class Failed(
-        val reason: String,
+        val error: ExportError,
     ) : ExportProgress()
+}
+
+/**
+ * Typed export progress stages. The presentation layer resolves
+ * these to localized strings.
+ */
+enum class ExportStage {
+    COLLECTING_JOURNALS,
+    COLLECTING_NOTES,
+    COLLECTING_DRAFTS,
+    PREPARING_DATA,
+    WRITING_ARCHIVE,
+}
+
+/**
+ * Typed export errors. The presentation layer resolves these
+ * to localized user-facing messages.
+ */
+enum class ExportError {
+    UNKNOWN,
 }
 
 /**

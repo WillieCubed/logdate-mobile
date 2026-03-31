@@ -3,7 +3,6 @@ package app.logdate.feature.core.export
 import app.logdate.client.domain.export.ExportCounts
 import app.logdate.client.domain.export.ExportStats
 import app.logdate.client.domain.export.GetExportCountsUseCase
-import app.logdate.client.domain.notes.GetAllAudioNotesUseCase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
@@ -145,8 +144,7 @@ private class FakeJournalNotesRepository : JournalNotesRepository {
 private fun createSuccessfulGetExportCountsUseCase(): GetExportCountsUseCase {
     val journalRepo = FakeJournalRepository()
     val notesRepo = FakeJournalNotesRepository()
-    val getAllAudioNotesUseCase = GetAllAudioNotesUseCase(notesRepo)
-    return GetExportCountsUseCase(journalRepo, notesRepo, getAllAudioNotesUseCase)
+    return GetExportCountsUseCase(journalRepo, notesRepo)
 }
 
 /**
@@ -197,8 +195,7 @@ private fun createFailingGetExportCountsUseCase(): GetExportCountsUseCase {
 
             override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = throw RuntimeException("Database error")
         }
-    val getAllAudioNotesUseCase = GetAllAudioNotesUseCase(failingNotesRepo)
-    return GetExportCountsUseCase(journalRepo, failingNotesRepo, getAllAudioNotesUseCase)
+    return GetExportCountsUseCase(journalRepo, failingNotesRepo)
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -410,7 +407,13 @@ class UserDataExportViewModelTest {
 
             viewModel.showExportOptions()
             viewModel.confirmExport()
-            fakeExportLauncher.triggerCompletion("/path/to/export.zip")
+            fakeExportLauncher.emitProgress(
+                ExportProgressInfo(
+                    isActive = false,
+                    completedFilePath = "/path/to/export.zip",
+                ),
+            )
+            advanceUntilIdle()
 
             assertIs<ExportState.Completed>(viewModel.exportState.value)
 
@@ -441,14 +444,20 @@ class UserDataExportViewModelTest {
         }
 
     @Test
-    fun `completion callback with path transitions to Completed with extracted fileName`() =
+    fun `completion progress with path transitions to Completed with extracted fileName`() =
         testScope.runTest {
             viewModel = createViewModel()
             advanceUntilIdle()
 
             viewModel.showExportOptions()
             viewModel.confirmExport()
-            fakeExportLauncher.triggerCompletion("/storage/exports/logdate-export.zip")
+            fakeExportLauncher.emitProgress(
+                ExportProgressInfo(
+                    isActive = false,
+                    completedFilePath = "/storage/exports/logdate-export.zip",
+                ),
+            )
+            advanceUntilIdle()
 
             val state = viewModel.exportState.value
             assertIs<ExportState.Completed>(state)
@@ -601,7 +610,13 @@ class UserDataExportViewModelTest {
             viewModel = createViewModel()
             advanceUntilIdle()
 
-            fakeExportLauncher.triggerCompletion("/path/to/file.zip")
+            fakeExportLauncher.emitProgress(
+                ExportProgressInfo(
+                    isActive = false,
+                    completedFilePath = "/path/to/file.zip",
+                ),
+            )
+            advanceUntilIdle()
 
             val state = viewModel.exportState.value
             assertIs<ExportState.Completed>(state)
@@ -614,9 +629,13 @@ class UserDataExportViewModelTest {
             viewModel = createViewModel()
             advanceUntilIdle()
 
-            fakeExportLauncher.triggerCompletion(
-                "content://com.android.providers.downloads/doc:logdate-export.zip",
+            fakeExportLauncher.emitProgress(
+                ExportProgressInfo(
+                    isActive = false,
+                    completedFilePath = "content://com.android.providers.downloads/doc:logdate-export.zip",
+                ),
             )
+            advanceUntilIdle()
 
             val state = viewModel.exportState.value
             assertIs<ExportState.Completed>(state)
