@@ -16,13 +16,13 @@ private val results =
             uid = Uuid.parse("00000000-0000-0000-0000-000000000061"),
             content = "Captured the last train home and wrote down the feeling before I forgot it.",
             created = ScreenshotTestData.baseInstant,
-            type = SearchResultType.TEXT_NOTE,
+            contentType = SearchResultType.TEXT_NOTE,
         ),
         SearchResult(
             uid = Uuid.parse("00000000-0000-0000-0000-000000000062"),
             content = "Voice memo about the route screenshot rollout and the remaining gaps in settings.",
             created = ScreenshotTestData.baseInstant,
-            type = SearchResultType.TRANSCRIPTION,
+            contentType = SearchResultType.TRANSCRIPTION,
         ),
     )
 

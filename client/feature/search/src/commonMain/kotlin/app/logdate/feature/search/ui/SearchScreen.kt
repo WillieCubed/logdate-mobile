@@ -1,7 +1,9 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+@file:Suppress("ktlint:standard:function-naming")
+@file:OptIn(ExperimentalMaterial3Api::class)
 
 package app.logdate.feature.search.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,12 +14,13 @@ import androidx.compose.foundation.text.input.clearText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExpandedFullScreenSearchBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
@@ -31,92 +34,112 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
-import app.logdate.client.repository.search.SearchResultType
-import app.logdate.ui.search.EntrySearchResultItem
-import app.logdate.ui.search.EntrySearchResultUiState
-import app.logdate.util.toReadableDateTimeShort
+import app.logdate.ui.search.UniversalSearchResultItem
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import logdate.client.feature.search.generated.resources.*
 import logdate.client.feature.search.generated.resources.Res
+import logdate.client.feature.search.generated.resources.clear_search
+import logdate.client.feature.search.generated.resources.go_back
+import logdate.client.feature.search.generated.resources.search
+import logdate.client.feature.search.generated.resources.search_entries
+import logdate.client.feature.search.generated.resources.search_for_entries
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.uuid.Uuid
 
 /**
- * Search screen for searching across all entries.
+ * Universal search screen.
  *
- * @param onNavigateToDay Callback when a search result is tapped
- * @param onGoBack Callback when back button is pressed
+ * Searches across all indexed content types (notes, journals, places, rewinds,
+ * stickers, postcards) via a single FTS5 query. Shows recent searches when idle.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
     onNavigateToDay: (LocalDate) -> Unit,
+    onNavigateToJournal: (Uuid) -> Unit = {},
     onGoBack: () -> Unit,
+    initialQuery: String = "",
     modifier: Modifier = Modifier,
     viewModel: SearchViewModel = koinViewModel(),
 ) {
-    val searchResults by viewModel.searchResults.collectAsState()
+    val searchState by viewModel.searchState.collectAsState()
 
     SearchScreenContent(
-        searchResults = searchResults,
+        searchState = searchState,
+        initialQuery = initialQuery,
         onQueryChange = viewModel::updateQuery,
+        onCommitSearch = viewModel::commitSearch,
         onNavigateToDay = onNavigateToDay,
+        onNavigateToJournal = onNavigateToJournal,
         onGoBack = onGoBack,
         modifier = modifier,
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Stateless content for the universal search screen.
+ *
+ * Renders an MD3 SearchBar that auto-expands on entry. Shows recent searches
+ * when idle, a "no results" message when empty, or a ranked list of
+ * [UniversalSearchResultItem]s when results are available.
+ */
 @Composable
 fun SearchScreenContent(
-    searchResults: List<SearchResult>,
+    searchState: SearchScreenState,
     onQueryChange: (String) -> Unit,
+    onCommitSearch: () -> Unit,
     onNavigateToDay: (LocalDate) -> Unit,
+    onNavigateToJournal: (Uuid) -> Unit,
     onGoBack: () -> Unit,
+    initialQuery: String = "",
     modifier: Modifier = Modifier,
 ) {
     val searchBarState = rememberSearchBarState()
-    val textFieldState = rememberSaveable(saver = TextFieldState.Saver) { TextFieldState() }
+    val textFieldState =
+        rememberSaveable(saver = TextFieldState.Saver) {
+            TextFieldState(initialText = initialQuery)
+        }
 
-    // Auto-expand on entry since this screen is navigated to for search
     LaunchedEffect(Unit) {
         searchBarState.animateToExpanded()
     }
 
-    // Propagate text changes to ViewModel
     LaunchedEffect(textFieldState) {
         snapshotFlow { textFieldState.text.toString() }
             .collectLatest { onQueryChange(it) }
     }
 
     Box(modifier = modifier) {
-        // Collapsed bar (briefly visible before auto-expand)
         SearchBar(
             state = searchBarState,
             inputField = {
                 SearchBarDefaults.InputField(
                     searchBarState = searchBarState,
                     textFieldState = textFieldState,
-                    onSearch = {},
+                    onSearch = { onCommitSearch() },
                     placeholder = { Text(stringResource(Res.string.search_entries)) },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = stringResource(Res.string.search),
+                        )
+                    },
                 )
             },
             modifier = Modifier.fillMaxWidth(),
         )
 
-        // Expanded full-screen overlay
         ExpandedFullScreenSearchBar(
             state = searchBarState,
             inputField = {
                 SearchBarDefaults.InputField(
                     searchBarState = searchBarState,
                     textFieldState = textFieldState,
-                    onSearch = {},
+                    onSearch = { onCommitSearch() },
                     placeholder = { Text(stringResource(Res.string.search_entries)) },
                     leadingIcon = {
                         IconButton(onClick = onGoBack) {
@@ -139,21 +162,45 @@ fun SearchScreenContent(
                 )
             },
         ) {
-            if (searchResults.isEmpty()) {
-                EmptySearchState(modifier = Modifier.fillMaxSize())
-            } else {
-                LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                    items(searchResults, key = { it.uid.toString() }) { result ->
-                        EntrySearchResultItem(
-                            state = result.toUiState(),
-                            onClick = {
-                                val date =
-                                    result.created
-                                        .toLocalDateTime(TimeZone.currentSystemDefault())
-                                        .date
-                                onNavigateToDay(date)
-                            },
+            when (searchState) {
+                is SearchScreenState.Idle -> {
+                    RecentSearchesList(
+                        recentSearches = searchState.recentSearches,
+                        onSelectRecent = { query -> onQueryChange(query) },
+                    )
+                }
+
+                is SearchScreenState.Empty -> {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        Text(
+                            text = "No results for \"${searchState.query}\"",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                }
+
+                is SearchScreenState.Results -> {
+                    LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                        items(
+                            items = searchState.results,
+                            key = { "${it.contentType.ftsValue}_${it.uid}" },
+                        ) { result ->
+                            UniversalSearchResultItem(
+                                result = result,
+                                onClick = {
+                                    onCommitSearch()
+                                    navigateToResult(
+                                        result = result,
+                                        onNavigateToDay = onNavigateToDay,
+                                        onNavigateToJournal = onNavigateToJournal,
+                                    )
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -161,36 +208,50 @@ fun SearchScreenContent(
     }
 }
 
-/**
- * Empty state shown when there are no search results or no query.
- */
 @Composable
-private fun EmptySearchState(modifier: Modifier = Modifier) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier.fillMaxSize(),
-    ) {
-        Text(
-            text = stringResource(Res.string.search_for_entries),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+private fun RecentSearchesList(
+    recentSearches: List<String>,
+    onSelectRecent: (String) -> Unit,
+) {
+    if (recentSearches.isEmpty()) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            Text(
+                text = stringResource(Res.string.search_for_entries),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    } else {
+        LazyColumn(modifier = Modifier.fillMaxWidth()) {
+            items(recentSearches) { query ->
+                ListItem(
+                    headlineContent = { Text(query) },
+                    leadingContent = {
+                        Icon(Icons.Default.History, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable { onSelectRecent(query) },
+                )
+            }
+        }
     }
 }
 
-private fun SearchResult.toUiState(): EntrySearchResultUiState =
-    EntrySearchResultUiState(
-        id = uid.toString(),
-        content = content,
-        dateLabel = created.toReadableDateTimeShort(),
-        typeLabel =
-            when (type) {
-                SearchResultType.TEXT_NOTE -> "Text note"
-                SearchResultType.TRANSCRIPTION -> "Voice note"
-            },
-        typeIcon =
-            when (type) {
-                SearchResultType.TEXT_NOTE -> Icons.Default.Search
-                SearchResultType.TRANSCRIPTION -> Icons.Default.Mic
-            },
-    )
+private fun navigateToResult(
+    result: SearchResult,
+    onNavigateToDay: (LocalDate) -> Unit,
+    onNavigateToJournal: (Uuid) -> Unit,
+) {
+    when (result.contentType) {
+        SearchContentType.JOURNAL -> onNavigateToJournal(result.uid)
+        else -> {
+            val date =
+                result.created
+                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                    .date
+            onNavigateToDay(date)
+        }
+    }
+}

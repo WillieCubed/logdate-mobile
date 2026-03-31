@@ -2,52 +2,99 @@ package app.logdate.feature.search.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.logdate.client.domain.search.SearchEntriesUseCase
+import app.logdate.client.domain.search.ObserveRecentSearchesUseCase
 import app.logdate.client.domain.search.SearchQuery
+import app.logdate.client.domain.search.UniversalSearchUseCase
 import app.logdate.client.repository.search.SearchResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /**
- * ViewModel for the search screen.
+ * ViewModel for the universal search screen.
  *
- * Manages search query state and search results with debouncing.
+ * Manages search query state, recent searches, and ranked results across
+ * all indexed content types.
  */
 class SearchViewModel(
-    searchEntriesUseCase: SearchEntriesUseCase,
+    universalSearchUseCase: UniversalSearchUseCase,
+    private val observeRecentSearchesUseCase: ObserveRecentSearchesUseCase,
 ) : ViewModel() {
-    private val _query = MutableStateFlow(SearchQuery.Empty)
-    val query: StateFlow<SearchQuery> = _query.asStateFlow()
+    private val queryState = MutableStateFlow(SearchQuery.Empty)
 
     /**
-     * Search results from the use case, automatically updated when query changes.
-     * The use case handles debouncing internally.
+     * The current search screen state: idle (with recents), empty, or results.
      */
-    val searchResults: StateFlow<List<SearchResult>> =
-        searchEntriesUseCase(_query)
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList(),
-            )
+    val searchState: StateFlow<SearchScreenState> =
+        combine(
+            queryState,
+            universalSearchUseCase(queryState),
+            observeRecentSearchesUseCase(),
+        ) { query, results, recentSearches ->
+            when {
+                query.isBlank -> SearchScreenState.Idle(recentSearches)
+                results.isEmpty() -> SearchScreenState.Empty(query.text)
+                else -> SearchScreenState.Results(results)
+            }
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = SearchScreenState.Idle(emptyList()),
+        )
 
     /**
-     * Updates the search query.
-     *
-     * This will trigger a new search after the debounce period.
+     * Updates the search query text.
      */
     fun updateQuery(newQuery: String) {
-        _query.update { SearchQuery(newQuery) }
+        queryState.update { SearchQuery(newQuery) }
     }
 
     /**
-     * Clears the search query and results.
+     * Records the current query as a recent search (call when user commits a search).
+     */
+    fun commitSearch() {
+        val current = queryState.value
+        if (current.isNotEmpty) {
+            viewModelScope.launch {
+                observeRecentSearchesUseCase.record(current.text)
+            }
+        }
+    }
+
+    /**
+     * Clears the current search query.
      */
     fun clearSearch() {
-        _query.update { SearchQuery.Empty }
+        queryState.update { SearchQuery.Empty }
     }
+}
+
+/**
+ * UI state for the search screen.
+ */
+sealed interface SearchScreenState {
+    /**
+     * No active query. Show recent searches as suggestions.
+     */
+    data class Idle(
+        val recentSearches: List<String>,
+    ) : SearchScreenState
+
+    /**
+     * Query submitted but no results found.
+     */
+    data class Empty(
+        val query: String,
+    ) : SearchScreenState
+
+    /**
+     * Ranked results from universal search.
+     */
+    data class Results(
+        val results: List<SearchResult>,
+    ) : SearchScreenState
 }

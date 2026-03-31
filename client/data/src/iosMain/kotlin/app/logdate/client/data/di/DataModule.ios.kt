@@ -23,6 +23,7 @@ import app.logdate.client.data.profile.OfflineFirstProfileRepository
 import app.logdate.client.data.quota.StubRemoteQuotaDataSource
 import app.logdate.client.data.rewind.DefaultRewindGenerationManager
 import app.logdate.client.data.rewind.OfflineFirstRewindRepository
+import app.logdate.client.data.search.DataStoreRecentSearchesRepository
 import app.logdate.client.data.search.OfflineFirstSearchRepository
 import app.logdate.client.data.timeline.OfflineFirstActivityTimelineRepository
 import app.logdate.client.data.transcription.OfflineFirstTranscriptionRepository
@@ -46,6 +47,7 @@ import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.quota.RemoteQuotaDataSource
 import app.logdate.client.repository.rewind.RewindGenerationManager
 import app.logdate.client.repository.rewind.RewindRepository
+import app.logdate.client.repository.search.RecentSearchesRepository
 import app.logdate.client.repository.search.SearchRepository
 import app.logdate.client.repository.timeline.ActivityTimelineRepository
 import app.logdate.client.repository.transcription.TranscriptionRepository
@@ -146,6 +148,7 @@ actual val dataModule: Module =
 
         // Search
         single<SearchRepository> { OfflineFirstSearchRepository(get()) }
+        single<RecentSearchesRepository> { DataStoreRecentSearchesRepository(get()) }
 
         // Integrity
         single { DataIntegrityService(get(), get(), get(), get()) }

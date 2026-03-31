@@ -5,25 +5,22 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * Repository for searching across all journal entries.
+ * Repository for full-text search across all indexed content.
  *
- * Provides full-text search capabilities across text notes and voice note transcriptions.
+ * Backed by FTS5. Supports text notes, transcriptions, journals, media captions,
+ * places, rewinds, stickers, and postcards.
  */
 interface SearchRepository {
     /**
-     * Searches all entries using full-text search.
+     * Searches all indexed content using full-text search.
      *
-     * @param query The search query
+     * @param query The search query (FTS5 syntax supported)
      * @return Flow of search results ordered by relevance and date
      */
     fun search(query: String): Flow<List<SearchResult>>
 
     /**
      * Searches with a limit on the number of results.
-     *
-     * @param query The search query
-     * @param limit Maximum number of results
-     * @return Flow of limited search results
      */
     fun searchWithLimit(
         query: String,
@@ -31,28 +28,61 @@ interface SearchRepository {
     ): Flow<List<SearchResult>>
 
     /**
-     * Searches with highlighted snippets.
-     *
-     * @param query The search query
-     * @return Flow of search results with highlighted content
+     * Searches with highlighted snippets (FTS5 snippet markers).
      */
     fun searchWithSnippets(query: String): Flow<List<SearchResult>>
+
+    /**
+     * Searches all indexed content with FTS5 relevance ranking.
+     *
+     * Returns results with rank scores for proper ordering across all content types.
+     * This is the primary query path for universal search.
+     */
+    fun searchRanked(
+        query: String,
+        limit: Int = 50,
+    ): Flow<List<SearchResult>>
 }
 
 /**
- * A search result representing a found entry.
+ * A search result from the FTS5 index.
+ *
+ * Represents any searchable entity in the app. The [contentType] field determines
+ * what kind of entity matched and how to navigate to it.
  */
 data class SearchResult(
     val uid: Uuid,
     val content: String,
     val created: Instant,
-    val type: SearchResultType,
+    val contentType: SearchContentType,
+    val rank: Double = 0.0,
 )
 
 /**
- * Type of search result.
+ * The type of entity that produced a search result.
+ *
+ * Each value corresponds to a `contentType` string stored in the FTS5 index.
  */
-enum class SearchResultType {
-    TEXT_NOTE,
-    TRANSCRIPTION,
+enum class SearchContentType(
+    val ftsValue: String,
+) {
+    TEXT_NOTE("text_note"),
+    TRANSCRIPTION("transcription"),
+    JOURNAL("journal"),
+    MEDIA_CAPTION("media_caption"),
+    PLACE("place"),
+    REWIND("rewind"),
+    STICKER("sticker"),
+    POSTCARD("postcard"),
+    ;
+
+    companion object {
+        fun fromFtsValue(value: String): SearchContentType = entries.find { it.ftsValue == value } ?: TEXT_NOTE
+    }
 }
+
+/**
+ * Legacy type alias for backward compatibility.
+ */
+@Deprecated("Use SearchContentType instead", ReplaceWith("SearchContentType"))
+typealias SearchResultType = SearchContentType

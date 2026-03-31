@@ -12,10 +12,14 @@ import kotlin.jvm.JvmInline
 value class SearchQuery(
     val text: String,
 ) {
+    /** Whether the query text is blank (empty or whitespace-only). */
     val isBlank: Boolean get() = text.isBlank()
+
+    /** Whether the query text is non-empty. */
     val isNotEmpty: Boolean get() = text.isNotEmpty()
 
     companion object {
+        /** A query with no text. */
         val Empty = SearchQuery("")
     }
 }

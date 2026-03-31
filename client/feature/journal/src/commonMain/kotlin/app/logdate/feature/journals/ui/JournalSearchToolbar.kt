@@ -238,13 +238,15 @@ private fun SearchResult.toUiState(): EntrySearchResultUiState =
         content = content,
         dateLabel = created.toReadableDateTimeShort(),
         typeLabel =
-            when (type) {
+            when (contentType) {
                 SearchResultType.TEXT_NOTE -> "Text note"
                 SearchResultType.TRANSCRIPTION -> "Voice note"
+                else -> "Note"
             },
         typeIcon =
-            when (type) {
+            when (contentType) {
                 SearchResultType.TEXT_NOTE -> Icons.Default.Search
                 SearchResultType.TRANSCRIPTION -> Icons.Default.Mic
+                else -> Icons.Default.Search
             },
     )

@@ -19,13 +19,13 @@ class SearchEntriesUseCaseTest {
                 uid = Uuid.random(),
                 content = "Hiked the sunset trail today.",
                 created = Clock.System.now(),
-                type = SearchResultType.TEXT_NOTE,
+                contentType = SearchResultType.TEXT_NOTE,
             ),
             SearchResult(
                 uid = Uuid.random(),
                 content = "Voice memo about the hiking plan.",
                 created = Clock.System.now(),
-                type = SearchResultType.TRANSCRIPTION,
+                contentType = SearchResultType.TRANSCRIPTION,
             ),
         )
 

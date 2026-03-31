@@ -37,13 +37,13 @@ private val auditSearchResults =
             uid = Uuid.parse("00000000-0000-0000-0000-000000000121"),
             content = "Captured the train ride home before dinner and tagged it for the weekly rewind.",
             created = ScreenshotTestData.baseInstant,
-            type = SearchResultType.TEXT_NOTE,
+            contentType = SearchResultType.TEXT_NOTE,
         ),
         SearchResult(
             uid = Uuid.parse("00000000-0000-0000-0000-000000000122"),
             content = "Voice memo about redesigning the journals overview for larger windows.",
             created = ScreenshotTestData.baseInstant - 2.hours,
-            type = SearchResultType.TRANSCRIPTION,
+            contentType = SearchResultType.TRANSCRIPTION,
         ),
     )
 

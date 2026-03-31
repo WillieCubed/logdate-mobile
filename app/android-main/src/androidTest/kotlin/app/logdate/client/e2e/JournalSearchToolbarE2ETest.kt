@@ -50,7 +50,7 @@ class JournalSearchToolbarE2ETest {
         uid = Uuid.random(),
         content = "Went hiking at sunset and captured the golden hour.",
         created = Clock.System.now(),
-        type = SearchResultType.TEXT_NOTE,
+        contentType = SearchResultType.TEXT_NOTE,
     )
 
     // region Collapsed State

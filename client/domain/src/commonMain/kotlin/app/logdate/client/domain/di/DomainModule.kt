@@ -48,8 +48,10 @@ import app.logdate.client.domain.rewind.GenerateRewindTitleUseCase
 import app.logdate.client.domain.rewind.GetPastRewindsUseCase
 import app.logdate.client.domain.rewind.GetRewindUseCase
 import app.logdate.client.domain.rewind.GetWeekRewindUseCase
+import app.logdate.client.domain.search.ObserveRecentSearchesUseCase
 import app.logdate.client.domain.search.SearchEntriesUseCase
 import app.logdate.client.domain.search.SearchJournalsUseCase
+import app.logdate.client.domain.search.UniversalSearchUseCase
 import app.logdate.client.domain.timeline.GetJournalMembershipUseCase
 import app.logdate.client.domain.timeline.GetMediaUrisUseCase
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
@@ -173,6 +175,8 @@ val domainModule: Module =
         // Search
         factory { SearchEntriesUseCase(get()) }
         factory { SearchJournalsUseCase(get()) }
+        factory { UniversalSearchUseCase(get()) }
+        factory { ObserveRecentSearchesUseCase(get()) }
 
         // Recommendations
         factory { GetMemoryRecallUseCase(get(), getOrNull()) }

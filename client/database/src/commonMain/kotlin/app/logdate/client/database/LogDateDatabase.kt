@@ -3,9 +3,12 @@ package app.logdate.client.database
 import androidx.room.ConstructedBy
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.RoomDatabase.Callback
 import androidx.room.TypeConverters
+import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.SQLiteDriver
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import androidx.sqlite.execSQL
 import app.logdate.client.database.converters.DurationConverter
 import app.logdate.client.database.converters.LocationDataConverter
 import app.logdate.client.database.converters.MediaDimensionsConverter
@@ -88,6 +91,7 @@ import app.logdate.client.database.migrations.MIGRATION_29_30
 import app.logdate.client.database.migrations.MIGRATION_2_3
 import app.logdate.client.database.migrations.MIGRATION_30_31
 import app.logdate.client.database.migrations.MIGRATION_31_32
+import app.logdate.client.database.migrations.MIGRATION_32_33
 import app.logdate.client.database.migrations.MIGRATION_3_4
 import app.logdate.client.database.migrations.MIGRATION_4_5
 import app.logdate.client.database.migrations.MIGRATION_5_6
@@ -144,7 +148,7 @@ import kotlinx.coroutines.IO
         PostcardEntity::class,
         StickerEntity::class,
     ],
-    version = 32,
+    version = 33,
     exportSchema = true,
 )
 @TypeConverters(
@@ -272,7 +276,9 @@ fun getRoomDatabase(
                 MIGRATION_29_30,
                 MIGRATION_30_31,
                 MIGRATION_31_32,
-            ).fallbackToDestructiveMigration(destroyTablesOnUpgrade)
+                MIGRATION_32_33,
+            ).addCallback(FtsTableCallback)
+            .fallbackToDestructiveMigration(destroyTablesOnUpgrade)
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)
             .setQueryCoroutineContext(dispatcher)
 
@@ -281,4 +287,31 @@ fun getRoomDatabase(
     }
 
     return configured.build()
+}
+
+/**
+ * Ensures the `entries_fts` FTS5 virtual table exists on every database open.
+ *
+ * The table is normally created by MIGRATION_19_20, but won't exist when:
+ * - The database was created fresh via destructive migration
+ * - The encrypted database failed to open and fell back to in-memory mode
+ * - A new install skipped the migration path entirely
+ *
+ * `CREATE VIRTUAL TABLE IF NOT EXISTS` is idempotent — it's a no-op when
+ * the table already exists.
+ */
+private object FtsTableCallback : Callback() {
+    override fun onOpen(connection: SQLiteConnection) {
+        connection.execSQL(
+            """
+            CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(
+                uid UNINDEXED,
+                content,
+                created UNINDEXED,
+                contentType UNINDEXED,
+                tokenize = 'porter unicode61'
+            )
+            """.trimIndent(),
+        )
+    }
 }

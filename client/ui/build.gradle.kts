@@ -57,6 +57,7 @@ kotlin {
             // Project dependencies
             api(projects.client.theme)
             implementation(projects.client.media)
+            implementation(projects.client.repository)
             implementation(projects.client.util)
             implementation(projects.client.sensor)
             implementation(projects.shared.model)

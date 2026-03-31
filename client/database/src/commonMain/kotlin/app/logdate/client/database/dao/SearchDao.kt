@@ -86,6 +86,53 @@ interface SearchDao {
     """,
     )
     suspend fun searchWithSnippets(query: String): List<SearchResultEntity>
+
+    /**
+     * Searches all indexed content with FTS5 relevance ranking.
+     *
+     * Returns results with snippet highlighting and rank scores. This is the
+     * primary query path for universal search — a single query covers all
+     * content types (text notes, transcriptions, journals, places, etc.).
+     *
+     * @param query The search query (FTS5 syntax)
+     * @param limit Maximum number of results
+     * @return Ranked results with snippet content
+     */
+    @Query(
+        """
+        SELECT
+            uid,
+            snippet(entries_fts, 1, '[', ']', '...', 32) as content,
+            created,
+            contentType,
+            rank
+        FROM entries_fts
+        WHERE entries_fts MATCH :query
+        ORDER BY rank, created DESC
+        LIMIT :limit
+    """,
+    )
+    suspend fun searchRanked(
+        query: String,
+        limit: Int = 50,
+    ): List<RankedSearchResultEntity>
+}
+
+/**
+ * Entity representing a ranked search result with FTS5 relevance score.
+ */
+data class RankedSearchResultEntity(
+    val uid: String,
+    val content: String,
+    val created: Long,
+    val contentType: String,
+    val rank: Double,
+) {
+    /** Parses the string [uid] into a [Uuid]. */
+    fun getUuid(): Uuid = Uuid.parse(uid)
+
+    /** Converts the epoch-millisecond [created] timestamp to an [Instant]. */
+    fun getCreatedInstant(): Instant = Instant.fromEpochMilliseconds(created)
 }
 
 /**

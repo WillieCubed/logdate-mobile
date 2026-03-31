@@ -7,6 +7,7 @@ import androidx.navigation3.runtime.NavKey
 import kotlin.reflect.KClass
 
 private const val ROUTE_CLASS_METADATA_KEY = "routeClass"
+internal typealias RouteMetadata = Map<String, Any>
 
 internal fun <T : Any> NavEntry<T>.routeClass(): KClass<out T>? {
     @Suppress("UNCHECKED_CAST")
@@ -14,7 +15,7 @@ internal fun <T : Any> NavEntry<T>.routeClass(): KClass<out T>? {
 }
 
 internal inline fun <reified T : NavKey> EntryProviderScope<NavKey>.routeEntry(
-    metadata: Map<String, Any> = emptyMap(),
+    metadata: RouteMetadata = emptyMap(),
     noinline content: @Composable (T) -> Unit,
 ) {
     entry<T>(
