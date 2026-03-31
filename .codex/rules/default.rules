@@ -1,0 +1,65 @@
+# Block device-capable Android commands for LogDate.
+prefix_rule(
+    pattern = ["adb"],
+    decision = "forbidden",
+    justification = "Do not use adb for LogDate from Codex. Use an emulator or Gradle Managed Device workflow instead.",
+    match = [
+        "adb devices",
+        "adb shell pm clear co.reasonabletech.logdate",
+        "adb install app.apk",
+    ],
+)
+
+prefix_rule(
+    pattern = ["fastboot"],
+    decision = "forbidden",
+    justification = "Do not use fastboot for LogDate from Codex.",
+    match = [
+        "fastboot devices",
+    ],
+)
+
+prefix_rule(
+    pattern = ["./gradlew", "connectedAndroidTest"],
+    decision = "forbidden",
+    justification = "Connected Android test tasks are blocked for LogDate. Use a Gradle Managed Device task instead.",
+    match = [
+        "./gradlew connectedAndroidTest",
+    ],
+)
+
+prefix_rule(
+    pattern = ["./gradlew", "connectedDebugAndroidTest"],
+    decision = "forbidden",
+    justification = "Connected Android test tasks are blocked for LogDate. Use a Gradle Managed Device task instead.",
+    match = [
+        "./gradlew connectedDebugAndroidTest",
+    ],
+)
+
+prefix_rule(
+    pattern = ["gradlew", "connectedAndroidTest"],
+    decision = "forbidden",
+    justification = "Connected Android test tasks are blocked for LogDate. Use a Gradle Managed Device task instead.",
+    match = [
+        "gradlew connectedAndroidTest",
+    ],
+)
+
+prefix_rule(
+    pattern = ["gradlew", "connectedDebugAndroidTest"],
+    decision = "forbidden",
+    justification = "Connected Android test tasks are blocked for LogDate. Use a Gradle Managed Device task instead.",
+    match = [
+        "gradlew connectedDebugAndroidTest",
+    ],
+)
+
+prefix_rule(
+    pattern = ["gradle", "connectedAndroidTest"],
+    decision = "forbidden",
+    justification = "Connected Android test tasks are blocked for LogDate. Use a Gradle Managed Device task instead.",
+    match = [
+        "gradle connectedAndroidTest",
+    ],
+)

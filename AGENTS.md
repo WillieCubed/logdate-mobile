@@ -99,6 +99,22 @@ Use [`docs/reference/standards/commit-messages.md`](./docs/reference/standards/c
 
 Keep modifications focused on the task. Don't add comments that restate code. Don't refactor surrounding code unless asked. Don't over-engineer.
 
+### Android Device Safety
+
+Physical Android devices are forbidden test and deployment targets for agent-driven work in this repository.
+
+- Never run `connected*AndroidTest`, `install*`, `adb install`, `adb shell am instrument`, `adb uninstall`, `adb shell pm clear`, or any other `adb` command against a physical device.
+- Only use Android emulators or Gradle Managed Devices for Android app installs, instrumentation tests, UI tests, screenshots, benchmarks, and manual validation.
+- Before any Android command that could talk to a device, verify the target is safe. A safe target is:
+  - an emulator with an `adb` serial that starts with `emulator-`, or
+  - a Gradle Managed Device started by Gradle for the current task.
+- If any connected target is a physical device, do not use it. Stop immediately and either:
+  - run the task on an emulator,
+  - run the task on a Gradle Managed Device, or
+  - ask the developer to disconnect the physical device before proceeding.
+- Convenience is irrelevant here. If there is any uncertainty about the target device type, treat it as unsafe and do not run the command.
+- A user must explicitly override this in the current conversation before any physical-device interaction is allowed. Repository defaults forbid it.
+
 ## Key References
 
 | Topic | Location |
