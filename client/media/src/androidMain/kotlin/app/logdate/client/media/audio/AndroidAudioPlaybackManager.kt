@@ -13,10 +13,10 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,20 +26,31 @@ import java.util.concurrent.Executor
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
+fun interface MediaControllerFutureFactory {
+    fun create(context: Context): ListenableFuture<MediaController>
+}
+
+fun interface AudioPlaybackItemFactory {
+    fun create(
+        uri: String,
+        metadata: AudioPlaybackMetadata?,
+    ): MediaItem
+}
+
 class AndroidAudioPlaybackManager(
     private val context: Context,
+    coroutineScope: CoroutineScope,
+    progressDispatcher: CoroutineDispatcher = Dispatchers.Main,
+    private val controllerFactory: MediaControllerFutureFactory = defaultMediaControllerFutureFactory,
+    private val controllerExecutor: Executor = mainThreadExecutor(),
+    private val mediaItemFactory: AudioPlaybackItemFactory = defaultMediaItemFactory,
 ) : AudioPlaybackManager,
     AudioPlaybackStatusProvider {
     override val playbackStatus: StateFlow<AudioPlaybackStatus>
         get() = _playbackStatus
 
     private val _playbackStatus = MutableStateFlow(AudioPlaybackStatus())
-    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private val mainExecutor: Executor =
-        Executor { runnable ->
-            mainHandler.post(runnable)
-        }
+    private val scope = CoroutineScope(coroutineScope.coroutineContext + progressDispatcher)
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null
@@ -60,13 +71,7 @@ class AndroidAudioPlaybackManager(
         // is only bound via BIND_AUTO_CREATE and stops itself ~1s after the controller connects.
         context.startService(Intent(context, AudioPlaybackService::class.java))
         withController { player ->
-            val mediaItem =
-                MediaItem
-                    .Builder()
-                    .setUri(uri)
-                    .setMediaId(metadata?.noteId?.toString() ?: uri)
-                    .setMediaMetadata(buildMediaMetadata(metadata))
-                    .build()
+            val mediaItem = mediaItemFactory.create(uri, metadata)
             player.setMediaItem(mediaItem)
             player.prepare()
             player.play()
@@ -126,17 +131,10 @@ class AndroidAudioPlaybackManager(
                 Napier.e(e) { "Failed to create MediaController for audio playback" }
                 onPlaybackCompleted?.invoke()
             }
-        }, mainExecutor)
+        }, controllerExecutor)
     }
 
-    private fun buildControllerFuture(): ListenableFuture<MediaController> {
-        val token =
-            SessionToken(
-                context,
-                ComponentName(context, AudioPlaybackService::class.java),
-            )
-        return MediaController.Builder(context, token).buildAsync()
-    }
+    private fun buildControllerFuture(): ListenableFuture<MediaController> = controllerFactory.create(context)
 
     private val playerListener =
         object : Player.Listener {
@@ -159,6 +157,10 @@ class AndroidAudioPlaybackManager(
                     return
                 }
                 updateStatus(player)
+            }
+
+            override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
+                controller?.let { updateStatus(it) }
             }
         }
 
@@ -205,20 +207,48 @@ class AndroidAudioPlaybackManager(
                 isPlaying = player.isPlaying,
                 progress = progress,
                 duration = duration,
+                isSuppressedForUnsuitableOutput =
+                    player.playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_UNSUITABLE_AUDIO_OUTPUT,
             )
     }
 
-    /**
-     * Builds media metadata for system UI surfaces and deep-link routing.
-     */
-    private fun buildMediaMetadata(metadata: AudioPlaybackMetadata?): MediaMetadata {
-        val extras = Bundle()
-        metadata?.noteId?.let { extras.putString(EXTRA_NOTE_ID, it.toString()) }
-        return MediaMetadata
-            .Builder()
-            .setTitle(metadata?.title ?: "Voice Note")
-            .setSubtitle(metadata?.subtitle)
-            .setExtras(extras.takeIf { !it.isEmpty })
-            .build()
+    private companion object {
+        val defaultMediaControllerFutureFactory =
+            MediaControllerFutureFactory { context ->
+                val token =
+                    SessionToken(
+                        context,
+                        ComponentName(context, AudioPlaybackService::class.java),
+                    )
+                MediaController.Builder(context, token).buildAsync()
+            }
+
+        val defaultMediaItemFactory =
+            AudioPlaybackItemFactory { uri, metadata ->
+                MediaItem
+                    .Builder()
+                    .setUri(uri)
+                    .setMediaId(metadata?.noteId?.toString() ?: uri)
+                    .setMediaMetadata(buildMediaMetadata(metadata))
+                    .build()
+            }
+
+        fun buildMediaMetadata(metadata: AudioPlaybackMetadata?): MediaMetadata {
+            val extras = Bundle()
+            metadata?.noteId?.let { extras.putString(EXTRA_NOTE_ID, it.toString()) }
+            return MediaMetadata
+                .Builder()
+                .setTitle(metadata?.title ?: "Voice Note")
+                .setSubtitle(metadata?.subtitle)
+                .setExtras(extras.takeIf { !it.isEmpty })
+                .build()
+        }
+
+        fun mainThreadExecutor(): Executor =
+            Handler(Looper.getMainLooper()).let { mainHandler ->
+                Executor { runnable ->
+                    mainHandler.post(runnable)
+                }
+            }
     }
 }

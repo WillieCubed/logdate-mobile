@@ -13,6 +13,7 @@ val baselineProfileRequested =
     gradle.startParameter.taskNames.any { taskName ->
         taskName.contains("BaselineProfile", ignoreCase = true)
     }
+val androidTestClassOverride = providers.gradleProperty("logdate.androidTestClass").orNull
 
 if (baselineProfileRequested) {
     apply(
@@ -48,11 +49,15 @@ extensions.configure<ApplicationExtension> {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        if (androidTestClassOverride != null) {
+            testInstrumentationRunnerArguments["class"] = androidTestClassOverride
+        }
     }
 
     buildTypes {
         getByName("debug") {
-            isTestCoverageEnabled = true
+            enableUnitTestCoverage = true
+            enableAndroidTestCoverage = true
         }
         getByName("release") {
             isMinifyEnabled = true
@@ -160,10 +165,12 @@ dependencies {
     testImplementation(libs.androidx.navigation3.runtime)
     testImplementation(libs.androidx.health.connect)
     testImplementation(libs.play.services.wearable)
+    testImplementation(projects.client.database)
     testImplementation(projects.client.domain)
     testImplementation(projects.client.healthConnect)
     testImplementation(projects.client.repository)
     testImplementation(projects.client.sync)
+    testImplementation(projects.shared.model)
 
     androidTestImplementation(projects.app.composeMain)
     androidTestImplementation(projects.client.feature.core)

@@ -1,7 +1,10 @@
 package app.logdate.client.media
 
 import android.content.ContentResolver
+import android.content.ContentValues
 import android.content.Context
+import android.database.Cursor
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.MediaStore
 import android.webkit.MimeTypeMap
@@ -10,16 +13,17 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.FileOutputStream
+import java.io.FileInputStream
 import java.io.InputStream
-import java.io.OutputStream
 import java.net.URLConnection
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 class AndroidMediaManager(
     private val contentResolver: ContentResolver,
@@ -27,22 +31,30 @@ class AndroidMediaManager(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : MediaManager {
     private val filesDir = context.filesDir
+    private val legacyBackfillMutex = Mutex()
+
+    private enum class MediaKind {
+        IMAGE,
+        VIDEO,
+    }
 
     override suspend fun getMedia(uri: String): MediaObject {
         val parsedUri = Uri.parse(uri)
+        val fileName = resolveFileName(parsedUri)
 
-        // Determine if this is an image or video URI
-        val isImage =
-            try {
-                contentResolver.getType(parsedUri)?.startsWith("image/") ?: false
-            } catch (e: Exception) {
-                false
-            }
-
-        return if (isImage) {
-            getImageMedia(parsedUri)
-        } else {
-            getVideoMedia(parsedUri)
+        return when (resolveMediaKind(parsedUri, fileName)) {
+            MediaKind.IMAGE ->
+                if (parsedUri.scheme == ContentResolver.SCHEME_FILE) {
+                    getImageMediaFromFileUri(parsedUri)
+                } else {
+                    getImageMedia(parsedUri)
+                }
+            MediaKind.VIDEO ->
+                if (parsedUri.scheme == ContentResolver.SCHEME_FILE) {
+                    getVideoMediaFromFileUri(parsedUri)
+                } else {
+                    getVideoMedia(parsedUri)
+                }
         }
     }
 
@@ -56,6 +68,7 @@ class AndroidMediaManager(
                 arrayOf(
                     MediaStore.Images.Media.DISPLAY_NAME,
                     MediaStore.Images.Media.SIZE,
+                    MediaStore.Images.Media.DATE_TAKEN,
                     MediaStore.Images.Media.DATE_ADDED,
                 ),
                 null,
@@ -64,41 +77,22 @@ class AndroidMediaManager(
             )
 
         return cursor?.use {
-            if (it.moveToFirst()) {
-                val nameIndex = it.getColumnIndex(MediaStore.Images.Media.DISPLAY_NAME)
-                val sizeIndex = it.getColumnIndex(MediaStore.Images.Media.SIZE)
-                val dateIndex = it.getColumnIndex(MediaStore.Images.Media.DATE_ADDED)
-
-                val name = if (nameIndex >= 0) it.getString(nameIndex) else "Unknown"
-                val size = if (sizeIndex >= 0) it.getInt(sizeIndex) else 0
-                val timestamp =
-                    if (dateIndex >= 0) {
-                        Instant.fromEpochMilliseconds(it.getLong(dateIndex) * 1000)
-                    } else {
-                        Instant.fromEpochMilliseconds(System.currentTimeMillis())
-                    }
-
-                MediaObject.Image(
-                    uri = uri.toString(),
-                    name = name,
-                    size = size,
-                    timestamp = timestamp,
-                )
-            } else {
-                // If we couldn't query the content provider, create a basic object with available info
-                MediaObject.Image(
-                    uri = uri.toString(),
-                    name = uri.lastPathSegment ?: "Unknown",
-                    size = 0,
-                    timestamp = Instant.fromEpochMilliseconds(System.currentTimeMillis()),
-                )
+            if (!it.moveToFirst()) {
+                throw IllegalStateException("Unable to query image metadata for URI: $uri")
             }
-        } ?: MediaObject.Image(
-            uri = uri.toString(),
-            name = uri.lastPathSegment ?: "Unknown",
-            size = 0,
-            timestamp = Instant.fromEpochMilliseconds(System.currentTimeMillis()),
-        )
+
+            val nameIndex = it.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+            val sizeIndex = it.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
+            val dateTakenIndex = it.getColumnIndex(MediaStore.Images.Media.DATE_TAKEN)
+            val dateIndex = it.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+
+            MediaObject.Image(
+                uri = uri.toString(),
+                name = it.requireString(nameIndex, MediaStore.Images.Media.DISPLAY_NAME, uri),
+                size = it.requireInt(sizeIndex, MediaStore.Images.Media.SIZE, uri),
+                timestamp = requireTimestamp(dateTakenIndex, dateIndex, it, uri, "image"),
+            )
+        } ?: throw IllegalStateException("Unable to query image metadata for URI: $uri")
     }
 
     /**
@@ -112,6 +106,7 @@ class AndroidMediaManager(
                     MediaStore.Video.Media.DISPLAY_NAME,
                     MediaStore.Video.Media.SIZE,
                     MediaStore.Video.Media.DURATION,
+                    MediaStore.Video.Media.DATE_TAKEN,
                     MediaStore.Video.Media.DATE_ADDED,
                 ),
                 null,
@@ -120,45 +115,24 @@ class AndroidMediaManager(
             )
 
         return cursor?.use {
-            if (it.moveToFirst()) {
-                val nameIndex = it.getColumnIndex(MediaStore.Video.Media.DISPLAY_NAME)
-                val sizeIndex = it.getColumnIndex(MediaStore.Video.Media.SIZE)
-                val durationIndex = it.getColumnIndex(MediaStore.Video.Media.DURATION)
-                val dateIndex = it.getColumnIndex(MediaStore.Video.Media.DATE_ADDED)
-
-                val name = if (nameIndex >= 0) it.getString(nameIndex) else "Unknown"
-                val size = if (sizeIndex >= 0) it.getInt(sizeIndex) else 0
-                val duration = if (durationIndex >= 0) it.getLong(durationIndex).milliseconds else Duration.ZERO
-                val timestamp =
-                    if (dateIndex >= 0) {
-                        Instant.fromEpochMilliseconds(it.getLong(dateIndex) * 1000)
-                    } else {
-                        Instant.fromEpochMilliseconds(System.currentTimeMillis())
-                    }
-
-                MediaObject.Video(
-                    uri = uri.toString(),
-                    name = name,
-                    size = size,
-                    duration = duration,
-                    timestamp = timestamp,
-                )
-            } else {
-                MediaObject.Video(
-                    uri = uri.toString(),
-                    name = uri.lastPathSegment ?: "Unknown",
-                    size = 0,
-                    duration = Duration.ZERO,
-                    timestamp = Instant.fromEpochMilliseconds(System.currentTimeMillis()),
-                )
+            if (!it.moveToFirst()) {
+                throw IllegalStateException("Unable to query video metadata for URI: $uri")
             }
-        } ?: MediaObject.Video(
-            uri = uri.toString(),
-            name = uri.lastPathSegment ?: "Unknown",
-            size = 0,
-            duration = Duration.ZERO,
-            timestamp = Instant.fromEpochMilliseconds(System.currentTimeMillis()),
-        )
+
+            val nameIndex = it.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+            val sizeIndex = it.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
+            val durationIndex = it.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
+            val dateTakenIndex = it.getColumnIndex(MediaStore.Video.Media.DATE_TAKEN)
+            val dateIndex = it.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
+
+            MediaObject.Video(
+                uri = uri.toString(),
+                name = it.requireString(nameIndex, MediaStore.Video.Media.DISPLAY_NAME, uri),
+                size = it.requireInt(sizeIndex, MediaStore.Video.Media.SIZE, uri),
+                duration = it.requireLong(durationIndex, MediaStore.Video.Media.DURATION, uri).milliseconds,
+                timestamp = requireTimestamp(dateTakenIndex, dateIndex, it, uri, "video"),
+            )
+        } ?: throw IllegalStateException("Unable to query video metadata for URI: $uri")
     }
 
     override suspend fun queryMediaByDate(
@@ -166,97 +140,137 @@ class AndroidMediaManager(
         end: Instant,
     ): Flow<List<MediaObject>> =
         flow {
-            emit(queryMediaByDateInternal(start, end))
+            ensureLegacyManagedMediaBackfilled()
+            try {
+                emit(queryMediaByDateInternal(start, end))
+            } catch (error: Exception) {
+                Napier.e("Failed to query Android media by date", error)
+                throw error
+            }
         }
 
     override suspend fun getRecentMedia(): Flow<List<MediaObject>> =
         flow {
-            emit(getRecentMediaInternal())
+            ensureLegacyManagedMediaBackfilled()
+            try {
+                emit(getRecentMediaInternal())
+            } catch (error: Exception) {
+                Napier.e("Failed to query recent Android media", error)
+                throw error
+            }
         }
 
     override suspend fun exists(mediaId: String): Boolean {
-        val uri =
-            Uri.withAppendedPath(
-                MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                mediaId,
-            )
-        val cursor =
-            contentResolver.query(
-                uri,
-                arrayOf(MediaStore.Video.Media._ID),
-                null,
-                null,
-                null,
-            )
-        return cursor.use {
-            it != null && it.moveToFirst()
+        val parsedUri = Uri.parse(mediaId)
+
+        return withContext(ioDispatcher) {
+            when (parsedUri.scheme) {
+                ContentResolver.SCHEME_CONTENT -> queryUriExists(parsedUri)
+                ContentResolver.SCHEME_FILE -> requireFileFromUri(parsedUri).exists()
+                null, "" -> {
+                    queryLegacyMediaStoreIdExists(mediaId) ||
+                        File(mediaId).exists() ||
+                        File(filesDir, "media/$mediaId").exists() ||
+                        File(filesDir, "user_media/$mediaId").exists()
+                }
+                else -> queryUriExists(parsedUri)
+            }
         }
     }
 
     override suspend fun addToDefaultCollection(uri: String) {
-        val mediaId = uri.substringAfterLast('/')
-        val destinationPath = getDestinationPath(mediaId)
-        copyMediaToAppStorage(Uri.parse(uri), destinationPath)
-        Napier.d("Media copied to app storage: $destinationPath")
-    }
+        val parsedUri = Uri.parse(uri)
+        val fileName = resolveFileName(parsedUri)
+        val mimeType = resolveSupportedMimeType(parsedUri, fileName)
 
-    private fun getDestinationPath(mediaId: String): String = "$filesDir/user_media/$mediaId"
+        if (parsedUri.authority == MediaStore.AUTHORITY) {
+            return
+        }
+
+        if (parsedUri.scheme == ContentResolver.SCHEME_FILE) {
+            val sourceFile = requireFileFromUri(parsedUri)
+            if (sourceFile.exists() && legacyMediaAlreadyPublished(sourceFile, mimeType)) {
+                Napier.d("Media already exists in MediaStore: $uri")
+                return
+            }
+        }
+
+        val publishedUri =
+            try {
+                publishMediaToStore(
+                    sourceUri = parsedUri,
+                    fileName = fileName,
+                    mimeType = mimeType,
+                    timestamp = resolveSourceTimestamp(parsedUri),
+                )
+            } catch (error: Exception) {
+                Napier.e("Failed to publish media to MediaStore", error)
+                throw error
+            }
+        Napier.d("Published media to MediaStore: $publishedUri")
+    }
 
     private suspend fun queryMediaByDateInternal(
         start: Instant,
         end: Instant,
     ): List<MediaObject> =
         withContext(ioDispatcher) {
-            val startMillis = start.toEpochMilliseconds() / 1000 // Convert to seconds for MediaStore
-            val endMillis = end.toEpochMilliseconds() / 1000
+            val startMillis = start.toEpochMilliseconds()
+            val endMillis = end.toEpochMilliseconds()
             val mediaItems = mutableListOf<MediaObject>()
 
-            val imageSelection = "${MediaStore.Images.Media.DATE_ADDED} >= ? AND ${MediaStore.Images.Media.DATE_ADDED} < ?"
-            val imageSelectionArgs = arrayOf(startMillis.toString(), endMillis.toString())
+            val imageSelection =
+                "(${MediaStore.Images.Media.DATE_TAKEN} >= ? AND ${MediaStore.Images.Media.DATE_TAKEN} < ?) " +
+                    "OR (${MediaStore.Images.Media.DATE_TAKEN} IS NULL AND ${MediaStore.Images.Media.DATE_ADDED} >= ? AND ${MediaStore.Images.Media.DATE_ADDED} < ?)"
             val imageCollection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
             val imageProjection =
                 arrayOf(
                     MediaStore.Images.Media._ID,
                     MediaStore.Images.Media.DISPLAY_NAME,
                     MediaStore.Images.Media.SIZE,
+                    MediaStore.Images.Media.DATE_TAKEN,
                     MediaStore.Images.Media.DATE_ADDED,
                 )
-            val imageSortOrder = "${MediaStore.Images.Media.DATE_ADDED} ASC"
+            val imageSortOrder = "${MediaStore.Images.Media.DATE_TAKEN} ASC, ${MediaStore.Images.Media.DATE_ADDED} ASC"
 
-            contentResolver
-                .query(
-                    imageCollection,
-                    imageProjection,
-                    imageSelection,
-                    imageSelectionArgs,
-                    imageSortOrder,
-                )?.use { cursor ->
-                    val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-                    val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-                    val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
-                    val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+            requireQueryCursor(
+                collectionUri = imageCollection,
+                projection = imageProjection,
+                selection = imageSelection,
+                selectionArgs =
+                    arrayOf(
+                        startMillis.toString(),
+                        endMillis.toString(),
+                        (startMillis / 1000).toString(),
+                        (endMillis / 1000).toString(),
+                    ),
+                sortOrder = imageSortOrder,
+                failureMessage = "Unable to query Android images for onboarding import",
+            ).use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+                val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
+                val dateTakenColumn = cursor.getColumnIndex(MediaStore.Images.Media.DATE_TAKEN)
+                val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
 
-                    while (cursor.moveToNext()) {
-                        val id = cursor.getLong(idColumn)
-                        val name = cursor.getString(nameColumn)
-                        val size = cursor.getInt(sizeColumn)
-                        val dateAdded = cursor.getLong(dateColumn)
-
-                        val contentUri = Uri.withAppendedPath(imageCollection, id.toString())
-
-                        mediaItems.add(
-                            MediaObject.Image(
-                                uri = contentUri.toString(),
-                                name = name,
-                                size = size,
-                                timestamp = Instant.fromEpochMilliseconds(dateAdded * 1000),
-                            ),
-                        )
-                    }
+                while (cursor.moveToNext()) {
+                    mediaItems.add(
+                        imageFromCursor(
+                            collectionUri = imageCollection,
+                            cursor = cursor,
+                            idColumn = idColumn,
+                            nameColumn = nameColumn,
+                            sizeColumn = sizeColumn,
+                            dateTakenColumn = dateTakenColumn,
+                            dateAddedColumn = dateColumn,
+                        ),
+                    )
                 }
+            }
 
-            val videoSelection = "${MediaStore.Video.Media.DATE_ADDED} >= ? AND ${MediaStore.Video.Media.DATE_ADDED} < ?"
-            val videoSelectionArgs = arrayOf(startMillis.toString(), endMillis.toString())
+            val videoSelection =
+                "(${MediaStore.Video.Media.DATE_TAKEN} >= ? AND ${MediaStore.Video.Media.DATE_TAKEN} < ?) " +
+                    "OR (${MediaStore.Video.Media.DATE_TAKEN} IS NULL AND ${MediaStore.Video.Media.DATE_ADDED} >= ? AND ${MediaStore.Video.Media.DATE_ADDED} < ?)"
             val videoCollection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
             val videoProjection =
                 arrayOf(
@@ -264,44 +278,47 @@ class AndroidMediaManager(
                     MediaStore.Video.Media.DISPLAY_NAME,
                     MediaStore.Video.Media.SIZE,
                     MediaStore.Video.Media.DURATION,
+                    MediaStore.Video.Media.DATE_TAKEN,
                     MediaStore.Video.Media.DATE_ADDED,
                 )
-            val videoSortOrder = "${MediaStore.Video.Media.DATE_ADDED} ASC"
+            val videoSortOrder = "${MediaStore.Video.Media.DATE_TAKEN} ASC, ${MediaStore.Video.Media.DATE_ADDED} ASC"
 
-            contentResolver
-                .query(
-                    videoCollection,
-                    videoProjection,
-                    videoSelection,
-                    videoSelectionArgs,
-                    videoSortOrder,
-                )?.use { cursor ->
-                    val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
-                    val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
-                    val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
-                    val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
-                    val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
+            requireQueryCursor(
+                collectionUri = videoCollection,
+                projection = videoProjection,
+                selection = videoSelection,
+                selectionArgs =
+                    arrayOf(
+                        startMillis.toString(),
+                        endMillis.toString(),
+                        (startMillis / 1000).toString(),
+                        (endMillis / 1000).toString(),
+                    ),
+                sortOrder = videoSortOrder,
+                failureMessage = "Unable to query Android videos for onboarding import",
+            ).use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+                val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+                val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
+                val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
+                val dateTakenColumn = cursor.getColumnIndex(MediaStore.Video.Media.DATE_TAKEN)
+                val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
 
-                    while (cursor.moveToNext()) {
-                        val id = cursor.getLong(idColumn)
-                        val name = cursor.getString(nameColumn)
-                        val size = cursor.getInt(sizeColumn)
-                        val duration = cursor.getLong(durationColumn)
-                        val dateAdded = cursor.getLong(dateColumn)
-
-                        val contentUri = Uri.withAppendedPath(videoCollection, id.toString())
-
-                        mediaItems.add(
-                            MediaObject.Video(
-                                uri = contentUri.toString(),
-                                name = name,
-                                size = size,
-                                duration = duration.milliseconds,
-                                timestamp = Instant.fromEpochMilliseconds(dateAdded * 1000),
-                            ),
-                        )
-                    }
+                while (cursor.moveToNext()) {
+                    mediaItems.add(
+                        videoFromCursor(
+                            collectionUri = videoCollection,
+                            cursor = cursor,
+                            idColumn = idColumn,
+                            nameColumn = nameColumn,
+                            sizeColumn = sizeColumn,
+                            durationColumn = durationColumn,
+                            dateTakenColumn = dateTakenColumn,
+                            dateAddedColumn = dateColumn,
+                        ),
+                    )
                 }
+            }
 
             mediaItems.sortBy { it.timestamp }
             mediaItems
@@ -311,112 +328,83 @@ class AndroidMediaManager(
         withContext(ioDispatcher) {
             val mediaItems = mutableListOf<MediaObject>()
 
-            try {
-                val imageCollection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
-                val imageProjection =
-                    arrayOf(
-                        MediaStore.Images.Media._ID,
-                        MediaStore.Images.Media.DISPLAY_NAME,
-                        MediaStore.Images.Media.SIZE,
-                        MediaStore.Images.Media.DATE_ADDED,
+            val imageCollection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+            val imageProjection =
+                arrayOf(
+                    MediaStore.Images.Media._ID,
+                    MediaStore.Images.Media.DISPLAY_NAME,
+                    MediaStore.Images.Media.SIZE,
+                    MediaStore.Images.Media.DATE_TAKEN,
+                    MediaStore.Images.Media.DATE_ADDED,
+                )
+            val imageSortOrder = "${MediaStore.Images.Media.DATE_TAKEN} DESC, ${MediaStore.Images.Media.DATE_ADDED} DESC"
+
+            requireQueryCursor(
+                collectionUri = imageCollection,
+                projection = imageProjection,
+                sortOrder = imageSortOrder,
+                failureMessage = "Unable to query recent Android images",
+            ).use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+                val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
+                val dateTakenColumn = cursor.getColumnIndex(MediaStore.Images.Media.DATE_TAKEN)
+                val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+
+                while (cursor.moveToNext()) {
+                    mediaItems.add(
+                        imageFromCursor(
+                            collectionUri = imageCollection,
+                            cursor = cursor,
+                            idColumn = idColumn,
+                            nameColumn = nameColumn,
+                            sizeColumn = sizeColumn,
+                            dateTakenColumn = dateTakenColumn,
+                            dateAddedColumn = dateColumn,
+                        ),
                     )
-                val imageSortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
-
-                contentResolver
-                    .query(
-                        imageCollection,
-                        imageProjection,
-                        null,
-                        null,
-                        imageSortOrder,
-                    )?.use { cursor ->
-                        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-                        val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-                        val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
-                        val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
-
-                        while (cursor.moveToNext()) {
-                            val id = cursor.getLong(idColumn)
-                            val name = cursor.getString(nameColumn)
-                            val size = cursor.getInt(sizeColumn)
-                            val dateAdded = cursor.getLong(dateColumn)
-
-                            val contentUri =
-                                Uri.withAppendedPath(
-                                    imageCollection,
-                                    id.toString(),
-                                )
-
-                            mediaItems.add(
-                                MediaObject.Image(
-                                    uri = contentUri.toString(),
-                                    name = name,
-                                    size = size,
-                                    timestamp = Instant.fromEpochMilliseconds(dateAdded * 1000),
-                                ),
-                            )
-                        }
-                    }
-            } catch (error: SecurityException) {
-                Napier.w("Unable to query recent Android images", error)
-            } catch (error: Exception) {
-                Napier.e("Failed to query recent Android images", error)
+                }
             }
 
-            try {
-                val videoCollection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
-                val videoProjection =
-                    arrayOf(
-                        MediaStore.Video.Media._ID,
-                        MediaStore.Video.Media.DISPLAY_NAME,
-                        MediaStore.Video.Media.SIZE,
-                        MediaStore.Video.Media.DURATION,
-                        MediaStore.Video.Media.DATE_ADDED,
+            val videoCollection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+            val videoProjection =
+                arrayOf(
+                    MediaStore.Video.Media._ID,
+                    MediaStore.Video.Media.DISPLAY_NAME,
+                    MediaStore.Video.Media.SIZE,
+                    MediaStore.Video.Media.DURATION,
+                    MediaStore.Video.Media.DATE_TAKEN,
+                    MediaStore.Video.Media.DATE_ADDED,
+                )
+            val videoSortOrder = "${MediaStore.Video.Media.DATE_TAKEN} DESC, ${MediaStore.Video.Media.DATE_ADDED} DESC"
+
+            requireQueryCursor(
+                collectionUri = videoCollection,
+                projection = videoProjection,
+                sortOrder = videoSortOrder,
+                failureMessage = "Unable to query recent Android videos",
+            ).use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+                val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+                val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
+                val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
+                val dateTakenColumn = cursor.getColumnIndex(MediaStore.Video.Media.DATE_TAKEN)
+                val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
+
+                while (cursor.moveToNext()) {
+                    mediaItems.add(
+                        videoFromCursor(
+                            collectionUri = videoCollection,
+                            cursor = cursor,
+                            idColumn = idColumn,
+                            nameColumn = nameColumn,
+                            sizeColumn = sizeColumn,
+                            durationColumn = durationColumn,
+                            dateTakenColumn = dateTakenColumn,
+                            dateAddedColumn = dateColumn,
+                        ),
                     )
-                val videoSortOrder = "${MediaStore.Video.Media.DATE_ADDED} DESC"
-
-                contentResolver
-                    .query(
-                        videoCollection,
-                        videoProjection,
-                        null,
-                        null,
-                        videoSortOrder,
-                    )?.use { cursor ->
-                        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
-                        val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
-                        val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
-                        val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
-                        val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
-
-                        while (cursor.moveToNext()) {
-                            val id = cursor.getLong(idColumn)
-                            val name = cursor.getString(nameColumn)
-                            val size = cursor.getInt(sizeColumn)
-                            val duration = cursor.getLong(durationColumn)
-                            val dateAdded = cursor.getLong(dateColumn)
-
-                            val contentUri =
-                                Uri.withAppendedPath(
-                                    videoCollection,
-                                    id.toString(),
-                                )
-
-                            mediaItems.add(
-                                MediaObject.Video(
-                                    uri = contentUri.toString(),
-                                    name = name,
-                                    size = size,
-                                    duration = duration.milliseconds,
-                                    timestamp = Instant.fromEpochMilliseconds(dateAdded * 1000),
-                                ),
-                            )
-                        }
-                    }
-            } catch (error: SecurityException) {
-                Napier.w("Unable to query recent Android videos", error)
-            } catch (error: Exception) {
-                Napier.e("Failed to query recent Android videos", error)
+                }
             }
 
             mediaItems
@@ -428,7 +416,7 @@ class AndroidMediaManager(
         withContext(ioDispatcher) {
             val parsedUri = Uri.parse(uri)
             val fileName = resolveFileName(parsedUri)
-            val mimeType = resolveMimeType(parsedUri, fileName)
+            val mimeType = resolveSupportedMimeType(parsedUri, fileName)
             val data = readBytes(parsedUri)
             MediaPayload(
                 fileName = fileName,
@@ -440,24 +428,24 @@ class AndroidMediaManager(
 
     override suspend fun saveMedia(payload: MediaPayload): String =
         withContext(ioDispatcher) {
-            val directory = File(filesDir, "user_media")
-            if (!directory.exists()) {
-                directory.mkdirs()
-            }
-            val sanitizedName =
-                payload.fileName
-                    .replace("..", "_")
-                    .replace("/", "_")
-                    .replace("\\", "_")
-            val fileName = "${Uuid.random()}-$sanitizedName"
-            val file = File(directory, fileName)
+            val mimeType =
+                requirePublishableMimeType(
+                    payload.mimeType.ifBlank {
+                        resolveMimeTypeFromFileName(payload.fileName)
+                    },
+                    payload.fileName,
+                )
             try {
-                file.writeBytes(payload.data)
-            } catch (e: Exception) {
-                Napier.e("Failed to save media payload to local storage", e)
-                throw e
+                publishBytesToMediaStore(
+                    bytes = payload.data,
+                    fileName = payload.fileName,
+                    mimeType = mimeType,
+                    timestamp = Clock.System.now(),
+                )
+            } catch (error: Exception) {
+                Napier.e("Failed to publish media payload to MediaStore", error)
+                throw error
             }
-            "file://${file.absolutePath}"
         }
 
     override suspend fun saveMediaFromFile(
@@ -466,54 +454,357 @@ class AndroidMediaManager(
         mimeType: String,
     ): String =
         withContext(ioDispatcher) {
-            val directory = File(filesDir, "user_media")
-            if (!directory.exists()) {
-                directory.mkdirs()
-            }
-            val sanitizedName =
-                fileName
-                    .replace("..", "_")
-                    .replace("/", "_")
-                    .replace("\\", "_")
-            val destFileName = "${Uuid.random()}-$sanitizedName"
-            val destFile = File(directory, destFileName)
             val sourceFile = File(sourceFilePath)
+            val publishableMimeType = requirePublishableMimeType(mimeType, fileName)
             try {
-                sourceFile.copyTo(destFile, overwrite = true)
-            } catch (e: Exception) {
-                Napier.e("Failed to save media file to local storage", e)
-                throw e
+                publishFileToMediaStore(
+                    sourceFile = sourceFile,
+                    fileName = fileName,
+                    mimeType = publishableMimeType,
+                    timestamp = fileTimestamp(sourceFile),
+                )
+            } catch (error: Exception) {
+                Napier.e("Failed to publish media file to MediaStore", error)
+                throw error
             }
-            Uri.fromFile(destFile).toString()
         }
 
-    private suspend fun copyMediaToAppStorage(
-        uri: Uri,
-        destinationPath: String,
-    ) = withContext(ioDispatcher) {
-        val inputStream: InputStream? = contentResolver.openInputStream(uri)
-        val outputStream: OutputStream = FileOutputStream(File(destinationPath))
-
-        try {
-            if (inputStream != null) {
-                val buffer = ByteArray(1024)
-                var length: Int
-                while (inputStream.read(buffer).also { length = it } > 0) {
-                    outputStream.write(buffer, 0, length)
-                }
-            } else {
-                throw IllegalArgumentException("Invalid URI: $uri")
+    private suspend fun ensureLegacyManagedMediaBackfilled() =
+        legacyBackfillMutex.withLock {
+            val directory = legacyMediaDirectory()
+            if (!directory.exists()) {
+                return@withLock
             }
-        } catch (e: Exception) {
-            Napier.e("Failed to copy media to app storage", e)
-            throw e
-        } finally {
-            inputStream?.close()
-            outputStream.close()
+
+            directory
+                .listFiles()
+                ?.asSequence()
+                ?.filter { it.isFile }
+                ?.forEach { file ->
+                    val inferredMimeType = resolveMimeTypeFromFileName(file.name) ?: return@forEach
+                    if (!isPublishableMimeType(inferredMimeType)) {
+                        return@forEach
+                    }
+
+                    if (
+                        legacyMediaAlreadyPublished(
+                            file = file,
+                            mimeType = inferredMimeType,
+                        )
+                    ) {
+                        Napier.d("Legacy media file already published in MediaStore: ${file.absolutePath}")
+                        return@forEach
+                    }
+
+                    runCatching {
+                        publishFileToMediaStore(
+                            sourceFile = file,
+                            fileName = file.name,
+                            mimeType = inferredMimeType,
+                            timestamp = fileTimestamp(file),
+                        )
+                    }.onSuccess { publishedUri ->
+                        Napier.d("Backfilled legacy media file into MediaStore: $publishedUri")
+                    }.onFailure { error ->
+                        Napier.e("Failed to backfill legacy media file: ${file.absolutePath}", error)
+                    }
+                }
+        }
+
+    private fun legacyMediaDirectory(): File = File(filesDir, "user_media")
+
+    private fun isPublishableMimeType(mimeType: String): Boolean = mimeType.startsWith("image/") || mimeType.startsWith("video/")
+
+    private fun resolveMimeTypeFromFileName(fileName: String): String? {
+        val extension = MimeTypeMap.getFileExtensionFromUrl(fileName)
+        val guessedFromExtension = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+        return guessedFromExtension ?: URLConnection.guessContentTypeFromName(fileName)
+    }
+
+    private fun fileTimestamp(file: File): Instant {
+        check(file.exists()) { "Media file does not exist: ${file.absolutePath}" }
+        val lastModified = file.lastModified()
+        check(lastModified > 0L) { "Unable to resolve lastModified for media file: ${file.absolutePath}" }
+        return Instant.fromEpochMilliseconds(lastModified)
+    }
+
+    private suspend fun publishMediaToStore(
+        sourceUri: Uri,
+        fileName: String,
+        mimeType: String,
+        timestamp: Instant,
+    ): String =
+        withContext(ioDispatcher) {
+            val target =
+                mediaStoreTargetForMimeType(mimeType)
+                    ?: throw IllegalArgumentException("Unsupported media type: $mimeType")
+            val sanitizedName = sanitizeFileName(fileName)
+            val values =
+                ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, sanitizedName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, target.relativePath)
+                    put(MediaStore.MediaColumns.DATE_TAKEN, timestamp.toEpochMilliseconds())
+                    put(MediaStore.MediaColumns.IS_PENDING, 1)
+                }
+
+            val insertedUri =
+                contentResolver.insert(target.collectionUri, values)
+                    ?: throw IllegalStateException("Failed to create MediaStore row for $sourceUri")
+
+            try {
+                contentResolver.openOutputStream(insertedUri, "w")?.use { output ->
+                    openSourceInputStream(sourceUri).use { input ->
+                        input.copyTo(output)
+                    }
+                } ?: throw IllegalStateException("Failed to open output stream for $insertedUri")
+
+                val cleared =
+                    contentResolver.update(
+                        insertedUri,
+                        ContentValues().apply {
+                            put(MediaStore.MediaColumns.IS_PENDING, 0)
+                        },
+                        null,
+                        null,
+                    )
+                if (cleared <= 0) {
+                    throw IllegalStateException("Failed to finalize MediaStore row for $insertedUri")
+                }
+
+                insertedUri.toString()
+            } catch (e: Exception) {
+                contentResolver.delete(insertedUri, null, null)
+                throw e
+            }
+        }
+
+    private suspend fun publishBytesToMediaStore(
+        bytes: ByteArray,
+        fileName: String,
+        mimeType: String,
+        timestamp: Instant,
+    ): String =
+        publishStreamToMediaStore(
+            inputStream = java.io.ByteArrayInputStream(bytes),
+            fileName = fileName,
+            mimeType = mimeType,
+            timestamp = timestamp,
+        )
+
+    private suspend fun publishFileToMediaStore(
+        sourceFile: File,
+        fileName: String,
+        mimeType: String,
+        timestamp: Instant,
+    ): String =
+        publishStreamToMediaStore(
+            inputStream = FileInputStream(sourceFile),
+            fileName = fileName,
+            mimeType = mimeType,
+            timestamp = timestamp,
+        )
+
+    private suspend fun publishStreamToMediaStore(
+        inputStream: InputStream,
+        fileName: String,
+        mimeType: String,
+        timestamp: Instant,
+    ): String =
+        withContext(ioDispatcher) {
+            inputStream.use { input ->
+                val target =
+                    mediaStoreTargetForMimeType(mimeType)
+                        ?: throw IllegalArgumentException("Unsupported media type: $mimeType")
+                val sanitizedName = sanitizeFileName(fileName)
+                val values =
+                    ContentValues().apply {
+                        put(MediaStore.MediaColumns.DISPLAY_NAME, sanitizedName)
+                        put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                        put(MediaStore.MediaColumns.RELATIVE_PATH, target.relativePath)
+                        put(MediaStore.MediaColumns.DATE_TAKEN, timestamp.toEpochMilliseconds())
+                        put(MediaStore.MediaColumns.IS_PENDING, 1)
+                    }
+                val insertedUri =
+                    contentResolver.insert(target.collectionUri, values)
+                        ?: throw IllegalStateException("Failed to create MediaStore row for $fileName")
+
+                try {
+                    contentResolver.openOutputStream(insertedUri, "w")?.use { output ->
+                        input.copyTo(output)
+                    } ?: throw IllegalStateException("Failed to open output stream for $insertedUri")
+
+                    val cleared =
+                        contentResolver.update(
+                            insertedUri,
+                            ContentValues().apply {
+                                put(MediaStore.MediaColumns.IS_PENDING, 0)
+                            },
+                            null,
+                            null,
+                        )
+                    if (cleared <= 0) {
+                        throw IllegalStateException("Failed to finalize MediaStore row for $insertedUri")
+                    }
+
+                    insertedUri.toString()
+                } catch (e: Exception) {
+                    contentResolver.delete(insertedUri, null, null)
+                    throw e
+                }
+            }
+        }
+
+    private fun openSourceInputStream(uri: Uri): InputStream =
+        when (uri.scheme) {
+            ContentResolver.SCHEME_FILE -> FileInputStream(requireFileFromUri(uri))
+            else -> contentResolver.openInputStream(uri) ?: throw IllegalArgumentException("Invalid URI: $uri")
+        }
+
+    private fun mediaStoreTargetForMimeType(mimeType: String): MediaStoreTarget? =
+        when {
+            mimeType.startsWith("image/") -> MediaStoreTarget(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "Pictures/LogDate")
+            mimeType.startsWith("video/") -> MediaStoreTarget(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, "Movies/LogDate")
+            else -> null
+        }
+
+    private data class MediaStoreTarget(
+        val collectionUri: Uri,
+        val relativePath: String,
+    )
+
+    private fun sanitizeFileName(fileName: String): String =
+        fileName
+            .replace("..", "_")
+            .replace("/", "_")
+            .replace("\\", "_")
+
+    private fun requireFileFromUri(uri: Uri): File {
+        val path = uri.path ?: throw IllegalArgumentException("File URI is missing a path: $uri")
+        return File(path)
+    }
+
+    private fun getImageMediaFromFileUri(uri: Uri): MediaObject.Image {
+        val file = requireFileFromUri(uri)
+        return MediaObject.Image(
+            uri = uri.toString(),
+            name = file.name,
+            size = file.length().toInt(),
+            timestamp = fileTimestamp(file),
+        )
+    }
+
+    private fun getVideoMediaFromFileUri(uri: Uri): MediaObject.Video {
+        val file = requireFileFromUri(uri)
+        return MediaObject.Video(
+            uri = uri.toString(),
+            name = file.name,
+            size = file.length().toInt(),
+            duration = resolveFileVideoDuration(uri),
+            timestamp = fileTimestamp(file),
+        )
+    }
+
+    private fun resolveSourceTimestamp(uri: Uri): Instant =
+        when (uri.scheme) {
+            ContentResolver.SCHEME_FILE -> fileTimestamp(requireFileFromUri(uri))
+            else ->
+                querySourceTimestamp(uri)
+                    ?: throw IllegalStateException("Unable to resolve timestamp for media URI: $uri")
+        }
+
+    private fun querySourceTimestamp(uri: Uri): Instant? {
+        val cursor =
+            contentResolver.query(
+                uri,
+                arrayOf(
+                    MediaStore.MediaColumns.DATE_TAKEN,
+                    MediaStore.MediaColumns.DATE_ADDED,
+                ),
+                null,
+                null,
+                null,
+            ) ?: return null
+
+        return cursor.use {
+            if (!it.moveToFirst()) {
+                null
+            } else {
+                val dateTakenIndex = it.getColumnIndex(MediaStore.MediaColumns.DATE_TAKEN)
+                val dateAddedIndex = it.getColumnIndex(MediaStore.MediaColumns.DATE_ADDED)
+                resolveTimestampOrNull(dateTakenIndex, dateAddedIndex, it)
+            }
         }
     }
 
+    private fun queryUriExists(uri: Uri): Boolean =
+        contentResolver
+            .query(
+                uri,
+                arrayOf(MediaStore.MediaColumns._ID),
+                null,
+                null,
+                null,
+            )?.use { cursor ->
+                cursor.moveToFirst()
+            } == true
+
+    private fun queryLegacyMediaStoreIdExists(mediaId: String): Boolean {
+        val imageUri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, mediaId)
+        val videoUri = Uri.withAppendedPath(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, mediaId)
+        return queryUriExists(imageUri) || queryUriExists(videoUri)
+    }
+
+    private fun legacyMediaAlreadyPublished(
+        file: File,
+        mimeType: String,
+    ): Boolean {
+        val target = mediaStoreTargetForMimeType(mimeType) ?: return false
+        val sanitizedName = sanitizeFileName(file.name)
+        val timestamp = fileTimestamp(file).toEpochMilliseconds()
+        return contentResolver
+            .query(
+                target.collectionUri,
+                arrayOf(MediaStore.MediaColumns._ID),
+                "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND ${MediaStore.MediaColumns.SIZE} = ? AND ${MediaStore.MediaColumns.DATE_TAKEN} = ?",
+                arrayOf(
+                    sanitizedName,
+                    file.length().toString(),
+                    timestamp.toString(),
+                ),
+                null,
+            )?.use { cursor ->
+                cursor.moveToFirst()
+            } == true
+    }
+
+    private fun resolveTimestampOrNull(
+        dateTakenColumn: Int,
+        dateAddedColumn: Int,
+        cursor: Cursor,
+    ): Instant? {
+        if (dateTakenColumn >= 0) {
+            val taken = cursor.getLong(dateTakenColumn)
+            if (taken > 0L) {
+                return Instant.fromEpochMilliseconds(taken)
+            }
+        }
+
+        if (dateAddedColumn >= 0) {
+            val added = cursor.getLong(dateAddedColumn)
+            if (added > 0L) {
+                return Instant.fromEpochMilliseconds(added * 1000)
+            }
+        }
+
+        return null
+    }
+
     private fun resolveFileName(uri: Uri): String {
+        if (uri.scheme == ContentResolver.SCHEME_FILE) {
+            return requireFileFromUri(uri).name
+        }
+
         val contentName =
             contentResolver
                 .query(
@@ -529,31 +820,168 @@ class AndroidMediaManager(
                         null
                     }
                 }
-        return contentName ?: (uri.lastPathSegment ?: "media")
+        return contentName?.takeIf { it.isNotBlank() }
+            ?: uri.lastPathSegment?.takeIf { it.isNotBlank() }
+            ?: throw IllegalStateException("Unable to resolve media file name for URI: $uri")
     }
 
-    private fun resolveMimeType(
+    private fun resolveSupportedMimeType(
         uri: Uri,
         fileName: String,
     ): String {
         val contentType = contentResolver.getType(uri)
         if (!contentType.isNullOrBlank()) {
-            return contentType
+            return requirePublishableMimeType(contentType, uri.toString())
         }
-        val extension = MimeTypeMap.getFileExtensionFromUrl(fileName)
-        val guessedFromExtension = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
-        if (!guessedFromExtension.isNullOrBlank()) {
-            return guessedFromExtension
-        }
-        return URLConnection.guessContentTypeFromName(fileName) ?: "application/octet-stream"
+
+        return requirePublishableMimeType(resolveMimeTypeFromFileName(fileName), uri.toString())
     }
 
-    private fun readBytes(uri: Uri): ByteArray {
-        val inputStream =
-            contentResolver.openInputStream(uri)
-                ?: throw IllegalArgumentException("Invalid URI: $uri")
-        return inputStream.use { stream ->
+    private fun readBytes(uri: Uri): ByteArray =
+        openSourceInputStream(uri).use { stream ->
             stream.readBytes()
         }
+
+    private fun resolveMediaKind(
+        uri: Uri,
+        fileName: String,
+    ): MediaKind =
+        when {
+            resolveSupportedMimeType(uri, fileName).startsWith("image/") -> MediaKind.IMAGE
+            else -> MediaKind.VIDEO
+        }
+
+    private fun requirePublishableMimeType(
+        mimeType: String?,
+        source: String,
+    ): String {
+        val resolvedMimeType =
+            mimeType?.takeIf { it.isNotBlank() }
+                ?: throw IllegalArgumentException("Unable to resolve media type for $source")
+        if (!isPublishableMimeType(resolvedMimeType)) {
+            throw IllegalArgumentException("Unsupported media type for $source: $resolvedMimeType")
+        }
+        return resolvedMimeType
+    }
+
+    private fun requireTimestamp(
+        dateTakenColumn: Int,
+        dateAddedColumn: Int,
+        cursor: Cursor,
+        uri: Uri,
+        mediaLabel: String,
+    ): Instant =
+        resolveTimestampOrNull(dateTakenColumn, dateAddedColumn, cursor)
+            ?: throw IllegalStateException("Missing $mediaLabel timestamp metadata for URI: $uri")
+
+    private fun resolveFileVideoDuration(uri: Uri): Duration {
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(requireFileFromUri(uri).absolutePath)
+            return retriever
+                .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                ?.toLongOrNull()
+                ?.milliseconds
+                ?: throw IllegalStateException("Missing video duration metadata for URI: $uri")
+        } catch (error: RuntimeException) {
+            throw IllegalStateException("Unable to resolve video duration for URI: $uri", error)
+        } finally {
+            try {
+                retriever.release()
+            } catch (error: RuntimeException) {
+                Napier.e("Failed to release MediaMetadataRetriever", error)
+            }
+        }
+    }
+
+    private fun requireQueryCursor(
+        collectionUri: Uri,
+        projection: Array<String>,
+        selection: String? = null,
+        selectionArgs: Array<String>? = null,
+        sortOrder: String? = null,
+        failureMessage: String,
+    ): Cursor =
+        contentResolver.query(
+            collectionUri,
+            projection,
+            selection,
+            selectionArgs,
+            sortOrder,
+        ) ?: throw IllegalStateException(failureMessage)
+
+    private fun imageFromCursor(
+        collectionUri: Uri,
+        cursor: Cursor,
+        idColumn: Int,
+        nameColumn: Int,
+        sizeColumn: Int,
+        dateTakenColumn: Int,
+        dateAddedColumn: Int,
+    ): MediaObject.Image {
+        val uri = Uri.withAppendedPath(collectionUri, cursor.getLong(idColumn).toString())
+        return MediaObject.Image(
+            uri = uri.toString(),
+            name = cursor.requireString(nameColumn, MediaStore.Images.Media.DISPLAY_NAME, uri),
+            size = cursor.requireInt(sizeColumn, MediaStore.Images.Media.SIZE, uri),
+            timestamp = requireTimestamp(dateTakenColumn, dateAddedColumn, cursor, uri, "image"),
+        )
+    }
+
+    private fun videoFromCursor(
+        collectionUri: Uri,
+        cursor: Cursor,
+        idColumn: Int,
+        nameColumn: Int,
+        sizeColumn: Int,
+        durationColumn: Int,
+        dateTakenColumn: Int,
+        dateAddedColumn: Int,
+    ): MediaObject.Video {
+        val uri = Uri.withAppendedPath(collectionUri, cursor.getLong(idColumn).toString())
+        return MediaObject.Video(
+            uri = uri.toString(),
+            name = cursor.requireString(nameColumn, MediaStore.Video.Media.DISPLAY_NAME, uri),
+            size = cursor.requireInt(sizeColumn, MediaStore.Video.Media.SIZE, uri),
+            duration = cursor.requireLong(durationColumn, MediaStore.Video.Media.DURATION, uri).milliseconds,
+            timestamp = requireTimestamp(dateTakenColumn, dateAddedColumn, cursor, uri, "video"),
+        )
+    }
+
+    private fun Cursor.requireString(
+        index: Int,
+        columnName: String,
+        uri: Uri,
+    ): String {
+        if (isNull(index)) {
+            throw IllegalStateException("Missing $columnName metadata for URI: $uri")
+        }
+
+        return getString(index)?.takeIf { it.isNotBlank() }
+            ?: throw IllegalStateException("Blank $columnName metadata for URI: $uri")
+    }
+
+    private fun Cursor.requireInt(
+        index: Int,
+        columnName: String,
+        uri: Uri,
+    ): Int {
+        if (isNull(index)) {
+            throw IllegalStateException("Missing $columnName metadata for URI: $uri")
+        }
+
+        return getInt(index)
+    }
+
+    private fun Cursor.requireLong(
+        index: Int,
+        columnName: String,
+        uri: Uri,
+    ): Long {
+        if (isNull(index)) {
+            throw IllegalStateException("Missing $columnName metadata for URI: $uri")
+        }
+
+        return getLong(index)
     }
 }

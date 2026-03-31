@@ -22,7 +22,7 @@ actual val audioModule: Module =
         single<AudioStorage> { AndroidAudioStorage(androidContext()) }
         // Provide the Android implementation of AudioRecordingManager as a singleton
         single<AudioRecordingManager> { AndroidAudioRecordingManager(androidContext(), get()) }
-        single<AudioPlaybackManager> { AndroidAudioPlaybackManager(androidContext()) }
+        single<AudioPlaybackManager> { AndroidAudioPlaybackManager(androidContext(), get()) }
         single<AudioDurationResolver> { AndroidAudioDurationResolver(androidContext()) }
 
         // On-demand transcription: loads Sherpa-ONNX from dynamic module when available,

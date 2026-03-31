@@ -7,6 +7,7 @@ data class AudioPlaybackStatus(
     val isPlaying: Boolean = false,
     val progress: Float = 0f,
     val duration: Duration = Duration.ZERO,
+    val isSuppressedForUnsuitableOutput: Boolean = false,
 )
 
 interface AudioPlaybackStatusProvider {
