@@ -139,7 +139,7 @@ class ExportUserDataUseCaseTest {
             val result = (progressUpdates.last() as ExportProgress.Completed).result
 
             val json = Json { ignoreUnknownKeys = true }
-            val metadata = json.decodeFromString<ExportMetadata>(result.metadata)
+            val metadata = json.decodeFromString<ExportMetadata>(result.serializeMetadata())
 
             assertEquals("Test User", metadata.userId)
             assertEquals(deviceIdProvider.getDeviceId().value.toString(), metadata.deviceId)
@@ -148,7 +148,7 @@ class ExportUserDataUseCaseTest {
             assertEquals(2, metadata.stats.noteCount)
             assertEquals(1, metadata.stats.mediaCount)
 
-            val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.notes)
+            val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.serializeNotes())
             val exportedIds = notesPayload.getValue("notes").map { it.id }.toSet()
             assertTrue(exportedIds.contains(textNote.uid.toString()), "Text note should be exported")
             assertTrue(exportedIds.contains(audioNote.uid.toString()), "Audio note should be exported")
@@ -157,7 +157,7 @@ class ExportUserDataUseCaseTest {
             assertEquals(uniquePaths.size, result.mediaFiles.size, "Media export paths should be unique")
             assertTrue(result.mediaFiles.all { it.exportPath.startsWith("media/") }, "Media should export under media/")
 
-            val relationsPayload = json.decodeFromString<Map<String, List<ExportJournalNoteRelation>>>(result.journalNotes)
+            val relationsPayload = json.decodeFromString<Map<String, List<ExportJournalNoteRelation>>>(result.serializeJournalNotes())
             val relations = relationsPayload.getValue("journal_notes")
             assertEquals(1, relations.size, "Journal-note relations should be exported")
             assertEquals(testJournal.id.toString(), relations.first().journalId)
@@ -174,16 +174,16 @@ class ExportUserDataUseCaseTest {
             val result = (progressUpdates.last() as ExportProgress.Completed).result
 
             val json = Json { ignoreUnknownKeys = true }
-            val metadata = json.decodeFromString<ExportMetadata>(result.metadata)
+            val metadata = json.decodeFromString<ExportMetadata>(result.serializeMetadata())
 
             assertEquals(0, metadata.stats.journalCount)
             assertEquals(0, metadata.stats.noteCount)
             assertEquals(0, metadata.stats.mediaCount)
 
-            val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.notes)
+            val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.serializeNotes())
             assertTrue(notesPayload.getValue("notes").isEmpty(), "Notes payload should be empty")
 
-            val relationsPayload = json.decodeFromString<Map<String, List<ExportJournalNoteRelation>>>(result.journalNotes)
+            val relationsPayload = json.decodeFromString<Map<String, List<ExportJournalNoteRelation>>>(result.serializeJournalNotes())
             assertTrue(relationsPayload.getValue("journal_notes").isEmpty(), "Journal-note relations should be empty")
         }
 
@@ -239,7 +239,7 @@ class ExportUserDataUseCaseTest {
             val result = (progressUpdates.last() as ExportProgress.Completed).result
 
             val json = Json { ignoreUnknownKeys = true }
-            val draftsPayload = json.decodeFromString<Map<String, List<ExportDraft>>>(result.drafts)
+            val draftsPayload = json.decodeFromString<Map<String, List<ExportDraft>>>(result.serializeDrafts())
             val exportDraft = draftsPayload.getValue("drafts").first()
 
             assertEquals(draft.id.toString(), exportDraft.id)
@@ -282,10 +282,10 @@ class ExportUserDataUseCaseTest {
             val result = (progressUpdates.last() as ExportProgress.Completed).result
 
             val json = Json { ignoreUnknownKeys = true }
-            val exportedNote = json.decodeFromString<Map<String, List<ExportNote>>>(result.notes).getValue("notes").single()
+            val exportedNote = json.decodeFromString<Map<String, List<ExportNote>>>(result.serializeNotes()).getValue("notes").single()
             val relationList =
                 json
-                    .decodeFromString<Map<String, List<ExportJournalNoteRelation>>>(result.journalNotes)
+                    .decodeFromString<Map<String, List<ExportJournalNoteRelation>>>(result.serializeJournalNotes())
                     .getValue("journal_notes")
 
             assertEquals(42, exportedNote.syncVersion)
@@ -355,11 +355,11 @@ class ExportUserDataUseCaseTest {
             val result = (progressUpdates.last() as ExportProgress.Completed).result
 
             val json = Json { ignoreUnknownKeys = true }
-            val metadata = json.decodeFromString<ExportMetadata>(result.metadata)
-            val exportedProfile = json.decodeFromString<ProfilePayload>(result.profile.orEmpty()).profile
-            val exportedPlaces = json.decodeFromString<PlacesPayload>(result.places.orEmpty()).places
+            val metadata = json.decodeFromString<ExportMetadata>(result.serializeMetadata())
+            val exportedProfile = json.decodeFromString<ProfilePayload>(result.serializeProfile().orEmpty()).profile
+            val exportedPlaces = json.decodeFromString<PlacesPayload>(result.serializePlaces().orEmpty()).places
             val exportedLocationHistory =
-                json.decodeFromString<LocationHistoryPayload>(result.locationHistory.orEmpty()).locationHistory
+                json.decodeFromString<LocationHistoryPayload>(result.serializeLocationHistory().orEmpty()).locationHistory
 
             assertTrue(metadata.stats.hasProfile)
             assertEquals(1, metadata.stats.placeCount)
@@ -397,10 +397,10 @@ class ExportUserDataUseCaseTest {
             val result = (progressUpdates.last() as ExportProgress.Completed).result
 
             val json = Json { ignoreUnknownKeys = true }
-            val metadata = json.decodeFromString<ExportMetadata>(result.metadata)
+            val metadata = json.decodeFromString<ExportMetadata>(result.serializeMetadata())
             assertEquals(0, metadata.stats.journalCount, "Journal count should be 0")
 
-            val relationsPayload = json.decodeFromString<Map<String, List<ExportJournalNoteRelation>>>(result.journalNotes)
+            val relationsPayload = json.decodeFromString<Map<String, List<ExportJournalNoteRelation>>>(result.serializeJournalNotes())
             assertTrue(relationsPayload.getValue("journal_notes").isEmpty(), "Journal-note relations should be empty")
         }
 
@@ -421,10 +421,10 @@ class ExportUserDataUseCaseTest {
             val result = (progressUpdates.last() as ExportProgress.Completed).result
 
             val json = Json { ignoreUnknownKeys = true }
-            val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.notes)
+            val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.serializeNotes())
             assertTrue(notesPayload.getValue("notes").isEmpty(), "Notes list should be empty")
 
-            val metadata = json.decodeFromString<ExportMetadata>(result.metadata)
+            val metadata = json.decodeFromString<ExportMetadata>(result.serializeMetadata())
             assertEquals(0, metadata.stats.noteCount, "Note count should be 0")
         }
 
@@ -453,10 +453,10 @@ class ExportUserDataUseCaseTest {
             val result = (progressUpdates.last() as ExportProgress.Completed).result
 
             val json = Json { ignoreUnknownKeys = true }
-            val draftsPayload = json.decodeFromString<Map<String, List<ExportDraft>>>(result.drafts)
+            val draftsPayload = json.decodeFromString<Map<String, List<ExportDraft>>>(result.serializeDrafts())
             assertTrue(draftsPayload.getValue("drafts").isEmpty(), "Drafts list should be empty")
 
-            val metadata = json.decodeFromString<ExportMetadata>(result.metadata)
+            val metadata = json.decodeFromString<ExportMetadata>(result.serializeMetadata())
             assertEquals(0, metadata.stats.draftCount, "Draft count should be 0")
         }
 
@@ -486,7 +486,7 @@ class ExportUserDataUseCaseTest {
             assertTrue(result.mediaFiles.isEmpty(), "Media files should be empty")
 
             val json = Json { ignoreUnknownKeys = true }
-            val metadata = json.decodeFromString<ExportMetadata>(result.metadata)
+            val metadata = json.decodeFromString<ExportMetadata>(result.serializeMetadata())
             assertEquals(0, metadata.stats.mediaCount, "Media count should be 0")
         }
 
@@ -517,7 +517,7 @@ class ExportUserDataUseCaseTest {
             val result = (progressUpdates.last() as ExportProgress.Completed).result
 
             val json = Json { ignoreUnknownKeys = true }
-            val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.notes)
+            val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.serializeNotes())
             val exportedNotes = notesPayload.getValue("notes")
 
             assertEquals(1, exportedNotes.size, "Only one note should pass the cutoff filter")
@@ -565,7 +565,7 @@ class ExportUserDataUseCaseTest {
             val result = (progressUpdates.last() as ExportProgress.Completed).result
 
             val json = Json { ignoreUnknownKeys = true }
-            val draftsPayload = json.decodeFromString<Map<String, List<ExportDraft>>>(result.drafts)
+            val draftsPayload = json.decodeFromString<Map<String, List<ExportDraft>>>(result.serializeDrafts())
             val exportedDrafts = draftsPayload.getValue("drafts")
 
             assertEquals(1, exportedDrafts.size, "Only one draft should pass the cutoff filter")
@@ -601,7 +601,7 @@ class ExportUserDataUseCaseTest {
             val result = (progressUpdates.last() as ExportProgress.Completed).result
 
             val json = Json { ignoreUnknownKeys = true }
-            val metadata = json.decodeFromString<ExportMetadata>(result.metadata)
+            val metadata = json.decodeFromString<ExportMetadata>(result.serializeMetadata())
             assertEquals(2, metadata.stats.journalCount, "Both journals should be exported regardless of cutoff")
         }
 
@@ -643,7 +643,7 @@ class ExportUserDataUseCaseTest {
             val result = (progressUpdates.last() as ExportProgress.Completed).result
 
             val json = Json { ignoreUnknownKeys = true }
-            val relationsPayload = json.decodeFromString<Map<String, List<ExportJournalNoteRelation>>>(result.journalNotes)
+            val relationsPayload = json.decodeFromString<Map<String, List<ExportJournalNoteRelation>>>(result.serializeJournalNotes())
             val relations = relationsPayload.getValue("journal_notes")
 
             assertEquals(1, relations.size, "Only one relation should pass the cutoff filter")
@@ -683,16 +683,16 @@ class ExportUserDataUseCaseTest {
             val result = (progressUpdates.last() as ExportProgress.Completed).result
 
             val json = Json { ignoreUnknownKeys = true }
-            val metadata = json.decodeFromString<ExportMetadata>(result.metadata)
+            val metadata = json.decodeFromString<ExportMetadata>(result.serializeMetadata())
             assertEquals(0, metadata.stats.journalCount, "Journal count should be 0")
             assertEquals(0, metadata.stats.noteCount, "Note count should be 0")
             assertEquals(0, metadata.stats.draftCount, "Draft count should be 0")
             assertEquals(0, metadata.stats.mediaCount, "Media count should be 0")
 
-            val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.notes)
+            val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.serializeNotes())
             assertTrue(notesPayload.getValue("notes").isEmpty(), "Notes should be empty")
 
-            val draftsPayload = json.decodeFromString<Map<String, List<ExportDraft>>>(result.drafts)
+            val draftsPayload = json.decodeFromString<Map<String, List<ExportDraft>>>(result.serializeDrafts())
             assertTrue(draftsPayload.getValue("drafts").isEmpty(), "Drafts should be empty")
 
             assertTrue(result.mediaFiles.isEmpty(), "Media files should be empty")
@@ -732,7 +732,7 @@ class ExportUserDataUseCaseTest {
             val result = (progressUpdates.last() as ExportProgress.Completed).result
 
             val json = Json { ignoreUnknownKeys = true }
-            val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.notes)
+            val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.serializeNotes())
             val exportedNotes = notesPayload.getValue("notes")
 
             val exportedText = exportedNotes.first { it.type == "text" }
@@ -778,7 +778,7 @@ class ExportUserDataUseCaseTest {
             val result = (progressUpdates.last() as ExportProgress.Completed).result
 
             val json = Json { ignoreUnknownKeys = true }
-            val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.notes)
+            val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.serializeNotes())
             val exportedNotes = notesPayload.getValue("notes")
 
             val exportedImage = exportedNotes.first { it.id == imageNote.uid.toString() }
@@ -865,7 +865,7 @@ class ExportUserDataUseCaseTest {
             val result = (progressUpdates.last() as ExportProgress.Completed).result
 
             val json = Json { ignoreUnknownKeys = true }
-            val metadata = json.decodeFromString<ExportMetadata>(result.metadata)
+            val metadata = json.decodeFromString<ExportMetadata>(result.serializeMetadata())
 
             assertEquals(1, metadata.stats.journalCount, "Journal count should include all journals")
             assertEquals(2, metadata.stats.noteCount, "Note count should reflect only filtered notes")

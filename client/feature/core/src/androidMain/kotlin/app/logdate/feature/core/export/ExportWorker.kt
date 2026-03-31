@@ -235,16 +235,16 @@ class ExportWorker(
         zipOut: ZipOutputStream,
         exportData: ExportResult,
     ) {
-        writeJsonEntry(zipOut, ExportFileStructure.METADATA_FILE, exportData.metadata)
-        writeJsonEntry(zipOut, ExportFileStructure.JOURNALS_FILE, exportData.journals)
-        writeJsonEntry(zipOut, ExportFileStructure.NOTES_FILE, exportData.notes)
-        writeJsonEntry(zipOut, ExportFileStructure.JOURNAL_NOTES_FILE, exportData.journalNotes)
-        writeJsonEntry(zipOut, ExportFileStructure.DRAFTS_FILE, exportData.drafts)
-        exportData.profile?.let { writeJsonEntry(zipOut, ExportFileStructure.PROFILE_FILE, it) }
-        exportData.places?.let { writeJsonEntry(zipOut, ExportFileStructure.PLACES_FILE, it) }
-        exportData.locationHistory?.let { writeJsonEntry(zipOut, ExportFileStructure.LOCATION_HISTORY_FILE, it) }
+        writeJsonEntry(zipOut, ExportFileStructure.METADATA_FILE, exportData.serializeMetadata())
+        writeJsonEntry(zipOut, ExportFileStructure.JOURNALS_FILE, exportData.serializeJournals())
+        writeJsonEntry(zipOut, ExportFileStructure.NOTES_FILE, exportData.serializeNotes())
+        writeJsonEntry(zipOut, ExportFileStructure.JOURNAL_NOTES_FILE, exportData.serializeJournalNotes())
+        writeJsonEntry(zipOut, ExportFileStructure.DRAFTS_FILE, exportData.serializeDrafts())
+        exportData.serializeProfile()?.let { writeJsonEntry(zipOut, ExportFileStructure.PROFILE_FILE, it) }
+        exportData.serializePlaces()?.let { writeJsonEntry(zipOut, ExportFileStructure.PLACES_FILE, it) }
+        exportData.serializeLocationHistory()?.let { writeJsonEntry(zipOut, ExportFileStructure.LOCATION_HISTORY_FILE, it) }
 
-        exportData.mediaManifest?.let { manifest ->
+        exportData.serializeMediaManifest()?.let { manifest ->
             writeJsonEntry(zipOut, ExportFileStructure.MEDIA_MANIFEST_FILE, manifest)
         }
 

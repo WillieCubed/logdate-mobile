@@ -179,16 +179,16 @@ class DesktopExportLauncher :
 
         // Create zip output stream
         ZipOutputStream(FileOutputStream(zipFile)).use { zipOutputStream ->
-            addZipEntry(zipOutputStream, ExportFileStructure.METADATA_FILE, exportResult.metadata)
-            addZipEntry(zipOutputStream, ExportFileStructure.JOURNALS_FILE, exportResult.journals)
-            addZipEntry(zipOutputStream, ExportFileStructure.NOTES_FILE, exportResult.notes)
-            addZipEntry(zipOutputStream, ExportFileStructure.JOURNAL_NOTES_FILE, exportResult.journalNotes)
-            addZipEntry(zipOutputStream, ExportFileStructure.DRAFTS_FILE, exportResult.drafts)
-            exportResult.profile?.let { addZipEntry(zipOutputStream, ExportFileStructure.PROFILE_FILE, it) }
-            exportResult.places?.let { addZipEntry(zipOutputStream, ExportFileStructure.PLACES_FILE, it) }
-            exportResult.locationHistory?.let { addZipEntry(zipOutputStream, ExportFileStructure.LOCATION_HISTORY_FILE, it) }
+            addZipEntry(zipOutputStream, ExportFileStructure.METADATA_FILE, exportResult.serializeMetadata())
+            addZipEntry(zipOutputStream, ExportFileStructure.JOURNALS_FILE, exportResult.serializeJournals())
+            addZipEntry(zipOutputStream, ExportFileStructure.NOTES_FILE, exportResult.serializeNotes())
+            addZipEntry(zipOutputStream, ExportFileStructure.JOURNAL_NOTES_FILE, exportResult.serializeJournalNotes())
+            addZipEntry(zipOutputStream, ExportFileStructure.DRAFTS_FILE, exportResult.serializeDrafts())
+            exportResult.serializeProfile()?.let { addZipEntry(zipOutputStream, ExportFileStructure.PROFILE_FILE, it) }
+            exportResult.serializePlaces()?.let { addZipEntry(zipOutputStream, ExportFileStructure.PLACES_FILE, it) }
+            exportResult.serializeLocationHistory()?.let { addZipEntry(zipOutputStream, ExportFileStructure.LOCATION_HISTORY_FILE, it) }
 
-            exportResult.mediaManifest?.let { manifest ->
+            exportResult.serializeMediaManifest()?.let { manifest ->
                 addZipEntry(zipOutputStream, ExportFileStructure.MEDIA_MANIFEST_FILE, manifest)
             }
 

@@ -669,15 +669,15 @@ class ExportImportRoundTripTest {
 
     private fun exportResultToBundle(result: ExportResult): RestoreBundle =
         RestoreBundle(
-            metadataJson = result.metadata,
-            journalsJson = result.journals,
-            notesJson = result.notes,
-            journalNotesJson = result.journalNotes,
-            draftsJson = result.drafts,
-            profileJson = result.profile,
-            placesJson = result.places,
-            locationHistoryJson = result.locationHistory,
-            mediaManifestJson = result.mediaManifest,
+            metadataJson = result.serializeMetadata(),
+            journalsJson = result.serializeJournals(),
+            notesJson = result.serializeNotes(),
+            journalNotesJson = result.serializeJournalNotes(),
+            draftsJson = result.serializeDrafts(),
+            profileJson = result.serializeProfile(),
+            placesJson = result.serializePlaces(),
+            locationHistoryJson = result.serializeLocationHistory(),
+            mediaManifestJson = result.serializeMediaManifest(),
         )
 
     private suspend fun exportThenImport(): app.logdate.client.domain.restore.RestoreResult {

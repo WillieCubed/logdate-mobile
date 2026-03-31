@@ -169,15 +169,15 @@ class IosExportLauncher(
     ) {
         val entries =
             buildList {
-                addJsonEntry(ExportFileStructure.METADATA_FILE, result.metadata)
-                addJsonEntry(ExportFileStructure.JOURNALS_FILE, result.journals)
-                addJsonEntry(ExportFileStructure.NOTES_FILE, result.notes)
-                addJsonEntry(ExportFileStructure.JOURNAL_NOTES_FILE, result.journalNotes)
-                addJsonEntry(ExportFileStructure.DRAFTS_FILE, result.drafts)
-                result.profile?.let { addJsonEntry(ExportFileStructure.PROFILE_FILE, it) }
-                result.places?.let { addJsonEntry(ExportFileStructure.PLACES_FILE, it) }
-                result.locationHistory?.let { addJsonEntry(ExportFileStructure.LOCATION_HISTORY_FILE, it) }
-                result.mediaManifest?.let { addJsonEntry(ExportFileStructure.MEDIA_MANIFEST_FILE, it) }
+                addJsonEntry(ExportFileStructure.METADATA_FILE, result.serializeMetadata())
+                addJsonEntry(ExportFileStructure.JOURNALS_FILE, result.serializeJournals())
+                addJsonEntry(ExportFileStructure.NOTES_FILE, result.serializeNotes())
+                addJsonEntry(ExportFileStructure.JOURNAL_NOTES_FILE, result.serializeJournalNotes())
+                addJsonEntry(ExportFileStructure.DRAFTS_FILE, result.serializeDrafts())
+                result.serializeProfile()?.let { addJsonEntry(ExportFileStructure.PROFILE_FILE, it) }
+                result.serializePlaces()?.let { addJsonEntry(ExportFileStructure.PLACES_FILE, it) }
+                result.serializeLocationHistory()?.let { addJsonEntry(ExportFileStructure.LOCATION_HISTORY_FILE, it) }
+                result.serializeMediaManifest()?.let { addJsonEntry(ExportFileStructure.MEDIA_MANIFEST_FILE, it) }
                 result.mediaFiles.forEach { mediaFile ->
                     add(buildMediaEntry(mediaFile))
                 }

@@ -241,38 +241,28 @@ class ExportUserDataUseCase(
                         stats = stats,
                     )
 
-                val metadataJson = json.encodeToString(exportMetadata)
-                val journalsJson = json.encodeToString(mapOf("journals" to journals))
-                val notesJson = json.encodeToString(mapOf("notes" to exportNotes))
-                val draftsJson = json.encodeToString(mapOf("drafts" to exportDrafts))
-                val journalNotesJson = json.encodeToString(mapOf("journal_notes" to exportRelations))
-                val mediaManifestJson = json.encodeToString(ExportMediaManifest(mediaFiles))
-                val profileJson =
-                    profile.takeIf { it != LogDateProfile() }?.let {
-                        json.encodeToString(ProfilePayload(profile = it))
-                    }
-                val placesJson =
-                    exportPlaces
-                        .takeIf { it.isNotEmpty() }
-                        ?.let { json.encodeToString(PlacesPayload(places = it)) }
-                val locationHistoryJson =
-                    exportLocationHistory
-                        .takeIf { it.isNotEmpty() }
-                        ?.let { json.encodeToString(LocationHistoryPayload(locationHistory = it)) }
-
                 emit(
                     ExportProgress.Completed(
                         ExportResult(
-                            metadata = metadataJson,
-                            journals = journalsJson,
-                            notes = notesJson,
-                            journalNotes = journalNotesJson,
-                            drafts = draftsJson,
-                            profile = profileJson,
-                            places = placesJson,
-                            locationHistory = locationHistoryJson,
+                            json = json,
+                            exportMetadata = exportMetadata,
+                            journals = journals,
+                            exportNotes = exportNotes,
+                            exportRelations = exportRelations,
+                            exportDrafts = exportDrafts,
+                            profilePayload =
+                                profile
+                                    .takeIf { it != LogDateProfile() }
+                                    ?.let { ProfilePayload(profile = it) },
+                            placesPayload =
+                                exportPlaces
+                                    .takeIf { it.isNotEmpty() }
+                                    ?.let { PlacesPayload(places = it) },
+                            locationHistoryPayload =
+                                exportLocationHistory
+                                    .takeIf { it.isNotEmpty() }
+                                    ?.let { LocationHistoryPayload(locationHistory = it) },
                             mediaFiles = mediaFiles,
-                            mediaManifest = mediaManifestJson,
                             stats = stats,
                         ),
                     ),
@@ -432,19 +422,41 @@ sealed class ExportProgress {
     ) : ExportProgress()
 }
 
-data class ExportResult(
-    val metadata: String,
-    val journals: String,
-    val notes: String,
-    val journalNotes: String,
-    val drafts: String,
-    val profile: String? = null,
-    val places: String? = null,
-    val locationHistory: String? = null,
+/**
+ * Result of a completed export. Holds domain objects and serializes each
+ * category lazily so only one JSON string is in memory at a time.
+ */
+class ExportResult(
+    private val json: Json,
+    private val exportMetadata: ExportMetadata,
+    private val journals: List<Journal>,
+    private val exportNotes: List<ExportNote>,
+    private val exportRelations: List<ExportJournalNoteRelation>,
+    private val exportDrafts: List<ExportDraft>,
+    private val profilePayload: ProfilePayload?,
+    private val placesPayload: PlacesPayload?,
+    private val locationHistoryPayload: LocationHistoryPayload?,
     val mediaFiles: List<ExportMediaFile>,
-    val mediaManifest: String? = null,
     val stats: ExportStats,
-)
+) {
+    fun serializeMetadata(): String = json.encodeToString(exportMetadata)
+
+    fun serializeJournals(): String = json.encodeToString(mapOf("journals" to journals))
+
+    fun serializeNotes(): String = json.encodeToString(mapOf("notes" to exportNotes))
+
+    fun serializeJournalNotes(): String = json.encodeToString(mapOf("journal_notes" to exportRelations))
+
+    fun serializeDrafts(): String = json.encodeToString(mapOf("drafts" to exportDrafts))
+
+    fun serializeProfile(): String? = profilePayload?.let { json.encodeToString(it) }
+
+    fun serializePlaces(): String? = placesPayload?.let { json.encodeToString(it) }
+
+    fun serializeLocationHistory(): String? = locationHistoryPayload?.let { json.encodeToString(it) }
+
+    fun serializeMediaManifest(): String? = mediaFiles.takeIf { it.isNotEmpty() }?.let { json.encodeToString(ExportMediaManifest(it)) }
+}
 
 /**
  * Represents a media file to be included in the export.
