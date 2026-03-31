@@ -55,6 +55,8 @@ class SherpaOnnxTranscriptionService(
     @Volatile
     private var isListening = false
 
+    private val floatBuffer = FloatArray(BUFFER_SIZE_SHORTS)
+
     override suspend fun warmUp() {
         recognizerProvider.ensureInitialized()
     }
@@ -300,8 +302,8 @@ class SherpaOnnxTranscriptionService(
             text = punctuatedText,
             utteranceStartMs = currentStreamStartMs,
             utteranceConsumedMs = samplesToMs(currentStreamAcceptedSamples),
-            tokens = result.tokens,
-            timestampsSeconds = result.timestamps,
+            tokens = result.tokens.toList(),
+            timestampsSeconds = result.timestamps.toList(),
         )
 
     private fun samplesToMs(sampleCount: Long): Long =
@@ -310,7 +312,10 @@ class SherpaOnnxTranscriptionService(
     private fun shortsToFloats(
         shorts: ShortArray,
         count: Int,
-    ): FloatArray = FloatArray(count) { shorts[it] / 32768.0f }
+    ): FloatArray {
+        for (i in 0 until count) floatBuffer[i] = shorts[i] / 32768.0f
+        return floatBuffer.copyOf(count)
+    }
 
     private fun stopAudioRecord() {
         try {

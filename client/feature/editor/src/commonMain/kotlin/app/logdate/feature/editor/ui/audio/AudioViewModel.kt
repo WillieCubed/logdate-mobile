@@ -12,7 +12,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
@@ -35,7 +34,6 @@ class AudioViewModel(
     val uiState: StateFlow<AudioUiState> = _uiState.asStateFlow()
     private var audioLevelJob: Job? = null
     private var durationJob: Job? = null
-    private var transcriptionJob: Job? = null
     private var structuredTranscriptionJob: Job? = null
 
     init {
@@ -328,8 +326,6 @@ class AudioViewModel(
         Napier.d("AudioViewModel: Being cleared")
         try {
             stopRecordingCollectors()
-            transcriptionJob?.cancel()
-            structuredTranscriptionJob?.cancel()
             audioRecordingManager.release()
             audioPlaybackManager.release()
         } catch (e: Exception) {
@@ -394,34 +390,14 @@ class AudioViewModel(
     private fun stopRecordingCollectors() {
         audioLevelJob?.cancel()
         durationJob?.cancel()
-        transcriptionJob?.cancel()
         structuredTranscriptionJob?.cancel()
         audioLevelJob = null
         durationJob = null
-        transcriptionJob = null
         structuredTranscriptionJob = null
     }
 
     private fun startTranscriptionCollector() {
-        if (transcriptionJob != null || structuredTranscriptionJob != null) return
-        transcriptionJob =
-            viewModelScope.launch {
-                audioRecordingManager.getTranscriptionFlow().collect { text ->
-                    if (!text.isNullOrBlank()) {
-                        _uiState.update { state ->
-                            val existingSuccess = state.transcriptionState as? AudioUiState.TranscriptionState.Success
-                            state.copy(
-                                transcriptionState =
-                                    AudioUiState.TranscriptionState.Success(
-                                        text = text,
-                                        timedTranscript = existingSuccess?.timedTranscript,
-                                        isFinal = existingSuccess?.isFinal == true,
-                                    ),
-                            )
-                        }
-                    }
-                }
-            }
+        if (structuredTranscriptionJob != null) return
         structuredTranscriptionJob =
             viewModelScope.launch {
                 audioRecordingManager.getStructuredTranscriptionFlow().collect { result ->

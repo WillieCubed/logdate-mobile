@@ -31,8 +31,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -55,7 +53,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.client.media.audio.transcription.TimedTranscript
 import app.logdate.client.media.audio.transcription.TimedUtterance
@@ -66,8 +63,6 @@ import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.audio_recording
 import logdate.client.feature.editor.generated.resources.delete
 import logdate.client.feature.editor.generated.resources.no_audio_recorded_yet
-import logdate.client.feature.editor.generated.resources.pause_audio
-import logdate.client.feature.editor.generated.resources.play_audio
 import logdate.client.feature.editor.generated.resources.search_transcript
 import logdate.client.feature.editor.generated.resources.text_00_00
 import org.jetbrains.compose.resources.stringResource
@@ -148,9 +143,10 @@ fun AudioBlockContent(
             }
         }
 
-    // Update target state when isExpanded changes
+    // Update transition and internal state when isExpanded changes
     LaunchedEffect(isExpanded) {
         transitionState.targetState = isExpanded
+        isCollapsedInternal = !isExpanded
     }
 
     // Shared transition between collapsed and expanded states
@@ -179,11 +175,6 @@ fun AudioBlockContent(
         },
     ) { state ->
         if (state) 1.4f else 1f // More dramatic scale change
-    }
-
-    // Update internal state when isExpanded changes
-    LaunchedEffect(isExpanded) {
-        isCollapsedInternal = !isExpanded
     }
 
     // The playback progress is now passed as a parameter directly from parent
@@ -215,7 +206,6 @@ fun AudioBlockContent(
                     onPlayPauseClicked = onPlayPauseClicked,
                     playButtonScale = playButtonScale,
                     waveformAmplitudes = waveformAmplitudes,
-//                    modifier = Modifier.fillMaxWidth(),
                     animatedVisibilityScope = this@AnimatedContent,
                     sharedTransitionScope = this@SharedTransitionLayout,
                 )
@@ -603,26 +593,26 @@ private fun TimedTranscriptPanel(
     }
 }
 
+private fun findWordMatchIndex(
+    utteranceWords: List<String>,
+    queryWords: List<String>,
+): Int? =
+    utteranceWords.indices.firstOrNull { start ->
+        queryWords.indices.all { offset ->
+            utteranceWords.getOrNull(start + offset) == queryWords[offset]
+        }
+    }
+
 private fun resolveSeekTargetMs(
     utterance: TimedUtterance,
     normalizedQuery: String,
 ): Long {
     if (normalizedQuery.isBlank()) return utterance.startMs
-    val queryWords =
-        normalizedQuery
-            .split(' ')
-            .map(String::trim)
-            .filter(String::isNotBlank)
+    val queryWords = normalizedQuery.split(' ').map(String::trim).filter(String::isNotBlank)
     if (queryWords.isEmpty()) return utterance.startMs
 
     val utteranceWords = utterance.words.map { it.normalizedText }
-    val matchIndex =
-        utteranceWords.indices.firstOrNull { startIndex ->
-            queryWords.indices.all { offset ->
-                utteranceWords.getOrNull(startIndex + offset) == queryWords[offset]
-            }
-        }
-
+    val matchIndex = findWordMatchIndex(utteranceWords, queryWords)
     return if (matchIndex != null) {
         utterance.words[matchIndex].startMs
     } else {
@@ -635,22 +625,12 @@ private fun utteranceMatchesQuery(
     normalizedQuery: String,
 ): Boolean {
     if (normalizedQuery.isBlank()) return true
-    val queryWords =
-        normalizedQuery
-            .split(' ')
-            .map(String::trim)
-            .filter(String::isNotBlank)
+    val queryWords = normalizedQuery.split(' ').map(String::trim).filter(String::isNotBlank)
     if (queryWords.isEmpty()) return true
 
     val utteranceWords = utterance.words.map { it.normalizedText }
-    val exactMatch =
-        utteranceWords.indices.any { startIndex ->
-            queryWords.indices.all { offset ->
-                utteranceWords.getOrNull(startIndex + offset) == queryWords[offset]
-            }
-        }
-
-    return exactMatch || utterance.words.any { it.normalizedText.contains(normalizedQuery) }
+    return findWordMatchIndex(utteranceWords, queryWords) != null ||
+        utterance.words.any { it.normalizedText.contains(normalizedQuery) }
 }
 
 private fun normalizeSearchQuery(query: String): String =
@@ -660,30 +640,3 @@ private fun normalizeSearchQuery(query: String): String =
         .filter { it.isLetterOrDigit() || it == '\'' || it == ' ' }
 
 // AnimatedPlayPauseButton moved to its own file
-
-/**
- * A simplified wrapper around AnimatedPlayPauseButton that just displays the icon
- * without the button background.
- *
- * @param isPlaying Current playback state, true for playing (pause icon), false for paused (play icon)
- * @param iconSize Size of the icon in dp
- * @param modifier Optional modifier for the icon
- */
-@Suppress("ktlint:standard:function-naming")
-@Composable
-private fun PlayPauseAnimatedIcon(
-    isPlaying: Boolean,
-    iconSize: Dp = 24.dp,
-    modifier: Modifier = Modifier,
-) {
-    Icon(
-        imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-        contentDescription =
-            if (isPlaying) {
-                stringResource(Res.string.pause_audio)
-            } else {
-                stringResource(Res.string.play_audio)
-            },
-        modifier = modifier.size(iconSize),
-    )
-}

@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -28,7 +29,7 @@ class AndroidAudioRecordingManager(
     private val context: Context,
     private val audioStorage: AudioStorage,
 ) : AudioRecordingManager {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val audioLevelFlow = MutableStateFlow(0f)
     private val durationFlow = MutableStateFlow(0L)
     private val transcriptionFlow = MutableStateFlow<String?>(null)
@@ -280,6 +281,7 @@ class AndroidAudioRecordingManager(
     override fun getStructuredTranscriptionFlow(): Flow<TranscriptionResult> = structuredTranscriptionFlow.filterNotNull()
 
     override fun release() {
+        scope.cancel()
         serviceStateJob?.cancel()
         serviceStateJob = null
         try {
