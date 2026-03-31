@@ -3,9 +3,9 @@
 
     <dist:module
         dist:instant="false"
-        dist:title="@string/title_speech_recognition">
+        dist:title="@string/feature_speech_recognition_module_title">
         <dist:delivery>
-            <dist:fast-follow />
+            <dist:install-time />
         </dist:delivery>
         <dist:fusing dist:include="true" />
     </dist:module>

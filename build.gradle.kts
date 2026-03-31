@@ -111,6 +111,18 @@ tasks.register("managedTabletDebugAndroidTest") {
     dependsOn(":app:android-main:tabletDevicesGroupDebugAndroidTest")
 }
 
+tasks.register<Exec>("managedTabletMediaCoverageAndroidTest") {
+    group = "verification"
+    description = "Run AndroidMediaManager instrumentation coverage on the managed tablet device."
+    workingDir = rootDir
+    commandLine(
+        rootDir.resolve("gradlew").absolutePath,
+        ":app:android-main:createManagedDeviceDebugAndroidTestCoverageReport",
+        "-Plogdate.managedDeviceProfile=tabletOnly",
+        "-Plogdate.androidTestClass=app.logdate.client.media.AndroidMediaManagerTest",
+    )
+}
+
 tasks.register("managedWearDebugAndroidTest") {
     group = "verification"
     description = "Run app/wear instrumented tests on the shared managed Wear OS device."
@@ -253,15 +265,20 @@ tasks.register<JacocoReport>("mediaAndroidTestCoverageReport") {
 
     val appProject = project(":app:android-main")
     val mediaProject = project(":client:media")
+    val managedDeviceCoverageFiles =
+        files(
+            appProject.layout.buildDirectory.file(
+                "outputs/managed_device_code_coverage/debug/largeScreenTabletApi34/coverage.ec",
+            ),
+            appProject.layout.buildDirectory.file(
+                "intermediates/managed_device_code_coverage/debugAndroidTest/largeScreenTabletApi34DebugAndroidTest/coverage.ec",
+            ),
+        )
 
-    dependsOn(":app:android-main:connectedDebugAndroidTest")
+    dependsOn("managedTabletMediaCoverageAndroidTest")
 
     executionData.setFrom(
-        files(
-            fileTree(appProject.layout.buildDirectory.dir("outputs/code_coverage/debugAndroidTest")) {
-                include("**/*.ec")
-            },
-        ),
+        managedDeviceCoverageFiles,
     )
 
     classDirectories.setFrom(
@@ -293,12 +310,12 @@ tasks.register<JacocoReport>("mediaAndroidTestCoverageReport") {
     }
 
     doFirst {
-        val missingExecFiles =
-            executionData.files.filterNot { it.exists() }
-        if (missingExecFiles.isNotEmpty()) {
+        val coverageFiles =
+            executionData.files.filter { it.exists() }
+        if (coverageFiles.isEmpty()) {
             throw GradleException(
-                "Missing Android instrumentation coverage data for media coverage: " +
-                    missingExecFiles.joinToString { it.absolutePath },
+                "Missing managed-device Android instrumentation coverage data for media coverage under " +
+                    managedDeviceCoverageFiles.files.joinToString { it.absolutePath },
             )
         }
     }
@@ -366,56 +383,84 @@ private data class ManagedDeviceProjectConfig(
     val groups: List<ManagedDeviceGroupConfig>,
 )
 
+private val managedDeviceProfile =
+    providers.gradleProperty("logdate.managedDeviceProfile").orNull
+
 private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectConfig? =
     when (projectPath) {
         ":app:android-main" ->
-            ManagedDeviceProjectConfig(
-                localDevices =
-                    listOf(
-                        ManagedVirtualDeviceConfig(
-                            deviceName = "oldestSupportedPhoneApi30",
-                            hardwareProfile = "Pixel 2",
-                            apiLevel = 30,
-                            systemImageSource = "google",
+            if (managedDeviceProfile == "tabletOnly") {
+                ManagedDeviceProjectConfig(
+                    localDevices =
+                        listOf(
+                            ManagedVirtualDeviceConfig(
+                                deviceName = "largeScreenTabletApi34",
+                                hardwareProfile = "Pixel Tablet",
+                                apiLevel = 34,
+                                systemImageSource = "google",
+                            ),
                         ),
-                        ManagedVirtualDeviceConfig(
-                            deviceName = "flagshipPhoneApi35",
-                            hardwareProfile = "Pixel 8 Pro",
-                            apiLevel = 35,
-                            systemImageSource = "google",
+                    groups =
+                        listOf(
+                            ManagedDeviceGroupConfig(
+                                groupName = "tabletDevices",
+                                targetDeviceNames = listOf("largeScreenTabletApi34"),
+                            ),
+                            ManagedDeviceGroupConfig(
+                                groupName = "deviceMatrix",
+                                targetDeviceNames = listOf("largeScreenTabletApi34"),
+                            ),
                         ),
-                        ManagedVirtualDeviceConfig(
-                            deviceName = "largeScreenTabletApi34",
-                            hardwareProfile = "Pixel Tablet",
-                            apiLevel = 34,
-                            systemImageSource = "google",
+                )
+            } else {
+                ManagedDeviceProjectConfig(
+                    localDevices =
+                        listOf(
+                            ManagedVirtualDeviceConfig(
+                                deviceName = "oldestSupportedPhoneApi30",
+                                hardwareProfile = "Pixel 2",
+                                apiLevel = 30,
+                                systemImageSource = "google",
+                            ),
+                            ManagedVirtualDeviceConfig(
+                                deviceName = "flagshipPhoneApi35",
+                                hardwareProfile = "Pixel 8 Pro",
+                                apiLevel = 35,
+                                systemImageSource = "google",
+                            ),
+                            ManagedVirtualDeviceConfig(
+                                deviceName = "largeScreenTabletApi34",
+                                hardwareProfile = "Pixel Tablet",
+                                apiLevel = 34,
+                                systemImageSource = "google",
+                            ),
                         ),
-                    ),
-                groups =
-                    listOf(
-                        ManagedDeviceGroupConfig(
-                            groupName = "phoneDevices",
-                            targetDeviceNames =
-                                listOf(
-                                    "oldestSupportedPhoneApi30",
-                                    "flagshipPhoneApi35",
-                                ),
+                    groups =
+                        listOf(
+                            ManagedDeviceGroupConfig(
+                                groupName = "phoneDevices",
+                                targetDeviceNames =
+                                    listOf(
+                                        "oldestSupportedPhoneApi30",
+                                        "flagshipPhoneApi35",
+                                    ),
+                            ),
+                            ManagedDeviceGroupConfig(
+                                groupName = "tabletDevices",
+                                targetDeviceNames = listOf("largeScreenTabletApi34"),
+                            ),
+                            ManagedDeviceGroupConfig(
+                                groupName = "deviceMatrix",
+                                targetDeviceNames =
+                                    listOf(
+                                        "oldestSupportedPhoneApi30",
+                                        "flagshipPhoneApi35",
+                                        "largeScreenTabletApi34",
+                                    ),
+                            ),
                         ),
-                        ManagedDeviceGroupConfig(
-                            groupName = "tabletDevices",
-                            targetDeviceNames = listOf("largeScreenTabletApi34"),
-                        ),
-                        ManagedDeviceGroupConfig(
-                            groupName = "deviceMatrix",
-                            targetDeviceNames =
-                                listOf(
-                                    "oldestSupportedPhoneApi30",
-                                    "flagshipPhoneApi35",
-                                    "largeScreenTabletApi34",
-                                ),
-                        ),
-                    ),
-            )
+                )
+            }
 
         ":app:wear" ->
             ManagedDeviceProjectConfig(
