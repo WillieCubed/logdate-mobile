@@ -1,6 +1,7 @@
 package app.logdate.feature.postcards.ui
 
 import app.logdate.feature.postcards.model.PostcardDocument
+import kotlin.uuid.Uuid
 
 /**
  * Preset export aspect ratios.
@@ -64,6 +65,6 @@ interface ExportEngine {
         captureRegion: ExportCaptureRegion,
         preset: ExportPreset,
         targetWidthPx: Int = 1080,
-        stickerUriMap: Map<kotlin.uuid.Uuid, String> = emptyMap(),
+        stickerUriMap: Map<Uuid, String> = emptyMap(),
     ): ExportResult?
 }

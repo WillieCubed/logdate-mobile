@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.postcards.model.PostcardDocument
+import kotlin.uuid.Uuid
 
 /**
  * Bottom sheet for exporting a postcard as a PNG image.
@@ -39,7 +40,7 @@ import app.logdate.feature.postcards.model.PostcardDocument
 fun ExportSheet(
     document: PostcardDocument,
     viewModel: ExportViewModel,
-    stickerUriMap: Map<kotlin.uuid.Uuid, String> = emptyMap(),
+    stickerUriMap: Map<Uuid, String> = emptyMap(),
     onShareResult: (uri: String) -> Unit,
     onDismiss: () -> Unit,
 ) {

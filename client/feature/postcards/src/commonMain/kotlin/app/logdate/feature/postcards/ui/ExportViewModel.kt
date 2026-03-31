@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.uuid.Uuid
 
 /**
  * UI state for the postcard export flow.
@@ -60,7 +61,7 @@ class ExportViewModel(
      */
     fun render(
         document: PostcardDocument,
-        stickerUriMap: Map<kotlin.uuid.Uuid, String> = emptyMap(),
+        stickerUriMap: Map<Uuid, String> = emptyMap(),
     ) {
         val preset = (_state.value as? ExportUiState.Ready)?.preset ?: ExportPreset.STORY
         _state.value = ExportUiState.Rendering

@@ -12,6 +12,7 @@ import app.logdate.feature.postcards.model.CanvasElement
 import app.logdate.feature.postcards.model.ElementTransform
 import app.logdate.feature.postcards.model.PostcardDocument
 import app.logdate.feature.stickers.ui.StickerRepository
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -568,8 +569,7 @@ class CanvasEditorViewModel(
                 }
                 _state.update { it.copy(document = doc, isSaving = false, isNewPostcard = false) }
             } catch (e: Exception) {
-                io.github.aakira.napier.Napier
-                    .e("Failed to save postcard", e)
+                Napier.e("Failed to save postcard", e)
                 _state.update { it.copy(isSaving = false, saveError = "Could not save postcard") }
             }
         }

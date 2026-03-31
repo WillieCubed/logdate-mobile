@@ -5,6 +5,7 @@ import app.logdate.feature.postcards.ui.ExportCaptureRegion
 import app.logdate.feature.postcards.ui.ExportEngine
 import app.logdate.feature.postcards.ui.ExportPreset
 import app.logdate.feature.postcards.ui.ExportResult
+import kotlin.uuid.Uuid
 
 /**
  * No-op export engine for platforms where export is not yet implemented.
@@ -15,6 +16,6 @@ class NoOpExportEngine : ExportEngine {
         captureRegion: ExportCaptureRegion,
         preset: ExportPreset,
         targetWidthPx: Int,
-        stickerUriMap: Map<kotlin.uuid.Uuid, String>,
+        stickerUriMap: Map<Uuid, String>,
     ): ExportResult? = null
 }

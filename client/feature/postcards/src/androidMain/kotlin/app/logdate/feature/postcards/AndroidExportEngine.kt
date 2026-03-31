@@ -23,6 +23,7 @@ import app.logdate.feature.postcards.ui.parseColor
 import io.github.aakira.napier.Napier
 import java.io.File
 import java.io.FileOutputStream
+import kotlin.uuid.Uuid
 
 /**
  * Android implementation of [ExportEngine].
@@ -39,7 +40,7 @@ class AndroidExportEngine(
         captureRegion: ExportCaptureRegion,
         preset: ExportPreset,
         targetWidthPx: Int,
-        stickerUriMap: Map<kotlin.uuid.Uuid, String>,
+        stickerUriMap: Map<Uuid, String>,
     ): ExportResult? =
         try {
             val aspectRatio = preset.widthRatio.toFloat() / preset.heightRatio.toFloat()
@@ -85,7 +86,7 @@ class AndroidExportEngine(
     private fun drawElement(
         canvas: Canvas,
         element: CanvasElement,
-        stickerUriMap: Map<kotlin.uuid.Uuid, String> = emptyMap(),
+        stickerUriMap: Map<Uuid, String> = emptyMap(),
     ) {
         val transform = element.transform
         canvas.save()
@@ -130,7 +131,7 @@ class AndroidExportEngine(
     private fun drawSticker(
         canvas: Canvas,
         element: CanvasElement.Sticker,
-        stickerUriMap: Map<kotlin.uuid.Uuid, String>,
+        stickerUriMap: Map<Uuid, String>,
     ) {
         val imageUri = stickerUriMap[element.stickerRef] ?: return
         val dest = RectF(0f, 0f, 80f, 80f)

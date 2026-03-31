@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -219,8 +220,7 @@ private fun CanvasBackgroundLayer(background: CanvasBackground) {
                 if (colors.size >= 2) {
                     drawRect(
                         brush =
-                            androidx.compose.ui.graphics.Brush
-                                .verticalGradient(colors),
+                            Brush.verticalGradient(colors),
                     )
                 }
             }
