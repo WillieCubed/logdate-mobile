@@ -25,19 +25,26 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import app.logdate.client.database.entities.PostcardEntity
+import app.logdate.feature.postcards.model.CanvasElement
+import app.logdate.feature.postcards.model.PostcardDocument
+import coil3.compose.AsyncImage
+import kotlinx.serialization.json.Json
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 
 /**
  * Grid collection view for the user's Postcards.
  *
- * Lives in Library → Postcards tab. Shows all saved Postcards as cards
- * with title and date. Tap opens the viewer; FAB creates a new one.
+ * Lives in Library > Postcards tab. Shows all saved Postcards as cards
+ * with a thumbnail of the first photo and the title. Tap opens the viewer;
+ * FAB creates a new one.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,11 +98,30 @@ fun PostcardsCollectionScreen(
     }
 }
 
+private val thumbnailJson = Json { ignoreUnknownKeys = true }
+
 @Composable
 private fun PostcardCard(
     postcard: PostcardEntity,
     onClick: () -> Unit,
 ) {
+    val thumbnailUri =
+        remember(postcard.documentJson) {
+            try {
+                val doc =
+                    thumbnailJson.decodeFromString(
+                        PostcardDocument.serializer(),
+                        postcard.documentJson,
+                    )
+                doc.elements
+                    .filterIsInstance<CanvasElement.Photo>()
+                    .firstOrNull()
+                    ?.mediaUri
+            } catch (_: Exception) {
+                null
+            }
+        }
+
     Card(
         modifier =
             Modifier
@@ -106,12 +132,28 @@ private fun PostcardCard(
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.BottomStart,
         ) {
+            if (thumbnailUri != null) {
+                AsyncImage(
+                    model = thumbnailUri,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             Text(
                 text = postcard.title.ifEmpty { "Untitled" },
                 style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(12.dp),
+                color =
+                    if (thumbnailUri != null) {
+                        MaterialTheme.colorScheme.inverseOnSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(12.dp),
             )
         }
     }

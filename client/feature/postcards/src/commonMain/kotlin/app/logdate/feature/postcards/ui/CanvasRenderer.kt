@@ -60,6 +60,8 @@ fun CanvasRenderer(
     modifier: Modifier = Modifier,
     selectedElementId: Uuid? = null,
     stickerUriMap: Map<Uuid, String> = emptyMap(),
+    viewportOffsetX: Float = 0f,
+    viewportOffsetY: Float = 0f,
     onElementTap: ((Uuid) -> Unit)? = null,
     onPhotoTap: ((CanvasElement.Photo) -> Unit)? = null,
 ) {
@@ -77,7 +79,12 @@ fun CanvasRenderer(
                 onTap = { onElementTap?.invoke(element.id) },
             ) {
                 when (element) {
-                    is CanvasElement.Photo -> PhotoElementRenderer(element)
+                    is CanvasElement.Photo ->
+                        PhotoElementRenderer(
+                            element,
+                            viewportOffsetX,
+                            viewportOffsetY,
+                        )
                     is CanvasElement.Text -> TextElementRenderer(element)
                     is CanvasElement.Ink -> InkElementRenderer(element)
                     is CanvasElement.Shape -> ShapeElementRenderer(element)
@@ -222,8 +229,13 @@ private fun CanvasBackgroundLayer(background: CanvasBackground) {
 }
 
 @Composable
-private fun PhotoElementRenderer(element: CanvasElement.Photo) {
+private fun PhotoElementRenderer(
+    element: CanvasElement.Photo,
+    viewportOffsetX: Float = 0f,
+    viewportOffsetY: Float = 0f,
+) {
     val transform = element.transform
+    val depth = element.parallaxDepth
     AsyncImage(
         model = element.mediaUri,
         contentDescription = null,
@@ -235,6 +247,8 @@ private fun PhotoElementRenderer(element: CanvasElement.Photo) {
                     rotationZ = transform.rotation
                     scaleX = transform.scaleX
                     scaleY = transform.scaleY
+                    translationX = viewportOffsetX * depth
+                    translationY = viewportOffsetY * depth
                 }.size(200.dp, 200.dp),
     )
 }

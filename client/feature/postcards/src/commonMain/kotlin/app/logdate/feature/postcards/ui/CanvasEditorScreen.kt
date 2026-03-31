@@ -38,6 +38,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,6 +74,8 @@ fun CanvasEditorScreen(
     Scaffold(
         topBar = {
             EditorTopBar(
+                title = state.document.title,
+                onTitleChange = viewModel::setTitle,
                 canUndo = viewModel.canUndo,
                 canRedo = viewModel.canRedo,
                 hasSelection = state.selectedElementId != null,
@@ -106,6 +111,8 @@ fun CanvasEditorScreen(
                         document = state.document,
                         selectedElementId = state.selectedElementId,
                         stickerUriMap = state.stickerUriMap,
+                        viewportOffsetX = viewportState.offset.x,
+                        viewportOffsetY = viewportState.offset.y,
                         onElementTap = { elementId ->
                             val element = state.document.elements.find { it.id == elementId }
                             if (element is CanvasElement.Text) {
@@ -220,6 +227,8 @@ fun CanvasEditorScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditorTopBar(
+    title: String,
+    onTitleChange: (String) -> Unit,
     canUndo: Boolean,
     canRedo: Boolean,
     hasSelection: Boolean,
@@ -229,8 +238,56 @@ private fun EditorTopBar(
     onDelete: () -> Unit,
     onSave: () -> Unit,
 ) {
+    var isEditingTitle by remember { mutableStateOf(false) }
+    var editableTitle by remember(title) { mutableStateOf(title) }
+
     TopAppBar(
-        title = {},
+        title = {
+            if (isEditingTitle) {
+                androidx.compose.foundation.text.BasicTextField(
+                    value = editableTitle,
+                    onValueChange = { editableTitle = it },
+                    singleLine = true,
+                    textStyle =
+                        MaterialTheme.typography.titleMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                        ),
+                    cursorBrush =
+                        androidx.compose.ui.graphics.SolidColor(
+                            MaterialTheme.colorScheme.primary,
+                        ),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(end = 8.dp),
+                    decorationBox = { innerTextField ->
+                        if (editableTitle.isEmpty()) {
+                            Text(
+                                "Untitled",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        innerTextField()
+                    },
+                )
+            } else {
+                Text(
+                    text = title.ifEmpty { "Untitled" },
+                    style = MaterialTheme.typography.titleMedium,
+                    color =
+                        if (title.isEmpty()) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                    modifier =
+                        Modifier.clickable {
+                            isEditingTitle = true
+                        },
+                )
+            }
+        },
         navigationIcon = {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -248,7 +305,13 @@ private fun EditorTopBar(
                     Icon(Icons.Filled.Delete, contentDescription = "Delete")
                 }
             }
-            IconButton(onClick = onSave) {
+            IconButton(onClick = {
+                if (isEditingTitle) {
+                    onTitleChange(editableTitle)
+                    isEditingTitle = false
+                }
+                onSave()
+            }) {
                 Icon(Icons.Filled.Check, contentDescription = "Save")
             }
         },
