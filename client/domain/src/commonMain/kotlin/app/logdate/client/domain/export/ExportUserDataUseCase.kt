@@ -24,8 +24,8 @@ import app.logdate.shared.model.profile.LogDateProfile
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -68,11 +68,11 @@ class ExportUserDataUseCase(
         includeMedia: Boolean = true,
         dateRangeCutoff: kotlin.time.Instant? = null,
     ): Flow<ExportProgress> =
-        flow {
-            emit(ExportProgress.Starting)
+        channelFlow {
+            send(ExportProgress.Starting)
 
             try {
-                emit(ExportProgress.InProgress(0.1f, "Collecting data..."))
+                send(ExportProgress.InProgress(0.1f, "Collecting data..."))
 
                 val (journals, notes, drafts, profile, places, locationHistory) =
                     coroutineScope {
@@ -139,7 +139,7 @@ class ExportUserDataUseCase(
                         .trim()
                         .ifBlank { "local-user" }
 
-                emit(ExportProgress.InProgress(0.7f, "Preparing export data..."))
+                send(ExportProgress.InProgress(0.7f, "Preparing export data..."))
 
                 val exportNotes =
                     notes.map { note ->
@@ -241,7 +241,7 @@ class ExportUserDataUseCase(
                         stats = stats,
                     )
 
-                emit(
+                send(
                     ExportProgress.Completed(
                         ExportResult(
                             json = json,
@@ -268,7 +268,7 @@ class ExportUserDataUseCase(
                     ),
                 )
             } catch (exception: Exception) {
-                emit(ExportProgress.Failed(exception.message ?: "Unknown error occurred"))
+                send(ExportProgress.Failed(exception.message ?: "Unknown error occurred"))
             }
         }
 
