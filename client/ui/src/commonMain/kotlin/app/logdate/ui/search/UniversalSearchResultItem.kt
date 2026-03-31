@@ -19,29 +19,36 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.util.toReadableDateTimeShort
 
+data class UniversalSearchResultUiState(
+    val id: String,
+    val contentText: AnnotatedString,
+    val supportingText: String,
+    val typeLabel: String,
+    val typeIcon: ImageVector,
+)
+
 /**
  * Renders a single universal search result with type-specific icon and label.
  *
  * Handles all [SearchContentType] variants with appropriate visual treatment.
- * Snippet text is highlighted via [parseSnippetMarkers] for FTS5 match markers.
+ * Search row state is precomputed before rendering to keep recomposition cheap.
  */
 @Composable
 fun UniversalSearchResultItem(
-    result: SearchResult,
+    state: UniversalSearchResultUiState,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val (icon, typeLabel) = result.contentType.visualInfo()
-
     ListItem(
         headlineContent = {
             Text(
-                text = parseSnippetMarkers(result.content),
+                text = state.contentText,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodyMedium,
@@ -49,15 +56,26 @@ fun UniversalSearchResultItem(
         },
         supportingContent = {
             Text(
-                text = "${result.created.toReadableDateTimeShort()} · $typeLabel",
+                text = state.supportingText,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         },
         leadingContent = {
-            Icon(icon, contentDescription = typeLabel)
+            Icon(state.typeIcon, contentDescription = state.typeLabel)
         },
         modifier = modifier.clickable(onClick = onClick),
+    )
+}
+
+fun SearchResult.toUniversalSearchResultUiState(): UniversalSearchResultUiState {
+    val (icon, typeLabel) = contentType.visualInfo()
+    return UniversalSearchResultUiState(
+        id = "${contentType.ftsValue}_$uid",
+        contentText = parseSnippetMarkers(content),
+        supportingText = "${created.toReadableDateTimeShort()} · $typeLabel",
+        typeLabel = typeLabel,
+        typeIcon = icon,
     )
 }
 

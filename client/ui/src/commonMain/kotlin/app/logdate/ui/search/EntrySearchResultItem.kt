@@ -25,7 +25,7 @@ fun EntrySearchResultItem(
     ListItem(
         headlineContent = {
             Text(
-                text = parseSnippetMarkers(state.content),
+                text = state.contentText,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodyMedium,

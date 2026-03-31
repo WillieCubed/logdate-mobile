@@ -13,9 +13,13 @@ internal object SearchIndexBootstrapper {
         createMetadataTable(connection)
         createFtsTable(connection)
         createVocabularyTable(connection)
-        recreateTriggers(connection)
 
-        if (needsRebuild(connection)) {
+        val schemaVersion = readSchemaVersion(connection)
+        if (needsTriggerRefresh(connection, schemaVersion)) {
+            recreateTriggers(connection)
+        }
+
+        if (needsRebuild(connection, schemaVersion)) {
             rebuildIndex(connection)
             optimizeIndex(connection)
             updateMetadata(connection)
@@ -82,16 +86,33 @@ internal object SearchIndexBootstrapper {
         triggerDefinitions.forEach(connection::execSQL)
     }
 
-    private fun needsRebuild(connection: SQLiteConnection): Boolean {
-        val schemaVersion =
-            connection.prepare("SELECT schemaVersion FROM $METADATA_TABLE WHERE id = 1").use { stmt ->
-                if (!stmt.step()) {
-                    null
-                } else {
-                    stmt.getLong(0)
-                }
+    private fun readSchemaVersion(connection: SQLiteConnection): Long? =
+        connection.prepare("SELECT schemaVersion FROM $METADATA_TABLE WHERE id = 1").use { stmt ->
+            if (!stmt.step()) {
+                null
+            } else {
+                stmt.getLong(0)
             }
+        }
 
+    private fun needsTriggerRefresh(
+        connection: SQLiteConnection,
+        schemaVersion: Long?,
+    ): Boolean {
+        if (schemaVersion != CURRENT_SCHEMA_VERSION) {
+            return true
+        }
+
+        return connection.prepare(sentinelTriggerExistsSql).use { stmt ->
+            stmt.step()
+            stmt.getLong(0) != 1L
+        }
+    }
+
+    private fun needsRebuild(
+        connection: SQLiteConnection,
+        schemaVersion: Long?,
+    ): Boolean {
         if (schemaVersion != CURRENT_SCHEMA_VERSION) {
             return true
         }
@@ -174,6 +195,16 @@ internal object SearchIndexBootstrapper {
             SELECT 1 FROM stickers WHERE label IS NOT NULL
             UNION ALL
             SELECT 1 FROM postcards WHERE title IS NOT NULL
+        )
+        """.trimIndent()
+
+    private val sentinelTriggerExistsSql =
+        """
+        SELECT EXISTS(
+            SELECT 1
+            FROM sqlite_master
+            WHERE type = 'trigger'
+              AND name = 'text_notes_fts_insert'
         )
         """.trimIndent()
 

@@ -5,10 +5,14 @@ import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.media.audio.AudioPlaybackStatus
 import app.logdate.client.media.audio.AudioPlaybackStatusProvider
+import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.feature.editor.audio.extraction.AmplitudeExtractor
 import app.logdate.feature.editor.audio.storage.WaveformStorage
+import app.logdate.shared.model.EditorDraft
+import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -76,6 +80,67 @@ class FakeJournalNotesRepository(
     fun setNotes(notes: List<JournalNote>) {
         notesFlow.value = notes
     }
+}
+
+class FakeDetailJournalRepository(
+    initialJournals: List<Journal> = emptyList(),
+) : JournalRepository {
+    private val journalsFlow = MutableStateFlow(initialJournals)
+
+    override val allJournalsObserved: Flow<List<Journal>> = journalsFlow
+
+    override fun observeJournalById(id: Uuid): Flow<Journal> = flowOf(journalsFlow.value.first { it.id == id })
+
+    override suspend fun getJournalById(id: Uuid): Journal? = journalsFlow.value.firstOrNull { it.id == id }
+
+    override suspend fun create(journal: Journal): Uuid {
+        journalsFlow.value = journalsFlow.value + journal
+        return journal.id
+    }
+
+    override suspend fun update(journal: Journal) = Unit
+
+    override suspend fun delete(journalId: Uuid) = Unit
+
+    override suspend fun saveDraft(draft: EditorDraft) = Unit
+
+    override suspend fun getLatestDraft(): EditorDraft? = null
+
+    override suspend fun getAllDrafts(): List<EditorDraft> = emptyList()
+
+    override suspend fun getDraft(id: Uuid): EditorDraft? = null
+
+    override suspend fun deleteDraft(id: Uuid) = Unit
+}
+
+class FakeDetailJournalContentRepository(
+    initialMemberships: Map<Uuid, List<Journal>> = emptyMap(),
+) : JournalContentRepository {
+    private val memberships = MutableStateFlow(initialMemberships)
+
+    override fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>> = flowOf(emptyList())
+
+    override fun observeJournalsForContent(contentId: Uuid): Flow<List<Journal>> = flowOf(memberships.value[contentId].orEmpty())
+
+    override suspend fun addContentToJournal(
+        contentId: Uuid,
+        journalId: Uuid,
+    ) = Unit
+
+    override suspend fun removeContentFromJournal(
+        contentId: Uuid,
+        journalId: Uuid,
+    ) = Unit
+
+    override suspend fun addContentToJournals(
+        contentId: Uuid,
+        journalIds: List<Uuid>,
+    ) = Unit
+
+    override suspend fun removeContentFromAllJournals(contentId: Uuid) = Unit
+
+    override fun observeJournalsForContents(contentIds: Set<Uuid>): Flow<Map<Uuid, List<Journal>>> =
+        flowOf(memberships.value.filterKeys { it in contentIds })
 }
 
 class FakeAudioDurationResolver(

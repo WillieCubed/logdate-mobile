@@ -57,6 +57,23 @@ class FakeJournalContentDao : JournalContentDao {
         emitState()
     }
 
+    override fun getJournalsForContents(contentIds: List<Uuid>): Flow<List<JournalContentEntityLink>> =
+        state.map {
+            contentIds.flatMap { contentId ->
+                contentJournals[contentId]
+                    ?.map { journalId ->
+                        JournalContentEntityLink(journalId = journalId, contentId = contentId)
+                    }.orEmpty()
+            }
+        }
+
+    override suspend fun getAllLinks(): List<JournalContentEntityLink> =
+        journalContent.flatMap { (journalId, contentIds) ->
+            contentIds.map { contentId ->
+                JournalContentEntityLink(journalId = journalId, contentId = contentId)
+            }
+        }
+
     override suspend fun isContentInJournal(
         journalId: Uuid,
         contentId: Uuid,

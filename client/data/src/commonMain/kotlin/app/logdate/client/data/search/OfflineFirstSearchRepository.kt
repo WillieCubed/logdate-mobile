@@ -25,9 +25,11 @@ import kotlin.math.abs
 class OfflineFirstSearchRepository(
     private val searchDao: SearchDao,
 ) : SearchRepository {
+    private val correctionCache = mutableMapOf<String, String?>()
+
     override fun search(query: String): Flow<List<SearchResult>> =
         observedFtsFlow(query) { preparedQuery ->
-            searchDao.search(preparedQuery).map { it.toSearchResult() }
+            searchDao.search(preparedQuery.query).map { it.toSearchResult() }
         }
 
     override fun searchWithLimit(
@@ -35,12 +37,12 @@ class OfflineFirstSearchRepository(
         limit: Int,
     ): Flow<List<SearchResult>> =
         observedFtsFlow(query) { preparedQuery ->
-            searchDao.searchWithLimit(preparedQuery, limit).map { it.toSearchResult() }
+            searchDao.searchWithLimit(preparedQuery.query, limit).map { it.toSearchResult() }
         }
 
     override fun searchWithSnippets(query: String): Flow<List<SearchResult>> =
         observedFtsFlow(query) { preparedQuery ->
-            searchDao.searchWithSnippets(preparedQuery).map { it.toSearchResult() }
+            searchDao.searchWithSnippets(preparedQuery.query).map { it.toSearchResult() }
         }
 
     override fun searchRanked(
@@ -48,7 +50,19 @@ class OfflineFirstSearchRepository(
         limit: Int,
     ): Flow<List<SearchResult>> =
         observedFtsFlow(query) { preparedQuery ->
-            searchDao.searchRanked(preparedQuery, limit).map { entity ->
+            val effectiveLimit =
+                if (preparedQuery.isSingleCharacterPlainQuery) {
+                    minOf(limit, SHORT_QUERY_RESULT_LIMIT)
+                } else {
+                    limit
+                }
+            val results =
+                if (preparedQuery.isSingleCharacterPlainQuery) {
+                    searchDao.searchRankedShortQuery(preparedQuery.query, effectiveLimit)
+                } else {
+                    searchDao.searchRanked(preparedQuery.query, effectiveLimit)
+                }
+            results.map { entity ->
                 SearchResult(
                     uid = entity.getUuid(),
                     content = entity.content,
@@ -64,7 +78,7 @@ class OfflineFirstSearchRepository(
      */
     private fun observedFtsFlow(
         query: String,
-        block: suspend (preparedQuery: String) -> List<SearchResult>,
+        block: suspend (preparedQuery: PreparedFtsQuery) -> List<SearchResult>,
     ): Flow<List<SearchResult>> {
         val prepared = prepareFtsQuery(query) ?: return flowOf(emptyList())
 
@@ -81,16 +95,15 @@ class OfflineFirstSearchRepository(
 
     private suspend fun executePreparedQuery(
         prepared: PreparedFtsQuery,
-        block: suspend (preparedQuery: String) -> List<SearchResult>,
+        block: suspend (preparedQuery: PreparedFtsQuery) -> List<SearchResult>,
     ): List<SearchResult> {
-        val primaryResults = block(prepared.query)
+        val primaryResults = block(prepared)
         if (primaryResults.isNotEmpty() || prepared.usesExplicitSyntax || prepared.tokens.isEmpty()) {
             return primaryResults
         }
 
         val correctedToken = correctedLastToken(prepared.tokens.last()) ?: return primaryResults
-        val fallbackQuery = prepared.withLastToken(correctedToken).query
-        return block(fallbackQuery)
+        return block(prepared.withLastToken(correctedToken))
     }
 
     private suspend fun correctedLastToken(lastToken: String): String? {
@@ -98,28 +111,43 @@ class OfflineFirstSearchRepository(
             return null
         }
 
+        synchronized(correctionCache) {
+            if (lastToken in correctionCache) {
+                return correctionCache[lastToken]
+            }
+        }
+
         val maxDistance = if (lastToken.length >= LONG_FUZZY_TOKEN_LENGTH) 2 else 1
+        val prefixLength = if (lastToken.length >= TWO_CHARACTER_PREFIX_MIN_LENGTH) 2 else 1
         val candidates =
             runCatching {
                 searchDao.findVocabularyTerms(
-                    prefix = lastToken.take(1),
+                    prefix = lastToken.take(prefixLength),
                     minLength = (lastToken.length - maxDistance).coerceAtLeast(MIN_FUZZY_TOKEN_LENGTH),
                     maxLength = lastToken.length + maxDistance,
                     limit = MAX_FUZZY_CANDIDATES,
                 )
             }.getOrElse { error ->
                 Napier.w("FTS vocabulary lookup unavailable; skipping fuzzy fallback", error)
+                synchronized(correctionCache) {
+                    correctionCache[lastToken] = null
+                }
                 return null
             }
 
-        return candidates
-            .asSequence()
-            .filterNot { it == lastToken }
-            .map { candidate -> candidate to levenshteinDistance(lastToken, candidate) }
-            .filter { (_, distance) -> distance in 1..maxDistance }
-            .sortedWith(compareBy<Pair<String, Int>>({ it.second }, { abs(it.first.length - lastToken.length) }, { it.first }))
-            .map { (candidate, _) -> candidate }
-            .firstOrNull()
+        val corrected =
+            candidates
+                .asSequence()
+                .filterNot { it == lastToken }
+                .map { candidate -> candidate to levenshteinDistance(lastToken, candidate) }
+                .filter { (_, distance) -> distance in 1..maxDistance }
+                .sortedWith(compareBy<Pair<String, Int>>({ it.second }, { abs(it.first.length - lastToken.length) }, { it.first }))
+                .map { (candidate, _) -> candidate }
+                .firstOrNull()
+        synchronized(correctionCache) {
+            correctionCache[lastToken] = corrected
+        }
+        return corrected
     }
 
     private fun SearchResultEntity.toSearchResult(): SearchResult =
@@ -140,8 +168,10 @@ class OfflineFirstSearchRepository(
 
     private companion object {
         const val LONG_FUZZY_TOKEN_LENGTH = 7
-        const val MAX_FUZZY_CANDIDATES = 200
+        const val MAX_FUZZY_CANDIDATES = 64
         const val MIN_FUZZY_TOKEN_LENGTH = 4
+        const val SHORT_QUERY_RESULT_LIMIT = 20
+        const val TWO_CHARACTER_PREFIX_MIN_LENGTH = 5
     }
 }
 
@@ -153,6 +183,9 @@ internal data class PreparedFtsQuery(
     val tokens: List<String>,
     val usesExplicitSyntax: Boolean,
 ) {
+    val isSingleCharacterPlainQuery: Boolean
+        get() = !usesExplicitSyntax && tokens.size == 1 && tokens.single().length == 1
+
     fun withLastToken(token: String): PreparedFtsQuery =
         copy(
             query = buildPrefixQuery(tokens.dropLast(1) + token),

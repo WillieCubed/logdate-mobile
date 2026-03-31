@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -38,6 +39,8 @@ import androidx.compose.ui.platform.testTag
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.ui.search.UniversalSearchResultItem
+import app.logdate.ui.search.UniversalSearchResultUiState
+import app.logdate.ui.search.toUniversalSearchResultUiState
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -221,17 +224,26 @@ fun SearchScreenContent(
                 }
 
                 is SearchScreenState.Results -> {
+                    val resultRows =
+                        remember(searchState.results) {
+                            searchState.results.map { result ->
+                                SearchResultRow(
+                                    result = result,
+                                    uiState = result.toUniversalSearchResultUiState(),
+                                )
+                            }
+                        }
                     LazyColumn(modifier = Modifier.fillMaxWidth()) {
                         items(
-                            items = searchState.results,
-                            key = { "${it.contentType.ftsValue}_${it.uid}" },
-                        ) { result ->
+                            items = resultRows,
+                            key = { it.uiState.id },
+                        ) { resultRow ->
                             UniversalSearchResultItem(
-                                result = result,
+                                state = resultRow.uiState,
                                 onClick = {
                                     onCommitSearch()
                                     navigateToResult(
-                                        result = result,
+                                        result = resultRow.result,
                                         onNavigateToDay = onNavigateToDay,
                                         onNavigateToJournal = onNavigateToJournal,
                                     )
@@ -244,6 +256,11 @@ fun SearchScreenContent(
         }
     }
 }
+
+private data class SearchResultRow(
+    val result: SearchResult,
+    val uiState: UniversalSearchResultUiState,
+)
 
 @Composable
 private fun RecentSearchesList(

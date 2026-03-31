@@ -21,6 +21,8 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalCoroutinesApi::class)
 class NoteViewerViewModelTest {
     private val dispatcher = StandardTestDispatcher()
+    private val journalRepository = FakeDetailJournalRepository()
+    private val journalContentRepository = FakeDetailJournalContentRepository()
 
     @BeforeTest
     fun setup() {
@@ -48,7 +50,10 @@ class NoteViewerViewModelTest {
             val viewModel =
                 NoteViewerViewModel(
                     noteId = noteId,
+                    journalId = null,
                     notesRepository = repository,
+                    journalRepository = journalRepository,
+                    journalContentRepository = journalContentRepository,
                     removeNoteUseCase = RemoveNoteUseCase(repository),
                 )
 
@@ -76,7 +81,10 @@ class NoteViewerViewModelTest {
             val viewModel =
                 NoteViewerViewModel(
                     noteId = noteId,
+                    journalId = null,
                     notesRepository = repository,
+                    journalRepository = journalRepository,
+                    journalContentRepository = journalContentRepository,
                     removeNoteUseCase = RemoveNoteUseCase(repository),
                 )
 
@@ -103,7 +111,10 @@ class NoteViewerViewModelTest {
             val viewModel =
                 NoteViewerViewModel(
                     noteId = noteId,
+                    journalId = null,
                     notesRepository = repository,
+                    journalRepository = journalRepository,
+                    journalContentRepository = journalContentRepository,
                     removeNoteUseCase = RemoveNoteUseCase(repository),
                 )
 
@@ -131,7 +142,10 @@ class NoteViewerViewModelTest {
             val viewModel =
                 NoteViewerViewModel(
                     noteId = noteId,
+                    journalId = null,
                     notesRepository = repository,
+                    journalRepository = journalRepository,
+                    journalContentRepository = journalContentRepository,
                     removeNoteUseCase = RemoveNoteUseCase(repository),
                 )
 
@@ -159,7 +173,10 @@ class NoteViewerViewModelTest {
             val viewModel =
                 NoteViewerViewModel(
                     noteId = noteId,
+                    journalId = null,
                     notesRepository = repository,
+                    journalRepository = journalRepository,
+                    journalContentRepository = journalContentRepository,
                     removeNoteUseCase = RemoveNoteUseCase(repository),
                 )
 

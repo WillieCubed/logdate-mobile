@@ -1,6 +1,7 @@
 package app.logdate.ui.search
 
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.AnnotatedString
 
 /**
  * Display state for a single entry search result.
@@ -10,7 +11,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
  */
 data class EntrySearchResultUiState(
     val id: String,
-    val content: String,
+    val contentText: AnnotatedString,
     val dateLabel: String,
     val typeLabel: String,
     val typeIcon: ImageVector,

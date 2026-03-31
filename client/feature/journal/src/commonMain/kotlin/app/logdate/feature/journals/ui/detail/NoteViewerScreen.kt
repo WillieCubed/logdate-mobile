@@ -66,6 +66,7 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
 import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.add_to_journal
 import logdate.client.feature.journal.generated.resources.back
 import logdate.client.feature.journal.generated.resources.error
 import logdate.client.feature.journal.generated.resources.image_note

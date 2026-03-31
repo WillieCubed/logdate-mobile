@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
@@ -40,6 +41,7 @@ import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.ui.search.EntrySearchResultItem
 import app.logdate.ui.search.EntrySearchResultUiState
+import app.logdate.ui.search.parseSnippetMarkers
 import app.logdate.util.toReadableDateTimeShort
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -157,6 +159,15 @@ private fun JournalSearchResults(
     val matchingJournals = filteredJournals.filterIsInstance<JournalListItemUiState.ExistingJournal>()
     val hasJournals = matchingJournals.isNotEmpty()
     val hasEntries = entryResults.isNotEmpty()
+    val entryResultRows =
+        remember(entryResults) {
+            entryResults.map { result ->
+                EntryResultRow(
+                    result = result,
+                    uiState = result.toUiState(),
+                )
+            }
+        }
 
     if (query.isNotEmpty() && !hasJournals && isEntrySearchInProgress) {
         Box(
@@ -252,14 +263,14 @@ private fun JournalSearchResults(
                 )
             }
             items(
-                items = entryResults,
-                key = { it.uid.toString() },
-            ) { result ->
+                items = entryResultRows,
+                key = { it.uiState.id },
+            ) { resultRow ->
                 EntrySearchResultItem(
-                    state = result.toUiState(),
+                    state = resultRow.uiState,
                     onClick = {
                         val date =
-                            result.created
+                            resultRow.result.created
                                 .toLocalDateTime(TimeZone.currentSystemDefault())
                                 .date
                         onNavigateToDay(date)
@@ -270,10 +281,15 @@ private fun JournalSearchResults(
     }
 }
 
+private data class EntryResultRow(
+    val result: SearchResult,
+    val uiState: EntrySearchResultUiState,
+)
+
 private fun SearchResult.toUiState(): EntrySearchResultUiState =
     EntrySearchResultUiState(
         id = uid.toString(),
-        content = content,
+        contentText = parseSnippetMarkers(content),
         dateLabel = created.toReadableDateTimeShort(),
         typeLabel =
             when (contentType) {

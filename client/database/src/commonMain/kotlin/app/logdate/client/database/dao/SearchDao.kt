@@ -60,7 +60,11 @@ interface SearchDao {
      */
     @Query(
         """
-        SELECT uid, content, created, contentType
+        SELECT
+            uid,
+            snippet(entries_fts, 1, '[', ']', '...', 16) as content,
+            created,
+            contentType
         FROM entries_fts
         WHERE entries_fts MATCH :query
         ORDER BY bm25(entries_fts), created DESC
@@ -123,6 +127,28 @@ interface SearchDao {
     suspend fun searchRanked(
         query: String,
         limit: Int = 50,
+    ): List<RankedSearchResultEntity>
+
+    /**
+     * Short-query ranked search with a smaller snippet window and capped result count.
+     */
+    @Query(
+        """
+        SELECT
+            uid,
+            snippet(entries_fts, 1, '[', ']', '...', 16) as content,
+            created,
+            contentType,
+            bm25(entries_fts) as result_rank
+        FROM entries_fts
+        WHERE entries_fts MATCH :query
+        ORDER BY bm25(entries_fts), created DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun searchRankedShortQuery(
+        query: String,
+        limit: Int,
     ): List<RankedSearchResultEntity>
 
     /**

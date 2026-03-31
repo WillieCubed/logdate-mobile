@@ -15,9 +15,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -48,7 +51,8 @@ class JournalsOverviewViewModelTest {
     private val journalRepository = TestJournalRepository(listOf(tripJournal, workJournal))
     private val preferencesDataSource = LogdatePreferencesDataSource(TestPreferencesDataStore())
     private val searchJournalsUseCase = SearchJournalsUseCase(journalRepository)
-    private val searchEntriesUseCase = SearchEntriesUseCase(TestSearchRepository())
+    private val searchRepository = TestSearchRepository()
+    private val searchEntriesUseCase = SearchEntriesUseCase(searchRepository)
 
     private lateinit var viewModel: JournalsOverviewViewModel
 
@@ -72,16 +76,18 @@ class JournalsOverviewViewModelTest {
     @Test
     fun `initial state has empty search query`() =
         runTest {
+            startUiStateCollection()
             testDispatcher.scheduler.advanceUntilIdle()
-            val state = viewModel.uiState.first()
+            val state = viewModel.uiState.value
             assertEquals("", state.searchQuery)
         }
 
     @Test
     fun `initial state includes all journals plus placeholder`() =
         runTest {
+            startUiStateCollection()
             testDispatcher.scheduler.advanceUntilIdle()
-            val state = viewModel.uiState.first()
+            val state = viewModel.uiState.value
             // 2 journals + 1 CreateJournalPlaceholder
             assertEquals(3, state.journals.size)
             assertTrue(state.journals.last() is JournalListItemUiState.CreateJournalPlaceholder)
@@ -90,10 +96,11 @@ class JournalsOverviewViewModelTest {
     @Test
     fun `updateSearchQuery filters journals by title`() =
         runTest {
+            startUiStateCollection()
             viewModel.updateSearchQuery("trip")
             testDispatcher.scheduler.advanceUntilIdle()
 
-            val state = viewModel.uiState.first()
+            val state = viewModel.uiState.value
             assertEquals("trip", state.searchQuery)
 
             val existingJournals = state.journals.filterIsInstance<JournalListItemUiState.ExistingJournal>()
@@ -104,10 +111,11 @@ class JournalsOverviewViewModelTest {
     @Test
     fun `updateSearchQuery filters journals by description`() =
         runTest {
+            startUiStateCollection()
             viewModel.updateSearchQuery("standup")
             testDispatcher.scheduler.advanceUntilIdle()
 
-            val state = viewModel.uiState.first()
+            val state = viewModel.uiState.value
             val existingJournals = state.journals.filterIsInstance<JournalListItemUiState.ExistingJournal>()
             assertEquals(1, existingJournals.size)
             assertEquals("Work Notes", existingJournals[0].data.title)
@@ -116,13 +124,14 @@ class JournalsOverviewViewModelTest {
     @Test
     fun `clearing query restores all journals`() =
         runTest {
+            startUiStateCollection()
             viewModel.updateSearchQuery("trip")
             testDispatcher.scheduler.advanceUntilIdle()
 
             viewModel.updateSearchQuery("")
             testDispatcher.scheduler.advanceUntilIdle()
 
-            val state = viewModel.uiState.first()
+            val state = viewModel.uiState.value
             val existingJournals = state.journals.filterIsInstance<JournalListItemUiState.ExistingJournal>()
             assertEquals(2, existingJournals.size)
         }
@@ -130,14 +139,31 @@ class JournalsOverviewViewModelTest {
     @Test
     fun `placeholder always present even with active search`() =
         runTest {
+            startUiStateCollection()
             viewModel.updateSearchQuery("trip")
             testDispatcher.scheduler.advanceUntilIdle()
 
-            val state = viewModel.uiState.first()
+            val state = viewModel.uiState.value
             assertTrue(state.journals.any { it is JournalListItemUiState.CreateJournalPlaceholder })
         }
 
+    @Test
+    fun `single character query still requests entry preview search`() =
+        runTest {
+            startUiStateCollection()
+            viewModel.updateSearchQuery("t")
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            assertEquals(listOf("t" to 5), searchRepository.limitedQueries)
+        }
+
     // region Fakes
+
+    private fun TestScope.startUiStateCollection() {
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect {}
+        }
+    }
 
     private class TestJournalRepository(
         initialJournals: List<Journal>,
@@ -171,14 +197,24 @@ class JournalsOverviewViewModelTest {
     }
 
     private class TestSearchRepository : SearchRepository {
+        val limitedQueries = mutableListOf<Pair<String, Int>>()
+
         override fun search(query: String): Flow<List<SearchResult>> = flowOf(emptyList())
 
         override fun searchWithLimit(
             query: String,
             limit: Int,
-        ): Flow<List<SearchResult>> = flowOf(emptyList())
+        ): Flow<List<SearchResult>> {
+            limitedQueries += query to limit
+            return flowOf(emptyList())
+        }
 
         override fun searchWithSnippets(query: String): Flow<List<SearchResult>> = flowOf(emptyList())
+
+        override fun searchRanked(
+            query: String,
+            limit: Int,
+        ): Flow<List<SearchResult>> = flowOf(emptyList())
     }
 
     private class TestPreferencesDataStore : DataStore<Preferences> {

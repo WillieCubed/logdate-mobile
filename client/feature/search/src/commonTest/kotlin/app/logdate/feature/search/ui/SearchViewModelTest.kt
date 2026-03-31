@@ -77,6 +77,38 @@ class SearchViewModelTest {
             assertEquals(1, resultState.results.size)
         }
 
+    @Test
+    fun singleCharacterQueriesStillReturnLiveResults() =
+        runTest(dispatcher) {
+            val repository =
+                FakeSearchRepository(
+                    listOf(
+                        SearchResult(
+                            uid = Uuid.random(),
+                            content = "A quiet morning walk",
+                            created = Instant.fromEpochMilliseconds(1_000),
+                            contentType = app.logdate.client.repository.search.SearchContentType.TEXT_NOTE,
+                        ),
+                    ),
+                )
+            val viewModel =
+                SearchViewModel(
+                    universalSearchUseCase = UniversalSearchUseCase(repository),
+                    observeRecentSearchesUseCase = ObserveRecentSearchesUseCase(FakeRecentSearchesRepository()),
+                )
+            backgroundScope.launch { viewModel.searchState.collect() }
+            runCurrent()
+
+            viewModel.updateQuery("a")
+            runCurrent()
+            advanceTimeBy(150)
+            advanceUntilIdle()
+
+            val resultState = assertIs<SearchScreenState.Results>(viewModel.searchState.value)
+            assertEquals("a", resultState.query)
+            assertEquals(1, resultState.results.size)
+        }
+
     private class FakeRecentSearchesRepository(
         recentSearches: List<String> = emptyList(),
     ) : RecentSearchesRepository {

@@ -3,6 +3,7 @@ package app.logdate.client.e2e
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -28,7 +29,7 @@ class EntrySearchResultItemE2ETest {
 
     private val textNoteState = EntrySearchResultUiState(
         id = "result-1",
-        content = "Watched the sunset from the balcony.",
+        contentText = AnnotatedString("Watched the sunset from the balcony."),
         dateLabel = "Mar 15, 2026",
         typeLabel = "Text note",
         typeIcon = Icons.Default.Search,
@@ -36,7 +37,7 @@ class EntrySearchResultItemE2ETest {
 
     private val voiceNoteState = EntrySearchResultUiState(
         id = "result-2",
-        content = "Quick memo about tomorrow's schedule.",
+        contentText = AnnotatedString("Quick memo about tomorrow's schedule."),
         dateLabel = "Mar 16, 2026",
         typeLabel = "Voice note",
         typeIcon = Icons.Default.Mic,
