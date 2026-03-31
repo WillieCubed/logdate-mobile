@@ -1,8 +1,8 @@
 package app.logdate.client.domain.search
 
 import app.logdate.client.domain.fakes.FakeSearchRepository
+import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
-import app.logdate.client.repository.search.SearchResultType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -19,13 +19,13 @@ class SearchEntriesUseCaseTest {
                 uid = Uuid.random(),
                 content = "Hiked the sunset trail today.",
                 created = Clock.System.now(),
-                contentType = SearchResultType.TEXT_NOTE,
+                contentType = SearchContentType.TEXT_NOTE,
             ),
             SearchResult(
                 uid = Uuid.random(),
                 content = "Voice memo about the hiking plan.",
                 created = Clock.System.now(),
-                contentType = SearchResultType.TRANSCRIPTION,
+                contentType = SearchContentType.TRANSCRIPTION,
             ),
         )
 
@@ -45,7 +45,8 @@ class SearchEntriesUseCaseTest {
         runTest {
             val queryFlow = MutableStateFlow(SearchQuery("hiking"))
             val result = useCase(queryFlow).first()
-            assertEquals(2, result.size)
+            assertEquals(1, result.size)
+            assertEquals(sampleResults[1].uid, result.single().uid)
         }
 
     @Test

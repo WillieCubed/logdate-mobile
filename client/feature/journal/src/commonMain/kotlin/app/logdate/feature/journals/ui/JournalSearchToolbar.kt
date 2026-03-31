@@ -36,8 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
-import app.logdate.client.repository.search.SearchResultType
 import app.logdate.ui.search.EntrySearchResultItem
 import app.logdate.ui.search.EntrySearchResultUiState
 import app.logdate.util.toReadableDateTimeShort
@@ -49,6 +49,7 @@ import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.cd_clear_search
 import logdate.client.feature.journal.generated.resources.cd_close_search
+import logdate.client.feature.journal.generated.resources.search_entries_loading
 import logdate.client.feature.journal.generated.resources.search_journals
 import logdate.client.feature.journal.generated.resources.search_no_results
 import logdate.client.feature.journal.generated.resources.search_section_entries
@@ -64,6 +65,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun JournalSearchToolbar(
     searchQuery: String,
+    isEntrySearchInProgress: Boolean = false,
     filteredJournals: List<JournalListItemUiState>,
     entryResults: List<SearchResult>,
     onQueryChange: (String) -> Unit,
@@ -78,6 +80,15 @@ fun JournalSearchToolbar(
     LaunchedEffect(textFieldState) {
         snapshotFlow { textFieldState.text.toString() }
             .collectLatest { onQueryChange(it) }
+    }
+
+    LaunchedEffect(searchQuery) {
+        val currentText = textFieldState.text.toString()
+        if (searchQuery != currentText) {
+            textFieldState.edit {
+                replace(0, length, searchQuery)
+            }
+        }
     }
 
     SearchBar(
@@ -125,6 +136,7 @@ fun JournalSearchToolbar(
     ) {
         JournalSearchResults(
             query = searchQuery,
+            isEntrySearchInProgress = isEntrySearchInProgress,
             filteredJournals = filteredJournals,
             entryResults = entryResults,
             onOpenJournal = onOpenJournal,
@@ -136,6 +148,7 @@ fun JournalSearchToolbar(
 @Composable
 private fun JournalSearchResults(
     query: String,
+    isEntrySearchInProgress: Boolean,
     filteredJournals: List<JournalListItemUiState>,
     entryResults: List<SearchResult>,
     onOpenJournal: JournalClickCallback,
@@ -144,6 +157,20 @@ private fun JournalSearchResults(
     val matchingJournals = filteredJournals.filterIsInstance<JournalListItemUiState.ExistingJournal>()
     val hasJournals = matchingJournals.isNotEmpty()
     val hasEntries = entryResults.isNotEmpty()
+
+    if (query.isNotEmpty() && !hasJournals && isEntrySearchInProgress) {
+        Box(
+            modifier = Modifier.fillMaxWidth().padding(32.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = stringResource(Res.string.search_entries_loading),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
 
     if (query.isNotEmpty() && !hasJournals && !hasEntries) {
         Box(
@@ -204,6 +231,17 @@ private fun JournalSearchResults(
             }
         }
 
+        if (query.isNotEmpty() && hasJournals && isEntrySearchInProgress && !hasEntries) {
+            item(key = "entries_loading") {
+                Text(
+                    text = stringResource(Res.string.search_entries_loading),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+        }
+
         if (query.isNotEmpty() && hasEntries) {
             item(key = "header_entries") {
                 Text(
@@ -239,14 +277,14 @@ private fun SearchResult.toUiState(): EntrySearchResultUiState =
         dateLabel = created.toReadableDateTimeShort(),
         typeLabel =
             when (contentType) {
-                SearchResultType.TEXT_NOTE -> "Text note"
-                SearchResultType.TRANSCRIPTION -> "Voice note"
+                SearchContentType.TEXT_NOTE -> "Text note"
+                SearchContentType.TRANSCRIPTION -> "Voice note"
                 else -> "Note"
             },
         typeIcon =
             when (contentType) {
-                SearchResultType.TEXT_NOTE -> Icons.Default.Search
-                SearchResultType.TRANSCRIPTION -> Icons.Default.Mic
+                SearchContentType.TEXT_NOTE -> Icons.Default.Search
+                SearchContentType.TRANSCRIPTION -> Icons.Default.Mic
                 else -> Icons.Default.Search
             },
     )

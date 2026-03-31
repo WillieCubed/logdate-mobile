@@ -5,4 +5,6 @@
     <string name="search">Search</string>
     <string name="search_entries">Search entries...</string>
     <string name="search_for_entries">Search for entries</string>
+    <string name="search_no_results">No results for "%1$s"</string>
+    <string name="searching_entries">Searching entries...</string>
 </resources>

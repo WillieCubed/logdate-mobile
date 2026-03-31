@@ -1,8 +1,10 @@
 package app.logdate.client.database.dao
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.SkipQueryVerification
+import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -12,12 +14,18 @@ import kotlin.uuid.Uuid
  * Uses FTS5 (Full-Text Search) virtual table for fast text search across entries.
  * Supports fuzzy matching, relevance ranking, and boolean operators.
  *
- * Note: @SkipQueryVerification is used because Room cannot validate FTS5 virtual tables
- * at compile time. The entries_fts table is created via database migration.
+ * Note: @SkipQueryVerification is used because Room cannot validate runtime-managed FTS5
+ * virtual tables at compile time. The entries_fts table is bootstrapped when the database opens.
  */
 @Dao
 @SkipQueryVerification
 interface SearchDao {
+    /**
+     * Emits whenever the runtime-managed search index changes or is rebuilt.
+     */
+    @Query("SELECT generation FROM search_index_metadata WHERE id = 1")
+    fun observeGeneration(): Flow<Long?>
+
     /**
      * Searches all entries using FTS5 MATCH operator.
      *
@@ -36,7 +44,7 @@ interface SearchDao {
         SELECT uid, content, created, contentType
         FROM entries_fts
         WHERE entries_fts MATCH :query
-        ORDER BY rank, created DESC
+        ORDER BY bm25(entries_fts), created DESC
     """,
     )
     suspend fun search(query: String): List<SearchResultEntity>
@@ -55,7 +63,7 @@ interface SearchDao {
         SELECT uid, content, created, contentType
         FROM entries_fts
         WHERE entries_fts MATCH :query
-        ORDER BY rank, created DESC
+        ORDER BY bm25(entries_fts), created DESC
         LIMIT :limit
     """,
     )
@@ -77,12 +85,12 @@ interface SearchDao {
         """
         SELECT
             uid,
-            snippet(entries_fts, 1, '[', ']', '...', 32) as content,
+            snippet(entries_fts, 1, '[', ']', '...', 20) as content,
             created,
             contentType
         FROM entries_fts
         WHERE entries_fts MATCH :query
-        ORDER BY rank, created DESC
+        ORDER BY bm25(entries_fts), created DESC
     """,
     )
     suspend fun searchWithSnippets(query: String): List<SearchResultEntity>
@@ -102,13 +110,13 @@ interface SearchDao {
         """
         SELECT
             uid,
-            snippet(entries_fts, 1, '[', ']', '...', 32) as content,
+            snippet(entries_fts, 1, '[', ']', '...', 24) as content,
             created,
             contentType,
-            rank
+            bm25(entries_fts) as result_rank
         FROM entries_fts
         WHERE entries_fts MATCH :query
-        ORDER BY rank, created DESC
+        ORDER BY bm25(entries_fts), created DESC
         LIMIT :limit
     """,
     )
@@ -116,6 +124,26 @@ interface SearchDao {
         query: String,
         limit: Int = 50,
     ): List<RankedSearchResultEntity>
+
+    /**
+     * Returns indexed terms for typo-tolerant fallback against the FTS vocabulary.
+     */
+    @Query(
+        """
+        SELECT term
+        FROM entries_fts_vocab
+        WHERE term LIKE :prefix || '%'
+          AND length(term) BETWEEN :minLength AND :maxLength
+        ORDER BY doc DESC, cnt DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun findVocabularyTerms(
+        prefix: String,
+        minLength: Int,
+        maxLength: Int,
+        limit: Int,
+    ): List<String>
 }
 
 /**
@@ -126,6 +154,7 @@ data class RankedSearchResultEntity(
     val content: String,
     val created: Long,
     val contentType: String,
+    @ColumnInfo(name = "result_rank")
     val rank: Double,
 ) {
     /** Parses the string [uid] into a [Uuid]. */

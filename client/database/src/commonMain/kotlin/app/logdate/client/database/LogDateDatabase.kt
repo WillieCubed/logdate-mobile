@@ -8,7 +8,6 @@ import androidx.room.TypeConverters
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.SQLiteDriver
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
-import androidx.sqlite.execSQL
 import app.logdate.client.database.converters.DurationConverter
 import app.logdate.client.database.converters.LocationDataConverter
 import app.logdate.client.database.converters.MediaDimensionsConverter
@@ -48,6 +47,7 @@ import app.logdate.client.database.entities.LocationLogEntity
 import app.logdate.client.database.entities.MediaCaptionEntity
 import app.logdate.client.database.entities.PlaceEntity
 import app.logdate.client.database.entities.PostcardEntity
+import app.logdate.client.database.entities.SearchIndexMetadataEntity
 import app.logdate.client.database.entities.StickerEntity
 import app.logdate.client.database.entities.StorageMetadataEntity
 import app.logdate.client.database.entities.TextNoteEntity
@@ -92,6 +92,7 @@ import app.logdate.client.database.migrations.MIGRATION_2_3
 import app.logdate.client.database.migrations.MIGRATION_30_31
 import app.logdate.client.database.migrations.MIGRATION_31_32
 import app.logdate.client.database.migrations.MIGRATION_32_33
+import app.logdate.client.database.migrations.MIGRATION_33_34
 import app.logdate.client.database.migrations.MIGRATION_3_4
 import app.logdate.client.database.migrations.MIGRATION_4_5
 import app.logdate.client.database.migrations.MIGRATION_5_6
@@ -147,8 +148,9 @@ import kotlinx.coroutines.IO
         // Postcards
         PostcardEntity::class,
         StickerEntity::class,
+        SearchIndexMetadataEntity::class,
     ],
-    version = 33,
+    version = 34,
     exportSchema = true,
 )
 @TypeConverters(
@@ -277,6 +279,7 @@ fun getRoomDatabase(
                 MIGRATION_30_31,
                 MIGRATION_31_32,
                 MIGRATION_32_33,
+                MIGRATION_33_34,
             ).addCallback(FtsTableCallback)
             .fallbackToDestructiveMigration(destroyTablesOnUpgrade)
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)
@@ -302,16 +305,6 @@ fun getRoomDatabase(
  */
 private object FtsTableCallback : Callback() {
     override fun onOpen(connection: SQLiteConnection) {
-        connection.execSQL(
-            """
-            CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(
-                uid UNINDEXED,
-                content,
-                created UNINDEXED,
-                contentType UNINDEXED,
-                tokenize = 'porter unicode61'
-            )
-            """.trimIndent(),
-        )
+        SearchIndexBootstrapper.bootstrap(connection)
     }
 }

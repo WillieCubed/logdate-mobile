@@ -2,10 +2,7 @@ package app.logdate.client.domain.search
 
 import app.logdate.client.repository.search.SearchRepository
 import app.logdate.client.repository.search.SearchResult
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -14,22 +11,14 @@ import kotlinx.coroutines.flow.map
 /**
  * Use case for searching across all journal entries.
  *
- * Provides debounced search to avoid excessive queries while the user types.
+ * Debouncing is handled by the caller so UI layers can expose a precise
+ * loading state while the query settles.
  */
-@OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 class SearchEntriesUseCase(
     private val searchRepository: SearchRepository,
 ) {
     /**
-     * Search delay in milliseconds to avoid excessive queries while typing.
-     */
-    private val searchDebounceMs = 300L
-
-    /**
-     * Searches all entries with debouncing.
-     *
-     * The search is debounced by 300ms to avoid excessive queries while the user types.
-     * Returns empty list if query is blank.
+     * Searches all entries for the current query.
      *
      * @param queryFlow Flow of search queries from the UI
      * @return Flow of search results
@@ -37,7 +26,6 @@ class SearchEntriesUseCase(
     operator fun invoke(queryFlow: Flow<SearchQuery>): Flow<List<SearchResult>> =
         queryFlow
             .map { it.text }
-            .debounce(searchDebounceMs)
             .distinctUntilChanged()
             .flatMapLatest { queryText ->
                 if (queryText.isBlank()) {
@@ -60,7 +48,6 @@ class SearchEntriesUseCase(
     ): Flow<List<SearchResult>> =
         queryFlow
             .map { it.text }
-            .debounce(searchDebounceMs)
             .distinctUntilChanged()
             .flatMapLatest { queryText ->
                 if (queryText.isBlank()) {

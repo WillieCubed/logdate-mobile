@@ -34,6 +34,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.ui.search.UniversalSearchResultItem
@@ -47,9 +48,13 @@ import logdate.client.feature.search.generated.resources.go_back
 import logdate.client.feature.search.generated.resources.search
 import logdate.client.feature.search.generated.resources.search_entries
 import logdate.client.feature.search.generated.resources.search_for_entries
+import logdate.client.feature.search.generated.resources.search_no_results
+import logdate.client.feature.search.generated.resources.searching_entries
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
+
+private const val EXPANDED_SEARCH_INPUT_TEST_TAG = "search_screen_input"
 
 /**
  * Universal search screen.
@@ -67,9 +72,17 @@ fun SearchScreen(
     viewModel: SearchViewModel = koinViewModel(),
 ) {
     val searchState by viewModel.searchState.collectAsState()
+    val queryText by viewModel.queryText.collectAsState()
+
+    LaunchedEffect(initialQuery) {
+        if (initialQuery.isNotBlank() && queryText.isBlank()) {
+            viewModel.updateQuery(initialQuery)
+        }
+    }
 
     SearchScreenContent(
         searchState = searchState,
+        queryText = queryText,
         initialQuery = initialQuery,
         onQueryChange = viewModel::updateQuery,
         onCommitSearch = viewModel::commitSearch,
@@ -96,6 +109,7 @@ fun SearchScreenContent(
     onNavigateToJournal: (Uuid) -> Unit,
     onGoBack: () -> Unit,
     initialQuery: String = "",
+    queryText: String = initialQuery,
     modifier: Modifier = Modifier,
 ) {
     val searchBarState = rememberSearchBarState()
@@ -111,6 +125,15 @@ fun SearchScreenContent(
     LaunchedEffect(textFieldState) {
         snapshotFlow { textFieldState.text.toString() }
             .collectLatest { onQueryChange(it) }
+    }
+
+    LaunchedEffect(queryText) {
+        val currentText = textFieldState.text.toString()
+        if (queryText != currentText) {
+            textFieldState.edit {
+                replace(0, length, queryText)
+            }
+        }
     }
 
     Box(modifier = modifier) {
@@ -140,6 +163,7 @@ fun SearchScreenContent(
                     searchBarState = searchBarState,
                     textFieldState = textFieldState,
                     onSearch = { onCommitSearch() },
+                    modifier = Modifier.testTag(EXPANDED_SEARCH_INPUT_TEST_TAG),
                     placeholder = { Text(stringResource(Res.string.search_entries)) },
                     leadingIcon = {
                         IconButton(onClick = onGoBack) {
@@ -170,13 +194,26 @@ fun SearchScreenContent(
                     )
                 }
 
+                is SearchScreenState.Searching -> {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.searching_entries),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
                 is SearchScreenState.Empty -> {
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         Text(
-                            text = "No results for \"${searchState.query}\"",
+                            text = stringResource(Res.string.search_no_results, searchState.query),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

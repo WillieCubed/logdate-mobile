@@ -6,10 +6,17 @@ import app.logdate.client.domain.search.ObserveRecentSearchesUseCase
 import app.logdate.client.domain.search.SearchQuery
 import app.logdate.client.domain.search.UniversalSearchUseCase
 import app.logdate.client.repository.search.SearchResult
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -20,25 +27,55 @@ import kotlinx.coroutines.launch
  * Manages search query state, recent searches, and ranked results across
  * all indexed content types.
  */
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class SearchViewModel(
     universalSearchUseCase: UniversalSearchUseCase,
     private val observeRecentSearchesUseCase: ObserveRecentSearchesUseCase,
 ) : ViewModel() {
     private val queryState = MutableStateFlow(SearchQuery.Empty)
+    private val searchDebounceMs = 150L
+
+    private val settledQueryState: StateFlow<SearchQuery> =
+        queryState
+            .debounce(searchDebounceMs)
+            .distinctUntilChanged()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SearchQuery.Empty)
+
+    private val latestResultsState: StateFlow<SearchResultSnapshot> =
+        settledQueryState
+            .flatMapLatest { settledQuery ->
+                if (settledQuery.isBlank) {
+                    flowOf(SearchResultSnapshot(settledQuery, emptyList()))
+                } else {
+                    universalSearchUseCase(flowOf(settledQuery)).map { results ->
+                        SearchResultSnapshot(settledQuery, results)
+                    }
+                }
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = SearchResultSnapshot(SearchQuery.Empty, emptyList()),
+            )
+
+    val queryText: StateFlow<String> =
+        queryState
+            .map { it.text }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
 
     /**
-     * The current search screen state: idle (with recents), empty, or results.
+     * The current search screen state: idle (with recents), searching, empty, or results.
      */
     val searchState: StateFlow<SearchScreenState> =
         combine(
             queryState,
-            universalSearchUseCase(queryState),
+            latestResultsState,
             observeRecentSearchesUseCase(),
-        ) { query, results, recentSearches ->
+        ) { query, latestResults, recentSearches ->
             when {
                 query.isBlank -> SearchScreenState.Idle(recentSearches)
-                results.isEmpty() -> SearchScreenState.Empty(query.text)
-                else -> SearchScreenState.Results(results)
+                query != latestResults.query -> SearchScreenState.Searching(query.text)
+                latestResults.results.isEmpty() -> SearchScreenState.Empty(query.text)
+                else -> SearchScreenState.Results(query.text, latestResults.results)
             }
         }.stateIn(
             scope = viewModelScope,
@@ -85,6 +122,13 @@ sealed interface SearchScreenState {
     ) : SearchScreenState
 
     /**
+     * Query is still settling or the latest result set has not completed yet.
+     */
+    data class Searching(
+        val query: String,
+    ) : SearchScreenState
+
+    /**
      * Query submitted but no results found.
      */
     data class Empty(
@@ -95,6 +139,12 @@ sealed interface SearchScreenState {
      * Ranked results from universal search.
      */
     data class Results(
+        val query: String = "",
         val results: List<SearchResult>,
     ) : SearchScreenState
 }
+
+private data class SearchResultSnapshot(
+    val query: SearchQuery,
+    val results: List<SearchResult>,
+)

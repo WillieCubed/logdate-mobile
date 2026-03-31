@@ -42,6 +42,7 @@ fun JournalsOverviewScreen(
         sortOption = state.sortOption,
         activeFilters = state.activeFilters,
         searchQuery = state.searchQuery,
+        isEntrySearchInProgress = state.isEntrySearchInProgress,
         entryResults = entryResults,
         onOpenJournal = onOpenJournal,
         onBrowseJournals = onBrowseJournals,
@@ -69,6 +70,7 @@ fun JournalsOverviewScreenContent(
     sortOption: JournalSortOption,
     activeFilters: Set<JournalFilter>,
     searchQuery: String,
+    isEntrySearchInProgress: Boolean = false,
     entryResults: List<SearchResult>,
     onOpenJournal: JournalClickCallback,
     onBrowseJournals: () -> Unit,
@@ -88,6 +90,7 @@ fun JournalsOverviewScreenContent(
         topBar = {
             JournalSearchToolbar(
                 searchQuery = searchQuery,
+                isEntrySearchInProgress = isEntrySearchInProgress,
                 filteredJournals = journals,
                 entryResults = entryResults,
                 onQueryChange = onQueryChange,

@@ -15,6 +15,7 @@ data class JournalsOverviewUiState(
     val sortOption: JournalSortOption = JournalSortOption.LAST_UPDATED,
     val activeFilters: Set<JournalFilter> = emptySet(),
     val searchQuery: String = "",
+    val isEntrySearchInProgress: Boolean = false,
 )
 
 /**
