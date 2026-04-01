@@ -269,7 +269,7 @@ fun S04_TimelineLocationQuickPeek() {
                 TimelinePane(
                     uiState = TimelineUiState(items = timelineQuickPeekDays),
                     onNewEntry = {},
-                    onShareMemory = {},
+                    onShareMemory = { _ -> },
                     onOpenDay = {},
                     onSearchClick = {},
                     onProfileClick = {},

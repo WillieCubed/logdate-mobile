@@ -2,8 +2,6 @@
 
 package app.logdate.navigation.routes
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
@@ -14,12 +12,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.navigation3.ui.NavDisplay
+import app.logdate.client.sharing.SharingLauncher
 import app.logdate.feature.library.ui.LibraryScreen
 import app.logdate.feature.library.ui.components.MediaBoundsTransform
 import app.logdate.feature.library.ui.detail.MediaDetailScreen
@@ -78,6 +76,7 @@ fun EntryProviderScope<NavKey>.libraryRoutes(
     onNavigateToJournal: (Uuid) -> Unit,
     onOpenSearch: () -> Unit,
     onOpenPostcards: () -> Unit = {},
+    sharingLauncher: SharingLauncher,
 ) {
     routeEntry<LibraryListRoute>(
         metadata = HomeScene.homeScene(),
@@ -97,7 +96,6 @@ fun EntryProviderScope<NavKey>.libraryRoutes(
     routeEntry<LibraryMediaDetailRoute>(
         metadata = libraryMediaDetailTransitionMetadata,
     ) { route ->
-        val context = LocalContext.current
         val navigationScope = NavigationSharedTransitionScope.current
         val animatedContentScope = LocalNavAnimatedContentScope.current
 
@@ -126,21 +124,7 @@ fun EntryProviderScope<NavKey>.libraryRoutes(
                 onBack = onBack,
                 onNavigateToJournal = onNavigateToJournal,
                 onShare = { mediaUri ->
-                    val uri = Uri.parse(mediaUri)
-                    val mimeType =
-                        context.contentResolver.getType(uri) ?: "image/*"
-                    val shareIntent =
-                        Intent(Intent.ACTION_SEND).apply {
-                            type = mimeType
-                            putExtra(Intent.EXTRA_STREAM, uri)
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                    val chooser =
-                        Intent.createChooser(shareIntent, null).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                    context.startActivity(chooser)
+                    sharingLauncher.shareContent(mediaUris = listOf(mediaUri))
                 },
                 modifier = sharedBoundsModifier,
             )

@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.MetadataChip
@@ -109,7 +110,7 @@ fun TimelineSuggestionBlock(
     onStartWriting: () -> Unit,
     onOpenDraft: (draftId: String) -> Unit,
     onViewMemoryDay: (LocalDate) -> Unit,
-    onShareMemory: (LocalDate) -> Unit,
+    onShareMemory: (TimelineSuggestionBlockUiState) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val suggestedTypeTitle =
@@ -266,7 +267,7 @@ private fun SuggestionActions(
     onStartWriting: () -> Unit,
     onOpenDraft: (String) -> Unit,
     onViewMemoryDay: (LocalDate) -> Unit,
-    onShareMemory: (LocalDate) -> Unit,
+    onShareMemory: (TimelineSuggestionBlockUiState) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -313,7 +314,8 @@ private fun SuggestionActions(
                     },
                 )
                 AssistChip(
-                    onClick = { state.memoryDate?.let(onShareMemory) },
+                    onClick = { state.memoryDate?.let { onShareMemory(state) } },
+                    modifier = Modifier.testTag("timeline_memory_share_action"),
                     label = { Text(stringResource(Res.string.share_link)) },
                     leadingIcon = {
                         Icon(
@@ -349,7 +351,7 @@ private fun TimelineSuggestionBlockPreview_MemoryRecall() {
         onStartWriting = {},
         onOpenDraft = {},
         onViewMemoryDay = {},
-        onShareMemory = {},
+        onShareMemory = { _ -> },
     )
 }
 
@@ -367,7 +369,7 @@ private fun TimelineSuggestionBlockPreview_CompleteDraft() {
         onStartWriting = {},
         onOpenDraft = {},
         onViewMemoryDay = {},
-        onShareMemory = {},
+        onShareMemory = { _ -> },
     )
 }
 
@@ -385,6 +387,6 @@ private fun TimelineSuggestionBlockPreview_EmptyDay() {
         onStartWriting = {},
         onOpenDraft = {},
         onViewMemoryDay = {},
-        onShareMemory = {},
+        onShareMemory = { _ -> },
     )
 }

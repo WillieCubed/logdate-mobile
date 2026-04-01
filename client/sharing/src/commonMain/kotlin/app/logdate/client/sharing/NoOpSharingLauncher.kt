@@ -7,9 +7,17 @@ import kotlin.uuid.Uuid
  * A no-op implementation of [SharingLauncher] for use in previews and non-sharing contexts.
  */
 object NoOpSharingLauncher : SharingLauncher {
+    override fun shareContent(
+        text: String?,
+        mediaUris: List<String>,
+        title: String?,
+        chooserTitle: String?,
+    ) {}
+
     override fun shareMemoryDay(
         date: LocalDate,
         summary: String,
+        mediaUris: List<String>,
     ) {}
 
     override fun shareJournalToInstagram(

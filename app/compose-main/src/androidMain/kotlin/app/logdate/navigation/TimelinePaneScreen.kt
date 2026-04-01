@@ -9,6 +9,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.location.timeline.ui.LocationTimelineBottomSheet
 import app.logdate.ui.timeline.TimelinePane
+import app.logdate.ui.timeline.TimelineSuggestionBlockUiState
 import app.logdate.ui.timeline.TimelineUiState
 import kotlinx.datetime.LocalDate
 import org.koin.compose.viewmodel.koinViewModel
@@ -33,7 +34,7 @@ fun TimelinePaneScreen(
     onOpenLocationTimeline: () -> Unit,
     onOpenSearch: () -> Unit = {},
     onOpenDraft: (draftId: String) -> Unit = {},
-    onShareMemory: (LocalDate) -> Unit = {},
+    onShareMemory: (TimelineSuggestionBlockUiState) -> Unit = {},
     onImportBackup: () -> Unit = {},
     viewModel: HomeViewModel = koinViewModel(),
 ) {

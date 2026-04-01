@@ -132,7 +132,7 @@ private fun RootPreviewFrame(
             TimelinePane(
                 uiState = TimelineUiState(items = rootTimelineDays),
                 onNewEntry = {},
-                onShareMemory = {},
+                onShareMemory = { _ -> },
                 onOpenDay = {},
                 onSearchClick = {},
                 onProfileClick = {},

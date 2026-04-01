@@ -158,7 +158,7 @@ fun S01_TimelineSuggestionCompleteYourDraft() {
             TimelinePane(
                 uiState = TimelineUiState(items = timelineDays),
                 onNewEntry = {},
-                onShareMemory = {},
+                onShareMemory = { _ -> },
                 onOpenDay = {},
                 onSearchClick = {},
                 onProfileClick = {},
@@ -181,7 +181,7 @@ fun S02_TimelineEmpty() {
             TimelinePane(
                 uiState = TimelineUiState(items = emptyList(), loadingState = TimelineLoadingState.InitialLoading),
                 onNewEntry = {},
-                onShareMemory = {},
+                onShareMemory = { _ -> },
                 onOpenDay = {},
                 onSearchClick = {},
                 onProfileClick = {},
@@ -200,7 +200,7 @@ fun S03_TimelineScrollToTopVisible() {
             TimelinePane(
                 uiState = TimelineUiState(items = List(8) { index -> timelineDays[index % timelineDays.size].copy(date = LocalDate(2025, 2, 20 - index)) }),
                 onNewEntry = {},
-                onShareMemory = {},
+                onShareMemory = { _ -> },
                 onOpenDay = {},
                 onSearchClick = {},
                 onProfileClick = {},
@@ -220,7 +220,7 @@ fun S03a_TimelineSuggestionEmptyDayWithLocation() {
             TimelinePane(
                 uiState = TimelineUiState(items = timelineDays),
                 onNewEntry = {},
-                onShareMemory = {},
+                onShareMemory = { _ -> },
                 onOpenDay = {},
                 onSearchClick = {},
                 onProfileClick = {},
@@ -244,7 +244,7 @@ fun S03b_TimelineSuggestionOnThisDayMemoryRecall() {
             TimelinePane(
                 uiState = TimelineUiState(items = timelineDays),
                 onNewEntry = {},
-                onShareMemory = {},
+                onShareMemory = { _ -> },
                 onOpenDay = {},
                 onSearchClick = {},
                 onProfileClick = {},
@@ -270,7 +270,7 @@ fun S04_TimelineDetailEmptyState() {
                 TimelinePane(
                     uiState = TimelineUiState(items = timelineDays),
                     onNewEntry = {},
-                    onShareMemory = {},
+                    onShareMemory = { _ -> },
                     onOpenDay = {},
                     onSearchClick = {},
                     onProfileClick = {},
@@ -293,7 +293,7 @@ fun S05_TimelineDetailPopulated() {
                 TimelinePane(
                     uiState = TimelineUiState(items = timelineDays),
                     onNewEntry = {},
-                    onShareMemory = {},
+                    onShareMemory = { _ -> },
                     onOpenDay = {},
                     onSearchClick = {},
                     onProfileClick = {},
@@ -322,7 +322,7 @@ fun S06_TimelineDetailNoPeople() {
                 TimelinePane(
                     uiState = TimelineUiState(items = timelineDays),
                     onNewEntry = {},
-                    onShareMemory = {},
+                    onShareMemory = { _ -> },
                     onOpenDay = {},
                     onSearchClick = {},
                     onProfileClick = {},

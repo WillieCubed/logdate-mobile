@@ -156,7 +156,7 @@ fun TimelineList(
     onStartWriting: () -> Unit = {},
     onOpenDraft: (draftId: String) -> Unit = {},
     onViewMemoryDay: (LocalDate) -> Unit = {},
-    onShareMemory: (LocalDate) -> Unit = {},
+    onShareMemory: (TimelineSuggestionBlockUiState) -> Unit = {},
     onVisibleAudioNoteIdsChanged: (Set<Uuid>) -> Unit = {},
     onImportBackup: () -> Unit = {},
     listState: LazyListState = rememberLazyListState(),

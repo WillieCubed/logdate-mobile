@@ -24,6 +24,7 @@ import app.logdate.navigation.routes.core.TimelineDetail
 import app.logdate.navigation.routes.core.TimelineListRoute
 import app.logdate.navigation.routes.routeEntry
 import app.logdate.navigation.scenes.HomeScene
+import app.logdate.ui.timeline.TimelineSuggestionBlockUiState
 import kotlinx.datetime.LocalDate
 import logdate.app.composemain.generated.resources.Res
 import logdate.app.composemain.generated.resources.select_an_entry_to_view_details
@@ -62,7 +63,15 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
             onOpenLocationTimeline = onOpenLocationTimeline,
             onOpenSearch = onOpenSearch,
             onOpenDraft = onOpenDraft,
-            onShareMemory = { date -> sharingLauncher.shareMemoryDay(date) },
+            onShareMemory = { state: TimelineSuggestionBlockUiState ->
+                state.memoryDate?.let { date ->
+                    sharingLauncher.shareMemoryDay(
+                        date = date,
+                        summary = state.message,
+                        mediaUris = state.mediaUris.map { it.uri },
+                    )
+                }
+            },
             onImportBackup = onImportBackup,
             viewModel = homeViewModel,
         )

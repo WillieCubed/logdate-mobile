@@ -68,7 +68,7 @@ fun TimelinePane(
     onProfileClick: () -> Unit = {},
     onStartWriting: () -> Unit = onNewEntry,
     onOpenDraft: (draftId: String) -> Unit = {},
-    onShareMemory: (LocalDate) -> Unit = {},
+    onShareMemory: (TimelineSuggestionBlockUiState) -> Unit = {},
     onImportBackup: () -> Unit = {},
     onHistoryClick: () -> Unit = {},
     birthday: Instant? = null,

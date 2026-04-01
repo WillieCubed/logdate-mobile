@@ -4,10 +4,11 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import androidx.core.content.FileProvider
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.toColorInt
-import androidx.core.net.toUri
 import app.logdate.shared.model.Journal
+import java.io.File
 
 // All in pixels
 private const val JOURNAL_CORNER_RADIUS = 16f
@@ -34,16 +35,13 @@ class AndroidShareAssetGenerator(
         shareTheme: ShareTheme,
     ): String {
         if (cachedJournalId == journal.id.toString()) {
-            return context.cacheDir
-                .resolve("shared_journal_background_${journal.id}.png")
-                .toUri()
-                .toString()
+            return cacheFileUri("shared_journal_background_${journal.id}.png").toString()
         }
         val bitmap = generateBackgroundLayer(shareTheme)
         val file = context.cacheDir.resolve("shared_journal_background_${journal.id}.png")
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, file.outputStream())
         cachedJournalId = journal.id.toString()
-        return file.toUri().toString()
+        return fileToShareUri(file).toString()
     }
 
     /**
@@ -58,17 +56,23 @@ class AndroidShareAssetGenerator(
         theme: ShareTheme,
     ): String {
         if (cachedJournalId == journal.id.toString()) {
-            return context.cacheDir
-                .resolve("shared_journal_cover_${journal.id}.png")
-                .toUri()
-                .toString()
+            return cacheFileUri("shared_journal_cover_${journal.id}.png").toString()
         }
         val bitmap = generateJournalCover(journal.title, theme)
         val file = context.cacheDir.resolve("shared_journal_cover_${journal.id}.png")
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, file.outputStream())
         cachedJournalId = journal.id.toString()
-        return file.toUri().toString()
+        return fileToShareUri(file).toString()
     }
+
+    private fun cacheFileUri(fileName: String) = fileToShareUri(context.cacheDir.resolve(fileName))
+
+    private fun fileToShareUri(file: File) =
+        FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.provider",
+            file,
+        )
 
     private fun generateBackgroundLayer(shareTheme: ShareTheme): Bitmap {
         val bitmap = createBitmap(1080, 1920)

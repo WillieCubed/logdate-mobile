@@ -5,6 +5,16 @@ import kotlin.uuid.Uuid
 
 interface SharingLauncher {
     /**
+     * Shares arbitrary text and/or media using the platform share surface.
+     */
+    fun shareContent(
+        text: String? = null,
+        mediaUris: List<String> = emptyList(),
+        title: String? = null,
+        chooserTitle: String? = null,
+    )
+
+    /**
      * Shares a memory from a specific day using the system share sheet.
      *
      * @param date The date of the memory to share
@@ -13,6 +23,7 @@ interface SharingLauncher {
     fun shareMemoryDay(
         date: LocalDate,
         summary: String = "",
+        mediaUris: List<String> = emptyList(),
     )
 
     /**

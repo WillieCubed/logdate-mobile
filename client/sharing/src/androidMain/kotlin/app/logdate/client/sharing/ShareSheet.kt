@@ -1,164 +1,156 @@
 package app.logdate.client.sharing
 
 import android.app.PendingIntent
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
 import android.service.chooser.ChooserAction
-import androidx.annotation.RequiresApi
 import app.logdate.shared.model.Journal
-import logdate.client.sharing.generated.resources.rounded_add_24
-import kotlin.uuid.Uuid
+
+internal data class ShareContentRequest(
+    val text: String? = null,
+    val mediaUris: List<Uri> = emptyList(),
+    val title: String? = null,
+    val chooserTitle: String? = null,
+    val copyText: String? = null,
+)
 
 /**
  * Shares a journal link using the system share sheet.
  *
  * This presents a system share sheet with some custom share options for the user to choose from,
- * including a "Share QR code" option that generates a QR code for the journal.
+ * including quick actions on supported Android versions.
  */
 internal fun Context.shareJournalLink(
     journal: Journal,
     previewImage: Uri? = null,
-) = Intent()
-    .apply {
-        action = Intent.ACTION_SEND
-        // TODO: Use a custom URL shortener
-        // TODO: Move URL generation to a utility function
-        val url = "https://logdate.app/j/${journal.id}"
-        putExtra(Intent.EXTRA_TEXT, url)
-        putExtra(Intent.EXTRA_TITLE, journal.title)
-        if (previewImage != null) {
-            data = previewImage
-            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+) {
+    val url = "https://logdate.app/j/${journal.id}"
+    val mediaUris = listOfNotNull(previewImage)
+    shareContent(
+        request =
+            ShareContentRequest(
+                text = url,
+                mediaUris = mediaUris,
+                title = journal.title,
+                chooserTitle = "Share journal",
+                copyText = url,
+            ),
+    )
+}
+
+/**
+ * Creates a chooser intent for sharing content, the system "share sheet".
+ */
+internal fun Context.shareContent(request: ShareContentRequest) {
+    val shareIntent = buildShareIntent(request)
+    val callbackIntent =
+        Intent(this, ShareReceiver::class.java).apply {
+            action = CustomIntents.ACTION_CHOOSER_RESULT
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            putExtra(Intent.EXTRA_CHOOSER_TARGETS, getJournalShareCustomOptions(journal.id))
-        }
-    }.run {
-        val pendingIntent =
-            PendingIntent.getBroadcast(
-                this@shareJournalLink,
-                0,
-                Intent(this@shareJournalLink, ShareReceiver::class.java),
-                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-            )
-        Intent.createChooser(
+    val pendingIntent =
+        PendingIntent.getBroadcast(
             this,
-            // TODO: Use string resource from Compose resources
-            "Share journal",
-//        getString(Res.string.share_title_share_journal),
-            pendingIntent.intentSender,
+            0,
+            callbackIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
         )
-    }.also {
-        it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        startActivity(it)
-    }
+    val chooserIntent =
+        Intent
+            .createChooser(
+                shareIntent,
+                request.chooserTitle,
+                pendingIntent.intentSender,
+            ).apply {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    putExtra(Intent.EXTRA_CHOOSER_CUSTOM_ACTIONS, buildChooserActions(request))
+                }
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+    startActivity(chooserIntent)
+}
 
-/**
- * Creates a chooser intent for sharing content, the system "share sheet".
- * @param title The title of the chooser dialog, only shown if
- */
-internal fun createChooserIntent(
-    context: Context,
-    title: String = "Share with",
-    image: Uri? = null,
-) = Intent(Intent.ACTION_ANSWER)
-    .apply {
-        action = Intent.ACTION_SEND
-        data = image
-        flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            putExtra(Intent.EXTRA_CHOOSER_TARGETS, context.getNoteShareCustomOptions())
+private fun Context.buildShareIntent(request: ShareContentRequest): Intent {
+    val shareIntent =
+        when (request.mediaUris.size) {
+            0 ->
+                Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                }
+            1 ->
+                Intent(Intent.ACTION_SEND).apply {
+                    type = resolveMimeType(request.mediaUris)
+                    putExtra(Intent.EXTRA_STREAM, request.mediaUris.first())
+                    clipData = ClipData.newUri(contentResolver, request.title ?: "shared media", request.mediaUris.first())
+                }
+            else ->
+                Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                    type = resolveMimeType(request.mediaUris)
+                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(request.mediaUris))
+                    clipData =
+                        ClipData
+                            .newUri(
+                                contentResolver,
+                                request.title ?: "shared media",
+                                request.mediaUris.first(),
+                            ).apply {
+                                request.mediaUris.drop(1).forEach { uri ->
+                                    addItem(ClipData.Item(uri))
+                                }
+                            }
+                }
         }
-    }.run {
-        val pendingIntent =
-            PendingIntent.getBroadcast(
-                context,
-                0,
-                Intent(context, ShareReceiver::class.java),
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_CANCEL_CURRENT,
-            )
-        Intent.createChooser(this, title, pendingIntent.intentSender)
+
+    return shareIntent.apply {
+        request.text?.let { putExtra(Intent.EXTRA_TEXT, it) }
+        request.title?.let { putExtra(Intent.EXTRA_TITLE, it) }
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
+}
 
-/**
- * Creates a chooser intent for sharing content, the system "share sheet".
- */
-internal fun createChooserIntent(images: List<Uri>) =
-    Intent().apply {
-        action = Intent.ACTION_SEND_MULTIPLE
-        putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(images))
-    }
+private fun Context.resolveMimeType(mediaUris: List<Uri>): String {
+    val mimeTypes = mediaUris.mapNotNull(contentResolver::getType).distinct()
+    if (mimeTypes.isEmpty()) return "*/*"
+    if (mimeTypes.size == 1) return mimeTypes.first()
+    val topLevelTypes = mimeTypes.map { it.substringBefore('/') }.distinct()
+    return if (topLevelTypes.size == 1) "${topLevelTypes.first()}/*" else "*/*"
+}
 
-@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-private fun Context.getJournalShareCustomOptions(journalId: Uuid): Array<ChooserAction> =
-    arrayOf(
-        ChooserAction
-            .Builder(
-                // TODO: Use custom app icons
-                Icon.createWithResource(this, R.drawable.rounded_qr_code_24),
-                "Share QR code",
-//            getString(Res.string.action_label_share_qr_code),
-                PendingIntent.getBroadcast(
-                    this,
-                    1,
-                    Intent(CustomIntents.ACTION_GENERATE_QR_CODE).apply {
-                        putExtra(CustomIntents.EXTRA_JOURNAL_ID, journalId.toString())
-                    },
-                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_CANCEL_CURRENT,
-                ),
-            ).build(),
-    )
-
-@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-private fun Context.getNoteShareCustomOptions(): Array<ChooserAction> =
-    arrayOf(
-        // TODO: Use custom app icons
-        ChooserAction
-            .Builder(
-                Icon.createWithResource(this, R.drawable.rounded_add_24),
-                "Add to journal",
-//            getString(Res.string.action_label_add_to_journal),
-                PendingIntent.getBroadcast(
-                    this,
-                    1,
-                    Intent(CustomIntents.ACTION_ADD_TO_JOURNAL).apply {},
-                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_CANCEL_CURRENT,
-                ),
-            ).build(),
-        ChooserAction
-            .Builder(
-                Icon.createWithResource(this, android.R.drawable.star_on),
-//            getString(Res.string.action_label_add_to_journal),
-                "Add to journal",
-                PendingIntent.getBroadcast(
-                    this,
-                    1,
-                    Intent(),
-                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_CANCEL_CURRENT,
-                ),
-            ).build(),
-    )
+private fun Context.buildChooserActions(request: ShareContentRequest): Array<ChooserAction> {
+    val actions = mutableListOf<ChooserAction>()
+    request.copyText
+        ?.takeIf(String::isNotBlank)
+        ?.let { copyText ->
+            actions +=
+                ChooserAction
+                    .Builder(
+                        Icon.createWithResource(this, android.R.drawable.ic_menu_set_as),
+                        "Copy link",
+                        PendingIntent.getBroadcast(
+                            this,
+                            1,
+                            Intent(this, ShareReceiver::class.java).apply {
+                                action = CustomIntents.ACTION_COPY_LINK
+                                putExtra(CustomIntents.EXTRA_SHARE_TEXT, copyText)
+                            },
+                            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_CANCEL_CURRENT,
+                        ),
+                    ).build()
+        }
+    return actions.toTypedArray()
+}
 
 /**
  * Custom intent actions and extras used by the share sheet.
  */
 object CustomIntents {
-    /**
-     * The UID of the journal to generate a QR code for.
-     */
-    const val EXTRA_JOURNAL_ID: String = "app.mobile.logdate.extra.JOURNAL_ID"
+    const val EXTRA_SHARE_TEXT: String = "app.mobile.logdate.extra.SHARE_TEXT"
 
-    /**
-     * Action to generate a QR code for a journal.
-     */
-    const val ACTION_ADD_TO_JOURNAL: String = "app.mobile.logdate.action.ADD_TO_JOURNAL"
+    const val ACTION_CHOOSER_RESULT: String = "app.mobile.logdate.action.CHOOSER_RESULT"
 
-    /**
-     * Action to generate a QR code for a journal.
-     */
-    const val ACTION_GENERATE_QR_CODE: String = "app.mobile.logdate.action.GENERATE_QR_CODE"
+    const val ACTION_COPY_LINK: String = "app.mobile.logdate.action.COPY_LINK"
 }

@@ -64,6 +64,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
@@ -316,7 +317,10 @@ private fun MediaDetailLayout(
                                 )
                             }
                         }
-                        FilledTonalIconButton(onClick = onShare) {
+                        FilledTonalIconButton(
+                            onClick = onShare,
+                            modifier = Modifier.testTag("media_detail_share_action"),
+                        ) {
                             Icon(
                                 imageVector = Icons.Filled.Share,
                                 contentDescription = "Share",

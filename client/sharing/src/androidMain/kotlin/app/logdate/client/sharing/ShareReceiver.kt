@@ -1,22 +1,35 @@
 package app.logdate.client.sharing
 
 import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.util.Log
+import android.widget.Toast
+import io.github.aakira.napier.Napier
 
 /**
  * A receiver that acts as a callback for the system share sheet.
  */
 class ShareReceiver : BroadcastReceiver() {
-    // TODO: Log share usage patterns to analytics
     override fun onReceive(
         context: Context,
         intent: Intent,
     ) {
+        when (intent.action) {
+            CustomIntents.ACTION_COPY_LINK -> {
+                copyLinkToClipboard(context, intent.getStringExtra(CustomIntents.EXTRA_SHARE_TEXT))
+                return
+            }
+            CustomIntents.ACTION_CHOOSER_RESULT -> {
+                logChosenComponent(intent)
+                return
+            }
+        }
+
         val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
         val sharedImage =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -38,10 +51,13 @@ class ShareReceiver : BroadcastReceiver() {
             // Handle single image
         } else if (sharedImages != null) {
             val totalImages = sharedImages.size
-            Log.d("ShareReceiver", "User send $totalImages images")
-            // Handle multiple images
+            Napier.d("Share sheet returned $totalImages image(s)")
         }
 
+        logChosenComponent(intent)
+    }
+
+    private fun logChosenComponent(intent: Intent) {
         val clickedComponent: ComponentName? =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 intent.getParcelableExtra(Intent.EXTRA_CHOSEN_COMPONENT, ComponentName::class.java)
@@ -49,6 +65,18 @@ class ShareReceiver : BroadcastReceiver() {
                 @Suppress("DEPRECATION")
                 intent.getParcelableExtra(Intent.EXTRA_CHOSEN_COMPONENT)
             }
-        // TODO: Log the clicked component to analytics
+        clickedComponent?.let { component ->
+            Napier.i("User shared via ${component.flattenToShortString()}")
+        }
+    }
+
+    private fun copyLinkToClipboard(
+        context: Context,
+        text: String?,
+    ) {
+        val linkText = text?.takeIf(String::isNotBlank) ?: return
+        val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboardManager.setPrimaryClip(ClipData.newPlainText("LogDate share", linkText))
+        Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
     }
 }

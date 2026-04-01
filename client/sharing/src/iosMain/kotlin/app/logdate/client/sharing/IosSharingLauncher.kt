@@ -20,9 +20,19 @@ class IosSharingLauncher(
     private val journalRepository: JournalRepository,
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main),
 ) : SharingLauncher {
+    override fun shareContent(
+        text: String?,
+        mediaUris: List<String>,
+        title: String?,
+        chooserTitle: String?,
+    ) {
+        // iOS share sheet implementation needed
+    }
+
     override fun shareMemoryDay(
         date: LocalDate,
         summary: String,
+        mediaUris: List<String>,
     ) {
         // iOS share sheet implementation needed
     }

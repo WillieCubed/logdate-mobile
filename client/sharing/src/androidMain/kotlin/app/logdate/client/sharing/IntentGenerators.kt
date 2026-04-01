@@ -42,6 +42,7 @@ internal fun createInstagramImageShareIntent(imageUri: Uri) =
         type = "image/*"
         putExtra(Intent.EXTRA_STREAM, imageUri)
         setPackage(INSTAGRAM_PACKAGE_NAME)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
 
 /**
@@ -61,4 +62,5 @@ internal fun createInstagramVideoShareIntent(videoUri: Uri) =
         type = "video/*"
         putExtra(Intent.EXTRA_STREAM, videoUri)
         setPackage(INSTAGRAM_PACKAGE_NAME)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }

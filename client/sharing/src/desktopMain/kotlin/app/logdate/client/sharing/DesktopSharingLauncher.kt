@@ -23,9 +23,29 @@ class DesktopSharingLauncher(
     private val journalRepository: JournalRepository,
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main),
 ) : SharingLauncher {
+    override fun shareContent(
+        text: String?,
+        mediaUris: List<String>,
+        title: String?,
+        chooserTitle: String?,
+    ) {
+        if (!text.isNullOrBlank() && text.startsWith("http")) {
+            coroutineScope.launch(Dispatchers.IO) {
+                runCatching {
+                    if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                        Desktop.getDesktop().browse(URI(text))
+                    }
+                }.onFailure { Napier.e("Failed to share content on desktop", it) }
+            }
+            return
+        }
+        Napier.w { "Generic sharing is not yet supported on desktop" }
+    }
+
     override fun shareMemoryDay(
         date: LocalDate,
         summary: String,
+        mediaUris: List<String>,
     ) {
         Napier.w { "Memory sharing is not yet supported on desktop" }
     }

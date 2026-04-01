@@ -18,6 +18,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.ui.audio.LocalTranscriptionState
 import app.logdate.ui.timeline.HomeTimelineUiState
 import app.logdate.ui.timeline.TimelinePane
+import app.logdate.ui.timeline.TimelineSuggestionBlockUiState
 import kotlinx.datetime.LocalDate
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Instant
@@ -43,6 +44,7 @@ fun TimelineRoute(
     onOpenTimelineItem: (uid: Uuid) -> Unit,
     onNewEntry: () -> Unit,
     onOpenEntryInNewWindow: (entryId: Uuid) -> Unit = {},
+    onShareMemory: (TimelineSuggestionBlockUiState) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: TimelineViewModel = koinViewModel(),
 ) {
@@ -68,6 +70,7 @@ fun TimelineRoute(
 internal fun TimelineScreen(
     state: HomeTimelineUiState,
     onNewEntry: () -> Unit,
+    onShareMemory: (TimelineSuggestionBlockUiState) -> Unit = {},
     onDismissSnackbar: () -> Unit,
     onSetSelectedDay: (LocalDate) -> Unit,
     onVisibleAudioNoteIdsChanged: (Set<Uuid>) -> Unit,
@@ -94,7 +97,7 @@ internal fun TimelineScreen(
                     loadingState = state.loadingState,
                 ),
             onNewEntry = onNewEntry,
-            onShareMemory = { /* Handle share memory */ },
+            onShareMemory = onShareMemory,
             onOpenDay = { date -> onSetSelectedDay(date) },
             onVisibleAudioNoteIdsChanged = onVisibleAudioNoteIdsChanged,
             birthday = birthday,

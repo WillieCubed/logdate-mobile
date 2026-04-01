@@ -3,7 +3,7 @@ package app.logdate.client.sharing
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.core.net.toUri
+import androidx.core.content.FileProvider
 import app.logdate.client.media.MediaManager
 import app.logdate.client.repository.journals.JournalRepository
 import kotlinx.coroutines.CoroutineScope
@@ -12,6 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
+import java.io.File
 import kotlin.uuid.Uuid
 
 /**
@@ -24,9 +25,28 @@ class AndroidSharingLauncher(
     private val shareAssetGenerator: ShareAssetInterface,
     private val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
 ) : SharingLauncher {
+    override fun shareContent(
+        text: String?,
+        mediaUris: List<String>,
+        title: String?,
+        chooserTitle: String?,
+    ) {
+        val resolvedUris = mediaUris.map(::getUriFromMedia)
+        context.shareContent(
+            request =
+                ShareContentRequest(
+                    text = text,
+                    mediaUris = resolvedUris,
+                    title = title,
+                    chooserTitle = chooserTitle,
+                ),
+        )
+    }
+
     override fun shareMemoryDay(
         date: LocalDate,
         summary: String,
+        mediaUris: List<String>,
     ) {
         val shareText =
             if (summary.isNotBlank()) {
@@ -34,16 +54,11 @@ class AndroidSharingLauncher(
             } else {
                 "Check out my memory from $date on LogDate!"
             }
-        val shareIntent =
-            Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, shareText)
-            }
-        val chooserIntent =
-            Intent.createChooser(shareIntent, null).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        context.startActivity(chooserIntent)
+        shareContent(
+            text = shareText,
+            mediaUris = mediaUris,
+            chooserTitle = "Share memory",
+        )
     }
 
     /**
@@ -65,11 +80,11 @@ class AndroidSharingLauncher(
             val background = shareAssetGenerator.generateBackgroundLayer(journal, theme)
             context.grantUriPermission(
                 INSTAGRAM_PACKAGE_NAME,
-                cover.toUri(),
+                Uri.parse(cover),
                 Intent.FLAG_GRANT_READ_URI_PERMISSION,
             )
             context.startActivity(
-                createInstagramStoryIntent(cover.toUri(), background.toUri()).apply {
+                createInstagramStoryIntent(Uri.parse(background), Uri.parse(cover)).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 },
             )
@@ -87,9 +102,8 @@ class AndroidSharingLauncher(
             val journal =
                 journalRepository.observeJournalById(journalId).firstOrNull()
                     ?: throw IllegalArgumentException("Journal with ID $journalId does not exist")
-
-            // Use the shareJournalLink extension function from ShareSheet.kt
-            context.shareJournalLink(journal)
+            val previewUri = Uri.parse(shareAssetGenerator.generateStickerLayer(journal, ShareTheme.Light))
+            context.shareJournalLink(journal, previewUri)
         }
     }
 
@@ -143,5 +157,21 @@ class AndroidSharingLauncher(
         }
     }
 
-    override fun getUriFromMedia(uid: String): Uri = context.filesDir.resolve("media/$uid").toUri()
+    override fun getUriFromMedia(uid: String): Uri {
+        if (uid.startsWith("content://") || uid.startsWith("file://")) {
+            return Uri.parse(uid)
+        }
+
+        val directFile = File(uid)
+        if (directFile.exists()) {
+            return FileProvider.getUriForFile(context, "${context.packageName}.provider", directFile)
+        }
+
+        val managedMediaFile = context.filesDir.resolve("media/$uid")
+        if (managedMediaFile.exists()) {
+            return FileProvider.getUriForFile(context, "${context.packageName}.provider", managedMediaFile)
+        }
+
+        return Uri.parse(uid)
+    }
 }
