@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.mapLatest
 import kotlin.math.abs
+import kotlin.uuid.Uuid
 
 /**
  * Offline-first implementation of [SearchRepository].
@@ -63,6 +64,23 @@ class OfflineFirstSearchRepository(
                     searchDao.searchRanked(preparedQuery.query, effectiveLimit)
                 }
             results.map { entity ->
+                SearchResult(
+                    uid = entity.getUuid(),
+                    content = entity.content,
+                    created = entity.getCreatedInstant(),
+                    contentType = SearchContentType.fromFtsValue(entity.contentType),
+                    rank = entity.rank,
+                )
+            }
+        }
+
+    override fun searchInJournal(
+        query: String,
+        journalId: Uuid,
+        limit: Int,
+    ): Flow<List<SearchResult>> =
+        observedFtsFlow(query) { preparedQuery ->
+            searchDao.searchInJournal(preparedQuery.query, journalId.toString(), limit).map { entity ->
                 SearchResult(
                     uid = entity.getUuid(),
                     content = entity.content,

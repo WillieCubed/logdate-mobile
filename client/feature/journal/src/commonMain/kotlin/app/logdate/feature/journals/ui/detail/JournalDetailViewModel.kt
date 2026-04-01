@@ -6,10 +6,12 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import app.logdate.client.domain.search.SearchInJournalUseCase
 import app.logdate.client.domain.timeline.GetJournalMembershipUseCase
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.sharing.SharingLauncher
 import app.logdate.feature.journals.navigation.JournalDetailsRoute
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -36,6 +38,7 @@ class JournalDetailViewModel(
     private val sharingLauncher: SharingLauncher,
     private val journalContentRepository: JournalContentRepository,
     private val getJournalMembership: GetJournalMembershipUseCase,
+    private val searchInJournal: SearchInJournalUseCase,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     // Simple MutableStateFlow to store the journal ID
@@ -43,6 +46,26 @@ class JournalDetailViewModel(
 
     // Current sort order preference
     private val sortOrderState = MutableStateFlow(SortOrder.NEWEST_FIRST)
+
+    // Search within the journal
+    private val searchQueryState = MutableStateFlow("")
+
+    val searchResults: StateFlow<List<SearchResult>> =
+        searchQueryState
+            .combine(journalIdState.filterNotNull()) { query, journalId -> query to journalId }
+            .flatMapLatest { (query, journalId) ->
+                if (query.isBlank()) {
+                    flowOf(emptyList())
+                } else {
+                    searchInJournal(query, journalId)
+                }
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val searchQuery: StateFlow<String> = searchQueryState
+
+    fun updateSearchQuery(query: String) {
+        searchQueryState.value = query
+    }
 
     // Try to initialize from route if possible
     init {

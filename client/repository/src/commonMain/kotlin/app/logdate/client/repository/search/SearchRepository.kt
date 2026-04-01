@@ -42,6 +42,15 @@ interface SearchRepository {
         query: String,
         limit: Int = 50,
     ): Flow<List<SearchResult>>
+
+    /**
+     * Searches entries within a specific journal.
+     */
+    fun searchInJournal(
+        query: String,
+        journalId: Uuid,
+        limit: Int = 50,
+    ): Flow<List<SearchResult>>
 }
 
 /**

@@ -50,6 +50,7 @@ import app.logdate.client.domain.rewind.GetRewindUseCase
 import app.logdate.client.domain.rewind.GetWeekRewindUseCase
 import app.logdate.client.domain.search.ObserveRecentSearchesUseCase
 import app.logdate.client.domain.search.SearchEntriesUseCase
+import app.logdate.client.domain.search.SearchInJournalUseCase
 import app.logdate.client.domain.search.SearchJournalsUseCase
 import app.logdate.client.domain.search.UniversalSearchUseCase
 import app.logdate.client.domain.streak.CalculateStreakUseCase
@@ -178,6 +179,7 @@ val domainModule: Module =
 
         // Search
         factory { SearchEntriesUseCase(get()) }
+        factory { SearchInJournalUseCase(get()) }
         factory { SearchJournalsUseCase(get()) }
         factory { UniversalSearchUseCase(get()) }
         factory { ObserveRecentSearchesUseCase(get()) }

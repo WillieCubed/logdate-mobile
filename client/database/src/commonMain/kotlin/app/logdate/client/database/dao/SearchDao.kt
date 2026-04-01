@@ -20,11 +20,23 @@ import kotlin.uuid.Uuid
 @Dao
 @SkipQueryVerification
 interface SearchDao {
+    @Query("SELECT generation FROM search_index_metadata WHERE id = 1")
+    suspend fun getGeneration(): Long?
+
     /**
      * Emits whenever the runtime-managed search index changes or is rebuilt.
      */
     @Query("SELECT generation FROM search_index_metadata WHERE id = 1")
     fun observeGeneration(): Flow<Long?>
+
+    @Query(
+        """
+        SELECT uid, content, created, contentType
+        FROM entries_fts
+        ORDER BY created DESC
+        """,
+    )
+    suspend fun getIndexedEntries(): List<SearchResultEntity>
 
     /**
      * Searches all entries using FTS5 MATCH operator.
@@ -149,6 +161,38 @@ interface SearchDao {
     suspend fun searchRankedShortQuery(
         query: String,
         limit: Int,
+    ): List<RankedSearchResultEntity>
+
+    /**
+     * Searches entries that belong to a specific journal.
+     *
+     * Joins the FTS index with the journal_content_links table to scope results.
+     *
+     * @param query The search query (FTS5 syntax)
+     * @param journalId The journal to search within
+     * @param limit Maximum number of results
+     * @return Ranked results scoped to the journal
+     */
+    @Query(
+        """
+        SELECT
+            f.uid,
+            snippet(entries_fts, 1, '[', ']', '...', 24) as content,
+            f.created,
+            f.contentType,
+            bm25(entries_fts) as result_rank
+        FROM entries_fts f
+        INNER JOIN journal_content_links jcl ON f.uid = jcl.content_id
+        WHERE entries_fts MATCH :query
+          AND jcl.journal_id = :journalId
+        ORDER BY bm25(entries_fts), f.created DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun searchInJournal(
+        query: String,
+        journalId: String,
+        limit: Int = 50,
     ): List<RankedSearchResultEntity>
 
     /**
