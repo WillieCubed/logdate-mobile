@@ -10,11 +10,14 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import java.io.File
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+import org.junit.Before
 import org.junit.Test
 
 class PhoneSyncedAudioResolverTest {
@@ -24,12 +27,22 @@ class PhoneSyncedAudioResolverTest {
     private val dataLayerClient = mockk<WearDataLayerClient>(relaxed = true)
     private val notesRepository = mockk<SyncableJournalNotesRepository>(relaxed = true)
 
-    private val resolver =
+    @Before
+    fun setUp() {
+        coEvery { audioStorage.createRecordingTarget(any()) } returns AudioRecordingTarget("/tmp/watch-cache-default.m4a")
+        coEvery { dataLayerClient.downloadAudioFromPhone(any(), any()) } returns true
+        coEvery { dataLayerClient.isPhoneConnected() } returns true
+    }
+
+    private fun buildResolver(
+        dispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
+    ) =
         PhoneSyncedAudioResolver(
             context = context,
             audioStorage = audioStorage,
             dataLayerClient = dataLayerClient,
             notesRepository = notesRepository,
+            ioDispatcher = dispatcher,
         )
 
     @Test
@@ -39,12 +52,13 @@ class PhoneSyncedAudioResolverTest {
         localFile.writeText("audio")
         val note = audioNote(noteId = noteId, mediaRef = localFile.absolutePath)
 
-        val result = resolver.resolvePlayableUri(note)
+        val result = buildResolver().resolvePlayableUri(note)
 
         assertTrue(result.isSuccess)
         assertEquals(localFile.absolutePath, result.getOrNull())
         coVerify(exactly = 0) { dataLayerClient.downloadAudioFromPhone(any(), any()) }
         coVerify(exactly = 0) { audioStorage.createRecordingTarget(any()) }
+        coVerify(exactly = 0) { dataLayerClient.isPhoneConnected() }
 
         localFile.delete()
     }
@@ -58,10 +72,11 @@ class PhoneSyncedAudioResolverTest {
         coEvery { audioStorage.createRecordingTarget("m4a") } returns AudioRecordingTarget(targetPath)
         coEvery { dataLayerClient.downloadAudioFromPhone(noteId, targetPath) } returns true
 
-        val result = resolver.resolvePlayableUri(note)
+        val result = buildResolver().resolvePlayableUri(note)
 
         assertTrue(result.isSuccess)
         assertEquals(targetPath, result.getOrNull())
+        coVerify { dataLayerClient.isPhoneConnected() }
         coVerify { dataLayerClient.downloadAudioFromPhone(noteId, targetPath) }
         coVerify { notesRepository.updateMediaRef(noteId, targetPath) }
     }
@@ -75,10 +90,28 @@ class PhoneSyncedAudioResolverTest {
         coEvery { audioStorage.createRecordingTarget("m4a") } returns AudioRecordingTarget(targetPath)
         coEvery { dataLayerClient.downloadAudioFromPhone(noteId, targetPath) } returns false
 
-        val result = resolver.resolvePlayableUri(note)
+        val result = buildResolver().resolvePlayableUri(note)
 
         assertTrue(result.isFailure)
+        coVerify { dataLayerClient.isPhoneConnected() }
         coVerify { dataLayerClient.downloadAudioFromPhone(noteId, targetPath) }
+        coVerify(exactly = 0) { notesRepository.updateMediaRef(any(), any()) }
+    }
+
+    @Test
+    fun `fails when phone is unreachable`() = runTest {
+        val noteId = Uuid.random()
+        val note = audioNote(noteId = noteId, mediaRef = "content://phone/audio/$noteId")
+        val targetPath = "/tmp/watch-cache-$noteId.m4a"
+
+        coEvery { audioStorage.createRecordingTarget("m4a") } returns AudioRecordingTarget(targetPath)
+        coEvery { dataLayerClient.isPhoneConnected() } returns false
+
+        val result = buildResolver().resolvePlayableUri(note)
+
+        assertTrue(result.isFailure)
+        coVerify { dataLayerClient.isPhoneConnected() }
+        coVerify(exactly = 0) { dataLayerClient.downloadAudioFromPhone(any(), any()) }
         coVerify(exactly = 0) { notesRepository.updateMediaRef(any(), any()) }
     }
 

@@ -29,12 +29,17 @@ import app.logdate.wear.playback.PhoneSyncedAudioResolver
 import app.logdate.wear.playback.WearSyncedAudioResolver
 import app.logdate.wear.recording.WearAudioRecordingManager
 import app.logdate.wear.sync.WearDataLayerClient
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import org.koin.core.qualifier.named
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 /**
  * Koin module for Wear OS audio recording, playback, and capture features.
  */
+private val wearIoDispatcherQualifier = named("wear-audio-io-dispatcher")
+
 val wearAudioModule = module {
     single { StorageSpaceChecker(get()) }
     single<AudioStorage> { AndroidAudioStorage(get()) }
@@ -50,12 +55,14 @@ val wearAudioModule = module {
     single { AndroidAudioPlaybackManager(get(), get()) }
     single<AudioPlaybackManager> { get<AndroidAudioPlaybackManager>() }
     single<AudioPlaybackStatusProvider> { get<AndroidAudioPlaybackManager>() }
+    single<CoroutineDispatcher>(wearIoDispatcherQualifier) { Dispatchers.IO }
     single<WearSyncedAudioResolver> {
         PhoneSyncedAudioResolver(
             context = get(),
             audioStorage = get(),
             dataLayerClient = get(),
             notesRepository = get(),
+            ioDispatcher = get(qualifier = wearIoDispatcherQualifier),
         )
     }
     viewModel {
