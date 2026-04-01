@@ -2,22 +2,33 @@
 
 package app.logdate.feature.journals.ui
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.logdate.client.domain.journals.JournalSuggestion
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.ui.theme.Spacing
 import kotlinx.datetime.LocalDate
+import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.suggestion_create_journal
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -35,6 +46,7 @@ fun JournalsOverviewScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val entryResults by viewModel.entrySearchResults.collectAsStateWithLifecycle()
+    val suggestions by viewModel.suggestions.collectAsStateWithLifecycle()
 
     JournalsOverviewScreenContent(
         journals = state.journals,
@@ -44,6 +56,7 @@ fun JournalsOverviewScreen(
         searchQuery = state.searchQuery,
         isEntrySearchInProgress = state.isEntrySearchInProgress,
         entryResults = entryResults,
+        suggestions = suggestions,
         onOpenJournal = onOpenJournal,
         onBrowseJournals = onBrowseJournals,
         onCreateJournal = onCreateJournal,
@@ -72,6 +85,7 @@ fun JournalsOverviewScreenContent(
     searchQuery: String,
     isEntrySearchInProgress: Boolean = false,
     entryResults: List<SearchResult>,
+    suggestions: List<JournalSuggestion> = emptyList(),
     onOpenJournal: JournalClickCallback,
     onBrowseJournals: () -> Unit,
     onCreateJournal: () -> Unit,
@@ -100,14 +114,20 @@ fun JournalsOverviewScreenContent(
             )
         },
     ) { paddingValues ->
-        Box(
+        Column(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
                     .padding(top = Spacing.sm),
-            contentAlignment = Alignment.Center,
         ) {
+            if (suggestions.isNotEmpty()) {
+                SuggestionRow(
+                    suggestions = suggestions,
+                    onCreateJournal = onCreateJournal,
+                )
+            }
+
             JournalListPanel(
                 journals = journals,
                 layoutMode = layoutMode,
@@ -120,8 +140,64 @@ fun JournalsOverviewScreenContent(
                 onSortOptionSelected = onSortOptionSelected,
                 onToggleFilter = onToggleFilter,
                 showLoading = false,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().weight(1f),
             )
+        }
+    }
+}
+
+@Composable
+private fun SuggestionRow(
+    suggestions: List<JournalSuggestion>,
+    onCreateJournal: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding =
+            androidx.compose.foundation.layout
+                .PaddingValues(horizontal = Spacing.lg),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        items(suggestions) { suggestion ->
+            SuggestionCard(
+                suggestion = suggestion,
+                onAccept = onCreateJournal,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SuggestionCard(
+    suggestion: JournalSuggestion,
+    onAccept: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier,
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            ),
+    ) {
+        Column(
+            modifier = Modifier.padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text(
+                text = suggestion.suggestedTitle,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            Text(
+                text = suggestion.reason,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+            )
+            OutlinedButton(onClick = onAccept) {
+                Text(stringResource(Res.string.suggestion_create_journal))
+            }
         }
     }
 }

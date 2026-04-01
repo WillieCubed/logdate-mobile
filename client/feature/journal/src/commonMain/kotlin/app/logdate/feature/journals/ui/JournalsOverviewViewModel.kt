@@ -3,6 +3,8 @@ package app.logdate.feature.journals.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.datastore.LogdatePreferencesDataSource
+import app.logdate.client.domain.journals.JournalSuggestion
+import app.logdate.client.domain.journals.SuggestJournalsUseCase
 import app.logdate.client.domain.search.SearchEntriesUseCase
 import app.logdate.client.domain.search.SearchJournalsUseCase
 import app.logdate.client.domain.search.SearchQuery
@@ -37,7 +39,21 @@ class JournalsOverviewViewModel(
     private val preferencesDataSource: LogdatePreferencesDataSource,
     private val searchJournalsUseCase: SearchJournalsUseCase,
     private val searchEntriesUseCase: SearchEntriesUseCase,
+    private val suggestJournalsUseCase: SuggestJournalsUseCase,
 ) : ViewModel() {
+    private val _suggestions = MutableStateFlow<List<JournalSuggestion>>(emptyList())
+    val suggestions: StateFlow<List<JournalSuggestion>> = _suggestions
+
+    init {
+        loadSuggestions()
+    }
+
+    private fun loadSuggestions() {
+        viewModelScope.launch {
+            _suggestions.value = suggestJournalsUseCase()
+        }
+    }
+
     private val entrySearchDebounceMs = 150L
     private val sortOptionState = MutableStateFlow(JournalSortOption.LAST_UPDATED)
     private val activeFiltersState = MutableStateFlow<Set<JournalFilter>>(emptySet())

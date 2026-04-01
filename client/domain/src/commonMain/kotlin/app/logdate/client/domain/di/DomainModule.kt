@@ -16,6 +16,7 @@ import app.logdate.client.domain.journals.DeleteJournalUseCase
 import app.logdate.client.domain.journals.GetCurrentUserJournalsUseCase
 import app.logdate.client.domain.journals.GetDefaultSelectedJournalsUseCase
 import app.logdate.client.domain.journals.GetJournalByIdUseCase
+import app.logdate.client.domain.journals.SuggestJournalsUseCase
 import app.logdate.client.domain.journals.UpdateJournalUseCase
 import app.logdate.client.domain.media.IndexMediaForPeriodUseCase
 import app.logdate.client.domain.notes.AddNoteUseCase
@@ -163,6 +164,7 @@ val domainModule: Module =
         // Journals
         factory { GetCurrentUserJournalsUseCase(get()) }
         factory { GetDefaultSelectedJournalsUseCase(get(), get()) }
+        factory { SuggestJournalsUseCase(get(), get()) }
         factory { GetJournalByIdUseCase(get()) }
         factory { UpdateJournalUseCase(get()) }
         factory { DeleteJournalUseCase(get()) }

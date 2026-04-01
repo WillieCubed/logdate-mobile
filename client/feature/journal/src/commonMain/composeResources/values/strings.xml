@@ -43,6 +43,7 @@
     <string name="journal_insights_photos">%1$d photos</string>
     <string name="journal_insights_videos">%1$d videos</string>
     <string name="journal_insights_recordings">%1$d recordings</string>
+    <string name="suggestion_create_journal">Create journal</string>
     <string name="enter_a_descriptive_name_for_your_journal">Enter a descriptive name for your journal</string>
     <string name="error">Error</string>
     <string name="failed_to_load_journal">Failed to load journal</string>

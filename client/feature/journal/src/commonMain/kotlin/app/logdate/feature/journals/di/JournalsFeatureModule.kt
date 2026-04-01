@@ -19,7 +19,7 @@ import kotlin.uuid.Uuid
 val journalsFeatureModule: Module =
     module {
         includes(sharingModule)
-        viewModel { JournalsOverviewViewModel(get(), get(), get(), get()) }
+        viewModel { JournalsOverviewViewModel(get(), get(), get(), get(), get()) }
         viewModel { JournalCreationViewModel(get(), get(), get(), get()) }
         viewModel {
             JournalDetailViewModel(
