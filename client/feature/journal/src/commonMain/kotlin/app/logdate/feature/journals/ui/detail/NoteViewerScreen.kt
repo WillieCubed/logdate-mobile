@@ -68,6 +68,8 @@ import coil3.compose.AsyncImage
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.add_to_journal
 import logdate.client.feature.journal.generated.resources.back
+import logdate.client.feature.journal.generated.resources.cd_next_entry
+import logdate.client.feature.journal.generated.resources.cd_previous_entry
 import logdate.client.feature.journal.generated.resources.error
 import logdate.client.feature.journal.generated.resources.image_note
 import logdate.client.feature.journal.generated.resources.location
@@ -452,7 +454,7 @@ private fun NoteViewerToolbar(
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                    contentDescription = "Previous entry",
+                    contentDescription = stringResource(Res.string.cd_previous_entry),
                 )
             }
             IconButton(
@@ -461,7 +463,7 @@ private fun NoteViewerToolbar(
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = "Next entry",
+                    contentDescription = stringResource(Res.string.cd_next_entry),
                 )
             }
         }

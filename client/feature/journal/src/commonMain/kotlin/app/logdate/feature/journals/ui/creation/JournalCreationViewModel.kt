@@ -45,17 +45,36 @@ class JournalCreationViewModel(
                 notes.map { note ->
                     RecentNoteItem(
                         id = note.uid,
-                        preview =
+                        textPreview =
                             when (note) {
                                 is JournalNote.Text -> note.content.take(100)
-                                is JournalNote.Image -> note.caption.ifBlank { "Photo" }
-                                is JournalNote.Video -> note.caption.ifBlank { "Video" }
-                                is JournalNote.Audio -> "Voice memo"
+                                is JournalNote.Image -> note.caption
+                                is JournalNote.Video -> note.caption
+                                is JournalNote.Audio -> null
+                            },
+                        type =
+                            when (note) {
+                                is JournalNote.Text -> NotePreviewType.TEXT
+                                is JournalNote.Image -> NotePreviewType.IMAGE
+                                is JournalNote.Video -> NotePreviewType.VIDEO
+                                is JournalNote.Audio -> NotePreviewType.AUDIO
                             },
                         timestamp = note.creationTimestamp,
                     )
                 }
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun addMediaUris(uris: List<String>) {
+        backingUiState.update { state ->
+            state.copy(selectedMediaUris = state.selectedMediaUris + uris)
+        }
+    }
+
+    fun removeMediaUri(uri: String) {
+        backingUiState.update { state ->
+            state.copy(selectedMediaUris = state.selectedMediaUris - uri)
+        }
+    }
 
     fun toggleNoteSelection(noteId: Uuid) {
         backingUiState.update { state ->
@@ -96,6 +115,7 @@ data class JournalCreationUiState(
     val journalId: Uuid? = null,
     val title: String = "",
     val selectedNoteIds: Set<Uuid> = emptySet(),
+    val selectedMediaUris: List<String> = emptyList(),
 )
 
 /**
@@ -103,6 +123,14 @@ data class JournalCreationUiState(
  */
 data class RecentNoteItem(
     val id: Uuid,
-    val preview: String,
+    val textPreview: String?,
+    val type: NotePreviewType,
     val timestamp: kotlin.time.Instant,
 )
+
+enum class NotePreviewType {
+    TEXT,
+    IMAGE,
+    VIDEO,
+    AUDIO,
+}

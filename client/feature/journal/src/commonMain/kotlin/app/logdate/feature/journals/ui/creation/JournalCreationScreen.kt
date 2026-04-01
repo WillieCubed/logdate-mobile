@@ -70,8 +70,10 @@ fun JournalCreationScreen(
         onNewJournal = viewModel::createJournal,
         initialTitle = uiState.title,
         selectedNoteIds = uiState.selectedNoteIds,
+        selectedMediaUris = uiState.selectedMediaUris,
         recentNotes = recentNotes,
         onToggleNoteSelection = viewModel::toggleNoteSelection,
+        onMediaSelected = viewModel::addMediaUris,
         modifier = modifier,
     )
 
@@ -90,13 +92,16 @@ fun JournalCreationScreenContent(
     onNewJournal: (data: NewJournalRequest) -> Unit,
     initialTitle: String = "",
     selectedNoteIds: Set<Uuid> = emptySet(),
+    selectedMediaUris: List<String> = emptyList(),
     recentNotes: List<RecentNoteItem> = emptyList(),
     onToggleNoteSelection: (Uuid) -> Unit = {},
+    onMediaSelected: (List<String>) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var title by rememberSaveable { mutableStateOf(initialTitle) }
     var contentDescription by rememberSaveable { mutableStateOf("") }
     var showNotePicker by rememberSaveable { mutableStateOf(false) }
+    val mediaPickerState = rememberMediaPickerLauncher(onMediaSelected = onMediaSelected)
 
     val canFinish = title.isNotBlank()
     val focusManager = LocalFocusManager.current
@@ -182,11 +187,20 @@ fun JournalCreationScreenContent(
                 ) {
                     Text(stringResource(Res.string.add_memories), style = MaterialTheme.typography.labelMedium)
                     ContainerButton(
-                        onClick = { /* TODO: Platform media picker via expect/actual */ },
+                        onClick = { mediaPickerState.launchPicker() },
                         icon = {
-                            Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
+                            if (selectedMediaUris.isNotEmpty()) {
+                                Icon(Icons.Default.Check, contentDescription = null)
+                            } else {
+                                Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
+                            }
                         },
-                        label = stringResource(Res.string.add_media_label),
+                        label =
+                            if (selectedMediaUris.isNotEmpty()) {
+                                stringResource(Res.string.media_selection_count, selectedMediaUris.size)
+                            } else {
+                                stringResource(Res.string.add_media_label)
+                            },
                         description = stringResource(Res.string.add_media_description),
                     )
                     ContainerButton(
@@ -273,7 +287,14 @@ private fun NotePickerBottomSheet(
                             )
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = note.preview,
+                                    text =
+                                        note.textPreview?.ifBlank { null }
+                                            ?: when (note.type) {
+                                                NotePreviewType.IMAGE -> stringResource(Res.string.image)
+                                                NotePreviewType.VIDEO -> stringResource(Res.string.video)
+                                                NotePreviewType.AUDIO -> stringResource(Res.string.note_type_voice_memo)
+                                                NotePreviewType.TEXT -> ""
+                                            },
                                     style = MaterialTheme.typography.bodyMedium,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
