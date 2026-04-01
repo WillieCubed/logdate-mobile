@@ -60,12 +60,16 @@ class ExportWorker(
             ?.let { Instant.fromEpochMilliseconds(it) }
 
     override suspend fun doWork(): Result {
+        Napier.i("ExportWorker.doWork() STARTED - export worker is executing")
+
         // Try to promote to foreground service — if this fails (e.g. missing
         // POST_NOTIFICATIONS permission on Android 13+), the export still runs.
         trySetForeground(getForegroundInfo())
+        Napier.i("ExportWorker: Foreground service setup complete")
 
         return try {
             var finalResult = Result.success()
+            Napier.i("ExportWorker: About to call exportUserDataUseCase.exportUserData()")
 
             exportUserDataUseCase
                 .exportUserData(

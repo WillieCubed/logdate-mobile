@@ -10,6 +10,7 @@ import androidx.lifecycle.Observer
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import app.logdate.client.domain.export.ExportFormat
@@ -209,6 +210,7 @@ class AndroidExportLauncher(
         val workRequest =
             OneTimeWorkRequestBuilder<ExportWorker>()
                 .setInputData(inputData)
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .build()
 
         WorkManager
