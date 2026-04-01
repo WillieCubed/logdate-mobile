@@ -30,6 +30,7 @@ class LogdatePreferencesDataSource(
         val DAY_START_HOUR = intPreferencesKey("day_start_hour")
         val DAY_END_HOUR = intPreferencesKey("day_end_hour")
         val BACKGROUND_SYNC_ENABLED = booleanPreferencesKey("background_sync_enabled")
+        val SYSTEM_SEARCH_VISIBILITY_ENABLED = booleanPreferencesKey("system_search_visibility_enabled")
 
         // Feature flags
         val LIBRARY_ENABLED = booleanPreferencesKey("library_enabled")
@@ -44,6 +45,10 @@ class LogdatePreferencesDataSource(
         val ORIGINAL_BIO = stringPreferencesKey("original_bio")
         val PROFILE_CREATED_AT = longPreferencesKey("profile_created_at")
         val PROFILE_LAST_UPDATED_AT = longPreferencesKey("profile_last_updated_at")
+
+        // Android AppSearch metadata
+        val ANDROID_PLATFORM_SEARCH_INDEX_GENERATION = longPreferencesKey("android_platform_search_index_generation")
+        val ANDROID_PLATFORM_SEARCH_SCHEMA_VERSION = intPreferencesKey("android_platform_search_schema_version")
     }
 
     val userData: Flow<UserData> =
@@ -78,6 +83,16 @@ class LogdatePreferencesDataSource(
             prefs[LIBRARY_ENABLED] ?: false
         }
 
+    fun observeSystemSearchVisibilityEnabled(): Flow<Boolean> =
+        userPreferences.data.map { prefs ->
+            prefs[SYSTEM_SEARCH_VISIBILITY_ENABLED] ?: false
+        }
+
+    fun observeAndroidPlatformSearchIndexedGeneration(): Flow<Long?> =
+        userPreferences.data.map { prefs ->
+            prefs[ANDROID_PLATFORM_SEARCH_INDEX_GENERATION]
+        }
+
     /**
      * Sets whether the Library feature is enabled.
      */
@@ -85,6 +100,38 @@ class LogdatePreferencesDataSource(
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
                 this[LIBRARY_ENABLED] = enabled
+            }
+        }
+    }
+
+    suspend fun setSystemSearchVisibilityEnabled(enabled: Boolean) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[SYSTEM_SEARCH_VISIBILITY_ENABLED] = enabled
+            }
+        }
+    }
+
+    suspend fun getSystemSearchVisibilityEnabled(): Boolean = observeSystemSearchVisibilityEnabled().first()
+
+    suspend fun getAndroidPlatformSearchIndexedGeneration(): Long? =
+        userPreferences.data
+            .map { prefs -> prefs[ANDROID_PLATFORM_SEARCH_INDEX_GENERATION] }
+            .first()
+
+    suspend fun getAndroidPlatformSearchSchemaVersion(): Int? =
+        userPreferences.data
+            .map { prefs -> prefs[ANDROID_PLATFORM_SEARCH_SCHEMA_VERSION] }
+            .first()
+
+    suspend fun setAndroidPlatformSearchIndexState(
+        generation: Long,
+        schemaVersion: Int,
+    ) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[ANDROID_PLATFORM_SEARCH_INDEX_GENERATION] = generation
+                this[ANDROID_PLATFORM_SEARCH_SCHEMA_VERSION] = schemaVersion
             }
         }
     }

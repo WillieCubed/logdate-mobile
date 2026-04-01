@@ -62,6 +62,8 @@ kotlin {
             implementation(libs.napier)
         }
         androidMain.dependencies {
+            implementation(libs.androidx.appsearch)
+            implementation(libs.androidx.appsearch.platform.storage)
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.koin.android)
             // Firebase

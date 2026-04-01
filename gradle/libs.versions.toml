@@ -85,6 +85,7 @@ androidxCamera = "1.6.0-rc01"
 androidxCameraViewfinderCompose = "1.0.0-alpha02"
 androidxBiometric = "1.4.0-alpha02"
 androidxAnnotation = "1.9.1"
+androidxAppSearch = "1.1.0"
 androidxCoreKtx = "1.16.0"
 androidxCoreSplashScreen = "1.2.0"
 androidxGlance = "1.1.1"
@@ -221,6 +222,8 @@ sqlcipher-android = { group = "net.zetetic", name = "sqlcipher-android", version
 androidx-datastore = { group = "androidx.datastore", name = "datastore", version.ref = "datastore" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "androidx-security-crypto" }
+androidx-appsearch = { group = "androidx.appsearch", name = "appsearch", version.ref = "androidxAppSearch" }
+androidx-appsearch-platform-storage = { group = "androidx.appsearch", name = "appsearch-platform-storage", version.ref = "androidxAppSearch" }
 
 ## Paging
 androidx-paging-common = { group = "androidx.paging", name = "paging-common", version.ref = "paging" }

@@ -56,6 +56,9 @@ import logdate.client.feature.core.generated.resources.remove_passkey
 import logdate.client.feature.core.generated.resources.remove_passkey_from_device
 import logdate.client.feature.core.generated.resources.settings_biometric_description
 import logdate.client.feature.core.generated.resources.settings_biometric_label
+import logdate.client.feature.core.generated.resources.system_search_visibility_description
+import logdate.client.feature.core.generated.resources.system_search_visibility_label
+import logdate.client.feature.core.generated.resources.system_search_visibility_section
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -83,8 +86,11 @@ fun PrivacySettingsScreen(
     PrivacySettingsContent(
         onBack = onBack,
         onSetBiometricsEnabled = viewModel::setBiometricEnabled,
+        onSetSystemSearchVisibilityEnabled = viewModel::setSystemSearchVisibilityEnabled,
         isBiometricsEnabled = state.isBiometricsEnabled,
         isAuthenticated = state.isAuthenticated,
+        isSystemSearchVisibilityEnabled = state.isSystemSearchVisibilityEnabled,
+        showSystemSearchVisibilityToggle = state.showSystemSearchVisibilityToggle,
         passkeys = state.passkeys,
         onCreatePasskey = { viewModel.createPasskey() },
         onRevokePasskey = { passkey -> viewModel.revokePasskey(passkey.id) },
@@ -179,8 +185,11 @@ private fun PasskeyOperationLoadingDialog(
 fun PrivacySettingsContent(
     onBack: () -> Unit,
     onSetBiometricsEnabled: (enabled: Boolean) -> Unit,
+    onSetSystemSearchVisibilityEnabled: (enabled: Boolean) -> Unit = {},
     isBiometricsEnabled: Boolean,
     isAuthenticated: Boolean,
+    isSystemSearchVisibilityEnabled: Boolean = false,
+    showSystemSearchVisibilityToggle: Boolean = false,
     passkeys: List<PasskeyInfo> = emptyList(),
     onCreatePasskey: () -> Unit = {},
     onRevokePasskey: (PasskeyInfo) -> Unit = {},
@@ -279,6 +288,22 @@ fun PrivacySettingsContent(
             }
         }
 
+        if (showSystemSearchVisibilityToggle) {
+            item {
+                SettingsSection(
+                    title = stringResource(Res.string.system_search_visibility_section),
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                ) {
+                    ToggleSettingsItem(
+                        title = stringResource(Res.string.system_search_visibility_label),
+                        description = stringResource(Res.string.system_search_visibility_description),
+                        checked = isSystemSearchVisibilityEnabled,
+                        onCheckedChange = onSetSystemSearchVisibilityEnabled,
+                    )
+                }
+            }
+        }
+
         // Location Settings Section
         item {
             SettingsSection(
@@ -354,8 +379,11 @@ private fun PrivacySettingsScreenPreview() {
     PrivacySettingsContent(
         onBack = {},
         onSetBiometricsEnabled = {},
+        onSetSystemSearchVisibilityEnabled = {},
         isBiometricsEnabled = true,
         isAuthenticated = true,
+        isSystemSearchVisibilityEnabled = true,
+        showSystemSearchVisibilityToggle = true,
         passkeys =
             listOf(
                 PasskeyInfo(

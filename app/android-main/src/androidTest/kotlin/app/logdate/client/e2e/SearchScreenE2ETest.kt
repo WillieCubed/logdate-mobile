@@ -2,6 +2,9 @@ package app.logdate.client.e2e
 
 import android.content.Context
 import androidx.activity.ComponentActivity
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -13,10 +16,13 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.core.app.ApplicationProvider
 import androidx.room.Room
+import app.logdate.client.data.search.AndroidPlatformSearchIndexManager
+import app.logdate.client.data.search.AndroidPlatformSearchRepository
 import app.logdate.client.data.search.OfflineFirstSearchRepository
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.database.getRoomDatabase
 import app.logdate.client.database.entities.TextNoteEntity
+import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.domain.search.ObserveRecentSearchesUseCase
 import app.logdate.client.domain.search.UniversalSearchUseCase
 import app.logdate.client.repository.search.SearchContentType
@@ -26,6 +32,10 @@ import app.logdate.feature.search.ui.SearchScreen
 import app.logdate.feature.search.ui.SearchScreenContent
 import app.logdate.feature.search.ui.SearchScreenState
 import app.logdate.feature.search.ui.SearchViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
@@ -51,6 +61,7 @@ class SearchScreenE2ETest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     private lateinit var database: LogDateDatabase
+    private lateinit var searchScope: CoroutineScope
     private lateinit var viewModel: SearchViewModel
 
     private val textNoteResult = SearchResult(
@@ -94,7 +105,20 @@ class SearchScreenE2ETest {
             )
         }
 
-        val searchRepository = OfflineFirstSearchRepository(database.searchDao())
+        searchScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+        val searchRepository =
+            AndroidPlatformSearchRepository(
+                appSearchIndexManager =
+                    AndroidPlatformSearchIndexManager(
+                        context = context,
+                        searchDao = database.searchDao(),
+                        preferencesDataSource = LogdatePreferencesDataSource(TestPreferencesDataStore()),
+                        externalScope = searchScope,
+                        databaseName = "search_screen_e2e_${System.nanoTime()}",
+                    ),
+                roomSearchRepository = OfflineFirstSearchRepository(database.searchDao()),
+            )
         val recentSearchesRepository = InMemoryRecentSearchesRepository()
         viewModel =
             SearchViewModel(
@@ -105,6 +129,7 @@ class SearchScreenE2ETest {
 
     @After
     fun tearDown() {
+        searchScope.cancel()
         database.close()
     }
 
@@ -254,5 +279,17 @@ private class InMemoryRecentSearchesRepository : RecentSearchesRepository {
 
     override suspend fun clearRecentSearches() {
         recentSearches.value = emptyList()
+    }
+}
+
+private class TestPreferencesDataStore : DataStore<Preferences> {
+    private val preferencesFlow = MutableStateFlow(emptyPreferences())
+
+    override val data: Flow<Preferences> = preferencesFlow
+
+    override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+        val updatedPreferences = transform(preferencesFlow.value)
+        preferencesFlow.value = updatedPreferences
+        return updatedPreferences
     }
 }

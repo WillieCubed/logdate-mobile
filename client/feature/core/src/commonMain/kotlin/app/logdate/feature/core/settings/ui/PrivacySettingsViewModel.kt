@@ -2,6 +2,7 @@ package app.logdate.feature.core.settings.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.domain.account.CreatePasskeyUseCase
 import app.logdate.client.domain.account.DeletePasskeyUseCase
@@ -22,6 +23,8 @@ data class PrivacySettingsState(
     val isBiometricsEnabled: Boolean,
     val isAuthenticated: Boolean,
     val passkeys: List<PasskeyInfo>,
+    val isSystemSearchVisibilityEnabled: Boolean,
+    val showSystemSearchVisibilityToggle: Boolean,
 )
 
 sealed class PasskeyRevocationState {
@@ -37,11 +40,13 @@ sealed class PasskeyRevocationState {
 }
 
 class PrivacySettingsViewModel(
+    private val preferencesDataSource: LogdatePreferencesDataSource,
     private val userStateRepository: UserStateRepository,
     private val sessionStorage: SessionStorage,
     private val getCurrentAccountUseCase: GetCurrentAccountUseCase,
     private val createPasskeyUseCase: CreatePasskeyUseCase,
     private val deletePasskeyUseCase: DeletePasskeyUseCase,
+    private val supportsSystemSearchVisibilityToggle: Boolean = false,
 ) : ViewModel() {
     private val _passkeyCreationState = MutableStateFlow<PasskeyCreationState>(PasskeyCreationState.Idle)
     val passkeyCreationState: StateFlow<PasskeyCreationState> = _passkeyCreationState
@@ -62,14 +67,17 @@ class PrivacySettingsViewModel(
 
     val state: StateFlow<PrivacySettingsState> =
         combine(
+            preferencesDataSource.observeSystemSearchVisibilityEnabled(),
             userStateRepository.userData,
             sessionStorage.getSessionFlow(),
             currentAccountFlow,
-        ) { userData, session, account ->
+        ) { isSystemSearchVisibilityEnabled, userData, session, account ->
             PrivacySettingsState(
                 isBiometricsEnabled = userData.securityLevel == AppSecurityLevel.BIOMETRIC,
                 isAuthenticated = session != null,
                 passkeys = account.orDefault().toPasskeyInfoList(),
+                isSystemSearchVisibilityEnabled = isSystemSearchVisibilityEnabled,
+                showSystemSearchVisibilityToggle = supportsSystemSearchVisibilityToggle,
             )
         }.stateIn(
             viewModelScope,
@@ -78,12 +86,20 @@ class PrivacySettingsViewModel(
                 isBiometricsEnabled = false,
                 isAuthenticated = false,
                 passkeys = emptyList(),
+                isSystemSearchVisibilityEnabled = false,
+                showSystemSearchVisibilityToggle = supportsSystemSearchVisibilityToggle,
             ),
         )
 
     fun setBiometricEnabled(enabled: Boolean) {
         viewModelScope.launch {
             userStateRepository.setBiometricEnabled(enabled)
+        }
+    }
+
+    fun setSystemSearchVisibilityEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesDataSource.setSystemSearchVisibilityEnabled(enabled)
         }
     }
 
