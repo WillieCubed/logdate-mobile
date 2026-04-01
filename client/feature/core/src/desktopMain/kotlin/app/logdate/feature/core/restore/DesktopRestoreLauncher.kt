@@ -53,6 +53,12 @@ class DesktopRestoreLauncher :
         _restoreProgress.value = info
     }
 
+    override fun completeRestore(outcome: RestoreOutcome) {
+        _restoreProgress.value = RestoreProgressInfo.Idle
+        completionCallback?.invoke(outcome)
+        Napier.i("Desktop: Restore completed via direct signal: $outcome")
+    }
+
     override fun startFileSelection() {
         currentRestoreJob?.cancel()
         currentRestoreJob =

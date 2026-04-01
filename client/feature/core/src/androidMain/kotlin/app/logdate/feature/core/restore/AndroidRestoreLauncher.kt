@@ -115,6 +115,12 @@ class AndroidRestoreLauncher(
         _restoreProgress.value = info
     }
 
+    override fun completeRestore(outcome: RestoreOutcome) {
+        _restoreProgress.value = RestoreProgressInfo.Idle
+        completionCallback?.invoke(outcome)
+        Napier.i("Restore completed via direct signal: $outcome")
+    }
+
     override fun startFileSelection() {
         val intent =
             Intent(Intent.ACTION_OPEN_DOCUMENT).apply {

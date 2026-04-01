@@ -59,6 +59,12 @@ interface RestoreLauncher {
     fun updateProgress(info: RestoreProgressInfo)
 
     /**
+     * Signals restore completion directly. Called by platform-specific workers
+     * to report final outcome independent of system completion mechanisms.
+     */
+    fun completeRestore(outcome: RestoreOutcome)
+
+    /**
      * Observable progress stream for the current restore operation.
      */
     val restoreProgress: StateFlow<RestoreProgressInfo>

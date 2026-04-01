@@ -125,6 +125,7 @@ class RestoreWorker(
             val summary = result.toSummary(source = sourceLabel)
 
             trySetForeground(notificationHelper.createCompletionInfo())
+            restoreLauncher.completeRestore(RestoreOutcome.Success(summary))
 
             Result.success(
                 workDataOf(
@@ -134,6 +135,7 @@ class RestoreWorker(
         } catch (e: Exception) {
             Napier.e("Restore failed", e)
             trySetForeground(notificationHelper.createErrorInfo(e.message ?: "Restore failed"))
+            restoreLauncher.completeRestore(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
             failure(e.message ?: "Restore failed")
         } finally {
             restoreLauncher.updateProgress(RestoreProgressInfo.Idle)

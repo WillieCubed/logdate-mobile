@@ -75,6 +75,12 @@ class IosRestoreLauncher(
         _restoreProgress.value = info
     }
 
+    override fun completeRestore(outcome: RestoreOutcome) {
+        _restoreProgress.value = RestoreProgressInfo.Idle
+        completionCallback?.invoke(outcome)
+        Napier.i("iOS: Restore completed via direct signal: $outcome")
+    }
+
     override fun startFileSelection() {
         currentRestoreJob?.cancel()
         val picker =
