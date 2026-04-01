@@ -177,7 +177,6 @@ fun ShareJournalContent(
             modifier = Modifier.widthIn(max = 240.dp),
         )
 
-        // Web availability notice
         MaterialContainer {
             SurfaceItem {
                 Row(
@@ -190,7 +189,7 @@ fun ShareJournalContent(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        text = stringResource(Res.string.this_journal_is_available_on_the_web_anyone_with_the_link_can_view_it),
+                        text = stringResource(Res.string.share_journal_description),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
