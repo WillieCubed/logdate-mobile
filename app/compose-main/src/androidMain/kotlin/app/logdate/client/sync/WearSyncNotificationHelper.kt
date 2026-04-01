@@ -1,11 +1,11 @@
 package app.logdate.client.sync
 
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import androidx.core.app.NotificationCompat
 import app.logdate.client.EditorActivity
+import app.logdate.client.notifications.LogDateNotificationChannelKey
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteType
 
@@ -21,10 +21,6 @@ class WearSyncNotificationHelper(
 ) {
     private val notificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-    init {
-        createNotificationChannel()
-    }
 
     /**
      * Posts a notification for a note that was just received from the paired watch.
@@ -63,21 +59,8 @@ class WearSyncNotificationHelper(
         )
     }
 
-    private fun createNotificationChannel() {
-        val channel =
-            NotificationChannel(
-                CHANNEL_ID,
-                "Watch sync",
-                NotificationManager.IMPORTANCE_DEFAULT,
-            ).apply {
-                description = "Notifications when notes sync from your watch"
-                setSound(null, null)
-            }
-        notificationManager.createNotificationChannel(channel)
-    }
-
     companion object {
-        const val CHANNEL_ID = "wear_sync_channel"
+        val CHANNEL_ID = LogDateNotificationChannelKey.WATCH_SYNC.id
         private const val NOTIFICATION_ID_BASE = 3000
 
         /**

@@ -2,8 +2,6 @@ package app.logdate.client.location.tracking
 
 import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
@@ -15,6 +13,7 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.location.history.LocationTracker
+import app.logdate.client.notifications.LogDateNotificationChannelKey
 import app.logdate.client.permissions.PermissionManager
 import app.logdate.client.permissions.PermissionType
 import app.logdate.client.repository.location.LocationCapturePipeline
@@ -100,7 +99,7 @@ class DetailedLocationTrackingService :
     companion object {
         const val ACTION_START = "app.logdate.location.action.START_DETAILED_TRACKING"
         const val ACTION_STOP = "app.logdate.location.action.STOP_DETAILED_TRACKING"
-        private const val CHANNEL_ID = "logdate_location_detail_tracking"
+        private val CHANNEL_ID = LogDateNotificationChannelKey.LOCATION_HISTORY.id
         private const val NOTIFICATION_ID = 1904
         private const val SAMPLE_INTERVAL_SECONDS = 60L
 
@@ -116,7 +115,6 @@ class DetailedLocationTrackingService :
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
     }
 
     override fun onStartCommand(
@@ -188,23 +186,6 @@ class DetailedLocationTrackingService :
                     delay(SAMPLE_INTERVAL_SECONDS.seconds)
                 }
             }
-    }
-
-    private fun createNotificationChannel() {
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channel =
-            NotificationChannel(
-                CHANNEL_ID,
-                "Location history",
-                NotificationManager.IMPORTANCE_MIN,
-            ).apply {
-                description = "Keeps your location history up to date in the background."
-                setSound(null, null)
-                enableVibration(false)
-                setShowBadge(false)
-                lockscreenVisibility = Notification.VISIBILITY_SECRET
-            }
-        manager.createNotificationChannel(channel)
     }
 
     private fun buildNotification(): Notification {

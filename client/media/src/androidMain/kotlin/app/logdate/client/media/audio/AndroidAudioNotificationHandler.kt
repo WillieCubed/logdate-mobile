@@ -1,13 +1,13 @@
 package app.logdate.client.media.audio
 
 import android.app.Notification
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import app.logdate.client.media.R
+import app.logdate.client.notifications.LogDateNotificationChannelKey
 import io.github.aakira.napier.Napier
 import kotlin.time.Clock
 
@@ -20,8 +20,8 @@ class AndroidAudioNotificationHandler(
     private val context: Context,
 ) {
     companion object {
-        const val CHANNEL_ID = "audio_recording_channel"
-        const val NOTIFICATION_ID = 1001
+        val CHANNEL_ID = LogDateNotificationChannelKey.AUDIO_RECORDING.id
+        val NOTIFICATION_ID = LogDateNotificationChannelKey.AUDIO_RECORDING.notificationId ?: 1001
 
         // Action constants for the notification buttons
         const val ACTION_PAUSE = "app.logdate.action.PAUSE_RECORDING"
@@ -31,28 +31,6 @@ class AndroidAudioNotificationHandler(
 
     private val notificationManager by lazy {
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-    }
-
-    init {
-        createNotificationChannel()
-    }
-
-    /**
-     * Creates notification channel for Android O+
-     */
-    private fun createNotificationChannel() {
-        val channel =
-            NotificationChannel(
-                CHANNEL_ID,
-                context.getString(R.string.audio_recording_channel_name),
-                NotificationManager.IMPORTANCE_LOW,
-            ).apply {
-                description = context.getString(R.string.audio_recording_notification_text)
-                setSound(null, null)
-                enableVibration(false)
-            }
-        notificationManager.createNotificationChannel(channel)
-        Napier.d("Created notification channel for audio recording")
     }
 
     /**

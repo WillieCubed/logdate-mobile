@@ -70,6 +70,7 @@ include(":client:sharing")
 include(":client:permissions")
 include(":client:util")
 include(":client:billing")
+include(":client:notifications")
 include(":client:sync")
 include(":client:health-connect")
 // Client Features

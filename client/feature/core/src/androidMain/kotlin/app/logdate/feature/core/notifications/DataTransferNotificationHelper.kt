@@ -1,6 +1,5 @@
 package app.logdate.feature.core.notifications
 
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.ServiceInfo
@@ -25,12 +24,6 @@ abstract class DataTransferNotificationHelper(
     protected abstract val notificationId: Int
 
     @get:StringRes
-    protected abstract val channelNameResId: Int
-
-    @get:StringRes
-    protected abstract val channelDescriptionResId: Int
-
-    @get:StringRes
     protected abstract val progressTitleResId: Int
 
     @get:StringRes
@@ -39,12 +32,8 @@ abstract class DataTransferNotificationHelper(
     @get:StringRes
     protected abstract val failedTitleResId: Int
 
-    private val notificationManager =
+    protected val notificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-    init {
-        createNotificationChannel()
-    }
 
     /**
      * Builds a foreground-service notification with a progress bar and cancel action.
@@ -126,18 +115,5 @@ abstract class DataTransferNotificationHelper(
             notification,
             ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
         )
-    }
-
-    private fun createNotificationChannel() {
-        val channel =
-            NotificationChannel(
-                channelId,
-                context.getString(channelNameResId),
-                NotificationManager.IMPORTANCE_LOW,
-            ).apply {
-                description = context.getString(channelDescriptionResId)
-                setSound(null, null)
-            }
-        notificationManager.createNotificationChannel(channel)
     }
 }

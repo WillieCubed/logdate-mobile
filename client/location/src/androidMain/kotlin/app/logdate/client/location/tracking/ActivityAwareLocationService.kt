@@ -2,8 +2,6 @@ package app.logdate.client.location.tracking
 
 import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
@@ -15,6 +13,7 @@ import android.os.Looper
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import app.logdate.client.location.history.LocationTracker
+import app.logdate.client.notifications.LogDateNotificationChannelKey
 import app.logdate.client.permissions.PermissionManager
 import app.logdate.client.permissions.PermissionType
 import app.logdate.client.repository.location.LocationCapturePipeline
@@ -103,8 +102,8 @@ class ActivityAwareLocationService :
     companion object {
         const val ACTION_START = "app.logdate.location.action.START_ACTIVITY_AWARE_TRACKING"
         const val ACTION_STOP = "app.logdate.location.action.STOP_ACTIVITY_AWARE_TRACKING"
-        private const val CHANNEL_ID = "logdate_location_active_tracking"
-        private const val NOTIFICATION_ID = 1905
+        private val CHANNEL_ID = LogDateNotificationChannelKey.LOCATION_HISTORY.id
+        private val NOTIFICATION_ID = LogDateNotificationChannelKey.LOCATION_HISTORY.notificationId ?: 1905
         private const val ACTIVITY_TRANSITION_REQUEST_CODE = 1906
 
         /**
@@ -132,7 +131,6 @@ class ActivityAwareLocationService :
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         activityRecognitionClient = ActivityRecognition.getClient(this)
         instance = this
-        createNotificationChannel()
     }
 
     override fun onStartCommand(
@@ -340,23 +338,6 @@ class ActivityAwareLocationService :
                 }
         }
         activityTransitionPendingIntent = null
-    }
-
-    private fun createNotificationChannel() {
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channel =
-            NotificationChannel(
-                CHANNEL_ID,
-                "Location history",
-                NotificationManager.IMPORTANCE_MIN,
-            ).apply {
-                description = "Keeps your location history up to date in the background."
-                setSound(null, null)
-                enableVibration(false)
-                setShowBadge(false)
-                lockscreenVisibility = Notification.VISIBILITY_SECRET
-            }
-        manager.createNotificationChannel(channel)
     }
 
     private fun buildNotification(): Notification {

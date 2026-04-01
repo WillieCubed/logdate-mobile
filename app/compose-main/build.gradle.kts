@@ -125,6 +125,7 @@ kotlin {
             implementation(libs.koin.android)
             implementation(libs.koin.androidx.workmanager)
             implementation(projects.client.feature.androidWidgets)
+            implementation(projects.client.notifications)
             implementation(libs.material)
             implementation(libs.play.app.update.ktx)
             implementation(libs.play.feature.delivery.ktx)

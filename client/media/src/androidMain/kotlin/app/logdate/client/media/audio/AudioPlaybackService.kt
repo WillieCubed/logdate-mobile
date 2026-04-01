@@ -11,12 +11,13 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
-import app.logdate.client.media.R
+import app.logdate.client.notifications.AndroidLogDateNotificationCatalog
+import app.logdate.client.notifications.LogDateNotificationChannelKey
 
 class AudioPlaybackService : MediaSessionService() {
     companion object {
-        const val CHANNEL_ID = "audio_playback_channel"
-        const val NOTIFICATION_ID = 2002
+        val CHANNEL_ID = LogDateNotificationChannelKey.AUDIO_PLAYBACK.id
+        val NOTIFICATION_ID = LogDateNotificationChannelKey.AUDIO_PLAYBACK.notificationId ?: 2002
     }
 
     private var mediaSession: MediaSession? = null
@@ -50,7 +51,7 @@ class AudioPlaybackService : MediaSessionService() {
                 .Builder(this)
                 .setNotificationId(NOTIFICATION_ID)
                 .setChannelId(CHANNEL_ID)
-                .setChannelName(R.string.audio_playback_channel_name)
+                .setChannelName(AndroidLogDateNotificationCatalog.channel(LogDateNotificationChannelKey.AUDIO_PLAYBACK).nameResId)
                 .build()
         setMediaNotificationProvider(notificationProvider)
 

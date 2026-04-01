@@ -3,6 +3,7 @@ package app.logdate.feature.core.restore
 import android.content.Context
 import androidx.work.ForegroundInfo
 import app.logdate.client.feature.core.R
+import app.logdate.client.notifications.LogDateNotificationChannelKey
 import app.logdate.feature.core.notifications.DataTransferNotificationHelper
 
 /**
@@ -14,10 +15,8 @@ class RestoreNotificationHelper(
     context: Context,
     workId: java.util.UUID,
 ) : DataTransferNotificationHelper(context, workId) {
-    override val channelId = "restore_channel"
-    override val notificationId = 1002
-    override val channelNameResId = R.string.restore_channel_name
-    override val channelDescriptionResId = R.string.restore_channel_description
+    override val channelId = LogDateNotificationChannelKey.DATA_RESTORE.id
+    override val notificationId = LogDateNotificationChannelKey.DATA_RESTORE.notificationId ?: 1002
     override val progressTitleResId = R.string.restore_title_progress
     override val completeTitleResId = R.string.restore_title_complete
     override val failedTitleResId = R.string.restore_title_failed

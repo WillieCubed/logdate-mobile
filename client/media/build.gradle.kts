@@ -68,6 +68,7 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.koin.android)
+            implementation(projects.client.notifications)
             implementation(libs.androidx.work.runtime)
             implementation(libs.media3.exoplayer)
             implementation(libs.media3.common)

@@ -67,6 +67,7 @@ kotlin {
             implementation(libs.play.services.maps)
             implementation(libs.google.maps.places)
             implementation(libs.koin.android)
+            implementation(projects.client.notifications)
             implementation(libs.androidx.work.runtime)
             implementation(libs.koin.androidx.workmanager)
         }

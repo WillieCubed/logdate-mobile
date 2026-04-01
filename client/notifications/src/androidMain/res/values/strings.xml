@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_group_capture_playback">Capture &amp; playback</string>
+    <string name="notification_group_background_services">Background services</string>
+    <string name="notification_group_connected_devices">Connected devices</string>
+    <string name="notification_group_import_export">Import &amp; export</string>
+
+    <string name="notification_channel_audio_recording_name">Audio recording</string>
+    <string name="notification_channel_audio_recording_description">Keeps recording controls available while you capture audio.</string>
+    <string name="notification_channel_audio_playback_name">Audio playback</string>
+    <string name="notification_channel_audio_playback_description">Shows playback controls while you listen to saved audio notes.</string>
+    <string name="notification_channel_location_history_name">Location history</string>
+    <string name="notification_channel_location_history_description">Keeps location history tracking running in the background.</string>
+    <string name="notification_channel_watch_sync_name">Watch sync</string>
+    <string name="notification_channel_watch_sync_description">Alerts when entries arrive from your watch.</string>
+    <string name="notification_channel_data_export_name">Data export</string>
+    <string name="notification_channel_data_export_description">Shows progress while exporting your LogDate data.</string>
+    <string name="notification_channel_data_restore_name">Data restore</string>
+    <string name="notification_channel_data_restore_description">Shows progress while restoring your LogDate data.</string>
+
+    <string name="notification_settings_title">Notifications</string>
+    <string name="notification_settings_android_section">Android settings</string>
+    <string name="notification_settings_app_title">All LogDate notifications</string>
+    <string name="notification_settings_app_description">Open Android notification settings for LogDate.</string>
+</resources>

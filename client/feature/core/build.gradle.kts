@@ -107,6 +107,7 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.koin.android)
+            implementation(projects.client.notifications)
             implementation(projects.client.media)
             implementation(libs.androidx.camera.camera2)
             implementation(libs.androidx.camera.lifecycle)

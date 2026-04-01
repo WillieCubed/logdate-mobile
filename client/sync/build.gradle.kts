@@ -76,6 +76,7 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(projects.client.database)
+            implementation(projects.client.notifications)
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.koin.android)
             implementation(libs.koin.androidx.workmanager)

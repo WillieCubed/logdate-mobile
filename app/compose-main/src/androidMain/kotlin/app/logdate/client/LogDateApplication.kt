@@ -8,6 +8,7 @@ import android.util.Log
 import app.logdate.client.image.DataSaverImageInterceptor
 import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.client.networking.DataUsagePolicy
+import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.di.initializeKoin
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
@@ -55,6 +56,11 @@ class LogdateApplication :
         Napier.base(DebugAntilog())
         initializeKoin()
         Log.i(APP_STARTUP_TAG, "Application onCreate: Koin initialized")
+        runCatching {
+            LogDateNotificationRegistrar(this).registerAllPhoneChannels()
+        }.onFailure { error ->
+            Napier.w("Failed to register notification channels on app startup", error)
+        }
         runCatching {
             get<LocationTrackingManager>().startTracking()
         }.onFailure { error ->
