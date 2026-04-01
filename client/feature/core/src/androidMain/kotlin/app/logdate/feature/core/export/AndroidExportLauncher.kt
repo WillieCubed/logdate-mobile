@@ -56,8 +56,9 @@ class AndroidExportLauncher(
                 .removeObserver(workInfoObserver!!)
         }
 
-        // Create new observer — handles terminal states only (completion callback).
-        // Progress is pushed directly by the worker via ExportLauncher.updateProgress().
+        // Create new observer for failure and cancellation states only.
+        // Success completion is signaled via ExportLauncher.updateProgress() flow,
+        // which carries stats. This eliminates race conditions and duplication.
         workInfoObserver =
             Observer { workInfoList ->
                 if (workInfoList.isEmpty()) return@Observer
@@ -66,15 +67,9 @@ class AndroidExportLauncher(
 
                 when (workInfo.state) {
                     WorkInfo.State.SUCCEEDED -> {
-                        _exportProgress.value = ExportProgressInfo()
-                        val filePath = workInfo.outputData.getString(ExportWorker.FILE_PATH_KEY)
-                        if (filePath != null) {
-                            Napier.i("Export completed: $filePath")
-                            completionCallback?.invoke(filePath)
-                        } else {
-                            Napier.w("Export completed but no file path was returned")
-                            completionCallback?.invoke(null)
-                        }
+                        // Success is signaled via updateProgress() by the worker.
+                        // Do nothing here — let the flow be the source of truth.
+                        Napier.i("Export work succeeded")
                     }
                     WorkInfo.State.FAILED, WorkInfo.State.CANCELLED -> {
                         _exportProgress.value = ExportProgressInfo()

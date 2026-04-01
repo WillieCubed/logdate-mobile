@@ -52,19 +52,29 @@ class UserDataExportViewModel(
     private var lastExportOptions: ExportOptions = ExportOptions()
 
     init {
+        // The callback only fires on cancellation/failure (path == null).
+        // Success completion is handled by the exportProgress flow, which carries stats.
+        // Guard against late callbacks overwriting terminal states.
         exportLauncher.setExportCompletionCallback { path ->
-            if (_exportState.value is ExportState.Completed) return@setExportCompletionCallback
             if (path == null) {
                 val current = _exportState.value
-                if (current is ExportState.Exporting) {
-                    _exportState.update { ExportState.Failed("Export was cancelled or failed") }
-                    _isSheetVisible.value = true
-                } else {
-                    _exportState.update { ExportState.Idle }
-                    _isSheetVisible.value = false
+                when (current) {
+                    is ExportState.Exporting -> {
+                        // Export was in progress when failure occurred
+                        _exportState.update { ExportState.Failed("Export was cancelled or failed") }
+                        _isSheetVisible.value = true
+                    }
+                    is ExportState.Selecting -> {
+                        // File picker was cancelled or never started
+                        _exportState.update { ExportState.Idle }
+                        _isSheetVisible.value = false
+                    }
+                    is ExportState.Completed, is ExportState.Failed -> {
+                        // Already in a terminal state, don't overwrite
+                    }
+                    else -> Unit
                 }
             }
-            // Success is handled by the exportProgress flow which carries stats
         }
 
         viewModelScope.launch {
