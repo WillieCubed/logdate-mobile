@@ -2,8 +2,6 @@
 
 package app.logdate.navigation.routes
 
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -14,9 +12,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.scene.Scene
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
-import androidx.navigation3.ui.NavDisplay
 import app.logdate.client.sharing.SharingLauncher
 import app.logdate.feature.library.ui.LibraryScreen
 import app.logdate.feature.library.ui.components.MediaBoundsTransform
@@ -33,20 +29,6 @@ import app.logdate.ui.LocalSharedTransitionScope as FeatureSharedTransitionScope
 
 fun MainAppNavigator.openMediaDetail(mediaId: Uuid) {
     backStack.add(LibraryMediaDetailRoute(mediaId))
-}
-
-private typealias SceneTransition = AnimatedContentTransitionScope<Scene<*>>.() -> ContentTransform
-private typealias PredictiveSceneTransition = AnimatedContentTransitionScope<Scene<*>>.(Int) -> ContentTransform
-
-private data class RouteTransitions(
-    val forward: SceneTransition,
-    val pop: SceneTransition,
-    val predictivePop: PredictiveSceneTransition,
-) {
-    fun toMetadata(): RouteMetadata =
-        NavDisplay.transitionSpec(forward) +
-            NavDisplay.popTransitionSpec(pop) +
-            NavDisplay.predictivePopTransitionSpec(predictivePop)
 }
 
 private val libraryMediaDetailTransitions =

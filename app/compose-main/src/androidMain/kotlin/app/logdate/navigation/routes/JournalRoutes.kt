@@ -1,5 +1,11 @@
 package app.logdate.navigation.routes
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.journals.ui.JournalClickCallback
@@ -58,6 +64,45 @@ fun MainAppNavigator.finishJournalCreation(journalId: Uuid) {
     )
 }
 
+private val journalDetailTransitions =
+    RouteTransitions(
+        forward = {
+            val fromRoute = sceneRouteClass(initialState)
+
+            if (fromRoute == JournalList::class) {
+                // When detail opens from the journals overview, the cover shared element
+                // is the semantic transition. Keep the list scene visible underneath.
+                EnterTransition.None togetherWith ExitTransition.KeepUntilTransitionsFinished
+            } else {
+                slideInHorizontally(initialOffsetX = { it }) togetherWith
+                    slideOutHorizontally(targetOffsetX = { -it })
+            }
+        },
+        pop = {
+            val toRoute = sceneRouteClass(targetState)
+
+            if (toRoute == JournalList::class) {
+                EnterTransition.None togetherWith fadeOut()
+            } else {
+                slideInHorizontally(initialOffsetX = { -it }) togetherWith
+                    slideOutHorizontally(targetOffsetX = { it })
+            }
+        },
+        predictivePop = { _ ->
+            val toRoute = sceneRouteClass(targetState)
+
+            if (toRoute == JournalList::class) {
+                EnterTransition.None togetherWith fadeOut()
+            } else {
+                slideInHorizontally(initialOffsetX = { -it }) togetherWith
+                    slideOutHorizontally(targetOffsetX = { it })
+            }
+        },
+    )
+
+private val journalDetailTransitionMetadata: RouteMetadata =
+    journalDetailTransitions.toMetadata()
+
 /**
  * Provides the navigation routes for journal-related screens.
  */
@@ -86,7 +131,9 @@ fun EntryProviderScope<NavKey>.journalRoutes(
         )
     }
     // Make sure we properly pass the journalId parameter to JournalDetailScreen
-    routeEntry<JournalDetail> { route ->
+    routeEntry<JournalDetail>(
+        metadata = journalDetailTransitionMetadata,
+    ) { route ->
         JournalDetailScreen(
             journalId = route.id,
             onGoBack = onBack,

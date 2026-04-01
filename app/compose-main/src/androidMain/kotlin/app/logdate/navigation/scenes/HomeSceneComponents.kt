@@ -34,14 +34,10 @@ import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.window.core.layout.WindowSizeClass.Companion.HEIGHT_DP_MEDIUM_LOWER_BOUND
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import app.logdate.navigation.LocalSharedTransitionScope
+import app.logdate.ui.common.transitions.TransitionKeys
 import logdate.app.composemain.generated.resources.Res
 import logdate.app.composemain.generated.resources.select_an_entry_to_view_details
 import org.jetbrains.compose.resources.stringResource
-
-/**
- * Shared element key for the FAB to editor transition.
- */
-internal const val FAB_TO_EDITOR_SHARED_ELEMENT_KEY = "fab_to_editor"
 
 // Front-loads the bounds movement so the shape rounding is visible early in the transition
 // rather than only at the very end when the bounds approach FAB size.
@@ -139,7 +135,7 @@ internal fun SharedElementFAB(
                     modifier
                         .shadow(elevation = 6.dp, shape = MaterialTheme.shapes.large, clip = false)
                         .sharedBounds(
-                            rememberSharedContentState(key = FAB_TO_EDITOR_SHARED_ELEMENT_KEY),
+                            rememberSharedContentState(key = TransitionKeys.FAB_TO_EDITOR_TRANSITION),
                             animatedVisibilityScope = animatedContentScope,
                             boundsTransform = FabEditorBoundsTransform,
                             clipInOverlayDuringTransition = OverlayClip(MaterialTheme.shapes.large),

@@ -49,8 +49,6 @@ import org.koin.compose.viewmodel.koinViewModel
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
 val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
 
-private const val FAB_TO_EDITOR_SHARED_ELEMENT_KEY = "fab_to_editor"
-
 @Suppress("ktlint:standard:function-naming")
 @Composable
 fun EntryEditorContent(

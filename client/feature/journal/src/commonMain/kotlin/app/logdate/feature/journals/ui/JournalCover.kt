@@ -33,6 +33,7 @@ import app.logdate.shared.model.Journal
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.common.AspectRatios
+import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
@@ -112,7 +113,9 @@ fun JournalCover(
                 modifier =
                     baseModifier
                         .sharedElement(
-                            sharedTransitionScope.rememberSharedContentState("journal-container-${journal.id}"),
+                            sharedTransitionScope.rememberSharedContentState(
+                                TransitionKeys.journalContainerTransition(journal.id),
+                            ),
                             animatedVisibilityScope,
                         ),
             ) {

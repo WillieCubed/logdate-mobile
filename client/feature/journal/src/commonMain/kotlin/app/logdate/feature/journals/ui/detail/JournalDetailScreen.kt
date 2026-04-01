@@ -77,6 +77,7 @@ import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.common.applyStandardContentWidth
+import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.localTime
 import app.logdate.util.toReadableDateShort
@@ -182,7 +183,9 @@ fun JournalDetailScreenContent(
                             if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                                 with(sharedTransitionScope) {
                                     baseModifier.sharedElement(
-                                        rememberSharedContentState("journal-container-${uiState.journalId}"),
+                                        rememberSharedContentState(
+                                            TransitionKeys.journalContainerTransition(uiState.journalId),
+                                        ),
                                         animatedVisibilityScope,
                                     )
                                 }
