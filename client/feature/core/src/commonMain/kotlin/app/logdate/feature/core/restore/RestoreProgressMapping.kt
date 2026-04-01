@@ -2,7 +2,11 @@ package app.logdate.feature.core.restore
 
 import app.logdate.client.domain.restore.RestoreProgressPhase
 
-internal fun RestoreProgressPhase.toProgressInfo(): RestoreProgressInfo = toRestoreStage().toProgressInfo()
+internal fun RestoreProgressPhase.toProgressInfo(): RestoreProgressInfo =
+    when (this) {
+        RestoreProgressPhase.COMPLETED -> RestoreProgressInfo.Idle
+        else -> toRestoreStage().toProgressInfo()
+    }
 
 internal fun RestoreStage.toProgressInfo(progressPercent: Int = defaultProgressPercent): RestoreProgressInfo =
     RestoreProgressInfo.Active(stage = this, progressPercent = progressPercent)
@@ -16,4 +20,5 @@ private fun RestoreProgressPhase.toRestoreStage(): RestoreStage =
         RestoreProgressPhase.RESTORING_PROFILE -> RestoreStage.RESTORING_PROFILE
         RestoreProgressPhase.RESTORING_PLACES -> RestoreStage.RESTORING_PLACES
         RestoreProgressPhase.RESTORING_LOCATION_HISTORY -> RestoreStage.RESTORING_LOCATION_HISTORY
+        RestoreProgressPhase.COMPLETED -> error("COMPLETED should be handled in toProgressInfo()")
     }
