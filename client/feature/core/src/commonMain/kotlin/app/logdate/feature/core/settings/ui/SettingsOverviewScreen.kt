@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -489,14 +488,7 @@ private fun SettingsIdentityCard(
             }
         }
 
-        FilledTonalButton(
-            onClick = onEditProfile,
-            colors =
-                ButtonDefaults.filledTonalButtonColors(
-                    containerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f),
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                ),
-        ) {
+        FilledTonalButton(onClick = onEditProfile) {
             Text(stringResource(Res.string.edit_profile))
         }
     }
