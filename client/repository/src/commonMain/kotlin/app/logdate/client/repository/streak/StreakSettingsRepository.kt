@@ -1,4 +1,4 @@
-package app.logdate.client.domain.streak
+package app.logdate.client.repository.streak
 
 import kotlinx.coroutines.flow.Flow
 

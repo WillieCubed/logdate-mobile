@@ -24,8 +24,11 @@ import app.logdate.client.data.profile.OfflineFirstProfileRepository
 import app.logdate.client.data.quota.StubRemoteQuotaDataSource
 import app.logdate.client.data.rewind.DefaultRewindGenerationManager
 import app.logdate.client.data.rewind.OfflineFirstRewindRepository
+import app.logdate.client.data.search.AndroidPlatformSearchIndexManager
+import app.logdate.client.data.search.AndroidPlatformSearchRepository
 import app.logdate.client.data.search.DataStoreRecentSearchesRepository
 import app.logdate.client.data.search.OfflineFirstSearchRepository
+import app.logdate.client.data.streak.DefaultStreakSettingsRepository
 import app.logdate.client.data.timeline.OfflineFirstActivityTimelineRepository
 import app.logdate.client.data.transcription.OfflineFirstTranscriptionRepository
 import app.logdate.client.data.user.DefaultUserDeviceRepository
@@ -56,12 +59,14 @@ import app.logdate.client.repository.rewind.RewindGenerationManager
 import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.client.repository.search.RecentSearchesRepository
 import app.logdate.client.repository.search.SearchRepository
+import app.logdate.client.repository.streak.StreakSettingsRepository
 import app.logdate.client.repository.timeline.ActivityTimelineRepository
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.repository.user.devices.UserDeviceRepository
 import app.logdate.shared.config.configModule
 import kotlinx.serialization.json.Json
+import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -170,8 +175,27 @@ actual val dataModule: Module =
         }
 
         // Search
-        single<SearchRepository> { OfflineFirstSearchRepository(get()) }
+        single { OfflineFirstSearchRepository(get()) }
+        single(createdAtStart = true) {
+            AndroidPlatformSearchIndexManager(
+                context = androidContext(),
+                searchDao = get(),
+                preferencesDataSource = get(),
+                externalScope = get(),
+            ).also { manager ->
+                manager.ensureStarted()
+            }
+        }
+        single<SearchRepository> {
+            AndroidPlatformSearchRepository(
+                appSearchIndexManager = get(),
+                roomSearchRepository = get(),
+            )
+        }
         single<RecentSearchesRepository> { DataStoreRecentSearchesRepository(get()) }
+
+        // Streaks
+        single<StreakSettingsRepository> { DefaultStreakSettingsRepository(get()) }
 
         // Integrity
         single { DataIntegrityService(get(), get(), get(), get()) }

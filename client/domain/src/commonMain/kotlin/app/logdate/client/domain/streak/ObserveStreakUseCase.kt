@@ -1,5 +1,6 @@
 package app.logdate.client.domain.streak
 
+import app.logdate.client.repository.streak.StreakSettingsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 

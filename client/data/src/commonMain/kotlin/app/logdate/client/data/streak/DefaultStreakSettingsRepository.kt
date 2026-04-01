@@ -1,6 +1,7 @@
-package app.logdate.client.domain.streak
+package app.logdate.client.data.streak
 
 import app.logdate.client.datastore.KeyValueStorage
+import app.logdate.client.repository.streak.StreakSettingsRepository
 import kotlinx.coroutines.flow.Flow
 
 /**

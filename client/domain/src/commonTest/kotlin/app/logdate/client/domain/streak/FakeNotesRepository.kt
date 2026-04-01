@@ -51,4 +51,9 @@ class FakeNotesRepository(
     override suspend fun getNoteById(noteId: Uuid): JournalNote? = null
 
     override suspend fun getNotesForDay(day: LocalDate): List<JournalNote> = notesPerDay[day] ?: emptyList()
+
+    override suspend fun getDatesWithEntries(
+        start: LocalDate,
+        end: LocalDate,
+    ): Set<LocalDate> = notesPerDay.keys.filter { it in start..end }.toSet()
 }

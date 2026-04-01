@@ -1,22 +1,30 @@
 package app.logdate.client.domain.streak
 
+import app.logdate.client.repository.streak.StreakSettingsRepository
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Recalculates the current streak and persists it to the cache.
  *
- * Call this at app startup, after saving a note, or when opening the streak settings.
+ * Uses a mutex to coalesce concurrent calls — if multiple ViewModels
+ * trigger a refresh simultaneously, only one calculation runs at a time.
  */
 class RefreshStreakUseCase(
     private val calculateStreakUseCase: CalculateStreakUseCase,
     private val streakSettingsRepository: StreakSettingsRepository,
 ) {
+    private val refreshMutex = Mutex()
+
     suspend operator fun invoke() {
-        try {
-            val streak = calculateStreakUseCase()
-            streakSettingsRepository.setCachedStreak(streak)
-        } catch (e: Exception) {
-            Napier.e("Failed to refresh streak", e)
+        refreshMutex.withLock {
+            try {
+                val streak = calculateStreakUseCase()
+                streakSettingsRepository.setCachedStreak(streak)
+            } catch (e: Exception) {
+                Napier.e("Failed to refresh streak", e)
+            }
         }
     }
 }

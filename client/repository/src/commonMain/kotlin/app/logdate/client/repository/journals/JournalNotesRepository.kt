@@ -4,7 +4,11 @@ import app.logdate.util.UuidSerializer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -84,6 +88,23 @@ interface JournalNotesRepository {
      * Fetches all notes for a single calendar day.
      */
     suspend fun getNotesForDay(day: LocalDate): List<JournalNote> = observeNotesForDay(day).first()
+
+    /**
+     * Returns the set of dates that have at least one entry within the given range.
+     * Used for streak calculation without loading full note contents.
+     */
+    suspend fun getDatesWithEntries(
+        start: LocalDate,
+        end: LocalDate,
+    ): Set<LocalDate> {
+        val timezone = TimeZone.currentSystemDefault()
+        val startInstant = start.atStartOfDayIn(timezone)
+        val endInstant = end.plus(1, DateTimeUnit.DAY).atStartOfDayIn(timezone)
+        return observeNotesInRange(startInstant, endInstant)
+            .first()
+            .map { it.creationTimestamp.toLocalDateTime(timezone).date }
+            .toSet()
+    }
 
     /**
      * Fetches a specific note by its ID. Used for loading entries for editing in new windows.
