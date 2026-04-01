@@ -197,7 +197,9 @@ fun CanvasEditorScreen(
                             viewModel.startTextEditing()
                         }
                     }
-                    else -> { /* STICKER handled in later phases */ }
+                    CanvasTool.STICKER -> {
+                        viewModel.setShelfMode(ShelfMode.Stickers)
+                    }
                 }
             }
 
@@ -439,11 +441,7 @@ private fun ShelfPhotoStrip(
         items(photos, key = { it.mediaUri }) { photo ->
             ShelfPhotoItem(
                 photo = photo,
-                onTap = {
-                    // For now, tap places at canvas center. Full drag gesture comes with
-                    // the transform overlay in Phase 3 refinement.
-                    onPhotoDrag(photo, 0f, 0f)
-                },
+                onTap = { onPhotoDrag(photo, 0f, 0f) },
             )
         }
     }

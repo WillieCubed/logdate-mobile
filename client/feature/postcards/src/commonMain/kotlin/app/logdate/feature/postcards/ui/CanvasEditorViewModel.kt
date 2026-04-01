@@ -260,10 +260,9 @@ class CanvasEditorViewModel(
     }
 
     /**
-     * Signals the end of a drag gesture. No-op currently — undo was pushed in [beginDrag].
+     * Signals the end of a drag gesture. Undo was already pushed in [beginDrag].
      */
     fun endDrag() {
-        // Intentionally empty. Undo snapshot was captured in beginDrag().
     }
 
     /**

@@ -8,10 +8,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import app.logdate.feature.postcards.model.InkPoint
 import app.logdate.feature.postcards.model.InkTool
@@ -90,56 +89,64 @@ fun InkCaptureOverlay(
                 .pointerInput(tool, color, strokeWidth) {
                     awaitPointerEventScope {
                         while (true) {
-                            val down = awaitPointerEvent().changes.firstOrNull() ?: continue
-                            if (down.pressed) {
-                                state.beginStroke(
-                                    down.position.x,
-                                    down.position.y,
-                                    down.pressure,
-                                )
-                                // Track drag
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    val change = event.changes.firstOrNull() ?: break
-                                    if (!change.pressed) {
-                                        val points = state.endStroke()
-                                        if (points.size >= 2) {
-                                            onStrokeComplete(points)
-                                        }
-                                        break
-                                    }
-                                    state.addPoint(
-                                        change.position.x,
-                                        change.position.y,
-                                        change.pressure,
-                                    )
+                            val event = awaitPointerEvent()
+                            val down = event.changes.firstOrNull() ?: continue
+                            if (!down.pressed) continue
+
+                            // Palm rejection: if a stylus started this stroke,
+                            // ignore subsequent touch input from fingers.
+                            val isStylus =
+                                down.type == PointerType.Stylus ||
+                                    down.type == PointerType.Eraser
+
+                            state.beginStroke(
+                                down.position.x,
+                                down.position.y,
+                                down.pressure,
+                            )
+
+                            while (true) {
+                                val dragEvent = awaitPointerEvent()
+                                val change = dragEvent.changes.firstOrNull() ?: break
+
+                                // Reject finger input when a stylus stroke is active
+                                if (isStylus && change.type == PointerType.Touch) {
                                     change.consume()
+                                    continue
                                 }
+
+                                if (!change.pressed) {
+                                    val points = state.endStroke()
+                                    if (points.size >= 2) {
+                                        onStrokeComplete(points)
+                                    }
+                                    break
+                                }
+                                state.addPoint(
+                                    change.position.x,
+                                    change.position.y,
+                                    change.pressure,
+                                )
+                                change.consume()
                             }
                         }
                     }
                 },
     ) {
-        // Render in-progress stroke
         val points = state.points
         if (points.size >= 2) {
-            val path =
-                Path().apply {
-                    moveTo(points[0].x, points[0].y)
-                    for (i in 1 until points.size) {
-                        lineTo(points[i].x, points[i].y)
-                    }
-                }
-            drawPath(
-                path = path,
-                color = parsedColor.copy(alpha = alpha),
-                style =
-                    Stroke(
-                        width = strokeWidth,
-                        cap = StrokeCap.Round,
-                        join = StrokeJoin.Round,
-                    ),
-            )
+            for (i in 1 until points.size) {
+                val prev = points[i - 1]
+                val curr = points[i]
+                val segmentWidth = strokeWidth * ((prev.pressure + curr.pressure) / 2f)
+                drawLine(
+                    color = parsedColor.copy(alpha = alpha),
+                    start = Offset(prev.x, prev.y),
+                    end = Offset(curr.x, curr.y),
+                    strokeWidth = segmentWidth.coerceAtLeast(0.5f),
+                    cap = StrokeCap.Round,
+                )
+            }
         }
     }
 }

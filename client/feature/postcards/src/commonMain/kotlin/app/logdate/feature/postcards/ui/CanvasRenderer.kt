@@ -1,13 +1,13 @@
 package app.logdate.feature.postcards.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,7 +21,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -119,14 +118,13 @@ private fun ElementWrapper(
 }
 
 /**
- * Draws visual selection indicators: a dashed border and corner handles.
+ * Draws selection indicators: a dashed border with corner and edge resize handles.
+ * Corner handles indicate pinch-to-resize; edge handles reinforce the affordance.
  */
 @Composable
 private fun SelectionChrome(element: CanvasElement) {
     val accentColor = MaterialTheme.colorScheme.primary
     val transform = element.transform
-
-    // Determine the element's rendered size for the selection frame
     val (widthDp, heightDp) = elementSizeDp(element)
 
     Box(
@@ -152,8 +150,10 @@ private fun SelectionChrome(element: CanvasElement) {
                     )
                 },
     ) {
-        // Corner handles
-        val handleSize = 10.dp
+        val cornerSize = 12.dp
+        val edgeSize = 8.dp
+
+        // Corner resize handles (filled accent circles)
         for (alignment in listOf(
             Alignment.TopStart,
             Alignment.TopEnd,
@@ -167,20 +167,50 @@ private fun SelectionChrome(element: CanvasElement) {
                         .offset(
                             x =
                                 when (alignment) {
-                                    Alignment.TopStart, Alignment.BottomStart -> -(handleSize / 2)
-                                    else -> handleSize / 2
+                                    Alignment.TopStart, Alignment.BottomStart -> -(cornerSize / 2)
+                                    else -> cornerSize / 2
                                 },
                             y =
                                 when (alignment) {
-                                    Alignment.TopStart, Alignment.TopEnd -> -(handleSize / 2)
-                                    else -> handleSize / 2
+                                    Alignment.TopStart, Alignment.TopEnd -> -(cornerSize / 2)
+                                    else -> cornerSize / 2
                                 },
-                        ).size(handleSize)
-                        .border(2.dp, accentColor, CircleShape)
+                        ).size(cornerSize)
                         .drawBehind {
                             drawCircle(color = Color.White, style = Fill)
+                            drawCircle(color = accentColor, style = Fill, radius = size.minDimension / 3f)
                             drawCircle(color = accentColor, style = Stroke(width = 2.dp.toPx()))
                         },
+            )
+        }
+
+        // Edge midpoint handles (smaller accent squares)
+        for (alignment in listOf(
+            Alignment.TopCenter,
+            Alignment.BottomCenter,
+            Alignment.CenterStart,
+            Alignment.CenterEnd,
+        )) {
+            Box(
+                modifier =
+                    Modifier
+                        .align(alignment)
+                        .offset(
+                            x =
+                                when (alignment) {
+                                    Alignment.CenterStart -> -(edgeSize / 2)
+                                    Alignment.CenterEnd -> edgeSize / 2
+                                    else -> 0.dp
+                                },
+                            y =
+                                when (alignment) {
+                                    Alignment.TopCenter -> -(edgeSize / 2)
+                                    Alignment.BottomCenter -> edgeSize / 2
+                                    else -> 0.dp
+                                },
+                        ).size(edgeSize)
+                        .background(Color.White, MaterialTheme.shapes.extraSmall)
+                        .border(1.5.dp, accentColor, MaterialTheme.shapes.extraSmall),
             )
         }
     }
@@ -192,7 +222,7 @@ private fun SelectionChrome(element: CanvasElement) {
 internal fun elementSizeDp(element: CanvasElement): Pair<Float, Float> =
     when (element) {
         is CanvasElement.Photo -> 200f to 200f
-        is CanvasElement.Text -> 150f to 40f // Approximate — text is variable
+        is CanvasElement.Text -> 150f to 40f
         is CanvasElement.Ink -> {
             if (element.points.size < 2) {
                 0f to 0f
@@ -292,30 +322,25 @@ private fun InkElementRenderer(element: CanvasElement.Ink) {
                     scaleY = transform.scaleY
                 },
     ) {
-        val path =
-            Path().apply {
-                moveTo(points[0].x, points[0].y)
-                for (i in 1 until points.size) {
-                    lineTo(points[i].x, points[i].y)
-                }
-            }
-
         val alpha =
             when (element.tool) {
                 InkTool.HIGHLIGHTER -> 0.4f
                 else -> 1f
             }
+        val strokeColor = parseColor(element.color).copy(alpha = alpha)
 
-        drawPath(
-            path = path,
-            color = parseColor(element.color).copy(alpha = alpha),
-            style =
-                Stroke(
-                    width = element.strokeWidth,
-                    cap = StrokeCap.Round,
-                    join = StrokeJoin.Round,
-                ),
-        )
+        for (i in 1 until points.size) {
+            val prev = points[i - 1]
+            val curr = points[i]
+            val segmentWidth = element.strokeWidth * ((prev.pressure + curr.pressure) / 2f)
+            drawLine(
+                color = strokeColor,
+                start = Offset(prev.x, prev.y),
+                end = Offset(curr.x, curr.y),
+                strokeWidth = segmentWidth.coerceAtLeast(0.5f),
+                cap = StrokeCap.Round,
+            )
+        }
     }
 }
 
