@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.journals.DeleteJournalUseCase
 import app.logdate.client.domain.journals.GetJournalByIdUseCase
 import app.logdate.client.domain.journals.UpdateJournalUseCase
+import app.logdate.client.repository.journals.JournalContentRepository
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.sharing.SharingLauncher
 import app.logdate.shared.model.Journal
 import io.github.aakira.napier.Napier
@@ -17,8 +19,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlin.uuid.Uuid
 
 /**
@@ -30,6 +35,7 @@ class JournalSettingsViewModel(
     private val getJournalByIdUseCase: GetJournalByIdUseCase,
     private val updateJournalUseCase: UpdateJournalUseCase,
     private val deleteJournalUseCase: DeleteJournalUseCase,
+    private val journalContentRepository: JournalContentRepository,
     private val sharingLauncher: SharingLauncher,
 ) : ViewModel() {
     private val journalIdState = MutableStateFlow<Uuid?>(null)
@@ -44,6 +50,8 @@ class JournalSettingsViewModel(
                 getJournalByIdUseCase(id)
                     .combine(editedNameState) { journal, editedName -> journal to editedName }
                     .combine(editedDescriptionState) { (journal, editedName), editedDesc ->
+                        Triple(journal, editedName, editedDesc)
+                    }.combine(journalContentRepository.observeContentForJournal(id)) { (journal, editedName, editedDesc), notes ->
                         val nameToUse = editedName ?: journal.title
                         val descToUse = editedDesc ?: journal.description
                         val hasChanges = nameToUse != journal.title || descToUse != journal.description
@@ -53,6 +61,7 @@ class JournalSettingsViewModel(
                             editedName = nameToUse,
                             editedDescription = descToUse,
                             hasUnsavedChanges = hasChanges,
+                            insights = computeInsights(notes),
                         )
                     }
             }.stateIn(
@@ -60,6 +69,35 @@ class JournalSettingsViewModel(
                 SharingStarted.WhileSubscribed(5000),
                 JournalSettingsUiState.Unknown,
             )
+
+    private fun computeInsights(notes: List<JournalNote>): JournalInsights {
+        val textCount = notes.count { it is JournalNote.Text }
+        val imageCount = notes.count { it is JournalNote.Image }
+        val videoCount = notes.count { it is JournalNote.Video }
+        val audioCount = notes.count { it is JournalNote.Audio }
+
+        val timestamps = notes.map { it.creationTimestamp }
+        val oldest = timestamps.minOrNull()
+        val newest = timestamps.maxOrNull()
+
+        val tz = TimeZone.currentSystemDefault()
+        val mostActiveDay =
+            timestamps
+                .groupBy { it.toLocalDateTime(tz).date }
+                .maxByOrNull { it.value.size }
+                ?.key
+
+        return JournalInsights(
+            entryCount = notes.size,
+            textCount = textCount,
+            imageCount = imageCount,
+            videoCount = videoCount,
+            audioCount = audioCount,
+            oldestEntry = oldest,
+            newestEntry = newest,
+            mostActiveDay = mostActiveDay,
+        )
+    }
 
     /**
      * Sets the journal ID to load.
@@ -167,7 +205,22 @@ sealed class JournalSettingsUiState {
         val editedName: String = journal.title,
         val editedDescription: String = journal.description,
         val hasUnsavedChanges: Boolean = false,
+        val insights: JournalInsights? = null,
     ) : JournalSettingsUiState()
 
     data object Unknown : JournalSettingsUiState()
 }
+
+/**
+ * Aggregate statistics about a journal's contents.
+ */
+data class JournalInsights(
+    val entryCount: Int,
+    val textCount: Int,
+    val imageCount: Int,
+    val videoCount: Int,
+    val audioCount: Int,
+    val oldestEntry: kotlin.time.Instant?,
+    val newestEntry: kotlin.time.Instant?,
+    val mostActiveDay: kotlinx.datetime.LocalDate?,
+)

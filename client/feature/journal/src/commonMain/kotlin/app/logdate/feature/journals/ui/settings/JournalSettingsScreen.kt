@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
@@ -35,6 +36,8 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -64,6 +67,7 @@ import app.logdate.shared.model.Journal
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
+import app.logdate.util.toReadableDateShort
 import logdate.client.feature.journal.generated.resources.*
 import logdate.client.feature.journal.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
@@ -85,12 +89,10 @@ fun JournalSettingsScreen(
     val state by viewModel.uiState.collectAsState()
     var openDeleteConfirmation by rememberSaveable { mutableStateOf(false) }
 
-    // Set the journal ID when the screen is mounted
     LaunchedEffect(journalId) {
         viewModel.setSelectedJournalId(journalId)
     }
 
-    // Create a scroll behavior for the top app bar
     JournalSettingsScreenContent(
         uiState = state,
         onGoBack = onGoBack,
@@ -217,6 +219,17 @@ fun JournalSettingsScreenContent(
                         )
                     }
 
+                    // Journal insights
+                    val insights = uiState.insights
+                    if (insights != null && insights.entryCount > 0) {
+                        item {
+                            JournalInsightsCard(
+                                insights = insights,
+                                modifier = Modifier.padding(horizontal = Spacing.lg),
+                            )
+                        }
+                    }
+
                     // Journal name section
                     item {
                         JournalNameField(
@@ -261,6 +274,77 @@ fun JournalSettingsScreenContent(
                 DeleteConfirmationDialog(
                     onDismissRequest = onDismissDeleteConfirmation,
                     onConfirmation = onConfirmDelete,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun JournalInsightsCard(
+    insights: JournalInsights,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            ),
+    ) {
+        Column(
+            modifier = Modifier.padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text(
+                text = stringResource(Res.string.journal_insights_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+
+            Text(
+                text = stringResource(Res.string.journal_insights_entries, insights.entryCount),
+                style = MaterialTheme.typography.headlineMedium,
+            )
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                if (insights.textCount > 0) {
+                    Text(
+                        text = stringResource(Res.string.journal_insights_texts, insights.textCount),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (insights.imageCount > 0) {
+                    Text(
+                        text = stringResource(Res.string.journal_insights_photos, insights.imageCount),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (insights.videoCount > 0) {
+                    Text(
+                        text = stringResource(Res.string.journal_insights_videos, insights.videoCount),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (insights.audioCount > 0) {
+                    Text(
+                        text = stringResource(Res.string.journal_insights_recordings, insights.audioCount),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            if (insights.oldestEntry != null && insights.newestEntry != null) {
+                Text(
+                    text = "${insights.oldestEntry.toReadableDateShort()} — ${insights.newestEntry.toReadableDateShort()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

@@ -54,6 +54,7 @@ val journalsFeatureModule: Module =
                 getJournalByIdUseCase = get(),
                 updateJournalUseCase = get(),
                 deleteJournalUseCase = get(),
+                journalContentRepository = get(),
                 sharingLauncher = get(),
             )
         }
