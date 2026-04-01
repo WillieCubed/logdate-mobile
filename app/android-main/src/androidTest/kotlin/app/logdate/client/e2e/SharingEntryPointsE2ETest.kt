@@ -1,0 +1,99 @@
+package app.logdate.client.e2e
+
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.logdate.feature.library.ui.detail.MediaDetailContent
+import app.logdate.feature.library.ui.detail.MediaDetailUiState
+import app.logdate.ui.theme.LogDateTheme
+import app.logdate.ui.timeline.MediaObjectUiState
+import app.logdate.ui.timeline.TimelineSuggestionBlock
+import app.logdate.ui.timeline.TimelineSuggestionBlockType
+import app.logdate.ui.timeline.TimelineSuggestionBlockUiState
+import kotlinx.datetime.LocalDate
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.time.Clock
+import kotlin.uuid.Uuid
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+class SharingEntryPointsE2ETest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    @Test
+    fun timelineMemoryShareAction_emitsCurrentMemoryRecallState() {
+        val memoryState =
+            TimelineSuggestionBlockUiState(
+                type = TimelineSuggestionBlockType.MEMORY_RECALL,
+                message = "Trip to the coast",
+                memoryDate = LocalDate(2024, 7, 4),
+                mediaUris = listOf(MediaObjectUiState(uri = "content://media/coast.jpg", uid = "coast")),
+                people = listOf("Lane"),
+            )
+        var sharedState: TimelineSuggestionBlockUiState? = null
+
+        composeRule.setContent {
+            LogDateTheme(dynamicColor = false) {
+                TimelineSuggestionBlock(
+                    state = memoryState,
+                    onStartWriting = {},
+                    onOpenDraft = {},
+                    onViewMemoryDay = {},
+                    onShareMemory = { sharedState = it },
+                )
+            }
+        }
+
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                composeRule.onNodeWithTag("timeline_memory_share_action").assertExists()
+                true
+            }.getOrDefault(false)
+        }
+
+        composeRule.onNodeWithTag("timeline_memory_share_action").assertIsDisplayed().performClick()
+
+        assertNotNull(sharedState)
+        assertEquals(memoryState, sharedState)
+    }
+
+    @Test
+    fun mediaDetailShareAction_emitsCurrentMediaReference() {
+        val mediaRef = "content://media/external/images/media/42"
+        var sharedMediaRef: String? = null
+
+        composeRule.setContent {
+            LogDateTheme(dynamicColor = false) {
+                MediaDetailContent(
+                    state =
+                        MediaDetailUiState.ImageContent(
+                            noteId = Uuid.random(),
+                            mediaRef = mediaRef,
+                            createdAt = Clock.System.now(),
+                            location = null,
+                        ),
+                    isExpanded = false,
+                    onBack = {},
+                    onShare = { sharedMediaRef = it },
+                )
+            }
+        }
+
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                composeRule.onNodeWithTag("media_detail_share_action").assertExists()
+                true
+            }.getOrDefault(false)
+        }
+
+        composeRule.onNodeWithTag("media_detail_share_action").assertIsDisplayed().performClick()
+
+        assertEquals(mediaRef, sharedMediaRef)
+    }
+}
