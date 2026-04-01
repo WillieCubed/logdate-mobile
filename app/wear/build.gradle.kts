@@ -15,12 +15,12 @@ val baselineProfileRequested =
 
 extensions.configure<ApplicationExtension> {
     namespace = "app.logdate.wear"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "app.logdate.wear"
         minSdk = 31
-        targetSdk = 35
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -84,6 +84,7 @@ dependencies {
 
     // Client dependencies for Wear - shared data infrastructure
     implementation(projects.client.repository)
+    implementation(projects.client.domain)
     implementation(projects.client.data)
     implementation(projects.client.database)
     implementation(projects.client.device)

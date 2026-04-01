@@ -3,6 +3,8 @@ package app.logdate.feature.core.profile.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.profile.UpdateProfileUseCase
+import app.logdate.client.domain.streak.ObserveStreakUseCase
+import app.logdate.client.domain.streak.StreakData
 import app.logdate.client.repository.account.AccountRepository
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.user.UserStateRepository
@@ -14,9 +16,11 @@ import app.logdate.feature.core.profile.ui.createProfileDisplayModel
 import app.logdate.shared.model.profile.LogDateProfile
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.time.Instant
 
@@ -31,6 +35,7 @@ class ProfileViewModel(
     private val accountRepository: AccountRepository,
     private val userStateRepository: UserStateRepository,
     private val updateProfileUseCase: UpdateProfileUseCase,
+    observeStreakUseCase: ObserveStreakUseCase,
 ) : ViewModel() {
     private val _uiState =
         MutableStateFlow(
@@ -42,6 +47,10 @@ class ProfileViewModel(
             ),
         )
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
+
+    val streakData: StateFlow<StreakData> =
+        observeStreakUseCase()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StreakData())
 
     init {
         loadProfile()

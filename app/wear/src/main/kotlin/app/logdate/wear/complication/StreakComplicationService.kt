@@ -9,9 +9,8 @@ import androidx.wear.watchface.complications.data.PlainComplicationText
 import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
-import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.domain.streak.CalculateStreakUseCase
 import app.logdate.wear.R
-import app.logdate.wear.util.StreakCalculator
 
 /**
  * Complication showing the user's current journaling streak.
@@ -51,10 +50,10 @@ class StreakComplicationService : SuspendingComplicationDataSourceService() {
 
     private suspend fun calculateStreak(): Int {
         return try {
-            val repository = org.koin.java.KoinJavaComponent
+            val calculateStreakUseCase = org.koin.java.KoinJavaComponent
                 .getKoin()
-                .get<JournalNotesRepository>()
-            StreakCalculator(repository).calculateStreak()
+                .get<CalculateStreakUseCase>()
+            calculateStreakUseCase()
         } catch (e: Exception) {
             0
         }

@@ -62,7 +62,6 @@ fun WelcomeBackScreenContent(name: String) {
             stringResource(Res.string.onboarding_welcome_back_title, name),
             style = MaterialTheme.typography.headlineMedium,
         )
-        // TODO: Actually reset streak
         Text(
             stringResource(Res.string.onboarding_welcome_back_description_streak_reset),
             style = MaterialTheme.typography.bodyLarge,

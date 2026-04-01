@@ -52,6 +52,12 @@ import app.logdate.client.domain.search.ObserveRecentSearchesUseCase
 import app.logdate.client.domain.search.SearchEntriesUseCase
 import app.logdate.client.domain.search.SearchJournalsUseCase
 import app.logdate.client.domain.search.UniversalSearchUseCase
+import app.logdate.client.domain.streak.CalculateStreakUseCase
+import app.logdate.client.domain.streak.DefaultStreakSettingsRepository
+import app.logdate.client.domain.streak.ObserveStreakUseCase
+import app.logdate.client.domain.streak.RefreshStreakUseCase
+import app.logdate.client.domain.streak.SetStreakEnabledUseCase
+import app.logdate.client.domain.streak.StreakSettingsRepository
 import app.logdate.client.domain.timeline.GetJournalMembershipUseCase
 import app.logdate.client.domain.timeline.GetMediaUrisUseCase
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
@@ -182,6 +188,13 @@ val domainModule: Module =
         factory { GetMemoryRecallUseCase(get(), getOrNull()) }
         factory { GetHomeRecommendationUseCase(get(), get(), get(), get(), get(), get()) }
         single<MemoriesSettingsRepository> { DefaultMemoriesSettingsRepository(get()) }
+
+        // Streaks
+        factory { CalculateStreakUseCase(get()) }
+        factory { ObserveStreakUseCase(get()) }
+        factory { RefreshStreakUseCase(get(), get()) }
+        factory { SetStreakEnabledUseCase(get()) }
+        single<StreakSettingsRepository> { DefaultStreakSettingsRepository(get()) }
 
         // Day boundaries
         single<DayBoundarySettingsRepository> { DefaultDayBoundarySettingsRepository(get(), get()) }

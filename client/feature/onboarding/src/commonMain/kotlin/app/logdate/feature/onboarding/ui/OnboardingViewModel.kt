@@ -8,6 +8,7 @@ import app.logdate.client.domain.dayboundary.HealthConnectStatus
 import app.logdate.client.domain.dayboundary.ObserveHealthConnectStatusUseCase
 import app.logdate.client.domain.identity.ObserveUserIdentityUseCase
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
+import app.logdate.client.domain.streak.RefreshStreakUseCase
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -42,6 +43,7 @@ class OnboardingViewModel(
     private val observeHealthConnectStatus: ObserveHealthConnectStatusUseCase,
     observeUserIdentity: ObserveUserIdentityUseCase,
     private val onboardingDeviceStateRepository: OnboardingDeviceStateRepository,
+    private val refreshStreakUseCase: RefreshStreakUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(OnboardingUiState())
     private val _healthConnectStatus = MutableStateFlow(HealthConnectStatus.CHECKING)
@@ -241,6 +243,7 @@ class OnboardingViewModel(
                 "Required onboarding steps are still incomplete"
             }
             userStateRepository.setIsOnboardingComplete(true)
+            refreshStreakUseCase()
         }
 
     fun firstIncompleteRequiredFreshStep(): OnboardingStep? = progressSnapshot.value.firstIncompleteRequiredFreshStep()

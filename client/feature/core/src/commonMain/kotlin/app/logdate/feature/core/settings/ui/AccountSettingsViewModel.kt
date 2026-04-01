@@ -8,6 +8,9 @@ import app.logdate.client.domain.account.GetCurrentAccountUseCase
 import app.logdate.client.domain.identity.ObserveUserIdentityUseCase
 import app.logdate.client.domain.identity.ResolvedUserIdentity
 import app.logdate.client.domain.profile.UpdateProfileUseCase
+import app.logdate.client.domain.streak.ObserveStreakUseCase
+import app.logdate.client.domain.streak.RefreshStreakUseCase
+import app.logdate.client.domain.streak.StreakData
 import app.logdate.client.repository.account.AccountHostedPlcOperation
 import app.logdate.client.repository.account.AccountIdentityRepository
 import app.logdate.client.repository.account.AccountIdentityStatus
@@ -79,6 +82,8 @@ class AccountSettingsViewModel(
     private val sessionStorage: SessionStorage,
     private val preferencesDataSource: LogdatePreferencesDataSource,
     private val observeUserIdentityUseCase: ObserveUserIdentityUseCase,
+    observeStreakUseCase: ObserveStreakUseCase,
+    private val refreshStreakUseCase: RefreshStreakUseCase,
 ) : ViewModel() {
     private val _profileUpdateState = MutableStateFlow<ProfileUpdateState>(ProfileUpdateState.Idle)
     val profileUpdateState: StateFlow<ProfileUpdateState> = _profileUpdateState
@@ -146,6 +151,10 @@ class AccountSettingsViewModel(
             .observeLibraryEnabled()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    val streakData: StateFlow<StreakData> =
+        observeStreakUseCase()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StreakData())
+
     fun setLibraryEnabled(enabled: Boolean) {
         viewModelScope.launch {
             preferencesDataSource.setLibraryEnabled(enabled)
@@ -153,6 +162,9 @@ class AccountSettingsViewModel(
     }
 
     init {
+        viewModelScope.launch {
+            refreshStreakUseCase()
+        }
         viewModelScope.launch {
             sessionStorage.getSessionFlow().collect { session ->
                 if (session == null) {

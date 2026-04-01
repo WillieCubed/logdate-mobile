@@ -18,8 +18,10 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.RestartAlt
@@ -63,6 +65,8 @@ import logdate.client.feature.core.generated.resources.logging_since
 import logdate.client.feature.core.generated.resources.memories
 import logdate.client.feature.core.generated.resources.memories_description
 import logdate.client.feature.core.generated.resources.navigate_to_title
+import logdate.client.feature.core.generated.resources.notifications_settings
+import logdate.client.feature.core.generated.resources.notifications_settings_description
 import logdate.client.feature.core.generated.resources.privacy_and_security
 import logdate.client.feature.core.generated.resources.privacy_security_description
 import logdate.client.feature.core.generated.resources.profile
@@ -74,6 +78,9 @@ import logdate.client.feature.core.generated.resources.settings_group_data_stora
 import logdate.client.feature.core.generated.resources.settings_group_personal
 import logdate.client.feature.core.generated.resources.settings_group_privacy_security
 import logdate.client.feature.core.generated.resources.sign_in
+import logdate.client.feature.core.generated.resources.streak_day_count
+import logdate.client.feature.core.generated.resources.streaks
+import logdate.client.feature.core.generated.resources.streaks_description
 import logdate.client.feature.core.generated.resources.sync_and_backup
 import logdate.client.feature.core.generated.resources.sync_and_backup_description
 import logdate.client.feature.core.generated.resources.sync_promotion_description
@@ -104,6 +111,8 @@ fun SettingsOverviewScreen(
     onNavigateToPrivacy: () -> Unit,
     onNavigateToLibrarySettings: () -> Unit,
     onNavigateToMemories: () -> Unit,
+    onNavigateToNotifications: (() -> Unit)? = null,
+    onNavigateToStreaks: () -> Unit = {},
     onNavigateToTimeline: () -> Unit,
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
@@ -113,6 +122,7 @@ fun SettingsOverviewScreen(
     viewModel: AccountSettingsViewModel = koinViewModel(),
 ) {
     val identity by viewModel.resolvedIdentity.collectAsState()
+    val streakData by viewModel.streakData.collectAsState()
 
     SettingsOverviewContent(
         onBack = onBack,
@@ -125,6 +135,8 @@ fun SettingsOverviewScreen(
         onNavigateToPrivacy = onNavigateToPrivacy,
         onNavigateToLibrarySettings = onNavigateToLibrarySettings,
         onNavigateToMemories = onNavigateToMemories,
+        onNavigateToNotifications = onNavigateToNotifications,
+        onNavigateToStreaks = onNavigateToStreaks,
         onNavigateToTimeline = onNavigateToTimeline,
         onNavigateToSync = onNavigateToSync,
         onNavigateToExport = onNavigateToExport,
@@ -137,6 +149,7 @@ fun SettingsOverviewScreen(
                 isAuthenticated = identity.isAuthenticated,
             ),
         onboardedDate = identity.onboardedDate ?: Instant.DISTANT_PAST,
+        streakCount = if (streakData.isEnabled) streakData.currentStreak else null,
         modifier = modifier,
     )
 }
@@ -152,6 +165,8 @@ fun SettingsOverviewContent(
     onNavigateToLocation: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
     onNavigateToMemories: () -> Unit,
+    onNavigateToNotifications: (() -> Unit)? = null,
+    onNavigateToStreaks: () -> Unit = {},
     onNavigateToTimeline: () -> Unit = {},
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
@@ -160,6 +175,7 @@ fun SettingsOverviewContent(
     onNavigateToLibrarySettings: () -> Unit = {},
     userProfile: UserProfile,
     onboardedDate: Instant = Instant.DISTANT_PAST,
+    streakCount: Int? = null,
     modifier: Modifier = Modifier,
 ) {
     SettingsScaffold(
@@ -171,6 +187,7 @@ fun SettingsOverviewContent(
             SettingsIdentityCard(
                 userProfile = userProfile,
                 onboardedDate = onboardedDate,
+                streakCount = streakCount,
                 onEditProfile = onNavigateToProfile,
                 modifier = Modifier.padding(horizontal = Spacing.lg),
             )
@@ -199,6 +216,12 @@ fun SettingsOverviewContent(
                     description = stringResource(Res.string.timeline_settings_description),
                     icon = { Icon(Icons.Default.Timeline, contentDescription = null) },
                     onClick = onNavigateToTimeline,
+                )
+                SettingsNavigationItem(
+                    title = stringResource(Res.string.streaks),
+                    description = stringResource(Res.string.streaks_description),
+                    icon = { Icon(Icons.Default.LocalFireDepartment, contentDescription = null) },
+                    onClick = onNavigateToStreaks,
                 )
                 SettingsNavigationItem(
                     title = "Your library",
@@ -247,6 +270,14 @@ fun SettingsOverviewContent(
                     icon = { Icon(Icons.Default.Watch, contentDescription = null) },
                     onClick = onNavigateToWatch,
                 )
+                onNavigateToNotifications?.let { navigateToNotifications ->
+                    SettingsNavigationItem(
+                        title = stringResource(Res.string.notifications_settings),
+                        description = stringResource(Res.string.notifications_settings_description),
+                        icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
+                        onClick = navigateToNotifications,
+                    )
+                }
             }
         }
 
@@ -371,6 +402,7 @@ private fun SettingsIdentityCard(
     userProfile: UserProfile,
     onboardedDate: Instant,
     onEditProfile: () -> Unit,
+    streakCount: Int? = null,
     modifier: Modifier = Modifier,
 ) {
     val displayName = userProfile.name.ifEmpty { userProfile.username.ifEmpty { "You" } }
@@ -425,6 +457,13 @@ private fun SettingsIdentityCard(
             if (yearString != null) {
                 Text(
                     text = stringResource(Res.string.logging_since, yearString),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                )
+            }
+            if (streakCount != null && streakCount > 0) {
+                Text(
+                    text = stringResource(Res.string.streak_day_count, streakCount),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                 )

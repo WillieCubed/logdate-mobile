@@ -1,4 +1,4 @@
-package app.logdate.wear.util
+package app.logdate.client.domain.streak
 
 import app.logdate.client.repository.journals.JournalNotesRepository
 import kotlinx.datetime.DateTimeUnit
@@ -15,26 +15,29 @@ import kotlin.time.Clock
  * giving the user until end of day to maintain it. If neither today nor yesterday
  * has entries, the streak is 0.
  */
-class StreakCalculator(
+class CalculateStreakUseCase(
     private val repository: JournalNotesRepository,
 ) {
-    suspend fun calculateStreak(
-        today: LocalDate = Clock.System.now()
-            .toLocalDateTime(TimeZone.currentSystemDefault())
-            .date,
+    suspend operator fun invoke(
+        today: LocalDate =
+            Clock.System
+                .now()
+                .toLocalDateTime(TimeZone.currentSystemDefault())
+                .date,
     ): Int {
         val todayHasEntries = repository.getNotesForDay(today).isNotEmpty()
 
-        val startDate = if (todayHasEntries) {
-            today
-        } else {
-            val yesterday = today.minus(1, DateTimeUnit.DAY)
-            if (repository.getNotesForDay(yesterday).isNotEmpty()) {
-                yesterday
+        val startDate =
+            if (todayHasEntries) {
+                today
             } else {
-                return 0
+                val yesterday = today.minus(1, DateTimeUnit.DAY)
+                if (repository.getNotesForDay(yesterday).isNotEmpty()) {
+                    yesterday
+                } else {
+                    return 0
+                }
             }
-        }
 
         var streak = 1
         var checkDate = startDate.minus(1, DateTimeUnit.DAY)

@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import app.logdate.client.permissions.rememberHealthConnectPermissionState
+import app.logdate.client.settings.NotificationSettingsScreen
 import app.logdate.feature.core.profile.ui.ProfileScreen
 import app.logdate.feature.core.settings.ui.AccountSettingsScreen
 import app.logdate.feature.core.settings.ui.AdvancedSettingsScreen
@@ -33,6 +34,7 @@ import app.logdate.feature.core.settings.ui.RecommendationSettingsScreen
 import app.logdate.feature.core.settings.ui.ResetAppSettingsScreen
 import app.logdate.feature.core.settings.ui.ResetSettingsScreen
 import app.logdate.feature.core.settings.ui.SettingsOverviewScreen
+import app.logdate.feature.core.settings.ui.StreakSettingsScreen
 import app.logdate.feature.core.settings.ui.SyncSettingsScreen
 import app.logdate.feature.core.settings.ui.TimelineSettingsScreen
 import app.logdate.feature.core.settings.ui.TimelineSettingsViewModel
@@ -57,12 +59,14 @@ import app.logdate.navigation.routes.core.LocationIntervalRoute
 import app.logdate.navigation.routes.core.LocationSettingsRoute
 import app.logdate.navigation.routes.core.LocationTrackingOptionsRoute
 import app.logdate.navigation.routes.core.MemoriesSettingsRoute
+import app.logdate.navigation.routes.core.NotificationsSettingsRoute
 import app.logdate.navigation.routes.core.OnboardingStart
 import app.logdate.navigation.routes.core.PrivacySettingsRoute
 import app.logdate.navigation.routes.core.RecommendationSettingsRoute
 import app.logdate.navigation.routes.core.ResetAppSettingsRoute
 import app.logdate.navigation.routes.core.ResetSettingsRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
+import app.logdate.navigation.routes.core.StreakSettingsRoute
 import app.logdate.navigation.routes.core.SyncSettingsRoute
 import app.logdate.navigation.routes.core.TimelineSettingsRoute
 import app.logdate.navigation.routes.core.WatchNotificationSettingsRoute
@@ -130,6 +134,13 @@ fun MainAppNavigator.openDevicesSettings() {
 }
 
 /**
+ * Opens Android notification settings for the app.
+ */
+fun MainAppNavigator.openNotificationSettings() {
+    backStack.add(NotificationsSettingsRoute)
+}
+
+/**
  * Opens the library settings screen.
  */
 fun MainAppNavigator.openLibrarySettings() {
@@ -169,6 +180,13 @@ fun MainAppNavigator.openResetAppSettings() {
  */
 fun MainAppNavigator.openRecommendationSettings() {
     backStack.add(RecommendationSettingsRoute)
+}
+
+/**
+ * Opens the streak settings detail screen.
+ */
+fun MainAppNavigator.openStreakSettings() {
+    backStack.add(StreakSettingsRoute)
 }
 
 fun MainAppNavigator.openTimelineSettings() {
@@ -276,6 +294,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onOpenLocationTimeline: () -> Unit,
     onNavigateToLibrarySettings: () -> Unit,
     onNavigateToMemories: () -> Unit,
+    onNavigateToNotifications: () -> Unit,
     onNavigateToRecommendations: () -> Unit,
     onNavigateToTimeline: () -> Unit,
     onNavigateToDayBoundary: () -> Unit,
@@ -292,6 +311,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToWatchSync: () -> Unit,
     onNavigateToWatchNotifications: () -> Unit,
     onNavigateToWatchTroubleshooting: () -> Unit,
+    onNavigateToStreaks: () -> Unit = {},
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
 ) {
@@ -312,6 +332,8 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onNavigateToPrivacy = onNavigateToPrivacy,
             onNavigateToLibrarySettings = onNavigateToLibrarySettings,
             onNavigateToMemories = onNavigateToMemories,
+            onNavigateToNotifications = onNavigateToNotifications,
+            onNavigateToStreaks = onNavigateToStreaks,
             onNavigateToTimeline = onNavigateToTimeline,
             onNavigateToSync = onNavigateToSync,
             onNavigateToExport = onNavigateToExport,
@@ -355,6 +377,15 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     ) { _ ->
         DevicesScreen(
             onBackClick = onBack,
+        )
+    }
+
+    // Android notification settings screen (detail pane)
+    routeEntry<NotificationsSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        NotificationSettingsScreen(
+            onBack = onBack,
         )
     }
 
@@ -504,6 +535,15 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
         MemoriesSettingsScreen(
             onBack = onBack,
             onNavigateToRecommendations = onNavigateToRecommendations,
+        )
+    }
+
+    // Streak settings detail (detail pane)
+    routeEntry<StreakSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        StreakSettingsScreen(
+            onBack = onBack,
         )
     }
 

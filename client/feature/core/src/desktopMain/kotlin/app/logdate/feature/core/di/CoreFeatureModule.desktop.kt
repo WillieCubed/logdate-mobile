@@ -61,6 +61,8 @@ actual val coreFeatureModule: Module =
                 get(),
                 get(),
                 get(),
+                get(),
+                get(),
             )
         }
         viewModel {
@@ -70,6 +72,8 @@ actual val coreFeatureModule: Module =
                 get(),
                 get(),
                 get(),
+                get(),
+                supportsSystemSearchVisibilityToggle = false,
             )
         }
         viewModel {
@@ -106,6 +110,7 @@ actual val coreFeatureModule: Module =
         // TODO(desktop): Wire location settings UX and platform permissions; keep settings storage available for now.
         viewModel { LocationSettingsViewModel(get()) }
         viewModel { MemoriesSettingsViewModel(get()) }
+        viewModel { StreakSettingsViewModel(get(), get(), get()) }
         viewModel { TimelineSettingsViewModel(get(), get(), get()) }
-        viewModel { ProfileViewModel(get(), get(), get(), get()) }
+        viewModel { ProfileViewModel(get(), get(), get(), get(), get()) }
     }

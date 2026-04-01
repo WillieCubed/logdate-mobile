@@ -26,6 +26,7 @@ import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.MemoriesSettingsViewModel
 import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
 import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
+import app.logdate.feature.core.settings.ui.StreakSettingsViewModel
 import app.logdate.feature.core.settings.ui.TimelineSettingsViewModel
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import org.koin.android.ext.koin.androidContext
@@ -75,6 +76,8 @@ actual val coreFeatureModule: Module =
                 get(),
                 get(),
                 get(),
+                get(),
+                get(),
             )
         }
         viewModel {
@@ -84,6 +87,8 @@ actual val coreFeatureModule: Module =
                 get(),
                 get(),
                 get(),
+                get(),
+                supportsSystemSearchVisibilityToggle = true,
             )
         }
         viewModel {
@@ -119,8 +124,9 @@ actual val coreFeatureModule: Module =
         viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get()) }
         viewModel { LocationSettingsViewModel(get()) }
         viewModel { MemoriesSettingsViewModel(get()) }
+        viewModel { StreakSettingsViewModel(get(), get(), get()) }
         viewModel { TimelineSettingsViewModel(get(), get(), get()) }
-        viewModel { ProfileViewModel(get(), get(), get(), get()) }
+        viewModel { ProfileViewModel(get(), get(), get(), get(), get()) }
     }
 
 // TODO: Fix this obvious code smell

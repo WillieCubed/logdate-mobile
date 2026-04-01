@@ -199,6 +199,9 @@
     <string name="privacy_and_security">Privacy &amp; Security</string>
     <string name="privacy_policy">Privacy Policy</string>
     <string name="privacy_security_description">Data protection, access controls, and location privacy</string>
+    <string name="system_search_visibility_section">System Search</string>
+    <string name="system_search_visibility_label">Show LogDate in system search</string>
+    <string name="system_search_visibility_description">Allow Android launcher and other system search surfaces to show your LogDate entries and journals.</string>
     <string name="profile">Profile</string>
     <string name="profile_information">Profile Information</string>
     <string name="profile_update_failed">Failed to update profile</string>
@@ -472,6 +475,8 @@
     <string name="passkey_operation_creating_message">Please wait while we create your passkey</string>
     <string name="memories">Memories</string>
     <string name="memories_description">Personalize recommendations and memory recall</string>
+    <string name="notifications_settings">Notifications</string>
+    <string name="notifications_settings_description">Manage Android alerts and notification categories</string>
     <string name="recommendations">Recommendations</string>
     <string name="recommendations_summary_on">Suggestions based on drafts, memories, and location</string>
     <string name="recommendations_summary_off">No timeline suggestions</string>
@@ -498,6 +503,17 @@
     <string name="widget_content_type_photos_description">Images attached to your entries</string>
     <string name="widget_content_type_audio">Audio notes</string>
     <string name="widget_content_type_audio_description">Voice recordings and audio clips</string>
+
+    <!-- Streak settings -->
+    <string name="streaks">Streaks</string>
+    <string name="streaks_description">Track your daily journaling streak</string>
+    <string name="streaks_detail_description">Track how many consecutive days you\'ve journaled. Your streak resets if you miss a day.</string>
+    <string name="track_journaling_streak">Track journaling streak</string>
+    <string name="streak_day_count">%1$d day streak</string>
+    <string name="streak_milestones_info">Milestones at 7, 14, 30, 60, and 100 days are celebrated in your Rewinds.</string>
+    <string name="streak_keep_it_up">Write, photograph, or record something every day to keep your streak alive.</string>
+    <string name="journaling_stats">Journaling stats</string>
+    <string name="current_streak">Current streak</string>
 
     <!-- Watch settings -->
     <string name="watch_settings">Watch</string>

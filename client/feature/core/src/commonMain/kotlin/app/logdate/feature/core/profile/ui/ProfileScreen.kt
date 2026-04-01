@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -59,6 +60,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.client.domain.streak.StreakData
 import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.SettingsSection
@@ -73,14 +75,17 @@ import logdate.client.feature.core.generated.resources.authentication
 import logdate.client.feature.core.generated.resources.back
 import logdate.client.feature.core.generated.resources.birthday
 import logdate.client.feature.core.generated.resources.cancel
+import logdate.client.feature.core.generated.resources.current_streak
 import logdate.client.feature.core.generated.resources.display_name
 import logdate.client.feature.core.generated.resources.edit_display_name
+import logdate.client.feature.core.generated.resources.journaling_stats
 import logdate.client.feature.core.generated.resources.no_display_name
 import logdate.client.feature.core.generated.resources.personal_information
 import logdate.client.feature.core.generated.resources.profile
 import logdate.client.feature.core.generated.resources.profile_photo
 import logdate.client.feature.core.generated.resources.profile_updated_successfully
 import logdate.client.feature.core.generated.resources.save
+import logdate.client.feature.core.generated.resources.streak_day_count
 import logdate.client.feature.core.generated.resources.username_handle
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -94,6 +99,7 @@ fun ProfileScreen(
     viewModel: ProfileViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val streakData by viewModel.streakData.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val profileUpdatedMessage = stringResource(Res.string.profile_updated_successfully)
 
@@ -113,6 +119,7 @@ fun ProfileScreen(
 
     ProfileScreenContent(
         uiState = uiState,
+        streakData = streakData,
         onBack = onBack,
         onNavigateToBirthday = onNavigateToBirthday,
         onStartEditingDisplayName = viewModel::startEditingDisplayName,
@@ -127,6 +134,7 @@ fun ProfileScreen(
 @Composable
 fun ProfileScreenContent(
     uiState: ProfileUiState,
+    streakData: StreakData = StreakData(),
     onBack: () -> Unit,
     onNavigateToBirthday: () -> Unit,
     onStartEditingDisplayName: () -> Unit,
@@ -238,6 +246,22 @@ fun ProfileScreenContent(
                                 },
                                 modifier = Modifier.clickable { onNavigateToBirthday() },
                             )
+                        }
+                    }
+
+                    // Journaling Stats Section (only show when streak tracking is enabled)
+                    if (streakData.isEnabled) {
+                        item {
+                            SettingsSection(
+                                title = stringResource(Res.string.journaling_stats),
+                                modifier = Modifier.padding(horizontal = Spacing.lg),
+                            ) {
+                                ProfileInfoItem(
+                                    icon = Icons.Default.LocalFireDepartment,
+                                    label = stringResource(Res.string.current_streak),
+                                    value = stringResource(Res.string.streak_day_count, streakData.currentStreak),
+                                )
+                            }
                         }
                     }
 
