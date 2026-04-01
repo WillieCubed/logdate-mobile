@@ -30,7 +30,7 @@ import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ElevatedButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -424,57 +424,75 @@ private fun SettingsIdentityCard(
                 .background(MaterialTheme.colorScheme.primaryContainer)
                 .clickable(onClick = onEditProfile)
                 .padding(Spacing.lg),
-        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        // Avatar
-        Box(
-            modifier =
-                Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
-            Icon(
-                imageVector = Icons.Default.Person,
-                contentDescription = null,
-                modifier = Modifier.size(36.dp),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-        }
-
-        // Name and subtitle
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-        ) {
-            Text(
-                text = displayName,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-            if (yearString != null) {
-                Text(
-                    text = stringResource(Res.string.logging_since, yearString),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+            Box(
+                modifier =
+                    Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(44.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
-            if (streakCount != null && streakCount > 0) {
+
+            Column(
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
                 Text(
-                    text = stringResource(Res.string.streak_day_count, streakCount),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    text = displayName,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
+                if (yearString != null) {
+                    Text(
+                        text = stringResource(Res.string.logging_since, yearString),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    )
+                }
+                if (streakCount != null && streakCount > 0) {
+                    Row(
+                        modifier =
+                            Modifier
+                                .clip(MaterialTheme.shapes.medium)
+                                .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f))
+                                .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocalFireDepartment,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Text(
+                            text = stringResource(Res.string.streak_day_count, streakCount),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    }
+                }
             }
         }
 
-        // Edit profile button
-        ElevatedButton(
+        FilledTonalButton(
             onClick = onEditProfile,
             colors =
-                ButtonDefaults.elevatedButtonColors(
+                ButtonDefaults.filledTonalButtonColors(
                     containerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f),
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 ),
