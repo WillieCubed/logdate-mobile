@@ -65,6 +65,7 @@ fun EntryProviderScope<NavKey>.editorRoutes(
                 onEntrySaved = onSave,
                 entryId = route.id,
                 draftId = route.draftId,
+                journalIds = route.journalIds,
                 modifier = sharedBoundsModifier,
             )
         }

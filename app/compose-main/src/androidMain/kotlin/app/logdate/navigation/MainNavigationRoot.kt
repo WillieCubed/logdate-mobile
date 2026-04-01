@@ -125,6 +125,7 @@ import app.logdate.navigation.routes.openLocationTimeline
 import app.logdate.navigation.routes.openLocationTrackingOptions
 import app.logdate.navigation.routes.openMediaDetail
 import app.logdate.navigation.routes.openMemoriesSettings
+import app.logdate.navigation.routes.openNotificationSettings
 import app.logdate.navigation.routes.openPrivacySettings
 import app.logdate.navigation.routes.openProfile
 import app.logdate.navigation.routes.openRecommendationSettings
@@ -133,6 +134,7 @@ import app.logdate.navigation.routes.openResetSettings
 import app.logdate.navigation.routes.openSearch
 import app.logdate.navigation.routes.openSettings
 import app.logdate.navigation.routes.openShareJournal
+import app.logdate.navigation.routes.openStreakSettings
 import app.logdate.navigation.routes.openSyncSettings
 import app.logdate.navigation.routes.openTimelineDetail
 import app.logdate.navigation.routes.openTimelineSettings
@@ -603,7 +605,9 @@ fun MainNavigationRoot(
                                 mainAppNavigator.backStack.add(NoteViewerRoute(noteId, journalId))
                             },
                             onNavigateToDay = mainAppNavigator::openTimelineDetail,
-                            onOpenEditor = mainAppNavigator::openEntryEditor,
+                            onOpenEditor = { journalId ->
+                                mainAppNavigator.openEntryEditor(journalIds = listOf(journalId))
+                            },
                             onNavigateToJournalSettings = mainAppNavigator::openJournalSettings,
                             onNavigateToShareJournal = mainAppNavigator::openShareJournal,
                             onJournalCreated = mainAppNavigator::finishJournalCreation,
@@ -638,6 +642,7 @@ fun MainNavigationRoot(
                             onNavigateToJournal = mainAppNavigator::openJournalDetail,
                             onOpenSearch = { mainAppNavigator.openSearch() },
                             onOpenPostcards = { mainAppNavigator.navigateToPostcardsCollection() },
+                            sharingLauncher = sharingLauncher,
                         )
                         searchRoutes(
                             onBack = mainAppNavigator::goBack,
@@ -665,14 +670,7 @@ fun MainNavigationRoot(
                                 mainAppNavigator.goBack()
                             },
                             onShareUri = { uri ->
-                                val shareIntent =
-                                    android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                        type = "image/png"
-                                        putExtra(android.content.Intent.EXTRA_STREAM, android.net.Uri.parse(uri))
-                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    }
-                                appContext.startActivity(android.content.Intent.createChooser(shareIntent, null))
+                                sharingLauncher.shareContent(mediaUris = listOf(uri))
                             },
                         )
                         appSettingsRoutes(
@@ -687,6 +685,8 @@ fun MainNavigationRoot(
                             onOpenLocationTimeline = mainAppNavigator::openLocationTimeline,
                             onNavigateToLibrarySettings = mainAppNavigator::openLibrarySettings,
                             onNavigateToMemories = mainAppNavigator::openMemoriesSettings,
+                            onNavigateToNotifications = mainAppNavigator::openNotificationSettings,
+                            onNavigateToStreaks = mainAppNavigator::openStreakSettings,
                             onNavigateToRecommendations = mainAppNavigator::openRecommendationSettings,
                             onNavigateToTimeline = mainAppNavigator::openTimelineSettings,
                             onNavigateToDayBoundary = mainAppNavigator::openDayBoundarySettings,

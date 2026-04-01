@@ -69,7 +69,7 @@ fun EntryProviderScope<NavKey>.journalRoutes(
     onJournalDeleted: () -> Unit,
     onNavigateToNoteDetail: (noteId: Uuid, journalId: Uuid) -> Unit,
     onNavigateToDay: (LocalDate) -> Unit,
-    onOpenEditor: () -> Unit = {},
+    onOpenEditor: (journalId: Uuid) -> Unit = {},
     onNavigateToJournalSettings: (Uuid) -> Unit = {},
     onNavigateToShareJournal: (Uuid) -> Unit = {},
     onJournalCreated: (Uuid) -> Unit = {},

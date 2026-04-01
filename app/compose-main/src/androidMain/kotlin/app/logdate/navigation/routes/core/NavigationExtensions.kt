@@ -35,9 +35,12 @@ fun MainAppNavigator.goBack() {
  *
  * @param entryId The ID of an existing entry to edit, or null to create a new entry
  */
-fun MainAppNavigator.openEntryEditor(entryId: Uuid? = null) {
+fun MainAppNavigator.openEntryEditor(
+    entryId: Uuid? = null,
+    journalIds: List<Uuid> = emptyList(),
+) {
     backStack.add(
-        EntryEditor(id = entryId),
+        EntryEditor(id = entryId, journalIds = journalIds),
     )
 }
 

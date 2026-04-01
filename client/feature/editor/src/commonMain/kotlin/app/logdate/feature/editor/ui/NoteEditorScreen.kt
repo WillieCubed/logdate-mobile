@@ -50,6 +50,7 @@ fun NoteEditorScreen(
     entryId: Uuid? = null,
     draftId: Uuid? = null,
     journalId: Uuid? = null,
+    journalIds: List<Uuid> = emptyList(),
     initialTextContent: String? = null,
     attachments: List<String> = emptyList(),
     viewModel: EntryEditorViewModel = koinViewModel(),
@@ -70,6 +71,8 @@ fun NoteEditorScreen(
             } catch (e: Exception) {
                 Napier.e("Failed to load existing entry: $entryId", e)
             }
+        } else if (journalIds.isNotEmpty()) {
+            viewModel.setSelectedJournals(journalIds)
         }
     }
 

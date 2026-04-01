@@ -127,11 +127,16 @@ data class ShareJournal(
  *
  * @param id An existing journal entry to edit, or null for a new entry.
  * @param draftId A draft to resume, or null when not opening a draft.
+ * @param journalIds Journals to pre-select for the new entry. Empty means use defaults.
  */
 @Serializable
 data class EntryEditor(
     val id: Uuid? = null,
     val draftId: Uuid? = null,
+    val journalIds: List<
+        @Serializable(with = UuidSerializer::class)
+        Uuid,
+    > = emptyList(),
 ) : NavKey
 
 /**
@@ -231,6 +236,12 @@ data object DataSettingsRoute : NavKey
 data object DevicesSettingsRoute : NavKey
 
 /**
+ * Navigation route for Android notification settings.
+ */
+@Serializable
+data object NotificationsSettingsRoute : NavKey
+
+/**
  * Navigation route for memories personalization settings.
  */
 @Serializable
@@ -247,6 +258,12 @@ data object LibrarySettingsRoute : NavKey
  */
 @Serializable
 data object RecommendationSettingsRoute : NavKey
+
+/**
+ * Navigation route for the streak settings detail screen.
+ */
+@Serializable
+data object StreakSettingsRoute : NavKey
 
 @Serializable
 data object TimelineSettingsRoute : NavKey
