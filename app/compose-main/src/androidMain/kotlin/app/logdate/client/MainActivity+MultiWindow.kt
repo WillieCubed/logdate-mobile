@@ -5,7 +5,11 @@ package app.logdate.client
 import android.content.Intent
 import android.view.Menu
 import android.view.MenuItem
+import androidx.lifecycle.lifecycleScope
+import app.logdate.client.media.MediaManager
 import app.logdate.navigation.EditorManager
+import io.github.aakira.napier.Napier
+import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
 /**
@@ -65,16 +69,23 @@ fun MainActivity.handleMultiWindowMenuSelection(item: MenuItem): Boolean {
  */
 fun MainActivity.handleMultiWindowIntent(intent: Intent) {
     val editorManager: EditorManager by inject()
+    val mediaManager: MediaManager by inject()
 
     // Check for actions that should launch a new editor
     when (intent.action) {
-        Intent.ACTION_SEND -> {
-            // Extract shared content
-            val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
-
-            // Open in a new window if we have content and multi-window is supported
-            if (!sharedText.isNullOrBlank() && editorManager.supportsMultiWindow()) {
-                editorManager.openNewEditorWindow(initialText = sharedText)
+        Intent.ACTION_SEND,
+        Intent.ACTION_SEND_MULTIPLE,
+        -> {
+            lifecycleScope.launch {
+                val sharedContent = importIncomingEditorShare(intent, mediaManager)
+                if (sharedContent == null) {
+                    Napier.w("Ignored unsupported incoming share intent")
+                    return@launch
+                }
+                editorManager.openNewEditorWindow(
+                    initialText = sharedContent.initialText,
+                    attachments = sharedContent.attachments,
+                )
             }
         }
     }

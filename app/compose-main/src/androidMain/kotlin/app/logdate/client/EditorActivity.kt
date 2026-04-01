@@ -176,6 +176,7 @@ class EditorActivity : FragmentActivity() {
                 }
 
                 // Flags to launch as a new document/task
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT)
                 addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
             }
