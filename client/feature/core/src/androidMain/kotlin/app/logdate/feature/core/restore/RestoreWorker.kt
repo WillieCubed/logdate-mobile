@@ -207,8 +207,13 @@ class RestoreWorker(
         exportPath: String,
     ): String? {
         val normalizedPath = exportPath.trimStart('/')
-        val entry = zipFile.getEntry(normalizedPath) ?: return null
+        val entry = zipFile.getEntry(normalizedPath)
+        if (entry == null) {
+            Napier.w("Media file not found in archive at path: $exportPath")
+            return null
+        }
         if (entry.isDirectory) {
+            Napier.w("Expected file but found directory in archive at path: $exportPath")
             return null
         }
         val fileName = normalizedPath.substringAfterLast('/')
@@ -219,13 +224,16 @@ class RestoreWorker(
                     input.copyTo(output)
                 }
             }
-            return mediaManager.saveMediaFromFile(
-                sourceFilePath = tempFile.absolutePath,
-                fileName = fileName,
-                mimeType = resolveMimeType(fileName),
-            )
+            val savedPath =
+                mediaManager.saveMediaFromFile(
+                    sourceFilePath = tempFile.absolutePath,
+                    fileName = fileName,
+                    mimeType = resolveMimeType(fileName),
+                )
+            Napier.d("Successfully imported media from archive: $exportPath")
+            return savedPath
         } catch (e: Exception) {
-            Napier.e("Failed to import media during restore", e)
+            Napier.e("Exception importing media from archive at path: $exportPath", e)
             return null
         } finally {
             tempFile.delete()

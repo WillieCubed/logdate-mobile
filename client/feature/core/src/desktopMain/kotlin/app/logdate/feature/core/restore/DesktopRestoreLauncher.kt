@@ -214,21 +214,33 @@ class DesktopRestoreLauncher :
         exportPath: String,
     ): String? {
         val normalizedPath = exportPath.trimStart('/')
-        val entry = zipFile.getEntry(normalizedPath) ?: return null
-        if (entry.isDirectory) {
+        val entry = zipFile.getEntry(normalizedPath)
+        if (entry == null) {
+            Napier.w("Desktop: Media file not found in archive at path: $exportPath")
             return null
         }
-        val data = zipFile.getInputStream(entry).use { input -> input.readBytes() }
-        val fileName = normalizedPath.substringAfterLast('/')
-        val payload =
-            MediaPayload(
-                fileName = fileName,
-                mimeType = resolveMimeType(fileName),
-                sizeBytes = data.size.toLong(),
-                data = data,
-            )
-        return runCatching { mediaManager.saveMedia(payload) }
-            .onFailure { Napier.e("Desktop: Failed to import media", it) }
+        if (entry.isDirectory) {
+            Napier.w("Desktop: Expected file but found directory in archive at path: $exportPath")
+            return null
+        }
+        return runCatching {
+            val data = zipFile.getInputStream(entry).use { input -> input.readBytes() }
+            val fileName = normalizedPath.substringAfterLast('/')
+            val payload =
+                MediaPayload(
+                    fileName = fileName,
+                    mimeType = resolveMimeType(fileName),
+                    sizeBytes = data.size.toLong(),
+                    data = data,
+                )
+            val savedPath = mediaManager.saveMedia(payload)
+            if (savedPath != null) {
+                Napier.d("Desktop: Successfully imported media from archive: $exportPath")
+            } else {
+                Napier.w("Desktop: Failed to save media during restore: $fileName")
+            }
+            savedPath
+        }.onFailure { Napier.e("Desktop: Exception importing media from archive at path: $exportPath", it) }
             .getOrNull()
     }
 

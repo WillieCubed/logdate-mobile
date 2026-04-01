@@ -164,10 +164,18 @@ class RestoreUserDataUseCase(
                     val normalizedType = note.type.lowercase()
                     val message =
                         if (normalizedType == "image" || normalizedType == "video" || normalizedType == "audio") {
-                            "Missing media reference for note ${note.id}"
+                            val mediaPath = note.mediaPath ?: "unknown"
+                            val status =
+                                if (mediaImporter != null && manifestIndex.containsKey(mediaPath)) {
+                                    "could not be imported (file missing or corrupted)"
+                                } else {
+                                    "not found in archive"
+                                }
+                            "Skipped $normalizedType note (ID: ${note.id}) - media file $status: $mediaPath"
                         } else {
-                            "Unsupported note type: ${note.type}"
+                            "Skipped unsupported note type: ${note.type}"
                         }
+                    Napier.w(message)
                     warnings.add(message)
                     continue
                 }
@@ -228,6 +236,8 @@ class RestoreUserDataUseCase(
             restoreProfile(profilePayload?.profile, options.strategy, warnings, onProgress)
             restorePlaces(placesPayload?.places.orEmpty(), warnings, onProgress)
             restoreLocationHistory(locationHistoryPayload?.locationHistory.orEmpty(), warnings, onProgress)
+
+            onProgress?.invoke(RestoreProgressPhase.COMPLETED)
 
             return RestoreResult(
                 metadata = metadata,

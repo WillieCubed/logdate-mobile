@@ -2,6 +2,7 @@ package app.logdate.feature.core.export
 
 import app.logdate.client.domain.export.ExportFormat
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -14,13 +15,29 @@ internal fun Instant.toExportTimestamp(): String {
     return buildString {
         append(local.year)
         append('-')
-        append(local.monthNumber.toString().padStart(2, '0'))
+        append(
+            local.month.number
+                .toString()
+                .padStart(2, '0'),
+        )
         append('-')
-        append(local.day.toString().padStart(2, '0'))
+        append(
+            local.day
+                .toString()
+                .padStart(2, '0'),
+        )
         append('_')
-        append(local.hour.toString().padStart(2, '0'))
+        append(
+            local.hour
+                .toString()
+                .padStart(2, '0'),
+        )
         append('-')
-        append(local.minute.toString().padStart(2, '0'))
+        append(
+            local.minute
+                .toString()
+                .padStart(2, '0'),
+        )
     }
 }
 

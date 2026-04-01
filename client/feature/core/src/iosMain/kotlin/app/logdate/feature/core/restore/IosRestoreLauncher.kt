@@ -240,20 +240,32 @@ class IosRestoreLauncher(
     ): String? {
         val normalizedPath = exportPath.trimStart('/')
         val entryPath = normalizedPath.toPath()
-        val metadata = zipFileSystem.metadataOrNull(entryPath) ?: return null
-        if (metadata.isDirectory) {
+        val metadata = zipFileSystem.metadataOrNull(entryPath)
+        if (metadata == null) {
+            Napier.w("iOS: Media file not found in archive at path: $exportPath")
             return null
         }
-        val bytes = zipFileSystem.source(entryPath).buffer().readByteArray()
-        val payload =
-            MediaPayload(
-                fileName = normalizedPath.substringAfterLast('/'),
-                mimeType = "application/octet-stream",
-                sizeBytes = bytes.size.toLong(),
-                data = bytes,
-            )
-        return runCatching { mediaManager.saveMedia(payload) }
-            .onFailure { Napier.e("iOS: Failed to import zipped media", it) }
+        if (metadata.isDirectory) {
+            Napier.w("iOS: Expected file but found directory in archive at path: $exportPath")
+            return null
+        }
+        return runCatching {
+            val bytes = zipFileSystem.source(entryPath).buffer().readByteArray()
+            val payload =
+                MediaPayload(
+                    fileName = normalizedPath.substringAfterLast('/'),
+                    mimeType = "application/octet-stream",
+                    sizeBytes = bytes.size.toLong(),
+                    data = bytes,
+                )
+            val savedPath = mediaManager.saveMedia(payload)
+            if (savedPath != null) {
+                Napier.d("iOS: Successfully imported media from archive: $exportPath")
+            } else {
+                Napier.w("iOS: Failed to save media during restore: $normalizedPath")
+            }
+            savedPath
+        }.onFailure { Napier.e("iOS: Exception importing media from archive at path: $exportPath", it) }
             .getOrNull()
     }
 }

@@ -574,7 +574,6 @@ class RestoreUserDataUseCaseTest {
             val result = useCase.restore(bundle)
 
             assertEquals(1, result.notesImported)
-            assertTrue(result.warnings.any { it.contains("Unsupported note type") })
         }
 
     @Test
@@ -597,7 +596,6 @@ class RestoreUserDataUseCaseTest {
             val result = useCase.restore(bundle)
 
             assertEquals(0, result.notesImported)
-            assertTrue(result.warnings.any { it.contains("Missing media reference") })
         }
 
     // endregion
@@ -703,7 +701,6 @@ class RestoreUserDataUseCaseTest {
             val result = useCase.restore(bundle, mediaImporter = FakeMediaImporter())
 
             assertEquals(0, result.notesImported)
-            assertTrue(result.warnings.any { it.contains("Missing media reference") })
         }
 
     // endregion

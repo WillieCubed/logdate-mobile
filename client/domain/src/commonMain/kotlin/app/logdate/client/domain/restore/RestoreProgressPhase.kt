@@ -8,4 +8,5 @@ enum class RestoreProgressPhase {
     RESTORING_PROFILE,
     RESTORING_PLACES,
     RESTORING_LOCATION_HISTORY,
+    COMPLETED,
 }
