@@ -36,12 +36,12 @@ android {
 
     testOptions {
         managedDevices {
-            lateinit var phoneApi35: ManagedVirtualDevice
+            lateinit var phoneApi36: ManagedVirtualDevice
             localDevices {
-                phoneApi35 =
-                    create("phoneApi35") {
-                        device = "Pixel 8 Pro"
-                        apiLevel = 35
+                phoneApi36 =
+                    create("phoneApi36") {
+                        device = "Pixel 10 Pro"
+                        apiLevel = 36
                         systemImageSource = "google"
                     }
             }
@@ -56,7 +56,7 @@ kotlin {
 }
 
 baselineProfile {
-    managedDevices += "phoneApi35"
+    managedDevices += "phoneApi36"
     useConnectedDevices = false
 }
 

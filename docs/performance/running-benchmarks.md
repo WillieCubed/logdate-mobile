@@ -17,15 +17,16 @@ Direct Gradle equivalents:
 ```bash
 ./gradlew managedPhoneBenchmark
 ./gradlew managedWearBenchmark
-./gradlew :benchmark:micro:connectedCheck
+./gradlew managedMicroBenchmark
 ./gradlew generatePhoneBaselineProfile
 ./gradlew generateWearBaselineProfile
 ```
 
 ## Device Guidance
 
-- Phone macrobenchmarks: use the managed `phoneApi35` device or a connected physical Pixel device.
+- Phone macrobenchmarks: use the managed `phoneApi36` device (Pixel 10 Pro) or a connected physical Pixel device.
 - Wear macrobenchmarks: use the managed `wearApi34` device or a connected physical Wear device.
+- Microbenchmarks: always run on the managed `flagshipPhoneApi36` device to avoid accidentally targeting physical hardware.
 - Baseline Profile generation:
   - managed devices are the default path
   - if you need a connected-device experiment, invoke the underlying connected Android test task directly from the benchmark module instead of the root helper

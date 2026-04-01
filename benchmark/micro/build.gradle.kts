@@ -1,3 +1,4 @@
+import com.android.build.api.dsl.ManagedVirtualDevice
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -15,11 +16,32 @@ android {
     defaultConfig {
         minSdk = 30
         testInstrumentationRunner = "androidx.benchmark.junit4.AndroidBenchmarkRunner"
+        testInstrumentationRunnerArguments["androidx.test.runner.monitoringInstrumentation.activityLaunchTimeoutMillis"] = "120000"
+        testInstrumentationRunnerArguments["androidx.benchmark.suppressErrors"] = "EMULATOR"
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+        }
+    }
+
+    testOptions {
+        managedDevices {
+            lateinit var flagshipPhoneApi36: ManagedVirtualDevice
+            localDevices {
+                flagshipPhoneApi36 =
+                    create("flagshipPhoneApi36") {
+                        device = "Pixel 10 Pro"
+                        apiLevel = 36
+                        systemImageSource = "google"
+                    }
+            }
+            groups {
+                create("microBenchmarkDevices") {
+                    targetDevices.add(flagshipPhoneApi36)
+                }
+            }
         }
     }
 

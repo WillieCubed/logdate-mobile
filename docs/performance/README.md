@@ -15,6 +15,7 @@ The benchmark program now has executable Gradle scaffolding:
 
 Start here:
 
+- [Benchmark Plan](./benchmark-plan.md)
 - [Benchmark Matrix](./benchmark-matrix.md)
 - [Running Benchmarks](./running-benchmarks.md)
 - [CI and Gate Policy](./ci-policy.md)

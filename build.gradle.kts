@@ -141,6 +141,12 @@ tasks.register("managedWearBenchmark") {
     dependsOn(":benchmark:wear-macro:wearBenchmarkDevicesGroupBenchmarkAndroidTest")
 }
 
+tasks.register("managedMicroBenchmark") {
+    group = "verification"
+    description = "Run Android microbenchmarks on the managed phone device."
+    dependsOn(":benchmark:micro:microBenchmarkDevicesGroupReleaseAndroidTest")
+}
+
 tasks.register("managedBenchmark") {
     group = "verification"
     description = "Run all managed phone and Wear benchmark suites."
@@ -423,9 +429,9 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                                 systemImageSource = "google",
                             ),
                             ManagedVirtualDeviceConfig(
-                                deviceName = "flagshipPhoneApi35",
-                                hardwareProfile = "Pixel 8 Pro",
-                                apiLevel = 35,
+                                deviceName = "flagshipPhoneApi36",
+                                hardwareProfile = "Pixel 10 Pro",
+                                apiLevel = 36,
                                 systemImageSource = "google",
                             ),
                             ManagedVirtualDeviceConfig(
@@ -442,7 +448,7 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                                 targetDeviceNames =
                                     listOf(
                                         "oldestSupportedPhoneApi30",
-                                        "flagshipPhoneApi35",
+                                        "flagshipPhoneApi36",
                                     ),
                             ),
                             ManagedDeviceGroupConfig(
@@ -454,7 +460,7 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                                 targetDeviceNames =
                                     listOf(
                                         "oldestSupportedPhoneApi30",
-                                        "flagshipPhoneApi35",
+                                        "flagshipPhoneApi36",
                                         "largeScreenTabletApi34",
                                     ),
                             ),

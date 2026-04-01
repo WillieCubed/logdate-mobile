@@ -45,7 +45,7 @@ test|test:coverage|Generate test coverage report|./gradlew koverHtmlReport
 test|test:verify|Verify coverage meets threshold|./gradlew koverVerify
 test|test:bench:phone|Run managed phone macrobenchmarks|./gradlew managedPhoneBenchmark
 test|test:bench:wear|Run managed Wear OS macrobenchmarks|./gradlew managedWearBenchmark
-test|test:bench:micro|Run Android microbenchmarks|./gradlew :benchmark:micro:connectedCheck
+test|test:bench:micro|Run Android microbenchmarks|./gradlew managedMicroBenchmark
 
 quality|lint|Run Android lint|./gradlew lint
 quality|lint:check|Check Kotlin code style|./gradlew ktlintCheck
