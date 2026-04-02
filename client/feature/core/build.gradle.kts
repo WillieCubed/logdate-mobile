@@ -23,6 +23,7 @@ kotlin {
             libs.versions.android.minSdk
                 .get()
                 .toInt()
+        withHostTestBuilder {}
         androidResources {
             enable = true
             noCompress += listOf("cvr")

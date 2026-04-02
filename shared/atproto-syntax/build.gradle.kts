@@ -26,6 +26,7 @@ kotlin {
             libs.versions.android.minSdk
                 .get()
                 .toInt()
+        withHostTestBuilder {}
 
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)

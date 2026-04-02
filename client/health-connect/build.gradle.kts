@@ -21,6 +21,7 @@ kotlin {
             libs.versions.android.minSdk
                 .get()
                 .toInt()
+        withHostTestBuilder {}
         optimization {
             consumerKeepRules.apply {
                 publish = true

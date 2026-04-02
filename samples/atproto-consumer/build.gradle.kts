@@ -1,7 +1,7 @@
 import java.util.Properties
 
 plugins {
-    kotlin("jvm") version "2.3.20-RC"
+    kotlin("jvm") version "2.3.20"
     application
 }
 

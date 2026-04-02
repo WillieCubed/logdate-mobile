@@ -20,6 +20,7 @@ kotlin {
             libs.versions.android.minSdk
                 .get()
                 .toInt()
+        withHostTestBuilder {}
         androidResources {
             enable = true
         }
