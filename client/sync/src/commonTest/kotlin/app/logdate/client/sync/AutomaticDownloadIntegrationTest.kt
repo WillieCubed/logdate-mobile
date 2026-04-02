@@ -30,6 +30,7 @@ import app.logdate.client.sync.test.TrackingJournalContentRepository
 import app.logdate.client.sync.test.failingCloudApiClient
 import app.logdate.client.sync.test.fakeAccountRepository
 import app.logdate.client.sync.test.fakeCloudApiClient
+import app.logdate.client.sync.test.fakeDataUsagePolicy
 import app.logdate.client.sync.test.fakeSessionStorage
 import app.logdate.client.sync.test.fakeSyncMetadataService
 import app.logdate.client.sync.test.lastWriteWinsResolver
@@ -111,6 +112,7 @@ class AutomaticDownloadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = fakeSyncMetadataService(),
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // When: We download remote changes
@@ -182,6 +184,7 @@ class AutomaticDownloadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = fakeSyncMetadataService(),
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // When: We download remote changes
@@ -240,6 +243,7 @@ class AutomaticDownloadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = fakeSyncMetadataService(),
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // When: We download remote changes
@@ -298,6 +302,7 @@ class AutomaticDownloadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             val result = syncManager.downloadRemoteChanges()
@@ -336,6 +341,7 @@ class AutomaticDownloadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             mockApiClient.getContentChangesResponse =
@@ -443,6 +449,7 @@ class AutomaticDownloadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             val result = syncManager.downloadRemoteChanges()
@@ -510,6 +517,7 @@ class AutomaticDownloadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             val result = syncManager.downloadRemoteChanges()
@@ -580,6 +588,7 @@ class AutomaticDownloadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = fakeSyncMetadataService(),
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // When: We download remote changes
@@ -647,6 +656,7 @@ class AutomaticDownloadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             val result = syncManager.downloadRemoteChanges()
@@ -685,6 +695,7 @@ class AutomaticDownloadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             mockApiClient.getJournalChangesResponse =
@@ -786,6 +797,7 @@ class AutomaticDownloadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = fakeSyncMetadataService(),
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // When: We download remote changes
@@ -827,6 +839,7 @@ class AutomaticDownloadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = fakeSyncMetadataService(),
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // When: We attempt to download without authentication
@@ -874,6 +887,7 @@ class AutomaticDownloadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = fakeSyncMetadataService(),
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // When: We attempt to download with failing API

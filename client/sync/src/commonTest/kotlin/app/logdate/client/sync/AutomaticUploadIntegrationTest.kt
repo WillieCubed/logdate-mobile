@@ -15,6 +15,7 @@ import app.logdate.client.sync.test.InMemorySyncRetryScheduleStore
 import app.logdate.client.sync.test.failingCloudApiClient
 import app.logdate.client.sync.test.fakeAccountRepository
 import app.logdate.client.sync.test.fakeCloudApiClient
+import app.logdate.client.sync.test.fakeDataUsagePolicy
 import app.logdate.client.sync.test.fakeJournalContentRepository
 import app.logdate.client.sync.test.fakeJournalNotesRepository
 import app.logdate.client.sync.test.fakeJournalRepository
@@ -63,6 +64,7 @@ class AutomaticUploadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             val note = notesRepository.addTestNote("Test automatic upload")
@@ -114,6 +116,7 @@ class AutomaticUploadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             val journal =
@@ -166,6 +169,7 @@ class AutomaticUploadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             val associationKey = AssociationPendingKey(Uuid.random(), Uuid.random())
@@ -211,6 +215,7 @@ class AutomaticUploadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             val pendingNotes = notesRepository.allNotesObserved.first()
@@ -260,6 +265,7 @@ class AutomaticUploadIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             val pendingNotes = notesRepository.allNotesObserved.first()

@@ -193,6 +193,7 @@ class SyncTestFakesTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = fakeSyncMetadataService(),
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // When: Performing a content sync
@@ -236,6 +237,7 @@ class SyncTestFakesTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = fakeSyncMetadataService(),
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // When: Attempting to sync without authentication
@@ -276,6 +278,7 @@ class SyncTestFakesTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = fakeSyncMetadataService(),
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // When: Attempting to sync with network failures

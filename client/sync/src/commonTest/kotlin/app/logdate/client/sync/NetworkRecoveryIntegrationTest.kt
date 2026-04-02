@@ -13,6 +13,7 @@ import app.logdate.client.sync.test.InMemorySyncRetryScheduleStore
 import app.logdate.client.sync.test.failingCloudApiClient
 import app.logdate.client.sync.test.fakeAccountRepository
 import app.logdate.client.sync.test.fakeCloudApiClient
+import app.logdate.client.sync.test.fakeDataUsagePolicy
 import app.logdate.client.sync.test.fakeJournalContentRepository
 import app.logdate.client.sync.test.fakeJournalNotesRepository
 import app.logdate.client.sync.test.fakeJournalRepository
@@ -58,6 +59,7 @@ class NetworkRecoveryIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // Configure API to fail with network error
@@ -99,6 +101,7 @@ class NetworkRecoveryIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // Successful sync
@@ -137,6 +140,7 @@ class NetworkRecoveryIntegrationTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             val failedResult = syncManager.syncContent()

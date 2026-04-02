@@ -14,6 +14,7 @@ import app.logdate.client.sync.test.InMemorySyncDeadLetterStore
 import app.logdate.client.sync.test.InMemorySyncRetryScheduleStore
 import app.logdate.client.sync.test.fakeAccountRepository
 import app.logdate.client.sync.test.fakeCloudApiClient
+import app.logdate.client.sync.test.fakeDataUsagePolicy
 import app.logdate.client.sync.test.fakeJournalContentRepository
 import app.logdate.client.sync.test.fakeJournalNotesRepository
 import app.logdate.client.sync.test.fakeJournalRepository
@@ -68,6 +69,7 @@ class SyncProductionScenariosTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // Enqueue all notes as pending
@@ -120,6 +122,7 @@ class SyncProductionScenariosTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // Enqueue all notes
@@ -176,6 +179,7 @@ class SyncProductionScenariosTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // Setup pending items
@@ -231,6 +235,7 @@ class SyncProductionScenariosTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             val note = notesRepository.allNotesObserved.first().first()
@@ -267,6 +272,7 @@ class SyncProductionScenariosTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             val onlineResult = onlineSyncManager.syncContent()
@@ -304,6 +310,7 @@ class SyncProductionScenariosTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // Enqueue local items for upload
@@ -352,6 +359,7 @@ class SyncProductionScenariosTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // Enqueue multiple entity types with failures
@@ -401,6 +409,7 @@ class SyncProductionScenariosTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // First sync succeeds
@@ -438,6 +447,7 @@ class SyncProductionScenariosTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // First failure
@@ -484,6 +494,7 @@ class SyncProductionScenariosTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // First successful sync
@@ -522,6 +533,7 @@ class SyncProductionScenariosTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             val result = syncManager.syncContent()
@@ -559,6 +571,7 @@ class SyncProductionScenariosTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // Download remote changes
@@ -594,6 +607,7 @@ class SyncProductionScenariosTest {
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
                     transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
                 )
 
             // Upload with empty queue (no pending items)
