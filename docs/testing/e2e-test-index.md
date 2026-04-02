@@ -6,7 +6,7 @@ Complete index of all end-to-end tests in the LogDate project with terminal comm
 
 Tests are organized into three categories:
 - **Pure Server Tests**: Gradle `testApplication` tests, no device needed
-- **Client Gradle Tests**: Android instrumented tests with gradle framework
+- **Client Gradle Tests**: Android instrumented tests on Gradle Managed Devices
 - **Client ADB Tests**: Verify actual device behavior via adb shell scripts
 
 See [E2E Test Organization Standard](./e2e-test-organization.md) for the complete framework and guidelines for adding new tests.
@@ -15,7 +15,7 @@ See [E2E Test Organization Standard](./e2e-test-organization.md) for the complet
 
 ```bash
 # Run all Android app e2e tests
-./gradlew :app:android-main:connectedDebugAndroidTest
+./gradlew managedAndroidE2EDebugAndroidTest
 
 # Run all server-side e2e tests
 ./gradlew :server:test --tests "app.logdate.server.e2e.*"
@@ -24,13 +24,16 @@ See [E2E Test Organization Standard](./e2e-test-organization.md) for the complet
 ./gradlew :integration:server-client-e2e:test
 
 # Run specific e2e test suite
-./gradlew :app:android-main:connectedDebugAndroidTest -k "TestClassName"
+./gradlew :app:android-main:smokeDevicesGroupDebugAndroidTest -Plogdate.androidTestClass=app.logdate.client.e2e.TestClassName
 
 # Run with verbose output
-./gradlew :app:android-main:connectedDebugAndroidTest --info
+./gradlew managedAndroidE2EDebugAndroidTest --info
+
+# Run the Android share UX suite
+./tests/e2e/test-share-functionality.sh
 
 # List available e2e tests without running
-./gradlew --dry-run :app:android-main:connectedDebugAndroidTest
+./gradlew --dry-run managedAndroidE2EDebugAndroidTest
 ```
 
 ## Client-Side E2E Tests (Android/Compose)
@@ -57,29 +60,20 @@ Client-side tests verify complete user workflows on the Android app using Espres
 - Window metrics and configuration changes
 
 **Requirements**:
-- Connected Android device or emulator with API 24+ (Android N+)
-- Device must support multi-window mode (most modern devices do)
-- Recommended: Pixel 4 or Pixel Tablet emulator for full multi-window features
-- When both a phone and emulator are connected, target the emulator explicitly with `ANDROID_SERIAL=emulator-5554` or `adb -s emulator-5554 ...`
+- Android SDK system images for the managed phone and tablet profiles
+- Host machine resources for the managed device snapshots
 
 **Commands**:
 
 ```bash
-# Prefer the emulator when multiple Android targets are attached
-export ANDROID_SERIAL=emulator-5554
-
 # Run all multi-window editor tests
-./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest"
+./gradlew managedAndroidMultiWindowDebugAndroidTest
 
 # Run specific test
-./gradlew :app:android-main:connectedDebugAndroidTest -k "testOpenEntryInNewWindow"
+./gradlew managedAndroidMultiWindowDebugAndroidTest
 
 # Run with debugging enabled
-./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest" --debug
-
-# Verify the emulator target
-adb -s emulator-5554 devices
-./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest"
+./gradlew managedAndroidMultiWindowDebugAndroidTest --info
 ```
 
 **ADB Shell Testing**:
@@ -101,6 +95,38 @@ For comprehensive device behavior verification using adb shell commands, use the
 ```
 
 See: `tests/e2e/test-multi-window-editor.sh` for details on testing actual window behavior, task recents, and multi-window integration.
+
+### 2. Share UX E2E Tests
+
+**Files**:
+- `IncomingShareE2ETest.kt`
+- `ShareReceiverE2ETest.kt`
+- `SharingEntryPointsE2ETest.kt`
+
+**Scenario**: User shares content into LogDate, uses chooser actions, and taps outbound share CTAs from timeline and library surfaces.
+
+**What it tests**:
+- `ACTION_SEND` text import into the editor
+- image and multi-image import into one draft
+- unsupported share rejection
+- chooser `Copy link` action behavior
+- timeline memory recall share CTA wiring
+- media detail share CTA wiring
+
+**Commands**:
+
+```bash
+# Build, provision, and run the full share UX suite on managed devices
+./tests/e2e/test-share-functionality.sh
+
+# Run with verbose Gradle output
+./tests/e2e/test-share-functionality.sh --verbose
+```
+
+**Coverage**:
+- `IncomingShareE2ETest` - 5 tests
+- `ShareReceiverE2ETest` - 1 test
+- `SharingEntryPointsE2ETest` - 2 tests
 
 **Test Coverage**:
 - ✅ testOpenEntryInNewWindow - Existing entry loading
@@ -177,7 +203,8 @@ See [Server-Client E2E README](../../integration/server-client-e2e/README.md) fo
 
 | Test Name | Type | Location | Shell Script |
 |-----------|------|----------|--------------|
-| MultiWindowEditorE2ETest | Client Gradle | `app/.../e2e/` | ✅ `test-multi-window-editor.sh` |
+| MultiWindowEditorE2ETest | Client Gradle | `app/.../e2e/` | ✅ `managedAndroidMultiWindowDebugAndroidTest` |
+| Share UX Suite | Client Instrumented | `app/.../e2e/` | ✅ `managedAndroidShareDebugAndroidTest` |
 | AuthV1E2ETest | Pure Server | `server/.../auth/` | ✅ `test-accounts-e2e.sh` |
 | BasicEndpointCoverageE2ETest | Pure Server | `server/.../basic-coverage/` | ❌ None |
 | SyncE2ETest | Pure Server | `server/.../sync/` | ✅ `test-sync-e2e.sh` |
@@ -196,10 +223,10 @@ See [Server-Client E2E README](../../integration/server-client-e2e/README.md) fo
 
 ```bash
 # All e2e tests (client + server)
-./gradlew connectedAndroidTest :server:test --tests "app.logdate.server.e2e.*"
+./gradlew managedAndroidE2EDebugAndroidTest :server:test --tests "app.logdate.server.e2e.*"
 
 # Client only
-./gradlew connectedAndroidTest
+./gradlew managedAndroidE2EDebugAndroidTest
 
 # Server only
 ./gradlew :server:test --tests "app.logdate.server.e2e.*"
@@ -209,7 +236,7 @@ See [Server-Client E2E README](../../integration/server-client-e2e/README.md) fo
 
 ```bash
 # All multi-window tests
-./gradlew connectedAndroidTest --tests "*MultiWindow*"
+./gradlew managedAndroidMultiWindowDebugAndroidTest
 
 # All account tests
 ./gradlew :server:test --tests "app.logdate.server.e2e.auth.AuthV1E2ETest"
@@ -222,10 +249,10 @@ See [Server-Client E2E README](../../integration/server-client-e2e/README.md) fo
 
 ```bash
 # Generate test report
-./gradlew connectedAndroidTest --tests "*E2ETest" --info
+./gradlew managedAndroidE2EDebugAndroidTest --info
 
 # Generate HTML report
-./gradlew connectedAndroidTest testReport
+./gradlew managedAndroidE2EDebugAndroidTest
 
 # View report (after build)
 # HTML report location: build/reports/tests/
@@ -247,10 +274,10 @@ Configuration: `.github/workflows/ci.yml`
 
 ```bash
 # Run full CI test suite locally
-./gradlew clean test :server:test -k "E2ETest"
+./gradlew clean test :server:test --tests "app.logdate.server.e2e.*"
 
 # Just the main quality gates
-./gradlew connectedAndroidTest lint koverVerify
+./gradlew managedAndroidE2EDebugAndroidTest lint koverVerify
 ```
 
 ---
@@ -261,44 +288,26 @@ Configuration: `.github/workflows/ci.yml`
 
 ```bash
 # Run with napier debug logging
-./gradlew :app:android-main:connectedDebugAndroidTest \
-  -k "MultiWindowEditorE2ETest" \
-  --info
+./gradlew managedAndroidMultiWindowDebugAndroidTest --info
 
-# Monitor logcat during tests
-adb logcat | grep -i "MultiWindowEditorE2ETest\|EditorActivity"
+# Inspect managed-device logs under build outputs when needed
+find app/android-main/build/outputs/androidTest-results/managedDevice -type f | sort
 ```
 
-### Capture Screenshots on Failure
+### Managed Device Artifacts
 
 ```bash
-# Screenshots are saved to device
-adb shell ls /storage/emulated/0/Pictures/
+# List managed-device result artifacts
+find app/android-main/build/outputs/androidTest-results/managedDevice -type f | sort
 
-# Pull screenshots from device
-adb pull /storage/emulated/0/Pictures/
-```
-
-### Debug with Activity Monitoring
-
-```bash
-# Watch activity lifecycle during test
-adb shell dumpsys activity | grep -A 10 "EditorActivity"
-
-# Monitor window changes
-adb shell dumpsys window | grep -i "window\|activity"
-
-# Check memory during multi-window test
-adb shell dumpsys meminfo app.logdate | tail -20
+# List managed-device HTML reports
+find app/android-main/build/reports/androidTests/managedDevice -type f | sort
 ```
 
 ### Stop on First Failure
 
 ```bash
-./gradlew :app:android-main:connectedDebugAndroidTest \
-  -k "MultiWindowEditorE2ETest" \
-  --no-parallel \
-  --fail-fast
+./gradlew managedAndroidMultiWindowDebugAndroidTest --fail-fast
 ```
 
 ---
@@ -307,45 +316,26 @@ adb shell dumpsys meminfo app.logdate | tail -20
 
 Before running E2E tests, verify:
 
-- [ ] **Device Connected**: `adb devices` shows device
-- [ ] **API Level**: Device has API 24+ (Android N+) for multi-window tests
-- [ ] **App Installed**: Debug APK installed on device
+- [ ] **Android SDK Images Installed**: Managed device system images are available
+- [ ] **Disk Space**: Host machine has enough free space for managed device snapshots
 - [ ] **Network**: If testing with backend, network connectivity available
-- [ ] **Storage**: Device has minimum 500MB free storage
-- [ ] **Battery**: Device battery > 50% (or connected to power)
-- [ ] **Screen On**: Device screen is on or use `adb shell input keyevent KEYCODE_WAKEUP`
+- [ ] **Storage**: Host machine has minimum 500MB free storage for test artifacts
 
 ### Pre-Test Setup
 
 ```bash
-# Build debug APK
-./gradlew :app:android-main:assembleDebug
-
-# Ensure app is installed
-adb install -r ./app/android-main/build/outputs/apk/debug/app-debug.apk
-
-# Clear app data before test
-adb shell pm clear app.logdate
-
-# Start app once to initialize
-adb shell am start -n "app.logdate/.MainActivity"
-
-# Return to home screen
-adb shell input keyevent KEYCODE_HOME
-
-# Now run e2e tests
-./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest"
+# Run the managed Android e2e lane
+./gradlew managedAndroidE2EDebugAndroidTest
 ```
 
 ---
 
 ## Troubleshooting
 
-### Device Not Found
+### Managed Device Provisioning Fails
 ```bash
-adb kill-server
-adb start-server
-adb devices  # Should list device
+./gradlew managedAndroidE2EDebugAndroidTest --info
+sdkmanager --list | rg "system-images;android"
 ```
 
 ### Tests Timeout
@@ -354,22 +344,17 @@ adb devices  # Should list device
 android.testInstrumentationRunnerArguments.timeout=60000
 
 # Or run with extended timeout
-./gradlew :app:android-main:connectedDebugAndroidTest \
+./gradlew managedAndroidE2EDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.timeout=120000
 ```
 
 ### Multi-Window Tests Skipped
-- Device may not support multi-window (API < 24)
-- Try with Pixel emulator: API 24+ recommended
-- Check: `adb shell getprop ro.build.version.sdk` ≥ 24
+- Ensure the managed device system images were downloaded successfully
+- Re-run with `--info` to inspect provisioning and instrumentation output
 
 ### Activity Not Found
 ```bash
-# Verify EditorActivity is registered in manifest
-adb shell pm list activities | grep EditorActivity
-
-# Check package name
-adb shell pm list packages | grep logdate
+./gradlew :app:android-main:processDebugManifest --info
 ```
 
 ---
@@ -392,7 +377,7 @@ To add a new e2e test:
 
 6. **Test locally before committing**:
    ```bash
-   ./gradlew connectedAndroidTest -k "MyFeatureE2ETest"
+   ./gradlew :app:android-main:smokeDevicesGroupDebugAndroidTest -Plogdate.androidTestClass=app.logdate.client.e2e.MyFeatureE2ETest
    ```
 
 7. **Verify CI passes**: PR will run full test suite

@@ -6,14 +6,13 @@ This document defines the systematic approach for organizing and running end-to-
 
 ## Android Device Targeting Standard
 
-When both a physical Android phone and an emulator are connected, all Android runtime verification in this repo should target the emulator explicitly:
+Android e2e coverage in this repo should default to Gradle Managed Devices. Use direct `adb` targeting only for the supplemental shell workflows that verify behavior Gradle instrumentation cannot cover:
 
 ```bash
-export ANDROID_SERIAL=emulator-5554
-adb -s emulator-5554 devices
+./gradlew managedAndroidE2EDebugAndroidTest
 ```
 
-Use `ANDROID_SERIAL=emulator-5554` for Gradle instrumented tests and `adb -s emulator-5554 ...` for direct shell/logcat workflows.
+Use managed-device Gradle tasks for Android instrumented tests and reserve `adb -s emulator-...` for supplemental shell/logcat workflows only.
 
 ### 1. Pure Server Tests (Gradle testApplication)
 
@@ -46,33 +45,44 @@ Use `ANDROID_SERIAL=emulator-5554` for Gradle instrumented tests and `adb -s emu
 
 ---
 
-### 2. Client Gradle Instrumented Tests (Gradle connectedAndroidTest)
+### 2. Client Gradle Instrumented Tests (Gradle Managed Devices)
 
-**Definition**: Android instrumented tests that run on a device/emulator using the gradle testing framework.
+**Definition**: Android instrumented tests that run on Gradle Managed Devices using the gradle testing framework.
 
 **Characteristics**:
 - Use AndroidJUnit4, Espresso, ActivityScenario
-- Run on connected device or emulator (requires API 24+)
+- Run on managed virtual devices (requires Android SDK system images)
 - Test Android framework behavior, UI interactions
 - Gradle manages test execution and reporting
 
 **Examples**:
 - `MultiWindowEditorE2ETest` - Multi-window intent flags, activity lifecycle
+- `IncomingShareE2ETest` - Share intents into LogDate drafts
+- `ShareReceiverE2ETest` - Share chooser actions
+- `SharingEntryPointsE2ETest` - Timeline and library share CTA wiring
 - Future tests: Navigation flows, permission handling, database integration
 
 **How to Run**:
 ```bash
 # Run all client e2e tests
-ANDROID_SERIAL=emulator-5554 ./gradlew :app:android-main:connectedDebugAndroidTest
+./gradlew managedAndroidE2EDebugAndroidTest
 
 # Run specific test class
-ANDROID_SERIAL=emulator-5554 ./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest"
+./gradlew managedAndroidMultiWindowDebugAndroidTest
 
 # Run with verbose output
-ANDROID_SERIAL=emulator-5554 ./gradlew :app:android-main:connectedDebugAndroidTest -k "MultiWindowEditorE2ETest" --info
+./gradlew managedAndroidMultiWindowDebugAndroidTest --info
 ```
 
 **When to Create Shell Script**: **Only if** the test needs to verify actual device behavior via adb shell commands that gradle cannot test.
+
+**Share UX runner**:
+The Android share UX suite uses the same managed-device flow as the rest of the Android e2e suite:
+
+```bash
+./tests/e2e/test-share-functionality.sh
+./tests/e2e/test-share-functionality.sh --verbose
+```
 
 ---
 
@@ -88,7 +98,7 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :app:android-main:connectedDebugAndroidTe
 - Run in shell scripts with color output and summary reporting
 
 **Examples**:
-- `tests/e2e/test-multi-window-editor.sh` - Verifies actual window creation, task isolation, recents behavior
+- `tests/e2e/test-multi-window-editor.sh` - Supplemental adb verification for actual window creation, task isolation, and recents behavior
 
 **How to Run**:
 ```bash
@@ -109,7 +119,8 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :app:android-main:connectedDebugAndroidTe
 ### Directory Structure
 ```
 tests/e2e/
-├── test-multi-window-editor.sh          # ADB-based window behavior tests
+├── test-multi-window-editor.sh          # Supplemental adb-based window behavior checks
+├── test-share-functionality.sh          # Managed-device Android share UX instrumentation
 ├── test-navigation-flows.sh             # (Future) Navigation flow tests via adb
 ├── test-permission-handling.sh          # (Future) Permission verification via adb
 └── run-e2e-tests.sh                    # Master test runner
@@ -209,7 +220,7 @@ The `docs/testing/e2e-test-index.md` should document:
 **Commands**:
 ```bash
 # Run via gradle (no shell script needed)
-./gradlew :server:test -k "TestClassName"
+./gradlew :server:test --tests "app.logdate.server.e2e.TestClassName"
 ```
 ```
 
@@ -217,8 +228,8 @@ The `docs/testing/e2e-test-index.md` should document:
 ```markdown
 **Commands**:
 ```bash
-# Run via gradle
-./gradlew :app:android-main:connectedDebugAndroidTest -k "TestClassName"
+# Run via managed devices
+./gradlew :app:android-main:smokeDevicesGroupDebugAndroidTest -Plogdate.androidTestClass=app.logdate.client.e2e.TestClassName
 
 # For actual device behavior verification, see adb shell tests:
 # ./tests/e2e/test-<feature>.sh
@@ -248,12 +259,12 @@ See: `tests/e2e/test-<feature>.sh` for full details
 ```
 Does the test involve:
 ├─ Gradle server testing (testApplication)?
-│  └─ NO SCRIPT NEEDED → Use ./gradlew :server:test -k "TestName"
+│  └─ NO SCRIPT NEEDED → Use ./gradlew :server:test --tests "app.logdate.server.e2e.TestName"
 │
-├─ Gradle instrumented testing (connectedAndroidTest)?
+├─ Gradle instrumented testing (managed devices)?
 │  │
 │  └─ Does it need to verify actual device behavior via adb?
-│     ├─ NO → Use ./gradlew :app:android-main:connectedDebugAndroidTest -k "TestName"
+│     ├─ NO → Use ./gradlew :app:android-main:smokeDevicesGroupDebugAndroidTest -Plogdate.androidTestClass=app.logdate.client.e2e.TestName
 │     └─ YES → CREATE SCRIPT → ./tests/e2e/test-<feature>.sh
 │         ├─ Script executes adb shell commands
 │         ├─ Script verifies real device behavior

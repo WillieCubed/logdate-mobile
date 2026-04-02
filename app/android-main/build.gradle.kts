@@ -14,6 +14,7 @@ val baselineProfileRequested =
         taskName.contains("BaselineProfile", ignoreCase = true)
     }
 val androidTestClassOverride = providers.gradleProperty("logdate.androidTestClass").orNull
+val androidTestPackageOverride = providers.gradleProperty("logdate.androidTestPackage").orNull
 
 if (baselineProfileRequested) {
     apply(
@@ -52,6 +53,9 @@ extensions.configure<ApplicationExtension> {
         if (androidTestClassOverride != null) {
             testInstrumentationRunnerArguments["class"] = androidTestClassOverride
         }
+        if (androidTestPackageOverride != null) {
+            testInstrumentationRunnerArguments["package"] = androidTestPackageOverride
+        }
     }
 
     buildTypes {
@@ -81,6 +85,15 @@ extensions.configure<ApplicationExtension> {
     }
 
     packaging {
+        jniLibs {
+            keepDebugSymbols += "**/libandroidx.graphics.path.so"
+            keepDebugSymbols += "**/libdatastore_shared_counter.so"
+            keepDebugSymbols += "**/libimage_processing_util_jni.so"
+            keepDebugSymbols += "**/libmockkjvmtiagent.so"
+            keepDebugSymbols += "**/libsqlcipher.so"
+            keepDebugSymbols += "**/libsqliteJni.so"
+            keepDebugSymbols += "**/libsurface_util_jni.so"
+        }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             pickFirsts += "**/*.properties"
@@ -240,11 +253,13 @@ dependencies {
     screenshotTestImplementation(projects.client.feature.rewind)
     screenshotTestImplementation(projects.client.feature.timeline)
     screenshotTestImplementation(projects.client.feature.locationTimeline)
+    screenshotTestImplementation(projects.client.feature.library)
     screenshotTestImplementation(projects.client.feature.search)
     screenshotTestImplementation(projects.client.permissions)
     screenshotTestImplementation(projects.client.domain)
     screenshotTestImplementation(projects.client.data)
     screenshotTestImplementation(projects.client.database)
+    screenshotTestImplementation(projects.client.media)
     screenshotTestImplementation(projects.client.sync)
     screenshotTestImplementation(projects.client.location)
     screenshotTestImplementation(projects.client.repository)

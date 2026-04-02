@@ -49,7 +49,7 @@ import kotlin.uuid.Uuid
  *
  * Run with:
  * ```
- * ./gradlew :app:android-main:connectedAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.logdate.client.e2e.DraftsE2ETest
+ * ./gradlew :app:android-main:smokeDevicesGroupDebugAndroidTest -Plogdate.androidTestClass=app.logdate.client.e2e.DraftsE2ETest
  * ```
  */
 @RunWith(AndroidJUnit4::class)

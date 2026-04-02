@@ -1,6 +1,7 @@
 @file:Suppress("UnstableApiUsage")
 
 import com.android.build.api.dsl.ApplicationExtension
+import com.android.build.api.dsl.ManagedVirtualDevice
 import org.jlleitschuh.gradle.ktlint.KtlintExtension
 import org.gradle.api.Project
 import org.gradle.api.tasks.testing.Test
@@ -105,6 +106,51 @@ tasks.register("managedPhoneDebugAndroidTest") {
     dependsOn(":app:android-main:phoneDevicesGroupDebugAndroidTest")
 }
 
+tasks.register("managedAndroidSmoke") {
+    group = "verification"
+    description = "Run the fast managed Android smoke lane for app/android-main on the flagship phone and tablet."
+    dependsOn(":app:android-main:smokeDevicesGroupDebugAndroidTest")
+}
+
+tasks.register<Exec>("managedAndroidE2EDebugAndroidTest") {
+    group = "verification"
+    description = "Run app/android-main end-to-end instrumentation tests on the managed Android smoke lane."
+    workingDir = rootDir
+    commandLine(
+        rootDir.resolve("gradlew").absolutePath,
+        ":app:android-main:smokeDevicesGroupDebugAndroidTest",
+        "-Plogdate.androidTestPackage=app.logdate.client.e2e",
+    )
+}
+
+tasks.register<Exec>("managedAndroidMultiWindowDebugAndroidTest") {
+    group = "verification"
+    description = "Run the multi-window Android e2e suite on the managed Android matrix."
+    workingDir = rootDir
+    commandLine(
+        rootDir.resolve("gradlew").absolutePath,
+        ":app:android-main:deviceMatrixGroupDebugAndroidTest",
+        "-Plogdate.androidTestClass=app.logdate.client.e2e.MultiWindowEditorE2ETest",
+    )
+}
+
+tasks.register<Exec>("managedAndroidShareDebugAndroidTest") {
+    group = "verification"
+    description = "Run the Android share e2e suite on the managed Android smoke lane."
+    workingDir = rootDir
+    commandLine(
+        rootDir.resolve("gradlew").absolutePath,
+        ":app:android-main:smokeDevicesGroupDebugAndroidTest",
+        "-Plogdate.androidTestClass=app.logdate.client.e2e.IncomingShareE2ETest,app.logdate.client.e2e.ShareReceiverE2ETest,app.logdate.client.e2e.SharingEntryPointsE2ETest",
+    )
+}
+
+tasks.register("managedAndroidMatrix") {
+    group = "verification"
+    description = "Run the managed Android phone and tablet matrix for app/android-main."
+    dependsOn(":app:android-main:deviceMatrixGroupDebugAndroidTest")
+}
+
 tasks.register("managedTabletDebugAndroidTest") {
     group = "verification"
     description = "Run app/android-main instrumented tests on the managed tablet device."
@@ -153,6 +199,16 @@ tasks.register("managedBenchmark") {
     dependsOn(
         "managedPhoneBenchmark",
         "managedWearBenchmark",
+    )
+}
+
+tasks.register("managedAndroidPerformance") {
+    group = "verification"
+    description = "Run the managed Android phone performance lane: phone macrobenchmarks, microbenchmarks, and baseline profile generation."
+    dependsOn(
+        "managedPhoneBenchmark",
+        "managedMicroBenchmark",
+        "generatePhoneBaselineProfile",
     )
 }
 
@@ -274,10 +330,10 @@ tasks.register<JacocoReport>("mediaAndroidTestCoverageReport") {
     val managedDeviceCoverageFiles =
         files(
             appProject.layout.buildDirectory.file(
-                "outputs/managed_device_code_coverage/debug/largeScreenTabletApi34/coverage.ec",
+                "outputs/managed_device_code_coverage/debug/largeScreenTabletApi35/coverage.ec",
             ),
             appProject.layout.buildDirectory.file(
-                "intermediates/managed_device_code_coverage/debugAndroidTest/largeScreenTabletApi34DebugAndroidTest/coverage.ec",
+                "intermediates/managed_device_code_coverage/debugAndroidTest/largeScreenTabletApi35DebugAndroidTest/coverage.ec",
             ),
         )
 
@@ -400,21 +456,25 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                     localDevices =
                         listOf(
                             ManagedVirtualDeviceConfig(
-                                deviceName = "largeScreenTabletApi34",
+                                deviceName = "largeScreenTabletApi35",
                                 hardwareProfile = "Pixel Tablet",
-                                apiLevel = 34,
+                                apiLevel = 35,
                                 systemImageSource = "google",
                             ),
                         ),
                     groups =
                         listOf(
                             ManagedDeviceGroupConfig(
+                                groupName = "smokeDevices",
+                                targetDeviceNames = listOf("largeScreenTabletApi35"),
+                            ),
+                            ManagedDeviceGroupConfig(
                                 groupName = "tabletDevices",
-                                targetDeviceNames = listOf("largeScreenTabletApi34"),
+                                targetDeviceNames = listOf("largeScreenTabletApi35"),
                             ),
                             ManagedDeviceGroupConfig(
                                 groupName = "deviceMatrix",
-                                targetDeviceNames = listOf("largeScreenTabletApi34"),
+                                targetDeviceNames = listOf("largeScreenTabletApi35"),
                             ),
                         ),
                 )
@@ -435,14 +495,22 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                                 systemImageSource = "google",
                             ),
                             ManagedVirtualDeviceConfig(
-                                deviceName = "largeScreenTabletApi34",
+                                deviceName = "largeScreenTabletApi35",
                                 hardwareProfile = "Pixel Tablet",
-                                apiLevel = 34,
+                                apiLevel = 35,
                                 systemImageSource = "google",
                             ),
                         ),
                     groups =
                         listOf(
+                            ManagedDeviceGroupConfig(
+                                groupName = "smokeDevices",
+                                targetDeviceNames =
+                                    listOf(
+                                        "flagshipPhoneApi36",
+                                        "largeScreenTabletApi35",
+                                    ),
+                            ),
                             ManagedDeviceGroupConfig(
                                 groupName = "phoneDevices",
                                 targetDeviceNames =
@@ -453,7 +521,7 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                             ),
                             ManagedDeviceGroupConfig(
                                 groupName = "tabletDevices",
-                                targetDeviceNames = listOf("largeScreenTabletApi34"),
+                                targetDeviceNames = listOf("largeScreenTabletApi35"),
                             ),
                             ManagedDeviceGroupConfig(
                                 groupName = "deviceMatrix",
@@ -461,7 +529,7 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                                     listOf(
                                         "oldestSupportedPhoneApi30",
                                         "flagshipPhoneApi36",
-                                        "largeScreenTabletApi34",
+                                        "largeScreenTabletApi35",
                                     ),
                             ),
                         ),
@@ -505,6 +573,7 @@ private fun ApplicationExtension.configureManagedDevices(project: Project) {
                                 device = deviceConfig.hardwareProfile
                                 apiLevel = deviceConfig.apiLevel
                                 systemImageSource = deviceConfig.systemImageSource
+                                pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_16KB_PAGES
                             }
                     deviceConfig.deviceName to managedDevice
                 }
