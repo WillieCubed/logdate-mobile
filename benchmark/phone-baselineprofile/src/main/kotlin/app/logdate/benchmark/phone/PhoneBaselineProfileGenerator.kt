@@ -18,9 +18,11 @@ class PhoneBaselineProfileGenerator {
             includeInStartupProfile = true,
         ) {
             PhoneBenchmarkConfig.run {
-                startFromLauncher()
+                startFromLauncher(fixture = onboardedHomeFixtureJson())
                 device.waitForIdle()
-                startFromDeepLink()
+                openSearchFromHome()
+                typeSearchQuery(query = "sun")
+                startFromDeepLink(fixture = onboardedHomeFixtureJson())
             }
         }
     }

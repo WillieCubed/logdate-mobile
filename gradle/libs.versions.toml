@@ -2,7 +2,7 @@
 # Build Plugin Versions
 desugar_jdk_libs = "2.1.5"
 filekitCompose = "0.8.8"
-kotlin = "2.3.20-RC"
+kotlin = "2.3.20"
 dokkaGradlePlugin = "2.2.0-Beta"
 compose-multiplatform = "1.11.0-alpha04"
 compose-material3 = "1.11.0-alpha04"
@@ -27,6 +27,8 @@ androidx-test-ext-junit = "1.3.0"
 androidx-test-runner = "1.7.0"
 androidx-test-core = "1.7.0"
 androidx-test-espresso = "3.7.0"
+androidx-test-orchestrator = "1.6.1"
+androidx-test-uiautomator = "2.3.0"
 
 # Common (Multiplatform) Dependencies
 ksp = "2.3.6"
@@ -224,6 +226,8 @@ androidx-datastore-preferences = { group = "androidx.datastore", name = "datasto
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "androidx-security-crypto" }
 androidx-appsearch = { group = "androidx.appsearch", name = "appsearch", version.ref = "androidxAppSearch" }
 androidx-appsearch-platform-storage = { group = "androidx.appsearch", name = "appsearch-platform-storage", version.ref = "androidxAppSearch" }
+androidx-test-orchestrator = { group = "androidx.test", name = "orchestrator", version.ref = "androidx-test-orchestrator" }
+androidx-test-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "androidx-test-uiautomator" }
 
 ## Paging
 androidx-paging-common = { group = "androidx.paging", name = "paging-common", version.ref = "paging" }

@@ -1,40 +1,54 @@
 package app.logdate.screenshots.flows.flow04_search
 
+import kotlin.uuid.Uuid
 import androidx.compose.runtime.Composable
+import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
-import app.logdate.client.repository.search.SearchResultType
 import app.logdate.feature.search.ui.SearchScreenContent
+import app.logdate.feature.search.ui.SearchScreenState
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTheme
 import com.android.tools.screenshot.PreviewTest
-import kotlin.uuid.Uuid
+
+private const val SEARCH_QUERY = "sun"
 
 private val results =
     listOf(
         SearchResult(
             uid = Uuid.parse("00000000-0000-0000-0000-000000000061"),
-            content = "Captured the last train home and wrote down the feeling before I forgot it.",
+            content = "Caught the sunrise train and wrote down the quiet before the city woke up.",
             created = ScreenshotTestData.baseInstant,
-            contentType = SearchResultType.TEXT_NOTE,
+            contentType = SearchContentType.TEXT_NOTE,
         ),
         SearchResult(
             uid = Uuid.parse("00000000-0000-0000-0000-000000000062"),
-            content = "Voice memo about the route screenshot rollout and the remaining gaps in settings.",
+            content = "Voice memo on the sunrise trail, the route changes, and what still needs shipping.",
             created = ScreenshotTestData.baseInstant,
-            contentType = SearchResultType.TRANSCRIPTION,
+            contentType = SearchContentType.TRANSCRIPTION,
         ),
     )
 
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S01_SearchEmpty() {
+fun S01_SearchIdleWithRecents() {
     ScreenshotTheme {
         SearchScreenContent(
-            searchResults = emptyList(),
+            searchState =
+                SearchScreenState.Idle(
+                    recentSearches =
+                        listOf(
+                            "sunrise trail",
+                            "voice memo",
+                            "budget review",
+                        ),
+                ),
+            queryText = "",
             onQueryChange = {},
+            onCommitSearch = {},
             onNavigateToDay = {},
+            onNavigateToJournal = {},
             onGoBack = {},
         )
     }
@@ -43,12 +57,15 @@ fun S01_SearchEmpty() {
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S02_SearchNoResults() {
+fun S02_SearchSearching() {
     ScreenshotTheme {
         SearchScreenContent(
-            searchResults = emptyList(),
+            searchState = SearchScreenState.Searching(query = SEARCH_QUERY),
+            queryText = SEARCH_QUERY,
             onQueryChange = {},
+            onCommitSearch = {},
             onNavigateToDay = {},
+            onNavigateToJournal = {},
             onGoBack = {},
         )
     }
@@ -57,12 +74,32 @@ fun S02_SearchNoResults() {
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S03_SearchWithResults() {
+fun S03_SearchEmpty() {
     ScreenshotTheme {
         SearchScreenContent(
-            searchResults = results,
+            searchState = SearchScreenState.Empty(query = SEARCH_QUERY),
+            queryText = SEARCH_QUERY,
             onQueryChange = {},
+            onCommitSearch = {},
             onNavigateToDay = {},
+            onNavigateToJournal = {},
+            onGoBack = {},
+        )
+    }
+}
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun S04_SearchResults() {
+    ScreenshotTheme {
+        SearchScreenContent(
+            searchState = SearchScreenState.Results(query = SEARCH_QUERY, results = results),
+            queryText = SEARCH_QUERY,
+            onQueryChange = {},
+            onCommitSearch = {},
+            onNavigateToDay = {},
+            onNavigateToJournal = {},
             onGoBack = {},
         )
     }
