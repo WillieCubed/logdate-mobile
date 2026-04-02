@@ -38,6 +38,7 @@ android {
                     create("wearApi34") {
                         device = "Wear OS Small Round"
                         apiLevel = 34
+                        pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_16KB_PAGES
                         systemImageSource = "google"
                     }
             }

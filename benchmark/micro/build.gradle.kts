@@ -34,6 +34,7 @@ android {
                     create("flagshipPhoneApi36") {
                         device = "Pixel 10 Pro"
                         apiLevel = 36
+                        pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_16KB_PAGES
                         systemImageSource = "google"
                     }
             }
