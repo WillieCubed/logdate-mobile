@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * No-op [NetworkSaverModeProvider] for platforms or tests that don't support data saver detection.
  */
 class StubNetworkSaverModeProvider : NetworkSaverModeProvider {
-    override val dataSaverModeState: Flow<NetworkSaverState> =
+    private val mutableState =
         MutableStateFlow(
             NetworkSaverState(
                 isDataSaverEnabled = false,
@@ -15,10 +15,15 @@ class StubNetworkSaverModeProvider : NetworkSaverModeProvider {
             ),
         )
 
-    override suspend fun getCurrentDataSaverState(): NetworkSaverState =
-        NetworkSaverState(isDataSaverEnabled = false, connectionType = NetworkConnectionType.WIFI)
+    override val dataSaverModeState: Flow<NetworkSaverState> = mutableState
 
-    override suspend fun isDataSaverModeActive(): Boolean = false
+    fun setNetworkSaverState(state: NetworkSaverState) {
+        mutableState.value = state
+    }
+
+    override suspend fun getCurrentDataSaverState(): NetworkSaverState = mutableState.value
+
+    override suspend fun isDataSaverModeActive(): Boolean = mutableState.value.isDataSaverEnabled
 
     override fun cleanup() {}
 }
