@@ -22,6 +22,7 @@ kotlin {
             libs.versions.android.minSdk
                 .get()
                 .toInt()
+        withHostTestBuilder {}
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
@@ -57,6 +58,7 @@ kotlin {
             implementation(libs.compose.foundation)
             implementation(libs.compose.material.icons.extended)
             implementation(libs.compose.material3)
+            implementation(libs.material3.adaptive)
             implementation(libs.compose.ui)
             implementation(libs.compose.components.resources)
             implementation(libs.compose.ui.tooling.preview)

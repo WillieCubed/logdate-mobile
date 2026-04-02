@@ -1,5 +1,12 @@
 package app.logdate.feature.postcards.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -7,11 +14,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,12 +46,17 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -48,11 +67,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import app.logdate.feature.postcards.model.CanvasElement
 import app.logdate.feature.postcards.model.InkTool
 import app.logdate.feature.postcards.model.ShapeKind
@@ -62,10 +89,9 @@ import org.koin.compose.viewmodel.koinViewModel
 /**
  * Full-screen immersive canvas editor for creating and editing Postcards.
  *
- * The editor has three main zones:
- * 1. **Canvas** — the pannable/zoomable editing area
- * 2. **Shelf** — content staging tray at the bottom (photos, stickers, browse)
- * 3. **Tool palette** — tool selection bar at the very bottom
+ * Adapts layout by screen size:
+ * - **Compact (phones):** Vertical layout — canvas, shelf, bottom tool bar
+ * - **Medium+ (tablets, landscape):** Horizontal layout — side tool rail, canvas, shelf panel
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,7 +101,7 @@ fun CanvasEditorScreen(
     onSaved: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
-    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(state.saveError) {
         state.saveError?.let { error ->
@@ -84,8 +110,12 @@ fun CanvasEditorScreen(
         }
     }
 
+    val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
+    val useWideLayout = windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND)
+
     Scaffold(
-        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             EditorTopBar(
                 title = state.document.title,
@@ -101,148 +131,267 @@ fun CanvasEditorScreen(
                     viewModel.save()
                     onSaved()
                 },
+                modifier = Modifier.statusBarsPadding(),
             )
         },
     ) { paddingValues ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-        ) {
-            val viewportState = rememberCanvasViewportState()
+        val viewportState = rememberCanvasViewportState()
 
-            // Canvas area
-            Box(
+        val keyboardModifier =
+            Modifier.onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                val isModifier = event.isCtrlPressed || event.isMetaPressed
+                when {
+                    isModifier && !event.isShiftPressed && event.key == Key.Z -> {
+                        viewModel.undo()
+                        true
+                    }
+                    isModifier && event.isShiftPressed && event.key == Key.Z -> {
+                        viewModel.redo()
+                        true
+                    }
+                    event.key == Key.Delete || event.key == Key.Backspace -> {
+                        if (state.selectedElementId != null) {
+                            viewModel.deleteSelectedElement()
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    event.key == Key.Escape -> {
+                        if (state.isTextEditorVisible) {
+                            viewModel.cancelTextEditing()
+                        } else {
+                            viewModel.selectElement(null)
+                        }
+                        true
+                    }
+                    event.key == Key.One -> {
+                        viewModel.setActiveTool(CanvasTool.SELECT)
+                        true
+                    }
+                    event.key == Key.Two -> {
+                        viewModel.setActiveTool(CanvasTool.INK)
+                        true
+                    }
+                    event.key == Key.Three -> {
+                        viewModel.setActiveTool(CanvasTool.SHAPE)
+                        true
+                    }
+                    event.key == Key.Four -> {
+                        viewModel.setActiveTool(CanvasTool.TEXT)
+                        true
+                    }
+                    event.key == Key.Five -> {
+                        viewModel.setActiveTool(CanvasTool.STICKER)
+                        true
+                    }
+                    else -> false
+                }
+            }
+
+        if (useWideLayout) {
+            // Tablet / landscape: tool rail on left, canvas center, shelf on right
+            Row(
                 modifier =
                     Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .then(keyboardModifier),
             ) {
-                val viewportGesturesEnabled =
-                    state.activeTool != CanvasTool.INK &&
-                        state.activeTool != CanvasTool.SHAPE
-                CanvasViewport(
-                    state = viewportState,
-                    gestureEnabled = viewportGesturesEnabled,
+                ToolRail(
+                    activeTool = state.activeTool,
+                    onToolSelected = viewModel::setActiveTool,
+                    modifier =
+                        Modifier
+                            .fillMaxHeight()
+                            .navigationBarsPadding(),
+                )
+
+                CanvasArea(
+                    state = state,
+                    viewModel = viewModel,
+                    viewportState = viewportState,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
+
+                Shelf(
+                    mode = state.shelfMode,
+                    photos = state.shelfPhotos,
+                    browsePhotos = state.browsePhotos,
+                    stickers = state.shelfStickers,
+                    onModeChange = viewModel::setShelfMode,
+                    onPhotoDrag = { photo, x, y -> viewModel.addPhotoElement(photo, x, y) },
+                    onStickerTap = { sticker -> viewModel.addStickerElement(sticker.id, 0f, 0f) },
+                    modifier =
+                        Modifier
+                            .width(200.dp)
+                            .fillMaxHeight()
+                            .navigationBarsPadding(),
+                )
+            }
+        } else {
+            // Phone: canvas on top, shelf + tool bar at bottom
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .then(keyboardModifier),
+            ) {
+                CanvasArea(
+                    state = state,
+                    viewModel = viewModel,
+                    viewportState = viewportState,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+
+                // Text editor slides up over the shelf when active
+                AnimatedVisibility(
+                    visible = state.isTextEditorVisible,
+                    enter = slideInVertically { it },
+                    exit = slideOutVertically { it },
                 ) {
-                    CanvasRenderer(
-                        document = state.document,
-                        selectedElementId = state.selectedElementId,
-                        stickerUriMap = state.stickerUriMap,
-                        viewportOffsetX = viewportState.offset.x,
-                        viewportOffsetY = viewportState.offset.y,
-                        onElementTap = { elementId ->
-                            val element = state.document.elements.find { it.id == elementId }
-                            if (element is CanvasElement.Text) {
-                                viewModel.startTextEditing(elementId)
-                            } else {
-                                viewModel.selectElement(elementId)
-                            }
+                    val editingElement =
+                        state.editingTextElementId?.let { id ->
+                            state.document.elements.find { it.id == id } as? CanvasElement.Text
+                        }
+                    TextElementEditor(
+                        initialText = editingElement?.content ?: "",
+                        initialFont = editingElement?.fontFamily ?: FontChoice.CAVEAT.id,
+                        initialColor = editingElement?.color ?: DEFAULT_STROKE_COLOR,
+                        initialFontSize = editingElement?.fontSize ?: 24f,
+                        onConfirm = { content, fontFamily, color, fontSize ->
+                            val centerX = -viewportState.offset.x / viewportState.scale
+                            val centerY = -viewportState.offset.y / viewportState.scale
+                            viewModel.confirmTextEditing(content, fontFamily, color, fontSize, centerX, centerY)
                         },
+                        onDismiss = viewModel::cancelTextEditing,
                     )
                 }
 
-                // Tool overlays — rendered on top of the viewport
-                when (state.activeTool) {
-                    CanvasTool.SELECT -> {
-                        val selectedId = state.selectedElementId
-                        if (selectedId != null) {
-                            SelectionOverlay(
-                                selectedElementId = selectedId,
-                                viewportScale = viewportState.scale,
-                                onBeginDrag = viewModel::beginDrag,
-                                onMoveElement = viewModel::moveElement,
-                                onEndDrag = viewModel::endDrag,
-                                onTransformElement = viewModel::transformElement,
-                                onDeselect = { viewModel.selectElement(null) },
-                            )
-                        }
-                    }
-                    CanvasTool.INK -> {
-                        InkCaptureOverlay(
-                            tool = InkTool.PEN,
-                            color = DEFAULT_STROKE_COLOR,
-                            strokeWidth = DEFAULT_INK_WIDTH,
-                            onStrokeComplete = { points ->
-                                viewModel.addInkStroke(
-                                    points = points,
-                                    tool = InkTool.PEN,
-                                    color = DEFAULT_STROKE_COLOR,
-                                    strokeWidth = DEFAULT_INK_WIDTH,
-                                )
-                            },
-                        )
-                    }
-                    CanvasTool.SHAPE -> {
-                        ShapeCaptureOverlay(
-                            shapeKind = ShapeKind.RECTANGLE,
-                            color = DEFAULT_STROKE_COLOR,
-                            strokeWidth = DEFAULT_SHAPE_WIDTH,
-                            onShapeComplete = { draft ->
-                                viewModel.addShape(
-                                    shapeKind = draft.kind,
-                                    x = draft.x,
-                                    y = draft.y,
-                                    width = draft.width,
-                                    height = draft.height,
-                                    color = DEFAULT_STROKE_COLOR,
-                                    strokeWidth = DEFAULT_SHAPE_WIDTH,
-                                )
-                            },
-                        )
-                    }
-                    CanvasTool.TEXT -> {
-                        if (!state.isTextEditorVisible) {
-                            viewModel.startTextEditing()
-                        }
-                    }
-                    CanvasTool.STICKER -> {
-                        viewModel.setShelfMode(ShelfMode.Stickers)
-                    }
-                }
-            }
+                Shelf(
+                    mode = state.shelfMode,
+                    photos = state.shelfPhotos,
+                    browsePhotos = state.browsePhotos,
+                    stickers = state.shelfStickers,
+                    onModeChange = viewModel::setShelfMode,
+                    onPhotoDrag = { photo, x, y -> viewModel.addPhotoElement(photo, x, y) },
+                    onStickerTap = { sticker -> viewModel.addStickerElement(sticker.id, 0f, 0f) },
+                )
 
-            // Text editor overlay — shown above shelf when active
-            if (state.isTextEditorVisible) {
-                val editingElement =
-                    state.editingTextElementId?.let { id ->
-                        state.document.elements.find { it.id == id } as? CanvasElement.Text
-                    }
-                TextElementEditor(
-                    initialText = editingElement?.content ?: "",
-                    initialFont = editingElement?.fontFamily ?: FontChoice.CAVEAT.id,
-                    initialColor = editingElement?.color ?: DEFAULT_STROKE_COLOR,
-                    initialFontSize = editingElement?.fontSize ?: 24f,
-                    onConfirm = { content, fontFamily, color, fontSize ->
-                        val centerX = -viewportState.offset.x / viewportState.scale
-                        val centerY = -viewportState.offset.y / viewportState.scale
-                        viewModel.confirmTextEditing(content, fontFamily, color, fontSize, centerX, centerY)
-                    },
-                    onDismiss = viewModel::cancelTextEditing,
+                ToolPalette(
+                    activeTool = state.activeTool,
+                    onToolSelected = viewModel::setActiveTool,
+                    modifier = Modifier.navigationBarsPadding(),
                 )
             }
+        }
+    }
+}
 
-            // Shelf
-            Shelf(
-                mode = state.shelfMode,
-                photos = state.shelfPhotos,
-                browsePhotos = state.browsePhotos,
-                stickers = state.shelfStickers,
-                onModeChange = viewModel::setShelfMode,
-                onPhotoDrag = { photo, x, y ->
-                    viewModel.addPhotoElement(photo, x, y)
-                },
-                onStickerTap = { sticker ->
-                    viewModel.addStickerElement(sticker.id, 0f, 0f)
+/**
+ * The main canvas area with viewport, renderer, and tool overlays.
+ */
+@Composable
+private fun CanvasArea(
+    state: CanvasEditorState,
+    viewModel: CanvasEditorViewModel,
+    viewportState: CanvasViewportState,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier) {
+        val viewportGesturesEnabled =
+            state.activeTool != CanvasTool.INK && state.activeTool != CanvasTool.SHAPE
+
+        CanvasViewport(
+            state = viewportState,
+            gestureEnabled = viewportGesturesEnabled,
+        ) {
+            CanvasRenderer(
+                document = state.document,
+                selectedElementId = state.selectedElementId,
+                stickerUriMap = state.stickerUriMap,
+                viewportOffsetX = viewportState.offset.x,
+                viewportOffsetY = viewportState.offset.y,
+                onElementTap = { elementId ->
+                    val element = state.document.elements.find { it.id == elementId }
+                    if (element is CanvasElement.Text) {
+                        viewModel.startTextEditing(elementId)
+                    } else {
+                        viewModel.selectElement(elementId)
+                    }
                 },
             )
+        }
 
-            // Tool palette
-            ToolPalette(
-                activeTool = state.activeTool,
-                onToolSelected = viewModel::setActiveTool,
-            )
+        // Tool overlays with animated crossfade
+        AnimatedContent(
+            targetState = state.activeTool,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            label = "tool-overlay",
+        ) { tool ->
+            when (tool) {
+                CanvasTool.SELECT -> {
+                    val selectedId = state.selectedElementId
+                    if (selectedId != null) {
+                        SelectionOverlay(
+                            selectedElementId = selectedId,
+                            viewportScale = viewportState.scale,
+                            onBeginDrag = viewModel::beginDrag,
+                            onMoveElement = viewModel::moveElement,
+                            onEndDrag = viewModel::endDrag,
+                            onTransformElement = viewModel::transformElement,
+                            onDeselect = { viewModel.selectElement(null) },
+                        )
+                    } else {
+                        Box(Modifier)
+                    }
+                }
+                CanvasTool.INK -> {
+                    InkCaptureOverlay(
+                        tool = InkTool.PEN,
+                        color = DEFAULT_STROKE_COLOR,
+                        strokeWidth = DEFAULT_INK_WIDTH,
+                        onStrokeComplete = { points ->
+                            viewModel.addInkStroke(
+                                points = points,
+                                tool = InkTool.PEN,
+                                color = DEFAULT_STROKE_COLOR,
+                                strokeWidth = DEFAULT_INK_WIDTH,
+                            )
+                        },
+                    )
+                }
+                CanvasTool.SHAPE -> {
+                    ShapeCaptureOverlay(
+                        shapeKind = ShapeKind.RECTANGLE,
+                        color = DEFAULT_STROKE_COLOR,
+                        strokeWidth = DEFAULT_SHAPE_WIDTH,
+                        onShapeComplete = { draft ->
+                            viewModel.addShape(
+                                shapeKind = draft.kind,
+                                x = draft.x,
+                                y = draft.y,
+                                width = draft.width,
+                                height = draft.height,
+                                color = DEFAULT_STROKE_COLOR,
+                                strokeWidth = DEFAULT_SHAPE_WIDTH,
+                            )
+                        },
+                    )
+                }
+                CanvasTool.TEXT -> {
+                    if (!state.isTextEditorVisible) {
+                        viewModel.startTextEditing()
+                    }
+                    Box(Modifier)
+                }
+                CanvasTool.STICKER -> {
+                    viewModel.setShelfMode(ShelfMode.Stickers)
+                    Box(Modifier)
+                }
+            }
         }
     }
 }
@@ -260,11 +409,13 @@ private fun EditorTopBar(
     onRedo: () -> Unit,
     onDelete: () -> Unit,
     onSave: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var isEditingTitle by remember { mutableStateOf(false) }
     var editableTitle by remember(title) { mutableStateOf(title) }
 
     TopAppBar(
+        modifier = modifier,
         title = {
             if (isEditingTitle) {
                 BasicTextField(
@@ -275,14 +426,8 @@ private fun EditorTopBar(
                         MaterialTheme.typography.titleMedium.copy(
                             color = MaterialTheme.colorScheme.onSurface,
                         ),
-                    cursorBrush =
-                        SolidColor(
-                            MaterialTheme.colorScheme.primary,
-                        ),
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(end = 8.dp),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
                     decorationBox = { innerTextField ->
                         if (editableTitle.isEmpty()) {
                             Text(
@@ -304,10 +449,7 @@ private fun EditorTopBar(
                         } else {
                             MaterialTheme.colorScheme.onSurface
                         },
-                    modifier =
-                        Modifier.clickable {
-                            isEditingTitle = true
-                        },
+                    modifier = Modifier.clickable { isEditingTitle = true },
                 )
             }
         },
@@ -317,30 +459,54 @@ private fun EditorTopBar(
             }
         },
         actions = {
-            IconButton(onClick = onUndo, enabled = canUndo) {
-                Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                tooltip = { PlainTooltip { Text("Undo (Ctrl+Z)") } },
+                state = rememberTooltipState(),
+            ) {
+                IconButton(onClick = onUndo, enabled = canUndo) {
+                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
+                }
             }
-            IconButton(onClick = onRedo, enabled = canRedo) {
-                Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo")
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                tooltip = { PlainTooltip { Text("Redo (Ctrl+Shift+Z)") } },
+                state = rememberTooltipState(),
+            ) {
+                IconButton(onClick = onRedo, enabled = canRedo) {
+                    Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo")
+                }
             }
             if (hasSelection) {
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete")
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                    tooltip = { PlainTooltip { Text("Delete (Del)") } },
+                    state = rememberTooltipState(),
+                ) {
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Delete")
+                    }
                 }
             }
-            IconButton(onClick = {
-                if (isEditingTitle) {
-                    onTitleChange(editableTitle)
-                    isEditingTitle = false
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                tooltip = { PlainTooltip { Text("Save") } },
+                state = rememberTooltipState(),
+            ) {
+                IconButton(onClick = {
+                    if (isEditingTitle) {
+                        onTitleChange(editableTitle)
+                        isEditingTitle = false
+                    }
+                    onSave()
+                }) {
+                    Icon(Icons.Filled.Check, contentDescription = "Save")
                 }
-                onSave()
-            }) {
-                Icon(Icons.Filled.Check, contentDescription = "Save")
             }
         },
         colors =
             TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent,
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
             ),
     )
 }
@@ -356,14 +522,11 @@ private fun Shelf(
     onModeChange: (ShelfMode) -> Unit,
     onPhotoDrag: (ShelfPhoto, Float, Float) -> Unit,
     onStickerTap: (StickerShelfItem) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceContainer),
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainer),
     ) {
-        // Mode tabs
         Row(
             modifier =
                 Modifier
@@ -388,26 +551,10 @@ private fun Shelf(
             )
         }
 
-        // Content strip
         when (mode) {
-            is ShelfMode.Photos -> {
-                ShelfPhotoStrip(
-                    photos = photos,
-                    onPhotoDrag = onPhotoDrag,
-                )
-            }
-            is ShelfMode.Stickers -> {
-                StickerShelfStrip(
-                    stickers = stickers,
-                    onStickerTap = onStickerTap,
-                )
-            }
-            is ShelfMode.Browse -> {
-                ShelfPhotoStrip(
-                    photos = browsePhotos,
-                    onPhotoDrag = onPhotoDrag,
-                )
-            }
+            is ShelfMode.Photos -> ShelfPhotoStrip(photos, onPhotoDrag)
+            is ShelfMode.Stickers -> StickerShelfStrip(stickers, onStickerTap)
+            is ShelfMode.Browse -> ShelfPhotoStrip(browsePhotos, onPhotoDrag)
         }
     }
 }
@@ -419,10 +566,7 @@ private fun ShelfPhotoStrip(
 ) {
     if (photos.isEmpty()) {
         Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(80.dp),
+            modifier = Modifier.fillMaxWidth().height(80.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -439,29 +583,18 @@ private fun ShelfPhotoStrip(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(photos, key = { it.mediaUri }) { photo ->
-            ShelfPhotoItem(
-                photo = photo,
-                onTap = { onPhotoDrag(photo, 0f, 0f) },
+            AsyncImage(
+                model = photo.mediaUri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier =
+                    Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onPhotoDrag(photo, 0f, 0f) },
             )
         }
     }
-}
-
-@Composable
-private fun ShelfPhotoItem(
-    photo: ShelfPhoto,
-    onTap: () -> Unit,
-) {
-    AsyncImage(
-        model = photo.mediaUri,
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier =
-            Modifier
-                .size(64.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(onClick = onTap),
-    )
 }
 
 @Composable
@@ -471,10 +604,7 @@ private fun StickerShelfStrip(
 ) {
     if (stickers.isEmpty()) {
         Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(80.dp),
+            modifier = Modifier.fillMaxWidth().height(80.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -505,60 +635,71 @@ private fun StickerShelfStrip(
     }
 }
 
-// --- Tool Palette ---
+// --- Tool Palette (compact - bottom bar) ---
 
 @Composable
 private fun ToolPalette(
     activeTool: CanvasTool,
     onToolSelected: (CanvasTool) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Row(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceContainer)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f))
+                .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
-        ToolButton(
-            icon = Icons.Filled.NearMe,
-            label = "Select",
-            isActive = activeTool == CanvasTool.SELECT,
-            onClick = { onToolSelected(CanvasTool.SELECT) },
-        )
-        ToolButton(
-            icon = Icons.Filled.Create,
-            label = "Ink",
-            isActive = activeTool == CanvasTool.INK,
-            onClick = { onToolSelected(CanvasTool.INK) },
-        )
-        ToolButton(
-            icon = Icons.Filled.CropSquare,
-            label = "Shape",
-            isActive = activeTool == CanvasTool.SHAPE,
-            onClick = { onToolSelected(CanvasTool.SHAPE) },
-        )
-        ToolButton(
-            icon = Icons.Filled.TextFields,
-            label = "Text",
-            isActive = activeTool == CanvasTool.TEXT,
-            onClick = { onToolSelected(CanvasTool.TEXT) },
-        )
-        ToolButton(
-            icon = Icons.Filled.Circle,
-            label = "Sticker",
-            isActive = activeTool == CanvasTool.STICKER,
-            onClick = { onToolSelected(CanvasTool.STICKER) },
-        )
+        for (tool in CanvasTool.entries) {
+            ToolButton(
+                icon = tool.icon,
+                label = tool.label,
+                isActive = activeTool == tool,
+                onClick = { onToolSelected(tool) },
+                shortcut = tool.shortcut,
+            )
+        }
     }
 }
 
+// --- Tool Rail (expanded - side bar) ---
+
+@Composable
+private fun ToolRail(
+    activeTool: CanvasTool,
+    onToolSelected: (CanvasTool) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .width(64.dp)
+                .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f))
+                .padding(vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        for (tool in CanvasTool.entries) {
+            ToolButton(
+                icon = tool.icon,
+                label = tool.label,
+                isActive = activeTool == tool,
+                onClick = { onToolSelected(tool) },
+                shortcut = tool.shortcut,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ToolButton(
     icon: ImageVector,
     label: String,
     isActive: Boolean,
     onClick: () -> Unit,
+    shortcut: String? = null,
 ) {
     val tint =
         if (isActive) {
@@ -567,23 +708,65 @@ private fun ToolButton(
             MaterialTheme.colorScheme.onSurfaceVariant
         }
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(onClick = onClick),
+    val tooltipText = if (shortcut != null) "$label ($shortcut)" else label
+
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(tooltipText) } },
+        state = rememberTooltipState(),
     ) {
-        Icon(
-            icon,
-            contentDescription = label,
-            tint = tint,
-            modifier = Modifier.size(24.dp),
-        )
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            color = tint,
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier =
+                Modifier
+                    .heightIn(min = 48.dp)
+                    .widthIn(min = 48.dp)
+                    .clickable(onClick = onClick),
+        ) {
+            Icon(
+                icon,
+                contentDescription = label,
+                tint = tint,
+                modifier = Modifier.size(24.dp),
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = tint,
+            )
+        }
     }
 }
+
+private val CanvasTool.icon: ImageVector
+    get() =
+        when (this) {
+            CanvasTool.SELECT -> Icons.Filled.NearMe
+            CanvasTool.INK -> Icons.Filled.Create
+            CanvasTool.SHAPE -> Icons.Filled.CropSquare
+            CanvasTool.TEXT -> Icons.Filled.TextFields
+            CanvasTool.STICKER -> Icons.Filled.Circle
+        }
+
+private val CanvasTool.label: String
+    get() =
+        when (this) {
+            CanvasTool.SELECT -> "Select"
+            CanvasTool.INK -> "Ink"
+            CanvasTool.SHAPE -> "Shape"
+            CanvasTool.TEXT -> "Text"
+            CanvasTool.STICKER -> "Sticker"
+        }
+
+private val CanvasTool.shortcut: String
+    get() =
+        when (this) {
+            CanvasTool.SELECT -> "1"
+            CanvasTool.INK -> "2"
+            CanvasTool.SHAPE -> "3"
+            CanvasTool.TEXT -> "4"
+            CanvasTool.STICKER -> "5"
+        }
 
 private const val DEFAULT_STROKE_COLOR = "#333333"
 private const val DEFAULT_INK_WIDTH = 4f

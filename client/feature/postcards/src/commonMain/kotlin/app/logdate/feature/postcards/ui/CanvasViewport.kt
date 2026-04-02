@@ -1,6 +1,9 @@
 package app.logdate.feature.postcards.ui
 
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -13,12 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 
 /**
  * State holder for the canvas viewport's pan and zoom transforms.
- *
- * The viewport is a window into the unbounded canvas coordinate space.
- * [offset] is the pan position and [scale] is the zoom level.
  */
 class CanvasViewportState {
     var offset by mutableStateOf(Offset.Zero)
@@ -38,12 +39,9 @@ fun rememberCanvasViewportState(): CanvasViewportState = remember { CanvasViewpo
 /**
  * A pannable, zoomable viewport into the canvas coordinate space.
  *
- * Two-finger gestures pan and zoom the viewport. Content is rendered
- * inside the viewport using canvas coordinate transforms.
- *
- * @param state The viewport state holding current pan offset and zoom scale.
- * @param modifier Modifier for the viewport container.
- * @param content Composable content to render inside the viewport.
+ * Pan and zoom require two-finger gestures to prevent accidental canvas
+ * movement from single-finger taps and drags (which are reserved for
+ * element interaction).
  */
 @Composable
 fun CanvasViewport(
@@ -55,13 +53,31 @@ fun CanvasViewport(
     val gestureModifier =
         if (gestureEnabled) {
             Modifier.pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    state.scale =
-                        (state.scale * zoom).coerceIn(
-                            CanvasViewportState.MIN_SCALE,
-                            CanvasViewportState.MAX_SCALE,
-                        )
-                    state.offset += pan
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    do {
+                        val event = awaitPointerEvent()
+                        val pointerCount = event.changes.count { it.pressed }
+
+                        // Only pan/zoom with two or more fingers
+                        if (pointerCount >= 2) {
+                            val zoom = event.calculateZoom()
+                            val pan = event.calculatePan()
+
+                            state.scale =
+                                (state.scale * zoom).coerceIn(
+                                    CanvasViewportState.MIN_SCALE,
+                                    CanvasViewportState.MAX_SCALE,
+                                )
+                            state.offset += pan
+
+                            event.changes.forEach { change ->
+                                if (change.positionChanged()) {
+                                    change.consume()
+                                }
+                            }
+                        }
+                    } while (event.changes.any { it.pressed })
                 }
             }
         } else {

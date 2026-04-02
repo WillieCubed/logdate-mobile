@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -22,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -31,9 +33,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
+import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import app.logdate.client.database.entities.PostcardEntity
 import app.logdate.feature.postcards.model.CanvasElement
 import app.logdate.feature.postcards.model.PostcardDocument
+import app.logdate.ui.common.verticalScrollbar
 import coil3.compose.AsyncImage
 import kotlinx.serialization.json.Json
 import org.koin.compose.viewmodel.koinViewModel
@@ -54,6 +59,13 @@ fun PostcardsCollectionScreen(
     onCreateNew: () -> Unit = {},
 ) {
     val postcards by viewModel.postcards.collectAsState()
+    val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
+    val columnCount =
+        when {
+            windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND) -> 4
+            windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND) -> 3
+            else -> 2
+        }
 
     Scaffold(
         topBar = {
@@ -80,12 +92,17 @@ fun PostcardsCollectionScreen(
                 )
             }
         } else {
+            val gridState = rememberLazyGridState()
             LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
+                state = gridState,
+                columns = GridCells.Fixed(columnCount),
                 contentPadding = PaddingValues(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(paddingValues),
+                modifier =
+                    Modifier
+                        .padding(paddingValues)
+                        .verticalScrollbar(gridState),
             ) {
                 items(postcards, key = { it.id.toString() }) { postcard ->
                     PostcardCard(

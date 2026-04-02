@@ -258,28 +258,23 @@ class ExportUserDataUseCase(
         seed: String,
         timestamp: kotlin.time.Instant,
     ): String {
-        val year = timestamp.toString().substring(0, 4)
-        val formattedTimestamp = timestamp.toString().replace(":", "-")
         val rawFileName =
             uri
                 .substringAfterLast("/")
                 .substringBefore("?")
-                .ifBlank { "media" }
+
+        // Extract file extension from original URI - fail explicitly if missing
+        val extensionPattern = Regex("\\.[a-zA-Z0-9]+$")
+        val extensionMatch = extensionPattern.find(rawFileName)
         val extension =
-            rawFileName
-                .substringAfterLast(".", "")
-                .takeIf { rawFileName.contains(".") && it.isNotBlank() }
-                ?.sanitizePathSegment()
-        val baseName = rawFileName.substringBeforeLast(".", rawFileName).sanitizePathSegment().ifBlank { "media" }
-        val uniqueSuffix = seed.sanitizePathSegment().ifBlank { uri.stableSuffix() }
-        val fileName =
-            if (extension != null) {
-                "${formattedTimestamp}_${baseName}_$uniqueSuffix.$extension"
+            if (extensionMatch != null) {
+                extensionMatch.value.substring(1).lowercase()
             } else {
-                "${formattedTimestamp}_${baseName}_$uniqueSuffix"
+                throw IllegalArgumentException("Media file has no extension: $uri")
             }
 
-        return "${ExportFileStructure.MEDIA_FOLDER}/$year/$fileName"
+        // Use ID-based filename: media/{noteId}.{ext}
+        return "${ExportFileStructure.MEDIA_FOLDER}/$seed.$extension"
     }
 
     private fun getMediaFilesToExport(
