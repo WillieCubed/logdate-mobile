@@ -24,14 +24,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ScreenShare
+import androidx.compose.material.icons.automirrored.filled.StopScreenShare
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.ScreenShare
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.StopScreenShare
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.CircularProgressIndicator
@@ -308,9 +308,9 @@ private fun MediaDetailLayout(
                                 Icon(
                                     imageVector =
                                         if (presenterState.isPresenting) {
-                                            Icons.Filled.StopScreenShare
+                                            Icons.AutoMirrored.Filled.StopScreenShare
                                         } else {
-                                            Icons.Filled.ScreenShare
+                                            Icons.AutoMirrored.Filled.ScreenShare
                                         },
                                     contentDescription =
                                         if (presenterState.isPresenting) "Stop presenting" else "Present",
@@ -439,7 +439,7 @@ private fun MediaDetailLayout(
                                 .fillMaxWidth()
                                 .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
                     ) {
-                        Icon(Icons.Filled.StopScreenShare, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.StopScreenShare, contentDescription = null)
                         Spacer(
                             modifier = Modifier.size(Spacing.sm),
                         )

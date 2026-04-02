@@ -41,6 +41,7 @@ import kotlin.time.Duration.Companion.seconds
  * @return `true` if the service was started, `false` if permission was missing or the system
  *   denied the foreground service launch.
  */
+@Suppress("DEPRECATION")
 fun Context.startDetailedLocationTrackingService(permissionManager: PermissionManager): Boolean {
     if (!permissionManager.isPermissionGranted(PermissionType.LOCATION)) {
         Napier.w("Detailed location tracking not started: missing location permission")
@@ -64,6 +65,7 @@ fun Context.startDetailedLocationTrackingService(permissionManager: PermissionMa
 }
 
 /** Stops the [DetailedLocationTrackingService] if it is running. */
+@Suppress("DEPRECATION")
 fun Context.stopDetailedLocationTrackingService() {
     val intent =
         Intent(this, DetailedLocationTrackingService::class.java).apply {

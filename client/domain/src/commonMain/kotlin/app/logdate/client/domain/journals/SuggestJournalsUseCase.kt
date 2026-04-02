@@ -54,7 +54,7 @@ class SuggestJournalsUseCase(
                 JournalSuggestion(
                     suggestedTitle = "Week of ${firstLocal.month.name.lowercase().replaceFirstChar {
                         it.uppercase()
-                    }} ${firstLocal.dayOfMonth}",
+                    }} ${firstLocal.day}",
                     noteIds = groupNotes.map { it.uid },
                     noteCount = groupNotes.size,
                     reason = "${groupNotes.size} entries from this week aren't in any journal",

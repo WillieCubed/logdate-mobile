@@ -5,6 +5,7 @@ import app.logdate.client.repository.search.SearchResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlin.uuid.Uuid
 
 /**
  * Minimal fake for testing use cases that depend on [SearchRepository].
@@ -36,6 +37,12 @@ class FakeSearchRepository(
 
     override fun searchRanked(
         query: String,
+        limit: Int,
+    ): Flow<List<SearchResult>> = search(query).map { it.take(limit) }
+
+    override fun searchInJournal(
+        query: String,
+        journalId: Uuid,
         limit: Int,
     ): Flow<List<SearchResult>> = search(query).map { it.take(limit) }
 }

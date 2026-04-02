@@ -73,7 +73,7 @@ fun SettingsScaffold(
                     }
                 },
                 scrollBehavior = scrollBehavior,
-                colors = topBarColors ?: TopAppBarDefaults.largeTopAppBarColors(),
+                colors = topBarColors ?: TopAppBarDefaults.topAppBarColors(),
             )
         },
         snackbarHost = {

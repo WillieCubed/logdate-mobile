@@ -2,6 +2,7 @@ package app.logdate.client.domain.search
 
 import app.logdate.client.repository.search.SearchRepository
 import app.logdate.client.repository.search.SearchResult
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.map
  * Debouncing is handled by the caller so the UI can represent in-flight search
  * more accurately. Results are ranked by local FTS relevance.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class UniversalSearchUseCase(
     private val searchRepository: SearchRepository,
 ) {
