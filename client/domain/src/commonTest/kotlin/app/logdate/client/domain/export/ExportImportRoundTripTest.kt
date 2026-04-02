@@ -307,7 +307,7 @@ class ExportImportRoundTripTest {
             val mediaImporter =
                 object : MediaImporter {
                     override suspend fun importMedia(exportPath: String): String? =
-                        if (exportPath.contains("sunset")) {
+                        if (exportPath == "media/$noteImage.jpg") {
                             "content://media/imported/sunset_new.jpg"
                         } else {
                             null
@@ -320,7 +320,7 @@ class ExportImportRoundTripTest {
 
             val image = destNotesRepo.getNoteById(noteImage)
             assertTrue(image is JournalNote.Image)
-            // Media importer matched the export path containing "sunset"
+            // Media importer matched the stable ID-based export path.
             assertEquals("content://media/imported/sunset_new.jpg", image.mediaRef)
             assertTrue(result.mediaImported > 0)
         }

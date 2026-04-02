@@ -5,18 +5,23 @@ import app.logdate.client.repository.streak.StreakSettingsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toLocalDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 class RefreshStreakUseCaseTest {
     @Test
     fun `refresh calculates streak and writes to cache`() =
         runTest {
-            val today = LocalDate(2026, 3, 31)
+            val today =
+                Clock.System
+                    .now()
+                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                    .date
             val instant = today.atStartOfDayIn(TimeZone.UTC)
             val note =
                 JournalNote.Text(
