@@ -33,6 +33,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    packaging {
+        jniLibs {
+            keepDebugSymbols += "**/libbenchmarkNative.so"
+            keepDebugSymbols += "**/libtracing_perfetto.so"
+        }
+    }
+
     testOptions {
         managedDevices {
             lateinit var phoneApi36: ManagedVirtualDevice
@@ -41,6 +48,7 @@ android {
                     create("phoneApi36") {
                         device = "Pixel 10 Pro"
                         apiLevel = 36
+                        pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_16KB_PAGES
                         systemImageSource = "google"
                     }
             }
@@ -63,4 +71,5 @@ dependencies {
     implementation(libs.androidx.benchmark.macro.junit4)
     implementation(libs.androidx.test.ext.junit)
     implementation(libs.androidx.test.runner)
+    implementation(libs.androidx.test.uiautomator)
 }

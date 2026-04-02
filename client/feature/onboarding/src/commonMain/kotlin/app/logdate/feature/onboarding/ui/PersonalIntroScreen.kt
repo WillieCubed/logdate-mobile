@@ -54,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -65,6 +66,12 @@ import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+
+const val PERSONAL_INTRO_ROOT_TAG = "onboarding_personal_intro_root"
+const val PERSONAL_INTRO_NAME_FIELD_TAG = "onboarding_personal_intro_name_field"
+const val PERSONAL_INTRO_NAME_CONTINUE_TAG = "onboarding_personal_intro_name_continue"
+const val PERSONAL_INTRO_BIO_FIELD_TAG = "onboarding_personal_intro_bio_field"
+const val PERSONAL_INTRO_BIO_CONTINUE_TAG = "onboarding_personal_intro_bio_continue"
 
 /**
  * Personal introduction screen that asks users to share their name and bio
@@ -137,6 +144,7 @@ fun PersonalIntroContent(
         Column(
             modifier =
                 Modifier
+                    .testTag(PERSONAL_INTRO_ROOT_TAG)
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.lg)
                     .verticalScroll(rememberScrollState())
@@ -312,6 +320,7 @@ private fun NameStep(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .testTag(PERSONAL_INTRO_NAME_FIELD_TAG)
                     .focusRequester(focusRequester),
             keyboardOptions =
                 KeyboardOptions(
@@ -333,7 +342,7 @@ private fun NameStep(
         Button(
             onClick = onContinue,
             enabled = canContinue,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag(PERSONAL_INTRO_NAME_CONTINUE_TAG),
         ) {
             Text(stringResource(Res.string.`continue`))
         }
@@ -424,6 +433,7 @@ private fun BioStep(
                 Modifier
                     .fillMaxWidth()
                     .height(120.dp)
+                    .testTag(PERSONAL_INTRO_BIO_FIELD_TAG)
                     .focusRequester(focusRequester),
             keyboardOptions =
                 KeyboardOptions(
@@ -444,7 +454,7 @@ private fun BioStep(
         Button(
             onClick = onContinue,
             enabled = canContinue,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag(PERSONAL_INTRO_BIO_CONTINUE_TAG),
         ) {
             Text(stringResource(Res.string.lets_see_what_i_think))
         }

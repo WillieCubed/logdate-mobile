@@ -1,134 +1,26 @@
 package app.logdate.screenshots.flows.flow01_onboarding
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.tooling.preview.Preview
-import app.logdate.feature.onboarding.ui.MemorySelectionUiState
-import app.logdate.feature.onboarding.ui.OnboardingCompletionContent
-import app.logdate.feature.onboarding.ui.OnboardingNotificationConfirmationContent
-import app.logdate.feature.onboarding.ui.OnboardingNotificationContent
-import app.logdate.feature.onboarding.ui.OnboardingOverviewScreen
-import app.logdate.feature.onboarding.ui.OnboardingStartScreen
-import app.logdate.feature.onboarding.ui.MemoriesImportInfoScreen
+import app.logdate.client.domain.dayboundary.HealthConnectStatus
+import app.logdate.client.media.MediaObject
+import app.logdate.feature.onboarding.ui.CloudAccountSetupContent
+import app.logdate.feature.onboarding.ui.CloudSetupOption
 import app.logdate.feature.onboarding.ui.MemorySelectionScreen
-import app.logdate.feature.onboarding.ui.BackupSyncScreenContent
-import app.logdate.feature.onboarding.ui.PersonalIntroContent
-import app.logdate.feature.onboarding.ui.PersonalIntroUiState
-import app.logdate.feature.onboarding.ui.PersonalIntroStep
-import app.logdate.feature.onboarding.ui.RecoveryPhraseSetupScreen
-import app.logdate.feature.onboarding.ui.RecoveryPhraseEntryScreen
-import app.logdate.feature.onboarding.ui.WelcomeBackScreenContent
-import app.logdate.screenshots.common.ScreenshotTestData.PHONE
+import app.logdate.feature.onboarding.ui.MemorySelectionUiState
+import app.logdate.feature.onboarding.ui.OnboardingDayBoundariesContent
+import app.logdate.feature.onboarding.ui.OnboardingNotificationsContent
+import app.logdate.feature.onboarding.ui.OnboardingRecommendationsContent
+import app.logdate.screenshots.common.LargeScreenAuditPreviewMatrix
+import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTheme
 import com.android.tools.screenshot.PreviewTest
-
-// ─── Start Screen ───────────────────────────────────────────────────────────────
-
-@PreviewTest
-@Preview(showBackground = true, device = PHONE)
-@Composable
-fun S01_OnboardingStart() {
-    ScreenshotTheme {
-        OnboardingStartScreen(onNext = {}, onStartFromBackup = {})
-    }
-}
+import kotlin.time.Clock
+import kotlin.time.Duration
 
 @PreviewTest
-@Preview(showBackground = true, device = PHONE, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@ScreenshotPreviewMatrix
 @Composable
-fun S02_OnboardingStartDark() {
-    ScreenshotTheme(darkTheme = true) {
-        OnboardingStartScreen(onNext = {}, onStartFromBackup = {})
-    }
-}
-
-// ─── Personal Intro ─────────────────────────────────────────────────────────────
-
-@PreviewTest
-@Preview(showBackground = true, device = PHONE)
-@Composable
-fun S03_PersonalIntroEmpty() {
-    ScreenshotTheme {
-        PersonalIntroContent(
-            uiState = PersonalIntroUiState(),
-            onNameChanged = {},
-            onBioChanged = {},
-            onProceedToBio = {},
-            onGoBackToName = {},
-            onProcessWithLlm = {},
-            onBack = {},
-        )
-    }
-}
-
-@PreviewTest
-@Preview(showBackground = true, device = PHONE)
-@Composable
-fun S04_PersonalIntroNameFilled() {
-    ScreenshotTheme {
-        PersonalIntroContent(
-            uiState = PersonalIntroUiState(
-                name = "Alex",
-                currentStep = PersonalIntroStep.Name,
-            ),
-            onNameChanged = {},
-            onBioChanged = {},
-            onProceedToBio = {},
-            onGoBackToName = {},
-            onProcessWithLlm = {},
-            onBack = {},
-        )
-    }
-}
-
-@PreviewTest
-@Preview(showBackground = true, device = PHONE)
-@Composable
-fun S05_PersonalIntroBioStep() {
-    ScreenshotTheme {
-        PersonalIntroContent(
-            uiState = PersonalIntroUiState(
-                name = "Alex",
-                bio = "I love hiking and photography",
-                currentStep = PersonalIntroStep.Bio,
-            ),
-            onNameChanged = {},
-            onBioChanged = {},
-            onProceedToBio = {},
-            onGoBackToName = {},
-            onProcessWithLlm = {},
-            onBack = {},
-        )
-    }
-}
-
-// ─── App Overview ───────────────────────────────────────────────────────────────
-
-@PreviewTest
-@Preview(showBackground = true, device = PHONE)
-@Composable
-fun S06_AppOverview() {
-    ScreenshotTheme {
-        OnboardingOverviewScreen(onBack = {}, onNext = {})
-    }
-}
-
-// ─── Memories Import ────────────────────────────────────────────────────────────
-
-@PreviewTest
-@Preview(showBackground = true, device = PHONE)
-@Composable
-fun S07_MemoriesImportInfo() {
-    ScreenshotTheme {
-        MemoriesImportInfoScreen(onBack = {}, onContinue = {})
-    }
-}
-
-// ─── Memory Selection ───────────────────────────────────────────────────────────
-
-@PreviewTest
-@Preview(showBackground = true, device = PHONE)
-@Composable
-fun S08_MemorySelectionEmpty() {
+fun S01_MemorySelectionEmpty() {
     ScreenshotTheme {
         MemorySelectionScreen(
             uiState = MemorySelectionUiState(isLoading = false, hasMoreMemories = false),
@@ -141,105 +33,173 @@ fun S08_MemorySelectionEmpty() {
     }
 }
 
-// ─── Notification Screens ───────────────────────────────────────────────────────
-
 @PreviewTest
-@Preview(showBackground = true, device = PHONE)
+@ScreenshotPreviewMatrix
 @Composable
-fun S09_NotificationPermission() {
+fun S02_MemorySelectionError() {
     ScreenshotTheme {
-        OnboardingNotificationContent(
+        MemorySelectionScreen(
+            uiState =
+                MemorySelectionUiState(
+                    isLoading = false,
+                    hasMoreMemories = false,
+                    loadFailed = true,
+                ),
             onBack = {},
-            useCompactLayout = true,
-            onEnableNotifications = {},
-            onSkipNotifications = {},
+            onContinue = {},
+            onToggleMemorySelection = {},
+            onLoadMoreMemories = {},
+            onRefreshMemories = {},
         )
     }
 }
 
 @PreviewTest
-@Preview(showBackground = true, device = PHONE)
+@ScreenshotPreviewMatrix
 @Composable
-fun S10_NotificationConfirmation() {
+fun S03_MemorySelectionLoading() {
     ScreenshotTheme {
-        OnboardingNotificationConfirmationContent(
+        MemorySelectionScreen(
+            uiState = MemorySelectionUiState(isLoading = true),
             onBack = {},
-            onNext = {},
-            useCompactLayout = true,
+            onContinue = {},
+            onToggleMemorySelection = {},
+            onLoadMoreMemories = {},
+            onRefreshMemories = {},
         )
     }
 }
 
-// ─── Backup & Sync ──────────────────────────────────────────────────────────────
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun S04_RecommendationsSaving() {
+    ScreenshotTheme {
+        OnboardingRecommendationsContent(
+            onBack = {},
+            onKeepOn = {},
+            onTurnOff = {},
+            isSaving = true,
+        )
+    }
+}
 
 @PreviewTest
-@Preview(showBackground = true, device = PHONE)
+@ScreenshotPreviewMatrix
 @Composable
-fun S11_BackupSync() {
+fun S05_DayBoundariesPermissionsNeeded() {
     ScreenshotTheme {
-        BackupSyncScreenContent(
-            useCompactLayout = true,
+        OnboardingDayBoundariesContent(
+            healthConnectStatus = HealthConnectStatus.PERMISSIONS_NEEDED,
             onBack = {},
+            onEnable = {},
+            onSkip = {},
+        )
+    }
+}
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun S06_DayBoundariesChecking() {
+    ScreenshotTheme {
+        OnboardingDayBoundariesContent(
+            healthConnectStatus = HealthConnectStatus.CHECKING,
+            onBack = {},
+            onEnable = {},
+            onSkip = {},
+        )
+    }
+}
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun S07_NotificationsDecisionHandled() {
+    ScreenshotTheme {
+        OnboardingNotificationsContent(
+            onBack = {},
+            onPrimaryAction = {},
+            onSkip = {},
+            recommendationsEnabled = false,
+            hasDecision = true,
+            hasPermission = false,
+        )
+    }
+}
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun S08_CloudAccountSelectedSignIn() {
+    ScreenshotTheme {
+        CloudAccountSetupContent(
+            useCompactLayout = true,
+            selectedOption = CloudSetupOption.SIGN_IN,
+            onBack = {},
+            onOptionSelected = {},
+            onContinue = {},
+            onSkip = {},
             onPlanSelected = {},
         )
     }
 }
 
-// ─── Recovery Phrase ────────────────────────────────────────────────────────────
-
 @PreviewTest
-@Preview(showBackground = true, device = PHONE)
+@LargeScreenAuditPreviewMatrix
 @Composable
-fun S12_RecoveryPhraseSetup() {
+fun S09_CloudAccountAdaptiveLargeScreen() {
     ScreenshotTheme {
-        RecoveryPhraseSetupScreen(onPhraseContinue = {})
-    }
-}
-
-@PreviewTest
-@Preview(showBackground = true, device = PHONE)
-@Composable
-fun S13_RecoveryPhraseEntry() {
-    ScreenshotTheme {
-        RecoveryPhraseEntryScreen(onRecovered = {})
-    }
-}
-
-// ─── Completion ─────────────────────────────────────────────────────────────────
-
-@PreviewTest
-@Preview(showBackground = true, device = PHONE)
-@Composable
-fun S14_OnboardingCompletionStreak() {
-    ScreenshotTheme {
-        OnboardingCompletionContent(
-            shouldShowFinish = false,
+        CloudAccountSetupContent(
+            useCompactLayout = false,
+            selectedOption = CloudSetupOption.CREATE_ACCOUNT,
+            onBack = {},
+            onOptionSelected = {},
             onContinue = {},
-            onFinish = {},
+            onSkip = {},
+            onPlanSelected = {},
         )
     }
 }
 
 @PreviewTest
-@Preview(showBackground = true, device = PHONE)
+@LargeScreenAuditPreviewMatrix
 @Composable
-fun S15_OnboardingCompletionFinal() {
+fun S10_MemorySelectionAdaptiveLargeScreen() {
     ScreenshotTheme {
-        OnboardingCompletionContent(
-            shouldShowFinish = true,
+        val sampleMemories =
+            (1..12).map { index ->
+                if (index % 4 == 0) {
+                    MediaObject.Video(
+                        uri = "sample$index",
+                        size = 2048,
+                        name = "VID_$index.mp4",
+                        timestamp = Clock.System.now(),
+                        duration = Duration.parse("45s"),
+                    )
+                } else {
+                    MediaObject.Image(
+                        uri = "sample$index",
+                        size = 1024,
+                        name = "IMG_$index.jpg",
+                        timestamp = Clock.System.now(),
+                    )
+                }
+            }
+        MemorySelectionScreen(
+            uiState =
+                MemorySelectionUiState(
+                    allMemories = sampleMemories,
+                    aiCuratedMemories = sampleMemories.take(4),
+                    selectedMemoryIds = setOf("sample1", "sample2", "sample7"),
+                    isLoading = false,
+                    hasMoreMemories = false,
+                ),
+            onBack = {},
             onContinue = {},
-            onFinish = {},
+            onToggleMemorySelection = {},
+            onLoadMoreMemories = {},
+            onRefreshMemories = {},
         )
-    }
-}
-
-// ─── Welcome Back ───────────────────────────────────────────────────────────────
-
-@PreviewTest
-@Preview(showBackground = true, device = PHONE)
-@Composable
-fun S16_WelcomeBack() {
-    ScreenshotTheme {
-        WelcomeBackScreenContent(name = "Alex")
     }
 }

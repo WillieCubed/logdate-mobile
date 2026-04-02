@@ -1,8 +1,15 @@
 package app.logdate.screenshots.flows.flow05_journals
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import app.logdate.client.R
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
@@ -11,22 +18,21 @@ import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
 import app.logdate.feature.editor.audio.model.DaylightPeriod
 import app.logdate.feature.editor.audio.model.SegmentType
+import app.logdate.feature.editor.ui.video.VideoPlayerContent
 import app.logdate.feature.journals.ui.detail.AudioNoteViewerContent
 import app.logdate.feature.journals.ui.detail.AudioNoteViewerUiState
 import app.logdate.feature.journals.ui.detail.AudioPlaybackUiState
 import app.logdate.feature.journals.ui.detail.NoteViewerErrorContent
-import app.logdate.feature.journals.ui.detail.NoteViewerImageContent
 import app.logdate.feature.journals.ui.detail.NoteViewerLoadingContent
 import app.logdate.feature.journals.ui.detail.NoteViewerScaffoldContent
 import app.logdate.feature.journals.ui.detail.NoteViewerShared
-import app.logdate.feature.journals.ui.detail.NoteViewerVideoContent
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTheme
 import com.android.tools.screenshot.PreviewTest
 import kotlin.uuid.Uuid
 
-private const val sampleVideoPreviewUri = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher"
+private const val sampleMediaUri = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher"
 
 private val sharedNote =
     NoteViewerShared(
@@ -109,7 +115,15 @@ fun S04_NoteViewerImage() {
             shared = sharedNote,
             onGoBack = {},
         ) {
-            NoteViewerImageContent(mediaRef = sampleVideoPreviewUri)
+            Image(
+                painter = painterResource(R.drawable.sample_note_photo),
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.large),
+                contentScale = ContentScale.Crop,
+            )
         }
     }
 }
@@ -123,7 +137,13 @@ fun S05_NoteViewerVideo() {
             shared = sharedNote,
             onGoBack = {},
         ) {
-            NoteViewerVideoContent(mediaRef = sampleVideoPreviewUri)
+            VideoPlayerContent(
+                uri = sampleMediaUri,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.large),
+            )
         }
     }
 }
