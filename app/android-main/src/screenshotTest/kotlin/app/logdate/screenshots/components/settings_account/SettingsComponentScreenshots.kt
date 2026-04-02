@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.repository.account.AccountIdentityStatus
 import app.logdate.feature.core.export.ExportState
@@ -204,10 +205,10 @@ fun LocationSettings() {
             settings = LocationTrackingSettings(),
             onBack = {},
             onToggleBackgroundTracking = {},
+            onSetCaptureMode = { _: LocationCaptureMode -> },
             onShowLocationTimeline = {},
             onNavigateToTrackingOptions = {},
             onNavigateToInterval = {},
-            onNavigateToAdvanced = {},
         )
     }
 }

@@ -4,7 +4,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import app.logdate.client.repository.search.SearchResult
-import app.logdate.client.repository.search.SearchResultType
+import app.logdate.client.repository.search.SearchContentType
 import app.logdate.feature.core.account.CloudAccountWelcomeContent
 import app.logdate.feature.core.settings.ui.ServerSelectionState
 import app.logdate.feature.core.profile.ui.ProfileScreenContent
@@ -22,6 +22,7 @@ import app.logdate.feature.onboarding.ui.PersonalIntroContent
 import app.logdate.feature.onboarding.ui.PersonalIntroStep
 import app.logdate.feature.onboarding.ui.PersonalIntroUiState
 import app.logdate.feature.search.ui.SearchScreenContent
+import app.logdate.feature.search.ui.SearchScreenState
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.screenshots.common.LargeScreenAuditPreviewMatrix
@@ -37,13 +38,13 @@ private val auditSearchResults =
             uid = Uuid.parse("00000000-0000-0000-0000-000000000121"),
             content = "Captured the train ride home before dinner and tagged it for the weekly rewind.",
             created = ScreenshotTestData.baseInstant,
-            contentType = SearchResultType.TEXT_NOTE,
+            contentType = SearchContentType.TEXT_NOTE,
         ),
         SearchResult(
             uid = Uuid.parse("00000000-0000-0000-0000-000000000122"),
             content = "Voice memo about redesigning the journals overview for larger windows.",
             created = ScreenshotTestData.baseInstant - 2.hours,
-            contentType = SearchResultType.TRANSCRIPTION,
+            contentType = SearchContentType.TRANSCRIPTION,
         ),
     )
 
@@ -157,10 +158,13 @@ fun A04_CloudAccountIntro() {
 fun A05_SearchWithResults() {
     ScreenshotTheme {
         SearchScreenContent(
-            searchResults = auditSearchResults,
+            searchState = SearchScreenState.Results(query = "train", results = auditSearchResults),
             onQueryChange = {},
+            onCommitSearch = {},
             onNavigateToDay = {},
+            onNavigateToJournal = {},
             onGoBack = {},
+            queryText = "train",
         )
     }
 }
@@ -175,10 +179,14 @@ fun A06_JournalsOverview() {
             layoutMode = JournalLayoutMode.CAROUSEL,
             sortOption = JournalSortOption.LAST_UPDATED,
             activeFilters = emptySet(),
+            searchQuery = "audit",
+            entryResults = auditSearchResults,
             onOpenJournal = {},
             onBrowseJournals = {},
             onCreateJournal = {},
+            onNavigateToDay = {},
             onNavigationClick = {},
+            onQueryChange = {},
             onToggleLayoutMode = {},
             onSortOptionSelected = {},
             onToggleFilter = {},

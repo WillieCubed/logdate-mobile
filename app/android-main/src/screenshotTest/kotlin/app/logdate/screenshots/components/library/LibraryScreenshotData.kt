@@ -1,6 +1,5 @@
 package app.logdate.screenshots.components.library
 
-import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.feature.library.ui.LibraryGridGroup
 import app.logdate.feature.library.ui.LibraryMediaItem
 import app.logdate.feature.library.ui.LibraryUiState
@@ -12,20 +11,16 @@ import app.logdate.feature.library.ui.detail.PresenterState
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-/**
- * Canned test data for Library screenshot previews.
- */
 object LibraryScreenshotData {
     private val march2026 = Instant.fromEpochMilliseconds(1_741_000_000_000L)
-    private val feb2026 = Instant.fromEpochMilliseconds(1_738_000_000_000L)
 
     private val sampleItems =
-        (1..9).map { i ->
+        (1..9).map { index ->
             LibraryMediaItem(
-                uid = Uuid.random(),
-                uri = "content://media/external/images/$i",
+                uid = Uuid.parse("00000000-0000-0000-0000-${index.toString().padStart(12, '0')}"),
+                uri = "content://media/external/images/media/$index",
                 thumbnailUri = null,
-                isVideo = i == 3 || i == 7,
+                isVideo = index == 3 || index == 7,
                 timestamp = march2026,
             )
         }
@@ -37,17 +32,23 @@ object LibraryScreenshotData {
                     LibraryGridGroup(label = "March 2026", items = sampleItems.take(6)),
                     LibraryGridGroup(label = "February 2026", items = sampleItems.drop(6)),
                 ),
-            totalCount = 9,
+            totalCount = sampleItems.size,
         )
 
     val imageDetail =
         MediaDetailUiState.ImageContent(
-            noteId = Uuid.random(),
-            mediaRef = "content://media/external/images/1",
+            noteId = Uuid.parse("00000000-0000-0000-0000-000000000101"),
+            mediaRef = "content://media/external/images/media/1",
             createdAt = march2026,
             location = null,
             locationDisplayName = "San Francisco, CA",
-            journals = listOf(JournalReference(id = Uuid.random(), title = "Trip to California")),
+            journals =
+                listOf(
+                    JournalReference(
+                        id = Uuid.parse("00000000-0000-0000-0000-000000000102"),
+                        title = "Trip to California",
+                    ),
+                ),
             exif =
                 ExifDisplayData(
                     cameraMake = "Google",
@@ -66,8 +67,12 @@ object LibraryScreenshotData {
             currentIndex = 2,
             totalItems = sampleItems.size,
             mediaItems =
-                sampleItems.map {
-                    PresenterMediaItem(uid = it.uid, uri = it.uri, isVideo = it.isVideo)
+                sampleItems.map { item ->
+                    PresenterMediaItem(
+                        uid = item.uid,
+                        uri = item.uri,
+                        isVideo = item.isVideo,
+                    )
                 },
         )
 }

@@ -8,7 +8,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.repository.search.SearchResult
-import app.logdate.client.repository.search.SearchResultType
+import app.logdate.client.repository.search.SearchContentType
 import app.logdate.feature.journals.ui.JournalListItemUiState
 import app.logdate.feature.journals.ui.JournalSearchToolbar
 import app.logdate.shared.model.Journal
@@ -50,7 +50,7 @@ class JournalSearchToolbarE2ETest {
         uid = Uuid.random(),
         content = "Went hiking at sunset and captured the golden hour.",
         created = Clock.System.now(),
-        contentType = SearchResultType.TEXT_NOTE,
+        contentType = SearchContentType.TEXT_NOTE,
     )
 
     // region Collapsed State

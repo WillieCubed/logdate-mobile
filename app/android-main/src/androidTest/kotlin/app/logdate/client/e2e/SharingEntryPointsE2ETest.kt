@@ -1,7 +1,8 @@
 package app.logdate.client.e2e
 
+import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -24,7 +25,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SharingEntryPointsE2ETest {
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<ShareEntryPointHostActivity>()
 
     @Test
     fun timelineMemoryShareAction_emitsCurrentMemoryRecallState() {
@@ -38,25 +39,21 @@ class SharingEntryPointsE2ETest {
             )
         var sharedState: TimelineSuggestionBlockUiState? = null
 
-        composeRule.setContent {
-            LogDateTheme(dynamicColor = false) {
-                TimelineSuggestionBlock(
-                    state = memoryState,
-                    onStartWriting = {},
-                    onOpenDraft = {},
-                    onViewMemoryDay = {},
-                    onShareMemory = { sharedState = it },
-                )
+        composeRule.runOnUiThread {
+            composeRule.activity.setContent {
+                LogDateTheme(dynamicColor = false) {
+                    TimelineSuggestionBlock(
+                        state = memoryState,
+                        onStartWriting = {},
+                        onOpenDraft = {},
+                        onViewMemoryDay = {},
+                        onShareMemory = { sharedState = it },
+                    )
+                }
             }
         }
 
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            runCatching {
-                composeRule.onNodeWithTag("timeline_memory_share_action").assertExists()
-                true
-            }.getOrDefault(false)
-        }
-
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag("timeline_memory_share_action").assertIsDisplayed().performClick()
 
         assertNotNull(sharedState)
@@ -68,30 +65,26 @@ class SharingEntryPointsE2ETest {
         val mediaRef = "content://media/external/images/media/42"
         var sharedMediaRef: String? = null
 
-        composeRule.setContent {
-            LogDateTheme(dynamicColor = false) {
-                MediaDetailContent(
-                    state =
-                        MediaDetailUiState.ImageContent(
-                            noteId = Uuid.random(),
-                            mediaRef = mediaRef,
-                            createdAt = Clock.System.now(),
-                            location = null,
-                        ),
-                    isExpanded = false,
-                    onBack = {},
-                    onShare = { sharedMediaRef = it },
-                )
+        composeRule.runOnUiThread {
+            composeRule.activity.setContent {
+                LogDateTheme(dynamicColor = false) {
+                    MediaDetailContent(
+                        state =
+                            MediaDetailUiState.ImageContent(
+                                noteId = Uuid.random(),
+                                mediaRef = mediaRef,
+                                createdAt = Clock.System.now(),
+                                location = null,
+                            ),
+                        isExpanded = false,
+                        onBack = {},
+                        onShare = { sharedMediaRef = it },
+                    )
+                }
             }
         }
 
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            runCatching {
-                composeRule.onNodeWithTag("media_detail_share_action").assertExists()
-                true
-            }.getOrDefault(false)
-        }
-
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag("media_detail_share_action").assertIsDisplayed().performClick()
 
         assertEquals(mediaRef, sharedMediaRef)

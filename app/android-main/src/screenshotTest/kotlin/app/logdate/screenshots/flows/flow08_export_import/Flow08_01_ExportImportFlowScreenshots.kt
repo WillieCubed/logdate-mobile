@@ -6,10 +6,11 @@ import androidx.compose.runtime.remember
 import app.logdate.client.domain.export.ExportCounts
 import app.logdate.client.domain.export.ExportStats
 import app.logdate.feature.core.export.ExportState
+import app.logdate.feature.core.restore.RestoreError
+import app.logdate.feature.core.restore.RestoreStage
 import app.logdate.feature.core.restore.RestoreState
 import app.logdate.feature.core.restore.RestoreSummary
 import app.logdate.feature.core.settings.ui.ExportSettingsContent
-import app.logdate.feature.core.settings.ui.IntegrityState
 import app.logdate.feature.core.settings.ui.SettingsOverviewContent
 import app.logdate.feature.core.settings.ui.UserProfile
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
@@ -24,9 +25,35 @@ private val sampleUserProfile =
         isAuthenticated = true,
     )
 
-// ─── Export Flow: Settings → Export Settings → Configure → In Progress → Done ───
+@Composable
+private fun ExportImportPreviewContent(
+    exportState: ExportState = ExportState.Idle,
+    restoreState: RestoreState = RestoreState.Idle,
+) {
+    val snackbarHostState = remember { SnackbarHostState() }
 
-/** Step 1: User is on the settings overview and taps "Export & Import". */
+    ExportSettingsContent(
+        onBack = {},
+        exportState = exportState,
+        onShowExportOptions = {},
+        onUpdateExportOptions = {},
+        onConfirmExport = {},
+        onCancelExport = {},
+        onRetryExport = {},
+        onDismissExport = {},
+        onBrowseExport = {},
+        restoreState = restoreState,
+        onShowRestoreSheet = {},
+        onSelectRestoreFile = {},
+        onUpdateImportOptions = {},
+        onConfirmImport = {},
+        onCancelRestore = {},
+        onRetryRestore = {},
+        onDismissRestore = {},
+        snackbarHostState = snackbarHostState,
+    )
+}
+
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
@@ -48,48 +75,21 @@ fun S01_SettingsOverview() {
     }
 }
 
-/** Step 2: User lands on the Export & Import settings screen. */
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
 fun S02_ExportSettingsIdle() {
-    val snackbarHostState = remember { SnackbarHostState() }
     ScreenshotTheme {
-        ExportSettingsContent(
-            onBack = {},
-            exportState = ExportState.Idle,
-            onShowExportOptions = {},
-            onUpdateExportOptions = {},
-            onConfirmExport = {},
-            onCancelExport = {},
-            onRetryExport = {},
-            onDismissExport = {},
-            onBrowseExport = {},
-            restoreState = RestoreState.Idle,
-            onShowRestoreSheet = {},
-            onSelectRestoreFile = {},
-            onUpdateImportOptions = {},
-            onConfirmImport = {},
-            onCancelRestore = {},
-            onRetryRestore = {},
-            onDismissRestore = {},
-            integrityState = IntegrityState(),
-            onRunIntegrityCheck = {},
-            onRepairIntegrity = {},
-            snackbarHostState = snackbarHostState,
-        )
+        ExportImportPreviewContent()
     }
 }
 
-/** Step 3: User taps "Export" — the export options bottom sheet appears. */
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
 fun S03_ExportConfiguring() {
-    val snackbarHostState = remember { SnackbarHostState() }
     ScreenshotTheme {
-        ExportSettingsContent(
-            onBack = {},
+        ExportImportPreviewContent(
             exportState =
                 ExportState.Configuring(
                     counts =
@@ -100,77 +100,31 @@ fun S03_ExportConfiguring() {
                             mediaCount = 18,
                         ),
                 ),
-            isExportSheetVisible = true,
-            onShowExportOptions = {},
-            onUpdateExportOptions = {},
-            onConfirmExport = {},
-            onCancelExport = {},
-            onRetryExport = {},
-            onDismissExport = {},
-            onBrowseExport = {},
-            restoreState = RestoreState.Idle,
-            onShowRestoreSheet = {},
-            onSelectRestoreFile = {},
-            onUpdateImportOptions = {},
-            onConfirmImport = {},
-            onCancelRestore = {},
-            onRetryRestore = {},
-            onDismissRestore = {},
-            integrityState = IntegrityState(),
-            onRunIntegrityCheck = {},
-            onRepairIntegrity = {},
-            snackbarHostState = snackbarHostState,
         )
     }
 }
 
-/** Step 4: Export is in progress with a determinate progress bar. */
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
 fun S04_ExportInProgress() {
-    val snackbarHostState = remember { SnackbarHostState() }
     ScreenshotTheme {
-        ExportSettingsContent(
-            onBack = {},
+        ExportImportPreviewContent(
             exportState =
                 ExportState.Exporting(
                     progressPercent = 65,
                     message = "Exporting media files\u2026",
                 ),
-            isExportSheetVisible = true,
-            onShowExportOptions = {},
-            onUpdateExportOptions = {},
-            onConfirmExport = {},
-            onCancelExport = {},
-            onRetryExport = {},
-            onDismissExport = {},
-            onBrowseExport = {},
-            restoreState = RestoreState.Idle,
-            onShowRestoreSheet = {},
-            onSelectRestoreFile = {},
-            onUpdateImportOptions = {},
-            onConfirmImport = {},
-            onCancelRestore = {},
-            onRetryRestore = {},
-            onDismissRestore = {},
-            integrityState = IntegrityState(),
-            onRunIntegrityCheck = {},
-            onRepairIntegrity = {},
-            snackbarHostState = snackbarHostState,
         )
     }
 }
 
-/** Step 5: Export completes successfully with stats. */
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
 fun S05_ExportCompleted() {
-    val snackbarHostState = remember { SnackbarHostState() }
     ScreenshotTheme {
-        ExportSettingsContent(
-            onBack = {},
+        ExportImportPreviewContent(
             exportState =
                 ExportState.Completed(
                     path = "/storage/emulated/0/Download/logdate-export.zip",
@@ -183,154 +137,56 @@ fun S05_ExportCompleted() {
                             mediaCount = 18,
                         ),
                 ),
-            isExportSheetVisible = true,
-            onShowExportOptions = {},
-            onUpdateExportOptions = {},
-            onConfirmExport = {},
-            onCancelExport = {},
-            onRetryExport = {},
-            onDismissExport = {},
-            onBrowseExport = {},
-            restoreState = RestoreState.Idle,
-            onShowRestoreSheet = {},
-            onSelectRestoreFile = {},
-            onUpdateImportOptions = {},
-            onConfirmImport = {},
-            onCancelRestore = {},
-            onRetryRestore = {},
-            onDismissRestore = {},
-            integrityState = IntegrityState(),
-            onRunIntegrityCheck = {},
-            onRepairIntegrity = {},
-            snackbarHostState = snackbarHostState,
         )
     }
 }
 
-/** Alternate ending: Export fails with an error message. */
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
 fun S06_ExportFailed() {
-    val snackbarHostState = remember { SnackbarHostState() }
     ScreenshotTheme {
-        ExportSettingsContent(
-            onBack = {},
+        ExportImportPreviewContent(
             exportState =
                 ExportState.Failed(
                     reason = "Not enough storage space to create the export archive.",
                 ),
-            isExportSheetVisible = true,
-            onShowExportOptions = {},
-            onUpdateExportOptions = {},
-            onConfirmExport = {},
-            onCancelExport = {},
-            onRetryExport = {},
-            onDismissExport = {},
-            onBrowseExport = {},
-            restoreState = RestoreState.Idle,
-            onShowRestoreSheet = {},
-            onSelectRestoreFile = {},
-            onUpdateImportOptions = {},
-            onConfirmImport = {},
-            onCancelRestore = {},
-            onRetryRestore = {},
-            onDismissRestore = {},
-            integrityState = IntegrityState(),
-            onRunIntegrityCheck = {},
-            onRepairIntegrity = {},
-            snackbarHostState = snackbarHostState,
         )
     }
 }
 
-// ─── Import Flow: Export Settings → Confirm → In Progress → Done ─────────────────
-
-/** Step 7: User taps "Import" — the import confirmation bottom sheet appears. */
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
 fun S07_ImportConfirming() {
-    val snackbarHostState = remember { SnackbarHostState() }
     ScreenshotTheme {
-        ExportSettingsContent(
-            onBack = {},
-            exportState = ExportState.Idle,
-            onShowExportOptions = {},
-            onUpdateExportOptions = {},
-            onConfirmExport = {},
-            onCancelExport = {},
-            onRetryExport = {},
-            onDismissExport = {},
-            onBrowseExport = {},
+        ExportImportPreviewContent(
             restoreState = RestoreState.Confirming,
-            isRestoreSheetVisible = true,
-            onShowRestoreSheet = {},
-            onSelectRestoreFile = {},
-            onUpdateImportOptions = {},
-            onConfirmImport = {},
-            onCancelRestore = {},
-            onRetryRestore = {},
-            onDismissRestore = {},
-            integrityState = IntegrityState(),
-            onRunIntegrityCheck = {},
-            onRepairIntegrity = {},
-            snackbarHostState = snackbarHostState,
         )
     }
 }
 
-/** Step 8: Import is in progress with an indeterminate progress indicator. */
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
 fun S08_ImportInProgress() {
-    val snackbarHostState = remember { SnackbarHostState() }
     ScreenshotTheme {
-        ExportSettingsContent(
-            onBack = {},
-            exportState = ExportState.Idle,
-            onShowExportOptions = {},
-            onUpdateExportOptions = {},
-            onConfirmExport = {},
-            onCancelExport = {},
-            onRetryExport = {},
-            onDismissExport = {},
-            onBrowseExport = {},
-            restoreState = RestoreState.Restoring(stage = app.logdate.feature.core.restore.RestoreStage.RESTORING_NOTES, progressPercent = 45),
-            isRestoreSheetVisible = true,
-            onShowRestoreSheet = {},
-            onSelectRestoreFile = {},
-            onUpdateImportOptions = {},
-            onConfirmImport = {},
-            onCancelRestore = {},
-            onRetryRestore = {},
-            onDismissRestore = {},
-            integrityState = IntegrityState(),
-            onRunIntegrityCheck = {},
-            onRepairIntegrity = {},
-            snackbarHostState = snackbarHostState,
+        ExportImportPreviewContent(
+            restoreState =
+                RestoreState.Restoring(
+                    stage = RestoreStage.RESTORING_NOTES,
+                    progressPercent = 45,
+                ),
         )
     }
 }
 
-/** Step 9: Import completes successfully with stats. */
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
 fun S09_ImportCompleted() {
-    val snackbarHostState = remember { SnackbarHostState() }
     ScreenshotTheme {
-        ExportSettingsContent(
-            onBack = {},
-            exportState = ExportState.Idle,
-            onShowExportOptions = {},
-            onUpdateExportOptions = {},
-            onConfirmExport = {},
-            onCancelExport = {},
-            onRetryExport = {},
-            onDismissExport = {},
-            onBrowseExport = {},
+        ExportImportPreviewContent(
             restoreState =
                 RestoreState.Completed(
                     summary =
@@ -339,109 +195,22 @@ fun S09_ImportCompleted() {
                             journalsImported = 5,
                             notesImported = 42,
                             draftsImported = 3,
-                            journalLinksImported = 28,
+                            journalLinksImported = 11,
                             mediaImported = 18,
+                            warnings = listOf("2 attachments were skipped because they were already present."),
                         ),
                 ),
-            isRestoreSheetVisible = true,
-            onShowRestoreSheet = {},
-            onSelectRestoreFile = {},
-            onUpdateImportOptions = {},
-            onConfirmImport = {},
-            onCancelRestore = {},
-            onRetryRestore = {},
-            onDismissRestore = {},
-            integrityState = IntegrityState(),
-            onRunIntegrityCheck = {},
-            onRepairIntegrity = {},
-            snackbarHostState = snackbarHostState,
         )
     }
 }
 
-/** Step 10: Import completes with warnings about skipped entries. */
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S10_ImportCompletedWithWarnings() {
-    val snackbarHostState = remember { SnackbarHostState() }
+fun S10_ImportFailed() {
     ScreenshotTheme {
-        ExportSettingsContent(
-            onBack = {},
-            exportState = ExportState.Idle,
-            onShowExportOptions = {},
-            onUpdateExportOptions = {},
-            onConfirmExport = {},
-            onCancelExport = {},
-            onRetryExport = {},
-            onDismissExport = {},
-            onBrowseExport = {},
-            restoreState =
-                RestoreState.Completed(
-                    summary =
-                        RestoreSummary(
-                            source = "logdate-export.zip",
-                            journalsImported = 5,
-                            notesImported = 38,
-                            draftsImported = 3,
-                            journalLinksImported = 24,
-                            mediaImported = 15,
-                            warnings =
-                                listOf(
-                                    "Skipped 4 notes with invalid UUIDs",
-                                    "3 media files could not be found in archive",
-                                ),
-                        ),
-                ),
-            isRestoreSheetVisible = true,
-            onShowRestoreSheet = {},
-            onSelectRestoreFile = {},
-            onUpdateImportOptions = {},
-            onConfirmImport = {},
-            onCancelRestore = {},
-            onRetryRestore = {},
-            onDismissRestore = {},
-            integrityState = IntegrityState(),
-            onRunIntegrityCheck = {},
-            onRepairIntegrity = {},
-            snackbarHostState = snackbarHostState,
-        )
-    }
-}
-
-/** Alternate ending: Import fails with an error message. */
-@PreviewTest
-@ScreenshotPreviewMatrix
-@Composable
-fun S11_ImportFailed() {
-    val snackbarHostState = remember { SnackbarHostState() }
-    ScreenshotTheme {
-        ExportSettingsContent(
-            onBack = {},
-            exportState = ExportState.Idle,
-            onShowExportOptions = {},
-            onUpdateExportOptions = {},
-            onConfirmExport = {},
-            onCancelExport = {},
-            onRetryExport = {},
-            onDismissExport = {},
-            onBrowseExport = {},
-            restoreState =
-                RestoreState.Failed(
-                    reason = "The archive appears to be corrupted or is not a valid LogDate export.",
-                ),
-            isRestoreSheetVisible = true,
-            onShowRestoreSheet = {},
-            onSelectRestoreFile = {},
-            onUpdateImportOptions = {},
-            onConfirmImport = {},
-            onCancelRestore = {},
-            onRetryRestore = {},
-            onDismissRestore = {},
-            integrityState = IntegrityState(),
-            onRunIntegrityCheck = {},
-            onRepairIntegrity = {},
-            snackbarHostState = snackbarHostState,
+        ExportImportPreviewContent(
+            restoreState = RestoreState.Failed(error = RestoreError.INVALID_ARCHIVE),
         )
     }
 }

@@ -9,6 +9,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.repository.account.AccountIdentityStatus
 import app.logdate.client.sync.SyncStatus
@@ -396,10 +397,10 @@ fun S12_LocationSettingsTrackingOff() {
             settings = LocationTrackingSettings(backgroundTrackingEnabled = false),
             onBack = {},
             onToggleBackgroundTracking = {},
+            onSetCaptureMode = { _: LocationCaptureMode -> },
             onShowLocationTimeline = {},
             onNavigateToTrackingOptions = {},
             onNavigateToInterval = {},
-            onNavigateToAdvanced = {},
         )
     }
 }
@@ -419,10 +420,10 @@ fun S13_LocationSettingsTrackingOn() {
                 ),
             onBack = {},
             onToggleBackgroundTracking = {},
+            onSetCaptureMode = { _: LocationCaptureMode -> },
             onShowLocationTimeline = {},
             onNavigateToTrackingOptions = {},
             onNavigateToInterval = {},
-            onNavigateToAdvanced = {},
         )
     }
 }

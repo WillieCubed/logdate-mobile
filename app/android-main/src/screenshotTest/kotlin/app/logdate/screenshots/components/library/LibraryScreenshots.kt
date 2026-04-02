@@ -2,26 +2,36 @@ package app.logdate.screenshots.components.library
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import app.logdate.feature.library.ui.LibraryContent
+import app.logdate.feature.library.ui.LibraryPanel
+import app.logdate.feature.library.ui.LibraryScreenContent
 import app.logdate.feature.library.ui.LibraryUiState
 import app.logdate.feature.library.ui.detail.MediaDetailContent
-import app.logdate.feature.library.ui.detail.MediaDetailUiState
-import app.logdate.feature.library.ui.detail.PresenterState
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE_LANDSCAPE
 import app.logdate.screenshots.common.ScreenshotTestData.TABLET
 import app.logdate.screenshots.common.ScreenshotTheme
 import com.android.tools.screenshot.PreviewTest
 
-// ─── Library Grid ────────────────────────────────────────────────────────────
-
 @PreviewTest
 @Preview(showBackground = true, device = PHONE)
 @Composable
 fun LibraryGrid_Empty() {
     ScreenshotTheme {
-        LibraryContent(
+        LibraryPanel(
             state = LibraryUiState.Empty,
+            columnCount = 3,
+            onItemClick = {},
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun LibraryGrid_PermissionRequired() {
+    ScreenshotTheme {
+        LibraryPanel(
+            state = LibraryUiState.PermissionRequired,
             columnCount = 3,
             onItemClick = {},
         )
@@ -33,24 +43,7 @@ fun LibraryGrid_Empty() {
 @Composable
 fun LibraryGrid_Content() {
     ScreenshotTheme {
-        LibraryContent(
-            state = LibraryScreenshotData.gridContent,
-            columnCount = 3,
-            onItemClick = {},
-        )
-    }
-}
-
-@PreviewTest
-@Preview(
-    showBackground = true,
-    device = PHONE,
-    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES,
-)
-@Composable
-fun LibraryGrid_Content_Dark() {
-    ScreenshotTheme(darkTheme = true) {
-        LibraryContent(
+        LibraryScreenContent(
             state = LibraryScreenshotData.gridContent,
             columnCount = 3,
             onItemClick = {},
@@ -63,15 +56,13 @@ fun LibraryGrid_Content_Dark() {
 @Composable
 fun LibraryGrid_Content_Tablet() {
     ScreenshotTheme {
-        LibraryContent(
+        LibraryScreenContent(
             state = LibraryScreenshotData.gridContent,
             columnCount = 5,
             onItemClick = {},
         )
     }
 }
-
-// ─── Media Detail ────────────────────────────────────────────────────────────
 
 @PreviewTest
 @Preview(showBackground = true, device = PHONE)
@@ -111,8 +102,6 @@ fun MediaDetail_Landscape() {
         )
     }
 }
-
-// ─── Presenter Mode ──────────────────────────────────────────────────────────
 
 @PreviewTest
 @Preview(showBackground = true, device = PHONE)

@@ -56,7 +56,7 @@ class PhoneWearSyncE2ETest {
         assertTrue(phoneNote is JournalNote.Audio)
         assertEquals(noteId, phoneNote.uid)
         assertEquals(4200, phoneNote.durationMs)
-        assertEquals(watchNote.mediaRef, (phoneNote as JournalNote.Audio).mediaRef)
+        assertEquals(watchNote.mediaRef, phoneNote.mediaRef)
         assertEquals(fixedTime, phoneNote.creationTimestamp)
     }
 
@@ -105,7 +105,7 @@ class PhoneWearSyncE2ETest {
         val phoneNote = mapper.fromDataMap(dataMap)
 
         assertTrue(phoneNote is JournalNote.Text)
-        assertEquals("Quick thought from my watch", (phoneNote as JournalNote.Text).content)
+        assertEquals("Quick thought from my watch", phoneNote.content)
     }
 
     @Test
@@ -291,7 +291,7 @@ class PhoneWearSyncE2ETest {
 
         // Step 5: Verify complete fidelity
         assertTrue(phoneReceivedNote is JournalNote.Audio)
-        val audioNote = phoneReceivedNote as JournalNote.Audio
+        val audioNote: JournalNote.Audio = phoneReceivedNote
 
         assertEquals(recordingNoteId, audioNote.uid)
         assertEquals(recordingTimestamp.toEpochMilliseconds(),
