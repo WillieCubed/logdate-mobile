@@ -36,6 +36,16 @@ class WatchSettingsViewModel(
             .observeNotificationSettings()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WatchNotificationSettings())
 
+    fun beginAssociation() {
+        viewModelScope.launch {
+            try {
+                connectionManager.beginAssociation()
+            } catch (e: Exception) {
+                Napier.e(e) { "Failed to begin watch association" }
+            }
+        }
+    }
+
     fun requestSync() {
         viewModelScope.launch {
             try {

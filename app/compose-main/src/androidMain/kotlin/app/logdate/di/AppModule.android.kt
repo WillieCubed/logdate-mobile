@@ -24,17 +24,28 @@ import app.logdate.client.sync.PhoneWearTransport
 import app.logdate.client.sync.WearSyncNotificationHelper
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.updates.PlayInAppUpdateController
+import app.logdate.client.watch.AndroidCompanionDeviceClient
 import app.logdate.client.watch.AndroidWatchConnectionManager
+import app.logdate.client.watch.CompanionDeviceClient
+import app.logdate.client.watch.DefaultWatchAssociationRequestFactory
+import app.logdate.client.watch.DefaultWatchCompanionAssociationManager
+import app.logdate.client.watch.WatchAssociationRequestFactory
+import app.logdate.client.watch.WatchCompanionAssociationManager
 import app.logdate.dynamic.DynamicFeatureLoader
 import app.logdate.dynamic.PlayDynamicFeatureLoader
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
 import app.logdate.feature.core.settings.updates.AppUpdateController
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.androidx.workmanager.koin.workManagerFactory
 import org.koin.core.context.startKoin
 import org.koin.core.module.Module
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
+
+private val watchConnectionIoDispatcherQualifier = named("watch-connection-io-dispatcher")
 
 actual val appModule: Module =
     module {
@@ -78,8 +89,25 @@ actual val appModule: Module =
 
         single<DynamicFeatureLoader> { PlayDynamicFeatureLoader(androidContext()) }
 
+        single<CoroutineDispatcher>(watchConnectionIoDispatcherQualifier) { Dispatchers.IO }
+        single<CompanionDeviceClient> { AndroidCompanionDeviceClient(androidContext()) }
+        single<WatchAssociationRequestFactory> { DefaultWatchAssociationRequestFactory() }
+        single<WatchCompanionAssociationManager> {
+            DefaultWatchCompanionAssociationManager(
+                companionDeviceClient = get(),
+                applicationScope = get(),
+                associationRequestFactory = get(),
+            )
+        }
+
         // Watch connection manager for Wear OS settings
-        single<WatchConnectionManager> { AndroidWatchConnectionManager(androidContext()) }
+        single<WatchConnectionManager> {
+            AndroidWatchConnectionManager(
+                context = androidContext(),
+                associationManager = get(),
+                ioDispatcher = get(qualifier = watchConnectionIoDispatcherQualifier),
+            )
+        }
     }
 
 /**

@@ -33,6 +33,7 @@ import logdate.client.feature.core.generated.resources.watch_troubleshooting
 import logdate.client.feature.core.generated.resources.watch_troubleshooting_common_issues
 import logdate.client.feature.core.generated.resources.watch_troubleshooting_install
 import logdate.client.feature.core.generated.resources.watch_troubleshooting_open
+import logdate.client.feature.core.generated.resources.watch_troubleshooting_pair
 import logdate.client.feature.core.generated.resources.watch_troubleshooting_tips
 import logdate.client.feature.core.generated.resources.watch_troubleshooting_watch_app
 import org.jetbrains.compose.resources.stringResource
@@ -54,6 +55,7 @@ fun WatchTroubleshootingScreen(
     WatchTroubleshootingContent(
         connectionState = connectionState,
         onBack = onBack,
+        onBeginAssociation = viewModel::beginAssociation,
         onInstallOnWatch = viewModel::installAppOnWatch,
         onOpenOnWatch = viewModel::openAppOnWatch,
         modifier = modifier,
@@ -64,6 +66,7 @@ fun WatchTroubleshootingScreen(
 fun WatchTroubleshootingContent(
     connectionState: WatchConnectionState,
     onBack: () -> Unit,
+    onBeginAssociation: () -> Unit,
     onInstallOnWatch: () -> Unit,
     onOpenOnWatch: () -> Unit,
     modifier: Modifier = Modifier,
@@ -81,6 +84,21 @@ fun WatchTroubleshootingContent(
                 Column(
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
+                    OutlinedButton(
+                        onClick = onBeginAssociation,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled =
+                            connectionState is WatchConnectionState.NeedsAssociation ||
+                                connectionState is WatchConnectionState.NoPairedWatch,
+                    ) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(Spacing.sm))
+                        Text(stringResource(Res.string.watch_troubleshooting_pair))
+                    }
                     OutlinedButton(
                         onClick = onInstallOnWatch,
                         modifier = Modifier.fillMaxWidth(),

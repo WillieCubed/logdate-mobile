@@ -107,6 +107,8 @@ extensions.configure<ApplicationExtension> {
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
 
     testOptions {
+        animationsDisabled = true
+        execution = "ANDROID_TEST_ORCHESTRATOR"
         unitTests.all {
             it.maxHeapSize = "4g"
         }
@@ -165,6 +167,7 @@ dependencies {
     testImplementation(libs.androidx.navigation3.runtime)
     testImplementation(libs.androidx.health.connect)
     testImplementation(libs.play.services.wearable)
+    testImplementation(projects.client.feature.core)
     testImplementation(projects.client.database)
     testImplementation(projects.client.domain)
     testImplementation(projects.client.healthConnect)
@@ -176,8 +179,13 @@ dependencies {
     androidTestImplementation(projects.client.feature.core)
     androidTestImplementation(projects.client.feature.editor)
     androidTestImplementation(projects.client.feature.journal)
+    androidTestImplementation(projects.client.feature.onboarding)
     androidTestImplementation(projects.client.domain)
+    androidTestImplementation(projects.client.healthConnect)
+    androidTestImplementation(projects.client.intelligence)
+    androidTestImplementation(projects.client.location)
     androidTestImplementation(projects.client.media)
+    androidTestImplementation(projects.client.networking)
     androidTestImplementation(projects.client.notifications)
     androidTestImplementation(projects.client.permissions)
     androidTestImplementation(projects.client.repository)
@@ -198,6 +206,7 @@ dependencies {
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation("io.mockk:mockk-android:${libs.versions.mockk.get()}")
     androidTestImplementation(libs.androidx.test.espresso.core)
+    androidTestUtil(libs.androidx.test.orchestrator)
     androidTestImplementation(libs.androidx.ui.test.junit4)
     androidTestImplementation(libs.androidx.activity.compose)
     androidTestImplementation(libs.compose.material3)

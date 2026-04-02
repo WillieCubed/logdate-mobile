@@ -15,6 +15,11 @@ interface WatchConnectionManager {
     fun observeConnectionState(): Flow<WatchConnectionState>
 
     /**
+     * Starts the system flow to associate LogDate with a watch.
+     */
+    suspend fun beginAssociation()
+
+    /**
      * Triggers an immediate sync with the connected watch.
      */
     suspend fun requestSync()

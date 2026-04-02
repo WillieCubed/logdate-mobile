@@ -7,9 +7,21 @@ import kotlin.time.Instant
  */
 sealed interface WatchConnectionState {
     /**
-     * No Wear OS watch is paired to this phone at the system level.
+     * No Wear OS watch is currently available to associate or connect.
      */
     data object NoPairedWatch : WatchConnectionState
+
+    /**
+     * A reachable watch exists, but LogDate has not been associated with it yet.
+     */
+    data class NeedsAssociation(
+        val watchName: String,
+    ) : WatchConnectionState
+
+    /**
+     * The system association flow is currently in progress.
+     */
+    data object AssociationPending : WatchConnectionState
 
     /**
      * A watch is paired but LogDate is not installed on it.

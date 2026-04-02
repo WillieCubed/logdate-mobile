@@ -521,6 +521,11 @@
     <string name="watch_loading">Looking for your watch\u2026</string>
     <string name="watch_no_paired">No watch connected</string>
     <string name="watch_no_paired_description">Pair a Wear OS watch with your phone to capture voice notes, mood check-ins, and more from your wrist.</string>
+    <string name="watch_needs_association">Pair LogDate with your watch</string>
+    <string name="watch_needs_association_description">%1$s is connected, but LogDate still needs permission to manage the watch relationship on this phone.</string>
+    <string name="watch_association_pending">Finish pairing on this phone</string>
+    <string name="watch_association_pending_description">Complete the system pairing prompt, then LogDate will reconnect to your watch automatically.</string>
+    <string name="watch_pair_watch">Pair Watch</string>
     <string name="watch_app_not_installed">Install LogDate on your watch</string>
     <string name="watch_app_not_installed_description">Your %1$s is connected but doesn\'t have LogDate yet.</string>
     <string name="watch_install_on_watch">Install on Watch</string>
@@ -565,6 +570,7 @@
 
     <!-- Watch troubleshooting detail -->
     <string name="watch_troubleshooting_watch_app">Watch app</string>
+    <string name="watch_troubleshooting_pair">Pair or reconnect watch</string>
     <string name="watch_troubleshooting_install">Install or update on watch</string>
     <string name="watch_troubleshooting_open">Open LogDate on watch</string>
     <string name="watch_troubleshooting_common_issues">Common issues</string>

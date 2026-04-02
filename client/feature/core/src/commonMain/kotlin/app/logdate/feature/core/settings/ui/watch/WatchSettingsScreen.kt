@@ -38,15 +38,20 @@ import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.watch_app_not_installed
 import logdate.client.feature.core.generated.resources.watch_app_not_installed_description
+import logdate.client.feature.core.generated.resources.watch_association_pending
+import logdate.client.feature.core.generated.resources.watch_association_pending_description
 import logdate.client.feature.core.generated.resources.watch_connected
 import logdate.client.feature.core.generated.resources.watch_install_on_watch
 import logdate.client.feature.core.generated.resources.watch_loading
+import logdate.client.feature.core.generated.resources.watch_needs_association
+import logdate.client.feature.core.generated.resources.watch_needs_association_description
 import logdate.client.feature.core.generated.resources.watch_no_paired
 import logdate.client.feature.core.generated.resources.watch_no_paired_description
 import logdate.client.feature.core.generated.resources.watch_notifications
 import logdate.client.feature.core.generated.resources.watch_notifications_description
 import logdate.client.feature.core.generated.resources.watch_notifications_title
 import logdate.client.feature.core.generated.resources.watch_out_of_range
+import logdate.client.feature.core.generated.resources.watch_pair_watch
 import logdate.client.feature.core.generated.resources.watch_privacy_description
 import logdate.client.feature.core.generated.resources.watch_privacy_title
 import logdate.client.feature.core.generated.resources.watch_settings
@@ -77,6 +82,7 @@ fun WatchSettingsScreen(
     WatchSettingsContent(
         connectionState = connectionState,
         onBack = onBack,
+        onBeginAssociation = viewModel::beginAssociation,
         onRequestSync = viewModel::requestSync,
         onInstallOnWatch = viewModel::installAppOnWatch,
         onNavigateToSync = onNavigateToSync,
@@ -90,6 +96,7 @@ fun WatchSettingsScreen(
 fun WatchSettingsContent(
     connectionState: WatchConnectionState,
     onBack: () -> Unit,
+    onBeginAssociation: () -> Unit,
     onRequestSync: () -> Unit,
     onInstallOnWatch: () -> Unit,
     onNavigateToSync: () -> Unit,
@@ -105,6 +112,7 @@ fun WatchSettingsContent(
         item {
             ConnectionStatusCard(
                 connectionState = connectionState,
+                onBeginAssociation = onBeginAssociation,
                 onInstallOnWatch = onInstallOnWatch,
                 modifier = Modifier.padding(horizontal = Spacing.lg),
             )
@@ -161,6 +169,8 @@ fun WatchSettingsContent(
             }
 
             is WatchConnectionState.AppNotInstalled,
+            is WatchConnectionState.NeedsAssociation,
+            is WatchConnectionState.AssociationPending,
             is WatchConnectionState.NoPairedWatch,
             is WatchConnectionState.Loading,
             -> {
@@ -190,6 +200,7 @@ fun WatchSettingsContent(
 @Composable
 private fun ConnectionStatusCard(
     connectionState: WatchConnectionState,
+    onBeginAssociation: () -> Unit,
     onInstallOnWatch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -233,6 +244,58 @@ private fun ConnectionStatusCard(
                     )
                     Text(
                         text = stringResource(Res.string.watch_no_paired_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            is WatchConnectionState.NeedsAssociation -> {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(Spacing.lg),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
+                    Icon(
+                        Icons.Default.Watch,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = stringResource(Res.string.watch_needs_association),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = stringResource(Res.string.watch_needs_association_description, connectionState.watchName),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Button(onClick = onBeginAssociation) {
+                        Text(stringResource(Res.string.watch_pair_watch))
+                    }
+                }
+            }
+
+            is WatchConnectionState.AssociationPending -> {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(Spacing.lg),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                    Text(
+                        text = stringResource(Res.string.watch_association_pending),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = stringResource(Res.string.watch_association_pending_description),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

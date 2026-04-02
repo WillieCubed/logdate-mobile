@@ -21,8 +21,11 @@ import androidx.navigation3.runtime.NavKey
 import app.logdate.client.database.DatabaseRecoveryController
 import app.logdate.client.database.DatabaseStartupMonitor
 import app.logdate.client.database.DatabaseStartupState
+import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.restore.PostRestoreType
+import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
+import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.feature.widgets.EXTRA_WIDGET_TARGET_DATE
 import app.logdate.client.feature.widgets.NAV_SOURCE_ON_THIS_DAY_WIDGET
 import app.logdate.client.launch.LaunchBootstrapState
@@ -30,15 +33,22 @@ import app.logdate.client.launch.LaunchStage
 import app.logdate.client.launch.LaunchStageSnapshot
 import app.logdate.client.launch.markCompleted
 import app.logdate.client.launch.reduceLaunchBootstrapState
+import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.client.location.tracking.NAV_SOURCE_LOCATION_HISTORY
 import app.logdate.client.media.audio.EXTRA_NAV_SOURCE
 import app.logdate.client.media.audio.EXTRA_NOTE_ID
 import app.logdate.client.media.audio.NAV_SOURCE_AUDIO_PLAYBACK
+import app.logdate.client.repository.profile.ProfileRepository
+import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.sharing.NoOpSharingLauncher
 import app.logdate.client.sharing.SharingLauncher
+import app.logdate.client.testing.navigation.readNavigationTestDestination
+import app.logdate.client.testing.onboarding.OnboardingTestFixtureApplier
+import app.logdate.client.testing.onboarding.readOnboardingTestFixture
 import app.logdate.client.updates.ActivityResultAppUpdateFlowLauncher
 import app.logdate.client.updates.PlayInAppUpdateController
+import app.logdate.client.watch.WatchCompanionAssociationManager
 import app.logdate.feature.core.AndroidBiometricGatekeeper
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.BiometricGatekeeper
@@ -51,6 +61,7 @@ import app.logdate.feature.core.isAppUnlocked
 import app.logdate.feature.core.restore.AndroidRestoreLauncher
 import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
+import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
 import app.logdate.navigation.routes.core.LocationRoute
 import app.logdate.navigation.routes.core.NoteViewerRoute
 import app.logdate.navigation.routes.core.TimelineDetail
@@ -59,6 +70,7 @@ import io.github.vinceglb.filekit.core.FileKit
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import kotlin.uuid.Uuid
@@ -85,8 +97,16 @@ class MainActivity : FragmentActivity() {
     private val databaseRecoveryController: DatabaseRecoveryController by inject()
     private val postRestoreDetector: PostRestoreDetector by inject()
     private val playInAppUpdateController: PlayInAppUpdateController by inject()
+    private val watchCompanionAssociationManager: WatchCompanionAssociationManager by inject()
     private val locationTrackingManager: LocationTrackingManager by inject()
     private val sharingLauncher: SharingLauncher by inject()
+    private val profileRepository: ProfileRepository by inject()
+    private val userStateRepository: UserStateRepository by inject()
+    private val sessionStorage: SessionStorage by inject()
+    private val memoriesSettingsRepository: MemoriesSettingsRepository by inject()
+    private val locationTrackingSettingsRepository: LocationTrackingSettingsRepository by inject()
+    private val dayBoundarySettingsRepository: DayBoundarySettingsRepository by inject()
+    private val onboardingDeviceStateRepository: OnboardingDeviceStateRepository by inject()
 
     private val viewModel by viewModel<AppViewModel>()
 
@@ -134,11 +154,21 @@ class MainActivity : FragmentActivity() {
             playInAppUpdateController.onUpdateFlowResult(result.resultCode)
         }
 
+    private val watchAssociationLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.StartIntentSenderForResult(),
+        ) { result ->
+            watchCompanionAssociationManager.onAssociationFlowResult(result.resultCode)
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         Napier.i("MainActivity onCreate: starting launch", tag = APP_LAUNCH_TAG)
         markLaunchStage(LaunchStage.ActivityCreated)
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) {
+            applyOnboardingTestFixtureFromLaunchIntent()
+        }
 
         // Set up FileKit for file operations
         FileKit.init(this)
@@ -155,6 +185,7 @@ class MainActivity : FragmentActivity() {
         androidRestoreLauncher.setupActivityResultLauncher(openDocumentLauncher)
         androidRestoreLauncher.setupWorkObserver(this)
         playInAppUpdateController.attachLauncher(ActivityResultAppUpdateFlowLauncher(appUpdateLauncher))
+        watchCompanionAssociationManager.attachLauncher(watchAssociationLauncher)
         Napier.i("MainActivity onCreate: export/restore/update launchers configured", tag = APP_LAUNCH_TAG)
 
         // Set up multi-window support
@@ -251,6 +282,23 @@ class MainActivity : FragmentActivity() {
 
         // Handle the intent if this activity was launched with one
         intent?.let { handleMultiWindowIntent(it) }
+    }
+
+    private fun applyOnboardingTestFixtureFromLaunchIntent() {
+        val fixture = intent?.readOnboardingTestFixture() ?: return
+        runBlocking {
+            OnboardingTestFixtureApplier(
+                profileRepository = profileRepository,
+                userStateRepository = userStateRepository,
+                sessionStorage = sessionStorage,
+                memoriesSettingsRepository = memoriesSettingsRepository,
+                locationTrackingSettingsRepository = locationTrackingSettingsRepository,
+                dayBoundarySettingsRepository = dayBoundarySettingsRepository,
+                onboardingDeviceStateRepository = onboardingDeviceStateRepository,
+            ).apply(fixture)
+        }
+        intent?.removeExtra(app.logdate.client.testing.onboarding.ONBOARDING_TEST_FIXTURE_EXTRA)
+        Napier.i("Applied onboarding test fixture from launch intent", tag = APP_LAUNCH_TAG)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -428,6 +476,7 @@ class MainActivity : FragmentActivity() {
 /** Resolves the optional deep-link destination from intent extras. */
 private fun resolveNavKey(intent: Intent?): NavKey? {
     if (intent == null) return null
+    intent.readNavigationTestDestination()?.let { return it }
     return when {
         intent.getStringExtra(EXTRA_NAV_SOURCE) == NAV_SOURCE_AUDIO_PLAYBACK -> {
             val noteId = intent.getStringExtra(EXTRA_NOTE_ID) ?: return null
