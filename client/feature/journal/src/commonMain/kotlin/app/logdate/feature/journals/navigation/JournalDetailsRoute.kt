@@ -3,7 +3,6 @@
 
 package app.logdate.feature.journals.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.navigation.NavController
@@ -65,16 +64,10 @@ fun NavGraphBuilder.journalDetailsRoute(
     onNavigateToNoteDetail: (noteId: Uuid) -> Unit,
 ) {
     composable<JournalDetailsRoute>(
-        enterTransition = {
-            slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Left,
-            )
-        },
-        exitTransition = {
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Right,
-            )
-        },
+        enterTransition = legacyJournalForwardEnterTransition,
+        exitTransition = legacyJournalForwardExitTransition,
+        popEnterTransition = legacyJournalPopEnterTransition,
+        popExitTransition = legacyJournalPopExitTransition,
     ) { backStackEntry ->
         CompositionLocalProvider(
             LocalNavAnimatedVisibilityScope provides this,

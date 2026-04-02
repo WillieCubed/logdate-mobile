@@ -57,6 +57,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -107,6 +108,7 @@ import app.logdate.navigation.routes.locationRoutes
 import app.logdate.navigation.routes.navigateToPostcardEditor
 import app.logdate.navigation.routes.navigateToPostcardViewer
 import app.logdate.navigation.routes.navigateToPostcardsCollection
+import app.logdate.navigation.routes.noteViewerRouteTransitionMetadata
 import app.logdate.navigation.routes.onboarding
 import app.logdate.navigation.routes.openAccountSettings
 import app.logdate.navigation.routes.openAdvancedSettings
@@ -148,9 +150,11 @@ import app.logdate.navigation.routes.rewindRoutes
 import app.logdate.navigation.routes.routeClass
 import app.logdate.navigation.routes.routeEntry
 import app.logdate.navigation.routes.searchRoutes
+import app.logdate.navigation.routes.supportsNoteViewerSharedTransition
 import app.logdate.navigation.routes.timelineRoutes
 import app.logdate.navigation.scenes.HomeSceneStrategy
 import app.logdate.navigation.scenes.HomeTab
+import app.logdate.navigation.scenes.supportsDualPaneHomeScene
 import io.github.aakira.napier.Napier
 import kotlin.reflect.KClass
 
@@ -442,18 +446,27 @@ private fun createSceneStrategy(
     val visibleTabs =
         if (isLibraryEnabled) HomeTab.entries else HomeTab.visibleEntries
 
+    val supportsDualPaneHomeSceneNow =
+        currentWindowAdaptiveInfo().windowSizeClass.supportsDualPaneHomeScene()
+
     val getVisibleTabs =
         remember(visibleTabs) {
             { visibleTabs }
         }
 
+    val getSupportsDualPaneHomeScene =
+        remember(supportsDualPaneHomeSceneNow) {
+            { supportsDualPaneHomeSceneNow }
+        }
+
     // Now remember the strategy with stable callbacks
     val homeStrategy =
-        remember(onTabSelected, onNewEntry, getSelectedTab, getVisibleTabs) {
+        remember(onTabSelected, onNewEntry, getSelectedTab, getSupportsDualPaneHomeScene, getVisibleTabs) {
             HomeSceneStrategy<NavKey>(
                 onTabSelected = onTabSelected,
                 onNewEntry = onNewEntry,
                 getSelectedTab = getSelectedTab,
+                supportsDualPaneHomeScene = getSupportsDualPaneHomeScene,
                 getVisibleTabs = getVisibleTabs,
             )
         }
@@ -578,10 +591,18 @@ fun MainNavigationRoot(
                         routeEntry<NavigationStart> { _ ->
                             TimelineLoadingPlaceholder(modifier = Modifier.fillMaxSize())
                         }
-                        routeEntry<NoteViewerRoute> { route ->
+                        routeEntry<NoteViewerRoute>(
+                            metadata = noteViewerRouteTransitionMetadata,
+                        ) { route ->
+                            val previousRouteClass =
+                                mainAppNavigator.backStack
+                                    .getOrNull(mainAppNavigator.backStack.lastIndex - 1)
+                                    ?.let { it::class }
+
                             NoteViewerScreen(
                                 noteId = route.id,
                                 journalId = route.journalId,
+                                enableSharedBounds = supportsNoteViewerSharedTransition(previousRouteClass),
                                 onGoBack = mainAppNavigator::goBack,
                                 onOpenLocationTimeline = mainAppNavigator::openLocationTimeline,
                                 onNavigateToNote = { newNoteId ->

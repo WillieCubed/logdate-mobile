@@ -4,6 +4,7 @@
 package app.logdate.feature.journals.ui.detail
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -426,6 +427,9 @@ private fun JournalEntryItem(
     onNavigateToJournal: (Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val noteViewerSharedBoundsModifier =
+        rememberNoteViewerSharedBoundsModifier(entry.id)
+
     Column(modifier = modifier) {
         when (entry) {
             is EntryDisplayData.TextEntry ->
@@ -433,24 +437,28 @@ private fun JournalEntryItem(
                     entry = entry,
                     onClick = onClick,
                     onRemoveFromJournal = onRemoveFromJournal,
+                    cardModifier = noteViewerSharedBoundsModifier,
                 )
             is EntryDisplayData.ImageEntry ->
                 ImageEntryCard(
                     entry = entry,
                     onClick = onClick,
                     onRemoveFromJournal = onRemoveFromJournal,
+                    cardModifier = noteViewerSharedBoundsModifier,
                 )
             is EntryDisplayData.VideoEntry ->
                 VideoEntryCard(
                     entry = entry,
                     onClick = onClick,
                     onRemoveFromJournal = onRemoveFromJournal,
+                    cardModifier = noteViewerSharedBoundsModifier,
                 )
             is EntryDisplayData.AudioEntry ->
                 AudioEntryCard(
                     entry = entry,
                     onClick = onClick,
                     onRemoveFromJournal = onRemoveFromJournal,
+                    cardModifier = noteViewerSharedBoundsModifier,
                 )
         }
 
@@ -461,6 +469,24 @@ private fun JournalEntryItem(
                 modifier = Modifier.padding(top = Spacing.xs),
             )
         }
+    }
+}
+
+@Composable
+private fun rememberNoteViewerSharedBoundsModifier(noteId: Uuid): Modifier {
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
+
+    return if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+        with(sharedTransitionScope) {
+            Modifier.sharedBounds(
+                rememberSharedContentState(TransitionKeys.noteViewerTransition(noteId)),
+                animatedVisibilityScope = animatedVisibilityScope,
+                resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
+            )
+        }
+    } else {
+        Modifier
     }
 }
 
@@ -522,6 +548,7 @@ private fun TextEntryCard(
     onClick: () -> Unit,
     onRemoveFromJournal: () -> Unit,
     modifier: Modifier = Modifier,
+    cardModifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -532,6 +559,7 @@ private fun TextEntryCard(
         },
         onRemoveFromJournal = onRemoveFromJournal,
         modifier = modifier,
+        cardModifier = cardModifier,
     ) {
         Text(
             text = entry.content,
@@ -553,12 +581,14 @@ private fun ImageEntryCard(
     onClick: () -> Unit,
     onRemoveFromJournal: () -> Unit,
     modifier: Modifier = Modifier,
+    cardModifier: Modifier = Modifier,
 ) {
     VerticalEntryCardShell(
         timestamp = entry.timestamp,
         onClick = onClick,
         onRemoveFromJournal = onRemoveFromJournal,
         modifier = modifier,
+        cardModifier = cardModifier,
     ) {
         AsyncImage(
             model = entry.mediaRef,
@@ -586,12 +616,14 @@ private fun VideoEntryCard(
     onClick: () -> Unit,
     onRemoveFromJournal: () -> Unit,
     modifier: Modifier = Modifier,
+    cardModifier: Modifier = Modifier,
 ) {
     VerticalEntryCardShell(
         timestamp = entry.timestamp,
         onClick = onClick,
         onRemoveFromJournal = onRemoveFromJournal,
         modifier = modifier,
+        cardModifier = cardModifier,
     ) {
         Box(
             modifier =
@@ -643,12 +675,14 @@ private fun AudioEntryCard(
     onClick: () -> Unit,
     onRemoveFromJournal: () -> Unit,
     modifier: Modifier = Modifier,
+    cardModifier: Modifier = Modifier,
 ) {
     InlineEntryCardShell(
         timestamp = entry.timestamp,
         onClick = onClick,
         onRemoveFromJournal = onRemoveFromJournal,
         modifier = modifier,
+        cardModifier = cardModifier,
     ) {
         Icon(
             Icons.Default.GraphicEq,
@@ -697,6 +731,7 @@ private fun VerticalEntryCardShell(
     onClick: () -> Unit,
     onRemoveFromJournal: () -> Unit,
     modifier: Modifier = Modifier,
+    cardModifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -711,7 +746,7 @@ private fun VerticalEntryCardShell(
 
         Card(
             onClick = onClick,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = cardModifier.fillMaxWidth(),
         ) {
             Column(modifier = Modifier.padding(Spacing.md)) {
                 content()
@@ -744,6 +779,7 @@ private fun InlineEntryCardShell(
     onClick: () -> Unit,
     onRemoveFromJournal: () -> Unit,
     modifier: Modifier = Modifier,
+    cardModifier: Modifier = Modifier,
     content: @Composable RowScope.() -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -758,7 +794,7 @@ private fun InlineEntryCardShell(
 
         Card(
             onClick = onClick,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = cardModifier.fillMaxWidth(),
         ) {
             Row(
                 modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 16.dp, end = 4.dp),

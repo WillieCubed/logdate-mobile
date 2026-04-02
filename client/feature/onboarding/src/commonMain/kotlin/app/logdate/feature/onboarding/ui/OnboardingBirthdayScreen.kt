@@ -1,4 +1,7 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+@file:Suppress(
+    "ktlint:standard:function-naming",
+    "ktlint:standard:no-wildcard-imports",
+)
 
 package app.logdate.feature.onboarding.ui
 
@@ -49,6 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -60,6 +64,10 @@ import logdate.client.feature.onboarding.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Instant
+
+const val ONBOARDING_BIRTHDAY_ROOT_TAG = "onboarding_birthday_root"
+const val ONBOARDING_BIRTHDAY_SET_TAG = "onboarding_birthday_set"
+const val ONBOARDING_BIRTHDAY_CONFIRM_TAG = "onboarding_birthday_confirm"
 
 @Composable
 fun OnboardingBirthdayScreen(
@@ -134,6 +142,7 @@ fun OnboardingBirthdayContent(
         LazyColumn(
             modifier =
                 Modifier
+                    .testTag(ONBOARDING_BIRTHDAY_ROOT_TAG)
                     .fillMaxHeight()
                     .widthIn(max = 444.dp)
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -205,7 +214,7 @@ fun OnboardingBirthdayContent(
                 ) {
                     Button(
                         onClick = { showDatePicker = true },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_BIRTHDAY_SET_TAG),
                         enabled = !isSaving,
                     ) {
                         if (isSaving) {
@@ -242,6 +251,7 @@ fun OnboardingBirthdayContent(
                         }
                         showDatePicker = false
                     },
+                    modifier = Modifier.testTag(ONBOARDING_BIRTHDAY_CONFIRM_TAG),
                 ) {
                     Text(stringResource(Res.string.onboarding_birthday_confirm))
                 }

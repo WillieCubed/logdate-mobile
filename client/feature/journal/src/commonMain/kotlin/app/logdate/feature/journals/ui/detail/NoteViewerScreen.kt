@@ -6,6 +6,7 @@
 package app.logdate.feature.journals.ui.detail
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -61,7 +62,7 @@ import app.logdate.feature.journals.ui.AddToJournalPicker
 import app.logdate.feature.journals.ui.deriveCoverColor
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
-import app.logdate.ui.common.transitions.TransitionKeys.EDITOR_TRANSITION
+import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
@@ -93,6 +94,7 @@ fun NoteViewerScreen(
     noteId: Uuid,
     onGoBack: () -> Unit,
     journalId: Uuid? = null,
+    enableSharedBounds: Boolean = journalId != null,
     onOpenLocationTimeline: () -> Unit = {},
     onNavigateToNote: (Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -104,23 +106,28 @@ fun NoteViewerScreen(
     val uiState by viewModel.uiState.collectAsState()
     val allJournals by viewModel.allJournals.collectAsState()
     val memberJournalIds by viewModel.memberJournalIds.collectAsState()
+    val sharedBoundsModifier =
+        rememberNoteViewerSharedBoundsModifier(
+            noteId = noteId,
+            enableSharedBounds = enableSharedBounds,
+        )
     var showAddToJournal by remember { mutableStateOf(false) }
 
     when (val state = uiState) {
         NoteViewerUiState.Loading -> {
-            NoteViewerLoadingContent(modifier = modifier)
+            NoteViewerLoadingContent(modifier = modifier.then(sharedBoundsModifier))
         }
         is NoteViewerUiState.Error -> {
             NoteViewerErrorContent(
                 message = state.message,
-                modifier = modifier,
+                modifier = modifier.then(sharedBoundsModifier),
             )
         }
         is NoteViewerUiState.AudioContent -> {
             AudioNoteViewerEntry(
                 noteId = state.shared.noteId,
                 onGoBack = onGoBack,
-                modifier = modifier,
+                modifier = modifier.then(sharedBoundsModifier),
             )
         }
         is NoteViewerUiState.TextContent -> {
@@ -130,7 +137,7 @@ fun NoteViewerScreen(
                 onOpenLocationTimeline = onOpenLocationTimeline,
                 onNavigateToNote = onNavigateToNote,
                 onShowAddToJournal = { showAddToJournal = true },
-                modifier = modifier,
+                modifier = modifier.then(sharedBoundsModifier),
             ) {
                 TextNoteViewer(
                     text = state.text,
@@ -145,7 +152,7 @@ fun NoteViewerScreen(
                 onOpenLocationTimeline = onOpenLocationTimeline,
                 onNavigateToNote = onNavigateToNote,
                 onShowAddToJournal = { showAddToJournal = true },
-                modifier = modifier,
+                modifier = modifier.then(sharedBoundsModifier),
             ) {
                 ImageNoteViewer(
                     mediaRef = state.mediaRef,
@@ -160,7 +167,7 @@ fun NoteViewerScreen(
                 onOpenLocationTimeline = onOpenLocationTimeline,
                 onNavigateToNote = onNavigateToNote,
                 onShowAddToJournal = { showAddToJournal = true },
-                modifier = modifier,
+                modifier = modifier.then(sharedBoundsModifier),
             ) {
                 VideoNoteViewer(mediaRef = state.mediaRef)
             }
@@ -344,6 +351,31 @@ private fun AudioNoteViewerEntry(
 
 // region Scaffold and toolbar
 
+@Composable
+private fun rememberNoteViewerSharedBoundsModifier(
+    noteId: Uuid,
+    enableSharedBounds: Boolean,
+): Modifier {
+    if (!enableSharedBounds) {
+        return Modifier
+    }
+
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
+
+    return if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+        with(sharedTransitionScope) {
+            Modifier.sharedBounds(
+                rememberSharedContentState(TransitionKeys.noteViewerTransition(noteId)),
+                animatedVisibilityScope = animatedVisibilityScope,
+                resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
+            )
+        }
+    } else {
+        Modifier
+    }
+}
+
 /**
  * Shared immersive layout for non-audio note presentations.
  * Provides the toolbar with journal context and wraps content in [ImmersiveEditorLayout].
@@ -358,20 +390,6 @@ fun NoteViewerScaffoldContent(
     modifier: Modifier = Modifier,
     noteContent: @Composable () -> Unit,
 ) {
-    val sharedTransitionScope = LocalSharedTransitionScope.current
-    val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
-    val layoutModifier =
-        if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-            with(sharedTransitionScope) {
-                Modifier.sharedElement(
-                    sharedTransitionScope.rememberSharedContentState(EDITOR_TRANSITION),
-                    animatedVisibilityScope,
-                )
-            }
-        } else {
-            Modifier
-        }
-
     val journalContext = shared.journalContext
     val accentColor =
         journalContext?.let {
@@ -398,7 +416,7 @@ fun NoteViewerScaffoldContent(
         bottomContent = {
             Spacer(modifier = Modifier.fillMaxWidth())
         },
-        modifier = modifier.then(layoutModifier),
+        modifier = modifier,
     )
 }
 

@@ -1,4 +1,8 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports", "ktlint:standard:max-line-length")
+@file:Suppress(
+    "ktlint:standard:function-naming",
+    "ktlint:standard:no-wildcard-imports",
+    "ktlint:standard:max-line-length",
+)
 
 package app.logdate.feature.onboarding.ui
 
@@ -45,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -59,6 +64,13 @@ import logdate.client.feature.onboarding.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import app.logdate.feature.core.account.OnboardingStep as CloudAccountOnboardingStep
+
+const val CLOUD_ACCOUNT_SETUP_ROOT_TAG = "onboarding_account_root"
+const val CLOUD_ACCOUNT_SETUP_CREATE_OPTION_TAG = "onboarding_account_create_option"
+const val CLOUD_ACCOUNT_SETUP_SIGN_IN_OPTION_TAG = "onboarding_account_sign_in_option"
+const val CLOUD_ACCOUNT_SETUP_SKIP_OPTION_TAG = "onboarding_account_skip_option"
+const val CLOUD_ACCOUNT_SETUP_PRIMARY_ACTION_TAG = "onboarding_account_primary_action"
+const val CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG = "onboarding_account_skip_action"
 
 @Composable
 fun CloudAccountSetupScreen(
@@ -294,7 +306,7 @@ private fun MainContent(
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
-        modifier = modifier.padding(Spacing.lg),
+        modifier = modifier.padding(Spacing.lg).testTag(CLOUD_ACCOUNT_SETUP_ROOT_TAG),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         item {
@@ -318,6 +330,7 @@ private fun MainContent(
                 description = "Set up a new account with secure passkey authentication and choose your storage plan.",
                 isSelected = selectedOption == CloudSetupOption.CREATE_ACCOUNT,
                 onClick = { onOptionSelected(CloudSetupOption.CREATE_ACCOUNT) },
+                modifier = Modifier.testTag(CLOUD_ACCOUNT_SETUP_CREATE_OPTION_TAG),
             )
         }
 
@@ -328,6 +341,7 @@ private fun MainContent(
                 description = "Already have a LogDate Cloud account? Sign in with your passkey to continue.",
                 isSelected = selectedOption == CloudSetupOption.SIGN_IN,
                 onClick = { onOptionSelected(CloudSetupOption.SIGN_IN) },
+                modifier = Modifier.testTag(CLOUD_ACCOUNT_SETUP_SIGN_IN_OPTION_TAG),
             )
         }
 
@@ -338,6 +352,7 @@ private fun MainContent(
                 description = "Keep using LogDate locally on this device only. You can set up cloud sync later in Settings.",
                 isSelected = selectedOption == CloudSetupOption.SKIP,
                 onClick = { onOptionSelected(CloudSetupOption.SKIP) },
+                modifier = Modifier.testTag(CLOUD_ACCOUNT_SETUP_SKIP_OPTION_TAG),
             )
         }
 
@@ -383,7 +398,7 @@ private fun MainContent(
                 CloudSetupOption.CREATE_ACCOUNT -> {
                     Button(
                         onClick = onContinue,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag(CLOUD_ACCOUNT_SETUP_PRIMARY_ACTION_TAG),
                     ) {
                         Icon(
                             imageVector = Icons.Default.PersonAdd,
@@ -397,7 +412,7 @@ private fun MainContent(
                 CloudSetupOption.SIGN_IN -> {
                     Button(
                         onClick = onContinue,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag(CLOUD_ACCOUNT_SETUP_PRIMARY_ACTION_TAG),
                     ) {
                         Icon(
                             imageVector = Icons.Default.AccountCircle,
@@ -414,7 +429,7 @@ private fun MainContent(
                     ) {
                         OutlinedButton(
                             onClick = onSkip,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().testTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG),
                         ) {
                             Text(stringResource(Res.string.continue_without_cloud_sync))
                         }
@@ -448,8 +463,10 @@ private fun CloudSetupOptionCard(
     description: String,
     isSelected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Card(
+        modifier = modifier,
         onClick = onClick,
         colors =
             CardDefaults.cardColors(

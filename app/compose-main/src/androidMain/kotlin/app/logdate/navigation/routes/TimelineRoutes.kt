@@ -76,7 +76,9 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
             viewModel = homeViewModel,
         )
     }
-    routeEntry<TimelineDetail> { route ->
+    routeEntry<TimelineDetail>(
+        metadata = timelineDetailRouteTransitionMetadata,
+    ) { route ->
         LaunchedEffect(route.day) {
             homeViewModel.selectDay(route.day)
         }

@@ -1,4 +1,8 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports", "ktlint:standard:max-line-length")
+@file:Suppress(
+    "ktlint:standard:function-naming",
+    "ktlint:standard:no-wildcard-imports",
+    "ktlint:standard:max-line-length",
+)
 
 package app.logdate.feature.onboarding.ui
 
@@ -21,6 +25,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.ui.theme.LogDateTheme
@@ -28,6 +33,9 @@ import app.logdate.ui.theme.Spacing
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
+
+const val MEMORIES_IMPORT_INFO_ROOT_TAG = "onboarding_memory_import_root"
+const val MEMORIES_IMPORT_INFO_CONTINUE_TAG = "onboarding_memory_import_continue"
 
 /**
  * Screen that explains the memories import feature during onboarding.
@@ -55,6 +63,7 @@ fun MemoriesImportInfoScreen(
         Box(
             modifier =
                 Modifier
+                    .testTag(MEMORIES_IMPORT_INFO_ROOT_TAG)
                     .fillMaxSize()
                     .padding(contentPadding)
                     .padding(Spacing.lg),
@@ -92,7 +101,8 @@ fun MemoriesImportInfoScreen(
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .testTag(MEMORIES_IMPORT_INFO_CONTINUE_TAG),
             ) {
                 Text(stringResource(Res.string.`continue`))
             }

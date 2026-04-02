@@ -1,4 +1,6 @@
-@file:Suppress("ktlint:standard:function-naming")
+@file:Suppress(
+    "ktlint:standard:function-naming",
+)
 
 package app.logdate.feature.onboarding.ui
 
@@ -14,6 +16,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
@@ -24,6 +27,8 @@ import logdate.client.feature.onboarding.generated.resources.onboarding_welcome_
 import logdate.client.feature.onboarding.generated.resources.onboarding_welcome_back_title
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+
+const val WELCOME_BACK_ROOT_TAG = "onboarding_welcome_back_root"
 
 /**
  * A screen shown to returning users after app setup.
@@ -45,7 +50,7 @@ fun WelcomeBackScreen(
     }
 
     Surface(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().testTag(WELCOME_BACK_ROOT_TAG),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         WelcomeBackScreenContent(name = name)

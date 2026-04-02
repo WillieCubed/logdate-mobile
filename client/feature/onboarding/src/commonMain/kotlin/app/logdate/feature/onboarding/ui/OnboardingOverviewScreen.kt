@@ -1,4 +1,8 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports", "ktlint:standard:max-line-length")
+@file:Suppress(
+    "ktlint:standard:function-naming",
+    "ktlint:standard:no-wildcard-imports",
+    "ktlint:standard:max-line-length",
+)
 
 package app.logdate.feature.onboarding.ui
 
@@ -34,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -45,6 +50,9 @@ import logdate.client.ui.generated.resources.book_open
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as coreRes
+
+const val ONBOARDING_OVERVIEW_ROOT_TAG = "onboarding_overview_root"
+const val ONBOARDING_OVERVIEW_CONTINUE_TAG = "onboarding_overview_continue"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,6 +90,7 @@ fun OnboardingOverviewScreen(
             LazyColumn(
                 modifier =
                     Modifier
+                        .testTag(ONBOARDING_OVERVIEW_ROOT_TAG)
                         .fillMaxHeight()
                         .widthIn(max = 444.dp)
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -132,6 +141,7 @@ fun OnboardingOverviewScreen(
                     ) {
                         Button(
                             onClick = onNext,
+                            modifier = Modifier.testTag(ONBOARDING_OVERVIEW_CONTINUE_TAG),
                         ) {
                             Text(text = stringResource(Res.string.`continue`))
                         }

@@ -17,6 +17,7 @@ class HomeSceneStrategy<T : NavKey>(
     private val onTabSelected: (HomeTab) -> Unit,
     private val onNewEntry: () -> Unit,
     private val getSelectedTab: () -> HomeTab,
+    private val supportsDualPaneHomeScene: () -> Boolean,
     private val getVisibleTabs: () -> List<HomeTab> = { HomeTab.visibleEntries },
 ) : SceneStrategy<T> {
     override fun SceneStrategyScope<T>.calculateScene(entries: List<NavEntry<T>>): Scene<T>? {
@@ -45,15 +46,25 @@ class HomeSceneStrategy<T : NavKey>(
 
             is RouteClassification.TwoPaneDetail -> {
                 if (previousEntry != null && !RouteConfig.isAlwaysFullscreen(lastEntry.routeClass())) {
-                    createTwoPaneHomeScene(
-                        mainEntry = previousEntry,
-                        detailEntry = lastEntry,
-                        previousEntries = entries.dropLast(1),
-                        tab = classification.parentTab,
-                        onTabSelected = onTabSelected,
-                        onNewEntry = onNewEntry,
-                        visibleTabs = getVisibleTabs(),
-                    )
+                    if (supportsDualPaneHomeScene()) {
+                        createTwoPaneHomeScene(
+                            mainEntry = previousEntry,
+                            detailEntry = lastEntry,
+                            previousEntries = entries.dropLast(1),
+                            tab = classification.parentTab,
+                            onTabSelected = onTabSelected,
+                            onNewEntry = onNewEntry,
+                            visibleTabs = getVisibleTabs(),
+                        )
+                    } else {
+                        createCompactDetailHomeScene(
+                            detailEntry = lastEntry,
+                            previousEntries = entries.dropLast(1),
+                            tab = classification.parentTab,
+                            onTabSelected = onTabSelected,
+                            visibleTabs = getVisibleTabs(),
+                        )
+                    }
                 } else {
                     createFullscreenHomeScene(
                         entry = lastEntry,

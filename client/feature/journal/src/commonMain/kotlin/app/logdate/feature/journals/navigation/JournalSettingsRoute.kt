@@ -2,7 +2,6 @@
 
 package app.logdate.feature.journals.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.navigation.NavController
@@ -43,16 +42,10 @@ fun NavGraphBuilder.journalSettingsRoute(
     onJournalDeleted: () -> Unit = {},
 ) {
     composable<JournalSettingsRoute>(
-        enterTransition = {
-            slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Left,
-            )
-        },
-        exitTransition = {
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Right,
-            )
-        },
+        enterTransition = legacyJournalForwardEnterTransition,
+        exitTransition = legacyJournalForwardExitTransition,
+        popEnterTransition = legacyJournalPopEnterTransition,
+        popExitTransition = legacyJournalPopExitTransition,
     ) { backStackEntry ->
         val route = backStackEntry.savedStateHandle.toRoute<JournalSettingsRoute>()
         val journalId = Uuid.parse(route.journalId)

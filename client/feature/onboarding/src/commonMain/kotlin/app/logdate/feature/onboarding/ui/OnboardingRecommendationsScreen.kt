@@ -1,4 +1,7 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+@file:Suppress(
+    "ktlint:standard:function-naming",
+    "ktlint:standard:no-wildcard-imports",
+)
 
 package app.logdate.feature.onboarding.ui
 
@@ -40,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -50,6 +54,10 @@ import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+
+const val ONBOARDING_RECOMMENDATIONS_ROOT_TAG = "onboarding_recommendations_root"
+const val ONBOARDING_RECOMMENDATIONS_KEEP_ON_TAG = "onboarding_recommendations_keep_on"
+const val ONBOARDING_RECOMMENDATIONS_TURN_OFF_TAG = "onboarding_recommendations_turn_off"
 
 @Composable
 fun OnboardingRecommendationsScreen(
@@ -128,6 +136,7 @@ fun OnboardingRecommendationsContent(
         LazyColumn(
             modifier =
                 Modifier
+                    .testTag(ONBOARDING_RECOMMENDATIONS_ROOT_TAG)
                     .fillMaxHeight()
                     .widthIn(max = 444.dp)
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -191,7 +200,7 @@ fun OnboardingRecommendationsContent(
                 ) {
                     Button(
                         onClick = onKeepOn,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_RECOMMENDATIONS_KEEP_ON_TAG),
                         enabled = !isSaving,
                     ) {
                         if (isSaving) {
@@ -203,7 +212,10 @@ fun OnboardingRecommendationsContent(
                             Text(stringResource(Res.string.onboarding_recommendations_keep_on))
                         }
                     }
-                    TextButton(onClick = onTurnOff) {
+                    TextButton(
+                        onClick = onTurnOff,
+                        modifier = Modifier.testTag(ONBOARDING_RECOMMENDATIONS_TURN_OFF_TAG),
+                    ) {
                         Text(stringResource(Res.string.onboarding_recommendations_turn_off))
                     }
                     errorMessage?.let { message ->

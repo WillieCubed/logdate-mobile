@@ -1,4 +1,8 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports", "ktlint:standard:max-line-length")
+@file:Suppress(
+    "ktlint:standard:function-naming",
+    "ktlint:standard:no-wildcard-imports",
+    "ktlint:standard:max-line-length",
+)
 
 @file:OptIn(ExperimentalSharedTransitionApi::class)
 
@@ -60,6 +64,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -75,6 +80,11 @@ import logdate.client.feature.onboarding.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 import kotlin.time.Duration
+
+const val MEMORY_SELECTION_ROOT_TAG = "onboarding_memory_selection_root"
+const val MEMORY_SELECTION_PERMISSION_ACTION_TAG = "onboarding_memory_selection_permission_action"
+const val MEMORY_SELECTION_STATUS_ACTION_TAG = "onboarding_memory_selection_status_action"
+const val MEMORY_SELECTION_CONTINUE_TAG = "onboarding_memory_selection_continue"
 
 /**
  * UI state for the memory selection screen.
@@ -203,7 +213,7 @@ private fun SharedTransitionScope.MemorySelectionContent(
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
-        modifier = modifier,
+        modifier = modifier.testTag(MEMORY_SELECTION_ROOT_TAG),
         contentPadding = PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
@@ -251,6 +261,7 @@ private fun SharedTransitionScope.MemorySelectionContent(
                     body = stringResource(Res.string.memory_access_needed_body),
                     actionLabel = stringResource(Res.string.enable),
                     onAction = onRequestMediaPermission,
+                    actionTag = MEMORY_SELECTION_PERMISSION_ACTION_TAG,
                 )
             }
             item {
@@ -266,6 +277,7 @@ private fun SharedTransitionScope.MemorySelectionContent(
                     body = stringResource(Res.string.memory_load_failed_body),
                     actionLabel = stringResource(Res.string.retry),
                     onAction = onRetryLoad,
+                    actionTag = MEMORY_SELECTION_STATUS_ACTION_TAG,
                 )
             }
             item {
@@ -281,6 +293,7 @@ private fun SharedTransitionScope.MemorySelectionContent(
                     body = stringResource(Res.string.memory_no_recent_items_body),
                     actionLabel = stringResource(Res.string.retry),
                     onAction = onRetryLoad,
+                    actionTag = MEMORY_SELECTION_STATUS_ACTION_TAG,
                 )
             }
             item {
@@ -346,6 +359,7 @@ private fun MemorySelectionStatusCard(
     body: String,
     actionLabel: String,
     onAction: () -> Unit,
+    actionTag: String,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -375,7 +389,7 @@ private fun MemorySelectionStatusCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
-            Button(onClick = onAction) {
+            Button(onClick = onAction, modifier = Modifier.testTag(actionTag)) {
                 Text(actionLabel)
             }
         }
@@ -392,7 +406,8 @@ private fun ContinueMemoryImportButton(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(top = Spacing.lg),
+                .padding(top = Spacing.lg)
+                .testTag(MEMORY_SELECTION_CONTINUE_TAG),
     ) {
         Text(
             if (selectedCount > 0) {

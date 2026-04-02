@@ -72,7 +72,7 @@ Every entry below records the same fields.
 - Opportunities:
   - Keep this as the fallback baseline, but route-level exceptions should increase for shared-bounds and two-pane selection flows.
 
-### A02. Timeline detail selection inherits the global push/pop model
+### A02. Timeline detail now varies by device class: compact keeps the push/pop model, larger layouts use pane activation
 
 - Files:
   - `app/compose-main/src/androidMain/kotlin/app/logdate/navigation/routes/TimelineRoutes.kt`
@@ -81,20 +81,22 @@ Every entry below records the same fields.
 - Context:
   - `TimelineDetail` is a two-pane-capable detail route when opened from `TimelineListRoute`.
 - Enter:
-  - No route override; inherits `A01`.
+  - Compact phone: compact detail scene keeps the global forward slide from `A01`.
+  - Landscape compact and expanded: route override uses `EnterTransition.None togetherWith ExitTransition.KeepUntilTransitionsFinished`.
 - Exit:
-  - No route override; inherits `A01`.
+  - Compact phone: inherits the global forward exit.
+  - Landscape compact and expanded: list pane stays visually stable while the detail pane activates.
 - Pop / Predictive back:
-  - No route override; inherits `A01`.
+  - Compact phone: inherits the global back and predictive-back slide.
+  - Landscape compact and expanded: `EnterTransition.None togetherWith fadeOut()`.
 - Shared motion:
   - None.
 - Responsive notes:
-  - Compact phone: push/pop slide is acceptable.
-  - Landscape compact and expanded: timeline already behaves like list-detail, so a full-width slide is less truthful than revealing or updating the detail pane.
+  - Compact phone: remains a full-screen hierarchical detail transition.
+  - Landscape compact and expanded: scene strategy now distinguishes compact detail-only mode from the true two-pane list-detail scene so motion can follow the actual layout.
 - Findings:
-  - This route changes semantic meaning by device class but keeps one transition model.
+  - The previous mismatch is addressed without degrading phone behavior.
 - Opportunities:
-  - Add a route-level override for expanded and landscape-compact layouts so detail selection behaves more like pane activation than full-screen navigation.
   - Consider shared or bounded transitions from day cards to the detail surface only if the list items expose a stable visual anchor.
 
 ### A03. Settings, search, postcards, and most utility routes inherit the baseline unchanged
@@ -118,12 +120,12 @@ Every entry below records the same fields.
 - Responsive notes:
   - Search and settings are plausible as generic pushes.
   - Rewind detail is always fullscreen and immersive, so the generic slide is mechanically correct but visually unopinionated.
-  - Postcard routes look like good future candidates for thumbnail-to-viewer or canvas-entry shared motion.
+  - Postcard routes still need visual groundwork before shared motion makes sense: collection cards are first-photo thumbnails, while viewer/editor surfaces are freeform canvases.
 - Findings:
   - These flows are consistent with the baseline, but they do not have route-specific semantics.
 - Opportunities:
   - Search: low-priority opportunity to feel more like transient exploration than hierarchy if product direction changes.
-  - Postcards: medium-priority shared-element opportunity if collection cards and viewer/editor canvases become visually linked.
+  - Postcards: medium-priority opportunity only after the collection and destination surfaces share an actual postcard-shaped anchor.
   - Rewind detail: decide whether immersive story entry should keep the baseline slide or gain a more media-driven transition.
 
 ### A04. Library media detail already treats shared bounds as the semantic transition
@@ -154,7 +156,7 @@ Every entry below records the same fields.
   - Use this route as the standard for future shared-bounds route work.
   - If Navigation 3 and shared transitions allow better progress coupling later, this is the route to upgrade first.
 
-### A05. FAB to editor has a shared-bounds pair but still relies on the global scene transition
+### A05. FAB to editor now suppresses the global slide when the FAB morph is the semantic transition
 
 - Files:
   - `app/compose-main/src/androidMain/kotlin/app/logdate/navigation/routes/EditorRoute.kt`
@@ -163,26 +165,28 @@ Every entry below records the same fields.
 - Context:
   - Home FAB opens the entry editor via shared bounds using the `fab_to_editor` key.
 - Enter:
-  - Source and destination expose shared bounds, but the route itself has no metadata override.
-  - Current forward transition still inherits the global horizontal slide from `A01`.
+  - Route override checks the originating route class.
+  - From a main tab route: `EnterTransition.None togetherWith ExitTransition.KeepUntilTransitionsFinished`
+  - From any other route: falls back to the global hierarchical slide from `A01`.
 - Exit:
-  - Current forward exit still inherits the global horizontal slide.
+  - Source and destination expose shared bounds with the same `fab_to_editor` key.
 - Pop / Predictive back:
-  - Route-level pop and predictive pop inherit `A01`.
+  - Back to a main tab route: `EnterTransition.None togetherWith fadeOut()`
+  - Back to any other route: falls back to the global slide from `A01`.
   - Inside the editor, local predictive back exists for expanded-block and immersive chrome transitions.
 - Shared motion:
   - Yes. Shared-bounds key `fab_to_editor` with 350ms tween and `FastOutSlowInEasing`.
 - Responsive notes:
-  - Compact phone: the slide conflicts directly with the FAB morph.
-  - Expanded layouts: the mismatch is even more visible because the home shell and editor semantics are already different.
+  - Compact phone: the FAB morph now owns the route transition when entering from home tabs.
+  - Expanded layouts: the route no longer layers the generic slide on top of the shared-bounds morph.
 - Findings:
-  - This is the highest-priority route inconsistency after library was fixed.
-  - The editor already has local predictive back sophistication, so the missing piece is route-level alignment.
+  - This inconsistency is addressed for the home-tab entry path.
+  - The editor now matches the library-detail model: keep the source scene stable and let the shared bounds define the motion.
 - Opportunities:
-  - Add route-level forward/pop/predictive overrides so the FAB morph, not the generic slide, owns the motion semantics.
   - Tune compact vs expanded behavior separately if the editor opens from different shell contexts on larger devices.
+  - Review non-home editor entry points to decide whether any of them also deserve route-specific motion instead of the fallback slide.
 
-### A06. Journal cover to journal detail already has a shared-element pair but no route-level semantic override
+### A06. Journal cover to journal detail now uses a route-level shared-motion override from the journals overview
 
 - Files:
   - `client/feature/journal/src/commonMain/kotlin/app/logdate/feature/journals/ui/JournalCover.kt`
@@ -193,50 +197,63 @@ Every entry below records the same fields.
   - Journal cover card opens journal detail.
   - Both source and destination use `journal-container-${journal.id}`.
 - Enter:
-  - Current route behavior inherits the global forward slide from `A01`.
+  - From `JournalList`: `EnterTransition.None togetherWith ExitTransition.KeepUntilTransitionsFinished`
+  - From any other route: falls back to the global forward slide from `A01`.
 - Exit:
-  - Current route behavior inherits the global forward exit from `A01`.
+  - Journal cover and journal detail scaffold share the same journal container key.
 - Pop / Predictive back:
-  - Inherits the global back and predictive-back transitions.
+  - Back to `JournalList`: `EnterTransition.None togetherWith fadeOut()`
+  - Back to any other route: falls back to the global back and predictive-back transitions from `A01`.
 - Shared motion:
   - Yes. Shared element on the journal cover and on the journal detail scaffold container.
 - Responsive notes:
-  - Compact phone: likely should behave like library detail, with the cover morph owning the transition.
-  - Expanded and landscape-compact: also a good candidate for keeping the journals pane visually stable while the detail surface morphs.
+  - Compact phone: the cover morph now owns the transition when detail opens from the journals overview.
+  - Expanded and landscape-compact: the journals surface can remain visually stable underneath the detail morph.
 - Findings:
-  - The raw shared-element plumbing already exists, but the route still behaves like a generic push.
+  - This inconsistency is addressed for the journals overview entry path.
+  - Non-overview journal-detail entry points intentionally keep the fallback hierarchy slide for now.
 - Opportunities:
-  - Promote this to a route-level shared-element transition with no-enter/keep-underlay behavior similar to library detail.
-  - Add a route-specific predictive pop so journal detail participates coherently in Android predictive back.
+  - Revisit larger-screen behavior to decide whether split-pane journal layouts should use an even more pane-oriented reveal.
+  - Audit other journal-detail origins to decide whether they should stay on the baseline slide or gain their own semantic overrides.
 
-### A07. Note viewer has destination-side shared motion only
+### A07. Note viewer now supports shared bounds from journal detail and location memory cards, while other origins still use the baseline
 
 - Files:
   - `client/feature/journal/src/commonMain/kotlin/app/logdate/feature/journals/ui/detail/NoteViewerScreen.kt`
+  - `client/feature/journal/src/commonMain/kotlin/app/logdate/feature/journals/ui/detail/JournalDetailScreen.kt`
+  - `client/feature/location-timeline/src/commonMain/kotlin/app/logdate/feature/location/timeline/ui/LocationTimelineScreen.kt`
   - `client/ui/src/commonMain/kotlin/app/logdate/ui/common/transitions/TransitionKeys.kt`
+  - `app/compose-main/src/androidMain/kotlin/app/logdate/navigation/routes/NoteViewerRouteTransitions.kt`
   - `app/compose-main/src/androidMain/kotlin/app/logdate/navigation/MainNavigationRoot.kt`
 - Context:
-  - Note viewer wraps its immersive surface in a shared element using `TransitionKeys.EDITOR_TRANSITION`.
+  - Journal detail note cards, location memory preview cards, and note viewer now share a note-specific bounds key where the source surface is spatially explicit.
 - Enter:
-  - Route behavior still inherits the global forward slide.
+  - From `JournalDetail`: `EnterTransition.None togetherWith ExitTransition.KeepUntilTransitionsFinished`
+  - From `LocationRoute`: `EnterTransition.None togetherWith ExitTransition.KeepUntilTransitionsFinished`
+  - From all other origins: falls back to the global forward slide from `A01`.
 - Exit:
-  - Inherits the global forward exit.
+  - Journal detail note cards attach shared bounds to the card surface only, excluding timestamps and membership badges.
+  - Location memory preview cards attach shared bounds to the bottom-sheet card surface.
+  - Note viewer attaches the matching shared bounds to text, image, video, and audio presentations.
 - Pop / Predictive back:
-  - Inherits the global back and predictive-back transitions.
+  - Back to `JournalDetail`: `EnterTransition.None togetherWith fadeOut()`
+  - Back to `LocationRoute`: `EnterTransition.None togetherWith fadeOut()`
+  - Back to all other origins: falls back to the global back and predictive-back transitions from `A01`.
 - Shared motion:
-  - Destination only.
-  - There is no matching source-side `EDITOR_TRANSITION` usage in journal detail, timeline, or other note-opening surfaces.
+  - Yes for journal-detail and location-timeline origins.
+  - Shared-bounds key `note-viewer-${noteId}` is present on both source card surfaces and the note viewer destination.
 - Responsive notes:
-  - Compact phone: destination-only shared motion gives no route-level benefit.
-  - Expanded layouts: this route can open from several contexts, so source-specific behavior matters even more.
+  - Compact phone: both journal-detail -> note-viewer and location-memory -> note-viewer now behave like true shared-container transitions.
+  - Expanded layouts: the note viewer still opens from several different contexts, so source-specific handling remains important.
 - Findings:
-  - The current key is a half-built transition contract.
+  - The journal-detail origin is now addressed, including audio notes.
+  - The location timeline origin is now addressed through the place-detail bottom sheet.
+  - Other origins still behave as plain hierarchy routes because they do not expose matching source surfaces yet.
 - Opportunities:
-  - Decide the true origin surface for note viewer on Android.
-  - If opened from journal note cards, add a source-side shared element and a route-level override.
-  - If opened from multiple unrelated surfaces, define separate keys or keep this as a plain hierarchy route.
+  - Add source-side shared motion for any remaining note-viewer origins only if those surfaces can expose stable visual anchors.
+  - Explore gesture-coupled predictive shared bounds if Navigation 3 and Compose shared transitions make progress-driven scrubbing practical later.
 
-### A08. Legacy journal Navigation Compose routes define forward-only transitions
+### A08. Legacy journal Navigation Compose routes now define explicit pop transitions, but still remain a separate navigation system
 
 - Files:
   - `client/feature/journal/src/commonMain/kotlin/app/logdate/feature/journals/navigation/JournalCreationRoute.kt`
@@ -250,17 +267,19 @@ Every entry below records the same fields.
 - Exit:
   - All four routes use `slideOutOfContainer(towards = Right)`.
 - Pop / Predictive back:
-  - No explicit `popEnterTransition`, `popExitTransition`, or predictive-back-specific behavior.
+  - All four routes now define explicit pop transitions:
+    - `popEnterTransition = slideIntoContainer(towards = Right)`
+    - `popExitTransition = slideOutOfContainer(towards = Left)`
+  - There is still no predictive-back-specific behavior.
 - Shared motion:
   - None at the navigation layer.
 - Responsive notes:
   - This stack is single-pane and does not adapt to the Navigation 3 two-pane rules.
 - Findings:
-  - Forward motion is explicit, but back behavior is implicit and not documented in code.
-  - This is the biggest navigation-system inconsistency in the codebase.
+  - Forward and back semantics are now explicit and symmetric within the legacy stack.
+  - The remaining inconsistency is architectural: this deprecated graph still uses a separate navigation system from the Navigation 3 app shell.
 - Opportunities:
   - Preferred: migrate these routes to Navigation 3 and inherit the app-wide scene model intentionally.
-  - Minimum: add explicit pop transitions so forward and back semantics are symmetric.
   - Predictive back support should be considered part of migration, not bolted onto this legacy graph.
 
 ## Android Shell, Inline Motion, And Responsive Surfaces
@@ -757,27 +776,23 @@ Every entry below records the same fields.
 
 ### Medium Priority
 
-4. `NoteViewerRoute`
-   - Why: destination-side shared element exists, but there is no source-side partner.
-   - Action: either add the matching source surface and route override or remove the orphaned shared-element expectation.
-
-5. `TimelineDetail` on expanded and landscape-compact layouts
-   - Why: route behavior changes from full-screen detail to pane selection, but motion does not.
-   - Action: add device-class-aware transition rules for two-pane detail activation.
-
-6. `PostcardViewerRoute` and `PostcardEditorRoute`
-   - Why: current behavior is baseline-only, but the feature is visually rich enough for shared-element opportunities if source cards become stable anchors.
-   - Action: revisit once postcard collection/viewer visual anchors are stable.
+4. `PostcardViewerRoute` and `PostcardEditorRoute`
+   - Why: current behavior is baseline-only, and the collection thumbnails do not match the viewer/editor canvas surface closely enough for a clean morph.
+   - Action: revisit only after the collection and destination surfaces share a postcard-shaped visual anchor.
 
 ### Lower Priority
 
-7. `SearchRoute`
+5. `NoteViewerRoute` non-journal origins
+   - Why: journal-detail and location origins are now covered, but any remaining non-spatial note entry points still use the baseline hierarchy transition.
+   - Action: only add source-side shared motion where those surfaces can expose stable anchors without compromising clarity.
+
+6. `SearchRoute`
    - Why: current global transitions are acceptable, but the route could eventually behave more like transient exploration than hierarchy.
 
-8. `RewindDetailRoute`
+7. `RewindDetailRoute`
    - Why: always fullscreen and immersive; the baseline slide works but is not tailored to story-style media.
 
-9. Local implicit `AnimatedContent` / `AnimatedVisibility` sites
+8. Local implicit `AnimatedContent` / `AnimatedVisibility` sites
    - Why: mostly fine today, but explicit specs would improve readability and auditability in timeline and settings surfaces.
 
 ## Responsive Transition Notes
@@ -797,8 +812,7 @@ Every entry below records the same fields.
 
 ## Recommended Follow-Up Order
 
-1. Fix `EntryEditor` route transitions.
-2. Fix `JournalDetail` route transitions.
-3. Decide the real source contract for `NoteViewerRoute`.
-4. Migrate or normalize legacy journal Navigation Compose routes.
-5. Add responsive transition variants for `TimelineDetail` on larger layouts.
+1. Evaluate postcards again only after the feature exposes matching postcard-shaped anchors across collection and destination surfaces.
+2. Revisit any remaining note-viewer origins and add source contracts only where the origin surface is spatially clear.
+3. Revisit search and rewind if product direction calls for more opinionated route motion.
+4. Normalize local `AnimatedContent` and `AnimatedVisibility` sites where implicit defaults are obscuring motion intent.

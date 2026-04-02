@@ -1,4 +1,7 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+@file:Suppress(
+    "ktlint:standard:function-naming",
+    "ktlint:standard:no-wildcard-imports",
+)
 
 package app.logdate.feature.onboarding.ui
 
@@ -30,6 +33,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -41,6 +45,10 @@ import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.feature.onboarding.generated.resources.action_onboarding_continue
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+
+const val ONBOARDING_COMPLETION_ROOT_TAG = "onboarding_complete_root"
+const val ONBOARDING_COMPLETION_CONTINUE_TAG = "onboarding_complete_continue"
+const val ONBOARDING_COMPLETION_FINAL_TAG = "onboarding_complete_final"
 
 /**
  * The last screen of the onboarding flow.
@@ -93,7 +101,7 @@ fun OnboardingCompletionContent(
 
     AnimatedContent(
         targetState = shouldShowFinish,
-        modifier = modifier,
+        modifier = modifier.testTag(ONBOARDING_COMPLETION_ROOT_TAG),
         transitionSpec = {
             fadeIn(
                 animationSpec = tween(3000),
@@ -156,7 +164,8 @@ private fun CompletionStreakContent(onContinue: () -> Unit) {
                     Modifier
                         .align(Alignment.BottomCenter)
                         .padding(app.logdate.ui.theme.Spacing.lg)
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .testTag(ONBOARDING_COMPLETION_CONTINUE_TAG),
             ) {
                 Text(stringResource(Res.string.action_onboarding_continue))
             }
@@ -186,7 +195,7 @@ private fun StreakCounterBox(count: Int = 1) {
 @Composable
 private fun CompletionFinalContent() {
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().testTag(ONBOARDING_COMPLETION_FINAL_TAG),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(

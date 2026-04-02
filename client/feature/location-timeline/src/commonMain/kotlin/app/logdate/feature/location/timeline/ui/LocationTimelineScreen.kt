@@ -1,8 +1,11 @@
 @file:Suppress("ktlint:standard:function-naming")
+@file:OptIn(ExperimentalSharedTransitionApi::class)
 
 package app.logdate.feature.location.timeline.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -75,6 +78,9 @@ import app.logdate.feature.location.timeline.ui.model.LocationPlaceUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationStopUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineErrorUiState
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
+import app.logdate.ui.LocalNavAnimatedVisibilityScope
+import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.common.transitions.TransitionKeys
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.all_time
 import logdate.client.feature.location.timeline.generated.resources.cancel
@@ -886,9 +892,11 @@ private fun LocationMemoryPreviewCard(
     onOpenNote: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val sharedBoundsModifier = rememberLocationMemoryPreviewSharedBoundsModifier(memory.noteId)
+
     Card(
         onClick = onOpenNote,
-        modifier = modifier,
+        modifier = modifier.then(sharedBoundsModifier),
     ) {
         Column(
             modifier =
@@ -916,6 +924,24 @@ private fun LocationMemoryPreviewCard(
                 Text(stringResource(Res.string.view_note))
             }
         }
+    }
+}
+
+@Composable
+private fun rememberLocationMemoryPreviewSharedBoundsModifier(noteId: Uuid): Modifier {
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
+
+    return if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+        with(sharedTransitionScope) {
+            Modifier.sharedBounds(
+                rememberSharedContentState(TransitionKeys.noteViewerTransition(noteId)),
+                animatedVisibilityScope = animatedVisibilityScope,
+                resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
+            )
+        }
+    } else {
+        Modifier
     }
 }
 

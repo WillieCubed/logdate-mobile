@@ -1,4 +1,7 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+@file:Suppress(
+    "ktlint:standard:function-naming",
+    "ktlint:standard:no-wildcard-imports",
+)
 
 package app.logdate.feature.onboarding.ui
 
@@ -37,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -48,6 +52,10 @@ import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+
+const val ONBOARDING_NOTIFICATIONS_ROOT_TAG = "onboarding_notifications_root"
+const val ONBOARDING_NOTIFICATIONS_PRIMARY_TAG = "onboarding_notifications_primary"
+const val ONBOARDING_NOTIFICATIONS_SKIP_TAG = "onboarding_notifications_skip"
 
 @Composable
 fun OnboardingNotificationsScreen(
@@ -152,6 +160,7 @@ fun OnboardingNotificationsContent(
         LazyColumn(
             modifier =
                 Modifier
+                    .testTag(ONBOARDING_NOTIFICATIONS_ROOT_TAG)
                     .fillMaxHeight()
                     .widthIn(max = 444.dp)
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -179,7 +188,7 @@ fun OnboardingNotificationsContent(
                 ) {
                     Button(
                         onClick = onPrimaryAction,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_NOTIFICATIONS_PRIMARY_TAG),
                         enabled = !isSaving,
                     ) {
                         if (isSaving) {
@@ -191,7 +200,7 @@ fun OnboardingNotificationsContent(
                             Text(primaryActionLabel)
                         }
                     }
-                    TextButton(onClick = onSkip) {
+                    TextButton(onClick = onSkip, modifier = Modifier.testTag(ONBOARDING_NOTIFICATIONS_SKIP_TAG)) {
                         Text(stringResource(Res.string.onboarding_notifications_not_now))
                     }
                     errorMessage?.let { message ->

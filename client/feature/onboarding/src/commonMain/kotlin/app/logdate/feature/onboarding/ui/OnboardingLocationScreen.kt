@@ -1,4 +1,7 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+@file:Suppress(
+    "ktlint:standard:function-naming",
+    "ktlint:standard:no-wildcard-imports",
+)
 
 package app.logdate.feature.onboarding.ui
 
@@ -42,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
@@ -54,6 +58,10 @@ import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+
+const val ONBOARDING_LOCATION_ROOT_TAG = "onboarding_location_root"
+const val ONBOARDING_LOCATION_ENABLE_TAG = "onboarding_location_enable"
+const val ONBOARDING_LOCATION_SKIP_TAG = "onboarding_location_skip"
 
 @Composable
 fun OnboardingLocationScreen(
@@ -124,6 +132,7 @@ fun OnboardingLocationContent(
         LazyColumn(
             modifier =
                 Modifier
+                    .testTag(ONBOARDING_LOCATION_ROOT_TAG)
                     .fillMaxHeight()
                     .widthIn(max = 444.dp)
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -188,7 +197,7 @@ fun OnboardingLocationContent(
                 ) {
                     Button(
                         onClick = onEnable,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_LOCATION_ENABLE_TAG),
                         enabled = !isSaving,
                     ) {
                         if (isSaving) {
@@ -200,7 +209,7 @@ fun OnboardingLocationContent(
                             Text(stringResource(Res.string.onboarding_location_enable))
                         }
                     }
-                    TextButton(onClick = onSkip) {
+                    TextButton(onClick = onSkip, modifier = Modifier.testTag(ONBOARDING_LOCATION_SKIP_TAG)) {
                         Text(stringResource(Res.string.onboarding_location_not_now))
                     }
                     errorMessage?.let { message ->

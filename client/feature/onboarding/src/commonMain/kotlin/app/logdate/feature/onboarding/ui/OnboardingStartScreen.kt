@@ -1,4 +1,7 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+@file:Suppress(
+    "ktlint:standard:function-naming",
+    "ktlint:standard:no-wildcard-imports",
+)
 
 package app.logdate.feature.onboarding.ui
 
@@ -23,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -35,6 +39,9 @@ import logdate.client.feature.onboarding.generated.resources.onboarding_action_s
 import org.jetbrains.compose.resources.stringResource
 
 private const val DELAY_TIME = 1_000L
+const val ONBOARDING_START_ROOT_TAG = "onboarding_start_root"
+const val ONBOARDING_START_GET_STARTED_TAG = "onboarding_start_get_started"
+const val ONBOARDING_START_FROM_BACKUP_TAG = "onboarding_start_from_backup"
 
 /**
  * An onboarding screen that
@@ -73,6 +80,7 @@ fun OnboardingStartScreenContent(
     Box(
         modifier =
             modifier
+                .testTag(ONBOARDING_START_ROOT_TAG)
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.primary)
                 .padding(Spacing.lg),
@@ -192,13 +200,13 @@ private fun OnboardingLandingContent(
             ) {
                 FilledTonalButton(
                     onClick = onGetStarted,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_START_GET_STARTED_TAG),
                 ) {
                     Text(stringResource(Res.string.get_started))
                 }
                 OutlinedButton(
                     onClick = onStartFromBackup,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_START_FROM_BACKUP_TAG),
                 ) {
                     Text(
                         stringResource(Res.string.onboarding_action_sign_in),

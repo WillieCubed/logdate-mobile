@@ -1,6 +1,5 @@
 package app.logdate.feature.journals.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
@@ -31,16 +30,10 @@ fun NavGraphBuilder.newJournalRoute(
     onCreateJournal: (journalId: Uuid) -> Unit,
 ) {
     composable<JournalCreationRoute>(
-        enterTransition = {
-            slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Left,
-            )
-        },
-        exitTransition = {
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Right,
-            )
-        },
+        enterTransition = legacyJournalForwardEnterTransition,
+        exitTransition = legacyJournalForwardExitTransition,
+        popEnterTransition = legacyJournalPopEnterTransition,
+        popExitTransition = legacyJournalPopExitTransition,
     ) {
         JournalCreationScreen(
             onGoBack = onGoBack,

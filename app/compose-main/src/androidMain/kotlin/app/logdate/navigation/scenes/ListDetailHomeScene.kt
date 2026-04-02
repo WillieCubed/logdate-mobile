@@ -18,9 +18,6 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.scene.Scene
-import androidx.window.core.layout.WindowSizeClass.Companion.HEIGHT_DP_MEDIUM_LOWER_BOUND
-import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
-import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import app.logdate.ui.theme.Spacing
 
 /**
@@ -51,23 +48,14 @@ class ListDetailHomeScene<T : NavKey>(
     @Composable
     private fun ListDetailContent() {
         val adaptiveInfo = currentWindowAdaptiveInfo()
-        val windowSizeClass = adaptiveInfo.windowSizeClass
-
-        val isLandscapeCompact =
-            !windowSizeClass.isHeightAtLeastBreakpoint(HEIGHT_DP_MEDIUM_LOWER_BOUND) &&
-                windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND)
-
-        val showTwoPane =
-            windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND) || isLandscapeCompact
-
-        val isDetailOnlyView = !showTwoPane
+        val showTwoPane = adaptiveInfo.windowSizeClass.supportsDualPaneHomeScene()
 
         val snackbarHostState = remember { SnackbarHostState() }
 
         NavigationShell(
             selectedTab = selectedTab,
             onTabSelected = onTabSelected,
-            isDetailOnlyView = isDetailOnlyView,
+            isDetailOnlyView = false,
             snackbarHostState = snackbarHostState,
             visibleTabs = visibleTabs,
         ) {
@@ -107,9 +95,6 @@ class ListDetailHomeScene<T : NavKey>(
                         detailEntry.Content()
                     }
                 }
-            } else {
-                // Compact/medium: detail takes over fullscreen
-                detailEntry.Content()
             }
         }
     }
