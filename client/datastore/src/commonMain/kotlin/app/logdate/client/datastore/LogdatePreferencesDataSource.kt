@@ -85,7 +85,7 @@ class LogdatePreferencesDataSource(
 
     fun observeSystemSearchVisibilityEnabled(): Flow<Boolean> =
         userPreferences.data.map { prefs ->
-            prefs[SYSTEM_SEARCH_VISIBILITY_ENABLED] ?: false
+            prefs[SYSTEM_SEARCH_VISIBILITY_ENABLED] ?: true
         }
 
     fun observeAndroidPlatformSearchIndexedGeneration(): Flow<Long?> =

@@ -8,15 +8,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class LogdatePreferencesDataSourceTest {
     private val dataSource = LogdatePreferencesDataSource(TestPreferencesDataStore())
 
     @Test
-    fun systemSearchVisibility_defaultsToDisabled() =
+    fun systemSearchVisibility_defaultsToEnabled() =
         runTest {
-            assertFalse(dataSource.getSystemSearchVisibilityEnabled())
+            assertTrue(dataSource.getSystemSearchVisibilityEnabled())
         }
 
     @Test
