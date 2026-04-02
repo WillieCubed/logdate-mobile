@@ -21,6 +21,6 @@ class ExportNotificationHelper(
     override val completeTitleResId = R.string.export_title_complete
     override val failedTitleResId = R.string.export_title_failed
 
-    override fun createCompletionInfo(filePath: String): ForegroundInfo =
-        super.createCompletionInfo(context.getString(R.string.export_text_path, filePath))
+    override fun createCompletionInfo(contentText: String): ForegroundInfo =
+        super.createCompletionInfo(context.getString(R.string.export_text_path, contentText))
 }

@@ -878,6 +878,60 @@ class ExportUserDataUseCaseTest {
             assertEquals(1, metadata.stats.draftCount, "Draft count should reflect only filtered drafts")
         }
 
+    @Test
+    fun `exportUserData normalizes media paths with embedded timestamps and double extensions`() =
+        runTest {
+            val now = Clock.System.now()
+            val audioId = Uuid.random()
+            val imageId = Uuid.random()
+
+            // Media file with embedded timestamp and double extension
+            // This is the corrupted pattern from prior exports
+            val audioWithEmbeddedTimestamp =
+                JournalNote.Audio(
+                    uid = audioId,
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    mediaRef = "file:///storage/fe3cd4ef-15fb-41d4-bf58-758f0517ae2b-2026-03-11T06-59-33.947Z_recording_56f7396b.m4a.m4a",
+                )
+
+            // Media file with just double extension (no embedded timestamp)
+            val imageWithDoubleExt =
+                JournalNote.Image(
+                    uid = imageId,
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    mediaRef = "file:///storage/photo.jpg.jpg",
+                    caption = "Photo",
+                )
+
+            mockNotesRepository.testNotes = listOf(audioWithEmbeddedTimestamp, imageWithDoubleExt)
+
+            val progressUpdates = useCase.exportUserData().toList()
+            val result = (progressUpdates.last() as ExportProgress.Completed).result
+
+            // Verify we have exactly 2 media files
+            assertEquals(2, result.mediaFiles.size, "Should export both media files")
+
+            // Check that paths are properly normalized
+            val paths = result.mediaFiles.map { it.exportPath }
+            paths.forEach { path ->
+                assertTrue(path.startsWith("media/"), "Path should stay under media/")
+                // Verify no double extensions
+                assertTrue(!path.contains(".m4a.m4a"), "Should not have double .m4a extension")
+                assertTrue(!path.contains(".jpg.jpg"), "Should not have double .jpg extension")
+            }
+
+            // Verify each file keeps the stable ID-based export structure.
+            val audioPath = result.mediaFiles.first { it.sourceUri.contains("m4a") }.exportPath
+            assertEquals("media/$audioId.m4a", audioPath)
+            assertTrue(audioPath.endsWith(".m4a"), "Audio should have only one .m4a extension")
+
+            val imagePath = result.mediaFiles.first { it.sourceUri.contains("jpg") }.exportPath
+            assertEquals("media/$imageId.jpg", imagePath)
+            assertTrue(imagePath.endsWith(".jpg"), "Image should have only one .jpg extension")
+        }
+
     private class FakeUserStateRepository : UserStateRepository {
         override val userData: Flow<UserData> = flowOf(UserData(displayName = "Test User"))
 

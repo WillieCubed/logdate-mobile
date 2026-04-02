@@ -274,24 +274,31 @@ class ExportWorker(
         zipOut: ZipOutputStream,
         mediaFile: app.logdate.client.domain.export.ExportMediaFile,
     ) {
-        zipOut.putNextEntry(ZipEntry(mediaFile.exportPath))
+        val sourceUri = mediaFile.sourceUri
         try {
-            val sourceUri = mediaFile.sourceUri
             if (sourceUri.startsWith("/") || sourceUri.startsWith("file://")) {
                 val file = java.io.File(sourceUri.removePrefix("file://"))
-                require(file.exists()) { "Media file missing at ${file.absolutePath}" }
+                if (!file.exists()) {
+                    Napier.w("Media file not found, skipping: ${file.absolutePath}")
+                    return
+                }
+                zipOut.putNextEntry(ZipEntry(mediaFile.exportPath))
                 file.inputStream().use { it.copyTo(zipOut) }
+                zipOut.closeEntry()
+                Napier.d("Added media file to archive: ${mediaFile.exportPath}")
             } else {
-                val inputStream =
-                    context.contentResolver.openInputStream(sourceUri.toUri())
-                        ?: error("Unable to open media URI: $sourceUri")
+                val inputStream = context.contentResolver.openInputStream(sourceUri.toUri())
+                if (inputStream == null) {
+                    Napier.w("Media file cannot be opened, skipping: $sourceUri")
+                    return
+                }
+                zipOut.putNextEntry(ZipEntry(mediaFile.exportPath))
                 inputStream.use { it.copyTo(zipOut) }
+                zipOut.closeEntry()
+                Napier.d("Added media file to archive: ${mediaFile.exportPath}")
             }
         } catch (e: Exception) {
-            Napier.e("Failed to add media file to ZIP: ${mediaFile.sourceUri}", e)
-            throw IllegalStateException("Failed to include media file: ${mediaFile.sourceUri}", e)
-        } finally {
-            zipOut.closeEntry()
+            Napier.w("Failed to add media file to ZIP, skipping: $sourceUri", e)
         }
     }
 }

@@ -235,7 +235,7 @@ class RestoreWorker(
             Napier.d("Successfully imported media from archive: $exportPath")
             return savedPath
         } catch (e: Exception) {
-            Napier.e("Exception importing media from archive at path: $exportPath", e)
+            Napier.e("Exception importing media from archive at path: $exportPath - file: $fileName - error: ${e.message}", e)
             return null
         } finally {
             tempFile.delete()
