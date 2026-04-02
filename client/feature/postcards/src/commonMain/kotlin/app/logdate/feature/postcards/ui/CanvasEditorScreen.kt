@@ -51,6 +51,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
@@ -83,6 +84,8 @@ import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOW
 import app.logdate.feature.postcards.model.CanvasElement
 import app.logdate.feature.postcards.model.InkTool
 import app.logdate.feature.postcards.model.ShapeKind
+import app.logdate.ui.common.CursorType
+import app.logdate.ui.common.cursorIcon
 import coil3.compose.AsyncImage
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -300,7 +303,15 @@ private fun CanvasArea(
     viewportState: CanvasViewportState,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier) {
+    val cursorType =
+        when (state.activeTool) {
+            CanvasTool.SELECT -> if (state.selectedElementId != null) CursorType.MOVE else CursorType.DEFAULT
+            CanvasTool.INK, CanvasTool.SHAPE -> CursorType.CROSSHAIR
+            CanvasTool.TEXT -> CursorType.TEXT
+            CanvasTool.STICKER -> CursorType.DEFAULT
+        }
+
+    Box(modifier = modifier.cursorIcon(cursorType)) {
         val viewportGesturesEnabled =
             state.activeTool != CanvasTool.INK && state.activeTool != CanvasTool.SHAPE
 
@@ -460,7 +471,7 @@ private fun EditorTopBar(
         },
         actions = {
             TooltipBox(
-                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
                 tooltip = { PlainTooltip { Text("Undo (Ctrl+Z)") } },
                 state = rememberTooltipState(),
             ) {
@@ -469,7 +480,7 @@ private fun EditorTopBar(
                 }
             }
             TooltipBox(
-                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
                 tooltip = { PlainTooltip { Text("Redo (Ctrl+Shift+Z)") } },
                 state = rememberTooltipState(),
             ) {
@@ -479,7 +490,7 @@ private fun EditorTopBar(
             }
             if (hasSelection) {
                 TooltipBox(
-                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
                     tooltip = { PlainTooltip { Text("Delete (Del)") } },
                     state = rememberTooltipState(),
                 ) {
@@ -489,7 +500,7 @@ private fun EditorTopBar(
                 }
             }
             TooltipBox(
-                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
                 tooltip = { PlainTooltip { Text("Save") } },
                 state = rememberTooltipState(),
             ) {
@@ -711,7 +722,7 @@ private fun ToolButton(
     val tooltipText = if (shortcut != null) "$label ($shortcut)" else label
 
     TooltipBox(
-        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
         tooltip = { PlainTooltip { Text(tooltipText) } },
         state = rememberTooltipState(),
     ) {
