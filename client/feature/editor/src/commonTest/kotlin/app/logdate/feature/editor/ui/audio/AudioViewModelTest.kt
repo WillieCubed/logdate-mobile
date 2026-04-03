@@ -118,7 +118,13 @@ class AudioViewModelTest {
             viewModel.startRecording()
             advanceUntilIdle()
 
-            recordingManager.emitTranscription("Hello world")
+            recordingManager.emitStructuredTranscription(
+                TranscriptionResult.Success(
+                    text = "Hello world",
+                    timedTranscript = null,
+                    isFinal = false,
+                ),
+            )
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
