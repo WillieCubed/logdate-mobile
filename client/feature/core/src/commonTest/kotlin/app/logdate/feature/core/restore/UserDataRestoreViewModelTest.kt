@@ -61,6 +61,10 @@ private class FakeRestoreLauncher : RestoreLauncher {
         _restoreProgress.value = info
     }
 
+    override fun completeRestore(outcome: RestoreOutcome) {
+        completionCallback?.invoke(outcome)
+    }
+
     fun triggerOutcome(outcome: RestoreOutcome) {
         completionCallback?.invoke(outcome)
     }
