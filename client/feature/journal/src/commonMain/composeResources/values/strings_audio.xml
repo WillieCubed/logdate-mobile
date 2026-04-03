@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="play_audio_note">Play audio note</string>
+    <string name="pause_audio_note">Pause audio note</string>
+</resources>

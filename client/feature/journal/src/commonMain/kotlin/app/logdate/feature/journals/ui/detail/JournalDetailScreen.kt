@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material.icons.filled.Settings
@@ -71,11 +72,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.journals.ui.deriveCoverColor
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.common.applyStandardContentWidth
 import app.logdate.ui.common.transitions.TransitionKeys
@@ -677,6 +680,10 @@ private fun AudioEntryCard(
     modifier: Modifier = Modifier,
     cardModifier: Modifier = Modifier,
 ) {
+    val audioPlaybackState = LocalAudioPlaybackState.current
+    val isCurrentEntry = audioPlaybackState.currentlyPlayingId == entry.id
+    val isEntryPlaying = isCurrentEntry && audioPlaybackState.isPlaying
+
     InlineEntryCardShell(
         timestamp = entry.timestamp,
         onClick = onClick,
@@ -703,6 +710,28 @@ private fun AudioEntryCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+        IconButton(
+            onClick = {
+                if (isEntryPlaying) {
+                    audioPlaybackState.pause()
+                } else {
+                    audioPlaybackState.play(entry.id, entry.mediaRef)
+                }
+            },
+            modifier = Modifier.testTag("journal-audio-playback-button"),
+        ) {
+            Icon(
+                imageVector = if (isEntryPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription =
+                    stringResource(
+                        if (isEntryPlaying) {
+                            Res.string.pause_audio_note
+                        } else {
+                            Res.string.play_audio_note
+                        },
+                    ),
+            )
         }
     }
 }
