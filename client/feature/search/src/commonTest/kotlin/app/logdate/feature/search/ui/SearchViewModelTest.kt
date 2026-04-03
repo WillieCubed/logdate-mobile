@@ -154,5 +154,11 @@ class SearchViewModelTest {
             query: String,
             limit: Int,
         ): Flow<List<SearchResult>> = search(query).map { it.take(limit) }
+
+        override fun searchInJournal(
+            query: String,
+            journalId: Uuid,
+            limit: Int,
+        ): Flow<List<SearchResult>> = search(query).map { it.take(limit) }
     }
 }

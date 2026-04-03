@@ -4,11 +4,14 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
 import app.logdate.client.datastore.LogdatePreferencesDataSource
+import app.logdate.client.domain.journals.SuggestJournalsUseCase
 import app.logdate.client.domain.search.SearchEntriesUseCase
 import app.logdate.client.domain.search.SearchJournalsUseCase
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.search.SearchRepository
 import app.logdate.client.repository.search.SearchResult
+import app.logdate.feature.journals.ui.detail.FakeDetailJournalContentRepository
+import app.logdate.feature.journals.ui.detail.FakeJournalNotesRepository
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.Dispatchers
@@ -53,6 +56,11 @@ class JournalsOverviewViewModelTest {
     private val searchJournalsUseCase = SearchJournalsUseCase(journalRepository)
     private val searchRepository = TestSearchRepository()
     private val searchEntriesUseCase = SearchEntriesUseCase(searchRepository)
+    private val suggestJournalsUseCase =
+        SuggestJournalsUseCase(
+            notesRepository = FakeJournalNotesRepository(),
+            contentRepository = FakeDetailJournalContentRepository(),
+        )
 
     private lateinit var viewModel: JournalsOverviewViewModel
 
@@ -65,6 +73,7 @@ class JournalsOverviewViewModelTest {
                 preferencesDataSource = preferencesDataSource,
                 searchJournalsUseCase = searchJournalsUseCase,
                 searchEntriesUseCase = searchEntriesUseCase,
+                suggestJournalsUseCase = suggestJournalsUseCase,
             )
     }
 
@@ -213,6 +222,12 @@ class JournalsOverviewViewModelTest {
 
         override fun searchRanked(
             query: String,
+            limit: Int,
+        ): Flow<List<SearchResult>> = flowOf(emptyList())
+
+        override fun searchInJournal(
+            query: String,
+            journalId: Uuid,
             limit: Int,
         ): Flow<List<SearchResult>> = flowOf(emptyList())
     }

@@ -1,5 +1,6 @@
 package app.logdate.client.sensor.network
 
+import app.logdate.client.networking.saver.NetworkConnectionType
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest

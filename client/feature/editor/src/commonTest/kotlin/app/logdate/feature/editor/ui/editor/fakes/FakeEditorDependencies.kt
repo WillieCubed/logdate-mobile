@@ -346,6 +346,12 @@ class FakeMediaManager : MediaManager {
         )
 
     override suspend fun saveMedia(payload: MediaPayload): String = "file:///tmp/${payload.fileName}"
+
+    override suspend fun saveMediaFromFile(
+        sourceFilePath: String,
+        fileName: String,
+        mimeType: String,
+    ): String = "file:///tmp/$fileName"
 }
 
 class FakeLocationTrackingSettingsRepository : LocationTrackingSettingsRepository {
