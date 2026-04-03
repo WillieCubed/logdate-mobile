@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -61,6 +63,8 @@ class WatchSettingsViewModelTest {
                     connectionManager = connectionManager,
                     settingsRepository = FakeWatchSettingsRepository(),
                 )
+            backgroundScope.launch { viewModel.connectionState.collect {} }
+            advanceUntilIdle()
 
             assertEquals(
                 WatchConnectionState.NeedsAssociation("Pixel Watch"),
