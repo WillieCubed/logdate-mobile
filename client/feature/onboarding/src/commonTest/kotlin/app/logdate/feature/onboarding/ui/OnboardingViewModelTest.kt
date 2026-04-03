@@ -11,6 +11,8 @@ import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.domain.recommendation.RecallMode
 import app.logdate.client.domain.recommendation.WidgetContentType
+import app.logdate.client.domain.streak.CalculateStreakUseCase
+import app.logdate.client.domain.streak.RefreshStreakUseCase
 import app.logdate.client.health.LocalFirstHealthRepository
 import app.logdate.client.health.model.DayBounds
 import app.logdate.client.health.model.SleepSession
@@ -21,6 +23,7 @@ import app.logdate.client.repository.account.AccountRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.profile.ProfileRepository
+import app.logdate.client.repository.streak.StreakSettingsRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.feature.onboarding.flow.OnboardingDeviceState
 import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
@@ -60,6 +63,7 @@ class OnboardingViewModelTest {
     private lateinit var fakeProfileRepository: FakeProfileRepository
     private lateinit var fakeAccountRepository: FakeAccountRepository
     private lateinit var fakeSessionStorage: FakeSessionStorage
+    private lateinit var fakeStreakSettingsRepository: FakeStreakSettingsRepository
     private lateinit var fakeOnboardingDeviceStateRepository: FakeOnboardingDeviceStateRepository
     private lateinit var viewModel: OnboardingViewModel
 
@@ -75,6 +79,7 @@ class OnboardingViewModelTest {
         fakeProfileRepository = FakeProfileRepository()
         fakeAccountRepository = FakeAccountRepository()
         fakeSessionStorage = FakeSessionStorage()
+        fakeStreakSettingsRepository = FakeStreakSettingsRepository()
         fakeOnboardingDeviceStateRepository = FakeOnboardingDeviceStateRepository()
         viewModel = createViewModel()
     }
@@ -95,6 +100,11 @@ class OnboardingViewModelTest {
                     sessionStorage = fakeSessionStorage,
                 ),
             onboardingDeviceStateRepository = fakeOnboardingDeviceStateRepository,
+            refreshStreakUseCase =
+                RefreshStreakUseCase(
+                    calculateStreakUseCase = CalculateStreakUseCase(fakeNotesRepository),
+                    streakSettingsRepository = fakeStreakSettingsRepository,
+                ),
         )
 
     @AfterTest
@@ -217,6 +227,27 @@ class OnboardingViewModelTest {
 
             assertTrue(viewModel.progressSnapshot.value.notificationsHandledOnThisDevice)
         }
+
+    private class FakeStreakSettingsRepository : StreakSettingsRepository {
+        private val streakEnabled = MutableStateFlow(true)
+        private val cachedStreak = MutableStateFlow(0)
+
+        override fun observeStreakEnabled(): Flow<Boolean> = streakEnabled
+
+        override suspend fun isStreakEnabled(): Boolean = streakEnabled.value
+
+        override suspend fun setStreakEnabled(enabled: Boolean) {
+            streakEnabled.value = enabled
+        }
+
+        override fun observeCachedStreak(): Flow<Int> = cachedStreak
+
+        override suspend fun getCachedStreak(): Int = cachedStreak.value
+
+        override suspend fun setCachedStreak(value: Int) {
+            cachedStreak.value = value
+        }
+    }
 
     @Test
     fun setActiveEntryMode_updatesState() =
