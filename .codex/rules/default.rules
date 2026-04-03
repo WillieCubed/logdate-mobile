@@ -38,6 +38,15 @@ prefix_rule(
 )
 
 prefix_rule(
+    pattern = ["./gradlew", ":app:android-main:connectedDebugAndroidTest"],
+    decision = "forbidden",
+    justification = "Do not run :app:android-main:connectedDebugAndroidTest in LogDate because it may accidentally delete data from the user's physical device. Use a Gradle Managed Device or emulator-only task instead.",
+    match = [
+        "./gradlew :app:android-main:connectedDebugAndroidTest",
+    ],
+)
+
+prefix_rule(
     pattern = ["gradlew", "connectedAndroidTest"],
     decision = "forbidden",
     justification = "Connected Android test tasks are blocked for LogDate. Use a Gradle Managed Device task instead.",
@@ -56,10 +65,28 @@ prefix_rule(
 )
 
 prefix_rule(
+    pattern = ["gradlew", ":app:android-main:connectedDebugAndroidTest"],
+    decision = "forbidden",
+    justification = "Do not run :app:android-main:connectedDebugAndroidTest in LogDate because it may accidentally delete data from the user's physical device. Use a Gradle Managed Device or emulator-only task instead.",
+    match = [
+        "gradlew :app:android-main:connectedDebugAndroidTest",
+    ],
+)
+
+prefix_rule(
     pattern = ["gradle", "connectedAndroidTest"],
     decision = "forbidden",
     justification = "Connected Android test tasks are blocked for LogDate. Use a Gradle Managed Device task instead.",
     match = [
         "gradle connectedAndroidTest",
+    ],
+)
+
+prefix_rule(
+    pattern = ["gradle", ":app:android-main:connectedDebugAndroidTest"],
+    decision = "forbidden",
+    justification = "Do not run :app:android-main:connectedDebugAndroidTest in LogDate because it may accidentally delete data from the user's physical device. Use a Gradle Managed Device or emulator-only task instead.",
+    match = [
+        "gradle :app:android-main:connectedDebugAndroidTest",
     ],
 )
