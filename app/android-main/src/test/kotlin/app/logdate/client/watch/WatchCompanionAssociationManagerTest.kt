@@ -5,6 +5,7 @@ import android.companion.AssociationInfo
 import android.companion.AssociationRequest
 import android.companion.CompanionDeviceManager
 import android.content.IntentSender
+import android.os.Build
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContract
@@ -62,7 +63,12 @@ class WatchCompanionAssociationManagerTest {
             advanceUntilIdle()
 
             manager.beginAssociation()
-            companionClient.callback?.onAssociationPending(mockk<IntentSender>(relaxed = true))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                companionClient.callback?.onAssociationPending(mockk<IntentSender>(relaxed = true))
+            } else {
+                @Suppress("DEPRECATION")
+                companionClient.callback?.onDeviceFound(mockk<IntentSender>(relaxed = true))
+            }
             companionClient.callback?.onAssociationCreated(
                 mockAssociationInfo(
                     displayName = "Pixel Watch",
