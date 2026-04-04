@@ -18,4 +18,5 @@ data class JournalEntity(
     val syncVersion: Long = 0,
     val lastSynced: Instant? = null,
     val deletedAt: Instant? = null,
+    val coverImageUri: String? = null,
 )

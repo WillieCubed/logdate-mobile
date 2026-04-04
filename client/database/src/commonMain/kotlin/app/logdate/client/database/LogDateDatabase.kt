@@ -93,6 +93,7 @@ import app.logdate.client.database.migrations.MIGRATION_30_31
 import app.logdate.client.database.migrations.MIGRATION_31_32
 import app.logdate.client.database.migrations.MIGRATION_32_33
 import app.logdate.client.database.migrations.MIGRATION_33_34
+import app.logdate.client.database.migrations.MIGRATION_34_35
 import app.logdate.client.database.migrations.MIGRATION_3_4
 import app.logdate.client.database.migrations.MIGRATION_4_5
 import app.logdate.client.database.migrations.MIGRATION_5_6
@@ -150,7 +151,7 @@ import kotlinx.coroutines.IO
         StickerEntity::class,
         SearchIndexMetadataEntity::class,
     ],
-    version = 34,
+    version = 35,
     exportSchema = true,
 )
 @TypeConverters(
@@ -280,6 +281,7 @@ fun getRoomDatabase(
                 MIGRATION_31_32,
                 MIGRATION_32_33,
                 MIGRATION_33_34,
+                MIGRATION_34_35,
             ).addCallback(FtsTableCallback)
             .fallbackToDestructiveMigration(destroyTablesOnUpgrade)
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)

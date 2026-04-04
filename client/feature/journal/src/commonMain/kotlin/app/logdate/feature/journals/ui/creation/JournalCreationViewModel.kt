@@ -86,11 +86,15 @@ class JournalCreationViewModel(
 
     fun createJournal(data: NewJournalRequest) {
         viewModelScope.launch {
+            // Auto-set cover from first selected media image
+            val coverUri = backingUiState.value.selectedMediaUris.firstOrNull()
+
             val journalId =
                 journalRepository.create(
                     Journal(
                         title = data.title,
                         description = data.contentDescription,
+                        coverImageUri = coverUri,
                     ),
                 )
 

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -23,9 +24,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -37,6 +41,7 @@ import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
+import coil3.compose.AsyncImage
 import kotlin.math.abs
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -98,9 +103,14 @@ fun JournalCover(
                 }
             }.widthIn(max = 256.dp)
 
+    val hasCoverImage = journal.coverImageUri != null
+
     val textColor =
-        remember(coverColor) {
-            if (coverColor.luminance() > 0.5f) {
+        remember(coverColor, hasCoverImage) {
+            if (hasCoverImage) {
+                // Cover image always uses a dark scrim, so text is always white
+                Color.White.copy(alpha = 0.95f)
+            } else if (coverColor.luminance() > 0.5f) {
                 Color.Black.copy(alpha = 0.87f)
             } else {
                 Color.White.copy(alpha = 0.95f)
@@ -134,6 +144,32 @@ private fun BoxScope.JournalCoverContent(
     journal: Journal,
     textColor: Color,
 ) {
+    // Cover image with scrim when available
+    journal.coverImageUri?.let { uri ->
+        AsyncImage(
+            model = uri,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .clip(JournalShape),
+        )
+        // Dark scrim over the bottom half for text readability
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f)),
+                            startY = 0.4f,
+                        ),
+                        shape = JournalShape,
+                    ),
+        )
+    }
+
     Column(
         modifier =
             Modifier

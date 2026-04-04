@@ -17,6 +17,7 @@ fun JournalEntity.toModel() =
         lastUpdated = lastUpdated,
         syncVersion = syncVersion,
         isFavorited = false, // TODO: Move this to separate user data source
+        coverImageUri = coverImageUri,
     )
 
 /**
@@ -32,4 +33,5 @@ fun Journal.toEntity() =
         created = created,
         lastUpdated = lastUpdated,
         syncVersion = syncVersion,
+        coverImageUri = coverImageUri,
     )

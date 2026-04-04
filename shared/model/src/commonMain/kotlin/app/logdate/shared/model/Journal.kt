@@ -16,4 +16,5 @@ data class Journal(
     val created: Instant = Clock.System.now(),
     val lastUpdated: Instant = Clock.System.now(),
     val syncVersion: Long = 0,
+    val coverImageUri: String? = null,
 )
