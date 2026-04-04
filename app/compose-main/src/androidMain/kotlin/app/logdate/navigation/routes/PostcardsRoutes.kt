@@ -1,5 +1,6 @@
 package app.logdate.navigation.routes
 
+import android.app.Activity
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -9,6 +10,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.postcards.copyUriToDestination
@@ -57,9 +62,38 @@ fun EntryProviderScope<NavKey>.postcardRoutes(
     }
 
     routeEntry<PostcardEditorRoute> { _ ->
+        val view = LocalView.current
+        var isFullscreen by rememberSaveable { mutableStateOf(false) }
+
         CanvasEditorScreen(
-            onNavigateBack = onBack,
+            onNavigateBack = {
+                if (isFullscreen) {
+                    val controller =
+                        WindowCompat.getInsetsController(
+                            (view.context as Activity).window,
+                            view,
+                        )
+                    controller.show(WindowInsetsCompat.Type.systemBars())
+                    isFullscreen = false
+                }
+                onBack()
+            },
             onSaved = onBack,
+            onToggleFullscreen = {
+                val controller =
+                    WindowCompat.getInsetsController(
+                        (view.context as Activity).window,
+                        view,
+                    )
+                isFullscreen = !isFullscreen
+                if (isFullscreen) {
+                    controller.hide(WindowInsetsCompat.Type.systemBars())
+                    controller.systemBarsBehavior =
+                        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                } else {
+                    controller.show(WindowInsetsCompat.Type.systemBars())
+                }
+            },
         )
     }
 

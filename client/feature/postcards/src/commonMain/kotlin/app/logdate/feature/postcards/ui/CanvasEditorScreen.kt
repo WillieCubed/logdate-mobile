@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.CropSquare
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.BottomSheetDefaults
@@ -103,6 +104,7 @@ fun CanvasEditorScreen(
     viewModel: CanvasEditorViewModel = koinViewModel(),
     onNavigateBack: () -> Unit = {},
     onSaved: () -> Unit = {},
+    onToggleFullscreen: (() -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -135,6 +137,7 @@ fun CanvasEditorScreen(
                     viewModel.save()
                     onSaved()
                 },
+                onToggleFullscreen = onToggleFullscreen,
                 modifier = Modifier.statusBarsPadding(),
             )
         },
@@ -429,6 +432,7 @@ private fun EditorTopBar(
     onRedo: () -> Unit,
     onDelete: () -> Unit,
     onSave: () -> Unit,
+    onToggleFullscreen: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var isEditingTitle by remember { mutableStateOf(false) }
@@ -505,6 +509,17 @@ private fun EditorTopBar(
                 ) {
                     IconButton(onClick = onDelete) {
                         Icon(Icons.Filled.Delete, contentDescription = "Delete")
+                    }
+                }
+            }
+            if (onToggleFullscreen != null) {
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                    tooltip = { PlainTooltip { Text("Fullscreen") } },
+                    state = rememberTooltipState(),
+                ) {
+                    IconButton(onClick = onToggleFullscreen) {
+                        Icon(Icons.Filled.Fullscreen, contentDescription = "Fullscreen")
                     }
                 }
             }
