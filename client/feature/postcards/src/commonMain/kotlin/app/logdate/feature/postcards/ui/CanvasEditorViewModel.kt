@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -103,7 +102,7 @@ class CanvasEditorViewModel(
             .get<String>("sourceMomentRef")
             ?.let { Uuid.parse(it) }
 
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = PostcardDocument.json
 
     private val _state = MutableStateFlow(createInitialState())
     val state: StateFlow<CanvasEditorState> = _state.asStateFlow()
@@ -168,7 +167,7 @@ class CanvasEditorViewModel(
                 createdAt = now,
                 modifiedAt = now,
                 sourceMomentRef = sourceMomentRef,
-                background = CanvasBackground.SolidColor("#FFFFFF"),
+                background = CanvasBackground.SolidColor(DEFAULT_CANVAS_BACKGROUND),
             )
         return CanvasEditorState(
             document = document,
@@ -186,8 +185,8 @@ class CanvasEditorViewModel(
                         entity.documentJson,
                     )
                 _state.update { it.copy(document = document, isNewPostcard = false) }
-            } catch (_: Exception) {
-                // Failed to parse — keep the blank document
+            } catch (e: Exception) {
+                Napier.e("Failed to parse postcard document, starting fresh", e)
             }
         }
     }
@@ -597,6 +596,7 @@ class CanvasEditorViewModel(
 
     companion object {
         private const val MAX_UNDO_HISTORY = 50
+        private const val DEFAULT_CANVAS_BACKGROUND = "#FFFFFF"
     }
 }
 

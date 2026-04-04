@@ -40,7 +40,7 @@ import app.logdate.feature.postcards.model.CanvasElement
 import app.logdate.feature.postcards.model.PostcardDocument
 import app.logdate.ui.common.verticalScrollbar
 import coil3.compose.AsyncImage
-import kotlinx.serialization.json.Json
+import io.github.aakira.napier.Napier
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 
@@ -115,7 +115,7 @@ fun PostcardsCollectionScreen(
     }
 }
 
-private val thumbnailJson = Json { ignoreUnknownKeys = true }
+private val thumbnailJson = PostcardDocument.json
 
 @Composable
 private fun PostcardCard(
@@ -134,7 +134,8 @@ private fun PostcardCard(
                     .filterIsInstance<CanvasElement.Photo>()
                     .firstOrNull()
                     ?.mediaUri
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Napier.w("Failed to extract thumbnail from postcard", e)
                 null
             }
         }

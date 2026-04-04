@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
 import kotlin.uuid.Uuid
 
 /**
@@ -49,7 +48,7 @@ class PostcardViewerViewModel(
             ?.let { Uuid.parse(it) }
             ?: error("postcardId is required")
 
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = PostcardDocument.json
 
     private val resolvedStickerUris = MutableStateFlow<Map<Uuid, String>>(emptyMap())
 

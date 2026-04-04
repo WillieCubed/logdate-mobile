@@ -109,7 +109,7 @@ class AndroidExportEngine(
         canvas: Canvas,
         element: CanvasElement.Photo,
     ) {
-        val dest = RectF(0f, 0f, 200f, 200f)
+        val dest = RectF(0f, 0f, PHOTO_EXPORT_SIZE, PHOTO_EXPORT_SIZE)
         try {
             val inputStream =
                 context.contentResolver.openInputStream(Uri.parse(element.mediaUri))
@@ -134,7 +134,7 @@ class AndroidExportEngine(
         stickerUriMap: Map<Uuid, String>,
     ) {
         val imageUri = stickerUriMap[element.stickerRef] ?: return
-        val dest = RectF(0f, 0f, 80f, 80f)
+        val dest = RectF(0f, 0f, STICKER_EXPORT_SIZE, STICKER_EXPORT_SIZE)
         try {
             val inputStream = context.contentResolver.openInputStream(Uri.parse(imageUri))
             if (inputStream != null) {
@@ -164,7 +164,7 @@ class AndroidExportEngine(
             Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = android.graphics.Color.DKGRAY
                 style = Paint.Style.STROKE
-                strokeWidth = 2f
+                strokeWidth = PLACEHOLDER_STROKE_WIDTH
             }
         canvas.drawRect(rect, bgPaint)
         canvas.drawLine(rect.left, rect.top, rect.right, rect.bottom, xPaint)
@@ -201,7 +201,7 @@ class AndroidExportEngine(
         val color = parseColor(element.color)
         val alpha =
             when (element.tool) {
-                InkTool.HIGHLIGHTER -> 0.4f
+                InkTool.HIGHLIGHTER -> HIGHLIGHTER_ALPHA
                 else -> 1f
             }
         val paint =
@@ -269,8 +269,8 @@ class AndroidExportEngine(
 
         when (element.shapeKind) {
             ShapeKind.RECTANGLE -> {
-                fillPaint?.let { canvas.drawRoundRect(rect, 4f, 4f, it) }
-                canvas.drawRoundRect(rect, 4f, 4f, strokePaint)
+                fillPaint?.let { canvas.drawRoundRect(rect, SHAPE_CORNER_RADIUS, SHAPE_CORNER_RADIUS, it) }
+                canvas.drawRoundRect(rect, SHAPE_CORNER_RADIUS, SHAPE_CORNER_RADIUS, strokePaint)
             }
             ShapeKind.CIRCLE -> {
                 val cx = element.width / 2
@@ -284,7 +284,7 @@ class AndroidExportEngine(
             }
             ShapeKind.ARROW -> {
                 canvas.drawLine(0f, 0f, element.width, element.height, strokePaint)
-                val arrowSize = element.strokeWidth * 4
+                val arrowSize = element.strokeWidth * ARROW_HEAD_SCALE
                 val path =
                     Path().apply {
                         moveTo(element.width, element.height)
@@ -342,12 +342,23 @@ class AndroidExportEngine(
     }
 
     private fun saveBitmapToCache(bitmap: Bitmap): File {
-        val cacheDir = File(context.externalCacheDir, "postcards")
+        val cacheDir = File(context.externalCacheDir, CACHE_SUBDIR)
         cacheDir.mkdirs()
         val file = File(cacheDir, "postcard_${System.currentTimeMillis()}.png")
         FileOutputStream(file).use { out ->
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            bitmap.compress(Bitmap.CompressFormat.PNG, PNG_QUALITY, out)
         }
         return file
+    }
+
+    companion object {
+        private const val PHOTO_EXPORT_SIZE = 200f
+        private const val STICKER_EXPORT_SIZE = 80f
+        private const val SHAPE_CORNER_RADIUS = 4f
+        private const val ARROW_HEAD_SCALE = 4
+        private const val PLACEHOLDER_STROKE_WIDTH = 2f
+        private const val CACHE_SUBDIR = "postcards"
+        private const val PNG_QUALITY = 100
+        private const val HIGHLIGHTER_ALPHA = 0.4f
     }
 }

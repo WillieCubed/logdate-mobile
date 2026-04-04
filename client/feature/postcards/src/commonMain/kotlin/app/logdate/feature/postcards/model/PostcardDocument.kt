@@ -1,6 +1,7 @@
 package app.logdate.feature.postcards.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -37,5 +38,12 @@ data class PostcardDocument(
 ) {
     companion object {
         const val CURRENT_VERSION = 1
+
+        /**
+         * Shared Json instance for serializing/deserializing PostcardDocuments.
+         * Uses `ignoreUnknownKeys` so documents from newer app versions
+         * can still be read by older versions.
+         */
+        val json: Json = Json { ignoreUnknownKeys = true }
     }
 }

@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.CropSquare
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -267,7 +268,7 @@ fun CanvasEditorScreen(
                         initialText = editingElement?.content ?: "",
                         initialFont = editingElement?.fontFamily ?: FontChoice.CAVEAT.id,
                         initialColor = editingElement?.color ?: DEFAULT_STROKE_COLOR,
-                        initialFontSize = editingElement?.fontSize ?: 24f,
+                        initialFontSize = editingElement?.fontSize ?: DEFAULT_TEXT_FONT_SIZE,
                         onConfirm = { content, fontFamily, color, fontSize ->
                             val centerX = -viewportState.offset.x / viewportState.scale
                             val centerY = -viewportState.offset.y / viewportState.scale
@@ -397,13 +398,17 @@ private fun CanvasArea(
                     )
                 }
                 CanvasTool.TEXT -> {
-                    if (!state.isTextEditorVisible) {
-                        viewModel.startTextEditing()
+                    LaunchedEffect(Unit) {
+                        if (!state.isTextEditorVisible) {
+                            viewModel.startTextEditing()
+                        }
                     }
                     Box(Modifier)
                 }
                 CanvasTool.STICKER -> {
-                    viewModel.setShelfMode(ShelfMode.Stickers)
+                    LaunchedEffect(Unit) {
+                        viewModel.setShelfMode(ShelfMode.Stickers)
+                    }
                     Box(Modifier)
                 }
             }
@@ -528,6 +533,7 @@ private fun EditorTopBar(
 
 // --- Shelf ---
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Shelf(
     mode: ShelfMode,
@@ -544,24 +550,15 @@ private fun Shelf(
     Column(
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainer),
     ) {
-        // Collapse handle
         Box(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clickable { isCollapsed = !isCollapsed }
-                    .padding(vertical = 4.dp),
+                    .heightIn(min = 48.dp)
+                    .clickable { isCollapsed = !isCollapsed },
             contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(width = 32.dp, height = 4.dp)
-                        .background(
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                            RoundedCornerShape(2.dp),
-                        ),
-            )
+            BottomSheetDefaults.DragHandle()
         }
 
         Row(
@@ -810,3 +807,4 @@ private val CanvasTool.shortcut: String
 private const val DEFAULT_STROKE_COLOR = "#333333"
 private const val DEFAULT_INK_WIDTH = 4f
 private const val DEFAULT_SHAPE_WIDTH = 3f
+private const val DEFAULT_TEXT_FONT_SIZE = 24f

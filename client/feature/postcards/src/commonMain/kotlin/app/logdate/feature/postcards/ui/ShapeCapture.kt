@@ -79,7 +79,7 @@ fun ShapeCaptureOverlay(
                                     val change = event.changes.firstOrNull() ?: break
                                     if (!change.pressed) {
                                         draft?.let { d ->
-                                            if (d.width > 5f || d.height > 5f) {
+                                            if (d.width > MIN_SHAPE_DIMENSION || d.height > MIN_SHAPE_DIMENSION) {
                                                 onShapeComplete(d)
                                             }
                                         }
@@ -140,7 +140,7 @@ fun ShapeCaptureOverlay(
                     strokeWidth = strokeWidth,
                     cap = StrokeCap.Round,
                 )
-                val arrowSize = strokeWidth * 4
+                val arrowSize = strokeWidth * ARROW_HEAD_SCALE
                 val path =
                     Path().apply {
                         moveTo(d.endX, d.endY)
@@ -153,3 +153,9 @@ fun ShapeCaptureOverlay(
         }
     }
 }
+
+/** Minimum size for a shape to be considered intentional (not an accidental tap). */
+private const val MIN_SHAPE_DIMENSION = 5f
+
+/** Arrowhead size relative to stroke width. */
+private const val ARROW_HEAD_SCALE = 4

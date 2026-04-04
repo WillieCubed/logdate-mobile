@@ -78,7 +78,7 @@ fun InkCaptureOverlay(
     val parsedColor = parseColor(color)
     val alpha =
         when (tool) {
-            InkTool.HIGHLIGHTER -> 0.4f
+            InkTool.HIGHLIGHTER -> HIGHLIGHTER_ALPHA
             else -> 1f
         }
 
@@ -143,10 +143,16 @@ fun InkCaptureOverlay(
                     color = parsedColor.copy(alpha = alpha),
                     start = Offset(prev.x, prev.y),
                     end = Offset(curr.x, curr.y),
-                    strokeWidth = segmentWidth.coerceAtLeast(0.5f),
+                    strokeWidth = segmentWidth.coerceAtLeast(MIN_VISIBLE_STROKE_WIDTH),
                     cap = StrokeCap.Round,
                 )
             }
         }
     }
 }
+
+/** Prevents strokes from becoming invisible at zero pressure. */
+private const val MIN_VISIBLE_STROKE_WIDTH = 0.5f
+
+/** Highlighter tool opacity. */
+private const val HIGHLIGHTER_ALPHA = 0.4f

@@ -3,9 +3,15 @@ package app.logdate.navigation.routes
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
+import app.logdate.feature.postcards.copyUriToDestination
 import app.logdate.feature.postcards.ui.CanvasEditorScreen
 import app.logdate.feature.postcards.ui.PostcardViewerScreen
 import app.logdate.feature.postcards.ui.PostcardsCollectionScreen
@@ -13,6 +19,7 @@ import app.logdate.navigation.MainAppNavigator
 import app.logdate.navigation.routes.core.PostcardEditorRoute
 import app.logdate.navigation.routes.core.PostcardViewerRoute
 import app.logdate.navigation.routes.core.PostcardsCollectionRoute
+import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
 
 fun MainAppNavigator.navigateToPostcardsCollection() {
@@ -55,18 +62,19 @@ fun EntryProviderScope<NavKey>.postcardRoutes(
         )
     }
 
-    routeEntry<PostcardViewerRoute> { route ->
+    routeEntry<PostcardViewerRoute> { _ ->
         val context = LocalContext.current
-        var pendingSourceUri: Uri? = null
+        val scope = rememberCoroutineScope()
+        var pendingSourceUri by rememberSaveable { mutableStateOf<String?>(null) }
+
         val saveFileLauncher =
             rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.CreateDocument("image/png"),
             ) { destinationUri ->
-                if (destinationUri != null && pendingSourceUri != null) {
-                    context.contentResolver.openInputStream(pendingSourceUri!!)?.use { input ->
-                        context.contentResolver.openOutputStream(destinationUri)?.use { output ->
-                            input.copyTo(output)
-                        }
+                val source = pendingSourceUri?.let { Uri.parse(it) } ?: return@rememberLauncherForActivityResult
+                if (destinationUri != null) {
+                    scope.launch {
+                        copyUriToDestination(context, source, destinationUri)
                     }
                 }
             }
@@ -76,7 +84,7 @@ fun EntryProviderScope<NavKey>.postcardRoutes(
             onEditPostcard = { onEditPostcard(it) },
             onShareUri = onShareUri,
             onSaveToFiles = { uri ->
-                pendingSourceUri = Uri.parse(uri)
+                pendingSourceUri = uri
                 saveFileLauncher.launch("postcard.png")
             },
             onNavigateToMoment = onNavigateToMoment,

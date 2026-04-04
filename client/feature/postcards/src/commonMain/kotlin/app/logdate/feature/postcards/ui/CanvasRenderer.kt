@@ -221,21 +221,22 @@ private fun SelectionChrome(element: CanvasElement) {
  */
 internal fun elementSizeDp(element: CanvasElement): Pair<Float, Float> =
     when (element) {
-        is CanvasElement.Photo -> 200f to 200f
-        is CanvasElement.Text -> 150f to 40f
+        is CanvasElement.Photo -> PHOTO_RENDER_SIZE to PHOTO_RENDER_SIZE
+        is CanvasElement.Text -> TEXT_APPROX_WIDTH to TEXT_APPROX_HEIGHT
         is CanvasElement.Ink -> {
-            if (element.points.size < 2) {
+            if (element.points.size < MIN_STROKE_POINTS) {
                 0f to 0f
             } else {
                 val minX = element.points.minOf { it.x }
                 val maxX = element.points.maxOf { it.x }
                 val minY = element.points.minOf { it.y }
                 val maxY = element.points.maxOf { it.y }
-                (maxX - minX).coerceAtLeast(20f) to (maxY - minY).coerceAtLeast(20f)
+                (maxX - minX).coerceAtLeast(MIN_INK_BOUNDS) to
+                    (maxY - minY).coerceAtLeast(MIN_INK_BOUNDS)
             }
         }
         is CanvasElement.Shape -> element.width to element.height
-        is CanvasElement.Sticker -> 80f to 80f
+        is CanvasElement.Sticker -> STICKER_RENDER_SIZE to STICKER_RENDER_SIZE
     }
 
 @Composable
@@ -279,7 +280,7 @@ private fun PhotoElementRenderer(
                     scaleY = transform.scaleY
                     translationX = viewportOffsetX * depth
                     translationY = viewportOffsetY * depth
-                }.size(200.dp, 200.dp),
+                }.size(PHOTO_RENDER_SIZE.dp, PHOTO_RENDER_SIZE.dp),
     )
 }
 
@@ -324,7 +325,7 @@ private fun InkElementRenderer(element: CanvasElement.Ink) {
     ) {
         val alpha =
             when (element.tool) {
-                InkTool.HIGHLIGHTER -> 0.4f
+                InkTool.HIGHLIGHTER -> HIGHLIGHTER_ALPHA
                 else -> 1f
             }
         val strokeColor = parseColor(element.color).copy(alpha = alpha)
@@ -337,7 +338,7 @@ private fun InkElementRenderer(element: CanvasElement.Ink) {
                 color = strokeColor,
                 start = Offset(prev.x, prev.y),
                 end = Offset(curr.x, curr.y),
-                strokeWidth = segmentWidth.coerceAtLeast(0.5f),
+                strokeWidth = segmentWidth.coerceAtLeast(MIN_VISIBLE_STROKE_WIDTH),
                 cap = StrokeCap.Round,
             )
         }
@@ -365,9 +366,13 @@ private fun ShapeElementRenderer(element: CanvasElement.Shape) {
         when (element.shapeKind) {
             ShapeKind.RECTANGLE -> {
                 if (fill != null) {
-                    drawRoundRect(color = fill, style = Fill, cornerRadius = CornerRadius(4f, 4f))
+                    drawRoundRect(color = fill, style = Fill, cornerRadius = CornerRadius(SHAPE_CORNER_RADIUS, SHAPE_CORNER_RADIUS))
                 }
-                drawRoundRect(color = strokeColor, style = strokeStyle, cornerRadius = CornerRadius(4f, 4f))
+                drawRoundRect(
+                    color = strokeColor,
+                    style = strokeStyle,
+                    cornerRadius = CornerRadius(SHAPE_CORNER_RADIUS, SHAPE_CORNER_RADIUS),
+                )
             }
             ShapeKind.CIRCLE -> {
                 val radius = minOf(size.width, size.height) / 2
@@ -394,7 +399,7 @@ private fun ShapeElementRenderer(element: CanvasElement.Shape) {
                     cap = StrokeCap.Round,
                 )
                 // Arrowhead
-                val arrowSize = element.strokeWidth * 4
+                val arrowSize = element.strokeWidth * ARROW_HEAD_SCALE
                 val endX = size.width
                 val endY = size.height
                 val path =
@@ -426,7 +431,7 @@ private fun StickerElementRenderer(
             modifier =
                 Modifier
                     .offset(x = transform.x.dp, y = transform.y.dp)
-                    .size(80.dp)
+                    .size(STICKER_RENDER_SIZE.dp)
                     .graphicsLayer {
                         rotationZ = transform.rotation
                         scaleX = transform.scaleX
@@ -438,7 +443,7 @@ private fun StickerElementRenderer(
             modifier =
                 Modifier
                     .offset(x = transform.x.dp, y = transform.y.dp)
-                    .size(80.dp)
+                    .size(STICKER_RENDER_SIZE.dp)
                     .graphicsLayer {
                         rotationZ = transform.rotation
                         scaleX = transform.scaleX
@@ -472,3 +477,31 @@ internal fun resolveFontFamily(name: String): FontFamily =
         "patrick-hand" -> FontFamily(Font(Res.font.patrick_hand_regular))
         else -> FontFamily.Default
     }
+
+/** Render size for photo elements in canvas dp units. */
+private const val PHOTO_RENDER_SIZE = 200f
+
+/** Render size for sticker elements in canvas dp units. */
+private const val STICKER_RENDER_SIZE = 80f
+
+/** Approximate selection chrome bounds for text elements. */
+private const val TEXT_APPROX_WIDTH = 150f
+private const val TEXT_APPROX_HEIGHT = 40f
+
+/** Minimum bounding box for very small ink strokes. */
+private const val MIN_INK_BOUNDS = 20f
+
+/** Minimum number of points for a valid ink stroke. */
+private const val MIN_STROKE_POINTS = 2
+
+/** Corner radius for rectangle shapes. */
+private const val SHAPE_CORNER_RADIUS = 4f
+
+/** Arrowhead size relative to stroke width. */
+private const val ARROW_HEAD_SCALE = 4
+
+/** Highlighter tool opacity. */
+private const val HIGHLIGHTER_ALPHA = 0.4f
+
+/** Prevents strokes from becoming invisible at zero pressure. */
+private const val MIN_VISIBLE_STROKE_WIDTH = 0.5f

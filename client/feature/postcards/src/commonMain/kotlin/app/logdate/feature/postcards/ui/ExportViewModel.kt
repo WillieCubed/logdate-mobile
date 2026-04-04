@@ -102,7 +102,7 @@ internal fun computeCaptureRegion(
 ): ExportCaptureRegion {
     if (document.elements.isEmpty()) {
         val ratio = preset.widthRatio.toFloat() / preset.heightRatio.toFloat()
-        val height = 400f
+        val height = EMPTY_DOCUMENT_CAPTURE_HEIGHT
         val width = height * ratio
         return ExportCaptureRegion(
             x = -width / 2,
@@ -152,3 +152,6 @@ internal fun computeCaptureRegion(
         height = finalHeight,
     )
 }
+
+/** Default capture region height when exporting a postcard with no elements. */
+private const val EMPTY_DOCUMENT_CAPTURE_HEIGHT = 400f

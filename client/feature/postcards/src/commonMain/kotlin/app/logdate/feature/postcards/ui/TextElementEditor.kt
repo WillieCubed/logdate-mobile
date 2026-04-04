@@ -56,8 +56,8 @@ enum class FontChoice(
 fun TextElementEditor(
     initialText: String = "",
     initialFont: String = FontChoice.CAVEAT.id,
-    initialColor: String = "#333333",
-    initialFontSize: Float = 24f,
+    initialColor: String = DEFAULT_TEXT_COLOR,
+    initialFontSize: Float = DEFAULT_FONT_SIZE,
     onConfirm: (content: String, fontFamily: String, color: String, fontSize: Float) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -132,3 +132,6 @@ fun TextElementEditor(
         }
     }
 }
+
+private const val DEFAULT_TEXT_COLOR = "#333333"
+private const val DEFAULT_FONT_SIZE = 24f
