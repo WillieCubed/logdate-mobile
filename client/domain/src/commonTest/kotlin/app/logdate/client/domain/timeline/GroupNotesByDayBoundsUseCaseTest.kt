@@ -178,7 +178,7 @@ class GroupNotesByDayBoundsUseCaseTest {
     // --- Fallback robustness: every note must always land in a valid day ---
 
     @Test
-    fun `note in sleep gap between days is assigned to nearest day, never lost`() =
+    fun `note in sleep gap between days is assigned to nearest day never lost`() =
         runTest {
             val march15 = LocalDate(2025, 3, 15)
             val march16 = LocalDate(2025, 3, 16)
@@ -249,7 +249,7 @@ class GroupNotesByDayBoundsUseCaseTest {
         }
 
     @Test
-    fun `health repository failure falls back to default bounds, notes still grouped`() =
+    fun `health repository failure falls back to default bounds notes still grouped`() =
         runTest {
             val note = textNote("Morning", localInstant(2025, 3, 15, 10, 0))
 
