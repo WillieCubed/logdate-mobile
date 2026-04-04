@@ -153,6 +153,10 @@ fun CanvasEditorScreen(
                         viewModel.redo()
                         true
                     }
+                    isModifier && event.key == Key.S -> {
+                        viewModel.save()
+                        true
+                    }
                     event.key == Key.Delete || event.key == Key.Backspace -> {
                         if (state.selectedElementId != null) {
                             viewModel.deleteSelectedElement()
@@ -501,7 +505,7 @@ private fun EditorTopBar(
             }
             TooltipBox(
                 positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                tooltip = { PlainTooltip { Text("Save") } },
+                tooltip = { PlainTooltip { Text("Save (Ctrl+S)") } },
                 state = rememberTooltipState(),
             ) {
                 IconButton(onClick = {
