@@ -539,9 +539,31 @@ private fun Shelf(
     onStickerTap: (StickerShelfItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var isCollapsed by remember { mutableStateOf(false) }
+
     Column(
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainer),
     ) {
+        // Collapse handle
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { isCollapsed = !isCollapsed }
+                    .padding(vertical = 4.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(width = 32.dp, height = 4.dp)
+                        .background(
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            RoundedCornerShape(2.dp),
+                        ),
+            )
+        }
+
         Row(
             modifier =
                 Modifier
@@ -566,10 +588,12 @@ private fun Shelf(
             )
         }
 
-        when (mode) {
-            is ShelfMode.Photos -> ShelfPhotoStrip(photos, onPhotoDrag)
-            is ShelfMode.Stickers -> StickerShelfStrip(stickers, onStickerTap)
-            is ShelfMode.Browse -> ShelfPhotoStrip(browsePhotos, onPhotoDrag)
+        AnimatedVisibility(visible = !isCollapsed) {
+            when (mode) {
+                is ShelfMode.Photos -> ShelfPhotoStrip(photos, onPhotoDrag)
+                is ShelfMode.Stickers -> StickerShelfStrip(stickers, onStickerTap)
+                is ShelfMode.Browse -> ShelfPhotoStrip(browsePhotos, onPhotoDrag)
+            }
         }
     }
 }
