@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.postcards.copyUriToDestination
+import app.logdate.feature.postcards.printPostcard
 import app.logdate.feature.postcards.ui.CanvasEditorScreen
 import app.logdate.feature.postcards.ui.PostcardViewerScreen
 import app.logdate.feature.postcards.ui.PostcardsCollectionScreen
@@ -86,6 +87,9 @@ fun EntryProviderScope<NavKey>.postcardRoutes(
             onSaveToFiles = { uri ->
                 pendingSourceUri = uri
                 saveFileLauncher.launch("postcard.png")
+            },
+            onPrint = { uri ->
+                printPostcard(context, android.net.Uri.parse(uri))
             },
             onNavigateToMoment = onNavigateToMoment,
         )

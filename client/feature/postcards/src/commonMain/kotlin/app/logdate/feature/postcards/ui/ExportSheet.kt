@@ -42,6 +42,7 @@ fun ExportSheet(
     stickerUriMap: Map<Uuid, String> = emptyMap(),
     onShareResult: (uri: String) -> Unit,
     onSaveToFiles: ((uri: String) -> Unit)? = null,
+    onPrint: ((uri: String) -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     val isExpanded =
@@ -65,6 +66,7 @@ fun ExportSheet(
                     stickerUriMap = stickerUriMap,
                     onShareResult = onShareResult,
                     onSaveToFiles = onSaveToFiles,
+                    onPrint = onPrint,
                 )
             },
             confirmButton = {},
@@ -95,6 +97,7 @@ fun ExportSheet(
                     stickerUriMap = stickerUriMap,
                     onShareResult = onShareResult,
                     onSaveToFiles = onSaveToFiles,
+                    onPrint = onPrint,
                 )
                 Spacer(Modifier.height(16.dp))
             }
@@ -109,6 +112,7 @@ private fun ExportContent(
     stickerUriMap: Map<Uuid, String>,
     onShareResult: (uri: String) -> Unit,
     onSaveToFiles: ((uri: String) -> Unit)? = null,
+    onPrint: ((uri: String) -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -162,6 +166,15 @@ private fun ExportContent(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("Save to Files")
+                }
+            }
+            if (onPrint != null) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { onPrint(current.result.uri) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Print")
                 }
             }
         }

@@ -46,6 +46,7 @@ fun PostcardViewerScreen(
     onEditPostcard: (Uuid) -> Unit = {},
     onShareUri: (String) -> Unit = {},
     onSaveToFiles: ((String) -> Unit)? = null,
+    onPrint: ((String) -> Unit)? = null,
     onNavigateToMoment: (Uuid) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -120,6 +121,13 @@ fun PostcardViewerScreen(
                                     { uri ->
                                         showExportSheet = false
                                         save(uri)
+                                    }
+                                },
+                            onPrint =
+                                onPrint?.let { print ->
+                                    { uri ->
+                                        showExportSheet = false
+                                        print(uri)
                                     }
                                 },
                             onDismiss = { showExportSheet = false },
