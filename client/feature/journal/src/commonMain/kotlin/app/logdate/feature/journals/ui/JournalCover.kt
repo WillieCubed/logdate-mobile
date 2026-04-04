@@ -108,7 +108,7 @@ fun JournalCover(
     val textColor =
         remember(coverColor, hasCoverImage) {
             if (hasCoverImage) {
-                // Cover image always uses a dark scrim, so text is always white
+                // Text sits on the scrim, which is always dark
                 Color.White.copy(alpha = 0.95f)
             } else if (coverColor.luminance() > 0.5f) {
                 Color.Black.copy(alpha = 0.87f)
@@ -155,7 +155,7 @@ private fun BoxScope.JournalCoverContent(
                     .fillMaxSize()
                     .clip(JournalShape),
         )
-        // Dark scrim over the bottom half for text readability
+        val scrimColor = MaterialTheme.colorScheme.scrim
         Box(
             modifier =
                 Modifier
@@ -166,7 +166,7 @@ private fun BoxScope.JournalCoverContent(
                                 arrayOf(
                                     0.0f to Color.Transparent,
                                     0.4f to Color.Transparent,
-                                    1.0f to Color.Black.copy(alpha = 0.6f),
+                                    1.0f to scrimColor.copy(alpha = 0.7f),
                                 ),
                         ),
                         shape = JournalShape,
