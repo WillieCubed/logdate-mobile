@@ -181,14 +181,11 @@ fun JournalDetailScreenContent(
         is JournalDetailUiState.Success -> {
             var showOverflowMenu by remember { mutableStateOf(false) }
             var selectedTab by remember { mutableStateOf(0) }
-            val hasMedia =
-                remember(uiState.entries) {
-                    uiState.entries.any { it is EntryDisplayData.ImageEntry || it is EntryDisplayData.VideoEntry }
-                }
             val mediaEntries =
                 remember(uiState.entries) {
                     uiState.entries.filter { it is EntryDisplayData.ImageEntry || it is EntryDisplayData.VideoEntry }
                 }
+            val hasMedia = mediaEntries.isNotEmpty()
 
             Scaffold(
                 modifier =
@@ -379,9 +376,9 @@ fun JournalDetailScreenContent(
                                             Text(
                                                 text =
                                                     if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
-                                                        "Newest first"
+                                                        stringResource(Res.string.sort_newest_first)
                                                     } else {
-                                                        "Oldest first"
+                                                        stringResource(Res.string.sort_oldest_first)
                                                     },
                                                 style = MaterialTheme.typography.labelMedium,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,

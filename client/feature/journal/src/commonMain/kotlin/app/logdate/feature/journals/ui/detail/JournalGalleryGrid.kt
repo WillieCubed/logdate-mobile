@@ -3,6 +3,7 @@
 package app.logdate.feature.journals.ui.detail
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
@@ -44,11 +45,9 @@ fun JournalGalleryGrid(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(Spacing.xs),
         horizontalArrangement =
-            androidx.compose.foundation.layout.Arrangement
-                .spacedBy(2.dp),
+            Arrangement.spacedBy(2.dp),
         verticalArrangement =
-            androidx.compose.foundation.layout.Arrangement
-                .spacedBy(2.dp),
+            Arrangement.spacedBy(2.dp),
     ) {
         items(
             items = mediaEntries,

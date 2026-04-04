@@ -162,8 +162,12 @@ private fun BoxScope.JournalCoverContent(
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f)),
-                            startY = 0.4f,
+                            colorStops =
+                                arrayOf(
+                                    0.0f to Color.Transparent,
+                                    0.4f to Color.Transparent,
+                                    1.0f to Color.Black.copy(alpha = 0.6f),
+                                ),
                         ),
                         shape = JournalShape,
                     ),

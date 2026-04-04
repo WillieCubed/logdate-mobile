@@ -7,7 +7,7 @@ import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.execSQL
 
 /**
- * Adds cover_image_uri column to the journals table for user-chosen cover photos.
+ * Adds coverImageUri column to the journals table for user-chosen cover photos.
  */
 val MIGRATION_34_35 =
     object : Migration(34, 35) {

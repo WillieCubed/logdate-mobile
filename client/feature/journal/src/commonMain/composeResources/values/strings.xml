@@ -50,6 +50,8 @@
     <string name="cd_next_entry">Next entry</string>
     <string name="tab_timeline">Timeline</string>
     <string name="tab_gallery">Gallery</string>
+    <string name="sort_newest_first">Newest first</string>
+    <string name="sort_oldest_first">Oldest first</string>
     <string name="enter_a_descriptive_name_for_your_journal">Enter a descriptive name for your journal</string>
     <string name="error">Error</string>
     <string name="failed_to_load_journal">Failed to load journal</string>
