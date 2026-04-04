@@ -14,6 +14,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
@@ -40,6 +41,7 @@ fun ExportSheet(
     viewModel: ExportViewModel,
     stickerUriMap: Map<Uuid, String> = emptyMap(),
     onShareResult: (uri: String) -> Unit,
+    onSaveToFiles: ((uri: String) -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     val isExpanded =
@@ -62,6 +64,7 @@ fun ExportSheet(
                     document = document,
                     stickerUriMap = stickerUriMap,
                     onShareResult = onShareResult,
+                    onSaveToFiles = onSaveToFiles,
                 )
             },
             confirmButton = {},
@@ -91,6 +94,7 @@ fun ExportSheet(
                     document = document,
                     stickerUriMap = stickerUriMap,
                     onShareResult = onShareResult,
+                    onSaveToFiles = onSaveToFiles,
                 )
                 Spacer(Modifier.height(16.dp))
             }
@@ -104,6 +108,7 @@ private fun ExportContent(
     document: PostcardDocument,
     stickerUriMap: Map<Uuid, String>,
     onShareResult: (uri: String) -> Unit,
+    onSaveToFiles: ((uri: String) -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -149,6 +154,15 @@ private fun ExportContent(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Share")
+            }
+            if (onSaveToFiles != null) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { onSaveToFiles(current.result.uri) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Save to Files")
+                }
             }
         }
 

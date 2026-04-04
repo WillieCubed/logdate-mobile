@@ -1,5 +1,9 @@
 package app.logdate.navigation.routes
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.postcards.ui.CanvasEditorScreen
@@ -52,10 +56,29 @@ fun EntryProviderScope<NavKey>.postcardRoutes(
     }
 
     routeEntry<PostcardViewerRoute> { route ->
+        val context = LocalContext.current
+        var pendingSourceUri: Uri? = null
+        val saveFileLauncher =
+            rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.CreateDocument("image/png"),
+            ) { destinationUri ->
+                if (destinationUri != null && pendingSourceUri != null) {
+                    context.contentResolver.openInputStream(pendingSourceUri!!)?.use { input ->
+                        context.contentResolver.openOutputStream(destinationUri)?.use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                }
+            }
+
         PostcardViewerScreen(
             onNavigateBack = onBack,
             onEditPostcard = { onEditPostcard(it) },
             onShareUri = onShareUri,
+            onSaveToFiles = { uri ->
+                pendingSourceUri = Uri.parse(uri)
+                saveFileLauncher.launch("postcard.png")
+            },
             onNavigateToMoment = onNavigateToMoment,
         )
     }
