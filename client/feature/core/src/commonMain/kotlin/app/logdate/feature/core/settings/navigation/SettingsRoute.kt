@@ -57,3 +57,9 @@ data object DayBoundarySettingsRoute
 
 @Serializable
 data object RecommendationSettingsRoute
+
+@Serializable
+data object ClearDataSettingsRoute
+
+@Serializable
+data object ResetAppSettingsRoute

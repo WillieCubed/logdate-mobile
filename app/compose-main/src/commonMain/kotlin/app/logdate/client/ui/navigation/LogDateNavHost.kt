@@ -11,6 +11,7 @@ import app.logdate.feature.core.navigation.BaseRoute
 import app.logdate.feature.core.navigation.landingDestination
 import app.logdate.feature.core.profile.navigation.profileRoute
 import app.logdate.feature.core.settings.navigation.BirthdaySettingsRoute
+import app.logdate.feature.core.settings.navigation.ExportSettingsRoute
 import app.logdate.feature.core.settings.navigation.SettingsRoute
 import app.logdate.feature.core.settings.navigation.settingsGraph
 import app.logdate.feature.editor.ui.EntryEditorContent
@@ -73,6 +74,9 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
             },
             onOpenSettings = { navController.navigate(SettingsRoute()) },
             onBrowseJournals = navController::navigateToJournalsOverview,
+            onOpenSearch = { navController.navigate(SearchRoute) },
+            onOpenDraft = { navController.navigate("editor") },
+            onImportBackup = { navController.navigate(ExportSettingsRoute) },
             onOpenMediaDetail = { mediaId -> navController.navigate(MediaDetailRoute(mediaId)) },
             libraryContent = { modifier ->
                 LibraryScreen(

@@ -31,6 +31,9 @@ fun NavGraphBuilder.homeGraph(
     onOpenRewind: (uid: Uuid) -> Unit,
     onOpenSettings: () -> Unit,
     onBrowseJournals: () -> Unit,
+    onOpenSearch: () -> Unit = {},
+    onOpenDraft: (draftId: String) -> Unit = {},
+    onImportBackup: () -> Unit = {},
     onOpenMediaDetail: (Uuid) -> Unit = {},
     libraryContent: @Composable (Modifier) -> Unit = {},
 ) {
@@ -42,6 +45,9 @@ fun NavGraphBuilder.homeGraph(
             onBrowseJournals = onBrowseJournals,
             onOpenRewind = onOpenRewind,
             onOpenSettings = onOpenSettings,
+            onOpenSearch = onOpenSearch,
+            onOpenDraft = onOpenDraft,
+            onImportBackup = onImportBackup,
             onOpenMediaDetail = onOpenMediaDetail,
             libraryContent = libraryContent,
         )

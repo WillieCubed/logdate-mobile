@@ -7,6 +7,7 @@ import app.logdate.feature.core.profile.navigation.ProfileRoute
 import app.logdate.feature.core.settings.ui.AccountSettingsScreen
 import app.logdate.feature.core.settings.ui.AdvancedSettingsScreen
 import app.logdate.feature.core.settings.ui.BirthdaySettingsScreen
+import app.logdate.feature.core.settings.ui.ClearDataSettingsScreen
 import app.logdate.feature.core.settings.ui.DataSettingsScreen
 import app.logdate.feature.core.settings.ui.DayBoundarySettingsScreen
 import app.logdate.feature.core.settings.ui.ExportSettingsScreen
@@ -15,6 +16,7 @@ import app.logdate.feature.core.settings.ui.LocationSettingsScreen
 import app.logdate.feature.core.settings.ui.MemoriesSettingsScreen
 import app.logdate.feature.core.settings.ui.PrivacySettingsScreen
 import app.logdate.feature.core.settings.ui.RecommendationSettingsScreen
+import app.logdate.feature.core.settings.ui.ResetAppSettingsScreen
 import app.logdate.feature.core.settings.ui.ResetSettingsScreen
 import app.logdate.feature.core.settings.ui.SettingsOverviewScreen
 import app.logdate.feature.core.settings.ui.StreakSettingsScreen
@@ -25,8 +27,9 @@ import app.logdate.feature.core.settings.ui.devices.DevicesScreen
 /**
  * Registers all settings routes in the common navigation graph.
  *
- * This provides the full settings experience for non-Android platforms (desktop, iOS)
- * that don't use Navigation3.
+ * Mirrors Android's `appSettingsRoutes` callback surface so both platforms expose the same
+ * settings hierarchy. Platform-specific features (Wear OS, Health Connect, notifications)
+ * use no-op callbacks since they require Android APIs.
  */
 fun NavGraphBuilder.settingsGraph(navController: NavController) {
     composable<SettingsRoute> {
@@ -35,16 +38,20 @@ fun NavGraphBuilder.settingsGraph(navController: NavController) {
             onNavigateToProfile = { navController.navigate(ProfileRoute) },
             onNavigateToAccount = { navController.navigate(AccountSettingsRoute) },
             onNavigateToDevices = { navController.navigate(DevicesRoute()) },
-            onNavigateToWatch = { /* No Wear OS on desktop */ },
+            onNavigateToWatch = { /* Wear OS not available on desktop */ },
             onNavigateToReset = { navController.navigate(ResetSettingsRoute) },
             onNavigateToLocation = { navController.navigate(LocationSettingsRoute) },
             onNavigateToPrivacy = { navController.navigate(PrivacySettingsRoute) },
             onNavigateToLibrarySettings = { navController.navigate(LibrarySettingsRoute) },
             onNavigateToMemories = { navController.navigate(MemoriesSettingsRoute) },
+            onNavigateToNotifications = null, // System notifications not available on desktop
             onNavigateToStreaks = { navController.navigate(StreakSettingsRoute) },
             onNavigateToTimeline = { navController.navigate(TimelineSettingsRoute) },
             onNavigateToSync = { navController.navigate(SyncSettingsRoute) },
             onNavigateToExport = { navController.navigate(ExportSettingsRoute) },
+            // Cloud account not available on desktop yet
+            onNavigateToCloudAccountCreation = {},
+            onNavigateToSignIn = {},
         )
     }
     composable<AccountSettingsRoute> {
@@ -71,7 +78,7 @@ fun NavGraphBuilder.settingsGraph(navController: NavController) {
     composable<LocationSettingsRoute> {
         LocationSettingsScreen(
             onBack = { navController.popBackStack() },
-            onOpenLocationTimeline = { /* Location timeline not routed from settings on desktop */ },
+            onOpenLocationTimeline = { /* No location timeline on desktop */ },
         )
     }
     composable<MemoriesSettingsRoute> {
@@ -94,6 +101,9 @@ fun NavGraphBuilder.settingsGraph(navController: NavController) {
     composable<DayBoundarySettingsRoute> {
         DayBoundarySettingsScreen(
             onBack = { navController.popBackStack() },
+            // Health Connect not available on desktop
+            onRequestHealthPermissions = {},
+            onEnableSleepBasedWithPermissions = {},
         )
     }
     composable<SyncSettingsRoute> {
@@ -114,8 +124,22 @@ fun NavGraphBuilder.settingsGraph(navController: NavController) {
     composable<ResetSettingsRoute> {
         ResetSettingsScreen(
             onBack = { navController.popBackStack() },
-            onNavigateToClearData = { /* Not critical for desktop MVP */ },
-            onNavigateToResetApp = { /* Not critical for desktop MVP */ },
+            onNavigateToClearData = { navController.navigate(ClearDataSettingsRoute) },
+            onNavigateToResetApp = { navController.navigate(ResetAppSettingsRoute) },
+        )
+    }
+    composable<ClearDataSettingsRoute> {
+        ClearDataSettingsScreen(
+            onBack = { navController.popBackStack() },
+        )
+    }
+    composable<ResetAppSettingsRoute> {
+        ResetAppSettingsScreen(
+            onBack = { navController.popBackStack() },
+            onAppReset = {
+                // After reset, navigate back to root
+                navController.popBackStack(SettingsRoute(), inclusive = true)
+            },
         )
     }
     composable<BirthdaySettingsRoute> {
