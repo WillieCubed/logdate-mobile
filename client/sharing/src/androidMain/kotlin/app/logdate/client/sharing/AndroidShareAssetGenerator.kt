@@ -15,10 +15,8 @@ import android.text.TextUtils
 import androidx.core.content.FileProvider
 import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.createBitmap
-import androidx.core.graphics.toColorInt
 import androidx.core.util.AtomicFile
 import app.logdate.shared.model.Journal
-import app.logdate.util.toReadableDateShort
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import kotlinx.coroutines.CoroutineDispatcher
@@ -28,16 +26,45 @@ import java.io.File
 import java.io.OutputStream
 import kotlin.math.abs
 
-// All in pixels — cover dimensions match the in-app AspectRatios.JOURNAL_COVER (9:16)
+// Cover dimensions — match the in-app AspectRatios.JOURNAL_COVER (9:16)
 private const val JOURNAL_COVER_WIDTH = 480
 private const val JOURNAL_COVER_HEIGHT = 853
-private const val JOURNAL_COVER_CORNER_RADIUS = 44f // proportional to 16.dp at max cover width
+private const val JOURNAL_COVER_CORNER_RADIUS = 44f
 private const val JOURNAL_COVER_PADDING = 40f
-private const val QR_CODE_SIZE = 1080
 
-// Cache file name prefixes — bump version suffix when cover rendering changes significantly
-private const val CACHE_BACKGROUND = "shared_journal_background"
-private const val CACHE_COVER = "shared_journal_cover_v3"
+// Cover text
+private const val TITLE_TEXT_SIZE = 40f
+private const val SUBTITLE_TEXT_SIZE = 26f
+private const val TITLE_MAX_LINES = 4
+private const val SUBTITLE_MAX_LINES = 2
+private const val TITLE_SUBTITLE_GAP = 8f
+private const val SUBTITLE_ALPHA_FACTOR = 0.7f
+private const val DEFAULT_TAGLINE = "logdate.app"
+
+// HSL values — match deriveCoverColor() in JournalCover.kt
+private const val HUE_DEGREES = 360
+private const val COVER_SATURATION = 0.50f
+private const val COVER_LIGHTNESS = 0.80f
+private const val LUMINANCE_THRESHOLD = 0.5f
+private const val TEXT_ON_LIGHT_ALPHA = 222 // 0.87 × 255
+private const val TEXT_ON_DARK_ALPHA = 242 // 0.95 × 255
+
+// Background HSL — desaturated tint of the journal's hue
+private const val BG_LIGHT_SATURATION = 0.25f
+private const val BG_LIGHT_LIGHTNESS = 0.92f
+private const val BG_DARK_SATURATION = 0.15f
+private const val BG_DARK_LIGHTNESS = 0.12f
+
+// Story background dimensions (used by system share sheet)
+private const val STORY_BACKGROUND_WIDTH = 1080
+private const val STORY_BACKGROUND_HEIGHT = 1920
+
+private const val QR_CODE_SIZE = 1080
+private const val PNG_QUALITY = 100
+
+// Cache file name prefixes — no versioning; files are always regenerated on share
+private const val CACHE_BACKGROUND = "shared_journal_bg"
+private const val CACHE_COVER = "shared_journal_cover"
 private const val CACHE_QR = "shared_journal_qr"
 
 /**
@@ -53,33 +80,24 @@ class AndroidShareAssetGenerator(
     ): String =
         withContext(ioDispatcher) {
             val file = backgroundCacheFile(journal, shareTheme)
-            if (file.exists()) {
-                return@withContext fileToShareUri(file).toString()
-            }
-            val bitmap = generateBackgroundLayer(shareTheme)
-            writeAtomically(file) { bitmap.compress(ShareAssetFormats.ASSET_COMPRESS_FORMAT, 100, it) }
+            val bitmap = renderBackground(journal, shareTheme)
+            writeAtomically(file) { bitmap.compress(ShareAssetFormats.ASSET_COMPRESS_FORMAT, PNG_QUALITY, it) }
             fileToShareUri(file).toString()
         }
 
     override suspend fun generateStickerLayer(journal: Journal): String =
         withContext(ioDispatcher) {
             val file = coverCacheFile(journal)
-            if (file.exists()) {
-                return@withContext fileToShareUri(file).toString()
-            }
             val bitmap = generateJournalCover(journal)
-            writeAtomically(file) { bitmap.compress(ShareAssetFormats.ASSET_COMPRESS_FORMAT, 100, it) }
+            writeAtomically(file) { bitmap.compress(ShareAssetFormats.ASSET_COMPRESS_FORMAT, PNG_QUALITY, it) }
             fileToShareUri(file).toString()
         }
 
     override suspend fun generateJournalQrCode(journal: Journal): String =
         withContext(ioDispatcher) {
             val file = qrCacheFile(journal)
-            if (file.exists()) {
-                return@withContext fileToShareUri(file).toString()
-            }
             val bitmap = generateQrCodeBitmap("https://logdate.app/j/${journal.id}")
-            writeAtomically(file) { bitmap.compress(ShareAssetFormats.ASSET_COMPRESS_FORMAT, 100, it) }
+            writeAtomically(file) { bitmap.compress(ShareAssetFormats.ASSET_COMPRESS_FORMAT, PNG_QUALITY, it) }
             fileToShareUri(file).toString()
         }
 
@@ -116,19 +134,22 @@ class AndroidShareAssetGenerator(
         }
     }
 
-    private fun generateBackgroundLayer(shareTheme: ShareTheme): Bitmap {
-        val bitmap = createBitmap(1080, 1920)
+    private fun journalHue(journal: Journal): Float = abs(journal.id.hashCode() % HUE_DEGREES).toFloat()
+
+    private fun renderBackground(
+        journal: Journal,
+        shareTheme: ShareTheme,
+    ): Bitmap {
+        val hue = journalHue(journal)
+        val bgColor =
+            if (shareTheme == ShareTheme.Dark) {
+                ColorUtils.HSLToColor(floatArrayOf(hue, BG_DARK_SATURATION, BG_DARK_LIGHTNESS))
+            } else {
+                ColorUtils.HSLToColor(floatArrayOf(hue, BG_LIGHT_SATURATION, BG_LIGHT_LIGHTNESS))
+            }
+        val bitmap = createBitmap(STORY_BACKGROUND_WIDTH, STORY_BACKGROUND_HEIGHT)
         with(Canvas(bitmap)) {
-            val paint =
-                Paint().apply {
-                    color =
-                        if (shareTheme == ShareTheme.Dark) {
-                            "#11140f".toColorInt() // Surface dark
-                        } else {
-                            "#f7fbf1".toColorInt() // Surface light
-                        }
-                }
-            drawRect(0f, 0f, 1080f, 1920f, paint)
+            drawColor(bgColor)
         }
         return bitmap
     }
@@ -138,96 +159,130 @@ class AndroidShareAssetGenerator(
      *
      * - Shape: flat left edge, rounded right edge (book-spine aesthetic), matching JournalShape.
      * - Color: HSL-derived from journal ID, matching deriveCoverColor().
-     * - Text: title (titleMedium weight) + "Last updated …" subtitle, bottom-left aligned.
+     * - Text: title + tagline, bottom-left aligned.
      */
     private fun generateJournalCover(journal: Journal): Bitmap {
-        val hue = abs(journal.id.hashCode() % 360).toFloat()
-        val coverColorInt = ColorUtils.HSLToColor(floatArrayOf(hue, 0.50f, 0.80f))
-
-        // Replicate the UI luminance-based text color logic from JournalCover.kt
-        val luminance = ColorUtils.calculateLuminance(coverColorInt)
-        val textColorInt =
-            if (luminance > 0.5f) {
-                Color.argb(222, 0, 0, 0) // Black @ 0.87 alpha
-            } else {
-                Color.argb(242, 255, 255, 255) // White @ 0.95 alpha
-            }
+        val coverColorInt = coverColor(journal)
+        val textColorInt = textColorFor(coverColorInt)
 
         val bitmap = createBitmap(JOURNAL_COVER_WIDTH, JOURNAL_COVER_HEIGHT)
+        val canvas = Canvas(bitmap)
+
+        val coverPath =
+            bookSpinePath(
+                JOURNAL_COVER_WIDTH.toFloat(),
+                JOURNAL_COVER_HEIGHT.toFloat(),
+                JOURNAL_COVER_CORNER_RADIUS,
+            )
+        canvas.drawPath(coverPath, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = coverColorInt })
+        canvas.clipPath(coverPath)
+
+        val tagline = journal.description.ifBlank { DEFAULT_TAGLINE }
+        drawCoverText(canvas, journal.title, tagline, textColorInt)
+
+        return bitmap
+    }
+
+    private fun coverColor(journal: Journal): Int =
+        ColorUtils.HSLToColor(floatArrayOf(journalHue(journal), COVER_SATURATION, COVER_LIGHTNESS))
+
+    private fun textColorFor(backgroundColor: Int): Int {
+        val luminance = ColorUtils.calculateLuminance(backgroundColor)
+        return if (luminance > LUMINANCE_THRESHOLD) {
+            Color.argb(TEXT_ON_LIGHT_ALPHA, 0, 0, 0)
+        } else {
+            Color.argb(TEXT_ON_DARK_ALPHA, 255, 255, 255)
+        }
+    }
+
+    private fun bookSpinePath(
+        width: Float,
+        height: Float,
+        cornerRadius: Float,
+    ): Path =
+        Path().apply {
+            addRoundRect(
+                RectF(0f, 0f, width, height),
+                floatArrayOf(0f, 0f, cornerRadius, cornerRadius, cornerRadius, cornerRadius, 0f, 0f),
+                Path.Direction.CW,
+            )
+        }
+
+    private fun drawCoverText(
+        canvas: Canvas,
+        title: String,
+        subtitle: String,
+        textColor: Int,
+    ) {
         val w = JOURNAL_COVER_WIDTH.toFloat()
         val h = JOURNAL_COVER_HEIGHT.toFloat()
-        val r = JOURNAL_COVER_CORNER_RADIUS
+        val textWidth = (w - JOURNAL_COVER_PADDING * 2).toInt()
 
-        with(Canvas(bitmap)) {
-            // Clip to book-spine shape before any drawing — eliminates corner artifacts
-            // caused by anti-aliased pixels blending against transparent-black.
-            val coverPath =
-                Path().apply {
-                    addRoundRect(
-                        RectF(0f, 0f, w, h),
-                        floatArrayOf(0f, 0f, r, r, r, r, 0f, 0f),
-                        Path.Direction.CW,
-                    )
-                }
-            clipPath(coverPath)
-            drawColor(coverColorInt)
+        val subtitleAlpha = (Color.alpha(textColor) * SUBTITLE_ALPHA_FACTOR).toInt()
+        val subtitleColor =
+            Color.argb(
+                subtitleAlpha,
+                Color.red(textColor),
+                Color.green(textColor),
+                Color.blue(textColor),
+            )
 
-            val padding = JOURNAL_COVER_PADDING
-            val textWidth = (w - padding * 2).toInt()
+        val subtitleLayout =
+            buildTextLayout(
+                subtitle,
+                subtitleColor,
+                SUBTITLE_TEXT_SIZE,
+                textWidth,
+                SUBTITLE_MAX_LINES,
+            )
+        val titleLayout =
+            buildTextLayout(
+                title,
+                textColor,
+                TITLE_TEXT_SIZE,
+                textWidth,
+                TITLE_MAX_LINES,
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL),
+            )
 
-            // Subtitle text color: 70% alpha of the title color, matching JournalCoverContent
-            val subtitleAlpha = (Color.alpha(textColorInt) * 0.7f).toInt()
-            val subtitleColorInt =
-                Color.argb(
-                    subtitleAlpha,
-                    Color.red(textColorInt),
-                    Color.green(textColorInt),
-                    Color.blue(textColorInt),
-                )
+        val subtitleTop = h - JOURNAL_COVER_PADDING - subtitleLayout.height
+        val titleTop = subtitleTop - TITLE_SUBTITLE_GAP - titleLayout.height
 
-            val subtitlePaint =
-                TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = subtitleColorInt
-                    textSize = 26f
-                }
-            val subtitleText = "Last updated ${journal.lastUpdated.toReadableDateShort()}"
-            val subtitleLayout =
-                StaticLayout.Builder
-                    .obtain(subtitleText, 0, subtitleText.length, subtitlePaint, textWidth)
-                    .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-                    .setMaxLines(1)
-                    .build()
+        canvas.withTranslation(JOURNAL_COVER_PADDING, titleTop) { titleLayout.draw(this) }
+        canvas.withTranslation(JOURNAL_COVER_PADDING, subtitleTop) { subtitleLayout.draw(this) }
+    }
 
-            // titleMedium: 16sp, FontWeight(500) — "sans-serif-medium" maps to weight 500 on Android
-            val titlePaint =
-                TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = textColorInt
-                    textSize = 40f
-                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-                }
-            val titleLayout =
-                StaticLayout.Builder
-                    .obtain(journal.title, 0, journal.title.length, titlePaint, textWidth)
-                    .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-                    .setMaxLines(4)
-                    .setEllipsize(TextUtils.TruncateAt.END)
-                    .build()
+    private fun buildTextLayout(
+        text: String,
+        color: Int,
+        size: Float,
+        width: Int,
+        maxLines: Int,
+        typeface: Typeface? = null,
+    ): StaticLayout {
+        val paint =
+            TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = color
+                textSize = size
+                typeface?.let { this.typeface = it }
+            }
+        return StaticLayout.Builder
+            .obtain(text, 0, text.length, paint, width)
+            .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+            .setMaxLines(maxLines)
+            .setEllipsize(TextUtils.TruncateAt.END)
+            .build()
+    }
 
-            // Stack from the bottom: subtitle, then title above it, both left-aligned
-            val subtitleTop = h - padding - subtitleLayout.height
-            val titleTop = subtitleTop - 8f - titleLayout.height
-
-            save()
-            translate(padding, titleTop)
-            titleLayout.draw(this)
-            restore()
-
-            save()
-            translate(padding, subtitleTop)
-            subtitleLayout.draw(this)
-            restore()
-        }
-        return bitmap
+    private inline fun Canvas.withTranslation(
+        x: Float,
+        y: Float,
+        block: Canvas.() -> Unit,
+    ) {
+        save()
+        translate(x, y)
+        block()
+        restore()
     }
 
     private fun generateQrCodeBitmap(content: String): Bitmap {

@@ -6,18 +6,19 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.core.content.FileProvider
+import androidx.core.graphics.ColorUtils
 import app.logdate.client.media.MediaManager
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.shared.model.Journal
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import java.io.File
+import kotlin.math.abs
 import kotlin.uuid.Uuid
 
 /**
@@ -89,17 +90,15 @@ class AndroidSharingLauncher(
                         return@launch
                     }
             try {
-                val (backgroundUri, coverUri) =
-                    coroutineScope {
-                        val bg = async { Uri.parse(shareAssetGenerator.generateBackgroundLayer(journal, theme)) }
-                        val cover = async { Uri.parse(shareAssetGenerator.generateStickerLayer(journal)) }
-                        bg.await() to cover.await()
-                    }
-                listOf(backgroundUri, coverUri).forEach { uri ->
-                    context.grantUriPermission(INSTAGRAM_PACKAGE_NAME, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
+                val coverUri = Uri.parse(shareAssetGenerator.generateStickerLayer(journal))
+                context.grantUriPermission(
+                    INSTAGRAM_PACKAGE_NAME,
+                    coverUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+                val bgHex = journalBackgroundHex(journal, theme)
                 context.startActivity(
-                    createInstagramStoryIntent(backgroundUri, coverUri).apply {
+                    createInstagramStoryIntent(coverUri, bgHex, bgHex).apply {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     },
                 )
@@ -119,6 +118,29 @@ class AndroidSharingLauncher(
         } catch (_: PackageManager.NameNotFoundException) {
             false
         }
+
+    private fun journalBackgroundHex(
+        journal: Journal,
+        theme: ShareTheme,
+    ): String {
+        val hue = abs(journal.id.hashCode() % HUE_DEGREES).toFloat()
+        val colorInt =
+            if (theme == ShareTheme.Dark) {
+                ColorUtils.HSLToColor(floatArrayOf(hue, BG_DARK_SATURATION, BG_DARK_LIGHTNESS))
+            } else {
+                ColorUtils.HSLToColor(floatArrayOf(hue, BG_LIGHT_SATURATION, BG_LIGHT_LIGHTNESS))
+            }
+        return String.format("#%06X", RGB_MASK and colorInt)
+    }
+
+    companion object {
+        private const val HUE_DEGREES = 360
+        private const val BG_LIGHT_SATURATION = 0.20f
+        private const val BG_LIGHT_LIGHTNESS = 0.92f
+        private const val BG_DARK_SATURATION = 0.15f
+        private const val BG_DARK_LIGHTNESS = 0.12f
+        private const val RGB_MASK = 0xFFFFFF
+    }
 
     /**
      * Shares a journal using the system share sheet.
