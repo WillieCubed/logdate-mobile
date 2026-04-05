@@ -37,6 +37,9 @@ import app.logdate.shared.model.Journal
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.common.AspectRatios
+import app.logdate.ui.common.ContextMenuArea
+import app.logdate.ui.common.ContextMenuItem
+import app.logdate.ui.common.focusableWithRing
 import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
@@ -78,6 +81,7 @@ fun JournalCover(
     journal: Journal,
     modifier: Modifier = Modifier,
     onClick: JournalClickCallback? = null,
+    contextMenuItems: List<ContextMenuItem> = emptyList(),
     enabled: Boolean = true,
     elevation: Dp = 0.dp,
 ) {
@@ -97,7 +101,7 @@ fun JournalCover(
                 shape = JournalShape,
             ).let { mod ->
                 if (onClick != null) {
-                    mod.clickable(enabled) { onClick(journal.id) }
+                    mod.focusableWithRing().clickable(enabled) { onClick(journal.id) }
                 } else {
                     mod
                 }
@@ -117,24 +121,26 @@ fun JournalCover(
             }
         }
 
-    if (animatedVisibilityScope != null && sharedTransitionScope != null) {
-        with(sharedTransitionScope) {
-            Box(
-                modifier =
-                    baseModifier
-                        .sharedElement(
-                            sharedTransitionScope.rememberSharedContentState(
-                                TransitionKeys.journalContainerTransition(journal.id),
+    ContextMenuArea(items = contextMenuItems) {
+        if (animatedVisibilityScope != null && sharedTransitionScope != null) {
+            with(sharedTransitionScope) {
+                Box(
+                    modifier =
+                        baseModifier
+                            .sharedElement(
+                                sharedTransitionScope.rememberSharedContentState(
+                                    TransitionKeys.journalContainerTransition(journal.id),
+                                ),
+                                animatedVisibilityScope,
                             ),
-                            animatedVisibilityScope,
-                        ),
-            ) {
+                ) {
+                    JournalCoverContent(journal, textColor)
+                }
+            }
+        } else {
+            Box(modifier = baseModifier) {
                 JournalCoverContent(journal, textColor)
             }
-        }
-    } else {
-        Box(modifier = baseModifier) {
-            JournalCoverContent(journal, textColor)
         }
     }
 }

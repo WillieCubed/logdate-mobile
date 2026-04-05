@@ -23,6 +23,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
+import app.logdate.ui.common.focusableWithRing
 import app.logdate.util.toReadableDateTimeShort
 
 data class UniversalSearchResultUiState(
@@ -64,7 +65,7 @@ fun UniversalSearchResultItem(
         leadingContent = {
             Icon(state.typeIcon, contentDescription = state.typeLabel)
         },
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier.focusableWithRing().clickable(onClick = onClick),
     )
 }
 

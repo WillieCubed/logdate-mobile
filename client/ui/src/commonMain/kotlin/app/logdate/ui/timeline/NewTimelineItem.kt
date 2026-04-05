@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.conditional
+import app.logdate.ui.common.focusableWithRing
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.asTime
 import logdate.client.ui.generated.resources.*
@@ -129,6 +130,7 @@ fun TextTimelineDetailItem(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .focusableWithRing()
                 .clickable(onClick = onClick),
     ) {
         Column(
