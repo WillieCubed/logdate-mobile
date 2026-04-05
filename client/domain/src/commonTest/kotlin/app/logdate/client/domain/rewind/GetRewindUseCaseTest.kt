@@ -35,6 +35,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -115,8 +116,8 @@ class GetRewindUseCaseTest {
             val result = useCase(params).first()
 
             // Then
-            assertTrue(result is RewindQueryResult.Success)
-            assertEquals(testRewind, (result as RewindQueryResult.Success).rewind)
+            val success = assertIs<RewindQueryResult.Success>(result)
+            assertEquals(testRewind, success.rewind)
             assertEquals(1, rewindRepository.getRewindBetweenCalls.size)
 
             val call = rewindRepository.getRewindBetweenCalls.first()
@@ -189,8 +190,8 @@ class GetRewindUseCaseTest {
             val result2 = useCase(params2).first()
 
             // Then
-            assertTrue(result1 is RewindQueryResult.Success)
-            assertEquals(rewind1, (result1 as RewindQueryResult.Success).rewind)
+            val success1 = assertIs<RewindQueryResult.Success>(result1)
+            assertEquals(rewind1, success1.rewind)
             assertEquals(RewindQueryResult.Generating, result2)
             assertEquals(2, rewindRepository.getRewindBetweenCalls.size)
         }
@@ -212,10 +213,10 @@ class GetRewindUseCaseTest {
             val result2 = useCase(params).first()
 
             // Then
-            assertTrue(result1 is RewindQueryResult.Success)
-            assertTrue(result2 is RewindQueryResult.Success)
-            assertEquals(testRewind, (result1 as RewindQueryResult.Success).rewind)
-            assertEquals(testRewind, (result2 as RewindQueryResult.Success).rewind)
+            val success1 = assertIs<RewindQueryResult.Success>(result1)
+            val success2 = assertIs<RewindQueryResult.Success>(result2)
+            assertEquals(testRewind, success1.rewind)
+            assertEquals(testRewind, success2.rewind)
             assertEquals(2, rewindRepository.getRewindBetweenCalls.size)
         }
 

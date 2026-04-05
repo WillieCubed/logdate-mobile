@@ -25,6 +25,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -105,8 +106,8 @@ class SummarizeJournalEntriesUseCaseTest {
             val result = useCase(testEntries)
 
             // Then
-            assertTrue(result is SummarizeJournalEntriesResult.Success)
-            assertEquals(expectedSummary, (result as SummarizeJournalEntriesResult.Success).summary)
+            val success = assertIs<SummarizeJournalEntriesResult.Success>(result)
+            assertEquals(expectedSummary, success.summary)
             assertEquals(1, fakeChatClient.prompts.size)
         }
 
@@ -216,8 +217,8 @@ class SummarizeJournalEntriesUseCaseTest {
             val result = useCase(listOf(singleNote))
 
             // Then
-            assertTrue(result is SummarizeJournalEntriesResult.Success)
-            assertEquals("Single note summary", (result as SummarizeJournalEntriesResult.Success).summary)
+            val success = assertIs<SummarizeJournalEntriesResult.Success>(result)
+            assertEquals("Single note summary", success.summary)
         }
 
     private fun createTestNote(

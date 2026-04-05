@@ -5,6 +5,7 @@ import app.logdate.shared.model.LogDateAccount
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class DeletePasskeyUseCaseTest {
@@ -103,8 +104,7 @@ class DeletePasskeyUseCaseTest {
             val result = useCase(request)
 
             // Assert
-            assertTrue(result is DeletePasskeyUseCase.DeletePasskeyResult.Error)
-            val errorResult = result as DeletePasskeyUseCase.DeletePasskeyResult.Error
+            val errorResult = assertIs<DeletePasskeyUseCase.DeletePasskeyResult.Error>(result)
             assertEquals(errorMessage, errorResult.message)
             assertEquals(exception, errorResult.cause)
         }

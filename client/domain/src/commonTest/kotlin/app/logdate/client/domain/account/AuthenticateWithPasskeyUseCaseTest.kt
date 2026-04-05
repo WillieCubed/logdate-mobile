@@ -5,6 +5,7 @@ import app.logdate.shared.model.LogDateAccount
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
@@ -301,7 +302,7 @@ class AuthenticateWithPasskeyUseCaseTest {
 
             // Then
             assertTrue(result is AuthenticateWithPasskeyUseCase.Result.Error)
-            assertTrue(result.error is AuthenticateWithPasskeyUseCase.AuthenticationError.Unknown)
-            assertEquals("Unexpected error", (result.error as AuthenticateWithPasskeyUseCase.AuthenticationError.Unknown).message)
+            val error = assertIs<AuthenticateWithPasskeyUseCase.AuthenticationError.Unknown>(result.error)
+            assertEquals("Unexpected error", error.message)
         }
 }
