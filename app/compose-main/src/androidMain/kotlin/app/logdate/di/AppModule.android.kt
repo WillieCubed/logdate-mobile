@@ -1,6 +1,10 @@
 package app.logdate.di
 
 import android.app.Application
+import app.logdate.client.ambient.AmbientPromptNotificationCoordinator
+import app.logdate.client.ambient.AmbientPromptScheduler
+import app.logdate.client.ambient.AmbientPromptSchedulingObserver
+import app.logdate.client.ambient.AmbientPromptWorker
 import app.logdate.client.data.di.appDataModule
 import app.logdate.client.device.di.deviceModule
 import app.logdate.client.domain.di.accountDomainModule
@@ -39,6 +43,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
+import org.koin.androidx.workmanager.dsl.workerOf
 import org.koin.androidx.workmanager.koin.workManagerFactory
 import org.koin.core.context.startKoin
 import org.koin.core.module.Module
@@ -70,6 +75,11 @@ actual val appModule: Module =
         includes(audioModule)
         includes(windowingModule)
         includes(widgetModule)
+
+        single { AmbientPromptNotificationCoordinator(androidContext()) }
+        single { AmbientPromptScheduler(androidContext(), get()) }
+        single { AmbientPromptSchedulingObserver(get(), get(), get()) }
+        workerOf(::AmbientPromptWorker)
 
         single { NoteDataMapper() }
         single { WearSyncNotificationHelper(androidContext()) }

@@ -5,6 +5,9 @@ package app.logdate.client
 import android.app.Application
 import android.content.Context
 import android.util.Log
+import app.logdate.client.ambient.AmbientPromptScheduler
+import app.logdate.client.ambient.AmbientPromptSchedulingObserver
+import app.logdate.client.domain.recommendation.AmbientPromptTriggerContext
 import app.logdate.client.image.DataSaverImageInterceptor
 import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.client.networking.DataUsagePolicy
@@ -60,6 +63,12 @@ class LogdateApplication :
             LogDateNotificationRegistrar(this).registerAllPhoneChannels()
         }.onFailure { error ->
             Napier.w("Failed to register notification channels on app startup", error)
+        }
+        runCatching {
+            get<AmbientPromptSchedulingObserver>().start()
+            get<AmbientPromptScheduler>().enqueueImmediateEvaluation(AmbientPromptTriggerContext.PERIODIC)
+        }.onFailure { error ->
+            Napier.w("Failed to initialize ambient prompt scheduling", error)
         }
         runCatching {
             get<LocationTrackingManager>().startTracking()

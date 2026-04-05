@@ -2,6 +2,7 @@ package app.logdate.feature.core.settings.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.domain.recommendation.AmbientPromptTime
 import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.domain.recommendation.RecallMode
@@ -49,6 +50,86 @@ class MemoriesSettingsViewModel(
                 settingsRepository.setAiRecallEnabled(enabled)
             } catch (e: Exception) {
                 Napier.e("Failed to toggle AI recall", e)
+            }
+        }
+    }
+
+    fun toggleAmbientPrompts(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                settingsRepository.setAmbientPromptsEnabled(enabled)
+            } catch (e: Exception) {
+                Napier.e("Failed to toggle ambient prompts", e)
+            }
+        }
+    }
+
+    fun toggleCaptureNudges(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                settingsRepository.setCaptureNudgesEnabled(enabled)
+            } catch (e: Exception) {
+                Napier.e("Failed to toggle capture nudges", e)
+            }
+        }
+    }
+
+    fun toggleDraftRescue(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                settingsRepository.setDraftRescueEnabled(enabled)
+            } catch (e: Exception) {
+                Napier.e("Failed to toggle draft rescue", e)
+            }
+        }
+    }
+
+    fun toggleMemoryRecallNotifications(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                settingsRepository.setMemoryRecallNotificationsEnabled(enabled)
+            } catch (e: Exception) {
+                Napier.e("Failed to toggle memory recall notifications", e)
+            }
+        }
+    }
+
+    fun toggleMorningPrompt(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                settingsRepository.setMorningPromptEnabled(enabled)
+            } catch (e: Exception) {
+                Napier.e("Failed to toggle morning prompt", e)
+            }
+        }
+    }
+
+    fun toggleEveningPrompt(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                settingsRepository.setEveningPromptEnabled(enabled)
+            } catch (e: Exception) {
+                Napier.e("Failed to toggle evening prompt", e)
+            }
+        }
+    }
+
+    fun setMorningPromptTime(time: AmbientPromptTime) {
+        viewModelScope.launch {
+            try {
+                settingsRepository.setMorningPromptTime(time)
+            } catch (e: Exception) {
+                Napier.e("Failed to set morning prompt time", e)
+            }
+        }
+    }
+
+    fun setEveningPromptTime(time: AmbientPromptTime) {
+        viewModelScope.launch {
+            try {
+                settingsRepository.setEveningPromptTime(time)
+            } catch (e: Exception) {
+                Napier.e("Failed to set evening prompt time", e)
             }
         }
     }

@@ -2,6 +2,7 @@
 <resources>
     <string name="notification_group_capture_playback">Capture &amp; playback</string>
     <string name="notification_group_background_services">Background services</string>
+    <string name="notification_group_ambient_intelligence">Ambient intelligence</string>
     <string name="notification_group_connected_devices">Connected devices</string>
     <string name="notification_group_import_export">Import &amp; export</string>
 
@@ -11,6 +12,12 @@
     <string name="notification_channel_audio_playback_description">Shows playback controls while you listen to saved audio notes.</string>
     <string name="notification_channel_location_history_name">Location history</string>
     <string name="notification_channel_location_history_description">Keeps location history tracking running in the background.</string>
+    <string name="notification_channel_capture_nudges_name">Capture nudges</string>
+    <string name="notification_channel_capture_nudges_description">Timely prompts to write while something is still fresh.</string>
+    <string name="notification_channel_draft_rescue_name">Draft rescue</string>
+    <string name="notification_channel_draft_rescue_description">Reminders to finish entries you already started.</string>
+    <string name="notification_channel_memory_recall_name">Memory recall</string>
+    <string name="notification_channel_memory_recall_description">Prompts to revisit meaningful older entries.</string>
     <string name="notification_channel_watch_sync_name">Watch sync</string>
     <string name="notification_channel_watch_sync_description">Alerts when entries arrive from your watch.</string>
     <string name="notification_channel_data_export_name">Data export</string>
@@ -22,4 +29,16 @@
     <string name="notification_settings_android_section">Android settings</string>
     <string name="notification_settings_app_title">All LogDate notifications</string>
     <string name="notification_settings_app_description">Open Android notification settings for LogDate.</string>
+
+    <string name="ambient_prompt_capture_morning_title">Start today’s story</string>
+    <string name="ambient_prompt_capture_morning_body">Write a quick note before the day gets away from you.</string>
+    <string name="ambient_prompt_capture_evening_title">Reflect on today</string>
+    <string name="ambient_prompt_capture_evening_body">Capture what stood out before the day fades.</string>
+    <string name="ambient_prompt_capture_novel_place_title">Write about %1$s</string>
+    <string name="ambient_prompt_capture_novel_place_body">You spent time somewhere new today. Capture what made it memorable.</string>
+    <string name="ambient_prompt_capture_novel_place_body_fallback">Something about today seems worth writing down while it’s still fresh.</string>
+    <string name="ambient_prompt_draft_rescue_title">Finish your draft</string>
+    <string name="ambient_prompt_draft_rescue_body">You already started writing. Pick it back up before the details fade.</string>
+    <string name="ambient_prompt_memory_recall_title">Revisit a memory</string>
+    <string name="ambient_prompt_memory_recall_body">Open an older entry worth revisiting today.</string>
 </resources>

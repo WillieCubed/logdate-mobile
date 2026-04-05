@@ -38,10 +38,15 @@ import app.logdate.client.domain.onboarding.ProcessPersonalIntroductionUseCase
 import app.logdate.client.domain.places.PlaceResolutionCache
 import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
 import app.logdate.client.domain.profile.UpdateProfileUseCase
+import app.logdate.client.domain.recommendation.AmbientPromptHistoryRepository
+import app.logdate.client.domain.recommendation.DefaultAmbientPromptHistoryRepository
 import app.logdate.client.domain.recommendation.DefaultMemoriesSettingsRepository
+import app.logdate.client.domain.recommendation.DefaultPlaceFamiliarityRepository
+import app.logdate.client.domain.recommendation.GenerateAmbientPromptCandidatesUseCase
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
+import app.logdate.client.domain.recommendation.PlaceFamiliarityRepository
 import app.logdate.client.domain.restore.PreviewArchiveUseCase
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.domain.rewind.GenerateBasicRewindUseCase
@@ -189,6 +194,9 @@ val domainModule: Module =
         // Recommendations
         factory { GetMemoryRecallUseCase(get(), getOrNull()) }
         factory { GetHomeRecommendationUseCase(get(), get(), get(), get(), get(), get()) }
+        factory { GenerateAmbientPromptCandidatesUseCase(get(), get(), get(), get(), get(), get(), get(), get()) }
+        single<AmbientPromptHistoryRepository> { DefaultAmbientPromptHistoryRepository(get()) }
+        single<PlaceFamiliarityRepository> { DefaultPlaceFamiliarityRepository(get()) }
         single<MemoriesSettingsRepository> { DefaultMemoriesSettingsRepository(get()) }
 
         // Streaks

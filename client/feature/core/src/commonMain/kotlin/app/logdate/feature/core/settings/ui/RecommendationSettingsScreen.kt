@@ -6,19 +6,54 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import app.logdate.client.domain.recommendation.AmbientPromptTime
 import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.PrimaryTogglePill
 import app.logdate.ui.common.SettingsScaffold
+import app.logdate.ui.common.SimpleSettingsItem
 import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.theme.Spacing
+import app.logdate.util.asTime
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.todayIn
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.ambient_prompts
+import logdate.client.feature.core.generated.resources.ambient_prompts_description
+import logdate.client.feature.core.generated.resources.cancel
+import logdate.client.feature.core.generated.resources.capture_nudges
+import logdate.client.feature.core.generated.resources.capture_nudges_description
+import logdate.client.feature.core.generated.resources.confirm
+import logdate.client.feature.core.generated.resources.draft_rescue
+import logdate.client.feature.core.generated.resources.draft_rescue_description
+import logdate.client.feature.core.generated.resources.evening_prompt
+import logdate.client.feature.core.generated.resources.evening_prompt_description
+import logdate.client.feature.core.generated.resources.evening_prompt_time
+import logdate.client.feature.core.generated.resources.evening_prompt_time_description
+import logdate.client.feature.core.generated.resources.memory_recall_notifications
+import logdate.client.feature.core.generated.resources.memory_recall_notifications_description
+import logdate.client.feature.core.generated.resources.morning_prompt
+import logdate.client.feature.core.generated.resources.morning_prompt_description
+import logdate.client.feature.core.generated.resources.morning_prompt_time
+import logdate.client.feature.core.generated.resources.morning_prompt_time_description
+import logdate.client.feature.core.generated.resources.prompt_schedule
 import logdate.client.feature.core.generated.resources.recall_options
 import logdate.client.feature.core.generated.resources.recommendations
 import logdate.client.feature.core.generated.resources.recommendations_detail_description
@@ -27,6 +62,7 @@ import logdate.client.feature.core.generated.resources.smart_recall_description
 import logdate.client.feature.core.generated.resources.use_recommendations
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.time.Clock
 
 /**
  * Detail screen for the Recommendations setting group.
@@ -46,19 +82,43 @@ fun RecommendationSettingsScreen(
         settings = uiState.settings,
         onBack = onBack,
         onToggleContextualRecommendations = viewModel::toggleContextualRecommendations,
+        onToggleAmbientPrompts = viewModel::toggleAmbientPrompts,
+        onToggleCaptureNudges = viewModel::toggleCaptureNudges,
+        onToggleDraftRescue = viewModel::toggleDraftRescue,
+        onToggleMemoryRecallNotifications = viewModel::toggleMemoryRecallNotifications,
+        onToggleMorningPrompt = viewModel::toggleMorningPrompt,
+        onToggleEveningPrompt = viewModel::toggleEveningPrompt,
+        onSetMorningPromptTime = viewModel::setMorningPromptTime,
+        onSetEveningPromptTime = viewModel::setEveningPromptTime,
         onToggleSmartRecall = viewModel::toggleAiRecall,
         modifier = modifier,
     )
 }
 
+private enum class PromptTimeSelection {
+    MORNING,
+    EVENING,
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecommendationSettingsContent(
     settings: MemoriesSettings,
     onBack: () -> Unit,
     onToggleContextualRecommendations: (Boolean) -> Unit,
+    onToggleAmbientPrompts: (Boolean) -> Unit,
+    onToggleCaptureNudges: (Boolean) -> Unit,
+    onToggleDraftRescue: (Boolean) -> Unit,
+    onToggleMemoryRecallNotifications: (Boolean) -> Unit,
+    onToggleMorningPrompt: (Boolean) -> Unit,
+    onToggleEveningPrompt: (Boolean) -> Unit,
+    onSetMorningPromptTime: (AmbientPromptTime) -> Unit,
+    onSetEveningPromptTime: (AmbientPromptTime) -> Unit,
     onToggleSmartRecall: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var editingPromptTime by remember { mutableStateOf<PromptTimeSelection?>(null) }
+
     SettingsScaffold(
         title = stringResource(Res.string.recommendations),
         onBack = onBack,
@@ -95,6 +155,86 @@ fun RecommendationSettingsContent(
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Text(
+                        text = stringResource(Res.string.ambient_prompts),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(vertical = Spacing.sm),
+                    )
+
+                    MaterialContainer {
+                        ToggleSettingsItem(
+                            title = stringResource(Res.string.ambient_prompts),
+                            description = stringResource(Res.string.ambient_prompts_description),
+                            checked = settings.ambientPromptsEnabled,
+                            onCheckedChange = onToggleAmbientPrompts,
+                        )
+
+                        if (settings.ambientPromptsEnabled) {
+                            ToggleSettingsItem(
+                                title = stringResource(Res.string.capture_nudges),
+                                description = stringResource(Res.string.capture_nudges_description),
+                                checked = settings.captureNudgesEnabled,
+                                onCheckedChange = onToggleCaptureNudges,
+                            )
+                            ToggleSettingsItem(
+                                title = stringResource(Res.string.draft_rescue),
+                                description = stringResource(Res.string.draft_rescue_description),
+                                checked = settings.draftRescueEnabled,
+                                onCheckedChange = onToggleDraftRescue,
+                            )
+                            ToggleSettingsItem(
+                                title = stringResource(Res.string.memory_recall_notifications),
+                                description = stringResource(Res.string.memory_recall_notifications_description),
+                                checked = settings.memoryRecallNotificationsEnabled,
+                                onCheckedChange = onToggleMemoryRecallNotifications,
+                            )
+                        }
+                    }
+
+                    if (settings.ambientPromptsEnabled && settings.captureNudgesEnabled) {
+                        Text(
+                            text = stringResource(Res.string.prompt_schedule),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(vertical = Spacing.sm),
+                        )
+
+                        MaterialContainer {
+                            ToggleSettingsItem(
+                                title = stringResource(Res.string.morning_prompt),
+                                description = stringResource(Res.string.morning_prompt_description),
+                                checked = settings.morningPromptEnabled,
+                                onCheckedChange = onToggleMorningPrompt,
+                            )
+                            SimpleSettingsItem(
+                                title = stringResource(Res.string.morning_prompt_time),
+                                description = stringResource(Res.string.morning_prompt_time_description),
+                                onClick = { editingPromptTime = PromptTimeSelection.MORNING },
+                            ) {
+                                Text(
+                                    text = formatPromptTime(settings.morningPromptTime),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                            }
+
+                            ToggleSettingsItem(
+                                title = stringResource(Res.string.evening_prompt),
+                                description = stringResource(Res.string.evening_prompt_description),
+                                checked = settings.eveningPromptEnabled,
+                                onCheckedChange = onToggleEveningPrompt,
+                            )
+                            SimpleSettingsItem(
+                                title = stringResource(Res.string.evening_prompt_time),
+                                description = stringResource(Res.string.evening_prompt_time_description),
+                                onClick = { editingPromptTime = PromptTimeSelection.EVENING },
+                            ) {
+                                Text(
+                                    text = formatPromptTime(settings.eveningPromptTime),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
                         text = stringResource(Res.string.recall_options),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(vertical = Spacing.sm),
@@ -113,4 +253,67 @@ fun RecommendationSettingsContent(
             }
         }
     }
+
+    val selectedTime =
+        when (editingPromptTime) {
+            PromptTimeSelection.MORNING -> settings.morningPromptTime
+            PromptTimeSelection.EVENING -> settings.eveningPromptTime
+            null -> null
+        }
+
+    if (selectedTime != null) {
+        PromptTimePickerDialog(
+            initialTime = selectedTime,
+            onConfirm = { updatedTime ->
+                when (editingPromptTime) {
+                    PromptTimeSelection.MORNING -> onSetMorningPromptTime(updatedTime)
+                    PromptTimeSelection.EVENING -> onSetEveningPromptTime(updatedTime)
+                    null -> Unit
+                }
+                editingPromptTime = null
+            },
+            onDismiss = { editingPromptTime = null },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PromptTimePickerDialog(
+    initialTime: AmbientPromptTime,
+    onConfirm: (AmbientPromptTime) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val state =
+        rememberTimePickerState(
+            initialHour = initialTime.hour,
+            initialMinute = initialTime.minute,
+        )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirm(AmbientPromptTime(hour = state.hour, minute = state.minute))
+                },
+            ) {
+                Text(stringResource(Res.string.confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(Res.string.cancel))
+            }
+        },
+        text = {
+            TimePicker(state = state)
+        },
+    )
+}
+
+private fun formatPromptTime(time: AmbientPromptTime): String {
+    val timeZone = TimeZone.currentSystemDefault()
+    val today = Clock.System.todayIn(timeZone)
+    return LocalDateTime(today, LocalTime(time.hour, time.minute)).toInstant(timeZone).asTime
 }

@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.ListenableWorker
 import androidx.work.testing.TestListenableWorkerBuilder
+import app.logdate.client.domain.recommendation.AmbientPromptTime
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
 import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
@@ -200,6 +201,14 @@ private class FakeMemoriesSettingsRepository(
     override fun observeSettings(): Flow<MemoriesSettings> = flowOf(settings)
     override suspend fun updateSettings(settings: MemoriesSettings) {}
     override suspend fun setContextualRecommendationsEnabled(enabled: Boolean) {}
+    override suspend fun setAmbientPromptsEnabled(enabled: Boolean) {}
+    override suspend fun setCaptureNudgesEnabled(enabled: Boolean) {}
+    override suspend fun setDraftRescueEnabled(enabled: Boolean) {}
+    override suspend fun setMemoryRecallNotificationsEnabled(enabled: Boolean) {}
+    override suspend fun setMorningPromptEnabled(enabled: Boolean) {}
+    override suspend fun setEveningPromptEnabled(enabled: Boolean) {}
+    override suspend fun setMorningPromptTime(time: AmbientPromptTime) {}
+    override suspend fun setEveningPromptTime(time: AmbientPromptTime) {}
     override suspend fun setAiRecallEnabled(enabled: Boolean) {}
     override suspend fun setRecallMode(mode: RecallMode) {}
     override suspend fun setWidgetContentTypes(types: Set<WidgetContentType>) {}

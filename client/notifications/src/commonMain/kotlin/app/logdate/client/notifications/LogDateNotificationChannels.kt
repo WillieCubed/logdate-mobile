@@ -8,6 +8,7 @@ enum class LogDateNotificationGroupKey(
 ) {
     CAPTURE_PLAYBACK("logdate_capture_playback"),
     BACKGROUND_SERVICES("logdate_background_services"),
+    AMBIENT_INTELLIGENCE("logdate_ambient_intelligence"),
     CONNECTED_DEVICES("logdate_connected_devices"),
     IMPORT_EXPORT("logdate_import_export"),
 }
@@ -40,6 +41,21 @@ enum class LogDateNotificationChannelKey(
         notificationId = 1905,
         legacyChannelIds = listOf("logdate_location_detail_tracking"),
     ),
+    CAPTURE_NUDGES(
+        id = "ambient_capture_nudges",
+        groupKey = LogDateNotificationGroupKey.AMBIENT_INTELLIGENCE,
+        notificationId = 4001,
+    ),
+    DRAFT_RESCUE(
+        id = "ambient_draft_rescue",
+        groupKey = LogDateNotificationGroupKey.AMBIENT_INTELLIGENCE,
+        notificationId = 4002,
+    ),
+    MEMORY_RECALL(
+        id = "ambient_memory_recall",
+        groupKey = LogDateNotificationGroupKey.AMBIENT_INTELLIGENCE,
+        notificationId = 4003,
+    ),
     WATCH_SYNC(
         id = "wear_sync_channel",
         groupKey = LogDateNotificationGroupKey.CONNECTED_DEVICES,
@@ -62,6 +78,9 @@ object LogDateNotificationChannels {
             LogDateNotificationChannelKey.AUDIO_RECORDING,
             LogDateNotificationChannelKey.AUDIO_PLAYBACK,
             LogDateNotificationChannelKey.LOCATION_HISTORY,
+            LogDateNotificationChannelKey.CAPTURE_NUDGES,
+            LogDateNotificationChannelKey.DRAFT_RESCUE,
+            LogDateNotificationChannelKey.MEMORY_RECALL,
             LogDateNotificationChannelKey.WATCH_SYNC,
             LogDateNotificationChannelKey.DATA_EXPORT,
             LogDateNotificationChannelKey.DATA_RESTORE,

@@ -96,11 +96,14 @@ fun MainActivityUiRoot(
     var hasRequestedUnlock by rememberSaveable { mutableStateOf(false) }
     var hasHandledInitialNavigation by rememberSaveable { mutableStateOf(false) }
     var hasReportedInitialNavigation by rememberSaveable { mutableStateOf(false) }
+    var hasStartedOnboardingNavigation by rememberSaveable { mutableStateOf(false) }
+    var lastOnboardingRouteName by rememberSaveable { mutableStateOf<String?>(null) }
     var showResetConfirmation by rememberSaveable { mutableStateOf(false) }
     var hideRecoveryDialog by rememberSaveable { mutableStateOf(false) }
     val appUpdateSnackbarHostState = remember { SnackbarHostState() }
+    val currentRoute = mainAppNavigator.backStack.lastOrNull()
 
-    LaunchedEffect(appUiState.isOnboarded, appUiState.requiresUnlock, pendingNavKey, databaseStartupState) {
+    LaunchedEffect(appUiState.isOnboarded, appUiState.requiresUnlock, pendingNavKey, databaseStartupState, currentRoute) {
         if (databaseStartupState is DatabaseStartupState.Ready) {
             hideRecoveryDialog = false
         }
@@ -108,8 +111,17 @@ fun MainActivityUiRoot(
             return@LaunchedEffect
         }
         if (!appUiState.isOnboarded) {
-            if (!mainAppNavigator.isShowingOnboardingRoute()) {
-                mainAppNavigator.startOnboarding()
+            if (currentRoute.isOnboardingRoute()) {
+                hasStartedOnboardingNavigation = true
+                lastOnboardingRouteName = currentRoute?.onboardingRouteName()
+            } else if (!hasStartedOnboardingNavigation) {
+                val restoredRoute = onboardingRouteForName(lastOnboardingRouteName)
+                if (restoredRoute != null) {
+                    mainAppNavigator.restoreOnboardingRoute(restoredRoute)
+                } else {
+                    mainAppNavigator.startOnboarding()
+                }
+                hasStartedOnboardingNavigation = true
             }
             if (!hasReportedInitialNavigation) {
                 hasReportedInitialNavigation = true
@@ -117,6 +129,8 @@ fun MainActivityUiRoot(
             }
             return@LaunchedEffect
         }
+        hasStartedOnboardingNavigation = false
+        lastOnboardingRouteName = null
         if (appUiState.requiresUnlock) {
             if (!hasRequestedUnlock) {
                 hasRequestedUnlock = true
@@ -264,8 +278,6 @@ fun MainActivityUiRoot(
     }
 }
 
-private fun MainAppNavigator.isShowingOnboardingRoute(): Boolean = backStack.lastOrNull().isOnboardingRoute()
-
 private fun NavKey?.isOnboardingRoute(): Boolean =
     when (this) {
         OnboardingStart,
@@ -285,3 +297,46 @@ private fun NavKey?.isOnboardingRoute(): Boolean =
 
         else -> false
     }
+
+private fun NavKey.onboardingRouteName(): String =
+    when (this) {
+        OnboardingStart -> "start"
+        PersonalIntroRoute -> "personal_intro"
+        OnboardingAppOverviewRoute -> "app_overview"
+        OnboardingImportRoute -> "memory_import"
+        OnboardingMemorySelectionRoute -> "memory_selection"
+        OnboardingAccountCreationRoute -> "account"
+        OnboardingBirthdayRoute -> "birthday"
+        OnboardingRecommendationsRoute -> "recommendations"
+        OnboardingDayBoundariesRoute -> "day_boundaries"
+        OnboardingLocationTimelineRoute -> "location"
+        OnboardingNotificationsRoute -> "notifications"
+        OnboardingCompleteRoute -> "complete"
+        OnboardingWelcomeBackRoute -> "welcome_back"
+        else -> "start"
+    }
+
+private fun onboardingRouteForName(routeName: String?): NavKey? =
+    when (routeName) {
+        "start" -> OnboardingStart
+        "personal_intro" -> PersonalIntroRoute
+        "app_overview" -> OnboardingAppOverviewRoute
+        "memory_import" -> OnboardingImportRoute
+        "memory_selection" -> OnboardingMemorySelectionRoute
+        "account" -> OnboardingAccountCreationRoute
+        "birthday" -> OnboardingBirthdayRoute
+        "recommendations" -> OnboardingRecommendationsRoute
+        "day_boundaries" -> OnboardingDayBoundariesRoute
+        "location" -> OnboardingLocationTimelineRoute
+        "notifications" -> OnboardingNotificationsRoute
+        "complete" -> OnboardingCompleteRoute
+        "welcome_back" -> OnboardingWelcomeBackRoute
+        else -> null
+    }
+
+private fun MainAppNavigator.restoreOnboardingRoute(route: NavKey) {
+    safelyClearBackstack(OnboardingStart)
+    if (route != OnboardingStart) {
+        backStack.add(route)
+    }
+}

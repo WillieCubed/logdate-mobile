@@ -1,0 +1,127 @@
+package app.logdate.client.ambient
+
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import androidx.core.app.NotificationCompat
+import app.logdate.client.MainActivity
+import app.logdate.client.domain.recommendation.AmbientCaptureNudgeStyle
+import app.logdate.client.domain.recommendation.AmbientPromptCandidate
+import app.logdate.client.domain.recommendation.AmbientPromptFamily
+import app.logdate.client.domain.recommendation.AmbientPromptPayload
+import app.logdate.client.notifications.LogDateNotificationChannelKey
+import io.github.aakira.napier.Napier
+import app.logdate.client.notifications.R as NotificationResources
+
+class AmbientPromptNotificationCoordinator(
+    private val context: Context,
+) {
+    private val notificationManager =
+        context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+    fun post(candidate: AmbientPromptCandidate): Boolean =
+        runCatching {
+            val channelKey = candidate.channelKey()
+            val content = notificationContent(candidate)
+            val notification =
+                NotificationCompat
+                    .Builder(context, channelKey.id)
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setContentTitle(content.title)
+                    .setContentText(content.body)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(content.body))
+                    .setAutoCancel(true)
+                    .setContentIntent(buildPendingIntent(candidate))
+                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    .setCategory(content.category)
+                    .build()
+
+            notificationManager.notify(channelKey.notificationId ?: candidate.dedupeKey.hashCode(), notification)
+        }.onFailure { error ->
+            Napier.w("Failed to post ambient prompt notification", error)
+        }.isSuccess
+
+    private fun buildPendingIntent(candidate: AmbientPromptCandidate): PendingIntent {
+        val launchIntent =
+            Intent(context, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                when (val payload = candidate.payload) {
+                    is AmbientPromptPayload.CaptureNudge -> {
+                        putExtra(EXTRA_AMBIENT_PROMPT_TARGET, AMBIENT_PROMPT_TARGET_NEW_ENTRY)
+                    }
+                    is AmbientPromptPayload.DraftRescue -> {
+                        putExtra(EXTRA_AMBIENT_PROMPT_TARGET, AMBIENT_PROMPT_TARGET_DRAFT)
+                        putExtra(EXTRA_AMBIENT_PROMPT_DRAFT_ID, payload.draftId.toString())
+                    }
+                    is AmbientPromptPayload.MemoryRecall -> {
+                        putExtra(EXTRA_AMBIENT_PROMPT_TARGET, AMBIENT_PROMPT_TARGET_MEMORY_RECALL)
+                        putExtra(EXTRA_AMBIENT_PROMPT_RECALL_DATE, payload.date.toString())
+                    }
+                }
+            }
+
+        return PendingIntent.getActivity(
+            context,
+            candidate.dedupeKey.hashCode(),
+            launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun AmbientPromptCandidate.channelKey(): LogDateNotificationChannelKey =
+        when (family) {
+            AmbientPromptFamily.CAPTURE_NUDGES -> LogDateNotificationChannelKey.CAPTURE_NUDGES
+            AmbientPromptFamily.DRAFT_RESCUE -> LogDateNotificationChannelKey.DRAFT_RESCUE
+            AmbientPromptFamily.MEMORY_RECALL -> LogDateNotificationChannelKey.MEMORY_RECALL
+        }
+
+    private fun notificationContent(candidate: AmbientPromptCandidate): AmbientNotificationContent =
+        when (val payload = candidate.payload) {
+            is AmbientPromptPayload.CaptureNudge ->
+                when (payload.style) {
+                    AmbientCaptureNudgeStyle.MORNING ->
+                        AmbientNotificationContent(
+                            title = context.getString(NotificationResources.string.ambient_prompt_capture_morning_title),
+                            body = context.getString(NotificationResources.string.ambient_prompt_capture_morning_body),
+                            category = NotificationCompat.CATEGORY_REMINDER,
+                        )
+                    AmbientCaptureNudgeStyle.EVENING ->
+                        AmbientNotificationContent(
+                            title = context.getString(NotificationResources.string.ambient_prompt_capture_evening_title),
+                            body = context.getString(NotificationResources.string.ambient_prompt_capture_evening_body),
+                            category = NotificationCompat.CATEGORY_REMINDER,
+                        )
+                    AmbientCaptureNudgeStyle.NOVEL_PLACE ->
+                        AmbientNotificationContent(
+                            title =
+                                payload.placeName?.let {
+                                    context.getString(NotificationResources.string.ambient_prompt_capture_novel_place_title, it)
+                                } ?: context.getString(NotificationResources.string.ambient_prompt_capture_evening_title),
+                            body =
+                                payload.placeName?.let {
+                                    context.getString(NotificationResources.string.ambient_prompt_capture_novel_place_body)
+                                } ?: context.getString(NotificationResources.string.ambient_prompt_capture_novel_place_body_fallback),
+                            category = NotificationCompat.CATEGORY_REMINDER,
+                        )
+                }
+            is AmbientPromptPayload.DraftRescue ->
+                AmbientNotificationContent(
+                    title = context.getString(NotificationResources.string.ambient_prompt_draft_rescue_title),
+                    body = context.getString(NotificationResources.string.ambient_prompt_draft_rescue_body),
+                    category = NotificationCompat.CATEGORY_REMINDER,
+                )
+            is AmbientPromptPayload.MemoryRecall ->
+                AmbientNotificationContent(
+                    title = context.getString(NotificationResources.string.ambient_prompt_memory_recall_title),
+                    body = payload.summary.ifBlank { context.getString(NotificationResources.string.ambient_prompt_memory_recall_body) },
+                    category = NotificationCompat.CATEGORY_RECOMMENDATION,
+                )
+        }
+}
+
+private data class AmbientNotificationContent(
+    val title: String,
+    val body: String,
+    val category: String,
+)
