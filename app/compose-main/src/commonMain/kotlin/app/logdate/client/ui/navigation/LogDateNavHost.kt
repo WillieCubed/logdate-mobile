@@ -10,6 +10,9 @@ import app.logdate.feature.core.main.navigateHome
 import app.logdate.feature.core.navigation.BaseRoute
 import app.logdate.feature.core.navigation.landingDestination
 import app.logdate.feature.core.profile.navigation.profileRoute
+import app.logdate.feature.core.settings.navigation.BirthdaySettingsRoute
+import app.logdate.feature.core.settings.navigation.SettingsRoute
+import app.logdate.feature.core.settings.navigation.settingsGraph
 import app.logdate.feature.editor.ui.EntryEditorContent
 import app.logdate.feature.journals.navigation.journalDetailsRoute
 import app.logdate.feature.journals.navigation.journalSettingsRoute
@@ -20,10 +23,17 @@ import app.logdate.feature.journals.navigation.navigateToJournalsOverview
 import app.logdate.feature.journals.navigation.navigateToNoteDetail
 import app.logdate.feature.journals.navigation.newJournalRoute
 import app.logdate.feature.journals.navigation.noteDetailRoute
+import app.logdate.feature.library.navigation.MediaDetailRoute
 import app.logdate.feature.library.navigation.libraryRoute
+import app.logdate.feature.library.navigation.mediaDetailRoute
 import app.logdate.feature.onboarding.navigation.onboardingGraph
 import app.logdate.feature.rewind.navigation.navigateToRewind
 import app.logdate.feature.rewind.navigation.rewindRoutes
+import app.logdate.feature.search.ui.SearchScreen
+import kotlinx.serialization.Serializable
+
+@Serializable
+private data object SearchRoute
 
 /**
  * The root composable for app-wide navigation.
@@ -60,7 +70,7 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
             onOpenRewind = {
                 navController.navigateToRewind(it)
             },
-            onOpenSettings = { /* Settings handled by Navigation 3 on Android */ },
+            onOpenSettings = { navController.navigate(SettingsRoute()) },
             onBrowseJournals = navController::navigateToJournalsOverview,
         )
         journalsOverviewRoute(
@@ -95,7 +105,10 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
             },
         )
         libraryRoute(
-            onOpenMediaDetail = { /* Media detail handled by Navigation 3 on Android */ },
+            onOpenMediaDetail = { mediaId -> navController.navigate(MediaDetailRoute(mediaId)) },
+        )
+        mediaDetailRoute(
+            onGoBack = { navController.popBackStack() },
         )
         // Use a composable instead of editorDestination
         composable("editor") {
@@ -113,16 +126,24 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
                 navController.popBackStack()
             },
         )
-        // Settings destination handled by Navigation 3 on Android
 
         profileRoute(
             onGoBack = { navController.popBackStack() },
-            onNavigateToBirthday = { /* TODO: Navigate to birthday detail page */ },
+            onNavigateToBirthday = { navController.navigate(BirthdaySettingsRoute) },
         )
 
         rewindRoutes(
             onOpenRewind = { navController.navigateToRewind(it) },
             onGoBack = { navController.popBackStack() },
         )
+
+        settingsGraph(navController)
+        composable<SearchRoute> {
+            SearchScreen(
+                onGoBack = { navController.popBackStack() },
+                onNavigateToDay = { /* Timeline day detail not available in common nav */ },
+                onNavigateToJournal = { journalId -> navController.navigateToJournal(journalId) },
+            )
+        }
     }
 }

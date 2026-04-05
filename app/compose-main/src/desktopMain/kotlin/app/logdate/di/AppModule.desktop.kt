@@ -6,8 +6,10 @@ import app.logdate.client.domain.di.accountDomainModule
 import app.logdate.client.domain.di.domainModule
 import app.logdate.client.domain.di.locationDomainModule
 import app.logdate.client.domain.di.quotaDomainModule
+import app.logdate.client.location.di.locationModule
 import app.logdate.client.media.di.audioModule
 import app.logdate.client.networking.di.networkingModule
+import app.logdate.client.sensor.di.sensorModule
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -23,6 +25,7 @@ actual val appModule: Module =
         includes(defaultModules)
         includes(appDataModule)
         includes(networkingModule)
+        includes(sensorModule)
         includes(deviceModule)
 
         // Domain modules in correct dependency order
@@ -32,5 +35,6 @@ actual val appModule: Module =
         includes(app.logdate.client.health.di.healthModule) // Common Health Connect implementation
         includes(app.logdate.client.health.di.jvmHealthModule) // Desktop-specific Health Connect implementation
         includes(domainModule) // Main domain module with no circular deps
+        includes(locationModule)
         includes(audioModule)
     }

@@ -15,7 +15,7 @@ import org.koin.dsl.module
 actual val networkingModule: Module =
     module {
         single { httpClient }
-        single<NetworkAvailabilityMonitor> { DesktopNetworkAvailabilityMonitor() }
+        single<NetworkAvailabilityMonitor> { DesktopNetworkAvailabilityMonitor(get()) }
         single<DataUsagePolicy> { DefaultDataUsagePolicy(get()) }
         single<ServerHealthChecker> { DefaultServerHealthChecker(get()) }
         single<ServerDiscoveryClient> { DefaultServerDiscoveryClient(get()) }

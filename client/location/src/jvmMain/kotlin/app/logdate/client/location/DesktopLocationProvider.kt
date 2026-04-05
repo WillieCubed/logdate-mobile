@@ -3,6 +3,7 @@ package app.logdate.client.location
 import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -33,7 +34,7 @@ class DesktopLocationProvider(
         try {
             locationFlowState.tryEmit(defaultLocation)
         } catch (e: Exception) {
-            println("Failed to emit default location: ${e.message}")
+            Napier.w("Failed to emit default location: ${e.message}")
         }
     }
 
@@ -43,7 +44,7 @@ class DesktopLocationProvider(
     override suspend fun getCurrentLocation(): Location = defaultLocation
 
     override suspend fun refreshLocation() {
-        println("Refreshing location on desktop (simulated)")
+        Napier.d("Refreshing location on desktop (simulated)")
         // Simulate a brief delay for realism
         delay(500)
         locationFlowState.emit(defaultLocation)

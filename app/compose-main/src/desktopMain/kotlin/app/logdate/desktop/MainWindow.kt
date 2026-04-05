@@ -2,20 +2,17 @@ package app.logdate.desktop
 
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
 import app.logdate.client.ui.LogDateAppRoot
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.GlobalAppUiLoadedState
-import app.logdate.feature.core.GlobalAppUiLoadingState
-import app.logdate.feature.core.GlobalAppUiState
 import logdate.app.composemain.generated.resources.Res
 import logdate.app.composemain.generated.resources.loading
 import org.jetbrains.compose.resources.stringResource
@@ -50,32 +47,7 @@ private fun MainWindowContent(
     onOpenEditor: () -> Unit,
     viewModel: AppViewModel = koinViewModel(),
 ) {
-    var uiState: GlobalAppUiState by remember { mutableStateOf(GlobalAppUiLoadingState) }
-    LaunchedEffect(viewModel.uiState) {
-        viewModel.uiState.collect {
-            uiState = it
-        }
-    }
-
-    // Debug print for initial state
-    println("Initial uiState: $uiState")
-
-    // Debug the viewModel initialization
-    LaunchedEffect(Unit) {
-        println("ViewModel hash: ${viewModel.hashCode()}")
-        println("Initial viewModel.uiState: ${viewModel.uiState.value}")
-    }
-
-    LaunchedEffect(viewModel) {
-        println("Starting to collect uiState")
-        viewModel.uiState.collect { newState ->
-            println("Collected new state: $newState")
-            uiState = newState
-        }
-    }
-
-    // Debug current state before conditional rendering
-    println("Current uiState: $uiState")
+    val uiState by viewModel.uiState.collectAsState()
 
     if (uiState is GlobalAppUiLoadedState) {
         LogDateAppRoot(

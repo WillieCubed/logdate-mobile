@@ -27,3 +27,33 @@ data object LocationSettingsRoute
 
 @Serializable
 data object AdvancedSettingsRoute
+
+@Serializable
+data object MemoriesSettingsRoute
+
+@Serializable
+data object StreakSettingsRoute
+
+@Serializable
+data object TimelineSettingsRoute
+
+@Serializable
+data object SyncSettingsRoute
+
+@Serializable
+data object ExportSettingsRoute
+
+@Serializable
+data object LibrarySettingsRoute
+
+@Serializable
+data object ResetSettingsRoute
+
+@Serializable
+data object BirthdaySettingsRoute
+
+@Serializable
+data object DayBoundarySettingsRoute
+
+@Serializable
+data object RecommendationSettingsRoute

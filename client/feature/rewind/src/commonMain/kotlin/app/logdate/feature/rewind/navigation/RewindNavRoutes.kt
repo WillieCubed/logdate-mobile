@@ -7,7 +7,6 @@ import androidx.navigation.toRoute
 import app.logdate.feature.rewind.ui.RewindOpenCallback
 import app.logdate.feature.rewind.ui.RewindOverviewScreen
 import app.logdate.feature.rewind.ui.detail.RewindDetailScreen
-import app.logdate.util.UuidSerializer
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
@@ -30,9 +29,10 @@ data object RewindOverviewRoute
  */
 @Serializable
 data class RewindDetailRoute(
-    @Serializable(with = UuidSerializer::class)
-    val id: Uuid,
-)
+    val id: String,
+) {
+    constructor(id: Uuid) : this(id.toString())
+}
 
 /**
  * Exposes the Rewind routes.
@@ -73,7 +73,7 @@ fun NavGraphBuilder.rewindDetailRoute(onExitRewind: () -> Unit) {
     composable<RewindDetailRoute> {
         val routeData: RewindDetailRoute = it.toRoute()
         RewindDetailScreen(
-            rewindId = routeData.id,
+            rewindId = Uuid.parse(routeData.id),
             onExitRewind = onExitRewind,
         )
     }
