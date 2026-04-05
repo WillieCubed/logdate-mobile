@@ -27,6 +27,10 @@
     <string name="transcription_failed">Transcription failed</string>
     <string name="video_recording">Video recording</string>
     <string name="audio_recording">Audio Recording</string>
+    <string name="audio_recording_today">%1$s recording</string>
+    <string name="audio_recording_from_yesterday">%1$s recording from yesterday</string>
+    <string name="audio_recording_from_day">%1$s recording from %2$s</string>
+    <string name="audio_recording_from_date">%1$s recording from %2$s %3$d</string>
     <string name="period_last_week">Last Week</string>
     <string name="period_this_week">This Week</string>
     <string name="period_years_ago">%1$s years ago</string>

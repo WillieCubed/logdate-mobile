@@ -241,7 +241,7 @@ class AndroidAudioPlaybackManager(
             val builder =
                 MediaMetadata
                     .Builder()
-                    .setTitle(metadata?.title ?: "Audio Recording")
+                    .setTitle(metadata?.title ?: "Audio")
                     .setSubtitle(metadata?.subtitle)
                     .setExtras(extras.takeIf { !it.isEmpty })
 

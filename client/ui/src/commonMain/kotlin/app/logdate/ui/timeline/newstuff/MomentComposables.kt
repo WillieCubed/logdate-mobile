@@ -35,6 +35,8 @@ import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.client.awareness.daylight.DaylightPeriod
+import app.logdate.client.awareness.daylight.stringRes
 import app.logdate.ui.common.formatting.asRelativeDate
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
@@ -460,14 +462,15 @@ private fun AudioMomentCard(
 @Composable
 private fun MomentLabel(
     label: String,
-    timeOfDay: String?,
+    timeOfDay: DaylightPeriod?,
     color: Color,
     modifier: Modifier = Modifier,
 ) {
     if (label.isBlank()) return
+    val periodName = timeOfDay?.let { stringResource(it.stringRes) }
     val displayText =
-        if (timeOfDay != null && !label.lowercase().contains(timeOfDay)) {
-            "$label \u00b7 $timeOfDay"
+        if (periodName != null && !label.lowercase().contains(periodName.lowercase())) {
+            "$label \u00b7 $periodName"
         } else {
             label
         }

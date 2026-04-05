@@ -58,6 +58,7 @@ kotlin {
 
         commonMain.dependencies {
             // Project dependencies
+            implementation(projects.client.awareness)
             implementation(projects.client.ui)
             implementation(projects.client.domain)
             implementation(projects.client.repository)

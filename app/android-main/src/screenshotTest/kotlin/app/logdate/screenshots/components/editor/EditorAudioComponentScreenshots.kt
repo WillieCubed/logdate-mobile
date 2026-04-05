@@ -3,7 +3,7 @@ package app.logdate.screenshots.components.editor
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.feature.editor.audio.model.AudioPalette
-import app.logdate.feature.editor.audio.model.DaylightPeriod
+import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.feature.editor.ui.audio.AudioTranscriptionUi
 import app.logdate.feature.editor.ui.audio.AudioUiState
 import app.logdate.feature.editor.ui.audio.ActiveRecordingDisplay

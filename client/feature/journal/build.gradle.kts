@@ -56,6 +56,7 @@ kotlin {
             implementation(projects.client.logdateDatastore)
             implementation(projects.client.domain)
             implementation(projects.client.sharing)
+            implementation(projects.client.awareness)
             implementation(projects.client.util)
             implementation(projects.client.media)
             implementation(projects.client.feature.editor)

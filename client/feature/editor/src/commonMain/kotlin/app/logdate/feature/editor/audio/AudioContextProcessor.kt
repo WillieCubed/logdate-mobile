@@ -1,12 +1,12 @@
 package app.logdate.feature.editor.audio
 
+import app.logdate.client.awareness.daylight.DaylightClassifier
+import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.feature.editor.audio.analysis.SegmentDetector
-import app.logdate.feature.editor.audio.color.DaylightClassifier
 import app.logdate.feature.editor.audio.color.PaletteGenerator
 import app.logdate.feature.editor.audio.extraction.AmplitudeExtractor
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
-import app.logdate.feature.editor.audio.model.DaylightPeriod
 import app.logdate.feature.editor.audio.storage.WaveformStorage
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers

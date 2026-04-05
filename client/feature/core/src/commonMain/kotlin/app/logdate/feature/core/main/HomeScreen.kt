@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.awareness.daylight.DaylightClassifier
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.HomeRecommendation
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
@@ -64,7 +65,6 @@ import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.TimelineUiState
 import app.logdate.ui.timeline.VideoNoteUiState
 import app.logdate.ui.timeline.createSemanticTimelineDayUiState
-import app.logdate.util.TimeOfDay
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -81,8 +81,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.create_new_entry
 import org.jetbrains.compose.resources.stringResource
@@ -97,6 +95,9 @@ fun HomeScreen(
     onBrowseJournals: () -> Unit,
     onOpenRewind: (Uuid) -> Unit,
     onOpenSettings: () -> Unit = {},
+    onOpenSearch: () -> Unit = {},
+    onOpenDraft: (draftId: String) -> Unit = {},
+    onImportBackup: () -> Unit = {},
     onOpenMediaDetail: (Uuid) -> Unit = {},
     locationContent: @Composable (Modifier) -> Unit = {},
     libraryContent: @Composable (Modifier) -> Unit = {},
@@ -176,6 +177,9 @@ fun HomeScreen(
                         onOpenDay = { date -> viewModel.selectDay(date) },
                         onLoadMoreOlder = viewModel::loadMoreOlder,
                         onProfileClick = onOpenSettings,
+                        onSearchClick = onOpenSearch,
+                        onOpenDraft = onOpenDraft,
+                        onImportBackup = onImportBackup,
                         timelineSuggestion = uiState.timelineSuggestion,
                         modifier =
                             Modifier
@@ -491,9 +495,7 @@ class HomeViewModel(
         isHero: Boolean,
         dayPeople: List<PersonUiState>,
     ): MomentUiState {
-        val timezone = TimeZone.currentSystemDefault()
-        val startLocal = estimatedStart.toLocalDateTime(timezone)
-        val timeOfDay = TimeOfDay.from(startLocal.hour).label
+        val timeOfDay = DaylightClassifier().classifyWithoutLocation(estimatedStart)
         val resolvedPeople =
             people.mapNotNull { name ->
                 dayPeople.find { it.name.equals(name, ignoreCase = true) }

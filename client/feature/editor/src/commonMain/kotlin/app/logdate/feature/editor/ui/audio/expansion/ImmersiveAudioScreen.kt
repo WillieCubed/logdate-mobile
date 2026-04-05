@@ -43,9 +43,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
-import app.logdate.feature.editor.audio.model.DaylightPeriod
 import app.logdate.feature.editor.ui.audio.AnimatedPlayPauseButton
 import app.logdate.feature.editor.ui.audio.waveform.BezierAudioWaveform
 import app.logdate.feature.editor.ui.formatMediaDuration

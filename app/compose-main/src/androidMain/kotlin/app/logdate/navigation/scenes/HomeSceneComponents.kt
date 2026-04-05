@@ -9,7 +9,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -26,6 +25,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -36,10 +36,9 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.window.core.layout.WindowSizeClass.Companion.HEIGHT_DP_MEDIUM_LOWER_BOUND
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
+import app.logdate.navigation.LocalBottomNavVisible
 import app.logdate.navigation.LocalSharedTransitionScope
-import app.logdate.ui.audio.MiniAudioPlayer
 import app.logdate.ui.common.transitions.TransitionKeys
-import app.logdate.ui.theme.Spacing
 import logdate.app.composemain.generated.resources.Res
 import logdate.app.composemain.generated.resources.select_an_entry_to_view_details
 import org.jetbrains.compose.resources.stringResource
@@ -66,7 +65,6 @@ internal fun NavigationShell(
     onTabSelected: (HomeTab) -> Unit,
     isDetailOnlyView: Boolean,
     snackbarHostState: SnackbarHostState,
-    onOpenAudioNote: () -> Unit = {},
     visibleTabs: List<HomeTab> = HomeTab.visibleEntries,
     content: @Composable () -> Unit,
 ) {
@@ -77,55 +75,52 @@ internal fun NavigationShell(
         !windowSizeClass.isHeightAtLeastBreakpoint(HEIGHT_DP_MEDIUM_LOWER_BOUND) &&
             windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND)
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-    ) {
-        NavigationSuiteScaffold(
-            containerColor = Color.Transparent,
-            navigationSuiteColors =
-                NavigationSuiteDefaults.colors(
-                    navigationRailContainerColor = Color.Transparent,
-                    navigationBarContainerColor = Color.Transparent,
-                ),
-            layoutType =
-                if (isDetailOnlyView) {
-                    NavigationSuiteType.None
-                } else if (isLandscapeCompact) {
-                    NavigationSuiteType.NavigationRail
-                } else {
-                    NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptiveInfo)
-                },
-            navigationSuiteItems = {
-                visibleTabs.forEach { tab ->
-                    item(
-                        selected = selectedTab == tab,
-                        onClick = { onTabSelected(tab) },
-                        icon = {
-                            Icon(
-                                imageVector = if (selectedTab == tab) tab.selectedIcon else tab.unselectedIcon,
-                                contentDescription = tab.title,
-                                modifier =
-                                    Modifier.semantics {
-                                        contentDescription = "${tab.title}|logdate_home_tab_${tab.name.lowercase()}"
-                                    },
-                            )
-                        },
-                        label = { Text(tab.title) },
-                    )
-                }
-            },
+    val effectiveLayoutType =
+        if (isDetailOnlyView) {
+            NavigationSuiteType.None
+        } else if (isLandscapeCompact) {
+            NavigationSuiteType.NavigationRail
+        } else {
+            NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptiveInfo)
+        }
+
+    val hasBottomNav = effectiveLayoutType == NavigationSuiteType.NavigationBar
+
+    CompositionLocalProvider(LocalBottomNavVisible provides hasBottomNav) {
+        Scaffold(
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            NavigationSuiteScaffold(
+                containerColor = Color.Transparent,
+                navigationSuiteColors =
+                    NavigationSuiteDefaults.colors(
+                        navigationRailContainerColor = Color.Transparent,
+                        navigationBarContainerColor = Color.Transparent,
+                    ),
+                layoutType = effectiveLayoutType,
+                navigationSuiteItems = {
+                    visibleTabs.forEach { tab ->
+                        item(
+                            selected = selectedTab == tab,
+                            onClick = { onTabSelected(tab) },
+                            icon = {
+                                Icon(
+                                    imageVector = if (selectedTab == tab) tab.selectedIcon else tab.unselectedIcon,
+                                    contentDescription = tab.title,
+                                    modifier =
+                                        Modifier.semantics {
+                                            contentDescription = "${tab.title}|logdate_home_tab_${tab.name.lowercase()}"
+                                        },
+                                )
+                            },
+                            label = { Text(tab.title) },
+                        )
+                    }
+                },
+            ) {
                 content()
-                MiniAudioPlayer(
-                    onOpenFullPlayer = onOpenAudioNote,
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-                )
             }
         }
     }

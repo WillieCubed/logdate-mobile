@@ -1,7 +1,7 @@
 package app.logdate.feature.editor.audio
 
-import app.logdate.feature.editor.audio.color.DaylightClassifier
-import app.logdate.feature.editor.audio.model.DaylightPeriod
+import app.logdate.client.awareness.daylight.DaylightClassifier
+import app.logdate.client.awareness.daylight.DaylightPeriod
 import kotlin.time.Instant
 
 /**

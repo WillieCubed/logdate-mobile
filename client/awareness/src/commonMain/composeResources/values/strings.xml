@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="daylight_period_dawn">Dawn</string>
+    <string name="daylight_period_morning">Morning</string>
+    <string name="daylight_period_midday">Midday</string>
+    <string name="daylight_period_afternoon">Afternoon</string>
+    <string name="daylight_period_golden_hour">Golden Hour</string>
+    <string name="daylight_period_evening">Evening</string>
+    <string name="daylight_period_night">Night</string>
+</resources>

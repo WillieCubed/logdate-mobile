@@ -28,14 +28,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.client.awareness.daylight.DaylightClassifier
+import app.logdate.client.awareness.daylight.stringRes
+import app.logdate.ui.audio.AudioPlaybackDisplayInfo
 import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.audio.LocalTranscriptionState
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.util.toReadableDateTimeShort
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.timeline.generated.resources.*
 import logdate.client.feature.timeline.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -71,6 +79,18 @@ fun AudioNoteSnippet(
             uiState.duration.milliseconds
         }
 
+    val audioTitle = audioRecordingTitle(uiState.timestamp)
+    val displayInfo =
+        remember(audioTitle, duration) {
+            val subtitle =
+                if (duration.inWholeSeconds > 0) {
+                    "${duration.inWholeMinutes}:${(duration.inWholeSeconds % 60).toString().padStart(2, '0')}"
+                } else {
+                    null
+                }
+            AudioPlaybackDisplayInfo(title = audioTitle, subtitle = subtitle)
+        }
+
     Column(
         modifier = modifier.padding(vertical = Spacing.xs),
     ) {
@@ -92,7 +112,7 @@ fun AudioNoteSnippet(
                         if (isThisPlaying) {
                             audioPlaybackState.pause()
                         } else {
-                            audioPlaybackState.play(uiState.noteId, uiState.uri, null)
+                            audioPlaybackState.play(uiState.noteId, uiState.uri, displayInfo)
                         }
                     },
         ) {
@@ -111,7 +131,7 @@ fun AudioNoteSnippet(
                             if (isThisPlaying) {
                                 audioPlaybackState.pause()
                             } else {
-                                audioPlaybackState.play(uiState.noteId, uiState.uri, null)
+                                audioPlaybackState.play(uiState.noteId, uiState.uri, displayInfo)
                             }
                         },
                         modifier = Modifier.size(40.dp),
@@ -293,6 +313,43 @@ fun AudioNoteSnippet(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Resolves a contextual title for an audio recording based on when it was captured.
+ * Uses [DaylightClassifier] for the period name and relative date context.
+ */
+@Composable
+private fun audioRecordingTitle(timestamp: kotlinx.datetime.Instant): String {
+    val period = DaylightClassifier().classifyWithoutLocation(timestamp)
+    val periodName = stringResource(period.stringRes)
+
+    val tz = TimeZone.currentSystemDefault()
+    val recorded = timestamp.toLocalDateTime(tz)
+    val now = Clock.System.now().toLocalDateTime(tz)
+    val today = now.date
+    val yesterday = today.minus(DatePeriod(days = 1))
+
+    return when (recorded.date) {
+        today -> stringResource(Res.string.audio_recording_today, periodName)
+        yesterday -> stringResource(Res.string.audio_recording_from_yesterday, periodName)
+        else -> {
+            val daysAgo = today.toEpochDays() - recorded.date.toEpochDays()
+            if (daysAgo in 2..6) {
+                val dayName =
+                    recorded.date.dayOfWeek.name
+                        .lowercase()
+                        .replaceFirstChar { it.uppercase() }
+                stringResource(Res.string.audio_recording_from_day, periodName, dayName)
+            } else {
+                val monthName =
+                    recorded.date.month.name
+                        .lowercase()
+                        .replaceFirstChar { it.uppercase() }
+                stringResource(Res.string.audio_recording_from_date, periodName, monthName, recorded.date.dayOfMonth)
             }
         }
     }

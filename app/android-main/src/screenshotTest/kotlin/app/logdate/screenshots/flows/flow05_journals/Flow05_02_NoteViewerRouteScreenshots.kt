@@ -16,7 +16,7 @@ import app.logdate.client.repository.journals.NotePlace
 import app.logdate.feature.editor.audio.AudioContext
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
-import app.logdate.feature.editor.audio.model.DaylightPeriod
+import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.feature.editor.audio.model.SegmentType
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
 import app.logdate.feature.journals.ui.detail.AudioNoteViewerContent

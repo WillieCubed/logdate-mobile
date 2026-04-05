@@ -4,6 +4,8 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -23,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavKey
 import app.logdate.client.database.DatabaseStartupState
 import app.logdate.client.sharing.SharingLauncher
@@ -31,6 +34,8 @@ import app.logdate.feature.core.GlobalAppUiLoadedState
 import app.logdate.feature.core.requiresUnlock
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
+import app.logdate.navigation.LocalBottomNavVisible
+import app.logdate.navigation.LocalOpenAudioNoteViewer
 import app.logdate.navigation.MainAppNavigator
 import app.logdate.navigation.MainNavigationRoot
 import app.logdate.navigation.rememberMainAppNavigator
@@ -57,13 +62,13 @@ import app.logdate.navigation.routes.openSettings
 import app.logdate.navigation.routes.startOnboarding
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.audio.AudioPlaybackProvider
-import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.audio.MiniAudioPlayer
 import app.logdate.ui.audio.TranscriptionProvider
 import app.logdate.ui.audio.TranscriptionState
 import app.logdate.ui.restore.LocalAcknowledgeCloudRestore
 import app.logdate.ui.restore.LocalIsPostCloudRestore
 import app.logdate.ui.theme.LogDateTheme
+import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.flow.distinctUntilChanged
 import logdate.app.composemain.generated.resources.Res
 import logdate.app.composemain.generated.resources.cancel
@@ -75,6 +80,7 @@ import logdate.app.composemain.generated.resources.reset_encrypted_storage_2
 import logdate.app.composemain.generated.resources.restart
 import logdate.app.composemain.generated.resources.update_ready_restart_to_finish_installing
 import org.jetbrains.compose.resources.stringResource
+import kotlin.uuid.Uuid
 
 /**
  * Renders the Android root UI once startup gates have produced a loaded app state.
@@ -189,25 +195,35 @@ fun MainActivityUiRoot(
                     displayName = appUiState.displayName,
                     onUsePasscode = onShowUnlockPrompt,
                 ) {
+                    val openAudioNoteViewer: (Uuid) -> Unit =
+                        remember(mainAppNavigator) {
+                            { noteId -> mainAppNavigator.backStack.add(NoteViewerRoute(noteId)) }
+                        }
+
                     AudioPlaybackProvider {
-                        TranscriptionProvider(state = TranscriptionState()) {
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                MainNavigationRoot(mainAppNavigator, sharingLauncher)
+                        CompositionLocalProvider(
+                            LocalOpenAudioNoteViewer provides openAudioNoteViewer,
+                        ) {
+                            TranscriptionProvider(state = TranscriptionState()) {
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    MainNavigationRoot(mainAppNavigator, sharingLauncher)
 
-                                val audioState = LocalAudioPlaybackState.current
-                                MiniAudioPlayer(
-                                    onOpenFullPlayer = {
-                                        audioState.currentlyPlayingId?.let { noteId ->
-                                            mainAppNavigator.backStack.add(NoteViewerRoute(noteId))
-                                        }
-                                    },
-                                    modifier = Modifier.align(Alignment.BottomCenter),
-                                )
+                                    val bottomNavPadding = if (LocalBottomNavVisible.current) 80.dp else 0.dp
+                                    MiniAudioPlayer(
+                                        onOpenFullPlayer = openAudioNoteViewer,
+                                        modifier =
+                                            Modifier
+                                                .align(Alignment.BottomCenter)
+                                                .navigationBarsPadding()
+                                                .padding(bottom = bottomNavPadding)
+                                                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                                    )
 
-                                SnackbarHost(
-                                    hostState = appUpdateSnackbarHostState,
-                                    modifier = Modifier.align(Alignment.BottomCenter),
-                                )
+                                    SnackbarHost(
+                                        hostState = appUpdateSnackbarHostState,
+                                        modifier = Modifier.align(Alignment.BottomCenter),
+                                    )
+                                }
                             }
                         }
                     }

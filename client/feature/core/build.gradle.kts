@@ -59,6 +59,7 @@ kotlin {
             implementation(projects.shared.model)
             implementation(projects.shared.config)
             implementation(projects.client.ui)
+            implementation(projects.client.awareness)
             implementation(projects.client.util)
             implementation(projects.client.repository)
             implementation(projects.client.domain)

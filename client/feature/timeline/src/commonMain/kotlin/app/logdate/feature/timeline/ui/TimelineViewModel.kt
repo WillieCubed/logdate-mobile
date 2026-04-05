@@ -4,6 +4,7 @@ package app.logdate.feature.timeline.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.awareness.daylight.DaylightClassifier
 import app.logdate.client.domain.notes.RemoveNoteUseCase
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.HomeRecommendation
@@ -52,8 +53,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlin.uuid.Uuid
 
 /**
@@ -262,14 +261,7 @@ class TimelineViewModel(
         dayPeople: List<PersonUiState>,
         membershipMap: Map<Uuid, List<Journal>> = emptyMap(),
     ): MomentUiState {
-        val timezone = TimeZone.currentSystemDefault()
-        val startLocal = estimatedStart.toLocalDateTime(timezone)
-        val timeOfDay =
-            when (startLocal.hour) {
-                in 0..11 -> "morning"
-                in 12..17 -> "afternoon"
-                else -> "evening"
-            }
+        val timeOfDay = DaylightClassifier().classifyWithoutLocation(estimatedStart)
         val resolvedPeople =
             people.mapNotNull { name ->
                 dayPeople.find { it.name.equals(name, ignoreCase = true) }

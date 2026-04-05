@@ -1,5 +1,6 @@
 package app.logdate.ui.timeline
 
+import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.util.now
@@ -110,9 +111,9 @@ data class MomentUiState(
      */
     val label: String,
     /**
-     * Subtle time-of-day hint: "morning", "afternoon".
+     * Classified daylight period for this moment.
      */
-    val timeOfDay: String? = null,
+    val timeOfDay: DaylightPeriod? = null,
     /**
      * Best text snippet for this moment, truncated.
      */

@@ -1,4 +1,4 @@
-package app.logdate.feature.editor.audio.color
+package app.logdate.client.awareness.daylight
 
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime

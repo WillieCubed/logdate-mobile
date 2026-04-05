@@ -158,6 +158,7 @@ import app.logdate.navigation.scenes.HomeTab
 import app.logdate.navigation.scenes.supportsDualPaneHomeScene
 import io.github.aakira.napier.Napier
 import kotlin.reflect.KClass
+import kotlin.uuid.Uuid
 
 /**
  * CompositionLocal for providing SharedTransitionScope throughout the navigation hierarchy.
@@ -165,6 +166,19 @@ import kotlin.reflect.KClass
  * explicitly passing it through parameters.
  */
 val LocalSharedTransitionScope = staticCompositionLocalOf<SharedTransitionScope?> { null }
+
+/**
+ * CompositionLocal for opening the full audio note viewer.
+ * Provided by [MainNavigationRoot] to avoid callback threading through scene classes.
+ */
+val LocalOpenAudioNoteViewer = staticCompositionLocalOf<(Uuid) -> Unit> { {} }
+
+/**
+ * Whether the bottom navigation bar is currently visible.
+ * Provided by [NavigationShell][app.logdate.navigation.scenes.NavigationShell]
+ * so the global mini audio player can position itself above the nav bar.
+ */
+val LocalBottomNavVisible = staticCompositionLocalOf { false }
 
 private fun sceneRouteClass(scene: Scene<NavKey>?): KClass<out NavKey>? = scene?.entries?.lastOrNull()?.routeClass()
 

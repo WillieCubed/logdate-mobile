@@ -5,8 +5,8 @@ package app.logdate.ui.audio
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -38,6 +39,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
+import kotlin.uuid.Uuid
 
 /**
  * A floating mini-player bar that appears when audio is playing.
@@ -45,25 +47,25 @@ import app.logdate.ui.theme.Spacing
  * Shows contextual title, progress, play/pause, and close controls.
  * Tapping the bar navigates to the immersive audio screen.
  *
- * @param onOpenFullPlayer Callback when the mini-player is tapped to open the full player.
+ * @param onOpenFullPlayer Callback invoked with the playing note's ID when the user taps the bar.
  */
 @Composable
 fun MiniAudioPlayer(
-    onOpenFullPlayer: () -> Unit,
+    onOpenFullPlayer: (Uuid) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val playbackState = LocalAudioPlaybackState.current
-    val isVisible = playbackState.currentlyPlayingId != null
+    val currentId = playbackState.currentlyPlayingId
 
     AnimatedVisibility(
-        visible = isVisible,
-        enter = slideInVertically(initialOffsetY = { it }),
-        exit = slideOutVertically(targetOffsetY = { it }),
+        visible = currentId != null,
+        enter = fadeIn(),
+        exit = fadeOut(),
         modifier = modifier,
     ) {
         MiniAudioPlayerContent(
             playbackState = playbackState,
-            onClick = onOpenFullPlayer,
+            onClick = { currentId?.let(onOpenFullPlayer) },
         )
     }
 }
@@ -93,6 +95,7 @@ private fun MiniAudioPlayerContent(
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
         modifier =
             Modifier
+                .widthIn(max = 480.dp)
                 .fillMaxWidth()
                 .clickable(onClick = onClick),
     ) {
@@ -139,7 +142,7 @@ private fun MiniAudioPlayerContent(
                     modifier = Modifier.weight(1f),
                 ) {
                     Text(
-                        text = displayInfo.title ?: "Audio Recording",
+                        text = displayInfo.title ?: displayInfo.subtitle ?: "",
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

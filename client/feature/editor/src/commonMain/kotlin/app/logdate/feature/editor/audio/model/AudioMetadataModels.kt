@@ -26,16 +26,6 @@ data class AudioPalette(
     val contentColor: Long = 0xFFF5F5F5,
 )
 
-enum class DaylightPeriod {
-    DAWN,
-    MORNING,
-    MIDDAY,
-    AFTERNOON,
-    GOLDEN_HOUR,
-    EVENING,
-    NIGHT,
-}
-
 enum class LocationType {
     NATURE,
     URBAN,
