@@ -4,15 +4,8 @@ package app.logdate.feature.onboarding.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,6 +48,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -148,7 +143,10 @@ fun PersonalIntroContent(
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.lg)
                     .verticalScroll(rememberScrollState())
-                    .widthIn(max = 500.dp),
+                    .widthIn(max = 500.dp)
+                    .semantics {
+                        contentDescription = PERSONAL_INTRO_ROOT_TAG
+                    },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(modifier = Modifier.height(Spacing.xl))
@@ -189,24 +187,7 @@ fun PersonalIntroContent(
 
             AnimatedContent(
                 targetState = uiState.currentStep,
-                transitionSpec = {
-                    slideInHorizontally(
-                        initialOffsetX = { it },
-                        animationSpec =
-                            spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessLow,
-                            ),
-                    ) togetherWith
-                        slideOutHorizontally(
-                            targetOffsetX = { -it },
-                            animationSpec =
-                                spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessLow,
-                                ),
-                        )
-                },
+                transitionSpec = { onboardingSlideTransition() },
                 label = "Step Content",
             ) { step ->
                 when (step) {
@@ -508,10 +489,7 @@ private fun LlmResponseStep(
 
         AnimatedContent(
             targetState = llmResponse != null || llmError != null,
-            transitionSpec = {
-                (fadeIn() + scaleIn(initialScale = 0.8f)) togetherWith
-                    (fadeOut() + scaleOut(targetScale = 0.8f))
-            },
+            transitionSpec = { onboardingFadeTransition() },
             label = "Response Content",
         ) { hasResponse ->
             if (hasResponse) {

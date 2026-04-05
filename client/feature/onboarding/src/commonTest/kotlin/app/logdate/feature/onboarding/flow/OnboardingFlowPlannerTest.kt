@@ -52,13 +52,16 @@ class OnboardingFlowPlannerTest {
         val snapshot =
             OnboardingProgressSnapshot(
                 hasPersonalIntro = true,
-                hasCloudAccount = true,
                 hasBirthday = false,
                 notificationsHandledOnThisDevice = false,
+                recommendationsHandledOnThisDevice = true,
+                locationHandledOnThisDevice = true,
+                dayBoundariesHandledOnThisDevice = true,
             )
 
         assertEquals(
             listOf(
+                OnboardingStep.ACCOUNT,
                 OnboardingStep.BIRTHDAY,
                 OnboardingStep.NOTIFICATIONS,
                 OnboardingStep.WELCOME_BACK,
@@ -78,6 +81,9 @@ class OnboardingFlowPlannerTest {
                 hasCloudAccount = true,
                 hasBirthday = true,
                 notificationsHandledOnThisDevice = true,
+                recommendationsHandledOnThisDevice = true,
+                locationHandledOnThisDevice = true,
+                dayBoundariesHandledOnThisDevice = true,
             )
 
         assertEquals(
@@ -94,7 +100,7 @@ class OnboardingFlowPlannerTest {
         val snapshot = OnboardingProgressSnapshot()
 
         assertEquals(
-            OnboardingStep.ACCOUNT,
+            OnboardingStep.PERSONAL_INTRO,
             firstOnboardingStep(
                 entryMode = OnboardingEntryMode.CONTINUE_SETUP,
                 snapshot = snapshot,
@@ -103,21 +109,27 @@ class OnboardingFlowPlannerTest {
     }
 
     @Test
-    fun `completion eligibility requires birthday and notification handling`() {
+    fun `completion eligibility requires all canonical setup steps to be handled`() {
         assertFalse(
             OnboardingProgressSnapshot(
                 hasPersonalIntro = true,
-                hasBirthday = false,
+                hasBirthday = true,
+                recommendationsHandledOnThisDevice = true,
+                locationHandledOnThisDevice = true,
+                dayBoundariesHandledOnThisDevice = false,
                 notificationsHandledOnThisDevice = true,
-            ).canCompleteFreshOnboarding(),
+            ).canCompleteOnboarding(),
         )
 
         assertTrue(
             OnboardingProgressSnapshot(
                 hasPersonalIntro = true,
                 hasBirthday = true,
+                recommendationsHandledOnThisDevice = true,
+                locationHandledOnThisDevice = true,
+                dayBoundariesHandledOnThisDevice = true,
                 notificationsHandledOnThisDevice = true,
-            ).canCompleteFreshOnboarding(),
+            ).canCompleteOnboarding(),
         )
     }
 
@@ -152,6 +164,42 @@ class OnboardingFlowPlannerTest {
                 entryMode = OnboardingEntryMode.FRESH,
                 snapshot = snapshot,
             ),
+        )
+    }
+
+    @Test
+    fun `continue setup flow includes unresolved setup choices after birthday`() {
+        val snapshot =
+            OnboardingProgressSnapshot(
+                hasPersonalIntro = true,
+                hasBirthday = true,
+                healthConnectStatus = HealthConnectStatus.NOT_AVAILABLE,
+            )
+
+        assertEquals(
+            listOf(
+                OnboardingStep.ACCOUNT,
+                OnboardingStep.RECOMMENDATIONS,
+                OnboardingStep.LOCATION,
+                OnboardingStep.NOTIFICATIONS,
+                OnboardingStep.WELCOME_BACK,
+            ),
+            onboardingStepsFor(
+                entryMode = OnboardingEntryMode.CONTINUE_SETUP,
+                snapshot = snapshot,
+            ),
+        )
+    }
+
+    @Test
+    fun `completion guard redirects to recommendations before notifications when unresolved`() {
+        assertEquals(
+            OnboardingStep.RECOMMENDATIONS,
+            OnboardingProgressSnapshot(
+                hasPersonalIntro = true,
+                hasBirthday = true,
+                notificationsHandledOnThisDevice = true,
+            ).firstIncompleteRequiredOnboardingStep(),
         )
     }
 }

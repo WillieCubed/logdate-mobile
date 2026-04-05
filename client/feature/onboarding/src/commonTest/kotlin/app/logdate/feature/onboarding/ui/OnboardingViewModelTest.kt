@@ -28,6 +28,7 @@ import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.feature.onboarding.flow.OnboardingDeviceState
 import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
 import app.logdate.feature.onboarding.flow.OnboardingEntryMode
+import app.logdate.feature.onboarding.flow.OnboardingStep
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.shared.model.user.UserData
@@ -35,6 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -193,6 +195,9 @@ class OnboardingViewModelTest {
                 ),
             )
             fakeUserStateRepository.setBirthday(Instant.fromEpochMilliseconds(946684800000))
+            fakeOnboardingDeviceStateRepository.markRecommendationsHandled()
+            fakeOnboardingDeviceStateRepository.markLocationHandled()
+            fakeOnboardingDeviceStateRepository.markDayBoundariesHandled()
             fakeOnboardingDeviceStateRepository.markNotificationsHandled()
             advanceUntilIdle()
 
@@ -211,6 +216,9 @@ class OnboardingViewModelTest {
                     bio = "Bio",
                 ),
             )
+            fakeOnboardingDeviceStateRepository.markRecommendationsHandled()
+            fakeOnboardingDeviceStateRepository.markLocationHandled()
+            fakeOnboardingDeviceStateRepository.markDayBoundariesHandled()
             fakeOnboardingDeviceStateRepository.markNotificationsHandled()
 
             val result = viewModel.completeOnboardingIfEligible()
@@ -220,12 +228,47 @@ class OnboardingViewModelTest {
         }
 
     @Test
+    fun completeOnboardingIfEligible_fails_when_location_step_not_handled() =
+        runTest {
+            fakeProfileRepository.setProfile(
+                LogDateProfile(
+                    displayName = "Alex",
+                    bio = "Bio",
+                ),
+            )
+            fakeUserStateRepository.setBirthday(Instant.fromEpochMilliseconds(946684800000))
+            fakeOnboardingDeviceStateRepository.markRecommendationsHandled()
+            fakeOnboardingDeviceStateRepository.markDayBoundariesHandled()
+            fakeOnboardingDeviceStateRepository.markNotificationsHandled()
+            advanceUntilIdle()
+
+            val result = viewModel.completeOnboardingIfEligible()
+
+            assertTrue(result.isFailure)
+            assertEquals(false, fakeUserStateRepository.isOnboardingComplete)
+            assertEquals(OnboardingStep.LOCATION, viewModel.firstIncompleteRequiredOnboardingStep())
+        }
+
+    @Test
     fun markNotificationsHandled_updatesProgressSnapshot() =
         runTest {
             viewModel.markNotificationsHandled()
             advanceUntilIdle()
 
             assertTrue(viewModel.progressSnapshot.value.notificationsHandledOnThisDevice)
+        }
+
+    @Test
+    fun handledMarkers_updateProgressSnapshot() =
+        runTest {
+            viewModel.markRecommendationsHandled()
+            viewModel.markDayBoundariesHandled()
+            viewModel.markLocationHandled()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.progressSnapshot.value.recommendationsHandledOnThisDevice)
+            assertTrue(viewModel.progressSnapshot.value.dayBoundariesHandledOnThisDevice)
+            assertTrue(viewModel.progressSnapshot.value.locationHandledOnThisDevice)
         }
 
     private class FakeStreakSettingsRepository : StreakSettingsRepository {
@@ -397,7 +440,19 @@ private class FakeSessionStorage : SessionStorage {
 
 private class FakeOnboardingDeviceStateRepository : OnboardingDeviceStateRepository {
     private val state = MutableStateFlow(OnboardingDeviceState())
-    override val deviceState: Flow<OnboardingDeviceState> = state
+    override val deviceState: StateFlow<OnboardingDeviceState> = state
+
+    override suspend fun markRecommendationsHandled() {
+        state.value = state.value.copy(recommendationsHandledOnThisDevice = true)
+    }
+
+    override suspend fun markDayBoundariesHandled() {
+        state.value = state.value.copy(dayBoundariesHandledOnThisDevice = true)
+    }
+
+    override suspend fun markLocationHandled() {
+        state.value = state.value.copy(locationHandledOnThisDevice = true)
+    }
 
     override suspend fun markNotificationsHandled() {
         state.value = state.value.copy(notificationsHandledOnThisDevice = true)

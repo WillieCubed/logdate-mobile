@@ -17,6 +17,6 @@ actual val onboardingFeatureModule: Module =
         single<OnboardingDeviceStateRepository> { InMemoryOnboardingDeviceStateRepository() }
         viewModel { OnboardingViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
         viewModel { MemorySelectionViewModel(get(), get()) }
-        viewModel { PersonalIntroViewModel(get()) }
+        viewModel { PersonalIntroViewModel(get(), get()) }
         viewModel { WelcomeBackViewModel(get()) }
     }

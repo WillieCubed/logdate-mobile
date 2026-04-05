@@ -6,10 +6,6 @@
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -76,7 +72,7 @@ fun OnboardingCompletionScreen(
                         onFinish()
                     }.onFailure {
                         viewModel
-                            .firstIncompleteRequiredFreshStep()
+                            .firstIncompleteRequiredOnboardingStep()
                             ?.let(onRequirementsIncomplete)
                     }
             }
@@ -102,14 +98,7 @@ fun OnboardingCompletionContent(
     AnimatedContent(
         targetState = shouldShowFinish,
         modifier = modifier.testTag(ONBOARDING_COMPLETION_ROOT_TAG),
-        transitionSpec = {
-            fadeIn(
-                animationSpec = tween(3000),
-            ) togetherWith
-                fadeOut(
-                    animationSpec = tween(3000),
-                )
-        },
+        transitionSpec = { onboardingFadeTransition() },
         label = "Show Finish Screen",
     ) { isShowingFinish ->
         if (isShowingFinish) {

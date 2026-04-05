@@ -37,6 +37,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -49,6 +54,7 @@ import app.logdate.client.domain.dayboundary.HealthConnectStatus
 import app.logdate.client.permissions.rememberHealthConnectPermissionState
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
+import kotlinx.coroutines.launch
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
@@ -61,11 +67,15 @@ const val ONBOARDING_DAY_BOUNDARIES_SKIP_TAG = "onboarding_day_boundaries_skip"
 @Composable
 fun OnboardingDayBoundariesScreen(
     onBack: () -> Unit,
-    onNext: () -> Unit,
+    onNext: (Boolean) -> Unit,
     viewModel: OnboardingViewModel = koinViewModel(),
 ) {
     val healthConnectStatus by viewModel.healthConnectStatus.collectAsState()
     val permissionState = rememberHealthConnectPermissionState()
+    val coroutineScope = rememberCoroutineScope()
+    var isSaving by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var enableAfterPermission by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(permissionState.completedRequestCount) {
         if (permissionState.completedRequestCount > 0) {
@@ -76,16 +86,66 @@ fun OnboardingDayBoundariesScreen(
     // Defensive: screen should not be reached when HC is unavailable, but navigate away if it is
     LaunchedEffect(healthConnectStatus) {
         if (healthConnectStatus == HealthConnectStatus.NOT_AVAILABLE) {
-            viewModel.disableSleepBasedDayBoundaries()
-            onNext()
+            coroutineScope.launch {
+                isSaving = true
+                errorMessage = null
+                viewModel
+                    .persistSleepBasedDayBoundariesEnabled(enabled = false)
+                    .onSuccess {
+                        viewModel
+                            .markDayBoundariesHandled()
+                            .onSuccess {
+                                isSaving = false
+                                onNext(false)
+                            }.onFailure {
+                                errorMessage = "We couldn't save your day boundary preference right now."
+                                isSaving = false
+                            }
+                    }.onFailure {
+                        errorMessage = "We couldn't save your day boundary preference right now."
+                        isSaving = false
+                    }
+            }
         }
     }
 
-    // Auto-advance once permission is granted and HC is confirmed connected
-    LaunchedEffect(permissionState.completedRequestCount, healthConnectStatus) {
-        if (permissionState.completedRequestCount > 0 && healthConnectStatus == HealthConnectStatus.CONNECTED) {
-            viewModel.enableSleepBasedDayBoundaries()
-            onNext()
+    LaunchedEffect(enableAfterPermission, permissionState.completedRequestCount, healthConnectStatus) {
+        when (
+            resolveDayBoundariesPostPermissionAction(
+                enableAfterPermission = enableAfterPermission,
+                completedRequestCount = permissionState.completedRequestCount,
+                healthConnectStatus = healthConnectStatus,
+            )
+        ) {
+            DayBoundariesPostPermissionAction.ENABLE_AND_CONTINUE -> {
+                enableAfterPermission = false
+                coroutineScope.launch {
+                    isSaving = true
+                    errorMessage = null
+                    viewModel
+                        .persistSleepBasedDayBoundariesEnabled(enabled = true)
+                        .onSuccess {
+                            viewModel
+                                .markDayBoundariesHandled()
+                                .onSuccess {
+                                    isSaving = false
+                                    onNext(true)
+                                }.onFailure {
+                                    errorMessage = "We couldn't save your day boundary preference right now."
+                                    isSaving = false
+                                }
+                        }.onFailure {
+                            errorMessage = "We couldn't save your day boundary preference right now."
+                            isSaving = false
+                        }
+                }
+            }
+
+            DayBoundariesPostPermissionAction.RESET_REQUEST_STATE -> {
+                enableAfterPermission = false
+            }
+
+            DayBoundariesPostPermissionAction.NONE -> Unit
         }
     }
 
@@ -95,20 +155,85 @@ fun OnboardingDayBoundariesScreen(
         onEnable = {
             when (healthConnectStatus) {
                 HealthConnectStatus.CONNECTED -> {
-                    viewModel.enableSleepBasedDayBoundaries()
-                    onNext()
+                    coroutineScope.launch {
+                        isSaving = true
+                        errorMessage = null
+                        viewModel
+                            .persistSleepBasedDayBoundariesEnabled(enabled = true)
+                            .onSuccess {
+                                viewModel
+                                    .markDayBoundariesHandled()
+                                    .onSuccess {
+                                        isSaving = false
+                                        onNext(true)
+                                    }.onFailure {
+                                        errorMessage = "We couldn't save your day boundary preference right now."
+                                        isSaving = false
+                                    }
+                            }.onFailure {
+                                errorMessage = "We couldn't save your day boundary preference right now."
+                                isSaving = false
+                            }
+                    }
                 }
-                HealthConnectStatus.PERMISSIONS_NEEDED -> permissionState.requestPermission()
+                HealthConnectStatus.PERMISSIONS_NEEDED -> {
+                    enableAfterPermission = true
+                    permissionState.requestPermission()
+                }
                 HealthConnectStatus.CHECKING,
                 HealthConnectStatus.NOT_AVAILABLE,
                 -> Unit
             }
         },
         onSkip = {
-            viewModel.disableSleepBasedDayBoundaries()
-            onNext()
+            coroutineScope.launch {
+                isSaving = true
+                errorMessage = null
+                viewModel
+                    .persistSleepBasedDayBoundariesEnabled(enabled = false)
+                    .onSuccess {
+                        viewModel
+                            .markDayBoundariesHandled()
+                            .onSuccess {
+                                isSaving = false
+                                onNext(false)
+                            }.onFailure {
+                                errorMessage = "We couldn't save your day boundary preference right now."
+                                isSaving = false
+                            }
+                    }.onFailure {
+                        errorMessage = "We couldn't save your day boundary preference right now."
+                        isSaving = false
+                    }
+            }
         },
+        isSaving = isSaving,
+        errorMessage = errorMessage,
     )
+}
+
+internal enum class DayBoundariesPostPermissionAction {
+    ENABLE_AND_CONTINUE,
+    RESET_REQUEST_STATE,
+    NONE,
+}
+
+internal fun resolveDayBoundariesPostPermissionAction(
+    enableAfterPermission: Boolean,
+    completedRequestCount: Int,
+    healthConnectStatus: HealthConnectStatus,
+): DayBoundariesPostPermissionAction {
+    if (!enableAfterPermission || completedRequestCount == 0) {
+        return DayBoundariesPostPermissionAction.NONE
+    }
+
+    return when (healthConnectStatus) {
+        HealthConnectStatus.CONNECTED -> DayBoundariesPostPermissionAction.ENABLE_AND_CONTINUE
+        HealthConnectStatus.PERMISSIONS_NEEDED,
+        HealthConnectStatus.NOT_AVAILABLE,
+        -> DayBoundariesPostPermissionAction.RESET_REQUEST_STATE
+        HealthConnectStatus.CHECKING -> DayBoundariesPostPermissionAction.NONE
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -118,6 +243,8 @@ fun OnboardingDayBoundariesContent(
     onBack: () -> Unit,
     onEnable: () -> Unit,
     onSkip: () -> Unit,
+    isSaving: Boolean = false,
+    errorMessage: String? = null,
 ) {
     val scrollState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(scrollState)
@@ -252,12 +379,23 @@ fun OnboardingDayBoundariesContent(
                     Button(
                         onClick = onEnable,
                         modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_DAY_BOUNDARIES_ENABLE_TAG),
-                        enabled = healthConnectStatus != HealthConnectStatus.CHECKING,
+                        enabled = !isSaving && healthConnectStatus != HealthConnectStatus.CHECKING,
                     ) {
                         Text(primaryActionLabel)
                     }
-                    TextButton(onClick = onSkip, modifier = Modifier.testTag(ONBOARDING_DAY_BOUNDARIES_SKIP_TAG)) {
+                    TextButton(
+                        onClick = onSkip,
+                        modifier = Modifier.testTag(ONBOARDING_DAY_BOUNDARIES_SKIP_TAG),
+                        enabled = !isSaving,
+                    ) {
                         Text(stringResource(Res.string.onboarding_day_boundaries_not_now))
+                    }
+                    errorMessage?.let { message ->
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
                     }
                 }
             }

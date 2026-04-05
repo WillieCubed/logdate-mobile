@@ -315,23 +315,28 @@ fun NavGraphBuilder.onboardingGraph(
             val progressSnapshot by viewModel.progressSnapshot.collectAsState()
             val entryMode by viewModel.activeEntryMode.collectAsState()
             val healthConnectStatus by viewModel.healthConnectStatus.collectAsState()
-            var pendingNextRoute by rememberSaveable { mutableStateOf(false) }
+            var pendingRecommendationsEnabled by rememberSaveable { mutableStateOf<Boolean?>(null) }
 
-            LaunchedEffect(pendingNextRoute, healthConnectStatus) {
+            LaunchedEffect(pendingRecommendationsEnabled, healthConnectStatus) {
                 if (
-                    !pendingNextRoute ||
+                    pendingRecommendationsEnabled == null ||
                     healthConnectStatus == HealthConnectStatus.CHECKING
                 ) {
                     return@LaunchedEffect
                 }
 
-                pendingNextRoute = false
+                val recommendationsEnabled = pendingRecommendationsEnabled ?: return@LaunchedEffect
+                pendingRecommendationsEnabled = null
                 onGoToItem(
                     routeForStep(
                         nextOnboardingStepAfter(
                             currentStep = OnboardingStep.RECOMMENDATIONS,
                             entryMode = entryMode,
-                            snapshot = progressSnapshot,
+                            snapshot =
+                                progressSnapshot.copy(
+                                    recommendationsHandledOnThisDevice = true,
+                                    contextualRecommendationsEnabled = recommendationsEnabled,
+                                ),
                         ) ?: terminalStepFor(entryMode),
                     ),
                 )
@@ -340,18 +345,22 @@ fun NavGraphBuilder.onboardingGraph(
             OnboardingRecommendationsScreen(
                 viewModel = viewModel,
                 onBack = onNavigateBack,
-                onNext = {
+                onNext = { recommendationsEnabled ->
                     if (
                         healthConnectStatus == HealthConnectStatus.CHECKING
                     ) {
-                        pendingNextRoute = true
+                        pendingRecommendationsEnabled = recommendationsEnabled
                     } else {
                         onGoToItem(
                             routeForStep(
                                 nextOnboardingStepAfter(
                                     currentStep = OnboardingStep.RECOMMENDATIONS,
                                     entryMode = entryMode,
-                                    snapshot = progressSnapshot,
+                                    snapshot =
+                                        progressSnapshot.copy(
+                                            recommendationsHandledOnThisDevice = true,
+                                            contextualRecommendationsEnabled = recommendationsEnabled,
+                                        ),
                                 ) ?: terminalStepFor(entryMode),
                             ),
                         )
@@ -366,13 +375,17 @@ fun NavGraphBuilder.onboardingGraph(
 
             OnboardingDayBoundariesScreen(
                 onBack = onNavigateBack,
-                onNext = {
+                onNext = { dayBoundariesEnabled ->
                     onGoToItem(
                         routeForStep(
                             nextOnboardingStepAfter(
                                 currentStep = OnboardingStep.DAY_BOUNDARIES,
                                 entryMode = entryMode,
-                                snapshot = progressSnapshot,
+                                snapshot =
+                                    progressSnapshot.copy(
+                                        dayBoundariesHandledOnThisDevice = true,
+                                        sleepBasedDayBoundariesEnabled = dayBoundariesEnabled,
+                                    ),
                             ) ?: terminalStepFor(entryMode),
                         ),
                     )
@@ -386,13 +399,17 @@ fun NavGraphBuilder.onboardingGraph(
 
             OnboardingLocationScreen(
                 onBack = onNavigateBack,
-                onNext = {
+                onNext = { locationEnabled ->
                     onGoToItem(
                         routeForStep(
                             nextOnboardingStepAfter(
                                 currentStep = OnboardingStep.LOCATION,
                                 entryMode = entryMode,
-                                snapshot = progressSnapshot,
+                                snapshot =
+                                    progressSnapshot.copy(
+                                        locationHandledOnThisDevice = true,
+                                        locationTrackingEnabled = locationEnabled,
+                                    ),
                             ) ?: terminalStepFor(entryMode),
                         ),
                     )

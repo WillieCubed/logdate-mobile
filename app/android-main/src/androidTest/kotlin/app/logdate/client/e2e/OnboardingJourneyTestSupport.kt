@@ -10,6 +10,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
+import app.logdate.client.domain.recommendation.AmbientPromptTime
 import app.logdate.client.domain.dayboundary.DayBoundarySettings
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
 import app.logdate.client.health.LocalFirstHealthRepository
@@ -182,8 +183,8 @@ internal class OnboardingKoinModuleOverrideRule(
         }
 }
 
-internal fun SemanticsNodeInteraction.captureStepScreenshot(
-    composeRule: AndroidComposeTestRule<ActivityScenarioRule<ComponentActivity>, ComponentActivity>,
+internal fun <A : ComponentActivity> SemanticsNodeInteraction.captureStepScreenshot(
+    composeRule: AndroidComposeTestRule<ActivityScenarioRule<A>, A>,
     testName: String,
     stepName: String,
 ) {
@@ -334,6 +335,38 @@ internal class OnboardingFakeMemoriesSettingsRepository : MemoriesSettingsReposi
         state.value = state.value.copy(contextualRecommendationsEnabled = enabled)
     }
 
+    override suspend fun setAmbientPromptsEnabled(enabled: Boolean) {
+        state.value = state.value.copy(ambientPromptsEnabled = enabled)
+    }
+
+    override suspend fun setCaptureNudgesEnabled(enabled: Boolean) {
+        state.value = state.value.copy(captureNudgesEnabled = enabled)
+    }
+
+    override suspend fun setDraftRescueEnabled(enabled: Boolean) {
+        state.value = state.value.copy(draftRescueEnabled = enabled)
+    }
+
+    override suspend fun setMemoryRecallNotificationsEnabled(enabled: Boolean) {
+        state.value = state.value.copy(memoryRecallNotificationsEnabled = enabled)
+    }
+
+    override suspend fun setMorningPromptEnabled(enabled: Boolean) {
+        state.value = state.value.copy(morningPromptEnabled = enabled)
+    }
+
+    override suspend fun setEveningPromptEnabled(enabled: Boolean) {
+        state.value = state.value.copy(eveningPromptEnabled = enabled)
+    }
+
+    override suspend fun setMorningPromptTime(time: AmbientPromptTime) {
+        state.value = state.value.copy(morningPromptTime = time)
+    }
+
+    override suspend fun setEveningPromptTime(time: AmbientPromptTime) {
+        state.value = state.value.copy(eveningPromptTime = time)
+    }
+
     override suspend fun setAiRecallEnabled(enabled: Boolean) {
         state.value = state.value.copy(aiRecallEnabled = enabled)
     }
@@ -385,10 +418,22 @@ internal class OnboardingFakeDayBoundarySettingsRepository : DayBoundarySettings
 
 internal class OnboardingFakeOnboardingDeviceStateRepository : app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository {
     private val state = MutableStateFlow(app.logdate.feature.onboarding.flow.OnboardingDeviceState())
-    override val deviceState: Flow<app.logdate.feature.onboarding.flow.OnboardingDeviceState> = state.asStateFlow()
+    override val deviceState: StateFlow<app.logdate.feature.onboarding.flow.OnboardingDeviceState> = state.asStateFlow()
 
     fun reset() {
         state.value = app.logdate.feature.onboarding.flow.OnboardingDeviceState()
+    }
+
+    override suspend fun markRecommendationsHandled() {
+        state.value = state.value.copy(recommendationsHandledOnThisDevice = true)
+    }
+
+    override suspend fun markDayBoundariesHandled() {
+        state.value = state.value.copy(dayBoundariesHandledOnThisDevice = true)
+    }
+
+    override suspend fun markLocationHandled() {
+        state.value = state.value.copy(locationHandledOnThisDevice = true)
     }
 
     override suspend fun markNotificationsHandled() {

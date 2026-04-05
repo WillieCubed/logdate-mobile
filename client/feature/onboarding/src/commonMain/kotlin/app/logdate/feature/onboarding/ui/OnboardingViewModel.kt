@@ -17,8 +17,8 @@ import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
 import app.logdate.feature.onboarding.flow.OnboardingEntryMode
 import app.logdate.feature.onboarding.flow.OnboardingProgressSnapshot
 import app.logdate.feature.onboarding.flow.OnboardingStep
-import app.logdate.feature.onboarding.flow.canCompleteFreshOnboarding
-import app.logdate.feature.onboarding.flow.firstIncompleteRequiredFreshStep
+import app.logdate.feature.onboarding.flow.canCompleteOnboarding
+import app.logdate.feature.onboarding.flow.firstIncompleteRequiredOnboardingStep
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -60,15 +60,37 @@ class OnboardingViewModel(
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
-                initialValue = OnboardingEntryMode.FRESH,
+                initialValue = onboardingDeviceStateRepository.deviceState.value.activeEntryMode,
             )
 
     val progressSnapshot: StateFlow<OnboardingProgressSnapshot> =
         combine(
             observeUserIdentity(),
-            onboardingDeviceStateRepository.deviceState,
-            healthConnectStatus,
-        ) { identity, deviceState, healthStatus ->
+            combine(
+                combine(
+                    onboardingDeviceStateRepository.deviceState,
+                    healthConnectStatus,
+                    memoriesSettingsRepository.observeSettings(),
+                    locationTrackingSettingsRepository.observeSettings(),
+                ) { deviceState, healthStatus, memoriesSettings, locationSettings ->
+                    PartialOnboardingProgressInputs(
+                        deviceState = deviceState,
+                        healthStatus = healthStatus,
+                        recommendationsEnabled = memoriesSettings.contextualRecommendationsEnabled,
+                        locationTrackingEnabled = locationSettings.backgroundTrackingEnabled,
+                    )
+                },
+                dayBoundarySettingsRepository.observeSettings(),
+            ) { partialInputs, dayBoundarySettings ->
+                OnboardingProgressInputs(
+                    deviceState = partialInputs.deviceState,
+                    healthStatus = partialInputs.healthStatus,
+                    recommendationsEnabled = partialInputs.recommendationsEnabled,
+                    locationTrackingEnabled = partialInputs.locationTrackingEnabled,
+                    sleepBasedDayBoundariesEnabled = dayBoundarySettings.sleepBasedBoundariesEnabled,
+                )
+            },
+        ) { identity, inputs ->
             OnboardingProgressSnapshot(
                 hasPersonalIntro = identity.displayName.isNotBlank() && !identity.bio.isNullOrBlank(),
                 hasBirthday = identity.birthday != null,
@@ -76,13 +98,30 @@ class OnboardingViewModel(
                     identity.isAuthenticated ||
                         identity.cloudAccountId != null ||
                         !identity.username.isNullOrBlank(),
-                notificationsHandledOnThisDevice = deviceState.notificationsHandledOnThisDevice,
-                healthConnectStatus = healthStatus,
+                recommendationsHandledOnThisDevice = inputs.deviceState.recommendationsHandledOnThisDevice,
+                contextualRecommendationsEnabled = inputs.recommendationsEnabled,
+                dayBoundariesHandledOnThisDevice = inputs.deviceState.dayBoundariesHandledOnThisDevice,
+                sleepBasedDayBoundariesEnabled = inputs.sleepBasedDayBoundariesEnabled,
+                locationHandledOnThisDevice = inputs.deviceState.locationHandledOnThisDevice,
+                locationTrackingEnabled = inputs.locationTrackingEnabled,
+                notificationsHandledOnThisDevice = inputs.deviceState.notificationsHandledOnThisDevice,
+                healthConnectStatus = inputs.healthStatus,
             )
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
-            initialValue = OnboardingProgressSnapshot(),
+            initialValue =
+                OnboardingProgressSnapshot(
+                    recommendationsHandledOnThisDevice =
+                        onboardingDeviceStateRepository.deviceState.value.recommendationsHandledOnThisDevice,
+                    dayBoundariesHandledOnThisDevice =
+                        onboardingDeviceStateRepository.deviceState.value.dayBoundariesHandledOnThisDevice,
+                    locationHandledOnThisDevice =
+                        onboardingDeviceStateRepository.deviceState.value.locationHandledOnThisDevice,
+                    notificationsHandledOnThisDevice =
+                        onboardingDeviceStateRepository.deviceState.value.notificationsHandledOnThisDevice,
+                    healthConnectStatus = healthConnectStatus.value,
+                ),
         )
 
     /**
@@ -232,6 +271,21 @@ class OnboardingViewModel(
             onboardingDeviceStateRepository.markNotificationsHandled()
         }
 
+    suspend fun markRecommendationsHandled(): Result<Unit> =
+        runCatching {
+            onboardingDeviceStateRepository.markRecommendationsHandled()
+        }
+
+    suspend fun markDayBoundariesHandled(): Result<Unit> =
+        runCatching {
+            onboardingDeviceStateRepository.markDayBoundariesHandled()
+        }
+
+    suspend fun markLocationHandled(): Result<Unit> =
+        runCatching {
+            onboardingDeviceStateRepository.markLocationHandled()
+        }
+
     suspend fun setActiveEntryMode(entryMode: OnboardingEntryMode): Result<Unit> =
         runCatching {
             onboardingDeviceStateRepository.setActiveEntryMode(entryMode)
@@ -239,17 +293,32 @@ class OnboardingViewModel(
 
     suspend fun completeOnboardingIfEligible(): Result<Unit> =
         runCatching {
-            require(progressSnapshot.value.canCompleteFreshOnboarding()) {
+            require(progressSnapshot.value.canCompleteOnboarding()) {
                 "Required onboarding steps are still incomplete"
             }
             userStateRepository.setIsOnboardingComplete(true)
             refreshStreakUseCase()
         }
 
-    fun firstIncompleteRequiredFreshStep(): OnboardingStep? = progressSnapshot.value.firstIncompleteRequiredFreshStep()
+    fun firstIncompleteRequiredOnboardingStep(): OnboardingStep? = progressSnapshot.value.firstIncompleteRequiredOnboardingStep()
 
     override fun onCleared() {
         healthStatusJob?.cancel()
         super.onCleared()
     }
+
+    private data class OnboardingProgressInputs(
+        val deviceState: app.logdate.feature.onboarding.flow.OnboardingDeviceState,
+        val healthStatus: HealthConnectStatus,
+        val recommendationsEnabled: Boolean,
+        val locationTrackingEnabled: Boolean,
+        val sleepBasedDayBoundariesEnabled: Boolean,
+    )
+
+    private data class PartialOnboardingProgressInputs(
+        val deviceState: app.logdate.feature.onboarding.flow.OnboardingDeviceState,
+        val healthStatus: HealthConnectStatus,
+        val recommendationsEnabled: Boolean,
+        val locationTrackingEnabled: Boolean,
+    )
 }

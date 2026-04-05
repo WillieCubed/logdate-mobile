@@ -216,37 +216,46 @@ fun EntryProviderScope<NavKey>.onboarding(
         val viewModel = koinViewModel<OnboardingViewModel>()
         val progressSnapshot by viewModel.progressSnapshot.collectAsState()
         val entryMode by viewModel.activeEntryMode.collectAsState()
-        var pendingNextRoute by rememberSaveable { mutableStateOf(false) }
+        var pendingRecommendationsEnabled by rememberSaveable { mutableStateOf<Boolean?>(null) }
 
-        LaunchedEffect(pendingNextRoute, progressSnapshot.healthConnectStatus) {
+        LaunchedEffect(pendingRecommendationsEnabled, progressSnapshot.healthConnectStatus) {
             if (
-                !pendingNextRoute ||
+                pendingRecommendationsEnabled == null ||
                 progressSnapshot.healthConnectStatus == HealthConnectStatus.CHECKING
             ) {
                 return@LaunchedEffect
             }
 
-            pendingNextRoute = false
+            val recommendationsEnabled = pendingRecommendationsEnabled ?: return@LaunchedEffect
+            pendingRecommendationsEnabled = null
             onNavigate(
                 routeForNextStep(
                     currentStep = OnboardingStep.RECOMMENDATIONS,
                     entryMode = entryMode,
-                    snapshot = progressSnapshot,
+                    snapshot =
+                        progressSnapshot.copy(
+                            recommendationsHandledOnThisDevice = true,
+                            contextualRecommendationsEnabled = recommendationsEnabled,
+                        ),
                 ),
             )
         }
 
         OnboardingRecommendationsScreen(
             onBack = onBack,
-            onNext = {
+            onNext = { recommendationsEnabled ->
                 if (progressSnapshot.healthConnectStatus == HealthConnectStatus.CHECKING) {
-                    pendingNextRoute = true
+                    pendingRecommendationsEnabled = recommendationsEnabled
                 } else {
                     onNavigate(
                         routeForNextStep(
                             currentStep = OnboardingStep.RECOMMENDATIONS,
                             entryMode = entryMode,
-                            snapshot = progressSnapshot,
+                            snapshot =
+                                progressSnapshot.copy(
+                                    recommendationsHandledOnThisDevice = true,
+                                    contextualRecommendationsEnabled = recommendationsEnabled,
+                                ),
                         ),
                     )
                 }
@@ -260,12 +269,16 @@ fun EntryProviderScope<NavKey>.onboarding(
 
         OnboardingDayBoundariesScreen(
             onBack = onBack,
-            onNext = {
+            onNext = { dayBoundariesEnabled ->
                 onNavigate(
                     routeForNextStep(
                         currentStep = OnboardingStep.DAY_BOUNDARIES,
                         entryMode = entryMode,
-                        snapshot = progressSnapshot,
+                        snapshot =
+                            progressSnapshot.copy(
+                                dayBoundariesHandledOnThisDevice = true,
+                                sleepBasedDayBoundariesEnabled = dayBoundariesEnabled,
+                            ),
                     ),
                 )
             },
@@ -278,12 +291,16 @@ fun EntryProviderScope<NavKey>.onboarding(
 
         OnboardingLocationScreen(
             onBack = onBack,
-            onNext = {
+            onNext = { locationEnabled ->
                 onNavigate(
                     routeForNextStep(
                         currentStep = OnboardingStep.LOCATION,
                         entryMode = entryMode,
-                        snapshot = progressSnapshot,
+                        snapshot =
+                            progressSnapshot.copy(
+                                locationHandledOnThisDevice = true,
+                                locationTrackingEnabled = locationEnabled,
+                            ),
                     ),
                 )
             },

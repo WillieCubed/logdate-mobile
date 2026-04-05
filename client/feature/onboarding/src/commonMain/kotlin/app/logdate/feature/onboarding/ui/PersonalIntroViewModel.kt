@@ -1,5 +1,6 @@
 package app.logdate.feature.onboarding.ui
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.onboarding.ProcessPersonalIntroductionUseCase
@@ -17,30 +18,33 @@ import kotlinx.coroutines.launch
  */
 class PersonalIntroViewModel(
     private val processPersonalIntroductionUseCase: ProcessPersonalIntroductionUseCase,
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(PersonalIntroUiState())
+    private val _uiState = MutableStateFlow(savedStateHandle.restoreUiState())
     val uiState: StateFlow<PersonalIntroUiState> = _uiState.asStateFlow()
 
     /**
      * Update the user's name input.
      */
     fun onNameChanged(name: String) {
-        _uiState.value =
-            _uiState.value.copy(
+        updateUiState {
+            it.copy(
                 name = name,
                 nameError = null, // Clear error when user starts typing
             )
+        }
     }
 
     /**
      * Update the user's bio input.
      */
     fun onBioChanged(bio: String) {
-        _uiState.value =
-            _uiState.value.copy(
+        updateUiState {
+            it.copy(
                 bio = bio,
                 bioError = null, // Clear error when user starts typing
             )
+        }
     }
 
     /**
@@ -50,27 +54,29 @@ class PersonalIntroViewModel(
         val currentState = _uiState.value
 
         if (currentState.name.trim().isEmpty()) {
-            _uiState.value = currentState.copy(nameError = "Please enter your name")
+            updateUiState { currentState.copy(nameError = "Please enter your name") }
             return
         }
 
-        _uiState.value =
+        updateUiState {
             currentState.copy(
                 currentStep = PersonalIntroStep.Bio,
                 nameError = null,
             )
+        }
     }
 
     /**
      * Go back from bio step to name step.
      */
     fun goBackToName() {
-        _uiState.value =
-            _uiState.value.copy(
+        updateUiState {
+            it.copy(
                 currentStep = PersonalIntroStep.Name,
                 bioError = null,
                 llmError = null,
             )
+        }
     }
 
     /**
@@ -80,18 +86,19 @@ class PersonalIntroViewModel(
         val currentState = _uiState.value
 
         if (currentState.bio.trim().isEmpty()) {
-            _uiState.value = currentState.copy(bioError = "Please tell us a bit about yourself")
+            updateUiState { currentState.copy(bioError = "Please tell us a bit about yourself") }
             return
         }
 
         viewModelScope.launch {
             try {
-                _uiState.value =
+                updateUiState {
                     currentState.copy(
                         isProcessingLlm = true,
                         bioError = null,
                         llmError = null,
                     )
+                }
 
                 // Process the entire introduction using the domain use case
                 val result =
@@ -102,30 +109,33 @@ class PersonalIntroViewModel(
 
                 when (result) {
                     is ProcessPersonalIntroductionUseCase.Result.Success -> {
-                        _uiState.value =
+                        updateUiState {
                             _uiState.value.copy(
                                 isProcessingLlm = false,
                                 llmResponse = result.data.llmResponse,
                                 currentStep = PersonalIntroStep.LlmResponse,
                             )
+                        }
                         Napier.d("Personal introduction processed successfully")
                     }
 
                     is ProcessPersonalIntroductionUseCase.Result.Error -> {
-                        _uiState.value =
+                        updateUiState {
                             _uiState.value.copy(
                                 isProcessingLlm = false,
                                 errorMessage = errorMessageFor(result.reason),
                             )
+                        }
                     }
                 }
             } catch (e: Exception) {
                 Napier.e("Failed to process personal introduction", e)
-                _uiState.value =
+                updateUiState {
                     _uiState.value.copy(
                         isProcessingLlm = false,
                         errorMessage = errorMessageFor(ProcessPersonalIntroductionUseCase.ErrorReason.UnexpectedFailure),
                     )
+                }
             }
         }
     }
@@ -144,7 +154,7 @@ class PersonalIntroViewModel(
      * Clear error messages.
      */
     fun clearError() {
-        _uiState.value = _uiState.value.copy(errorMessage = null)
+        updateUiState { it.copy(errorMessage = null) }
     }
 
     private fun errorMessageFor(reason: ProcessPersonalIntroductionUseCase.ErrorReason): String =
@@ -158,4 +168,42 @@ class PersonalIntroViewModel(
             ProcessPersonalIntroductionUseCase.ErrorReason.UnexpectedFailure ->
                 "Something went wrong. Please try again."
         }
+
+    private fun updateUiState(update: (PersonalIntroUiState) -> PersonalIntroUiState) {
+        val newState = update(_uiState.value)
+        _uiState.value = newState
+        savedStateHandle.persistUiState(newState)
+    }
+}
+
+private const val PERSONAL_INTRO_STEP_KEY = "personal_intro_step"
+private const val PERSONAL_INTRO_NAME_KEY = "personal_intro_name"
+private const val PERSONAL_INTRO_BIO_KEY = "personal_intro_bio"
+private const val PERSONAL_INTRO_LLM_RESPONSE_KEY = "personal_intro_llm_response"
+
+private fun SavedStateHandle.restoreUiState(): PersonalIntroUiState =
+    PersonalIntroUiState(
+        currentStep =
+            when (get<String>(PERSONAL_INTRO_STEP_KEY)) {
+                "bio" -> PersonalIntroStep.Bio
+                "llm_response" -> PersonalIntroStep.LlmResponse
+                else -> PersonalIntroStep.Name
+            },
+        name = get(PERSONAL_INTRO_NAME_KEY) ?: "",
+        bio = get(PERSONAL_INTRO_BIO_KEY) ?: "",
+        llmResponse = get(PERSONAL_INTRO_LLM_RESPONSE_KEY),
+    )
+
+private fun SavedStateHandle.persistUiState(state: PersonalIntroUiState) {
+    set(
+        PERSONAL_INTRO_STEP_KEY,
+        when (state.currentStep) {
+            PersonalIntroStep.Name -> "name"
+            PersonalIntroStep.Bio -> "bio"
+            PersonalIntroStep.LlmResponse -> "llm_response"
+        },
+    )
+    set(PERSONAL_INTRO_NAME_KEY, state.name)
+    set(PERSONAL_INTRO_BIO_KEY, state.bio)
+    set(PERSONAL_INTRO_LLM_RESPONSE_KEY, state.llmResponse)
 }

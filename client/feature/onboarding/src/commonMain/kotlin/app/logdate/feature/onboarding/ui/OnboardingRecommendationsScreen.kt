@@ -62,7 +62,7 @@ const val ONBOARDING_RECOMMENDATIONS_TURN_OFF_TAG = "onboarding_recommendations_
 @Composable
 fun OnboardingRecommendationsScreen(
     onBack: () -> Unit,
-    onNext: () -> Unit,
+    onNext: (Boolean) -> Unit,
     viewModel: OnboardingViewModel = koinViewModel(),
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -78,8 +78,15 @@ fun OnboardingRecommendationsScreen(
                 viewModel
                     .persistRecommendationsEnabled(true)
                     .onSuccess {
-                        isSaving = false
-                        onNext()
+                        viewModel
+                            .markRecommendationsHandled()
+                            .onSuccess {
+                                isSaving = false
+                                onNext(true)
+                            }.onFailure {
+                                errorMessage = "We couldn't save your recommendations setting right now."
+                                isSaving = false
+                            }
                     }.onFailure {
                         errorMessage = "We couldn't save your recommendations setting right now."
                         isSaving = false
@@ -93,8 +100,15 @@ fun OnboardingRecommendationsScreen(
                 viewModel
                     .persistRecommendationsEnabled(false)
                     .onSuccess {
-                        isSaving = false
-                        onNext()
+                        viewModel
+                            .markRecommendationsHandled()
+                            .onSuccess {
+                                isSaving = false
+                                onNext(false)
+                            }.onFailure {
+                                errorMessage = "We couldn't save your recommendations setting right now."
+                                isSaving = false
+                            }
                     }.onFailure {
                         errorMessage = "We couldn't save your recommendations setting right now."
                         isSaving = false

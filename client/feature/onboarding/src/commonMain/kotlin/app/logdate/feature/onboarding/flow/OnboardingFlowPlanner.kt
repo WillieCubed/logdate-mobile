@@ -26,6 +26,12 @@ data class OnboardingProgressSnapshot(
     val hasPersonalIntro: Boolean = false,
     val hasBirthday: Boolean = false,
     val hasCloudAccount: Boolean = false,
+    val recommendationsHandledOnThisDevice: Boolean = false,
+    val contextualRecommendationsEnabled: Boolean = true,
+    val dayBoundariesHandledOnThisDevice: Boolean = false,
+    val sleepBasedDayBoundariesEnabled: Boolean = false,
+    val locationHandledOnThisDevice: Boolean = false,
+    val locationTrackingEnabled: Boolean = false,
     val notificationsHandledOnThisDevice: Boolean = false,
     val healthConnectStatus: HealthConnectStatus = HealthConnectStatus.CHECKING,
 )
@@ -61,32 +67,22 @@ private fun onboardingStepOrderFor(
     entryMode: OnboardingEntryMode,
     healthConnectStatus: HealthConnectStatus,
 ): List<OnboardingStep> =
-    when (entryMode) {
-        OnboardingEntryMode.FRESH ->
-            buildList {
-                add(OnboardingStep.PERSONAL_INTRO)
-                add(OnboardingStep.APP_OVERVIEW)
-                add(OnboardingStep.MEMORY_IMPORT)
-                add(OnboardingStep.MEMORY_SELECTION)
-                add(OnboardingStep.ACCOUNT)
-                add(OnboardingStep.BIRTHDAY)
-                add(OnboardingStep.RECOMMENDATIONS)
-                if (healthConnectStatus != HealthConnectStatus.NOT_AVAILABLE) {
-                    add(OnboardingStep.DAY_BOUNDARIES)
-                }
-                add(OnboardingStep.LOCATION)
-                add(OnboardingStep.NOTIFICATIONS)
-                add(OnboardingStep.COMPLETE)
-            }
-
-        OnboardingEntryMode.CONTINUE_SETUP ->
-            listOf(
-                OnboardingStep.ACCOUNT,
-                OnboardingStep.PERSONAL_INTRO,
-                OnboardingStep.BIRTHDAY,
-                OnboardingStep.NOTIFICATIONS,
-                OnboardingStep.WELCOME_BACK,
-            )
+    buildList {
+        add(OnboardingStep.PERSONAL_INTRO)
+        if (entryMode == OnboardingEntryMode.FRESH) {
+            add(OnboardingStep.APP_OVERVIEW)
+            add(OnboardingStep.MEMORY_IMPORT)
+            add(OnboardingStep.MEMORY_SELECTION)
+        }
+        add(OnboardingStep.ACCOUNT)
+        add(OnboardingStep.BIRTHDAY)
+        add(OnboardingStep.RECOMMENDATIONS)
+        if (healthConnectStatus != HealthConnectStatus.NOT_AVAILABLE) {
+            add(OnboardingStep.DAY_BOUNDARIES)
+        }
+        add(OnboardingStep.LOCATION)
+        add(OnboardingStep.NOTIFICATIONS)
+        add(terminalStepFor(entryMode))
     }
 
 private fun shouldIncludeStep(
@@ -97,19 +93,46 @@ private fun shouldIncludeStep(
         OnboardingStep.PERSONAL_INTRO -> !snapshot.hasPersonalIntro
         OnboardingStep.ACCOUNT -> !snapshot.hasCloudAccount
         OnboardingStep.BIRTHDAY -> !snapshot.hasBirthday
+        OnboardingStep.RECOMMENDATIONS -> !snapshot.hasResolvedRecommendations()
+        OnboardingStep.DAY_BOUNDARIES -> !snapshot.hasResolvedDayBoundaries()
+        OnboardingStep.LOCATION -> !snapshot.hasResolvedLocation()
         OnboardingStep.NOTIFICATIONS -> !snapshot.notificationsHandledOnThisDevice
         else -> true
     }
 
-fun OnboardingProgressSnapshot.canCompleteFreshOnboarding(): Boolean =
+fun OnboardingProgressSnapshot.canCompleteOnboarding(): Boolean =
     hasPersonalIntro &&
         hasBirthday &&
+        hasResolvedRecommendations() &&
+        hasResolvedDayBoundaries() &&
+        hasResolvedLocation() &&
         notificationsHandledOnThisDevice
 
-fun OnboardingProgressSnapshot.firstIncompleteRequiredFreshStep(): OnboardingStep? =
+fun OnboardingProgressSnapshot.firstIncompleteRequiredOnboardingStep(): OnboardingStep? =
     when {
         !hasPersonalIntro -> OnboardingStep.PERSONAL_INTRO
         !hasBirthday -> OnboardingStep.BIRTHDAY
+        !hasResolvedRecommendations() -> OnboardingStep.RECOMMENDATIONS
+        !hasResolvedDayBoundaries() -> OnboardingStep.DAY_BOUNDARIES
+        !hasResolvedLocation() -> OnboardingStep.LOCATION
         !notificationsHandledOnThisDevice -> OnboardingStep.NOTIFICATIONS
         else -> null
+    }
+
+private fun OnboardingProgressSnapshot.hasResolvedRecommendations(): Boolean =
+    recommendationsHandledOnThisDevice || !contextualRecommendationsEnabled
+
+private fun OnboardingProgressSnapshot.hasResolvedDayBoundaries(): Boolean =
+    healthConnectStatus == HealthConnectStatus.NOT_AVAILABLE ||
+        dayBoundariesHandledOnThisDevice ||
+        sleepBasedDayBoundariesEnabled
+
+private fun OnboardingProgressSnapshot.hasResolvedLocation(): Boolean =
+    locationHandledOnThisDevice ||
+        locationTrackingEnabled
+
+private fun terminalStepFor(entryMode: OnboardingEntryMode): OnboardingStep =
+    when (entryMode) {
+        OnboardingEntryMode.FRESH -> OnboardingStep.COMPLETE
+        OnboardingEntryMode.CONTINUE_SETUP -> OnboardingStep.WELCOME_BACK
     }

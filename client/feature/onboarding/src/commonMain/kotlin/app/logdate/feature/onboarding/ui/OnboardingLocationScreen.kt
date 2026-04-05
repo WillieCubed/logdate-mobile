@@ -66,7 +66,7 @@ const val ONBOARDING_LOCATION_SKIP_TAG = "onboarding_location_skip"
 @Composable
 fun OnboardingLocationScreen(
     onBack: () -> Unit,
-    onNext: () -> Unit,
+    onNext: (Boolean) -> Unit,
     viewModel: OnboardingViewModel = koinViewModel(),
 ) {
     val permissionState = rememberLocationPermissionState()
@@ -83,8 +83,15 @@ fun OnboardingLocationScreen(
                 viewModel
                     .persistLocationTrackingEnabled()
                     .onSuccess {
-                        isSaving = false
-                        onNext()
+                        viewModel
+                            .markLocationHandled()
+                            .onSuccess {
+                                isSaving = false
+                                onNext(true)
+                            }.onFailure {
+                                errorMessage = "We couldn't save your location preference right now."
+                                isSaving = false
+                            }
                     }.onFailure {
                         errorMessage = "We couldn't save your location preference right now."
                         isSaving = false
@@ -96,7 +103,21 @@ fun OnboardingLocationScreen(
     OnboardingLocationContent(
         onBack = onBack,
         onEnable = permissionState.requestPermission,
-        onSkip = onNext,
+        onSkip = {
+            coroutineScope.launch {
+                isSaving = true
+                errorMessage = null
+                viewModel
+                    .markLocationHandled()
+                    .onSuccess {
+                        isSaving = false
+                        onNext(false)
+                    }.onFailure {
+                        errorMessage = "We couldn't save your location preference right now."
+                        isSaving = false
+                    }
+            }
+        },
         isSaving = isSaving,
         errorMessage = errorMessage,
     )

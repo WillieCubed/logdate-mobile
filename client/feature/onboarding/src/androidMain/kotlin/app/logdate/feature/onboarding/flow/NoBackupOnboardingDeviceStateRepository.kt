@@ -2,30 +2,36 @@ package app.logdate.feature.onboarding.flow
 
 import android.content.Context
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import java.io.File
 
 class NoBackupOnboardingDeviceStateRepository(
     context: Context,
 ) : OnboardingDeviceStateRepository {
+    private val recommendationsHandledFile = File(context.noBackupFilesDir, RECOMMENDATIONS_HANDLED_FILENAME)
+    private val dayBoundariesHandledFile = File(context.noBackupFilesDir, DAY_BOUNDARIES_HANDLED_FILENAME)
+    private val locationHandledFile = File(context.noBackupFilesDir, LOCATION_HANDLED_FILENAME)
     private val notificationsHandledFile = File(context.noBackupFilesDir, NOTIFICATIONS_HANDLED_FILENAME)
     private val activeEntryModeFile = File(context.noBackupFilesDir, ACTIVE_ENTRY_MODE_FILENAME)
     private val state = MutableStateFlow(readCurrentState())
 
-    override val deviceState: Flow<OnboardingDeviceState> = state
+    override val deviceState: StateFlow<OnboardingDeviceState> = state
+
+    override suspend fun markRecommendationsHandled() {
+        persistMarkerFile(recommendationsHandledFile)
+    }
+
+    override suspend fun markDayBoundariesHandled() {
+        persistMarkerFile(dayBoundariesHandledFile)
+    }
+
+    override suspend fun markLocationHandled() {
+        persistMarkerFile(locationHandledFile)
+    }
 
     override suspend fun markNotificationsHandled() {
-        notificationsHandledFile.parentFile?.mkdirs()
-        runCatching {
-            if (!notificationsHandledFile.exists()) {
-                notificationsHandledFile.createNewFile()
-            }
-            state.value = readCurrentState()
-        }.onFailure { error ->
-            Napier.e("Failed to persist onboarding device state", error)
-            throw error
-        }
+        persistMarkerFile(notificationsHandledFile)
     }
 
     override suspend fun setActiveEntryMode(entryMode: OnboardingEntryMode) {
@@ -44,6 +50,15 @@ class NoBackupOnboardingDeviceStateRepository(
             if (notificationsHandledFile.exists()) {
                 notificationsHandledFile.delete()
             }
+            if (recommendationsHandledFile.exists()) {
+                recommendationsHandledFile.delete()
+            }
+            if (dayBoundariesHandledFile.exists()) {
+                dayBoundariesHandledFile.delete()
+            }
+            if (locationHandledFile.exists()) {
+                locationHandledFile.delete()
+            }
             if (activeEntryModeFile.exists()) {
                 activeEntryModeFile.delete()
             }
@@ -56,9 +71,25 @@ class NoBackupOnboardingDeviceStateRepository(
 
     private fun readCurrentState(): OnboardingDeviceState =
         OnboardingDeviceState(
+            recommendationsHandledOnThisDevice = recommendationsHandledFile.exists(),
+            dayBoundariesHandledOnThisDevice = dayBoundariesHandledFile.exists(),
+            locationHandledOnThisDevice = locationHandledFile.exists(),
             notificationsHandledOnThisDevice = notificationsHandledFile.exists(),
             activeEntryMode = readActiveEntryMode(),
         )
+
+    private fun persistMarkerFile(file: File) {
+        file.parentFile?.mkdirs()
+        runCatching {
+            if (!file.exists()) {
+                file.createNewFile()
+            }
+            state.value = readCurrentState()
+        }.onFailure { error ->
+            Napier.e("Failed to persist onboarding device state", error)
+            throw error
+        }
+    }
 
     private fun readActiveEntryMode(): OnboardingEntryMode =
         runCatching {
@@ -72,6 +103,9 @@ class NoBackupOnboardingDeviceStateRepository(
         }
 
     private companion object {
+        private const val RECOMMENDATIONS_HANDLED_FILENAME = ".onboarding_recommendations_handled"
+        private const val DAY_BOUNDARIES_HANDLED_FILENAME = ".onboarding_day_boundaries_handled"
+        private const val LOCATION_HANDLED_FILENAME = ".onboarding_location_handled"
         private const val NOTIFICATIONS_HANDLED_FILENAME = ".onboarding_notifications_handled"
         private const val ACTIVE_ENTRY_MODE_FILENAME = ".onboarding_entry_mode"
     }
