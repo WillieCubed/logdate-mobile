@@ -18,6 +18,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -76,8 +78,10 @@ fun TextBlockContent(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .testTag("editor_text_input")
-                    .focusable(enabled = !readOnly)
+                    .testTag(LOGDATE_EDITOR_TEXT_INPUT_TAG)
+                    .semantics {
+                        contentDescription = LOGDATE_EDITOR_TEXT_INPUT_TAG
+                    }.focusable(enabled = !readOnly)
                     .focusRequester(focusRequester),
             textStyle =
                 TextStyle(
@@ -120,3 +124,5 @@ fun TextBlockContent(
         }
     }
 }
+
+const val LOGDATE_EDITOR_TEXT_INPUT_TAG = "editor_text_input"

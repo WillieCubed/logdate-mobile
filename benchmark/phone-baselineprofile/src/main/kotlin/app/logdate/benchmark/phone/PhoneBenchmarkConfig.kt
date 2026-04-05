@@ -11,8 +11,8 @@ internal object PhoneBenchmarkConfig {
     private const val MAIN_ACTIVITY = "app.logdate.client.MainActivity"
     private const val ONBOARDING_FIXTURE_EXTRA = "app.logdate.client.testing.onboarding.FIXTURE"
     private const val DEFAULT_WAIT_TIMEOUT_MS = 5_000L
-    private const val SEARCH_BUTTON_DESCRIPTION = "Search"
-    private const val SEARCH_PLACEHOLDER = "Search entries"
+    private const val SEARCH_BUTTON_ACCESSIBILITY = "logdate_home_search"
+    private const val SEARCH_FIELD_ACCESSIBILITY = "logdate_search_input"
     private const val SEARCH_RESULT_TIMEOUT_MS = 3_000L
 
     fun MacrobenchmarkScope.startFromLauncher(fixture: String? = null) {
@@ -43,7 +43,7 @@ internal object PhoneBenchmarkConfig {
     fun MacrobenchmarkScope.openSearchFromHome() {
         val searchButton =
             device.wait(
-                Until.findObject(By.desc(SEARCH_BUTTON_DESCRIPTION)),
+                Until.findObject(By.descContains(SEARCH_BUTTON_ACCESSIBILITY)),
                 DEFAULT_WAIT_TIMEOUT_MS,
             )
         check(searchButton != null) {
@@ -52,7 +52,7 @@ internal object PhoneBenchmarkConfig {
         searchButton.click()
         check(
             device.wait(
-                Until.hasObject(By.textContains(SEARCH_PLACEHOLDER)),
+                Until.hasObject(By.descContains(SEARCH_FIELD_ACCESSIBILITY)),
                 DEFAULT_WAIT_TIMEOUT_MS,
             ),
         ) {
@@ -63,7 +63,7 @@ internal object PhoneBenchmarkConfig {
     fun MacrobenchmarkScope.typeSearchQuery(query: String) {
         val searchField =
             device.wait(
-                Until.findObject(By.textContains(SEARCH_PLACEHOLDER)),
+                Until.findObject(By.descContains(SEARCH_FIELD_ACCESSIBILITY)),
                 DEFAULT_WAIT_TIMEOUT_MS,
             )
         check(searchField != null) {

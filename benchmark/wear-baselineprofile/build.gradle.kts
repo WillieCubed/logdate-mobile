@@ -8,7 +8,10 @@ plugins {
 
 android {
     namespace = "app.logdate.benchmark.wear.baselineprofile"
-    compileSdk = 36
+    compileSdk =
+        libs.versions.android.compileSdk
+            .get()
+            .toInt()
     targetProjectPath = ":app:wear"
 
     defaultConfig {
@@ -33,12 +36,12 @@ android {
 
     testOptions {
         managedDevices {
-            lateinit var wearApi34: ManagedVirtualDevice
+            lateinit var wearApi35: ManagedVirtualDevice
             localDevices {
-                wearApi34 =
-                    create("wearApi34") {
+                wearApi35 =
+                    create("wearApi35") {
                         device = "Wear OS Small Round"
-                        apiLevel = 34
+                        apiLevel = 35
                         pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_16KB_PAGES
                         systemImageSource = "google"
                     }
@@ -54,7 +57,7 @@ kotlin {
 }
 
 baselineProfile {
-    managedDevices += "wearApi34"
+    managedDevices += "wearApi35"
     useConnectedDevices = false
 }
 

@@ -18,6 +18,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation3.runtime.NavKey
+import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_DRAFT
+import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_MEMORY_RECALL
+import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_NEW_ENTRY
+import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_DRAFT_ID
+import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_RECALL_DATE
+import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_TARGET
 import app.logdate.client.database.DatabaseRecoveryController
 import app.logdate.client.database.DatabaseStartupMonitor
 import app.logdate.client.database.DatabaseStartupState
@@ -62,6 +68,7 @@ import app.logdate.feature.core.restore.AndroidRestoreLauncher
 import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
+import app.logdate.navigation.routes.core.EntryEditor
 import app.logdate.navigation.routes.core.LocationRoute
 import app.logdate.navigation.routes.core.NoteViewerRoute
 import app.logdate.navigation.routes.core.TimelineDetail
@@ -490,6 +497,20 @@ private fun resolveNavKey(intent: Intent?): NavKey? {
 
         intent.getStringExtra(EXTRA_LOCATION_NAV_SOURCE) == NAV_SOURCE_LOCATION_HISTORY -> {
             LocationRoute
+        }
+
+        intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_NEW_ENTRY -> {
+            EntryEditor()
+        }
+
+        intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_DRAFT -> {
+            val draftId = intent.getStringExtra(EXTRA_AMBIENT_PROMPT_DRAFT_ID) ?: return null
+            runCatching { EntryEditor(draftId = Uuid.parse(draftId)) }.getOrNull()
+        }
+
+        intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_MEMORY_RECALL -> {
+            val dateStr = intent.getStringExtra(EXTRA_AMBIENT_PROMPT_RECALL_DATE) ?: return null
+            runCatching { TimelineDetail(kotlinx.datetime.LocalDate.parse(dateStr)) }.getOrNull()
         }
 
         else -> null

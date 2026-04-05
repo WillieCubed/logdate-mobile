@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -29,12 +30,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.window.core.layout.WindowSizeClass.Companion.HEIGHT_DP_MEDIUM_LOWER_BOUND
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import app.logdate.navigation.LocalSharedTransitionScope
+import app.logdate.ui.audio.MiniAudioPlayer
 import app.logdate.ui.common.transitions.TransitionKeys
+import app.logdate.ui.theme.Spacing
 import logdate.app.composemain.generated.resources.Res
 import logdate.app.composemain.generated.resources.select_an_entry_to_view_details
 import org.jetbrains.compose.resources.stringResource
@@ -61,6 +66,7 @@ internal fun NavigationShell(
     onTabSelected: (HomeTab) -> Unit,
     isDetailOnlyView: Boolean,
     snackbarHostState: SnackbarHostState,
+    onOpenAudioNote: () -> Unit = {},
     visibleTabs: List<HomeTab> = HomeTab.visibleEntries,
     content: @Composable () -> Unit,
 ) {
@@ -100,6 +106,10 @@ internal fun NavigationShell(
                             Icon(
                                 imageVector = if (selectedTab == tab) tab.selectedIcon else tab.unselectedIcon,
                                 contentDescription = tab.title,
+                                modifier =
+                                    Modifier.semantics {
+                                        contentDescription = "${tab.title}|logdate_home_tab_${tab.name.lowercase()}"
+                                    },
                             )
                         },
                         label = { Text(tab.title) },
@@ -107,7 +117,16 @@ internal fun NavigationShell(
                 }
             },
         ) {
-            content()
+            Box(modifier = Modifier.fillMaxSize()) {
+                content()
+                MiniAudioPlayer(
+                    onOpenFullPlayer = onOpenAudioNote,
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                )
+            }
         }
     }
 }
@@ -119,7 +138,7 @@ internal fun NavigationShell(
 @Composable
 internal fun SharedElementFAB(
     onClick: () -> Unit,
-    contentDescription: String,
+    contentDescriptionText: String,
     modifier: Modifier = Modifier,
 ) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
@@ -143,11 +162,13 @@ internal fun SharedElementFAB(
                 }
             } else {
                 modifier
+            }.semantics {
+                contentDescription = "$contentDescriptionText|$HOME_NEW_ENTRY_FAB_TAG"
             },
     ) {
         Icon(
             Icons.Filled.Add,
-            contentDescription = contentDescription,
+            contentDescription = contentDescriptionText,
             modifier = Modifier.size(24.dp),
         )
     }
@@ -167,3 +188,5 @@ internal fun DetailPlaceholder() {
         )
     }
 }
+
+private const val HOME_NEW_ENTRY_FAB_TAG = "logdate_home_new_entry"

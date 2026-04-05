@@ -143,6 +143,16 @@ tasks.withType<Test>().configureEach {
         }
 }
 
+tasks.configureEach {
+    if (name.startsWith("mergeExtDex") && name.endsWith("AndroidTest")) {
+        val variantName =
+            name
+                .removePrefix("mergeExtDex")
+                .removeSuffix("AndroidTest")
+        dependsOn("desugar${variantName}AndroidTestFileDependencies")
+    }
+}
+
 configurations.all {
     resolutionStrategy.eachDependency {
         // Navigation3 beta01 pulls compose.ui to 1.11.0-beta01 while JetBrains

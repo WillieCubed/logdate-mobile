@@ -32,7 +32,7 @@ android {
             localDevices {
                 flagshipPhoneApi36 =
                     create("flagshipPhoneApi36") {
-                        device = "Pixel 10 Pro"
+                        device = "Pixel 9 Pro"
                         apiLevel = 36
                         pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_16KB_PAGES
                         systemImageSource = "google"
@@ -63,6 +63,10 @@ kotlin {
 dependencies {
     implementation(projects.client.media)
 
+    androidTestImplementation(projects.client.domain)
+    androidTestImplementation(projects.client.healthConnect)
+    androidTestImplementation(projects.client.repository)
+    androidTestImplementation(libs.kotlinx.datetime)
     androidTestImplementation(libs.androidx.benchmark.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.rules)

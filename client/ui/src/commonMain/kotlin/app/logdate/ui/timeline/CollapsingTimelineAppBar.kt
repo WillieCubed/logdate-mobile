@@ -15,8 +15,14 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import logdate.client.ui.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
+
+private const val BENCHMARK_TAG_HISTORY = "logdate_home_history"
+private const val BENCHMARK_TAG_SEARCH = "logdate_home_search"
+private const val BENCHMARK_TAG_SETTINGS = "logdate_home_settings"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,22 +41,44 @@ fun TimelineTopAppBar(
             )
         },
         actions = {
-            IconButton(onClick = onHistoryClick) {
+            val historyLabel = stringResource(Res.string.location_history)
+            val searchLabel = stringResource(Res.string.search)
+            val settingsLabel = stringResource(Res.string.settings)
+
+            IconButton(
+                onClick = onHistoryClick,
+                modifier =
+                    Modifier.semantics {
+                        contentDescription = "$historyLabel|$BENCHMARK_TAG_HISTORY"
+                    },
+            ) {
                 Icon(
                     imageVector = Icons.Default.History,
-                    contentDescription = stringResource(Res.string.location_history),
+                    contentDescription = historyLabel,
                 )
             }
-            IconButton(onClick = onSearchClick) {
+            IconButton(
+                onClick = onSearchClick,
+                modifier =
+                    Modifier.semantics {
+                        contentDescription = "$searchLabel|$BENCHMARK_TAG_SEARCH"
+                    },
+            ) {
                 Icon(
                     imageVector = Icons.Default.Search,
-                    contentDescription = stringResource(Res.string.search),
+                    contentDescription = searchLabel,
                 )
             }
-            IconButton(onClick = onSettingsClick) {
+            IconButton(
+                onClick = onSettingsClick,
+                modifier =
+                    Modifier.semantics {
+                        contentDescription = "$settingsLabel|$BENCHMARK_TAG_SETTINGS"
+                    },
+            ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
-                    contentDescription = stringResource(Res.string.settings),
+                    contentDescription = settingsLabel,
                 )
             }
         },

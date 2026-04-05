@@ -91,6 +91,7 @@ import kotlinx.datetime.LocalDate
 import logdate.client.ui.generated.resources.Res
 import logdate.client.ui.generated.resources.a_long_time_passed
 import logdate.client.ui.generated.resources.add_your_birthday_in_settings_to_see_something_special_here
+import logdate.client.ui.generated.resources.audio_recording
 import logdate.client.ui.generated.resources.congrats_curious_explorer
 import logdate.client.ui.generated.resources.happy_birthday
 import logdate.client.ui.generated.resources.journey_days_count
@@ -99,7 +100,6 @@ import logdate.client.ui.generated.resources.post_restore_import_message
 import logdate.client.ui.generated.resources.post_restore_start_fresh
 import logdate.client.ui.generated.resources.post_restore_welcome_back
 import logdate.client.ui.generated.resources.suggestion_draft_fallback
-import logdate.client.ui.generated.resources.voice_note
 import logdate.client.ui.generated.resources.youve_reached_the_end
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.absoluteValue
@@ -1055,7 +1055,7 @@ private fun AudioSection(
                     color = style.accentColor,
                 )
                 Text(
-                    text = stringResource(Res.string.voice_note),
+                    text = stringResource(Res.string.audio_recording),
                     style =
                         if (emphasized) {
                             MaterialTheme.typography.titleLarge

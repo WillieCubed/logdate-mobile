@@ -22,20 +22,35 @@ Direct Gradle equivalents:
 ./gradlew generateWearBaselineProfile
 ```
 
+Use deterministic reruns for trend runs:
+
+```bash
+./gradlew managedPhoneBenchmark managedWearBenchmark managedMicroBenchmark --no-daemon --rerun-tasks
+./gradlew generatePhoneBaselineProfile generateWearBaselineProfile --no-daemon --rerun-tasks
+```
+
 ## Device Guidance
 
-- Phone macrobenchmarks: use the managed `phoneApi36` device (Pixel 10 Pro) or a connected physical Pixel device.
-- Wear macrobenchmarks: use the managed `wearApi34` device or a connected physical Wear device.
-- Microbenchmarks: always run on the managed `flagshipPhoneApi36` device to avoid accidentally targeting physical hardware.
+- Phone macrobenchmarks: use the managed `flagshipPhoneApi36` device (Pixel 9 Pro, API 36).
+- Wear macrobenchmarks: use the managed `wearApi35` device (API 35).
+- Microbenchmarks: always run on the managed `flagshipPhoneApi36` device (Pixel 9 Pro, API 36).
 - Baseline Profile generation:
   - managed devices are the default path
-  - if you need a connected-device experiment, invoke the underlying connected Android test task directly from the benchmark module instead of the root helper
+  - all baseline profile generation uses managed devices only
+
+## Safety Rules
+
+- Never run benchmark commands against connected physical devices.
+- `managed*Benchmark` tasks are mapped to managed-device group tasks and should not use connected devices by default.
+- If a connected-device run is explicitly requested, it must be approved in advance for this repository context and documented in the run ticket.
+
+This repository's Android agent workflow must not target connected non-emulator devices for benchmark runs unless an explicit override is approved by the repo owner.
 
 ## How to Read Results
 
 - Macrobenchmark results are emitted as instrumentation outputs and JSON summaries under each benchmark module.
 - Baseline Profile generation copies the generated profile into the target app module through the AndroidX Baseline Profile plugin.
-- Microbenchmark results include time and allocation statistics.
+- Microbenchmark results include time and allocation statistics for transcript accumulation and timeline page shaping hot paths.
 
 ## Expansion Workflow
 

@@ -43,11 +43,11 @@ android {
 
     testOptions {
         managedDevices {
-            lateinit var phoneApi36: ManagedVirtualDevice
+            lateinit var flagshipPhoneApi36: ManagedVirtualDevice
             localDevices {
-                phoneApi36 =
-                    create("phoneApi36") {
-                        device = "Pixel 10 Pro"
+                flagshipPhoneApi36 =
+                    create("flagshipPhoneApi36") {
+                        device = "Pixel 9 Pro"
                         apiLevel = 36
                         pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_16KB_PAGES
                         systemImageSource = "google"
@@ -64,7 +64,7 @@ kotlin {
 }
 
 baselineProfile {
-    managedDevices += "phoneApi36"
+    managedDevices += "flagshipPhoneApi36"
     useConnectedDevices = false
 }
 

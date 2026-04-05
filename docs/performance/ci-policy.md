@@ -8,7 +8,7 @@
   - treat regressions in implemented Tier 1 scenarios as blocking once stable baselines are recorded
 - Nightly:
   - rerun all managed macrobenchmarks
-  - run microbenchmarks on a connected device lane
+  - run microbenchmarks on a managed device lane
   - archive benchmark JSON outputs and generated profiles
 - Release validation:
   - generate phone and Wear baseline profiles

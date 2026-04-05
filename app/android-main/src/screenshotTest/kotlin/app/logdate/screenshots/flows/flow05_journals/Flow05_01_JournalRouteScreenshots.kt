@@ -202,6 +202,7 @@ fun S12_ShareJournalLoading() {
             uiState = ShareJournalUiState.Loading,
             onGoBack = {},
             onShareToInstagram = {},
+            onShareQrCode = {},
             onShareJournal = {},
         )
     }
@@ -220,6 +221,7 @@ fun S13_ShareJournalSuccess() {
                 ),
             onGoBack = {},
             onShareToInstagram = {},
+            onShareQrCode = {},
             onShareJournal = {},
         )
     }
@@ -234,6 +236,7 @@ fun S14_ShareJournalError() {
             uiState = ShareJournalUiState.Error,
             onGoBack = {},
             onShareToInstagram = {},
+            onShareQrCode = {},
             onShareJournal = {},
         )
     }

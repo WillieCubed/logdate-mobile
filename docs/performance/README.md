@@ -25,5 +25,5 @@ Current implementation status:
 
 - Starter phone macrobenchmarks are in place for launcher startup, deep-link startup, and frame timing smoke.
 - Starter Wear macrobenchmarks are in place for launcher startup, quick-capture startup path, and frame timing smoke.
-- A starter microbenchmark is in place for transcript accumulation, chosen because audio transcription is already a key user experience in the app.
+- Starter microbenchmark coverage is in place for transcript accumulation and timeline page shaping, covering two of the highest-value shared hot paths.
 - The full scenario catalog is documented below and should be expanded into benchmark code incrementally.

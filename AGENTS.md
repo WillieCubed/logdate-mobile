@@ -103,8 +103,10 @@ Keep modifications focused on the task. Don't add comments that restate code. Do
 
 Physical Android devices are forbidden test and deployment targets for agent-driven work in this repository.
 
+- Never run `./gradlew :app:android-main:connectedDebugAndroidTest`. This task is forbidden in this repository, regardless of target selection, and must not be used as a shortcut for emulator or device validation.
 - Never run `connected*AndroidTest`, `install*`, `adb install`, `adb shell am instrument`, `adb uninstall`, `adb shell pm clear`, or any other `adb` command against a physical device.
 - Only use Android emulators or Gradle Managed Devices for Android app installs, instrumentation tests, UI tests, screenshots, benchmarks, and manual validation.
+- If Android instrumentation coverage is needed, use an emulator-only or Gradle Managed Device task such as `:app:android-main:smokeDevicesGroupDebugAndroidTest` instead of `:app:android-main:connectedDebugAndroidTest`.
 - Before any Android command that could talk to a device, verify the target is safe. A safe target is:
   - an emulator with an `adb` serial that starts with `emulator-`, or
   - a Gradle Managed Device started by Gradle for the current task.

@@ -36,6 +36,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.ui.search.UniversalSearchResultItem
@@ -57,7 +59,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 
-private const val EXPANDED_SEARCH_INPUT_TEST_TAG = "search_screen_input"
+const val SEARCH_SCREEN_INPUT_ACCESSIBILITY_TAG = "search_screen_input"
 
 /**
  * Universal search screen.
@@ -166,7 +168,12 @@ fun SearchScreenContent(
                     searchBarState = searchBarState,
                     textFieldState = textFieldState,
                     onSearch = { onCommitSearch() },
-                    modifier = Modifier.testTag(EXPANDED_SEARCH_INPUT_TEST_TAG),
+                    modifier =
+                        Modifier
+                            .testTag(SEARCH_SCREEN_INPUT_ACCESSIBILITY_TAG)
+                            .semantics {
+                                contentDescription = SEARCH_SCREEN_INPUT_ACCESSIBILITY_TAG
+                            },
                     placeholder = { Text(stringResource(Res.string.search_entries)) },
                     leadingIcon = {
                         IconButton(onClick = onGoBack) {

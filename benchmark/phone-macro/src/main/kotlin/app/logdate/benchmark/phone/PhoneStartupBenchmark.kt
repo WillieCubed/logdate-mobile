@@ -23,6 +23,7 @@ class PhoneStartupBenchmark {
 
     @Test
     fun coldStartup() {
+        stopAppIfRunning()
         benchmarkRule.measureRepeated(
             packageName = PhoneBenchmarkConfig.PACKAGE_NAME,
             metrics = listOf(StartupTimingMetric()),
@@ -95,6 +96,7 @@ class PhoneStartupBenchmark {
 
     @Test
     fun coldStartupToFreshOnboarding() {
+        stopAppIfRunning()
         benchmarkRule.measureRepeated(
             packageName = PhoneBenchmarkConfig.PACKAGE_NAME,
             metrics = listOf(StartupTimingMetric()),
@@ -104,16 +106,33 @@ class PhoneStartupBenchmark {
         ) {
             PhoneBenchmarkConfig.run {
                 startFromLauncher(fixture = freshOnboardingFixtureJson())
-            }
-            check(device.wait(Until.hasObject(By.textContains("Get started")), ONBOARDING_TIMEOUT_MS)) {
-                "Fresh onboarding did not reach the landing screen"
+                waitForFreshOnboardingStart()
             }
             captureBenchmarkScreenshot(device, "fresh-onboarding-start")
-            device.findObject(By.textContains("Get started"))?.click()
-            check(device.wait(Until.hasObject(By.textContains("Who are you?")), ONBOARDING_TIMEOUT_MS)) {
+            device.findObject(By.descContains("onboarding_start_get_started"))?.click()
+            check(
+                device.wait(Until.hasObject(By.descContains("onboarding_personal_intro_root")), ONBOARDING_TIMEOUT_MS),
+            ) {
                 "Fresh onboarding did not reach the personal intro screen"
             }
             captureBenchmarkScreenshot(device, "fresh-onboarding-personal-intro")
+        }
+    }
+
+    @Test
+    fun createTextEntryInTimeline() {
+        benchmarkRule.measureRepeated(
+            packageName = PhoneBenchmarkConfig.PACKAGE_NAME,
+            metrics = listOf(FrameTimingMetric()),
+            iterations = 4,
+            startupMode = StartupMode.WARM,
+            compilationMode = CompilationMode.Partial(),
+        ) {
+            PhoneBenchmarkConfig.run {
+                startFromLauncher(fixture = onboardedHomeFixtureJson())
+                openNewEntryFromHome()
+                enterTextAndSaveDraft("Benchmark entry ${System.currentTimeMillis() % 100_000}")
+            }
         }
     }
 
@@ -128,6 +147,12 @@ class PhoneStartupBenchmark {
                 "benchmark-artifacts/onboarding",
             ).apply { mkdirs() }
         device.takeScreenshot(File(outputDir, "$name.png"))
+    }
+
+    private fun stopAppIfRunning() {
+        PhoneBenchmarkConfig.stopAppProcess(
+            UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()),
+        )
     }
 
     private companion object {

@@ -37,6 +37,9 @@ class WearStartupBenchmark {
             iterations = 6,
             startupMode = StartupMode.WARM,
             compilationMode = CompilationMode.Partial(),
+            setupBlock = {
+                device.pressHome()
+            },
         ) {
             WearBenchmarkConfig.run {
                 startFromLauncher()
@@ -52,6 +55,9 @@ class WearStartupBenchmark {
             iterations = 6,
             startupMode = StartupMode.WARM,
             compilationMode = CompilationMode.Partial(),
+            setupBlock = {
+                device.pressHome()
+            },
         ) {
             WearBenchmarkConfig.run {
                 startFromLauncher()

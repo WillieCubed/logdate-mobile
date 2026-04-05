@@ -6,6 +6,8 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import app.logdate.navigation.scenes.HomeTab
 
@@ -38,6 +40,10 @@ fun LogDateBottomNavigationBar(
                 icon = {
                     Icon(
                         imageVector = if (tab == selectedTab) tab.selectedIcon else tab.unselectedIcon,
+                        modifier =
+                            Modifier.semantics {
+                                contentDescription = "logdate_home_tab_${tab.name.lowercase()}"
+                            },
                         contentDescription = tab.title,
                     )
                 },

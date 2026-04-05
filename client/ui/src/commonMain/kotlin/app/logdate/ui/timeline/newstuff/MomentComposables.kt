@@ -46,7 +46,7 @@ import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelineMediaItemUiState
 import coil3.compose.AsyncImage
 import logdate.client.ui.generated.resources.Res
-import logdate.client.ui.generated.resources.voice_note
+import logdate.client.ui.generated.resources.audio_recording
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -438,7 +438,7 @@ private fun AudioMomentCard(
                     modifier = Modifier.weight(1f),
                 ) {
                     Text(
-                        text = stringResource(Res.string.voice_note),
+                        text = stringResource(Res.string.audio_recording),
                         style = MaterialTheme.typography.titleMedium,
                     )
                 }

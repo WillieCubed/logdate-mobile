@@ -17,11 +17,11 @@ This matrix is the source of truth for which Android surfaces are measured and h
 | Launcher cold/warm startup | startup time | Macrobenchmark + Baseline Profile | Implemented |
 | Deep-link startup | startup time | Macrobenchmark + Baseline Profile | Implemented |
 | Timeline first render and scroll | frame timing / jank | Macrobenchmark | Starter smoke implemented |
-| Onboarding | startup-to-interaction | Macrobenchmark | Planned |
-| New editor open / existing editor open | interaction latency | Macrobenchmark | Planned |
+| Onboarding | startup-to-interaction | Macrobenchmark | Partial |
+| New editor open / existing editor open | interaction latency | Macrobenchmark | Partial |
 | Text save / autosave recovery | interaction latency | Macrobenchmark | Planned |
 | Audio record / stop / save / playback / transcript | interaction latency / frame timing | Macrobenchmark + Microbenchmark | Partial |
-| Search open / query / results | interaction latency | Macrobenchmark | Planned |
+| Search open / query / results | interaction latency | Macrobenchmark | Implemented |
 | Journals overview / detail | frame timing / interaction latency | Macrobenchmark | Planned |
 | Rewind open / playback path | frame timing | Macrobenchmark | Planned |
 | Share-in startup | startup time | Macrobenchmark | Planned |
@@ -50,7 +50,7 @@ This matrix is the source of truth for which Android surfaces are measured and h
 | Hot path | Primary metric | Tooling | Status |
 | --- | --- | --- | --- |
 | Transcript accumulation | wall-clock time / allocations | Microbenchmark | Implemented |
-| Timeline grouping and large-list shaping | wall-clock time / allocations | Microbenchmark | Planned |
+| Timeline grouping and large-list shaping | wall-clock time / allocations | Microbenchmark | Implemented |
 | Sync diffing and payload serialization | wall-clock time / allocations | Microbenchmark | Planned |
 | Search indexing and ranking | wall-clock time / allocations | Microbenchmark | Planned |
 | Database read/write hot paths | wall-clock time / allocations | Microbenchmark | Planned |

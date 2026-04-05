@@ -209,7 +209,7 @@ module/src/
 ./gradlew generateWearBaselineProfile
 
 # Android microbenchmarks
-./gradlew :benchmark:micro:connectedCheck
+./gradlew managedMicroBenchmark
 ```
 
 ## Reference: Testing Patterns

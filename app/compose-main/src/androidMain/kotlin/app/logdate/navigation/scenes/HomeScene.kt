@@ -112,7 +112,7 @@ class HomeScene<T : NavKey>(
 
                     SharedElementFAB(
                         onClick = onNewEntry,
-                        contentDescription = stringResource(Res.string.new_entry),
+                        contentDescriptionText = stringResource(Res.string.new_entry),
                         modifier =
                             Modifier
                                 .align(Alignment.BottomEnd)

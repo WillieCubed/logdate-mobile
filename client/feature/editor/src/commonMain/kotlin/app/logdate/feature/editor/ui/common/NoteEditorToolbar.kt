@@ -34,6 +34,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.AutoSaveStatus
 import app.logdate.ui.theme.Spacing
@@ -110,7 +112,12 @@ fun NoteEditorToolbar(
                 if (draftCount > 0) {
                     FilledTonalIconButton(
                         onClick = { onShowDrafts() },
-                        modifier = Modifier.testTag("editor_drafts_button"),
+                        modifier =
+                            Modifier
+                                .testTag(LOGDATE_EDITOR_DRAFTS_BUTTON_TAG)
+                                .semantics {
+                                    contentDescription = LOGDATE_EDITOR_DRAFTS_BUTTON_TAG
+                                },
                     ) {
                         BadgedBox(
                             badge = {
@@ -127,7 +134,12 @@ fun NoteEditorToolbar(
 
                 FilledTonalIconButton(
                     onClick = { onSave() },
-                    modifier = Modifier.testTag("editor_save_button"),
+                    modifier =
+                        Modifier
+                            .testTag(LOGDATE_EDITOR_SAVE_BUTTON_TAG)
+                            .semantics {
+                                contentDescription = LOGDATE_EDITOR_SAVE_BUTTON_TAG
+                            },
                 ) {
                     Icon(
                         imageVector = Icons.Default.Save,
@@ -158,6 +170,9 @@ fun NoteEditorToolbar(
         }
     }
 }
+
+const val LOGDATE_EDITOR_SAVE_BUTTON_TAG = "editor_save_button"
+const val LOGDATE_EDITOR_DRAFTS_BUTTON_TAG = "editor_drafts_button"
 
 /**
  * A subtle indicator for displaying auto-save status.
