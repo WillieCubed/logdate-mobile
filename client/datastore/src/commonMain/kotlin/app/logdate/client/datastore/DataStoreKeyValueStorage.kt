@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
@@ -27,6 +28,8 @@ class DataStoreKeyValueStorage(
         return try {
             val preferences = dataStore.data.first()
             preferences[prefKey]
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Failed to get string for key: $key", e)
             null
@@ -49,6 +52,8 @@ class DataStoreKeyValueStorage(
             dataStore.edit { preferences ->
                 preferences[prefKey] = value
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Failed to put string for key: $key", e)
         }
@@ -62,6 +67,8 @@ class DataStoreKeyValueStorage(
         return try {
             val preferences = dataStore.data.first()
             preferences[prefKey] ?: defaultValue
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Failed to get boolean for key: $key", e)
             defaultValue
@@ -77,6 +84,8 @@ class DataStoreKeyValueStorage(
             dataStore.edit { preferences ->
                 preferences[prefKey] = value
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Failed to put boolean for key: $key", e)
         }
@@ -90,6 +99,8 @@ class DataStoreKeyValueStorage(
         return try {
             val preferences = dataStore.data.first()
             preferences[prefKey] ?: defaultValue
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Failed to get int for key: $key", e)
             defaultValue
@@ -105,6 +116,8 @@ class DataStoreKeyValueStorage(
             dataStore.edit { preferences ->
                 preferences[prefKey] = value
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Failed to put int for key: $key", e)
         }
@@ -118,6 +131,8 @@ class DataStoreKeyValueStorage(
         return try {
             val preferences = dataStore.data.first()
             preferences[prefKey] ?: defaultValue
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Failed to get long for key: $key", e)
             defaultValue
@@ -133,6 +148,8 @@ class DataStoreKeyValueStorage(
             dataStore.edit { preferences ->
                 preferences[prefKey] = value
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Failed to put long for key: $key", e)
         }
@@ -146,6 +163,8 @@ class DataStoreKeyValueStorage(
         return try {
             val preferences = dataStore.data.first()
             preferences[prefKey] ?: defaultValue
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Failed to get float for key: $key", e)
             defaultValue
@@ -161,6 +180,8 @@ class DataStoreKeyValueStorage(
             dataStore.edit { preferences ->
                 preferences[prefKey] = value
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Failed to put float for key: $key", e)
         }
@@ -169,7 +190,6 @@ class DataStoreKeyValueStorage(
     override suspend fun remove(key: String) {
         try {
             dataStore.edit { preferences ->
-                // Find and remove the key regardless of its type
                 val keysToRemove =
                     preferences
                         .asMap()
@@ -178,6 +198,8 @@ class DataStoreKeyValueStorage(
 
                 keysToRemove.forEach { preferences.remove(it) }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Failed to remove key: $key", e)
         }
@@ -187,6 +209,8 @@ class DataStoreKeyValueStorage(
         try {
             val preferences = dataStore.data.first()
             preferences.asMap().keys.any { it.name == key }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Failed to check if contains key: $key", e)
             false
@@ -197,6 +221,8 @@ class DataStoreKeyValueStorage(
             dataStore.edit { preferences ->
                 preferences.clear()
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Failed to clear preferences", e)
         }
