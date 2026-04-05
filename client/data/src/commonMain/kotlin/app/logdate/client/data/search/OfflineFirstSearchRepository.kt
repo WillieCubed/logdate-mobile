@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.math.abs
 import kotlin.uuid.Uuid
 
@@ -27,6 +29,7 @@ class OfflineFirstSearchRepository(
     private val searchDao: SearchDao,
 ) : SearchRepository {
     private val correctionCache = mutableMapOf<String, String?>()
+    private val correctionCacheMutex = Mutex()
 
     override fun search(query: String): Flow<List<SearchResult>> =
         observedFtsFlow(query) { preparedQuery ->
@@ -129,9 +132,10 @@ class OfflineFirstSearchRepository(
             return null
         }
 
-        synchronized(correctionCache) {
+        correctionCacheMutex.withLock {
+            correctionCache[lastToken]?.let { return it }
             if (lastToken in correctionCache) {
-                return correctionCache[lastToken]
+                return null
             }
         }
 
@@ -147,7 +151,7 @@ class OfflineFirstSearchRepository(
                 )
             }.getOrElse { error ->
                 Napier.w("FTS vocabulary lookup unavailable; skipping fuzzy fallback", error)
-                synchronized(correctionCache) {
+                correctionCacheMutex.withLock {
                     correctionCache[lastToken] = null
                 }
                 return null
@@ -162,7 +166,7 @@ class OfflineFirstSearchRepository(
                 .sortedWith(compareBy<Pair<String, Int>>({ it.second }, { abs(it.first.length - lastToken.length) }, { it.first }))
                 .map { (candidate, _) -> candidate }
                 .firstOrNull()
-        synchronized(correctionCache) {
+        correctionCacheMutex.withLock {
             correctionCache[lastToken] = corrected
         }
         return corrected
