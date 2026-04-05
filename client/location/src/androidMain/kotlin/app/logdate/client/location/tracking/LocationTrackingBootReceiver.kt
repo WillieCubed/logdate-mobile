@@ -4,8 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import io.github.aakira.napier.Napier
-import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
+import org.koin.mp.KoinPlatformTools
 
 /**
  * Restores location tracking after a device reboot or app update.
@@ -15,13 +14,9 @@ import org.koin.core.component.inject
  *
  * @see OptimizedBackgroundLocationRegistrar
  */
-class LocationTrackingBootReceiver :
-    BroadcastReceiver(),
-    KoinComponent {
-    private val locationTrackingManager: LocationTrackingManager by inject()
-
+class LocationTrackingBootReceiver : BroadcastReceiver() {
     override fun onReceive(
-        context: Context,
+        _context: Context,
         intent: Intent,
     ) {
         when (intent.action) {
@@ -29,6 +24,12 @@ class LocationTrackingBootReceiver :
             Intent.ACTION_MY_PACKAGE_REPLACED,
             -> {
                 Napier.i("Rehydrating location tracking after ${intent.action}")
+                val koinContext = KoinPlatformTools.defaultContext().getOrNull()
+                if (koinContext == null) {
+                    Napier.w("Koin context was not initialized; skipping location boot rehydration.")
+                    return
+                }
+                val locationTrackingManager = koinContext.get<LocationTrackingManager>()
                 locationTrackingManager.startTracking()
             }
         }
