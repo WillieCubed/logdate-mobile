@@ -58,6 +58,10 @@
                 <data android:scheme="https" />
 
                 <data android:host="logdate.app" />
+                <data android:pathPrefix="/journal" />
+                <data android:pathPrefix="/rewind" />
+                <data android:pathPrefix="/postcard" />
+                <data android:pathPrefix="/day" />
             </intent-filter>
 
             <intent-filter>
@@ -70,6 +74,9 @@
 
                 <data android:host="journal" />
                 <data android:host="rewind" />
+                <data android:host="postcard" />
+                <data android:host="day" />
+                <data android:host="note" />
             </intent-filter>
 
             <intent-filter>

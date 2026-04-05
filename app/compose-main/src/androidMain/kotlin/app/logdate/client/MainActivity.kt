@@ -513,6 +513,9 @@ private fun resolveNavKey(intent: Intent?): NavKey? {
             runCatching { TimelineDetail(kotlinx.datetime.LocalDate.parse(dateStr)) }.getOrNull()
         }
 
+        // Deep link URIs: logdate://journal/{id}, logdate://day/{date}, etc.
+        intent.data != null -> resolveDeepLinkUri(intent.data!!)
+
         else -> null
     }
 }
