@@ -1,5 +1,6 @@
 package app.logdate.feature.postcards.ui
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,10 +16,13 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -41,6 +45,7 @@ import app.logdate.feature.postcards.model.PostcardDocument
 import app.logdate.ui.common.ContextMenuArea
 import app.logdate.ui.common.ContextMenuItem
 import app.logdate.ui.common.focusableWithRing
+import app.logdate.ui.common.rememberMultiSelectState
 import app.logdate.ui.common.verticalScrollbar
 import coil3.compose.AsyncImage
 import io.github.aakira.napier.Napier
@@ -72,9 +77,33 @@ fun PostcardsCollectionScreen(
             else -> 2
         }
 
+    val multiSelect = rememberMultiSelectState()
+    val allIds = postcards.map { it.id.toString() }
+
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Postcards") })
+            if (multiSelect.hasSelection) {
+                TopAppBar(
+                    title = { Text("${multiSelect.selectionCount} selected") },
+                    navigationIcon = {
+                        IconButton(onClick = { multiSelect.clear() }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Clear selection")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = {
+                            multiSelect.selectedIds.forEach { id ->
+                                onDeletePostcard(Uuid.parse(id))
+                            }
+                            multiSelect.clear()
+                        }) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Delete selected")
+                        }
+                    },
+                )
+            } else {
+                TopAppBar(title = { Text("Postcards") })
+            }
         },
         floatingActionButton = {
             FloatingActionButton(onClick = onCreateNew) {
@@ -110,17 +139,27 @@ fun PostcardsCollectionScreen(
                         .verticalScrollbar(gridState),
             ) {
                 items(postcards, key = { it.id.toString() }) { postcard ->
+                    val id = postcard.id.toString()
+                    val isSelected = multiSelect.isSelected(id)
                     ContextMenuArea(
                         items =
                             listOf(
                                 ContextMenuItem("Open") { onOpenPostcard(postcard.id) },
                                 ContextMenuItem("Edit") { onEditPostcard(postcard.id) },
+                                ContextMenuItem("Select") { multiSelect.toggle(id) },
                                 ContextMenuItem("Delete") { onDeletePostcard(postcard.id) },
                             ),
                     ) {
                         PostcardCard(
                             postcard = postcard,
-                            onClick = { onOpenPostcard(postcard.id) },
+                            isSelected = isSelected,
+                            onClick = {
+                                if (multiSelect.hasSelection) {
+                                    multiSelect.toggle(id)
+                                } else {
+                                    onOpenPostcard(postcard.id)
+                                }
+                            },
                         )
                     }
                 }
@@ -135,6 +174,7 @@ private val thumbnailJson = PostcardDocument.json
 private fun PostcardCard(
     postcard: PostcardEntity,
     onClick: () -> Unit,
+    isSelected: Boolean = false,
 ) {
     val thumbnailUri =
         remember(postcard.documentJson) {
@@ -160,7 +200,13 @@ private fun PostcardCard(
                 .fillMaxWidth()
                 .aspectRatio(3f / 4f)
                 .clip(RoundedCornerShape(12.dp))
-                .focusableWithRing()
+                .then(
+                    if (isSelected) {
+                        Modifier.border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                    } else {
+                        Modifier
+                    },
+                ).focusableWithRing()
                 .clickable(onClick = onClick),
     ) {
         Box(

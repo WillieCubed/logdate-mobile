@@ -99,6 +99,7 @@ fun NoteViewerScreen(
     enableSharedBounds: Boolean = journalId != null,
     onOpenLocationTimeline: () -> Unit = {},
     onNavigateToNote: (Uuid) -> Unit = {},
+    onEnterPiP: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: NoteViewerViewModel =
         koinViewModel(
@@ -129,6 +130,7 @@ fun NoteViewerScreen(
             AudioNoteViewerEntry(
                 noteId = state.shared.noteId,
                 onGoBack = onGoBack,
+                onEnterPiP = onEnterPiP,
                 modifier = modifier.then(sharedBoundsModifier),
             )
         }
@@ -334,6 +336,7 @@ private fun VideoNoteViewer(
 private fun AudioNoteViewerEntry(
     noteId: Uuid,
     onGoBack: () -> Unit,
+    onEnterPiP: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: AudioNoteViewerViewModel =
         koinViewModel(
@@ -348,6 +351,7 @@ private fun AudioNoteViewerEntry(
         onSeek = viewModel::seekTo,
         onSkipBack = { viewModel.skipByMillis(-10_000L) },
         onSkipForward = { viewModel.skipByMillis(10_000L) },
+        onEnterPiP = onEnterPiP,
         modifier = modifier,
     )
 }
@@ -663,6 +667,7 @@ fun AudioNoteViewerContent(
     onSeek: (Float) -> Unit = {},
     onSkipBack: () -> Unit = {},
     onSkipForward: () -> Unit = {},
+    onEnterPiP: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {

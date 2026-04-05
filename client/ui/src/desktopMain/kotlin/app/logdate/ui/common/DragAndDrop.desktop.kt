@@ -5,3 +5,5 @@ import androidx.compose.ui.Modifier
 actual fun Modifier.noteDragSource(text: String): Modifier = this
 
 actual fun Modifier.noteDropTarget(onDrop: (String) -> Unit): Modifier = this
+
+actual fun Modifier.batchDragSource(items: List<String>): Modifier = this

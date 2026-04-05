@@ -10,14 +10,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.library.ui.LibraryGridGroup
+import app.logdate.ui.common.MultiSelectState
+import app.logdate.ui.common.rememberMultiSelectState
 import kotlin.uuid.Uuid
 
 /**
  * A responsive grid of media thumbnails grouped by month.
  *
- * @param groups Media items grouped by month with date headers
- * @param columnCount Number of columns to display (varies by screen width)
- * @param onItemClick Callback when a media item is tapped
+ * Supports multi-selection via long-press or Ctrl+click when
+ * [multiSelectState] has active selections.
  */
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -26,6 +27,7 @@ fun MediaThumbnailGrid(
     columnCount: Int,
     onItemClick: (Uuid) -> Unit,
     modifier: Modifier = Modifier,
+    multiSelectState: MultiSelectState = rememberMultiSelectState(),
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(columnCount),
@@ -44,9 +46,17 @@ fun MediaThumbnailGrid(
                 items = group.items,
                 key = { it.uid },
             ) { item ->
+                val id = item.uid.toString()
                 MediaThumbnailItem(
                     item = item,
-                    onItemClick = onItemClick,
+                    onItemClick = { uid ->
+                        if (multiSelectState.hasSelection) {
+                            multiSelectState.toggle(id)
+                        } else {
+                            onItemClick(uid)
+                        }
+                    },
+                    isSelected = multiSelectState.isSelected(id),
                 )
             }
         }

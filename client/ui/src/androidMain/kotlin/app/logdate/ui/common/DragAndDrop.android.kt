@@ -20,6 +20,16 @@ actual fun Modifier.noteDragSource(text: String): Modifier =
     }
 
 @OptIn(ExperimentalFoundationApi::class)
+actual fun Modifier.batchDragSource(items: List<String>): Modifier =
+    this.dragAndDropSource { _ ->
+        val clipData = ClipData.newPlainText("batch", items.firstOrNull() ?: "")
+        items.drop(1).forEach { item ->
+            clipData.addItem(ClipData.Item(item))
+        }
+        DragAndDropTransferData(clipData = clipData)
+    }
+
+@OptIn(ExperimentalFoundationApi::class)
 actual fun Modifier.noteDropTarget(onDrop: (String) -> Unit): Modifier {
     val target =
         object : DragAndDropTarget {

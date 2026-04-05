@@ -81,6 +81,7 @@ import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
 import androidx.navigation3.ui.NavDisplay
 import app.logdate.client.datastore.LogdatePreferencesDataSource
+import app.logdate.client.enterPictureInPicture
 import app.logdate.client.sharing.SharingLauncher
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.journals.ui.detail.NoteViewerScreen
@@ -594,6 +595,7 @@ fun MainNavigationRoot(
                         routeEntry<NoteViewerRoute>(
                             metadata = noteViewerRouteTransitionMetadata,
                         ) { route ->
+                            val noteViewerActivity = LocalContext.current as? android.app.Activity
                             val previousRouteClass =
                                 mainAppNavigator.backStack
                                     .getOrNull(mainAppNavigator.backStack.lastIndex - 1)
@@ -608,6 +610,9 @@ fun MainNavigationRoot(
                                 onNavigateToNote = { newNoteId ->
                                     mainAppNavigator.backStack.removeLastOrNull()
                                     mainAppNavigator.backStack.add(NoteViewerRoute(newNoteId, route.journalId))
+                                },
+                                onEnterPiP = {
+                                    noteViewerActivity?.let { enterPictureInPicture(it) }
                                 },
                             )
                         }

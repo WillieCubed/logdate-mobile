@@ -22,3 +22,11 @@ expect fun Modifier.noteDragSource(text: String): Modifier
  * @param onDrop Called with the dropped text when a valid drop occurs.
  */
 expect fun Modifier.noteDropTarget(onDrop: (String) -> Unit): Modifier
+
+/**
+ * Makes this element a drag source for multiple items.
+ *
+ * On Android, initiates a system drag carrying all [items] as separate
+ * plain text ClipData entries. On other platforms this is a no-op.
+ */
+expect fun Modifier.batchDragSource(items: List<String>): Modifier
