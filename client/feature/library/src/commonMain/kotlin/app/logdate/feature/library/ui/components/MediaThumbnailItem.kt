@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import app.logdate.feature.library.ui.LibraryMediaItem
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.common.ContextMenuArea
+import app.logdate.ui.common.ContextMenuItem
 import app.logdate.ui.common.noteDragSource
 import app.logdate.ui.common.transitions.TransitionKeys
 import coil3.compose.AsyncImage
@@ -59,6 +61,7 @@ private val ThumbnailShape = RoundedCornerShape(4.dp)
 fun MediaThumbnailItem(
     item: LibraryMediaItem,
     onItemClick: (Uuid) -> Unit,
+    contextMenuItems: List<ContextMenuItem> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
@@ -87,34 +90,36 @@ fun MediaThumbnailItem(
         label = "ThumbnailHoverScale",
     )
 
-    Box(
-        modifier =
-            modifier
-                .aspectRatio(1f)
-                .graphicsLayer(scaleX = scale, scaleY = scale)
-                .then(sharedModifier)
-                .clip(ThumbnailShape)
-                .hoverable(interactionSource)
-                .noteDragSource(item.uri)
-                .clickable { onItemClick(item.uid) },
-    ) {
-        AsyncImage(
-            model = item.thumbnailUri ?: item.uri,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-        )
-        if (item.isVideo) {
-            Icon(
-                imageVector = Icons.Filled.PlayCircleFilled,
-                contentDescription = "Video",
-                tint = Color.White,
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(4.dp)
-                        .size(20.dp),
+    ContextMenuArea(items = contextMenuItems) {
+        Box(
+            modifier =
+                modifier
+                    .aspectRatio(1f)
+                    .graphicsLayer(scaleX = scale, scaleY = scale)
+                    .then(sharedModifier)
+                    .clip(ThumbnailShape)
+                    .hoverable(interactionSource)
+                    .noteDragSource(item.uri)
+                    .clickable { onItemClick(item.uid) },
+        ) {
+            AsyncImage(
+                model = item.thumbnailUri ?: item.uri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
             )
+            if (item.isVideo) {
+                Icon(
+                    imageVector = Icons.Filled.PlayCircleFilled,
+                    contentDescription = "Video",
+                    tint = Color.White,
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(4.dp)
+                            .size(20.dp),
+                )
+            }
         }
     }
 }

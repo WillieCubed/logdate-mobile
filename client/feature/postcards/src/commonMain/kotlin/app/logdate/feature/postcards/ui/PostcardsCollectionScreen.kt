@@ -38,6 +38,8 @@ import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOW
 import app.logdate.client.database.entities.PostcardEntity
 import app.logdate.feature.postcards.model.CanvasElement
 import app.logdate.feature.postcards.model.PostcardDocument
+import app.logdate.ui.common.ContextMenuArea
+import app.logdate.ui.common.ContextMenuItem
 import app.logdate.ui.common.verticalScrollbar
 import coil3.compose.AsyncImage
 import io.github.aakira.napier.Napier
@@ -56,6 +58,8 @@ import kotlin.uuid.Uuid
 fun PostcardsCollectionScreen(
     viewModel: PostcardsCollectionViewModel = koinViewModel(),
     onOpenPostcard: (Uuid) -> Unit = {},
+    onEditPostcard: (Uuid) -> Unit = {},
+    onDeletePostcard: (Uuid) -> Unit = {},
     onCreateNew: () -> Unit = {},
 ) {
     val postcards by viewModel.postcards.collectAsState()
@@ -105,10 +109,19 @@ fun PostcardsCollectionScreen(
                         .verticalScrollbar(gridState),
             ) {
                 items(postcards, key = { it.id.toString() }) { postcard ->
-                    PostcardCard(
-                        postcard = postcard,
-                        onClick = { onOpenPostcard(postcard.id) },
-                    )
+                    ContextMenuArea(
+                        items =
+                            listOf(
+                                ContextMenuItem("Open") { onOpenPostcard(postcard.id) },
+                                ContextMenuItem("Edit") { onEditPostcard(postcard.id) },
+                                ContextMenuItem("Delete") { onDeletePostcard(postcard.id) },
+                            ),
+                    ) {
+                        PostcardCard(
+                            postcard = postcard,
+                            onClick = { onOpenPostcard(postcard.id) },
+                        )
+                    }
                 }
             }
         }
