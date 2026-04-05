@@ -174,6 +174,29 @@ class SyncBackedLogDateCollectionsRepository(
             .associationChanges(userId = userId, since = since, limit = limit)
             .toAssociationChanges()
 
+    override suspend fun upsertDraft(
+        userId: UUID,
+        draft: LogDateDraft,
+    ): LogDateDraft = throw UnsupportedOperationException("Draft sync not yet supported in sync-backed repository")
+
+    override suspend fun getDraft(
+        userId: UUID,
+        id: String,
+    ): LogDateDraft? = null
+
+    override suspend fun deleteDraft(
+        userId: UUID,
+        id: String,
+        deletedAt: Long,
+    ) {}
+
+    override suspend fun draftChanges(
+        userId: UUID,
+        since: Long,
+        limit: Int,
+    ): LogDateChangeSet<LogDateDraft, LogDateDraftDeletion> =
+        LogDateChangeSet(changes = emptyList(), deletions = emptyList(), lastTimestamp = 0L)
+
     override suspend fun purgeTombstones(
         userId: UUID,
         olderThan: Long,

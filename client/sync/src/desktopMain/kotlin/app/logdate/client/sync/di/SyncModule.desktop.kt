@@ -38,6 +38,7 @@ actual val syncModule: Module =
                 cloudJournalDataSource = get(),
                 cloudAssociationDataSource = get(),
                 cloudMediaDataSource = get(),
+                cloudDraftDataSource = get(),
                 cloudAccountRepository = get(),
                 sessionStorage = get(),
                 mediaManager = get(),

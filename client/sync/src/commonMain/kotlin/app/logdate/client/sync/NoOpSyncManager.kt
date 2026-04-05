@@ -29,6 +29,8 @@ object NoOpSyncManager : SyncManager {
 
     override suspend fun syncAssociations(): SyncResult = noOpResult
 
+    override suspend fun syncDrafts(): SyncResult = noOpResult
+
     override suspend fun fullSync(): SyncResult = noOpResult
 
     override suspend fun getSyncStatus(): SyncStatus = noOpStatus

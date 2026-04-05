@@ -10,6 +10,7 @@ import app.logdate.server.logdate.LogDateBlobNamespace
 import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateBlobWriteRequest
 import app.logdate.server.logdate.LogDateCollectionsRepository
+import app.logdate.server.logdate.LogDateDraft
 import app.logdate.server.logdate.LogDateEntry
 import app.logdate.server.logdate.LogDateJournal
 import app.logdate.server.logdate.LogDateMedia
@@ -883,6 +884,68 @@ fun Route.syncRoutes(
                 } finally {
                     metrics.recordOperation(METRIC_ASSOCIATION_DELETE, System.currentTimeMillis() - start, success)
                 }
+            }
+        }
+
+        route("/drafts") {
+            put("/{draftId}") {
+                val userId = extractUserId(call, tokenService) ?: return@put
+                val draftId = call.requiredPathParam("draftId")
+                val req = call.receive<app.logdate.shared.model.sync.DraftUploadRequest>()
+                val stored =
+                    collectionsRepository.upsertDraft(
+                        userId = userId,
+                        draft =
+                            LogDateDraft(
+                                id = draftId,
+                                content = req.content,
+                                blockTypes = req.blockTypes,
+                                journalIds = req.journalIds,
+                                createdAt = req.createdAt,
+                                lastUpdated = req.lastUpdated,
+                                version = 0L,
+                                deviceId = req.deviceId,
+                            ),
+                    )
+                call.respond(
+                    HttpStatusCode.OK,
+                    app.logdate.shared.model.sync.DraftUploadResponse(
+                        id = stored.id,
+                        serverVersion = stored.version,
+                        uploadedAt = stored.lastUpdated,
+                    ),
+                )
+            }
+
+            get("/changes") {
+                val userId = extractUserId(call, tokenService) ?: return@get
+                val since = call.request.queryParameters["since"]?.toLongOrNull() ?: 0L
+                val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 100
+                val changeSet = collectionsRepository.draftChanges(userId, since, limit)
+                call.respond(
+                    app.logdate.shared.model.sync.DraftChangesResponse(
+                        drafts =
+                            changeSet.changes.map { draft ->
+                                app.logdate.shared.model.sync.DraftChange(
+                                    id = draft.id,
+                                    content = draft.content,
+                                    blockTypes = draft.blockTypes,
+                                    journalIds = draft.journalIds,
+                                    createdAt = draft.createdAt,
+                                    lastUpdated = draft.lastUpdated,
+                                    deviceId = draft.deviceId,
+                                    serverVersion = draft.version,
+                                )
+                            },
+                    ),
+                )
+            }
+
+            delete("/{draftId}") {
+                val userId = extractUserId(call, tokenService) ?: return@delete
+                val draftId = call.requiredPathParam("draftId")
+                collectionsRepository.deleteDraft(userId, draftId, System.currentTimeMillis())
+                call.respond(HttpStatusCode.NoContent)
             }
         }
 

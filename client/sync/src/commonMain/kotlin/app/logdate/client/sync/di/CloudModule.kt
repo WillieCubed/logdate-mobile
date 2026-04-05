@@ -3,10 +3,12 @@ package app.logdate.client.sync.di
 import app.logdate.client.sync.cloud.CloudApiClient
 import app.logdate.client.sync.cloud.CloudAssociationDataSource
 import app.logdate.client.sync.cloud.CloudContentDataSource
+import app.logdate.client.sync.cloud.CloudDraftDataSource
 import app.logdate.client.sync.cloud.CloudJournalDataSource
 import app.logdate.client.sync.cloud.CloudMediaDataSource
 import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
 import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
+import app.logdate.client.sync.cloud.DefaultCloudDraftDataSource
 import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
 import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
 import app.logdate.client.sync.cloud.LogDateCloudApiClient
@@ -35,6 +37,7 @@ val cloudModule =
         single<CloudContentDataSource> { DefaultCloudContentDataSource(get()) }
         single<CloudJournalDataSource> { DefaultCloudJournalDataSource(get()) }
         single<CloudAssociationDataSource> { DefaultCloudAssociationDataSource(get()) }
+        single<CloudDraftDataSource> { DefaultCloudDraftDataSource(get()) }
         single { MediaPayloadKeyProvider(get(), get()) }
         single<MediaPayloadCrypto> { StoredMediaPayloadCrypto(get()) }
         single<CloudMediaDataSource> { DefaultCloudMediaDataSource(get(), get()) }

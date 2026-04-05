@@ -341,6 +341,8 @@ class AndroidSyncManager(
 
     override suspend fun syncAssociations(): SyncResult = defaultSyncManager.syncAssociations()
 
+    override suspend fun syncDrafts(): SyncResult = defaultSyncManager.syncDrafts()
+
     override suspend fun fullSync(): SyncResult = defaultSyncManager.fullSync()
 
     override suspend fun getSyncStatus(): SyncStatus = defaultSyncManager.getSyncStatus()

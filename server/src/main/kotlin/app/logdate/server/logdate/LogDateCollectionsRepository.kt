@@ -80,6 +80,22 @@ data class LogDateAssociationDeletion(
     val deletedAt: Long,
 )
 
+data class LogDateDraft(
+    val id: String,
+    val content: String,
+    val blockTypes: List<String>,
+    val journalIds: List<String>,
+    val createdAt: Long,
+    val lastUpdated: Long,
+    val version: Long,
+    val deviceId: DeviceId,
+)
+
+data class LogDateDraftDeletion(
+    val id: String,
+    val deletedAt: Long,
+)
+
 /**
  * Internal collection repository boundary for the LogDate data model.
  *
@@ -155,6 +171,28 @@ interface LogDateCollectionsRepository {
         since: Long,
         limit: Int,
     ): LogDateChangeSet<LogDateAssociation, LogDateAssociationDeletion>
+
+    suspend fun upsertDraft(
+        userId: UUID,
+        draft: LogDateDraft,
+    ): LogDateDraft
+
+    suspend fun getDraft(
+        userId: UUID,
+        id: String,
+    ): LogDateDraft?
+
+    suspend fun deleteDraft(
+        userId: UUID,
+        id: String,
+        deletedAt: Long,
+    )
+
+    suspend fun draftChanges(
+        userId: UUID,
+        since: Long,
+        limit: Int,
+    ): LogDateChangeSet<LogDateDraft, LogDateDraftDeletion>
 
     suspend fun purgeTombstones(
         userId: UUID,

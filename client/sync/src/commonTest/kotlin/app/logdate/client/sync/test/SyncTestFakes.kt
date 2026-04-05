@@ -26,6 +26,7 @@ import app.logdate.client.sync.cloud.CheckUsernameAvailabilityResponse
 import app.logdate.client.sync.cloud.CloudApiClient
 import app.logdate.client.sync.cloud.CloudAssociationDataSource
 import app.logdate.client.sync.cloud.CloudContentDataSource
+import app.logdate.client.sync.cloud.CloudDraftDataSource
 import app.logdate.client.sync.cloud.CloudJournalDataSource
 import app.logdate.client.sync.cloud.CloudMediaDataSource
 import app.logdate.client.sync.cloud.ContentChangesResponse
@@ -35,8 +36,12 @@ import app.logdate.client.sync.cloud.ContentUploadRequest
 import app.logdate.client.sync.cloud.ContentUploadResponse
 import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
 import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
+import app.logdate.client.sync.cloud.DefaultCloudDraftDataSource
 import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
 import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
+import app.logdate.client.sync.cloud.DraftChangesResponse
+import app.logdate.client.sync.cloud.DraftUploadRequest
+import app.logdate.client.sync.cloud.DraftUploadResponse
 import app.logdate.client.sync.cloud.JournalChangesResponse
 import app.logdate.client.sync.cloud.JournalUpdateRequest
 import app.logdate.client.sync.cloud.JournalUpdateResponse
@@ -128,6 +133,7 @@ fun testDefaultSyncManager(
     cloudJournalDataSource: CloudJournalDataSource = DefaultCloudJournalDataSource(fakeCloudApiClient()),
     cloudAssociationDataSource: CloudAssociationDataSource = DefaultCloudAssociationDataSource(fakeCloudApiClient()),
     cloudMediaDataSource: CloudMediaDataSource = DefaultCloudMediaDataSource(fakeCloudApiClient()),
+    cloudDraftDataSource: CloudDraftDataSource = DefaultCloudDraftDataSource(fakeCloudApiClient()),
     cloudAccountRepository: CloudAccountRepository = fakeAccountRepository(),
     sessionStorage: SessionStorage = fakeSessionStorage(),
     mediaManager: MediaManager = StubMediaManager(),
@@ -149,6 +155,7 @@ fun testDefaultSyncManager(
         cloudJournalDataSource = cloudJournalDataSource,
         cloudAssociationDataSource = cloudAssociationDataSource,
         cloudMediaDataSource = cloudMediaDataSource,
+        cloudDraftDataSource = cloudDraftDataSource,
         cloudAccountRepository = cloudAccountRepository,
         sessionStorage = sessionStorage,
         mediaManager = mediaManager,
@@ -341,6 +348,41 @@ open class FakeCloudApiClient : CloudApiClient {
     ): Result<Unit> {
         methodCalls.add("deleteAssociations")
         return deleteAssociationsResponse
+    }
+
+    // Draft sync methods
+    override suspend fun uploadDraft(
+        accessToken: String,
+        draft: DraftUploadRequest,
+    ): Result<DraftUploadResponse> {
+        methodCalls.add("uploadDraft")
+        return Result.success(
+            DraftUploadResponse(
+                id = draft.id,
+                serverVersion = 1L,
+                uploadedAt = draft.lastUpdated,
+            ),
+        )
+    }
+
+    override suspend fun getDraftChanges(
+        accessToken: String,
+        since: Long,
+        limit: Int?,
+    ): Result<DraftChangesResponse> {
+        methodCalls.add("getDraftChanges")
+        return Result.success(
+            app.logdate.shared.model.sync
+                .DraftChangesResponse(drafts = emptyList()),
+        )
+    }
+
+    override suspend fun deleteDraft(
+        accessToken: String,
+        draftId: String,
+    ): Result<Unit> {
+        methodCalls.add("deleteDraft")
+        return Result.success(Unit)
     }
 
     // Media sync methods
@@ -888,6 +930,8 @@ class TrackingSyncManager : SyncManager {
         syncAssociationsCalls++
         return syncResult
     }
+
+    override suspend fun syncDrafts(): SyncResult = syncResult
 
     override suspend fun fullSync(): SyncResult {
         fullSyncCalls++

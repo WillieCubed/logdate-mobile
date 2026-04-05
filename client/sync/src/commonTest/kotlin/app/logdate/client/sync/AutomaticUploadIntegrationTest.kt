@@ -3,6 +3,7 @@ package app.logdate.client.sync
 import app.logdate.client.media.StubMediaManager
 import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
 import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
+import app.logdate.client.sync.cloud.DefaultCloudDraftDataSource
 import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
 import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
 import app.logdate.client.sync.metadata.AssociationPendingKey
@@ -50,6 +51,7 @@ class AutomaticUploadIntegrationTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),
@@ -102,6 +104,7 @@ class AutomaticUploadIntegrationTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),
@@ -155,6 +158,7 @@ class AutomaticUploadIntegrationTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),
@@ -201,6 +205,7 @@ class AutomaticUploadIntegrationTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),
@@ -251,6 +256,7 @@ class AutomaticUploadIntegrationTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(authenticated = false),
                     sessionStorage = fakeSessionStorage(authenticated = false),
                     mediaManager = StubMediaManager(),

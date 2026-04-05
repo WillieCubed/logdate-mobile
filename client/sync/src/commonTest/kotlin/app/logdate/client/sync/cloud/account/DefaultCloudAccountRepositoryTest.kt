@@ -8,6 +8,7 @@ import app.logdate.client.sync.cloud.ContentUpdateRequest
 import app.logdate.client.sync.cloud.ContentUpdateResponse
 import app.logdate.client.sync.cloud.ContentUploadRequest
 import app.logdate.client.sync.cloud.ContentUploadResponse
+import app.logdate.client.sync.cloud.DraftUploadRequest
 import app.logdate.client.sync.cloud.JournalChangesResponse
 import app.logdate.client.sync.cloud.JournalUpdateRequest
 import app.logdate.client.sync.cloud.JournalUpdateResponse
@@ -216,6 +217,22 @@ private class FakeCloudApiClient(
         accessToken: String,
         media: MediaUploadRequest,
     ): Result<MediaUploadResponse> = Result.failure(NotImplementedError())
+
+    override suspend fun uploadDraft(
+        accessToken: String,
+        draft: DraftUploadRequest,
+    ) = TODO()
+
+    override suspend fun getDraftChanges(
+        accessToken: String,
+        since: Long,
+        limit: Int?,
+    ) = TODO()
+
+    override suspend fun deleteDraft(
+        accessToken: String,
+        draftId: String,
+    ) = TODO()
 
     override suspend fun downloadMedia(
         accessToken: String,

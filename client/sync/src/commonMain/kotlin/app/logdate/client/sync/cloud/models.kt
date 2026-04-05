@@ -33,3 +33,8 @@ typealias MediaUploadRequest = app.logdate.shared.model.sync.MediaUploadRequest
 typealias MediaUploadResponse = app.logdate.shared.model.sync.MediaUploadResponse
 typealias MediaMetadataResponse = app.logdate.shared.model.sync.MediaMetadataResponse
 typealias MediaDownloadResponse = app.logdate.shared.model.sync.MediaDownloadResponse
+
+typealias DraftUploadRequest = app.logdate.shared.model.sync.DraftUploadRequest
+typealias DraftUploadResponse = app.logdate.shared.model.sync.DraftUploadResponse
+typealias DraftChangesResponse = app.logdate.shared.model.sync.DraftChangesResponse
+typealias DraftChange = app.logdate.shared.model.sync.DraftChange

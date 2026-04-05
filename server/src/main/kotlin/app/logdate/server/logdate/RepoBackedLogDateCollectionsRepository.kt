@@ -309,6 +309,80 @@ internal class RepoBackedLogDateCollectionsRepository(
         )
     }
 
+    override suspend fun upsertDraft(
+        userId: UUID,
+        draft: LogDateDraft,
+    ): LogDateDraft {
+        val repoDid = canonicalRepoDid(userId)
+        repoEngine.putRecord(draftRecordId(repoDid, draft.id), draft.toRepoJson()).getOrThrow()
+        val metadata =
+            metadataStore.upsert(
+                userId = userId,
+                repoDid = repoDid,
+                collection = LogDateCollectionKind.DRAFT,
+                recordKey = draft.id,
+            )
+        return draft.copy(version = metadata.version, lastUpdated = System.currentTimeMillis())
+    }
+
+    override suspend fun getDraft(
+        userId: UUID,
+        id: String,
+    ): LogDateDraft? {
+        val metadata = metadataStore.metadata(userId, LogDateCollectionKind.DRAFT, id) ?: return null
+        val repoDid = canonicalRepoDid(userId)
+        return repoEngine
+            .getRecord(draftRecordId(repoDid, id))
+            .getOrThrow()
+            ?.value
+            ?.toLogDateDraft(recordKey = RecordKey.require(id), version = metadata.version)
+    }
+
+    override suspend fun deleteDraft(
+        userId: UUID,
+        id: String,
+        deletedAt: Long,
+    ) {
+        val existing = metadataStore.metadata(userId, LogDateCollectionKind.DRAFT, id) ?: return
+        val repoDid = canonicalRepoDid(userId)
+        repoEngine.deleteRecord(draftRecordId(repoDid, id)).getOrThrow()
+        metadataStore.delete(
+            userId = userId,
+            repoDid = repoDid,
+            collection = LogDateCollectionKind.DRAFT,
+            recordKey = existing.recordKey,
+            deletedAt = deletedAt,
+        )
+    }
+
+    override suspend fun draftChanges(
+        userId: UUID,
+        since: Long,
+        limit: Int,
+    ): LogDateChangeSet<LogDateDraft, LogDateDraftDeletion> {
+        val repoDid = canonicalRepoDid(userId)
+        val metadata = metadataStore.changes(userId, LogDateCollectionKind.DRAFT, since, limit)
+        return LogDateChangeSet(
+            changes =
+                metadata.changes.mapNotNull { change ->
+                    repoEngine
+                        .getRecord(draftRecordId(repoDid, change.recordKey))
+                        .getOrThrow()
+                        ?.value
+                        ?.toLogDateDraft(recordKey = RecordKey.require(change.recordKey), version = change.version)
+                },
+            deletions =
+                metadata.deletions.map { deletion ->
+                    LogDateDraftDeletion(
+                        id = deletion.recordKey,
+                        deletedAt = requireNotNull(deletion.deletedAt),
+                    )
+                },
+            lastTimestamp = metadata.lastTimestamp,
+            hasMore = metadata.hasMore,
+        )
+    }
+
     override suspend fun purgeTombstones(
         userId: UUID,
         olderThan: Long,

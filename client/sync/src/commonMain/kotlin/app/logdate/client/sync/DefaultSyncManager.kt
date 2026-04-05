@@ -15,6 +15,7 @@ import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.CloudAssociationDataSource
 import app.logdate.client.sync.cloud.CloudContentDataSource
+import app.logdate.client.sync.cloud.CloudDraftDataSource
 import app.logdate.client.sync.cloud.CloudJournalDataSource
 import app.logdate.client.sync.cloud.CloudMediaDataSource
 import app.logdate.client.sync.cloud.JournalContentAssociation
@@ -59,6 +60,7 @@ class DefaultSyncManager(
     private val cloudJournalDataSource: CloudJournalDataSource,
     private val cloudAssociationDataSource: CloudAssociationDataSource,
     private val cloudMediaDataSource: CloudMediaDataSource,
+    private val cloudDraftDataSource: CloudDraftDataSource,
     private val cloudAccountRepository: CloudAccountRepository,
     private val sessionStorage: SessionStorage,
     private val mediaManager: MediaManager,
@@ -421,16 +423,63 @@ class DefaultSyncManager(
             }
         }
 
+    override suspend fun syncDrafts(): SyncResult =
+        syncMutex.withLock {
+            if (!isEnabled || !isAuthenticated()) {
+                return SyncResult(success = false)
+            }
+            syncStateFlow.value = SyncState.Syncing
+            try {
+                val accessToken =
+                    getAccessToken() ?: return SyncResult(
+                        success = false,
+                        errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "No access token")),
+                    )
+                val lastSync = syncMetadataService.getLastSyncTime(EntityType.DRAFT) ?: Instant.fromEpochMilliseconds(0)
+
+                // Download remote draft changes
+                val changesResult =
+                    cloudDraftDataSource.getDraftChanges(
+                        accessToken = accessToken,
+                        since = lastSync,
+                    )
+                val downloaded = changesResult.getOrNull()?.changes?.size ?: 0
+
+                if (changesResult.isSuccess) {
+                    val result = changesResult.getOrThrow()
+                    syncMetadataService.updateLastSyncTime(
+                        EntityType.DRAFT,
+                        result.lastSyncTimestamp,
+                    )
+                }
+
+                SyncResult(
+                    success = changesResult.isSuccess,
+                    downloadedItems = downloaded,
+                    lastSyncTime = Clock.System.now(),
+                )
+            } catch (e: Exception) {
+                Napier.e("Draft sync failed", e)
+                SyncResult(
+                    success = false,
+                    errors = listOf(SyncError(SyncErrorType.UNKNOWN_ERROR, "Draft sync failed: ${e.message}")),
+                )
+            } finally {
+                syncStateFlow.value = SyncState.Idle
+            }
+        }
+
     override suspend fun fullSync(): SyncResult {
         val uploadResult = uploadPendingChanges()
         val downloadResult = downloadRemoteChanges()
+        val draftResult = syncDrafts()
 
         return SyncResult(
-            success = uploadResult.success && downloadResult.success,
-            uploadedItems = uploadResult.uploadedItems,
-            downloadedItems = downloadResult.downloadedItems,
+            success = uploadResult.success && downloadResult.success && draftResult.success,
+            uploadedItems = uploadResult.uploadedItems + draftResult.uploadedItems,
+            downloadedItems = downloadResult.downloadedItems + draftResult.downloadedItems,
             conflictsResolved = downloadResult.conflictsResolved,
-            errors = uploadResult.errors + downloadResult.errors,
+            errors = uploadResult.errors + downloadResult.errors + draftResult.errors,
             lastSyncTime = latestSyncTime(),
         )
     }

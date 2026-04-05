@@ -32,6 +32,10 @@ internal enum class LogDateCollectionKind(
         storageName = "association",
         nsid = Nsid.require("studio.hypertext.logdate.association"),
     ),
+    DRAFT(
+        storageName = "draft",
+        nsid = Nsid.require("studio.hypertext.logdate.draft"),
+    ),
     ;
 
     companion object {
@@ -68,6 +72,16 @@ internal fun associationRecordId(
         repo = repo,
         collection = LogDateCollectionKind.ASSOCIATION.nsid,
         recordKey = associationRecordKey(journalId, entryId),
+    )
+
+internal fun draftRecordId(
+    repo: AtprotoDid,
+    id: String,
+): RepoRecordId =
+    RepoRecordId(
+        repo = repo,
+        collection = LogDateCollectionKind.DRAFT.nsid,
+        recordKey = RecordKey.require(id),
     )
 
 internal fun associationRecordKey(
@@ -225,6 +239,38 @@ internal fun JsonObject.deviceIdOrDefault(default: DeviceId? = null): DeviceId =
     } else {
         default ?: DeviceId.UNKNOWN
     }
+
+internal fun LogDateDraft.toRepoJson(): JsonObject =
+    buildJsonObject {
+        put(TYPE_FIELD_NAME, LogDateCollectionKind.DRAFT.nsid.toString())
+        put("id", id)
+        put("content", content)
+        put("createdAt", createdAt)
+        put("lastUpdated", lastUpdated)
+        put("deviceId", deviceId.value)
+    }
+
+internal fun JsonObject.toLogDateDraft(
+    recordKey: RecordKey,
+    version: Long,
+): LogDateDraft =
+    LogDateDraft(
+        id = stringValue("id") ?: recordKey.toString(),
+        content = stringValue("content").orEmpty(),
+        blockTypes = emptyList(),
+        journalIds = emptyList(),
+        createdAt = longValue("createdAt") ?: 0L,
+        lastUpdated = longValue("lastUpdated") ?: 0L,
+        version = version,
+        deviceId = deviceIdOrDefault(),
+    )
+
+internal fun draftToRecord(draft: LogDateDraft): JsonObject = draft.toRepoJson()
+
+internal fun recordToDraft(
+    id: String,
+    record: JsonObject,
+): LogDateDraft = record.toLogDateDraft(RecordKey(id), record.longValue("lastUpdated") ?: 0L)
 
 internal const val DEFAULT_CONTENT_TYPE: String = "TEXT"
 internal const val DEFAULT_DURATION_MS: Long = 0L

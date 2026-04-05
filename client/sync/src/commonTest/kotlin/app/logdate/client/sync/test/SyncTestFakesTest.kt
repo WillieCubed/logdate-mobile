@@ -5,6 +5,7 @@ import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.cloud.ContentUploadRequest
 import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
 import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
+import app.logdate.client.sync.cloud.DefaultCloudDraftDataSource
 import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
 import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
 import kotlinx.coroutines.test.runTest
@@ -179,6 +180,7 @@ class SyncTestFakesTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = accountRepository,
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),
@@ -223,6 +225,7 @@ class SyncTestFakesTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = accountRepository,
                     sessionStorage = fakeSessionStorage(authenticated = false),
                     mediaManager = StubMediaManager(),
@@ -264,6 +267,7 @@ class SyncTestFakesTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = accountRepository,
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),

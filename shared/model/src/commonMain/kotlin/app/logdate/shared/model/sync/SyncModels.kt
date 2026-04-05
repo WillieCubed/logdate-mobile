@@ -295,3 +295,43 @@ data class BackupInfoResponse(
 data class BackupListResponse(
     val backups: List<BackupInfoResponse>,
 )
+
+// --- Draft sync models (cross-device handoff) ---
+
+@Serializable
+data class DraftUploadRequest(
+    val id: String,
+    val content: String,
+    val blockTypes: List<String> = emptyList(),
+    val journalIds: List<String> = emptyList(),
+    val createdAt: Long,
+    val lastUpdated: Long,
+    val deviceId: DeviceId = DeviceId.UNKNOWN,
+)
+
+@Serializable
+data class DraftUploadResponse(
+    val id: String,
+    val serverVersion: Long,
+    val uploadedAt: Long,
+)
+
+@Serializable
+data class DraftChangesResponse(
+    val drafts: List<DraftChange>,
+    val cursor: VersionConstraint? = null,
+)
+
+@Serializable
+data class DraftChange(
+    val id: String,
+    val content: String,
+    val blockTypes: List<String>,
+    val journalIds: List<String>,
+    val createdAt: Long,
+    val lastUpdated: Long,
+    val deviceId: DeviceId,
+    val serverVersion: Long,
+    @SerialName("is_deleted")
+    val isDeleted: Boolean = false,
+)

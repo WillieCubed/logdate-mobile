@@ -20,6 +20,7 @@ import io.ktor.client.request.delete
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.get
+import io.ktor.client.request.parameter
 import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.put
@@ -673,6 +674,71 @@ class LogDateCloudApiClient(
                     cause = e,
                 ),
             )
+        }
+
+    // Draft Operations
+    override suspend fun uploadDraft(
+        accessToken: String,
+        draft: DraftUploadRequest,
+    ): Result<DraftUploadResponse> =
+        try {
+            val baseUrl = getBaseUrl()
+            val response =
+                httpClient.put("$baseUrl/drafts/${draft.id}") {
+                    headers.append("Authorization", "Bearer $accessToken")
+                    contentType(ContentType.Application.Json)
+                    setBody(draft)
+                }
+            when (response.status) {
+                HttpStatusCode.OK, HttpStatusCode.Created ->
+                    Result.success(response.body<DraftUploadResponse>())
+                else -> handleApiError(response)
+            }
+        } catch (e: Exception) {
+            Napier.e("Failed to upload draft", e)
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to upload draft: ${e.message}", cause = e))
+        }
+
+    override suspend fun getDraftChanges(
+        accessToken: String,
+        since: Long,
+        limit: Int?,
+    ): Result<DraftChangesResponse> =
+        try {
+            val baseUrl = getBaseUrl()
+            val response =
+                httpClient.get("$baseUrl/drafts/changes") {
+                    headers.append("Authorization", "Bearer $accessToken")
+                    parameter("since", since)
+                    limit?.let { parameter("limit", it) }
+                }
+            when (response.status) {
+                HttpStatusCode.OK ->
+                    Result.success(response.body<DraftChangesResponse>())
+                else -> handleApiError(response)
+            }
+        } catch (e: Exception) {
+            Napier.e("Failed to get draft changes", e)
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to get draft changes: ${e.message}", cause = e))
+        }
+
+    override suspend fun deleteDraft(
+        accessToken: String,
+        draftId: String,
+    ): Result<Unit> =
+        try {
+            val baseUrl = getBaseUrl()
+            val response =
+                httpClient.delete("$baseUrl/drafts/$draftId") {
+                    headers.append("Authorization", "Bearer $accessToken")
+                }
+            when (response.status) {
+                HttpStatusCode.NoContent -> Result.success(Unit)
+                else -> handleApiError(response)
+            }
+        } catch (e: Exception) {
+            Napier.e("Failed to delete draft", e)
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to delete draft: ${e.message}", cause = e))
         }
 
     // Media Operations

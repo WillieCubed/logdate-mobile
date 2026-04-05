@@ -50,6 +50,13 @@ interface SyncManager {
     suspend fun syncAssociations(): SyncResult
 
     /**
+     * Syncs editor drafts for cross-device handoff.
+     * Uploads local drafts and downloads drafts started on other devices,
+     * enabling users to continue editing where they left off.
+     */
+    suspend fun syncDrafts(): SyncResult
+
+    /**
      * Performs a full bidirectional sync of all data.
      * This is the most comprehensive sync operation.
      */

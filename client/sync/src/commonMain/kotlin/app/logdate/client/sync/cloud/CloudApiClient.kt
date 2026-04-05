@@ -163,6 +163,24 @@ interface CloudApiClient {
         associations: AssociationDeleteRequest,
     ): Result<Unit>
 
+    // Draft Operations
+
+    suspend fun uploadDraft(
+        accessToken: String,
+        draft: DraftUploadRequest,
+    ): Result<DraftUploadResponse>
+
+    suspend fun getDraftChanges(
+        accessToken: String,
+        since: Long,
+        limit: Int? = null,
+    ): Result<DraftChangesResponse>
+
+    suspend fun deleteDraft(
+        accessToken: String,
+        draftId: String,
+    ): Result<Unit>
+
     // Media Operations
 
     /**

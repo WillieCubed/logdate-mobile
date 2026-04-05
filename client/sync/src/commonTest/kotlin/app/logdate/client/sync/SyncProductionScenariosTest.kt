@@ -3,6 +3,7 @@ package app.logdate.client.sync
 import app.logdate.client.media.StubMediaManager
 import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
 import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
+import app.logdate.client.sync.cloud.DefaultCloudDraftDataSource
 import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
 import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
 import app.logdate.client.sync.metadata.EntityType
@@ -55,6 +56,7 @@ class SyncProductionScenariosTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),
@@ -108,6 +110,7 @@ class SyncProductionScenariosTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),
@@ -165,6 +168,7 @@ class SyncProductionScenariosTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),
@@ -221,6 +225,7 @@ class SyncProductionScenariosTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(offlineClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(offlineClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(offlineClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(offlineClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),
@@ -258,6 +263,7 @@ class SyncProductionScenariosTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(fakeCloudApiClient()),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(fakeCloudApiClient()),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(fakeCloudApiClient()),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(fakeCloudApiClient()),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),
@@ -296,6 +302,7 @@ class SyncProductionScenariosTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),
@@ -345,6 +352,7 @@ class SyncProductionScenariosTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),
@@ -395,6 +403,7 @@ class SyncProductionScenariosTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),
@@ -433,6 +442,7 @@ class SyncProductionScenariosTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),
@@ -480,6 +490,7 @@ class SyncProductionScenariosTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),
@@ -519,6 +530,7 @@ class SyncProductionScenariosTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(authenticated = false), // Simulate auth loss
                     sessionStorage = fakeSessionStorage(authenticated = false),
                     mediaManager = StubMediaManager(),
@@ -557,6 +569,7 @@ class SyncProductionScenariosTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),
@@ -593,6 +606,7 @@ class SyncProductionScenariosTest {
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
                     cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
                     mediaManager = StubMediaManager(),

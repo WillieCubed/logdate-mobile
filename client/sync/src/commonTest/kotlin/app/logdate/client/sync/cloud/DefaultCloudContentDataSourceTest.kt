@@ -450,6 +450,22 @@ private class MockCloudApiClientForContent : CloudApiClient {
         associations: AssociationDeleteRequest,
     ): Result<Unit> = Result.failure(NotImplementedError())
 
+    override suspend fun uploadDraft(
+        accessToken: String,
+        draft: DraftUploadRequest,
+    ): Result<DraftUploadResponse> = Result.failure(NotImplementedError())
+
+    override suspend fun getDraftChanges(
+        accessToken: String,
+        since: Long,
+        limit: Int?,
+    ): Result<DraftChangesResponse> = Result.failure(NotImplementedError())
+
+    override suspend fun deleteDraft(
+        accessToken: String,
+        draftId: String,
+    ): Result<Unit> = Result.failure(NotImplementedError())
+
     override suspend fun uploadMedia(
         accessToken: String,
         media: MediaUploadRequest,

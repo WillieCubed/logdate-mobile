@@ -181,6 +181,8 @@ private class MockSyncManager : SyncManager {
         return SyncResult(success = true)
     }
 
+    override suspend fun syncDrafts() = SyncResult(success = true)
+
     override suspend fun fullSync(): SyncResult {
         fullSyncCalls++
         return SyncResult(success = true)
