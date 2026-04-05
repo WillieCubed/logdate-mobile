@@ -16,6 +16,8 @@ internal data class ShareContentRequest(
     val title: String? = null,
     val chooserTitle: String? = null,
     val copyText: String? = null,
+    val qrCodeImageUri: Uri? = null,
+    val qrCodeText: String? = null,
 )
 
 /**
@@ -27,6 +29,7 @@ internal data class ShareContentRequest(
 internal fun Context.shareJournalLink(
     journal: Journal,
     previewImage: Uri? = null,
+    qrCodeImage: Uri? = null,
 ) {
     val url = "https://logdate.app/j/${journal.id}"
     val mediaUris = listOfNotNull(previewImage)
@@ -37,6 +40,25 @@ internal fun Context.shareJournalLink(
                 mediaUris = mediaUris,
                 title = journal.title,
                 chooserTitle = "Share journal",
+                copyText = url,
+                qrCodeImageUri = qrCodeImage,
+                qrCodeText = url,
+            ),
+    )
+}
+
+internal fun Context.shareJournalQrCode(
+    journal: Journal,
+    qrCodeImage: Uri,
+) {
+    val url = "https://logdate.app/j/${journal.id}"
+    shareContent(
+        request =
+            ShareContentRequest(
+                text = url,
+                mediaUris = listOf(qrCodeImage),
+                title = journal.title,
+                chooserTitle = "Share QR code",
                 copyText = url,
             ),
     )
@@ -141,6 +163,27 @@ private fun Context.buildChooserActions(request: ShareContentRequest): Array<Cho
                         ),
                     ).build()
         }
+    val qrCodeImageUri = request.qrCodeImageUri
+    val qrCodeText = request.qrCodeText
+    if (qrCodeImageUri != null && !qrCodeText.isNullOrBlank()) {
+        actions +=
+            ChooserAction
+                .Builder(
+                    Icon.createWithResource(this, android.R.drawable.ic_menu_share),
+                    "Share QR code",
+                    PendingIntent.getBroadcast(
+                        this,
+                        2,
+                        Intent(this, ShareReceiver::class.java).apply {
+                            action = CustomIntents.ACTION_SHARE_QR_CODE
+                            putExtra(CustomIntents.EXTRA_SHARE_TEXT, qrCodeText)
+                            putExtra(CustomIntents.EXTRA_SHARE_URI, qrCodeImageUri)
+                            putExtra(CustomIntents.EXTRA_SHARE_TITLE, request.title)
+                        },
+                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_CANCEL_CURRENT,
+                    ),
+                ).build()
+    }
     return actions.toTypedArray()
 }
 
@@ -149,8 +192,11 @@ private fun Context.buildChooserActions(request: ShareContentRequest): Array<Cho
  */
 object CustomIntents {
     const val EXTRA_SHARE_TEXT: String = "app.mobile.logdate.extra.SHARE_TEXT"
+    const val EXTRA_SHARE_TITLE: String = "app.mobile.logdate.extra.SHARE_TITLE"
+    const val EXTRA_SHARE_URI: String = "app.mobile.logdate.extra.SHARE_URI"
 
     const val ACTION_CHOOSER_RESULT: String = "app.mobile.logdate.action.CHOOSER_RESULT"
 
     const val ACTION_COPY_LINK: String = "app.mobile.logdate.action.COPY_LINK"
+    const val ACTION_SHARE_QR_CODE: String = "app.mobile.logdate.action.SHARE_QR_CODE"
 }

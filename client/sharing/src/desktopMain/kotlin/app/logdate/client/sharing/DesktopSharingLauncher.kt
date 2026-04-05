@@ -99,6 +99,10 @@ class DesktopSharingLauncher(
         }
     }
 
+    override fun shareJournalQrCode(journalId: Uuid) {
+        shareJournalLink(journalId)
+    }
+
     /**
      * Not implemented for desktop.
      *

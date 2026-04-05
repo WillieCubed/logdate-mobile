@@ -60,6 +60,7 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.koin.android)
+            implementation(libs.zxing.core)
         }
     }
 }

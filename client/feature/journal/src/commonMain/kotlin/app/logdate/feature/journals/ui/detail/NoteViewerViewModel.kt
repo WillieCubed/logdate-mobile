@@ -8,6 +8,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.sharing.SharingLauncher
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -34,6 +35,7 @@ class NoteViewerViewModel(
     private val journalRepository: JournalRepository,
     private val journalContentRepository: JournalContentRepository,
     private val removeNoteUseCase: RemoveNoteUseCase,
+    private val sharingLauncher: SharingLauncher,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<NoteViewerUiState>(NoteViewerUiState.Loading)
     val uiState: StateFlow<NoteViewerUiState> = _uiState.asStateFlow()
@@ -156,6 +158,27 @@ class NoteViewerViewModel(
             } else {
                 journalContentRepository.removeContentFromJournal(noteId, targetJournalId)
             }
+        }
+    }
+
+    /**
+     * Shares the currently viewed note using the platform share surface.
+     */
+    fun shareCurrentNote() {
+        when (val state = _uiState.value) {
+            is NoteViewerUiState.TextContent -> {
+                sharingLauncher.shareContent(text = state.text, chooserTitle = "Share note")
+            }
+            is NoteViewerUiState.ImageContent -> {
+                sharingLauncher.shareContent(mediaUris = listOf(state.mediaRef), chooserTitle = "Share note")
+            }
+            is NoteViewerUiState.VideoContent -> {
+                sharingLauncher.shareContent(mediaUris = listOf(state.mediaRef), chooserTitle = "Share note")
+            }
+            is NoteViewerUiState.AudioContent -> {
+                sharingLauncher.shareContent(mediaUris = listOf(state.mediaRef), chooserTitle = "Share note")
+            }
+            else -> Unit
         }
     }
 }

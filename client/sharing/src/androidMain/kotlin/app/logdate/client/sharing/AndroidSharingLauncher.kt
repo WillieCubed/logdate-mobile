@@ -103,7 +103,18 @@ class AndroidSharingLauncher(
                 journalRepository.observeJournalById(journalId).firstOrNull()
                     ?: throw IllegalArgumentException("Journal with ID $journalId does not exist")
             val previewUri = Uri.parse(shareAssetGenerator.generateStickerLayer(journal, ShareTheme.Light))
-            context.shareJournalLink(journal, previewUri)
+            val qrCodeUri = Uri.parse(shareAssetGenerator.generateJournalQrCode(journal))
+            context.shareJournalLink(journal, previewUri, qrCodeUri)
+        }
+    }
+
+    override fun shareJournalQrCode(journalId: Uuid) {
+        coroutineScope.launch {
+            val journal =
+                journalRepository.observeJournalById(journalId).firstOrNull()
+                    ?: throw IllegalArgumentException("Journal with ID $journalId does not exist")
+            val qrCodeUri = Uri.parse(shareAssetGenerator.generateJournalQrCode(journal))
+            context.shareJournalQrCode(journal, qrCodeUri)
         }
     }
 

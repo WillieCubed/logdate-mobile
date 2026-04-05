@@ -29,4 +29,14 @@ interface ShareAssetInterface {
         journal: Journal,
         theme: ShareTheme,
     ): String
+
+    /**
+     * Creates and returns a QR code image for the given [journal].
+     *
+     * The QR code points to the journal's public web URL and is stored in the cache directory so
+     * it can be shared with other apps.
+     *
+     * @return The URI of the generated QR code image.
+     */
+    fun generateJournalQrCode(journal: Journal): String
 }

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -76,6 +77,7 @@ import logdate.client.feature.journal.generated.resources.image_note
 import logdate.client.feature.journal.generated.resources.location
 import logdate.client.feature.journal.generated.resources.open_in_locations
 import logdate.client.feature.journal.generated.resources.pinned_location
+import logdate.client.feature.journal.generated.resources.share
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -137,6 +139,7 @@ fun NoteViewerScreen(
                 onOpenLocationTimeline = onOpenLocationTimeline,
                 onNavigateToNote = onNavigateToNote,
                 onShowAddToJournal = { showAddToJournal = true },
+                onShare = viewModel::shareCurrentNote,
                 modifier = modifier.then(sharedBoundsModifier),
             ) {
                 TextNoteViewer(
@@ -152,6 +155,7 @@ fun NoteViewerScreen(
                 onOpenLocationTimeline = onOpenLocationTimeline,
                 onNavigateToNote = onNavigateToNote,
                 onShowAddToJournal = { showAddToJournal = true },
+                onShare = viewModel::shareCurrentNote,
                 modifier = modifier.then(sharedBoundsModifier),
             ) {
                 ImageNoteViewer(
@@ -167,6 +171,7 @@ fun NoteViewerScreen(
                 onOpenLocationTimeline = onOpenLocationTimeline,
                 onNavigateToNote = onNavigateToNote,
                 onShowAddToJournal = { showAddToJournal = true },
+                onShare = viewModel::shareCurrentNote,
                 modifier = modifier.then(sharedBoundsModifier),
             ) {
                 VideoNoteViewer(mediaRef = state.mediaRef)
@@ -387,6 +392,7 @@ fun NoteViewerScaffoldContent(
     onOpenLocationTimeline: () -> Unit = {},
     onNavigateToNote: (Uuid) -> Unit = {},
     onShowAddToJournal: () -> Unit = {},
+    onShare: () -> Unit = {},
     modifier: Modifier = Modifier,
     noteContent: @Composable () -> Unit,
 ) {
@@ -404,6 +410,7 @@ fun NoteViewerScaffoldContent(
                 accentColor = accentColor,
                 onNavigateToNote = onNavigateToNote,
                 onShowAddToJournal = onShowAddToJournal,
+                onShare = onShare,
             )
         },
         editorContent = {
@@ -430,6 +437,7 @@ private fun NoteViewerToolbar(
     accentColor: Color? = null,
     onNavigateToNote: (Uuid) -> Unit = {},
     onShowAddToJournal: () -> Unit = {},
+    onShare: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.xs),
@@ -462,6 +470,13 @@ private fun NoteViewerToolbar(
             Icon(
                 Icons.Default.LibraryAdd,
                 contentDescription = stringResource(Res.string.add_to_journal),
+            )
+        }
+
+        IconButton(onClick = onShare) {
+            Icon(
+                Icons.Default.Share,
+                contentDescription = stringResource(Res.string.share),
             )
         }
 

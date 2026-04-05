@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.net.Uri
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -25,6 +26,8 @@ class ShareReceiverE2ETest {
     private lateinit var context: Context
     private lateinit var clipboardManager: ClipboardManager
     private lateinit var clipboardContext: Context
+    private lateinit var startedActivityIntent: Intent
+    private lateinit var shareActionContext: Context
     private lateinit var capturedClip: ClipData
 
     @Before
@@ -42,6 +45,12 @@ class ShareReceiverE2ETest {
                         Context.CLIPBOARD_SERVICE -> clipboardManager
                         else -> super.getSystemService(name)
                     }
+            }
+        shareActionContext =
+            object : ContextWrapper(context) {
+                override fun startActivity(intent: Intent) {
+                    startedActivityIntent = intent
+                }
             }
     }
 
@@ -63,5 +72,37 @@ class ShareReceiverE2ETest {
         verify(exactly = 1) { clipboardManager.setPrimaryClip(any()) }
         assertNotNull(capturedClip)
         assertEquals(sharedLink, capturedClip.getItemAt(0).coerceToText(context).toString())
+    }
+
+    @Test
+    fun shareQrCodeAction_launchesChooserWithQrImagePayload() {
+        val sharedLink = "https://logdate.app/j/example"
+        val qrCodeUri = Uri.parse("content://app.logdate.test/qr/example.png")
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            ShareReceiver().onReceive(
+                shareActionContext,
+                Intent(shareActionContext, ShareReceiver::class.java).apply {
+                    action = CustomIntents.ACTION_SHARE_QR_CODE
+                    putExtra(CustomIntents.EXTRA_SHARE_TEXT, sharedLink)
+                    putExtra(CustomIntents.EXTRA_SHARE_TITLE, "Example journal")
+                    putExtra(CustomIntents.EXTRA_SHARE_URI, qrCodeUri)
+                },
+            )
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        assertEquals(Intent.ACTION_CHOOSER, startedActivityIntent.action)
+        val shareIntent =
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                startedActivityIntent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                startedActivityIntent.getParcelableExtra(Intent.EXTRA_INTENT)
+            }
+        assertNotNull(shareIntent)
+        assertEquals(Intent.ACTION_SEND, shareIntent.action)
+        assertEquals(qrCodeUri, shareIntent.getParcelableExtra(Intent.EXTRA_STREAM))
+        assertEquals(sharedLink, shareIntent.getStringExtra(Intent.EXTRA_TEXT))
     }
 }

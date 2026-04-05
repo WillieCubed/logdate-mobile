@@ -47,6 +47,14 @@ interface SharingLauncher {
     fun shareJournalLink(journalId: Uuid)
 
     /**
+     * Shares a journal QR code using the system share sheet.
+     *
+     * @param journalId The ID of the journal to share. If the journal does not exist, an exception
+     * will be thrown.
+     */
+    fun shareJournalQrCode(journalId: Uuid)
+
+    /**
      * Triggers the app to share a photo to Instagram.
      *
      * This method will trigger the Instagram app to open and share the photo. The given photo ID

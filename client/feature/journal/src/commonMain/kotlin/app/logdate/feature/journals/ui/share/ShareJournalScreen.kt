@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.journals.ui.JournalShape
@@ -60,7 +61,7 @@ import org.koin.compose.koinInject
 /**
  * Screen for sharing a journal with others.
  *
- * Provides options to share via the system share sheet or Instagram.
+ * Provides options to share via the system share sheet, a QR code, or Instagram.
  *
  * @param journalId ID of the journal to share
  * @param onGoBack Callback to navigate back
@@ -87,6 +88,7 @@ fun ShareJournalScreen(
         uiState = uiState,
         onGoBack = onGoBack,
         onShareToInstagram = { journal -> viewModel.shareToInstagram(journal) },
+        onShareQrCode = { journal -> viewModel.shareJournalQrCode(journal) },
         onShareJournal = { journal -> viewModel.shareJournal(journal) },
     )
 }
@@ -97,6 +99,7 @@ fun ShareJournalScreenContent(
     uiState: ShareJournalUiState,
     onGoBack: () -> Unit,
     onShareToInstagram: (Journal) -> Unit,
+    onShareQrCode: (Journal) -> Unit,
     onShareJournal: (Journal) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -137,6 +140,7 @@ fun ShareJournalScreenContent(
                 ShareJournalContent(
                     journal = state.journal,
                     onShareToInstagram = { onShareToInstagram(state.journal) },
+                    onShareQrCode = { onShareQrCode(state.journal) },
                     onShareJournal = { onShareJournal(state.journal) },
                     modifier = Modifier.padding(paddingValues),
                 )
@@ -152,6 +156,7 @@ fun ShareJournalScreenContent(
  *
  * @param journal Journal to be shared
  * @param onShareToInstagram Callback when sharing to Instagram
+ * @param onShareQrCode Callback when sharing a QR code
  * @param onShareJournal Callback when using general share sheet
  * @param modifier Modifier for this composable
  */
@@ -159,6 +164,7 @@ fun ShareJournalScreenContent(
 fun ShareJournalContent(
     journal: Journal,
     onShareToInstagram: () -> Unit,
+    onShareQrCode: () -> Unit,
     onShareJournal: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -203,11 +209,12 @@ fun ShareJournalContent(
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             Button(
-                onClick = onShareToInstagram,
+                onClick = onShareQrCode,
                 modifier =
                     Modifier
                         .weight(1f)
-                        .height(56.dp),
+                        .height(56.dp)
+                        .testTag("share_journal_qr_action"),
                 colors =
                     ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -216,7 +223,7 @@ fun ShareJournalContent(
             ) {
                 Icon(
                     imageVector = Icons.Default.QrCode,
-                    contentDescription = null,
+                    contentDescription = stringResource(Res.string.share_qr_code),
                     modifier = Modifier.size(24.dp),
                 )
             }
@@ -226,7 +233,8 @@ fun ShareJournalContent(
                 modifier =
                     Modifier
                         .weight(3f)
-                        .height(56.dp),
+                        .height(56.dp)
+                        .testTag("share_journal_sheet_action"),
             ) {
                 Icon(
                     imageVector = Icons.Default.Share,
@@ -235,6 +243,21 @@ fun ShareJournalContent(
                 Spacer(modifier = Modifier.width(Spacing.sm))
                 Text(text = stringResource(Res.string.share))
             }
+        }
+
+        Button(
+            onClick = onShareToInstagram,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+        ) {
+            Text(text = stringResource(Res.string.share_to_instagram))
         }
 
         Spacer(modifier = Modifier.weight(1f))

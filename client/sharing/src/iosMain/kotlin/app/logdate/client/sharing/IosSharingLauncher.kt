@@ -69,6 +69,10 @@ class IosSharingLauncher(
         }
     }
 
+    override fun shareJournalQrCode(journalId: Uuid) {
+        shareJournalLink(journalId)
+    }
+
     /**
      * Triggers the app to share a photo to Instagram.
      *

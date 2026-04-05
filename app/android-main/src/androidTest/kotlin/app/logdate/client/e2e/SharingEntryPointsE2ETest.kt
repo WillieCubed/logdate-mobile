@@ -6,8 +6,10 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.logdate.feature.journals.ui.share.ShareJournalContent
 import app.logdate.feature.library.ui.detail.MediaDetailContent
 import app.logdate.feature.library.ui.detail.MediaDetailUiState
+import app.logdate.shared.model.Journal
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.timeline.MediaObjectUiState
 import app.logdate.ui.timeline.TimelineSuggestionBlock
@@ -88,5 +90,32 @@ class SharingEntryPointsE2ETest {
         composeRule.onNodeWithTag("media_detail_share_action").assertIsDisplayed().performClick()
 
         assertEquals(mediaRef, sharedMediaRef)
+    }
+
+    @Test
+    fun journalShareActions_emitCurrentJournalState() {
+        val journal = Journal(title = "Road Trip")
+        var qrJournal: Journal? = null
+        var sharedJournal: Journal? = null
+
+        composeRule.runOnUiThread {
+            composeRule.activity.setContent {
+                LogDateTheme(dynamicColor = false) {
+                    ShareJournalContent(
+                        journal = journal,
+                        onShareToInstagram = {},
+                        onShareQrCode = { qrJournal = journal },
+                        onShareJournal = { sharedJournal = journal },
+                    )
+                }
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("share_journal_qr_action").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("share_journal_sheet_action").assertIsDisplayed().performClick()
+
+        assertEquals(journal, qrJournal)
+        assertEquals(journal, sharedJournal)
     }
 }

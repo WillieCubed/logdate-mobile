@@ -90,6 +90,19 @@ class ShareJournalViewModel(
     }
 
     /**
+     * Share the journal as a QR code image.
+     *
+     * @param journal The journal to share
+     */
+    fun shareJournalQrCode(journal: Journal) {
+        try {
+            sharingLauncher.shareJournalQrCode(journal.id)
+        } catch (e: Exception) {
+            _error.value = "Failed to share QR code: ${e.message}"
+        }
+    }
+
+    /**
      * Share the journal through the system share sheet
      *
      * @param journal The journal to share

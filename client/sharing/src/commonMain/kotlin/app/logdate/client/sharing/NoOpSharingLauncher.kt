@@ -27,6 +27,8 @@ object NoOpSharingLauncher : SharingLauncher {
 
     override fun shareJournalLink(journalId: Uuid) {}
 
+    override fun shareJournalQrCode(journalId: Uuid) {}
+
     override fun sharePhotoToInstagramFeed(photoId: String) {}
 
     override fun shareVideoToInstagramFeed(videoId: String) {}

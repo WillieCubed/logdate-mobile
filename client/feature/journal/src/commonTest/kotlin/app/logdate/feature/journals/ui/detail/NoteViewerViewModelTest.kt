@@ -2,6 +2,8 @@ package app.logdate.feature.journals.ui.detail
 
 import app.logdate.client.domain.notes.RemoveNoteUseCase
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.sharing.ShareTheme
+import app.logdate.client.sharing.SharingLauncher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -23,6 +25,7 @@ class NoteViewerViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val journalRepository = FakeDetailJournalRepository()
     private val journalContentRepository = FakeDetailJournalContentRepository()
+    private val sharingLauncher = RecordingSharingLauncher()
 
     @BeforeTest
     fun setup() {
@@ -55,6 +58,7 @@ class NoteViewerViewModelTest {
                     journalRepository = journalRepository,
                     journalContentRepository = journalContentRepository,
                     removeNoteUseCase = RemoveNoteUseCase(repository),
+                    sharingLauncher = sharingLauncher,
                 )
 
             advanceUntilIdle()
@@ -86,6 +90,7 @@ class NoteViewerViewModelTest {
                     journalRepository = journalRepository,
                     journalContentRepository = journalContentRepository,
                     removeNoteUseCase = RemoveNoteUseCase(repository),
+                    sharingLauncher = sharingLauncher,
                 )
 
             advanceUntilIdle()
@@ -116,6 +121,7 @@ class NoteViewerViewModelTest {
                     journalRepository = journalRepository,
                     journalContentRepository = journalContentRepository,
                     removeNoteUseCase = RemoveNoteUseCase(repository),
+                    sharingLauncher = sharingLauncher,
                 )
 
             advanceUntilIdle()
@@ -147,6 +153,7 @@ class NoteViewerViewModelTest {
                     journalRepository = journalRepository,
                     journalContentRepository = journalContentRepository,
                     removeNoteUseCase = RemoveNoteUseCase(repository),
+                    sharingLauncher = sharingLauncher,
                 )
 
             advanceUntilIdle()
@@ -178,6 +185,7 @@ class NoteViewerViewModelTest {
                     journalRepository = journalRepository,
                     journalContentRepository = journalContentRepository,
                     removeNoteUseCase = RemoveNoteUseCase(repository),
+                    sharingLauncher = sharingLauncher,
                 )
 
             var deleted = false
@@ -187,4 +195,101 @@ class NoteViewerViewModelTest {
             assertTrue(deleted)
             assertEquals(noteId, repository.lastRemovedId)
         }
+
+    @Test
+    fun shareCurrentNote_sharesTextContentAsPlainText() =
+        runTest(dispatcher) {
+            val noteId = Uuid.random()
+            val now = Instant.parse("2025-01-01T00:00:00Z")
+            val note =
+                JournalNote.Text(
+                    uid = noteId,
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    content = "Share me",
+                )
+            val repository = FakeJournalNotesRepository(listOf(note))
+            val viewModel =
+                NoteViewerViewModel(
+                    noteId = noteId,
+                    journalId = null,
+                    notesRepository = repository,
+                    journalRepository = journalRepository,
+                    journalContentRepository = journalContentRepository,
+                    removeNoteUseCase = RemoveNoteUseCase(repository),
+                    sharingLauncher = sharingLauncher,
+                )
+
+            advanceUntilIdle()
+            viewModel.shareCurrentNote()
+
+            assertEquals("Share me", sharingLauncher.sharedText)
+            assertTrue(sharingLauncher.sharedMediaUris.isEmpty())
+        }
+
+    @Test
+    fun shareCurrentNote_sharesImageContentAsMedia() =
+        runTest(dispatcher) {
+            val noteId = Uuid.random()
+            val now = Instant.parse("2025-01-01T00:00:00Z")
+            val note =
+                JournalNote.Image(
+                    uid = noteId,
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    mediaRef = "content://media/image/1",
+                )
+            val repository = FakeJournalNotesRepository(listOf(note))
+            val viewModel =
+                NoteViewerViewModel(
+                    noteId = noteId,
+                    journalId = null,
+                    notesRepository = repository,
+                    journalRepository = journalRepository,
+                    journalContentRepository = journalContentRepository,
+                    removeNoteUseCase = RemoveNoteUseCase(repository),
+                    sharingLauncher = sharingLauncher,
+                )
+
+            advanceUntilIdle()
+            viewModel.shareCurrentNote()
+
+            assertEquals(listOf("content://media/image/1"), sharingLauncher.sharedMediaUris)
+        }
+
+    private class RecordingSharingLauncher : SharingLauncher {
+        var sharedText: String? = null
+        var sharedMediaUris: List<String> = emptyList()
+
+        override fun shareContent(
+            text: String?,
+            mediaUris: List<String>,
+            title: String?,
+            chooserTitle: String?,
+        ) {
+            sharedText = text
+            sharedMediaUris = mediaUris
+        }
+
+        override fun shareMemoryDay(
+            date: kotlinx.datetime.LocalDate,
+            summary: String,
+            mediaUris: List<String>,
+        ) = Unit
+
+        override fun shareJournalToInstagram(
+            journalId: Uuid,
+            theme: ShareTheme,
+        ) = Unit
+
+        override fun shareJournalLink(journalId: Uuid) = Unit
+
+        override fun shareJournalQrCode(journalId: Uuid) = Unit
+
+        override fun sharePhotoToInstagramFeed(photoId: String) = Unit
+
+        override fun shareVideoToInstagramFeed(videoId: String) = Unit
+
+        override fun getUriFromMedia(uid: String): Any = uid
+    }
 }

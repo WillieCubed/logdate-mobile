@@ -8,12 +8,15 @@ import androidx.core.content.FileProvider
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.toColorInt
 import app.logdate.shared.model.Journal
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
 import java.io.File
 
 // All in pixels
 private const val JOURNAL_CORNER_RADIUS = 16f
 private const val JOURNAL_COVER_HEIGHT = 320f
 private const val JOURNAL_COVER_WIDTH = 180f
+private const val QR_CODE_SIZE = 1080
 
 /**
  * A utility that generates assets for sharing content to external apps.
@@ -21,9 +24,6 @@ private const val JOURNAL_COVER_WIDTH = 180f
 class AndroidShareAssetGenerator(
     private val context: Context,
 ) : ShareAssetInterface {
-    // TODO: Implement more robust check to ensure we're not generating the same asset multiple times
-    private var cachedJournalId: String? = null
-
     /**
      * Creates and returns a background layer for the given [journal].
      *
@@ -34,13 +34,12 @@ class AndroidShareAssetGenerator(
         journal: Journal,
         shareTheme: ShareTheme,
     ): String {
-        if (cachedJournalId == journal.id.toString()) {
-            return cacheFileUri("shared_journal_background_${journal.id}.png").toString()
+        val file = context.cacheDir.resolve("shared_journal_background_${journal.id}.png")
+        if (file.exists()) {
+            return fileToShareUri(file).toString()
         }
         val bitmap = generateBackgroundLayer(shareTheme)
-        val file = context.cacheDir.resolve("shared_journal_background_${journal.id}.png")
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, file.outputStream())
-        cachedJournalId = journal.id.toString()
         return fileToShareUri(file).toString()
     }
 
@@ -55,17 +54,24 @@ class AndroidShareAssetGenerator(
         journal: Journal,
         theme: ShareTheme,
     ): String {
-        if (cachedJournalId == journal.id.toString()) {
-            return cacheFileUri("shared_journal_cover_${journal.id}.png").toString()
+        val file = context.cacheDir.resolve("shared_journal_cover_${journal.id}.png")
+        if (file.exists()) {
+            return fileToShareUri(file).toString()
         }
         val bitmap = generateJournalCover(journal.title, theme)
-        val file = context.cacheDir.resolve("shared_journal_cover_${journal.id}.png")
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, file.outputStream())
-        cachedJournalId = journal.id.toString()
         return fileToShareUri(file).toString()
     }
 
-    private fun cacheFileUri(fileName: String) = fileToShareUri(context.cacheDir.resolve(fileName))
+    override fun generateJournalQrCode(journal: Journal): String {
+        val file = context.cacheDir.resolve("shared_journal_qr_${journal.id}.png")
+        if (file.exists()) {
+            return fileToShareUri(file).toString()
+        }
+        val bitmap = generateQrCodeBitmap("https://logdate.app/j/${journal.id}")
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, file.outputStream())
+        return fileToShareUri(file).toString()
+    }
 
     private fun fileToShareUri(file: File) =
         FileProvider.getUriForFile(
@@ -138,6 +144,21 @@ class AndroidShareAssetGenerator(
                 }
             // TODO: Handle truncating text if it doesn't fit
             drawText(journalName, 10f, 20f, titlePaint)
+        }
+        return bitmap
+    }
+
+    private fun generateQrCodeBitmap(content: String): Bitmap {
+        val matrix = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, QR_CODE_SIZE, QR_CODE_SIZE)
+        val bitmap = createBitmap(QR_CODE_SIZE, QR_CODE_SIZE)
+        for (x in 0 until QR_CODE_SIZE) {
+            for (y in 0 until QR_CODE_SIZE) {
+                bitmap.setPixel(
+                    x,
+                    y,
+                    if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE,
+                )
+            }
         }
         return bitmap
     }

@@ -28,6 +28,10 @@ class ShareReceiver : BroadcastReceiver() {
                 logChosenComponent(intent)
                 return
             }
+            CustomIntents.ACTION_SHARE_QR_CODE -> {
+                shareQrCode(context, intent)
+                return
+            }
         }
 
         val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
@@ -79,4 +83,28 @@ class ShareReceiver : BroadcastReceiver() {
         clipboardManager.setPrimaryClip(ClipData.newPlainText("LogDate share", linkText))
         Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
     }
+
+    private fun shareQrCode(
+        context: Context,
+        intent: Intent,
+    ) {
+        val shareUri = intent.parcelableExtra<Uri>(CustomIntents.EXTRA_SHARE_URI) ?: return
+        context.shareContent(
+            ShareContentRequest(
+                text = intent.getStringExtra(CustomIntents.EXTRA_SHARE_TEXT),
+                mediaUris = listOf(shareUri),
+                title = intent.getStringExtra(CustomIntents.EXTRA_SHARE_TITLE),
+                chooserTitle = "Share QR code",
+                copyText = intent.getStringExtra(CustomIntents.EXTRA_SHARE_TEXT),
+            ),
+        )
+    }
+
+    private inline fun <reified T : Any> Intent.parcelableExtra(name: String): T? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getParcelableExtra(name, T::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            getParcelableExtra(name)
+        }
 }
