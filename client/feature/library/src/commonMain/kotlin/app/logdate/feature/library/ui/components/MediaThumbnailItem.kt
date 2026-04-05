@@ -36,6 +36,7 @@ import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.common.ContextMenuArea
 import app.logdate.ui.common.ContextMenuItem
+import app.logdate.ui.common.focusableWithRing
 import app.logdate.ui.common.noteDragSource
 import app.logdate.ui.common.transitions.TransitionKeys
 import coil3.compose.AsyncImage
@@ -100,6 +101,7 @@ fun MediaThumbnailItem(
                     .clip(ThumbnailShape)
                     .hoverable(interactionSource)
                     .noteDragSource(item.uri)
+                    .focusableWithRing()
                     .clickable { onItemClick(item.uid) },
         ) {
             AsyncImage(

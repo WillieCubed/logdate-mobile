@@ -40,6 +40,7 @@ import app.logdate.feature.postcards.model.CanvasElement
 import app.logdate.feature.postcards.model.PostcardDocument
 import app.logdate.ui.common.ContextMenuArea
 import app.logdate.ui.common.ContextMenuItem
+import app.logdate.ui.common.focusableWithRing
 import app.logdate.ui.common.verticalScrollbar
 import coil3.compose.AsyncImage
 import io.github.aakira.napier.Napier
@@ -159,6 +160,7 @@ private fun PostcardCard(
                 .fillMaxWidth()
                 .aspectRatio(3f / 4f)
                 .clip(RoundedCornerShape(12.dp))
+                .focusableWithRing()
                 .clickable(onClick = onClick),
     ) {
         Box(

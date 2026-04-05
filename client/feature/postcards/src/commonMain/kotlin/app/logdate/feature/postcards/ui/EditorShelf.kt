@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.focusableWithRing
 import coil3.compose.AsyncImage
 
 /**
@@ -132,6 +133,7 @@ private fun ShelfPhotoStrip(
                     Modifier
                         .size(64.dp)
                         .clip(RoundedCornerShape(8.dp))
+                        .focusableWithRing()
                         .clickable { onPhotoDrag(photo, 0f, 0f) },
             )
         }
@@ -170,6 +172,7 @@ private fun StickerShelfStrip(
                     Modifier
                         .size(64.dp)
                         .clip(RoundedCornerShape(8.dp))
+                        .focusableWithRing()
                         .clickable { onStickerTap(sticker) },
             )
         }

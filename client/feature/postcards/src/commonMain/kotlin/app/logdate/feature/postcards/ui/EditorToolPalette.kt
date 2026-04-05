@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.focusableWithRing
 
 private const val TOOL_SURFACE_ALPHA = 0.92f
 private const val TOOL_RAIL_WIDTH = 64
@@ -123,6 +124,7 @@ private fun ToolButton(
                 Modifier
                     .heightIn(min = 48.dp)
                     .widthIn(min = 48.dp)
+                    .focusableWithRing()
                     .clickable(onClick = onClick),
         ) {
             Icon(
