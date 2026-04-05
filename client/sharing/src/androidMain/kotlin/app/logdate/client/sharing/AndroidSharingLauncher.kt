@@ -92,7 +92,7 @@ class AndroidSharingLauncher(
                 val (backgroundUri, coverUri) =
                     coroutineScope {
                         val bg = async { Uri.parse(shareAssetGenerator.generateBackgroundLayer(journal, theme)) }
-                        val cover = async { Uri.parse(shareAssetGenerator.generateStickerLayer(journal, theme)) }
+                        val cover = async { Uri.parse(shareAssetGenerator.generateStickerLayer(journal)) }
                         bg.await() to cover.await()
                     }
                 listOf(backgroundUri, coverUri).forEach { uri ->
@@ -131,7 +131,7 @@ class AndroidSharingLauncher(
             val journal =
                 journalRepository.observeJournalById(journalId).firstOrNull()
                     ?: throw IllegalArgumentException("Journal with ID $journalId does not exist")
-            val previewUri = Uri.parse(shareAssetGenerator.generateStickerLayer(journal, ShareTheme.Light))
+            val previewUri = Uri.parse(shareAssetGenerator.generateStickerLayer(journal))
             val qrCodeUri = Uri.parse(shareAssetGenerator.generateJournalQrCode(journal))
             context.shareJournalLink(journal, previewUri, qrCodeUri)
         }

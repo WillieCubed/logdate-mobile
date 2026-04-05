@@ -24,8 +24,9 @@ internal fun createInstagramStoryIntent(
     metaAppId: String = System.getProperty("META_APP_ID") ?: "",
 ) = Intent(INSTAGRAM_STORY_INTENT).apply {
     putExtra("source_application", metaAppId)
+    putExtra("background_asset_uri", backgroundAsset)
     putExtra("interactive_asset_uri", stickerAsset)
-    setDataAndType(backgroundAsset, ShareAssetFormats.ASSET_MIME_TYPE)
+    type = ShareAssetFormats.ASSET_MIME_TYPE
     setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 }
 

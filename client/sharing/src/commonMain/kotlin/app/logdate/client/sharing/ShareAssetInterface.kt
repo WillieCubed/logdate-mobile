@@ -25,10 +25,7 @@ interface ShareAssetInterface {
      *
      * @return The URI of the generated sticker layer image.
      */
-    suspend fun generateStickerLayer(
-        journal: Journal,
-        theme: ShareTheme,
-    ): String
+    suspend fun generateStickerLayer(journal: Journal): String
 
     /**
      * Creates and returns a QR code image for the given [journal].

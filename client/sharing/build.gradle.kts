@@ -49,6 +49,7 @@ kotlin {
             // Project dependencies
             implementation(projects.client.media)
             implementation(projects.client.repository)
+            implementation(projects.client.util)
             implementation(projects.shared.model)
             // Compose
             implementation(libs.compose.runtime)
