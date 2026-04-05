@@ -146,6 +146,8 @@ class WearDataLayerSyncManager(
         )
     }
 
+    override suspend fun syncDrafts(): SyncResult = SyncResult(success = true)
+
     override suspend fun syncAssociations(): SyncResult {
         if (!dataLayerClient.isPhoneConnected()) {
             return notConnectedResult()
