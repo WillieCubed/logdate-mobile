@@ -188,14 +188,25 @@ class ActivityAwareLocationService :
         if (locationCallback != null) return
 
         val notification = buildNotification()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: SecurityException) {
+            // Android 14+ enforces FGS type pre-conditions at startForeground() time.
+            // A SecurityException here means the app was not in an eligible state
+            // (e.g., no visible activity) when the service tried to promote itself.
+            // Stop gracefully rather than crashing; the service will be restarted
+            // once the app returns to the foreground.
+            Napier.w(e) { "Location FGS promotion denied; stopping service" }
+            stopSelf()
+            return
         }
 
         registerActivityTransitions()
