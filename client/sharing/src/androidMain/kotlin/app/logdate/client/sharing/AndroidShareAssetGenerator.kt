@@ -7,10 +7,15 @@ import android.graphics.Paint
 import androidx.core.content.FileProvider
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.toColorInt
+import androidx.core.util.AtomicFile
 import app.logdate.shared.model.Journal
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.OutputStream
 
 // All in pixels
 private const val JOURNAL_CORNER_RADIUS = 16f
@@ -23,6 +28,7 @@ private const val QR_CODE_SIZE = 1080
  */
 class AndroidShareAssetGenerator(
     private val context: Context,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ShareAssetInterface {
     /**
      * Creates and returns a background layer for the given [journal].
@@ -30,18 +36,22 @@ class AndroidShareAssetGenerator(
      * This layer is used to overlay the journal cover on top of a background image. It is stored
      * in the cache directory and can be shared with other apps.
      */
-    override fun generateBackgroundLayer(
+    override suspend fun generateBackgroundLayer(
         journal: Journal,
         shareTheme: ShareTheme,
-    ): String {
-        val file = context.cacheDir.resolve("shared_journal_background_${journal.id}.png")
-        if (file.exists()) {
-            return fileToShareUri(file).toString()
+    ): String =
+        withContext(ioDispatcher) {
+            val file =
+                context.cacheDir.resolve(
+                    "shared_journal_background_${journal.id}_${shareTheme.cacheKey}.${ShareAssetFormats.ASSET_FILE_EXT}",
+                )
+            if (file.exists()) {
+                return@withContext fileToShareUri(file).toString()
+            }
+            val bitmap = generateBackgroundLayer(shareTheme)
+            writeAtomically(file) { bitmap.compress(ShareAssetFormats.ASSET_COMPRESS_FORMAT, 100, it) }
+            fileToShareUri(file).toString()
         }
-        val bitmap = generateBackgroundLayer(shareTheme)
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, file.outputStream())
-        return fileToShareUri(file).toString()
-    }
 
     /**
      * Creates and returns a sticker layer for the given [journal].
@@ -50,28 +60,30 @@ class AndroidShareAssetGenerator(
      * in the cache directory and can be shared with other apps. Assume that this sticker layer
      * may have a transparent background.
      */
-    override fun generateStickerLayer(
+    override suspend fun generateStickerLayer(
         journal: Journal,
         theme: ShareTheme,
-    ): String {
-        val file = context.cacheDir.resolve("shared_journal_cover_${journal.id}.png")
-        if (file.exists()) {
-            return fileToShareUri(file).toString()
+    ): String =
+        withContext(ioDispatcher) {
+            val file = context.cacheDir.resolve("shared_journal_cover_${journal.id}_${theme.cacheKey}.${ShareAssetFormats.ASSET_FILE_EXT}")
+            if (file.exists()) {
+                return@withContext fileToShareUri(file).toString()
+            }
+            val bitmap = generateJournalCover(journal.title, theme)
+            writeAtomically(file) { bitmap.compress(ShareAssetFormats.ASSET_COMPRESS_FORMAT, 100, it) }
+            fileToShareUri(file).toString()
         }
-        val bitmap = generateJournalCover(journal.title, theme)
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, file.outputStream())
-        return fileToShareUri(file).toString()
-    }
 
-    override fun generateJournalQrCode(journal: Journal): String {
-        val file = context.cacheDir.resolve("shared_journal_qr_${journal.id}.png")
-        if (file.exists()) {
-            return fileToShareUri(file).toString()
+    override suspend fun generateJournalQrCode(journal: Journal): String =
+        withContext(ioDispatcher) {
+            val file = context.cacheDir.resolve("shared_journal_qr_${journal.id}.${ShareAssetFormats.ASSET_FILE_EXT}")
+            if (file.exists()) {
+                return@withContext fileToShareUri(file).toString()
+            }
+            val bitmap = generateQrCodeBitmap("https://logdate.app/j/${journal.id}")
+            writeAtomically(file) { bitmap.compress(ShareAssetFormats.ASSET_COMPRESS_FORMAT, 100, it) }
+            fileToShareUri(file).toString()
         }
-        val bitmap = generateQrCodeBitmap("https://logdate.app/j/${journal.id}")
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, file.outputStream())
-        return fileToShareUri(file).toString()
-    }
 
     private fun fileToShareUri(file: File) =
         FileProvider.getUriForFile(
@@ -79,6 +91,21 @@ class AndroidShareAssetGenerator(
             "${context.packageName}.provider",
             file,
         )
+
+    private fun writeAtomically(
+        dest: File,
+        block: (OutputStream) -> Unit,
+    ) {
+        val atomic = AtomicFile(dest)
+        val stream = atomic.startWrite()
+        try {
+            block(stream)
+            atomic.finishWrite(stream)
+        } catch (e: Exception) {
+            atomic.failWrite(stream)
+            throw e
+        }
+    }
 
     private fun generateBackgroundLayer(shareTheme: ShareTheme): Bitmap {
         val bitmap = createBitmap(1080, 1920)

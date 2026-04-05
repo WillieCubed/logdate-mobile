@@ -11,7 +11,7 @@ interface ShareAssetInterface {
      *
      * @return The URI of the generated background layer image.
      */
-    fun generateBackgroundLayer(
+    suspend fun generateBackgroundLayer(
         journal: Journal,
         shareTheme: ShareTheme,
     ): String
@@ -25,7 +25,7 @@ interface ShareAssetInterface {
      *
      * @return The URI of the generated sticker layer image.
      */
-    fun generateStickerLayer(
+    suspend fun generateStickerLayer(
         journal: Journal,
         theme: ShareTheme,
     ): String
@@ -38,5 +38,5 @@ interface ShareAssetInterface {
      *
      * @return The URI of the generated QR code image.
      */
-    fun generateJournalQrCode(journal: Journal): String
+    suspend fun generateJournalQrCode(journal: Journal): String
 }

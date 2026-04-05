@@ -7,6 +7,7 @@ import app.logdate.client.sharing.ShareAssetInterface
 import app.logdate.client.sharing.SharingLauncher
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 /**
@@ -15,6 +16,6 @@ import org.koin.dsl.module
 actual val sharingModule: Module =
     module {
         includes(mediaModule)
-        factory<ShareAssetInterface> { AndroidShareAssetGenerator(androidContext()) }
+        factory<ShareAssetInterface> { AndroidShareAssetGenerator(androidContext(), get(named("io-dispatcher"))) }
         factory<SharingLauncher> { AndroidSharingLauncher(get(), get(), get(), get()) }
     }

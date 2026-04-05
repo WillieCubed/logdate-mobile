@@ -25,7 +25,7 @@ internal fun createInstagramStoryIntent(
 ) = Intent(INSTAGRAM_STORY_INTENT).apply {
     putExtra("source_application", metaAppId)
     putExtra("interactive_asset_uri", stickerAsset)
-    setDataAndType(backgroundAsset, "image/jpeg")
+    setDataAndType(backgroundAsset, ShareAssetFormats.ASSET_MIME_TYPE)
     setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 }
 
@@ -39,7 +39,7 @@ internal fun createInstagramStoryIntent(
  */
 internal fun createInstagramImageShareIntent(imageUri: Uri) =
     Intent(Intent.ACTION_SEND).apply {
-        type = "image/*"
+        type = ShareAssetFormats.IMAGE_ANY
         putExtra(Intent.EXTRA_STREAM, imageUri)
         setPackage(INSTAGRAM_PACKAGE_NAME)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -59,7 +59,7 @@ internal fun createInstagramImageShareIntent(imageUri: Uri) =
  */
 internal fun createInstagramVideoShareIntent(videoUri: Uri) =
     Intent(Intent.ACTION_SEND).apply {
-        type = "video/*"
+        type = ShareAssetFormats.VIDEO_ANY
         putExtra(Intent.EXTRA_STREAM, videoUri)
         setPackage(INSTAGRAM_PACKAGE_NAME)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

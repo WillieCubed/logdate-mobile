@@ -1,14 +1,19 @@
 package app.logdate.client.sharing
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.core.content.FileProvider
 import app.logdate.client.media.MediaManager
 import app.logdate.client.repository.journals.JournalRepository
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
@@ -73,23 +78,47 @@ class AndroidSharingLauncher(
         theme: ShareTheme,
     ) {
         coroutineScope.launch {
+            if (!isInstagramInstalled()) {
+                Napier.w("Instagram is not installed; cannot share journal $journalId")
+                return@launch
+            }
             val journal =
                 journalRepository.observeJournalById(journalId).firstOrNull()
-                    ?: throw IllegalArgumentException("Journal with ID $journalId does not exist")
-            val cover = shareAssetGenerator.generateStickerLayer(journal, theme)
-            val background = shareAssetGenerator.generateBackgroundLayer(journal, theme)
-            context.grantUriPermission(
-                INSTAGRAM_PACKAGE_NAME,
-                Uri.parse(cover),
-                Intent.FLAG_GRANT_READ_URI_PERMISSION,
-            )
-            context.startActivity(
-                createInstagramStoryIntent(Uri.parse(background), Uri.parse(cover)).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                },
-            )
+                    ?: run {
+                        Napier.e("Journal $journalId not found; cannot share to Instagram")
+                        return@launch
+                    }
+            try {
+                val (backgroundUri, coverUri) =
+                    coroutineScope {
+                        val bg = async { Uri.parse(shareAssetGenerator.generateBackgroundLayer(journal, theme)) }
+                        val cover = async { Uri.parse(shareAssetGenerator.generateStickerLayer(journal, theme)) }
+                        bg.await() to cover.await()
+                    }
+                listOf(backgroundUri, coverUri).forEach { uri ->
+                    context.grantUriPermission(INSTAGRAM_PACKAGE_NAME, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(
+                    createInstagramStoryIntent(backgroundUri, coverUri).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    },
+                )
+            } catch (e: ActivityNotFoundException) {
+                // Instagram could be uninstalled between isInstagramInstalled() and startActivity()
+                Napier.e("Instagram activity not found when sharing journal $journalId", e)
+            } catch (e: Exception) {
+                Napier.e("Failed to share journal $journalId to Instagram", e)
+            }
         }
     }
+
+    private fun isInstagramInstalled(): Boolean =
+        try {
+            context.packageManager.getPackageInfo(INSTAGRAM_PACKAGE_NAME, 0)
+            true
+        } catch (_: PackageManager.NameNotFoundException) {
+            false
+        }
 
     /**
      * Shares a journal using the system share sheet.
