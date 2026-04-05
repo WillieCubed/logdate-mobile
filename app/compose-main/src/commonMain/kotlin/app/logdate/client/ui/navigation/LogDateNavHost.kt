@@ -33,7 +33,7 @@ import app.logdate.feature.search.ui.SearchScreen
 import kotlinx.serialization.Serializable
 
 @Serializable
-private data object SearchRoute
+internal data object SearchRoute
 
 /**
  * The root composable for app-wide navigation.

@@ -1,6 +1,5 @@
 package app.logdate.desktop
 
-import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -13,9 +12,6 @@ import androidx.compose.ui.window.rememberWindowState
 import app.logdate.client.ui.LogDateAppRoot
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.GlobalAppUiLoadedState
-import logdate.app.composemain.generated.resources.Res
-import logdate.app.composemain.generated.resources.loading
-import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
 @Suppress("ktlint:standard:function-naming")
@@ -48,16 +44,12 @@ private fun MainWindowContent(
     viewModel: AppViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val loadedState = (uiState as? GlobalAppUiLoadedState) ?: GlobalAppUiLoadedState()
 
-    if (uiState is GlobalAppUiLoadedState) {
-        LogDateAppRoot(
-            // TODO: Allow new window editor to be opened
-            uiState as GlobalAppUiLoadedState,
-            onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
-        )
-    } else {
-        Text(stringResource(Res.string.loading))
-    }
+    LogDateAppRoot(
+        appUiState = loadedState,
+        onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
+    )
 }
 
 @Composable
