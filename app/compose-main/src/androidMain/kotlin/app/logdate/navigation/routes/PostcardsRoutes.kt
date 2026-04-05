@@ -65,35 +65,29 @@ fun EntryProviderScope<NavKey>.postcardRoutes(
         val view = LocalView.current
         var isFullscreen by rememberSaveable { mutableStateOf(false) }
 
+        fun setFullscreen(enabled: Boolean) {
+            val controller =
+                WindowCompat.getInsetsController(
+                    (view.context as Activity).window,
+                    view,
+                )
+            isFullscreen = enabled
+            if (enabled) {
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            } else {
+                controller.show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+
         CanvasEditorScreen(
             onNavigateBack = {
-                if (isFullscreen) {
-                    val controller =
-                        WindowCompat.getInsetsController(
-                            (view.context as Activity).window,
-                            view,
-                        )
-                    controller.show(WindowInsetsCompat.Type.systemBars())
-                    isFullscreen = false
-                }
+                if (isFullscreen) setFullscreen(false)
                 onBack()
             },
             onSaved = onBack,
-            onToggleFullscreen = {
-                val controller =
-                    WindowCompat.getInsetsController(
-                        (view.context as Activity).window,
-                        view,
-                    )
-                isFullscreen = !isFullscreen
-                if (isFullscreen) {
-                    controller.hide(WindowInsetsCompat.Type.systemBars())
-                    controller.systemBarsBehavior =
-                        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                } else {
-                    controller.show(WindowInsetsCompat.Type.systemBars())
-                }
-            },
+            onToggleFullscreen = { setFullscreen(!isFullscreen) },
         )
     }
 
@@ -106,11 +100,11 @@ fun EntryProviderScope<NavKey>.postcardRoutes(
             rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.CreateDocument("image/png"),
             ) { destinationUri ->
-                val source = pendingSourceUri?.let { Uri.parse(it) } ?: return@rememberLauncherForActivityResult
+                val source =
+                    pendingSourceUri?.let { Uri.parse(it) }
+                        ?: return@rememberLauncherForActivityResult
                 if (destinationUri != null) {
-                    scope.launch {
-                        copyUriToDestination(context, source, destinationUri)
-                    }
+                    scope.launch { copyUriToDestination(context, source, destinationUri) }
                 }
             }
 
@@ -122,9 +116,7 @@ fun EntryProviderScope<NavKey>.postcardRoutes(
                 pendingSourceUri = uri
                 saveFileLauncher.launch("postcard.png")
             },
-            onPrint = { uri ->
-                printPostcard(context, android.net.Uri.parse(uri))
-            },
+            onPrint = { uri -> printPostcard(context, Uri.parse(uri)) },
             onNavigateToMoment = onNavigateToMoment,
         )
     }
