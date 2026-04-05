@@ -25,6 +25,9 @@ kotlin {
                 .get()
                 .toInt()
         withHostTestBuilder {}
+        androidResources {
+            enable = true
+        }
 
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
