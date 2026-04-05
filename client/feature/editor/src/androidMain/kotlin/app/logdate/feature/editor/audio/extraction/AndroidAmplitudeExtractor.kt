@@ -8,8 +8,6 @@ import android.net.Uri
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.nio.ByteBuffer
-import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
@@ -43,12 +41,18 @@ class AndroidAmplitudeExtractor(
                         Napier.w { "No MIME type found for audio track" }
                         return@withContext emptyList()
                     }
+                val durationUs =
+                    if (format.containsKey(MediaFormat.KEY_DURATION)) {
+                        format.getLong(MediaFormat.KEY_DURATION)
+                    } else {
+                        -1L
+                    }
 
                 val decoder = MediaCodec.createDecoderByType(mimeType)
                 decoder.configure(format, null, null, 0)
                 decoder.start()
 
-                val amplitudes = decodeAndExtractAmplitudes(extractor, decoder, targetSampleCount)
+                val amplitudes = decodeAndExtractAmplitudes(extractor, decoder, durationUs, targetSampleCount)
 
                 decoder.stop()
                 decoder.release()
@@ -73,15 +77,27 @@ class AndroidAmplitudeExtractor(
         return null
     }
 
+    /**
+     * Decodes the audio and computes per-bucket RMS amplitudes in a single pass.
+     *
+     * Each output buffer from MediaCodec is assigned to a waveform bucket using
+     * its presentation timestamp, so no intermediate sample list is accumulated.
+     * Memory usage is O(targetSampleCount) regardless of audio length.
+     */
     private fun decodeAndExtractAmplitudes(
         extractor: MediaExtractor,
         decoder: MediaCodec,
+        durationUs: Long,
         targetSampleCount: Int,
     ): List<Float> {
         val bufferInfo = MediaCodec.BufferInfo()
         var sawInputEOS = false
         var sawOutputEOS = false
-        val chunkSamples = mutableListOf<Short>()
+
+        // Accumulate RMS per bucket — fixed size, no per-sample boxing
+        val sumSquares = DoubleArray(targetSampleCount)
+        val counts = IntArray(targetSampleCount)
+        var framesProcessed = 0L
 
         while (!sawOutputEOS) {
             if (!sawInputEOS) {
@@ -116,48 +132,35 @@ class AndroidAmplitudeExtractor(
                 if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
                     sawOutputEOS = true
                 }
-
                 val outputBuffer = decoder.getOutputBuffer(outputBufferIndex)
                 if (outputBuffer != null && bufferInfo.size > 0) {
-                    extractSamplesFromBuffer(outputBuffer, bufferInfo.size, chunkSamples)
+                    val bucketIndex =
+                        if (durationUs > 0 && bufferInfo.presentationTimeUs >= 0) {
+                            ((bufferInfo.presentationTimeUs.toDouble() / durationUs) * targetSampleCount)
+                                .toInt()
+                                .coerceIn(0, targetSampleCount - 1)
+                        } else {
+                            (framesProcessed % targetSampleCount).toInt()
+                        }
+
+                    outputBuffer.position(0)
+                    val shortBuffer = outputBuffer.asShortBuffer()
+                    val frameCount = bufferInfo.size / 2
+                    var bufferSumSquares = 0.0
+                    for (i in 0 until frameCount) {
+                        val sample = shortBuffer.get().toDouble()
+                        bufferSumSquares += sample * sample
+                    }
+                    sumSquares[bucketIndex] += bufferSumSquares
+                    counts[bucketIndex] += frameCount
+                    framesProcessed++
                 }
                 decoder.releaseOutputBuffer(outputBufferIndex, false)
             }
         }
 
-        return downsampleToTarget(chunkSamples, targetSampleCount)
-    }
-
-    private fun extractSamplesFromBuffer(
-        buffer: ByteBuffer,
-        size: Int,
-        samples: MutableList<Short>,
-    ) {
-        buffer.position(0)
-        val shortBuffer = buffer.asShortBuffer()
-        val sampleCount = size / 2
-        for (i in 0 until sampleCount) {
-            samples.add(shortBuffer.get())
-        }
-    }
-
-    private fun downsampleToTarget(
-        samples: List<Short>,
-        targetCount: Int,
-    ): List<Float> {
-        if (samples.isEmpty()) return emptyList()
-
-        val chunkSize = samples.size / targetCount
-        if (chunkSize <= 0) return samples.map { abs(it.toFloat()) }
-
-        return (0 until targetCount).map { i ->
-            val start = i * chunkSize
-            val end = minOf(start + chunkSize, samples.size)
-            val chunk = samples.subList(start, end)
-
-            // Compute RMS (Root Mean Square) for better amplitude representation
-            val sumSquares = chunk.sumOf { it.toDouble() * it.toDouble() }
-            sqrt(sumSquares / chunk.size).toFloat()
+        return (0 until targetSampleCount).map { i ->
+            if (counts[i] > 0) sqrt(sumSquares[i] / counts[i]).toFloat() else 0f
         }
     }
 

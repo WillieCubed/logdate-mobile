@@ -73,26 +73,14 @@ class AudioContextProcessor(
         withContext(coroutineContext) {
             Napier.d { "Processing audio context for $audioUri" }
 
-            // Load or extract amplitudes
             val amplitudes = loadOrExtractAmplitudes(audioUri)
-
-            // Detect segments
             val segments =
                 if (amplitudes.isNotEmpty() && durationMs > 0) {
                     segmentDetector.detectSegments(amplitudes, durationMs)
                 } else {
                     emptyList()
                 }
-
-            // Classify daylight period
-            val daylightPeriod =
-                if (latitude != null && longitude != null) {
-                    daylightClassifier.classify(createdAt, latitude, longitude)
-                } else {
-                    daylightClassifier.classifyWithoutLocation(createdAt)
-                }
-
-            // Generate palette
+            val daylightPeriod = classifyDaylightPeriod(createdAt, latitude, longitude)
             val palette = paletteGenerator.generate(daylightPeriod)
 
             Napier.d { "Audio context processed: ${amplitudes.size} amplitudes, ${segments.size} segments, $daylightPeriod" }
@@ -109,17 +97,14 @@ class AudioContextProcessor(
      * Loads cached amplitudes or extracts them from the audio file.
      */
     private suspend fun loadOrExtractAmplitudes(audioUri: String): List<Float> {
-        // Try to load from cache first
         waveformStorage.load(audioUri)?.let { cached ->
             Napier.d { "Loaded cached waveform for $audioUri" }
             return cached
         }
 
-        // Extract from audio file
         Napier.d { "Extracting amplitudes from $audioUri" }
         val amplitudes = amplitudeExtractor.extractAmplitudes(audioUri)
 
-        // Cache for future use
         if (amplitudes.isNotEmpty()) {
             try {
                 waveformStorage.save(audioUri, amplitudes)
@@ -131,6 +116,38 @@ class AudioContextProcessor(
 
         return amplitudes
     }
+
+    /**
+     * Builds an initial context for immediate display while waveform extraction runs.
+     *
+     * Palette and daylight period are derived from the recording timestamp and location —
+     * fast operations that don't require audio decoding. Amplitudes and segments are empty
+     * and will be populated once [process] completes in the background.
+     */
+    fun buildInitialContext(
+        createdAt: Instant,
+        latitude: Double?,
+        longitude: Double?,
+    ): AudioContext {
+        val daylightPeriod = classifyDaylightPeriod(createdAt, latitude, longitude)
+        return AudioContext(
+            amplitudes = emptyList(),
+            segments = emptyList(),
+            daylightPeriod = daylightPeriod,
+            palette = paletteGenerator.generate(daylightPeriod),
+        )
+    }
+
+    private fun classifyDaylightPeriod(
+        createdAt: Instant,
+        latitude: Double?,
+        longitude: Double?,
+    ): DaylightPeriod =
+        if (latitude != null && longitude != null) {
+            daylightClassifier.classify(createdAt, latitude, longitude)
+        } else {
+            daylightClassifier.classifyWithoutLocation(createdAt)
+        }
 
     /**
      * Clears cached waveform data for an audio file.

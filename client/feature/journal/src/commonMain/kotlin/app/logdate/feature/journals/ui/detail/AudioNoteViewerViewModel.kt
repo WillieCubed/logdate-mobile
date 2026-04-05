@@ -14,6 +14,7 @@ import app.logdate.feature.editor.audio.AudioContextProcessor
 import app.logdate.feature.editor.audio.AudioLabelResolver
 import app.logdate.feature.editor.audio.formatAudioLabelAsync
 import app.logdate.util.formatDateLocalized
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -104,11 +105,27 @@ class AudioNoteViewerViewModel(
             if (shouldProcess) {
                 cachedAudioMediaRef = note.mediaRef
                 cachedAudioDurationMs = durationMs
-                cachedAudioContext = null
                 cachedLocationName = note.location?.displayName
                 cachedLatitude = note.location?.effectiveLatitude
                 cachedLongitude = note.location?.effectiveLongitude
-                _uiState.value = AudioNoteViewerUiState.Loading
+
+                // Show the player with correct colors immediately; waveform fills in once
+                // extraction completes in the background.
+                val initialContext =
+                    audioContextProcessor.buildInitialContext(
+                        createdAt = note.creationTimestamp,
+                        latitude = cachedLatitude,
+                        longitude = cachedLongitude,
+                    )
+                cachedAudioContext = initialContext
+                _uiState.value =
+                    AudioNoteViewerUiState.Ready(
+                        mediaRef = note.mediaRef,
+                        durationMs = durationMs,
+                        createdAt = note.creationTimestamp,
+                        context = initialContext,
+                        playbackState = cachedPlaybackState,
+                    )
                 processAudioContext(note, durationMs)
             } else {
                 _uiState.value =
@@ -142,19 +159,19 @@ class AudioNoteViewerViewModel(
                     }.getOrNull()
 
                 if (result == null) {
-                    _uiState.value = AudioNoteViewerUiState.Error("Audio context unavailable")
+                    Napier.w { "Waveform extraction failed for ${note.mediaRef}; playing without waveform" }
                     return@launch
                 }
 
+                // Guard against applying a stale result if the user opened a different note
+                // before extraction finished.
+                if (note.mediaRef != cachedAudioMediaRef) return@launch
+
                 cachedAudioContext = result
-                _uiState.value =
-                    AudioNoteViewerUiState.Ready(
-                        mediaRef = note.mediaRef,
-                        durationMs = durationMs,
-                        createdAt = note.creationTimestamp,
-                        context = result,
-                        playbackState = cachedPlaybackState,
-                    )
+                _uiState.update { state ->
+                    val ready = state as? AudioNoteViewerUiState.Ready ?: return@update state
+                    ready.copy(context = result)
+                }
             }
     }
 
