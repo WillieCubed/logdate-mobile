@@ -2,6 +2,7 @@ package app.logdate.feature.journals.ui.detail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.domain.timeline.GetJournalMembershipUseCase
 import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackMetadata
@@ -10,6 +11,8 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.feature.editor.audio.AudioContext
 import app.logdate.feature.editor.audio.AudioContextProcessor
+import app.logdate.feature.editor.audio.AudioLabelResolver
+import app.logdate.feature.editor.audio.formatAudioLabelAsync
 import app.logdate.util.formatDateLocalized
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +37,7 @@ class AudioNoteViewerViewModel(
     private val audioContextProcessor: AudioContextProcessor,
     private val durationResolver: AudioDurationResolver,
     private val audioPlaybackManager: AudioPlaybackManager,
+    private val getJournalMembership: GetJournalMembershipUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<AudioNoteViewerUiState>(AudioNoteViewerUiState.Loading)
     val uiState: StateFlow<AudioNoteViewerUiState> = _uiState.asStateFlow()
@@ -44,10 +48,16 @@ class AudioNoteViewerViewModel(
     private var cachedAudioMediaRef: String? = null
     private var cachedAudioDurationMs: Long = 0L
     private var cachedPlaybackState = AudioPlaybackUiState()
+    private var cachedLocationName: String? = null
+    private var cachedLatitude: Double? = null
+    private var cachedLongitude: Double? = null
+    private var cachedJournalNames: List<String> = emptyList()
+    private val labelResolver = AudioLabelResolver()
 
     init {
         observeNote()
         observePlaybackStatus()
+        observeJournalMembership()
     }
 
     private fun observeNote() {
@@ -95,6 +105,9 @@ class AudioNoteViewerViewModel(
                 cachedAudioMediaRef = note.mediaRef
                 cachedAudioDurationMs = durationMs
                 cachedAudioContext = null
+                cachedLocationName = note.location?.displayName
+                cachedLatitude = note.location?.effectiveLatitude
+                cachedLongitude = note.location?.effectiveLongitude
                 _uiState.value = AudioNoteViewerUiState.Loading
                 processAudioContext(note, durationMs)
             } else {
@@ -145,6 +158,14 @@ class AudioNoteViewerViewModel(
             }
     }
 
+    private fun observeJournalMembership() {
+        viewModelScope.launch {
+            getJournalMembership(setOf(noteId)).collect { membershipMap ->
+                cachedJournalNames = membershipMap[noteId]?.map { it.title }.orEmpty()
+            }
+        }
+    }
+
     private fun observePlaybackStatus() {
         statusProvider ?: return
         viewModelScope.launch {
@@ -188,7 +209,7 @@ class AudioNoteViewerViewModel(
                 )
             }
         } else {
-            startPlayback(content)
+            viewModelScope.launch { startPlayback(content) }
         }
     }
 
@@ -219,16 +240,30 @@ class AudioNoteViewerViewModel(
         seekTo(ratio)
     }
 
-    private fun startPlayback(content: AudioNoteViewerUiState.Ready) {
+    private suspend fun startPlayback(content: AudioNoteViewerUiState.Ready) {
         val subtitle =
             formatDateLocalized(
                 content.createdAt.toLocalDateTime(TimeZone.currentSystemDefault()).date,
             )
+        val labelResult =
+            labelResolver.resolve(
+                createdAt = content.createdAt,
+                locationName = cachedLocationName,
+                latitude = cachedLatitude,
+                longitude = cachedLongitude,
+            )
+        val title = formatAudioLabelAsync(labelResult)
+        val palette = content.context.palette
         val metadata =
             AudioPlaybackMetadata(
-                title = "Audio Entry",
+                title = title,
                 subtitle = subtitle,
                 noteId = noteId,
+                journalNames = cachedJournalNames,
+                accentColor = palette.accentColor,
+                immersiveBackground = palette.immersiveBackground,
+                gradientStart = palette.waveformGradientStart,
+                gradientEnd = palette.waveformGradientEnd,
             )
         audioPlaybackManager.startPlayback(
             uri = content.mediaRef,

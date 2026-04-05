@@ -198,6 +198,7 @@ class JournalDetailViewModel(
                     timestamp = creationTimestamp,
                     mediaRef = mediaRef,
                     durationMs = durationMs,
+                    locationName = location?.displayName,
                     otherJournals = otherJournals,
                 )
         }

@@ -92,7 +92,7 @@ fun AudioNoteSnippet(
                         if (isThisPlaying) {
                             audioPlaybackState.pause()
                         } else {
-                            audioPlaybackState.play(uiState.noteId, uiState.uri)
+                            audioPlaybackState.play(uiState.noteId, uiState.uri, null)
                         }
                     },
         ) {
@@ -111,7 +111,7 @@ fun AudioNoteSnippet(
                             if (isThisPlaying) {
                                 audioPlaybackState.pause()
                             } else {
-                                audioPlaybackState.play(uiState.noteId, uiState.uri)
+                                audioPlaybackState.play(uiState.noteId, uiState.uri, null)
                             }
                         },
                         modifier = Modifier.size(40.dp),
@@ -128,7 +128,7 @@ fun AudioNoteSnippet(
                     ) {
                         // Audio note title
                         Text(
-                            text = stringResource(Res.string.voice_note),
+                            text = stringResource(Res.string.audio_recording),
                             style = MaterialTheme.typography.titleSmall,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,

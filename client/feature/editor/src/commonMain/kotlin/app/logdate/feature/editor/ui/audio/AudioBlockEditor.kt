@@ -10,14 +10,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import app.logdate.client.media.audio.AudioPlaybackMetadata
+import app.logdate.feature.editor.audio.AudioLabelResolver
+import app.logdate.feature.editor.audio.formatAudioLabel
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.RecordingState
 import app.logdate.util.formatDateLocalized
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import logdate.client.feature.editor.generated.resources.Res
-import logdate.client.feature.editor.generated.resources.audio_recording
-import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -40,7 +39,18 @@ fun AudioBlockEditor(
     onDeleteRequested: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val audioRecordingTitle = stringResource(Res.string.audio_recording)
+    val labelResolver = remember { AudioLabelResolver() }
+    val labelResult =
+        remember(block.caption, block.timestamp, block.location) {
+            labelResolver.resolve(
+                createdAt = block.timestamp,
+                caption = block.caption,
+                latitude = block.location?.latitude,
+                longitude = block.location?.longitude,
+            )
+        }
+    val resolvedTitle = formatAudioLabel(labelResult)
+
     // Get the ViewModel at this level, not in child composables
     val audioViewModel: AudioViewModel = koinViewModel()
     // Collect audio state from ViewModel
@@ -60,10 +70,10 @@ fun AudioBlockEditor(
     val audioLevels = audioUiState.audioLevels
 
     val playbackMetadata =
-        remember(block) {
+        remember(block, resolvedTitle) {
             val subtitle = formatDateLocalized(block.timestamp.toLocalDateTime(TimeZone.currentSystemDefault()).date)
             AudioPlaybackMetadata(
-                title = block.caption.ifBlank { audioRecordingTitle },
+                title = resolvedTitle,
                 subtitle = subtitle,
                 noteId = block.id,
             )

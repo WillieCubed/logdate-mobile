@@ -41,7 +41,7 @@ class AndroidAudioPlaybackManagerTest {
         val itemFactory = RecordingAudioPlaybackItemFactory()
         val metadata =
             AudioPlaybackMetadata(
-                title = "Voice Note",
+                title = "Morning Recording",
                 subtitle = "March 31",
                 noteId = noteId,
             )

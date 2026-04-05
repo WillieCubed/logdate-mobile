@@ -28,6 +28,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.feature.editor.audio.AudioLabelResolver
+import app.logdate.feature.editor.audio.formatAudioLabel
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
 import logdate.client.feature.journal.generated.resources.*
@@ -155,8 +157,18 @@ private fun JournalNoteItem(
                         )
                     }
                     is JournalNote.Audio -> {
+                        val labelResolver = remember { AudioLabelResolver() }
+                        val labelResult =
+                            remember(note.creationTimestamp, note.location) {
+                                labelResolver.resolve(
+                                    createdAt = note.creationTimestamp,
+                                    locationName = note.location?.displayName,
+                                    latitude = note.location?.effectiveLatitude,
+                                    longitude = note.location?.effectiveLongitude,
+                                )
+                            }
                         Text(
-                            text = stringResource(Res.string.audio_note),
+                            text = formatAudioLabel(labelResult),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }

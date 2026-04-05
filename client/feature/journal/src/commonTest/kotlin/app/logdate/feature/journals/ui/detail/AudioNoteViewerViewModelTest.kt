@@ -1,5 +1,6 @@
 package app.logdate.feature.journals.ui.detail
 
+import app.logdate.client.domain.timeline.GetJournalMembershipUseCase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.feature.editor.audio.AudioContextProcessor
 import kotlinx.coroutines.Dispatchers
@@ -62,6 +63,7 @@ class AudioNoteViewerViewModelTest {
                     audioContextProcessor = audioContextProcessor,
                     durationResolver = durationResolver,
                     audioPlaybackManager = audioPlaybackManager,
+                    getJournalMembership = GetJournalMembershipUseCase(FakeDetailJournalContentRepository()),
                 )
 
             advanceUntilIdle()
@@ -100,6 +102,7 @@ class AudioNoteViewerViewModelTest {
                     audioContextProcessor = audioContextProcessor,
                     durationResolver = FakeAudioDurationResolver(durationMs = 1000L),
                     audioPlaybackManager = audioPlaybackManager,
+                    getJournalMembership = GetJournalMembershipUseCase(FakeDetailJournalContentRepository()),
                 )
 
             advanceUntilIdle()
@@ -140,6 +143,7 @@ class AudioNoteViewerViewModelTest {
                     audioContextProcessor = audioContextProcessor,
                     durationResolver = FakeAudioDurationResolver(durationMs = 1000L),
                     audioPlaybackManager = audioPlaybackManager,
+                    getJournalMembership = GetJournalMembershipUseCase(FakeDetailJournalContentRepository()),
                 )
 
             advanceUntilIdle()
@@ -178,6 +182,7 @@ class AudioNoteViewerViewModelTest {
                     audioContextProcessor = audioContextProcessor,
                     durationResolver = FakeAudioDurationResolver(durationMs = 1000L),
                     audioPlaybackManager = audioPlaybackManager,
+                    getJournalMembership = GetJournalMembershipUseCase(FakeDetailJournalContentRepository()),
                 )
 
             advanceUntilIdle()

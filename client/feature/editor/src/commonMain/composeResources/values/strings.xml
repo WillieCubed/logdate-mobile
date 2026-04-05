@@ -128,4 +128,17 @@
     <string name="new_note_action_record_video">Record video</string>
     <string name="text_placeholder_location">Unknown location</string>
     <string name="text_placeholder_start_writing">Start writing…</string>
+
+    <!-- Daylight period labels for audio entries -->
+    <string name="daylight_period_dawn">Dawn</string>
+    <string name="daylight_period_morning">Morning</string>
+    <string name="daylight_period_midday">Midday</string>
+    <string name="daylight_period_afternoon">Afternoon</string>
+    <string name="daylight_period_golden_hour">Golden Hour</string>
+    <string name="daylight_period_evening">Evening</string>
+    <string name="daylight_period_night">Night</string>
+
+    <!-- Audio label templates -->
+    <string name="audio_label_period_recording">%s Recording</string>
+    <string name="audio_label_period_at_location">%1$s at %2$s</string>
 </resources>

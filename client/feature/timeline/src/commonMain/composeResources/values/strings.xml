@@ -26,7 +26,7 @@
     <string name="transcript">Transcript:</string>
     <string name="transcription_failed">Transcription failed</string>
     <string name="video_recording">Video recording</string>
-    <string name="voice_note">Voice Note</string>
+    <string name="audio_recording">Audio Recording</string>
     <string name="period_last_week">Last Week</string>
     <string name="period_this_week">This Week</string>
     <string name="period_years_ago">%1$s years ago</string>

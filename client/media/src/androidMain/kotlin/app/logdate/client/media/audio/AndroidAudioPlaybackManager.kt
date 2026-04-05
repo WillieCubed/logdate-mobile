@@ -233,15 +233,34 @@ class AndroidAudioPlaybackManager(
                     .build()
             }
 
+        private val artworkGenerator = AudioNotificationArtworkGenerator()
+
         fun buildMediaMetadata(metadata: AudioPlaybackMetadata?): MediaMetadata {
             val extras = Bundle()
             metadata?.noteId?.let { extras.putString(EXTRA_NOTE_ID, it.toString()) }
-            return MediaMetadata
-                .Builder()
-                .setTitle(metadata?.title ?: "Voice Note")
-                .setSubtitle(metadata?.subtitle)
-                .setExtras(extras.takeIf { !it.isEmpty })
-                .build()
+            val builder =
+                MediaMetadata
+                    .Builder()
+                    .setTitle(metadata?.title ?: "Audio Recording")
+                    .setSubtitle(metadata?.subtitle)
+                    .setExtras(extras.takeIf { !it.isEmpty })
+
+            // Show journal names as the artist field
+            val journalNames = metadata?.journalNames.orEmpty()
+            if (journalNames.isNotEmpty()) {
+                builder.setArtist(journalNames.joinToString(", "))
+            }
+
+            // Generate palette-based artwork from daylight colors
+            val bg = metadata?.immersiveBackground
+            val start = metadata?.gradientStart
+            val end = metadata?.gradientEnd
+            if (bg != null && start != null && end != null) {
+                val artworkBytes = artworkGenerator.generate(bg, start, end)
+                builder.setArtworkData(artworkBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+            }
+
+            return builder.build()
         }
 
         fun mainThreadExecutor(): Executor =

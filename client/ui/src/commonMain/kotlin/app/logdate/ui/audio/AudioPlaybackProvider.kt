@@ -22,6 +22,15 @@ import kotlin.time.Duration
 import kotlin.uuid.Uuid
 
 /**
+ * Display metadata for the currently playing audio, used by the mini-player.
+ */
+data class AudioPlaybackDisplayInfo(
+    val title: String? = null,
+    val subtitle: String? = null,
+    val accentColor: Long? = null,
+)
+
+/**
  * State for audio playback that is shared across the app.
  * Only one audio file can be playing at a time.
  */
@@ -30,7 +39,8 @@ data class AudioPlaybackState(
     val isPlaying: Boolean = false,
     val progress: Float = 0f,
     val duration: Duration = Duration.ZERO,
-    val play: (id: Uuid, uri: String) -> Unit = { _, _ -> },
+    val displayInfo: AudioPlaybackDisplayInfo = AudioPlaybackDisplayInfo(),
+    val play: (id: Uuid, uri: String, displayInfo: AudioPlaybackDisplayInfo?) -> Unit = { _, _, _ -> },
     val pause: () -> Unit = {},
     val stop: () -> Unit = {},
     val seekTo: (position: Float) -> Unit = {},
@@ -59,6 +69,7 @@ fun AudioPlaybackProvider(content: @Composable () -> Unit) {
     var isPlaying by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
     var duration by remember { mutableStateOf(Duration.ZERO) }
+    var displayInfo by remember { mutableStateOf(AudioPlaybackDisplayInfo()) }
     val playbackStatus =
         statusProvider?.playbackStatus?.collectAsState(
             initial = AudioPlaybackStatus(),
@@ -72,7 +83,7 @@ fun AudioPlaybackProvider(content: @Composable () -> Unit) {
     }
 
     // Functions to control playback
-    val play: (id: Uuid, uri: String) -> Unit = { id, uri ->
+    val play: (id: Uuid, uri: String, info: AudioPlaybackDisplayInfo?) -> Unit = { id, uri, info ->
         // Stop current playback if different ID
         if (currentlyPlayingId != id) {
             audioPlaybackManager.stopPlayback()
@@ -81,6 +92,7 @@ fun AudioPlaybackProvider(content: @Composable () -> Unit) {
         currentlyPlayingId = id
         currentAudioUri = uri
         isPlaying = true
+        displayInfo = info ?: AudioPlaybackDisplayInfo()
 
         audioPlaybackManager.startPlayback(
             uri = uri,
@@ -105,6 +117,7 @@ fun AudioPlaybackProvider(content: @Composable () -> Unit) {
         currentlyPlayingId = null
         currentAudioUri = null
         progress = 0f
+        displayInfo = AudioPlaybackDisplayInfo()
         audioPlaybackManager.stopPlayback()
     }
 
@@ -127,6 +140,7 @@ fun AudioPlaybackProvider(content: @Composable () -> Unit) {
             isPlaying = isPlaying,
             progress = progress,
             duration = duration,
+            displayInfo = displayInfo,
             play = play,
             pause = pause,
             stop = stop,

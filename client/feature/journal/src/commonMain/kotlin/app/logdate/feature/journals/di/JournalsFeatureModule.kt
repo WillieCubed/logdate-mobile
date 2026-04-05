@@ -39,6 +39,7 @@ val journalsFeatureModule: Module =
                 journalRepository = get(),
                 journalContentRepository = get(),
                 removeNoteUseCase = get(),
+                sharingLauncher = get(),
             )
         }
         viewModel { (noteId: Uuid) ->
@@ -48,6 +49,7 @@ val journalsFeatureModule: Module =
                 audioContextProcessor = get(),
                 durationResolver = get(),
                 audioPlaybackManager = get(),
+                getJournalMembership = get(),
             )
         }
         viewModel {

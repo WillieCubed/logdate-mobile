@@ -57,10 +57,11 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.media.audio.transcription.TimedTranscript
 import app.logdate.client.media.audio.transcription.TimedUtterance
 import app.logdate.feature.editor.audio.AudioContextProcessor
+import app.logdate.feature.editor.audio.AudioLabelResolver
+import app.logdate.feature.editor.audio.formatAudioLabel
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.formatMediaDuration
 import logdate.client.feature.editor.generated.resources.Res
-import logdate.client.feature.editor.generated.resources.audio_recording
 import logdate.client.feature.editor.generated.resources.delete
 import logdate.client.feature.editor.generated.resources.no_audio_recorded_yet
 import logdate.client.feature.editor.generated.resources.search_transcript
@@ -322,7 +323,17 @@ private fun ExpandedAudioContent(
     modifier: Modifier = Modifier,
 ) {
     with(sharedTransitionScope) {
-        val audioRecordingTitle = stringResource(Res.string.audio_recording)
+        val labelResolver = remember { AudioLabelResolver() }
+        val labelResult =
+            remember(block.caption, block.timestamp, block.location) {
+                labelResolver.resolve(
+                    createdAt = block.timestamp,
+                    caption = block.caption,
+                    latitude = block.location?.latitude,
+                    longitude = block.location?.longitude,
+                )
+            }
+        val resolvedTitle = formatAudioLabel(labelResult)
         Column(
             modifier =
                 modifier
@@ -339,7 +350,7 @@ private fun ExpandedAudioContent(
             ) {
                 // Audio title or caption
                 Text(
-                    text = block.caption.ifEmpty { audioRecordingTitle },
+                    text = resolvedTitle,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )

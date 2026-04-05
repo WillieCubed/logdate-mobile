@@ -71,6 +71,7 @@ sealed interface EntryDisplayData {
         override val timestamp: Instant,
         val mediaRef: String,
         val durationMs: Long,
+        val locationName: String? = null,
         override val otherJournals: List<JournalReference> = emptyList(),
     ) : EntryDisplayData
 }

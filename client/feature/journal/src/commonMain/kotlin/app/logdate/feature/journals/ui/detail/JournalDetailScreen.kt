@@ -6,6 +6,8 @@ package app.logdate.feature.journals.ui.detail
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,9 +35,7 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material.icons.filled.Settings
@@ -51,6 +51,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
@@ -71,15 +72,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.editor.audio.AudioLabelResolver
+import app.logdate.feature.editor.audio.color.PaletteGenerator
+import app.logdate.feature.editor.audio.formatAudioLabel
+import app.logdate.feature.editor.ui.audio.AnimatedPlayPauseButton
 import app.logdate.feature.journals.ui.deriveCoverColor
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.audio.AudioPlaybackDisplayInfo
 import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.common.applyStandardContentWidth
@@ -725,6 +733,35 @@ private fun AudioEntryCard(
     val isCurrentEntry = audioPlaybackState.currentlyPlayingId == entry.id
     val isEntryPlaying = isCurrentEntry && audioPlaybackState.isPlaying
 
+    val labelResolver = remember { AudioLabelResolver() }
+    val labelResult =
+        remember(entry.timestamp, entry.locationName) {
+            labelResolver.resolve(
+                createdAt = entry.timestamp,
+                locationName = entry.locationName,
+            )
+        }
+    val resolvedTitle = formatAudioLabel(labelResult)
+
+    // Derive palette from daylight period for the progress indicator and mini-player
+    val paletteGenerator = remember { PaletteGenerator() }
+    val palette =
+        remember(labelResult) {
+            when (labelResult) {
+                is app.logdate.feature.editor.audio.AudioLabelResult.Contextual ->
+                    paletteGenerator.generate(labelResult.period)
+                else -> null
+            }
+        }
+    val accentColor = palette?.let { Color(it.accentColor) }
+
+    // Smooth progress animation
+    val animatedProgress by animateFloatAsState(
+        targetValue = if (isCurrentEntry) audioPlaybackState.progress else 0f,
+        animationSpec = tween(durationMillis = 100),
+        label = "AudioCardProgress",
+    )
+
     InlineEntryCardShell(
         timestamp = entry.timestamp,
         onClick = onClick,
@@ -732,47 +769,56 @@ private fun AudioEntryCard(
         modifier = modifier,
         cardModifier = cardModifier,
     ) {
-        Icon(
-            Icons.Default.GraphicEq,
-            contentDescription = null,
-            modifier = Modifier.size(24.dp),
-            tint = MaterialTheme.colorScheme.primary,
-        )
-        Spacer(Modifier.width(Spacing.sm))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(Res.string.audio_note),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            if (entry.durationMs > 0) {
-                Text(
-                    text = formatAudioDuration(entry.durationMs),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        IconButton(
+        AnimatedPlayPauseButton(
+            isPlaying = isEntryPlaying,
             onClick = {
                 if (isEntryPlaying) {
                     audioPlaybackState.pause()
                 } else {
-                    audioPlaybackState.play(entry.id, entry.mediaRef)
+                    audioPlaybackState.play(
+                        entry.id,
+                        entry.mediaRef,
+                        AudioPlaybackDisplayInfo(
+                            title = resolvedTitle,
+                            subtitle = if (entry.durationMs > 0) formatAudioDuration(entry.durationMs) else null,
+                            accentColor = palette?.accentColor,
+                        ),
+                    )
                 }
             },
-            modifier = Modifier.testTag("journal-audio-playback-button"),
-        ) {
-            Icon(
-                imageVector = if (isEntryPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription =
-                    stringResource(
-                        if (isEntryPlaying) {
-                            Res.string.pause_audio_note
-                        } else {
-                            Res.string.play_audio_note
-                        },
-                    ),
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .testTag("journal-audio-playback-button"),
+            iconSize = 20.dp,
+        )
+        Spacer(Modifier.width(Spacing.sm))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = resolvedTitle,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
             )
+            Spacer(Modifier.height(4.dp))
+            LinearProgressIndicator(
+                progress = { animatedProgress },
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp)),
+                color = accentColor ?: MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                strokeCap = StrokeCap.Round,
+            )
+            Spacer(Modifier.height(2.dp))
+            if (entry.durationMs > 0) {
+                Text(
+                    text = formatAudioDuration(entry.durationMs),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
