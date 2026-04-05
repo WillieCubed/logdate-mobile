@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.rounded.Error
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -222,7 +222,7 @@ private fun TranscriptionErrorUi(
                 modifier = Modifier.size(32.dp),
             ) {
                 Icon(
-                    imageVector = Icons.Default.Refresh,
+                    imageVector = Icons.Rounded.Refresh,
                     contentDescription = stringResource(Res.string.try_again),
                     tint = MaterialTheme.colorScheme.primary,
                 )

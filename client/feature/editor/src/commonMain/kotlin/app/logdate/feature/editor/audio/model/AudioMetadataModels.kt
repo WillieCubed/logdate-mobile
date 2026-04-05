@@ -22,6 +22,8 @@ data class AudioPalette(
     val playedFillColor: Long,
     val accentColor: Long,
     val immersiveBackground: Long,
+    /** Legible text and icon color for content drawn on [immersiveBackground]. */
+    val contentColor: Long = 0xFFF5F5F5,
 )
 
 enum class DaylightPeriod {

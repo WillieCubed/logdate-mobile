@@ -18,9 +18,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -125,9 +125,9 @@ private fun MiniAudioPlayerContent(
                     Icon(
                         imageVector =
                             if (playbackState.isPlaying) {
-                                Icons.Default.Pause
+                                Icons.Rounded.Pause
                             } else {
-                                Icons.Default.PlayArrow
+                                Icons.Rounded.PlayArrow
                             },
                         contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
                         tint = accentColor,
@@ -161,7 +161,7 @@ private fun MiniAudioPlayerContent(
                     modifier = Modifier.size(36.dp),
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Close,
+                        imageVector = Icons.Rounded.Close,
                         contentDescription = "Stop playback",
                         modifier = Modifier.size(18.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,

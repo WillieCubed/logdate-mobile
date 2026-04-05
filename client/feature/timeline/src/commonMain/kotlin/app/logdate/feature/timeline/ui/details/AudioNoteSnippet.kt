@@ -10,9 +10,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -117,7 +117,7 @@ fun AudioNoteSnippet(
                         modifier = Modifier.size(40.dp),
                     ) {
                         Icon(
-                            imageVector = if (isThisPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            imageVector = if (isThisPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                             contentDescription = if (isThisPlaying) "Pause" else "Play",
                             modifier = Modifier.size(24.dp),
                         )
@@ -154,7 +154,7 @@ fun AudioNoteSnippet(
                             modifier = Modifier.size(32.dp),
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Stop,
+                                imageVector = Icons.Rounded.Stop,
                                 contentDescription = stringResource(Res.string.stop),
                                 modifier = Modifier.size(20.dp),
                             )

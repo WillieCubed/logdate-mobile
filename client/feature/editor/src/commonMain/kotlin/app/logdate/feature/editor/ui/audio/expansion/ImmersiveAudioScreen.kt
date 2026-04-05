@@ -19,19 +19,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Forward10
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Replay10
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
 import app.logdate.feature.editor.audio.model.DaylightPeriod
+import app.logdate.feature.editor.ui.audio.AnimatedPlayPauseButton
 import app.logdate.feature.editor.ui.audio.waveform.BezierAudioWaveform
 import app.logdate.feature.editor.ui.formatMediaDuration
 import kotlinx.coroutines.delay
@@ -91,6 +90,8 @@ fun ImmersiveAudioScreen(
     onCrossSegment: () -> Unit = {},
     onClose: () -> Unit = {},
 ) {
+    ImmersiveSystemBarEffect()
+
     var controlsVisible by remember { mutableStateOf(true) }
     val interactionSource = remember { MutableInteractionSource() }
 
@@ -102,13 +103,16 @@ fun ImmersiveAudioScreen(
         }
     }
 
+    val backgroundColor = Color(palette.immersiveBackground)
+    val onBackgroundColor = Color(palette.contentColor)
+
     val backgroundBrush =
         Brush.verticalGradient(
             colors =
                 listOf(
-                    Color(palette.immersiveBackground),
+                    backgroundColor,
                     Color(palette.waveformGradientStart).copy(alpha = 0.8f),
-                    Color(palette.immersiveBackground),
+                    backgroundColor,
                 ),
         )
 
@@ -136,7 +140,7 @@ fun ImmersiveAudioScreen(
             Icon(
                 imageVector = Icons.Rounded.Close,
                 contentDescription = stringResource(Res.string.close),
-                tint = Color.White.copy(alpha = 0.8f),
+                tint = onBackgroundColor.copy(alpha = 0.8f),
             )
         }
 
@@ -155,13 +159,13 @@ fun ImmersiveAudioScreen(
             Text(
                 text = formatDaylightPeriod(daylightPeriod),
                 style = MaterialTheme.typography.labelLarge,
-                color = Color.White.copy(alpha = 0.6f),
+                color = onBackgroundColor.copy(alpha = 0.6f),
             )
 
             Text(
                 text = formatDateTime(createdAt),
                 style = MaterialTheme.typography.headlineSmall,
-                color = Color.White,
+                color = onBackgroundColor,
             )
 
             Spacer(modifier = Modifier.height(48.dp))
@@ -207,7 +211,7 @@ fun ImmersiveAudioScreen(
                             SliderDefaults.colors(
                                 thumbColor = Color(palette.accentColor),
                                 activeTrackColor = Color(palette.playedFillColor),
-                                inactiveTrackColor = Color.White.copy(alpha = 0.2f),
+                                inactiveTrackColor = onBackgroundColor.copy(alpha = 0.2f),
                             ),
                     )
 
@@ -219,12 +223,12 @@ fun ImmersiveAudioScreen(
                         Text(
                             text = formatProgress(progress, durationMs),
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.7f),
+                            color = onBackgroundColor.copy(alpha = 0.7f),
                         )
                         Text(
                             text = formatMediaDuration(durationMs, false),
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.7f),
+                            color = onBackgroundColor.copy(alpha = 0.7f),
                         )
                     }
 
@@ -235,45 +239,49 @@ fun ImmersiveAudioScreen(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        IconButton(onClick = onSkipBack) {
+                        val skipButtonColors =
+                            IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = Color(palette.accentColor).copy(alpha = 0.2f),
+                                contentColor = Color(palette.accentColor),
+                            )
+
+                        FilledTonalIconButton(
+                            onClick = onSkipBack,
+                            colors = skipButtonColors,
+                            modifier = Modifier.size(48.dp),
+                        ) {
                             Icon(
                                 imageVector = Icons.Rounded.Replay10,
                                 contentDescription = stringResource(Res.string.skip_back_10_seconds),
-                                tint = Color.White,
-                                modifier = Modifier.size(32.dp),
+                                modifier = Modifier.size(28.dp),
                             )
                         }
 
                         Spacer(modifier = Modifier.width(24.dp))
 
-                        // Large play/pause button
-                        Surface(
+                        AnimatedPlayPauseButton(
+                            isPlaying = isPlaying,
                             onClick = onPlayPause,
-                            shape = CircleShape,
-                            color = Color(palette.accentColor),
                             modifier = Modifier.size(80.dp),
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize(),
-                            ) {
-                                Icon(
-                                    imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                    contentDescription = if (isPlaying) "Pause" else "Play",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(48.dp),
-                                )
-                            }
-                        }
+                            iconSize = 48.dp,
+                            colors =
+                                IconButtonDefaults.filledIconButtonColors(
+                                    containerColor = Color(palette.accentColor),
+                                    contentColor = onBackgroundColor,
+                                ),
+                        )
 
                         Spacer(modifier = Modifier.width(24.dp))
 
-                        IconButton(onClick = onSkipForward) {
+                        FilledTonalIconButton(
+                            onClick = onSkipForward,
+                            colors = skipButtonColors,
+                            modifier = Modifier.size(48.dp),
+                        ) {
                             Icon(
                                 imageVector = Icons.Rounded.Forward10,
                                 contentDescription = stringResource(Res.string.skip_forward_10_seconds),
-                                tint = Color.White,
-                                modifier = Modifier.size(32.dp),
+                                modifier = Modifier.size(28.dp),
                             )
                         }
                     }

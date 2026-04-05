@@ -30,18 +30,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.RemoveCircleOutline
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.RemoveCircleOutline
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Videocam
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
@@ -216,7 +216,7 @@ fun JournalDetailScreenContent(
                 contentWindowInsets = WindowInsets.navigationBars,
                 floatingActionButton = {
                     FloatingActionButton(onClick = onOpenEditor) {
-                        Icon(Icons.Default.Edit, contentDescription = stringResource(Res.string.create_new_entry))
+                        Icon(Icons.Rounded.Edit, contentDescription = stringResource(Res.string.create_new_entry))
                     }
                 },
                 topBar = {
@@ -225,7 +225,7 @@ fun JournalDetailScreenContent(
                         navigationIcon = {
                             IconButton(onClick = onGoBack) {
                                 Icon(
-                                    Icons.AutoMirrored.Default.ArrowBack,
+                                    Icons.AutoMirrored.Rounded.ArrowBack,
                                     contentDescription = stringResource(Res.string.back),
                                 )
                             }
@@ -235,9 +235,9 @@ fun JournalDetailScreenContent(
                             IconButton(onClick = onToggleSortOrder) {
                                 val sortIcon =
                                     if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
-                                        Icons.Default.ArrowDownward
+                                        Icons.Rounded.ArrowDownward
                                     } else {
-                                        Icons.Default.ArrowUpward
+                                        Icons.Rounded.ArrowUpward
                                     }
 
                                 val description =
@@ -256,7 +256,7 @@ fun JournalDetailScreenContent(
                             Box {
                                 IconButton(onClick = { showOverflowMenu = true }) {
                                     Icon(
-                                        Icons.Default.MoreVert,
+                                        Icons.Rounded.MoreVert,
                                         contentDescription = stringResource(Res.string.journal_settings_2),
                                     )
                                 }
@@ -271,7 +271,7 @@ fun JournalDetailScreenContent(
                                             onNavigateToShare(uiState.journalId)
                                         },
                                         leadingIcon = {
-                                            Icon(Icons.Default.Share, contentDescription = null)
+                                            Icon(Icons.Rounded.Share, contentDescription = null)
                                         },
                                     )
                                     DropdownMenuItem(
@@ -281,7 +281,7 @@ fun JournalDetailScreenContent(
                                             onNavigateToSettings(uiState.journalId)
                                         },
                                         leadingIcon = {
-                                            Icon(Icons.Default.Settings, contentDescription = null)
+                                            Icon(Icons.Rounded.Settings, contentDescription = null)
                                         },
                                     )
                                     DropdownMenuItem(
@@ -291,7 +291,7 @@ fun JournalDetailScreenContent(
                                             onRequestDelete()
                                         },
                                         leadingIcon = {
-                                            Icon(Icons.Default.DeleteOutline, contentDescription = null)
+                                            Icon(Icons.Rounded.DeleteOutline, contentDescription = null)
                                         },
                                     )
                                 }
@@ -692,7 +692,7 @@ private fun VideoEntryCard(
             )
             // Play indicator overlay
             Icon(
-                Icons.Default.PlayArrow,
+                Icons.Rounded.PlayArrow,
                 contentDescription = null,
                 modifier =
                     Modifier
@@ -701,7 +701,7 @@ private fun VideoEntryCard(
                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
             )
             Icon(
-                Icons.Default.Videocam,
+                Icons.Rounded.Videocam,
                 contentDescription = null,
                 modifier =
                     Modifier
@@ -941,7 +941,7 @@ private fun EntryOverflowMenu(
     Box {
         IconButton(onClick = onShowMenu) {
             Icon(
-                Icons.Default.MoreVert,
+                Icons.Rounded.MoreVert,
                 contentDescription = stringResource(Res.string.journal_settings_2),
             )
         }
@@ -953,7 +953,7 @@ private fun EntryOverflowMenu(
                 text = { Text(stringResource(Res.string.remove_from_journal)) },
                 onClick = onRemoveFromJournal,
                 leadingIcon = {
-                    Icon(Icons.Default.RemoveCircleOutline, contentDescription = null)
+                    Icon(Icons.Rounded.RemoveCircleOutline, contentDescription = null)
                 },
             )
         }
@@ -968,7 +968,7 @@ private fun EntryOverflowMenu(
 fun DeleteConfirmationDialog(
     onDismissRequest: () -> Unit,
     onConfirmation: () -> Unit,
-    icon: ImageVector = Icons.Default.WarningAmber,
+    icon: ImageVector = Icons.Rounded.Warning,
 ) {
     AlertDialog(
         icon = {
@@ -1020,7 +1020,7 @@ private fun RemoveNoteFromJournalDialog(
 ) {
     AlertDialog(
         icon = {
-            Icon(Icons.Default.WarningAmber, contentDescription = null)
+            Icon(Icons.Rounded.Warning, contentDescription = null)
         },
         title = {
             Text(text = stringResource(Res.string.remove_from_journal_title))

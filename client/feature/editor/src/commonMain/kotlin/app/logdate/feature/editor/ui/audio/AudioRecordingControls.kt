@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -129,7 +129,7 @@ fun AudioRecordingControls(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Mic,
+                        imageVector = Icons.Rounded.Mic,
                         contentDescription = null,
                         modifier = Modifier.size(40.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
@@ -172,7 +172,7 @@ fun AudioRecordingControls(
                         .testTag("audio_record_stop_button"),
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Stop,
+                    imageVector = Icons.Rounded.Stop,
                     contentDescription = stringResource(Res.string.stop_recording),
                     modifier = Modifier.size(24.dp),
                 )
@@ -196,7 +196,7 @@ fun AudioRecordingControls(
                         .testTag("audio_record_start_button"),
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Mic,
+                    imageVector = Icons.Rounded.Mic,
                     contentDescription = stringResource(Res.string.start_recording),
                     modifier = Modifier.size(24.dp),
                 )

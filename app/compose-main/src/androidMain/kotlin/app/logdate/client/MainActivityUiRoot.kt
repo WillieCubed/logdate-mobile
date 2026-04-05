@@ -36,6 +36,7 @@ import app.logdate.navigation.MainNavigationRoot
 import app.logdate.navigation.rememberMainAppNavigator
 import app.logdate.navigation.routes.core.ExportSettingsRoute
 import app.logdate.navigation.routes.core.NavigationStart
+import app.logdate.navigation.routes.core.NoteViewerRoute
 import app.logdate.navigation.routes.core.OnboardingAccountCreationRoute
 import app.logdate.navigation.routes.core.OnboardingAppOverviewRoute
 import app.logdate.navigation.routes.core.OnboardingBirthdayRoute
@@ -55,6 +56,11 @@ import app.logdate.navigation.routes.openExportSettings
 import app.logdate.navigation.routes.openSettings
 import app.logdate.navigation.routes.startOnboarding
 import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.audio.AudioPlaybackProvider
+import app.logdate.ui.audio.LocalAudioPlaybackState
+import app.logdate.ui.audio.MiniAudioPlayer
+import app.logdate.ui.audio.TranscriptionProvider
+import app.logdate.ui.audio.TranscriptionState
 import app.logdate.ui.restore.LocalAcknowledgeCloudRestore
 import app.logdate.ui.restore.LocalIsPostCloudRestore
 import app.logdate.ui.theme.LogDateTheme
@@ -183,13 +189,27 @@ fun MainActivityUiRoot(
                     displayName = appUiState.displayName,
                     onUsePasscode = onShowUnlockPrompt,
                 ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        MainNavigationRoot(mainAppNavigator, sharingLauncher)
+                    AudioPlaybackProvider {
+                        TranscriptionProvider(state = TranscriptionState()) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                MainNavigationRoot(mainAppNavigator, sharingLauncher)
 
-                        SnackbarHost(
-                            hostState = appUpdateSnackbarHostState,
-                            modifier = Modifier.align(Alignment.BottomCenter),
-                        )
+                                val audioState = LocalAudioPlaybackState.current
+                                MiniAudioPlayer(
+                                    onOpenFullPlayer = {
+                                        audioState.currentlyPlayingId?.let { noteId ->
+                                            mainAppNavigator.backStack.add(NoteViewerRoute(noteId))
+                                        }
+                                    },
+                                    modifier = Modifier.align(Alignment.BottomCenter),
+                                )
+
+                                SnackbarHost(
+                                    hostState = appUpdateSnackbarHostState,
+                                    modifier = Modifier.align(Alignment.BottomCenter),
+                                )
+                            }
+                        }
                     }
                 }
 

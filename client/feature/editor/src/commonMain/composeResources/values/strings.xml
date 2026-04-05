@@ -139,6 +139,6 @@
     <string name="daylight_period_night">Night</string>
 
     <!-- Audio label templates -->
-    <string name="audio_label_period_recording">%s Recording</string>
+    <string name="audio_label_period_recording">%1$s Recording</string>
     <string name="audio_label_period_at_location">%1$s at %2$s</string>
 </resources>

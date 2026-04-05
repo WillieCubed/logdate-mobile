@@ -26,7 +26,12 @@ class AndroidAmplitudeExtractor(
         withContext(Dispatchers.Default) {
             val extractor = MediaExtractor()
             try {
-                extractor.setDataSource(context, Uri.parse(uri), null)
+                val parsedUri = Uri.parse(uri)
+                if (parsedUri.scheme.isNullOrBlank()) {
+                    extractor.setDataSource(uri)
+                } else {
+                    extractor.setDataSource(context, parsedUri, null)
+                }
 
                 val audioTrackIndex =
                     findAudioTrack(extractor) ?: run {
