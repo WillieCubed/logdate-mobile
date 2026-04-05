@@ -2,28 +2,28 @@
 
 package app.logdate.feature.core.main
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -64,6 +64,7 @@ import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.TimelineUiState
 import app.logdate.ui.timeline.VideoNoteUiState
 import app.logdate.ui.timeline.createSemanticTimelineDayUiState
+import app.logdate.util.TimeOfDay
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -96,123 +97,120 @@ fun HomeScreen(
     onBrowseJournals: () -> Unit,
     onOpenRewind: (Uuid) -> Unit,
     onOpenSettings: () -> Unit = {},
+    onOpenMediaDetail: (Uuid) -> Unit = {},
     locationContent: @Composable (Modifier) -> Unit = {},
+    libraryContent: @Composable (Modifier) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = koinViewModel(),
-) {
-    HomeScaffoldWrapper(
-        showFab = true,
-        onFabClick = { destination ->
-            when (destination) {
-                HomeRouteDestination.Timeline -> onNewEntry()
-                HomeRouteDestination.Journals -> onCreateJournal()
-                else -> onNewEntry()
-            }
-        },
-        modifier = modifier,
-    ) { currentDestination ->
-        when (currentDestination) {
-            HomeRouteDestination.Timeline -> {
-                val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-                TimelinePane(
-                    uiState =
-                        TimelineUiState(
-                            items = uiState.items,
-                            loadingState = uiState.loadingState,
-                            isLoadingMore = uiState.isLoadingMore,
-                            hasMoreOlderContent = uiState.hasMoreOlderContent,
-                            appendError = uiState.appendError,
-                        ),
-                    onNewEntry = onNewEntry,
-                    onOpenDay = { date -> viewModel.selectDay(date) },
-                    onLoadMoreOlder = viewModel::loadMoreOlder,
-                    onProfileClick = onOpenSettings,
-                    timelineSuggestion = uiState.timelineSuggestion,
-                    modifier =
-                        Modifier
-                            .applyScreenStyles()
-                            .safeDrawingPadding(),
-                )
-            }
-
-            HomeRouteDestination.Rewind -> {
-                RewindOverviewScreen(
-                    onOpenRewind = onOpenRewind,
-                    modifier = Modifier.applyScreenStyles(),
-                )
-            }
-
-            HomeRouteDestination.Journals -> {
-                JournalsOverviewScreen(
-                    onOpenJournal = onOpenJournal,
-                    onBrowseJournals = onBrowseJournals,
-                    onCreateJournal = onCreateJournal,
-                    modifier = Modifier.applyScreenStyles(),
-                )
-            }
-
-            HomeRouteDestination.LocationHistory -> {
-                locationContent(
-                    Modifier
-                        .applyScreenStyles()
-                        .safeDrawingPadding(),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-internal fun HomeScaffoldWrapper(
-    showFab: Boolean,
-    onFabClick: (HomeRouteDestination) -> Unit,
-    modifier: Modifier = Modifier,
-    content: @Composable (HomeRouteDestination) -> Unit = {},
 ) {
     var currentDestination: HomeRouteDestination by rememberSaveable {
         mutableStateOf(HomeRouteDestination.Timeline)
     }
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer)) {
-        content(currentDestination)
-
-        // Bottom navigation bar
-        NavigationBar(
-            modifier = Modifier.align(Alignment.BottomCenter),
-        ) {
-            HomeRouteDestination.ALL.forEach { destination ->
-                NavigationBarItem(
-                    icon = {
-                        Icon(
-                            imageVector =
-                                if (destination == currentDestination) {
-                                    destination.selectedIcon
-                                } else {
-                                    destination.unselectedIcon
-                                },
-                            contentDescription = destination.label,
-                        )
-                    },
-                    label = { Text(destination.label) },
-                    selected = destination == currentDestination,
-                    onClick = { currentDestination = destination },
-                )
-            }
-        }
-
-        if (showFab) {
+    Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        floatingActionButton = {
             FloatingActionButton(
-                onClick = { onFabClick(currentDestination) },
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .systemBarsPadding()
-                        .padding(16.dp),
+                onClick = {
+                    when (currentDestination) {
+                        HomeRouteDestination.Journals -> onCreateJournal()
+                        else -> onNewEntry()
+                    }
+                },
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             ) {
                 Icon(
                     Icons.Default.EditNote,
                     contentDescription = stringResource(Res.string.create_new_entry),
                 )
+            }
+        },
+        modifier = modifier,
+    ) { innerPadding ->
+        NavigationSuiteScaffold(
+            containerColor = Color.Transparent,
+            navigationSuiteColors =
+                NavigationSuiteDefaults.colors(
+                    navigationRailContainerColor = Color.Transparent,
+                    navigationBarContainerColor = Color.Transparent,
+                ),
+            navigationSuiteItems = {
+                HomeRouteDestination.visibleEntries.forEach { destination ->
+                    item(
+                        selected = destination == currentDestination,
+                        onClick = { currentDestination = destination },
+                        icon = {
+                            Icon(
+                                imageVector =
+                                    if (destination == currentDestination) {
+                                        destination.selectedIcon
+                                    } else {
+                                        destination.unselectedIcon
+                                    },
+                                contentDescription = destination.label,
+                            )
+                        },
+                        label = { Text(destination.label) },
+                    )
+                }
+            },
+            modifier = Modifier.padding(innerPadding),
+        ) {
+            when (currentDestination) {
+                HomeRouteDestination.Timeline -> {
+                    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+                    TimelinePane(
+                        uiState =
+                            TimelineUiState(
+                                items = uiState.items,
+                                loadingState = uiState.loadingState,
+                                isLoadingMore = uiState.isLoadingMore,
+                                hasMoreOlderContent = uiState.hasMoreOlderContent,
+                                appendError = uiState.appendError,
+                            ),
+                        onNewEntry = onNewEntry,
+                        onOpenDay = { date -> viewModel.selectDay(date) },
+                        onLoadMoreOlder = viewModel::loadMoreOlder,
+                        onProfileClick = onOpenSettings,
+                        timelineSuggestion = uiState.timelineSuggestion,
+                        modifier =
+                            Modifier
+                                .applyScreenStyles()
+                                .safeDrawingPadding(),
+                    )
+                }
+
+                HomeRouteDestination.LocationHistory -> {
+                    locationContent(
+                        Modifier
+                            .applyScreenStyles()
+                            .safeDrawingPadding(),
+                    )
+                }
+
+                HomeRouteDestination.Journals -> {
+                    JournalsOverviewScreen(
+                        onOpenJournal = onOpenJournal,
+                        onBrowseJournals = onBrowseJournals,
+                        onCreateJournal = onCreateJournal,
+                        modifier = Modifier.applyScreenStyles(),
+                    )
+                }
+
+                HomeRouteDestination.Library -> {
+                    libraryContent(Modifier.applyScreenStyles())
+                }
+
+                HomeRouteDestination.Rewind -> {
+                    RewindOverviewScreen(
+                        onOpenRewind = onOpenRewind,
+                        modifier = Modifier.applyScreenStyles(),
+                    )
+                }
             }
         }
     }
@@ -495,12 +493,7 @@ class HomeViewModel(
     ): MomentUiState {
         val timezone = TimeZone.currentSystemDefault()
         val startLocal = estimatedStart.toLocalDateTime(timezone)
-        val timeOfDay =
-            when (startLocal.hour) {
-                in 0..11 -> "morning"
-                in 12..17 -> "afternoon"
-                else -> "evening"
-            }
+        val timeOfDay = TimeOfDay.from(startLocal.hour).label
         val resolvedPeople =
             people.mapNotNull { name ->
                 dayPeople.find { it.name.equals(name, ignoreCase = true) }

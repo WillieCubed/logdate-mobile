@@ -26,6 +26,7 @@ import app.logdate.feature.journals.navigation.noteDetailRoute
 import app.logdate.feature.library.navigation.MediaDetailRoute
 import app.logdate.feature.library.navigation.libraryRoute
 import app.logdate.feature.library.navigation.mediaDetailRoute
+import app.logdate.feature.library.ui.LibraryScreen
 import app.logdate.feature.onboarding.navigation.onboardingGraph
 import app.logdate.feature.rewind.navigation.navigateToRewind
 import app.logdate.feature.rewind.navigation.rewindRoutes
@@ -72,6 +73,13 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
             },
             onOpenSettings = { navController.navigate(SettingsRoute()) },
             onBrowseJournals = navController::navigateToJournalsOverview,
+            onOpenMediaDetail = { mediaId -> navController.navigate(MediaDetailRoute(mediaId)) },
+            libraryContent = { modifier ->
+                LibraryScreen(
+                    onOpenMediaDetail = { mediaId -> navController.navigate(MediaDetailRoute(mediaId)) },
+                    modifier = modifier,
+                )
+            },
         )
         journalsOverviewRoute(
             onOpenJournal = navController::navigateToJournal,

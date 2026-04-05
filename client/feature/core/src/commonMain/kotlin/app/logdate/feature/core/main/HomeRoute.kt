@@ -1,5 +1,7 @@
 package app.logdate.feature.core.main
 
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
@@ -29,9 +31,10 @@ fun NavGraphBuilder.homeGraph(
     onOpenRewind: (uid: Uuid) -> Unit,
     onOpenSettings: () -> Unit,
     onBrowseJournals: () -> Unit,
+    onOpenMediaDetail: (Uuid) -> Unit = {},
+    libraryContent: @Composable (Modifier) -> Unit = {},
 ) {
     composable<HomeRoute> {
-        // Removed problematic CompositionLocalProvider that was causing the Compose compiler bug
         HomeScreen(
             onNewEntry = onCreateNote,
             onOpenJournal = onOpenJournal,
@@ -39,6 +42,8 @@ fun NavGraphBuilder.homeGraph(
             onBrowseJournals = onBrowseJournals,
             onOpenRewind = onOpenRewind,
             onOpenSettings = onOpenSettings,
+            onOpenMediaDetail = onOpenMediaDetail,
+            libraryContent = libraryContent,
         )
     }
 }

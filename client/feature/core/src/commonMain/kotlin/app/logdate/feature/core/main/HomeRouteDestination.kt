@@ -2,15 +2,23 @@ package app.logdate.feature.core.main
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.outlined.Book
+import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material.icons.outlined.Timeline
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.ui.graphics.vector.ImageVector
 
+/**
+ * Tabs in the home navigation shell.
+ *
+ * Matches Android's [HomeTab] enum: same order, icons, and labels so the desktop
+ * and Android experiences stay consistent.
+ */
 enum class HomeRouteDestination(
     val label: String,
     val selectedIcon: ImageVector,
@@ -18,43 +26,37 @@ enum class HomeRouteDestination(
 ) {
     Timeline(
         label = "Timeline",
-        selectedIcon = Icons.Filled.Timeline,
-        unselectedIcon = Icons.Outlined.Timeline,
-    ),
-    Rewind(
-        label = "Rewind",
         selectedIcon = Icons.Filled.History,
         unselectedIcon = Icons.Outlined.History,
-    ),
-    Journals(
-        label = "Journals",
-        selectedIcon = Icons.Filled.Book,
-        unselectedIcon = Icons.Outlined.Book,
     ),
     LocationHistory(
         label = "Locations",
         selectedIcon = Icons.Filled.LocationOn,
         unselectedIcon = Icons.Outlined.LocationOn,
     ),
+    Journals(
+        label = "Journals",
+        selectedIcon = Icons.Filled.Book,
+        unselectedIcon = Icons.Outlined.Book,
+    ),
+    Library(
+        label = "Library",
+        selectedIcon = Icons.Filled.PhotoLibrary,
+        unselectedIcon = Icons.Outlined.PhotoLibrary,
+    ),
+    Rewind(
+        label = "Rewind",
+        selectedIcon = Icons.Filled.DateRange,
+        unselectedIcon = Icons.Outlined.DateRange,
+    ),
     ;
 
-    //    People(
-//        label = "People",
-//        selectedIcon = "ic_people_selected",
-//        unselectedIcon = "ic_people_unselected",
-//    ),
-//    Events(
-//        label = "Events",
-//        selectedIcon = "ic_events_selected",
-//        unselectedIcon = "ic_events_unselected",
-//    ),
-//    Notes(
-//        label = "Notes",
-//        selectedIcon = "ic_notes_selected",
-//        unselectedIcon = "ic_notes_unselected",
-//    );
-
     companion object {
+        /**
+         * Tabs visible by default. The Library tab is behind a feature flag.
+         */
+        val visibleEntries: List<HomeRouteDestination> = entries.filter { it != Library }
+
         val ALL = entries.toTypedArray()
     }
 }
