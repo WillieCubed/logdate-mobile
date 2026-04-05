@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavKey
@@ -57,6 +58,7 @@ import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.restore.LocalAcknowledgeCloudRestore
 import app.logdate.ui.restore.LocalIsPostCloudRestore
 import app.logdate.ui.theme.LogDateTheme
+import kotlinx.coroutines.flow.distinctUntilChanged
 import logdate.app.composemain.generated.resources.Res
 import logdate.app.composemain.generated.resources.cancel
 import logdate.app.composemain.generated.resources.encrypted_data_recovery_required
@@ -90,6 +92,7 @@ fun MainActivityUiRoot(
     onAcknowledgeCloudRestore: () -> Unit = {},
     appUpdateUiState: AppUpdateUiState = AppUpdateUiState(),
     onCompleteAppUpdate: () -> Unit = {},
+    onCurrentDestinationChanged: (NavKey) -> Unit = {},
     mainAppNavigator: MainAppNavigator = rememberMainAppNavigator(initialRoute = NavigationStart),
     sharingLauncher: SharingLauncher,
 ) {
@@ -102,6 +105,12 @@ fun MainActivityUiRoot(
     var hideRecoveryDialog by rememberSaveable { mutableStateOf(false) }
     val appUpdateSnackbarHostState = remember { SnackbarHostState() }
     val currentRoute = mainAppNavigator.backStack.lastOrNull()
+
+    LaunchedEffect(Unit) {
+        snapshotFlow { mainAppNavigator.backStack.lastOrNull() }
+            .distinctUntilChanged()
+            .collect { key -> key?.let { onCurrentDestinationChanged(it) } }
+    }
 
     LaunchedEffect(appUiState.isOnboarded, appUiState.requiresUnlock, pendingNavKey, databaseStartupState, currentRoute) {
         if (databaseStartupState is DatabaseStartupState.Ready) {

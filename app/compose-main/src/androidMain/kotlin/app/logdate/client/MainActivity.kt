@@ -1,6 +1,13 @@
 package app.logdate.client
 
+import android.annotation.SuppressLint
+import android.app.HandoffActivityData
+import android.app.HandoffActivityDataRequestInfo
+import android.app.HandoffActivityParams
+import android.content.ComponentName
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -119,6 +126,7 @@ class MainActivity : FragmentActivity() {
 
     private var appUiState by mutableStateOf<GlobalAppUiState>(GlobalAppUiLoadingState)
     private var pendingNavKey by mutableStateOf<NavKey?>(null)
+    private var currentNavKey by mutableStateOf<NavKey?>(null)
     private var databaseStartupState by mutableStateOf<DatabaseStartupState>(DatabaseStartupState.Ready)
     private var appUpdateUiState by mutableStateOf(AppUpdateUiState())
     private var launchSnapshot by mutableStateOf(LaunchStageSnapshot())
@@ -254,6 +262,19 @@ class MainActivity : FragmentActivity() {
         }
 
         enableEdgeToEdge()
+
+        if (Build.VERSION.SDK_INT >= 37) {
+            // TODO: Enable web handoff once logdate.app can reconstruct app state from the URL.
+            //  Flip setAllowHandoffWithoutPackageInstalled to true and verify each deep-link path
+            //  renders the correct content on the web before enabling.
+            val handoffParams =
+                HandoffActivityParams
+                    .Builder()
+                    .setAllowHandoffWithoutPackageInstalled(false)
+                    .build()
+            setHandoffEnabled(true, handoffParams)
+        }
+
         pendingNavKey = resolveNavKey(intent)
 
         setContent {
@@ -278,6 +299,7 @@ class MainActivity : FragmentActivity() {
                             playInAppUpdateController.completeUpdate()
                         }
                     },
+                    onCurrentDestinationChanged = { currentNavKey = it },
                     sharingLauncher = sharingLauncher,
                 )
             } else {
@@ -327,6 +349,15 @@ class MainActivity : FragmentActivity() {
         }
 
         return super.onOptionsItemSelected(item)
+    }
+
+    @SuppressLint("NewApi")
+    override fun onHandoffActivityDataRequested(info: HandoffActivityDataRequestInfo): HandoffActivityData? {
+        val url = currentNavKey?.toWebUrl() ?: return null
+        return HandoffActivityData
+            .Builder(ComponentName(this, MainActivity::class.java))
+            .setFallbackUri(Uri.parse(url))
+            .build()
     }
 
     override fun onResume() {

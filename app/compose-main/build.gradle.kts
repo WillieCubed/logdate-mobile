@@ -10,6 +10,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.dokka)
+    alias(libs.plugins.buildConfig)
     alias(libs.plugins.kotlinx.serialization)
 }
 
@@ -197,4 +198,13 @@ compose.desktop {
             }
         }
     }
+}
+
+buildConfig {
+    packageName("app.logdate.client")
+
+    // Values sourced from gradle.properties; override in local.properties or CI for non-production builds.
+    // TODO: add per-variant overrides once a staging/debug web environment exists.
+    buildConfigField("LOGDATE_ORIGIN", providers.gradleProperty("logdate.origin").get())
+    buildConfigField("LOGDATE_API_BASE_URL", providers.gradleProperty("logdate.apiBaseUrl").get())
 }
