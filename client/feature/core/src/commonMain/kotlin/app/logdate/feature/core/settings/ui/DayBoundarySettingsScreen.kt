@@ -77,12 +77,11 @@ fun DayBoundarySettingsScreen(
         healthConnectStatus = uiState.healthConnectStatus,
         onBack = onBack,
         onToggleSleepBased = { enabled ->
-            when {
-                !enabled -> viewModel.toggleSleepBasedBoundaries(false)
-                uiState.healthConnectStatus == HealthConnectStatus.CONNECTED -> viewModel.toggleSleepBasedBoundaries(true)
-                uiState.healthConnectStatus == HealthConnectStatus.PERMISSIONS_NEEDED -> onEnableSleepBasedWithPermissions()
-                uiState.healthConnectStatus == HealthConnectStatus.NOT_AVAILABLE -> Unit
-                uiState.healthConnectStatus == HealthConnectStatus.CHECKING -> Unit
+            when (resolveDayBoundaryToggleAction(enabled, uiState.healthConnectStatus)) {
+                DayBoundaryToggleAction.DISABLE -> viewModel.toggleSleepBasedBoundaries(false)
+                DayBoundaryToggleAction.ENABLE_DIRECTLY -> viewModel.toggleSleepBasedBoundaries(true)
+                DayBoundaryToggleAction.REQUEST_PERMISSIONS -> onEnableSleepBasedWithPermissions()
+                DayBoundaryToggleAction.NO_OP -> Unit
             }
         },
         onSetFallbackHour = viewModel::setFallbackStartHour,
@@ -316,3 +315,23 @@ private fun formatHour(hour: Int): String {
     val today = Clock.System.todayIn(tz)
     return LocalDateTime(today, LocalTime(hour, 0)).toInstant(tz).asTime
 }
+
+internal enum class DayBoundaryToggleAction {
+    DISABLE,
+    ENABLE_DIRECTLY,
+    REQUEST_PERMISSIONS,
+    NO_OP,
+}
+
+internal fun resolveDayBoundaryToggleAction(
+    enabled: Boolean,
+    healthConnectStatus: HealthConnectStatus,
+): DayBoundaryToggleAction =
+    when {
+        !enabled -> DayBoundaryToggleAction.DISABLE
+        healthConnectStatus == HealthConnectStatus.CONNECTED -> DayBoundaryToggleAction.ENABLE_DIRECTLY
+        healthConnectStatus == HealthConnectStatus.PERMISSIONS_NEEDED -> DayBoundaryToggleAction.REQUEST_PERMISSIONS
+        healthConnectStatus == HealthConnectStatus.CHECKING -> DayBoundaryToggleAction.REQUEST_PERMISSIONS
+        healthConnectStatus == HealthConnectStatus.NOT_AVAILABLE -> DayBoundaryToggleAction.NO_OP
+        else -> DayBoundaryToggleAction.NO_OP
+    }
