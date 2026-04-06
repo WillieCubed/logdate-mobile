@@ -39,10 +39,15 @@ class RewindSequencer {
     ): List<RewindContent> {
         Napier.d("Sequencing narrative with ${narrative.storyBeats.size} beats")
 
+        // Derive timestamp boundaries from actual content
+        val allTimestamps = textEntries.map { it.creationTimestamp } + media.map { it.timestamp }
+        val earliestTimestamp = allTimestamps.minOrNull() ?: Instant.DISTANT_PAST
+        val latestTimestamp = allTimestamps.maxOrNull() ?: Instant.DISTANT_FUTURE
+
         val panels = mutableListOf<RewindContent>()
 
         // 1. Opening: Narrative context that sets the scene
-        panels.add(createOpeningContext(narrative))
+        panels.add(createOpeningContext(narrative, earliestTimestamp))
 
         // 2. Story beats with evidence and transitions
         narrative.storyBeats.forEachIndexed { index, beat ->
@@ -58,7 +63,7 @@ class RewindSequencer {
         }
 
         // 3. Resolution: Close with the overall narrative
-        panels.add(createResolution(narrative))
+        panels.add(createResolution(narrative, latestTimestamp))
 
         Napier.d("Generated ${panels.size} panels from narrative")
         return panels
@@ -69,7 +74,10 @@ class RewindSequencer {
      *
      * Sets the scene for the week's story.
      */
-    private fun createOpeningContext(narrative: WeekNarrative): RewindContent.NarrativeContext {
+    private fun createOpeningContext(
+        narrative: WeekNarrative,
+        earliestTimestamp: Instant,
+    ): RewindContent.NarrativeContext {
         // Extract first sentence from overall narrative as opening
         val sentences = narrative.overallNarrative.split(". ")
         val openingText =
@@ -80,10 +88,10 @@ class RewindSequencer {
             }
 
         return RewindContent.NarrativeContext(
-            timestamp = Instant.DISTANT_PAST, // Placeholder - will be set by generator
+            timestamp = earliestTimestamp,
             sourceId = Uuid.random(),
             contextText = openingText,
-            backgroundImage = null, // Could enhance: Use first photo from week
+            backgroundImage = null,
         )
     }
 
@@ -123,7 +131,7 @@ class RewindSequencer {
             }
 
         return RewindContent.Transition(
-            timestamp = Instant.DISTANT_PAST, // Placeholder
+            timestamp = Instant.DISTANT_PAST,
             sourceId = Uuid.random(),
             transitionText = transitionText,
         )
@@ -206,7 +214,10 @@ class RewindSequencer {
     /**
      * Creates resolution panel that closes the week's story.
      */
-    private fun createResolution(narrative: WeekNarrative): RewindContent.NarrativeContext {
+    private fun createResolution(
+        narrative: WeekNarrative,
+        latestTimestamp: Instant,
+    ): RewindContent.NarrativeContext {
         // Use last sentence(s) from overall narrative as resolution
         val sentences = narrative.overallNarrative.split(". ")
         val resolutionText =
@@ -218,7 +229,7 @@ class RewindSequencer {
             }
 
         return RewindContent.NarrativeContext(
-            timestamp = Instant.DISTANT_FUTURE, // Placeholder - signals end
+            timestamp = latestTimestamp,
             sourceId = Uuid.random(),
             contextText = resolutionText,
             backgroundImage = null,

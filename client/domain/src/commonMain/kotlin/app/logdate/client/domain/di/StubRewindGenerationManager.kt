@@ -53,6 +53,16 @@ class StubRewindGenerationManager : RewindGenerationManager {
                 )
         }
 
+    override suspend fun updateRequestStatus(
+        id: Uuid,
+        status: RewindGenerationRequest.Status,
+        details: String?,
+    ): Boolean {
+        val request = activeRequests[id] ?: return false
+        activeRequests[id] = request.copy(status = status, details = details)
+        return true
+    }
+
     override suspend fun cancelGeneration(requestId: Uuid): Boolean {
         val request = activeRequests[requestId] ?: return false
         activeRequests[requestId] = request.copy(status = RewindGenerationRequest.Status.CANCELLED)

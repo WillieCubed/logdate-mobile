@@ -112,10 +112,10 @@ class DefaultRewindGenerationManager(
      * @param details Optional details about the status change
      * @return True if the update was successful, false otherwise
      */
-    suspend fun updateRequestStatus(
+    override suspend fun updateRequestStatus(
         id: Uuid,
         status: RewindGenerationRequest.Status,
-        details: String? = null,
+        details: String?,
     ): Boolean =
         try {
             // Convert from model status to entity status

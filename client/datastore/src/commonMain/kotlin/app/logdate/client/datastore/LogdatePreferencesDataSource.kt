@@ -12,6 +12,7 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.datetime.DayOfWeek
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -45,6 +46,9 @@ class LogdatePreferencesDataSource(
         val ORIGINAL_BIO = stringPreferencesKey("original_bio")
         val PROFILE_CREATED_AT = longPreferencesKey("profile_created_at")
         val PROFILE_LAST_UPDATED_AT = longPreferencesKey("profile_last_updated_at")
+
+        // Calendar preferences
+        val FIRST_DAY_OF_WEEK = stringPreferencesKey("first_day_of_week")
 
         // Android AppSearch metadata
         val ANDROID_PLATFORM_SEARCH_INDEX_GENERATION = longPreferencesKey("android_platform_search_index_generation")
@@ -371,6 +375,34 @@ class LogdatePreferencesDataSource(
             Napier.e("Failed to clear user data", e)
             Result.failure(e)
         }
+
+    /**
+     * Observes the user's preferred first day of the week.
+     *
+     * Returns null when no preference has been saved, allowing callers to apply
+     * their own fallback (typically the device locale default).
+     */
+    fun observeFirstDayOfWeek(): Flow<DayOfWeek?> =
+        userPreferences.data.map { prefs ->
+            val stored = prefs[FIRST_DAY_OF_WEEK] ?: return@map null
+            runCatching { DayOfWeek.valueOf(stored) }.getOrNull()
+        }
+
+    /**
+     * Gets the user's preferred first day of the week, or null if not set.
+     */
+    suspend fun getFirstDayOfWeek(): DayOfWeek? = observeFirstDayOfWeek().first()
+
+    /**
+     * Sets the user's preferred first day of the week.
+     */
+    suspend fun setFirstDayOfWeek(dayOfWeek: DayOfWeek) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[FIRST_DAY_OF_WEEK] = dayOfWeek.name
+            }
+        }
+    }
 
     private fun millisToInstantOrDistantPast(millis: Long?): Instant {
         val value = millis ?: 0L

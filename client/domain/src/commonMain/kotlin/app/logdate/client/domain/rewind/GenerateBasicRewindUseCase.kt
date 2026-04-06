@@ -123,9 +123,13 @@ class GenerateBasicRewindUseCase(
         Napier.d("Created generation request: ${request.id}")
 
         try {
-            // First ensure all media in the time period is indexed
-            val newlyIndexedCount = indexMediaForPeriod(startTime, endTime)
-            Napier.d("Indexed $newlyIndexedCount new media items")
+            // Index media for the period — non-fatal if this fails
+            try {
+                val newlyIndexedCount = indexMediaForPeriod(startTime, endTime)
+                Napier.d("Indexed $newlyIndexedCount new media items")
+            } catch (e: Exception) {
+                Napier.w("Media indexing failed, continuing with already-indexed media", e)
+            }
 
             // Collect all raw content for narrative synthesis
             val allTextEntries = mutableListOf<JournalNote.Text>()
@@ -315,13 +319,12 @@ class GenerateBasicRewindUseCase(
         details: String? = null,
     ) {
         try {
-            // Just use the cancelGeneration method to set the status to cancelled if needed
             if (status == RewindGenerationRequest.Status.CANCELLED) {
                 generationManager.cancelGeneration(requestId)
+            } else {
+                generationManager.updateRequestStatus(requestId, status, details)
             }
-
-            // Log the status update
-            Napier.d("Updating generation request $requestId to $status ${details?.let{"($it)"} ?: ""}")
+            Napier.d("Updated generation request $requestId to $status ${details?.let { "($it)" } ?: ""}")
         } catch (e: Exception) {
             Napier.e("Failed to update generation status", e)
         }

@@ -1,5 +1,6 @@
 package app.logdate.util
 
+import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
@@ -209,3 +210,10 @@ expect val Instant.asTime: String
  * @return A localized date string in long format
  */
 expect fun formatDateLocalized(date: LocalDate): String
+
+/**
+ * Returns the first day of the week according to the device's current locale.
+ *
+ * For example, Sunday in the US, Monday in most of Europe.
+ */
+expect fun getLocaleFirstDayOfWeek(): DayOfWeek

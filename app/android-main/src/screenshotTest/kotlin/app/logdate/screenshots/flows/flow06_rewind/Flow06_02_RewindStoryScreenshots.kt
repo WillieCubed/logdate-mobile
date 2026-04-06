@@ -27,8 +27,8 @@ import kotlin.uuid.Uuid
 private val sampleRewindId = Uuid.parse("00000000-0000-0000-0000-000000000020")
 
 private val samplePastRewinds = listOf(
-    RewindHistoryUiState(uid = sampleRewindId, title = "Week of Feb 17"),
-    RewindHistoryUiState(uid = Uuid.parse("00000000-0000-0000-0000-000000000021"), title = "Week of Feb 10"),
+    RewindHistoryUiState(uid = sampleRewindId, title = "Week of Feb 17", label = "Week 8", startDate = LocalDate(2025, 2, 17), endDate = LocalDate(2025, 2, 23)),
+    RewindHistoryUiState(uid = Uuid.parse("00000000-0000-0000-0000-000000000021"), title = "Week of Feb 10", label = "Week 7", startDate = LocalDate(2025, 2, 10), endDate = LocalDate(2025, 2, 16)),
 )
 
 private val samplePreview = RewindPreviewUiState(

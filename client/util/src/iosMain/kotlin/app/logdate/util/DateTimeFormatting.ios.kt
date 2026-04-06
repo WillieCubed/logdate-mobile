@@ -1,8 +1,10 @@
 package app.logdate.util
 
+import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.number
+import platform.Foundation.NSCalendar
 import platform.Foundation.NSDate
 import platform.Foundation.NSDateFormatter
 import platform.Foundation.NSDateFormatterLongStyle
@@ -10,6 +12,7 @@ import platform.Foundation.NSDateFormatterNoStyle
 import platform.Foundation.NSDateFormatterShortStyle
 import platform.Foundation.NSLocale
 import platform.Foundation.NSTimeZone
+import platform.Foundation.currentCalendar
 import platform.Foundation.currentLocale
 import platform.Foundation.dateWithTimeIntervalSince1970
 import platform.Foundation.timeZoneWithName
@@ -62,4 +65,19 @@ actual fun formatDateLocalized(date: LocalDate): String {
         }
 
     return formatter.stringFromDate(nsDate)
+}
+
+actual fun getLocaleFirstDayOfWeek(): DayOfWeek {
+    // NSCalendar firstWeekday: 1 = Sunday, 2 = Monday, ..., 7 = Saturday
+    val firstWeekday = NSCalendar.currentCalendar.firstWeekday.toInt()
+    return when (firstWeekday) {
+        1 -> DayOfWeek.SUNDAY
+        2 -> DayOfWeek.MONDAY
+        3 -> DayOfWeek.TUESDAY
+        4 -> DayOfWeek.WEDNESDAY
+        5 -> DayOfWeek.THURSDAY
+        6 -> DayOfWeek.FRIDAY
+        7 -> DayOfWeek.SATURDAY
+        else -> DayOfWeek.MONDAY
+    }
 }

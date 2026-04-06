@@ -147,22 +147,25 @@ class WittyRewindMessageGenerator : RewindMessageGenerator {
 
     override suspend fun generateMessage(rewindAvailable: Boolean): String = selectMessage(rewindAvailable)
 
+    override suspend fun generateContextualMessage(
+        rewindAvailable: Boolean,
+        photoCount: Int,
+        textCount: Int,
+        peopleCount: Int,
+        themes: List<String>,
+    ): String =
+        generateDetailedContextualMessage(
+            rewindAvailable = rewindAvailable,
+            themes = themes,
+            photoCount = photoCount,
+            textCount = textCount,
+            peopleCount = peopleCount,
+        )
+
     /**
-     * Generates a contextual message based on rewind characteristics and narrative themes.
-     *
-     * @param rewindAvailable Whether the rewind is ready
-     * @param themes Narrative themes from AI analysis (e.g., "travel", "work stress", "celebration")
-     * @param photoCount Number of photos in the rewind
-     * @param videoCount Number of videos in the rewind
-     * @param textCount Number of text entries in the rewind
-     * @param peopleCount Number of people mentioned
-     * @param activity Detected activity type
-     * @param hasLateNightEntries Whether there are entries after midnight
-     * @param foodMentions Number of food-related mentions
-     * @param streakDays Consecutive days of journaling
-     * @return A contextual, witty message
+     * Internal implementation with full parameter set for contextual message generation.
      */
-    fun generateContextualMessage(
+    private fun generateDetailedContextualMessage(
         rewindAvailable: Boolean,
         themes: List<String> = emptyList(),
         photoCount: Int = 0,

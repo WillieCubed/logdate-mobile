@@ -5,20 +5,28 @@ package app.logdate.feature.rewind.ui.detail
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import app.logdate.feature.rewind.ui.RewindDetailUiState
 import app.logdate.feature.rewind.ui.RewindDetailViewModel
+import app.logdate.ui.common.AspectRatios
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 
@@ -71,20 +79,44 @@ fun RewindDetailScreenContent(
     onExitRewind: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
+    val isWideScreen = windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND)
+
     when (val currentState = uiState) {
         is RewindDetailUiState.Loading -> {
             RewindLoadingScreen(modifier = modifier.fillMaxSize())
         }
 
         is RewindDetailUiState.Success -> {
-            RewindStoryView(
-                panels = currentState.panels,
-                onExit = onExitRewind,
-                content = { panel ->
-                    RewindStoryContent(panel = panel)
-                },
-                modifier = modifier.fillMaxSize(),
-            )
+            if (isWideScreen) {
+                // On wide screens, center a 9:16 card with rounded corners
+                Box(
+                    modifier = modifier.fillMaxSize().background(Color.Black),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    RewindStoryView(
+                        panels = currentState.panels,
+                        onExit = onExitRewind,
+                        content = { panel ->
+                            RewindStoryContent(panel = panel)
+                        },
+                        modifier =
+                            Modifier
+                                .fillMaxHeight(0.9f)
+                                .aspectRatio(AspectRatios.RATIO_9_16)
+                                .clip(RoundedCornerShape(16.dp)),
+                    )
+                }
+            } else {
+                RewindStoryView(
+                    panels = currentState.panels,
+                    onExit = onExitRewind,
+                    content = { panel ->
+                        RewindStoryContent(panel = panel)
+                    },
+                    modifier = modifier.fillMaxSize(),
+                )
+            }
         }
 
         is RewindDetailUiState.Error -> {

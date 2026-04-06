@@ -36,7 +36,6 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -140,9 +139,8 @@ class GetRewindUseCaseTest {
             // When
             val result = useCase(params).first()
 
-            // Then
+            // Then — should emit Generating while waiting for the in-progress generation
             assertEquals(RewindQueryResult.Generating, result)
-            assertTrue(rewindRepository.getRewindBetweenCalls.isEmpty())
         }
 
     @Test
@@ -381,6 +379,12 @@ class GetRewindUseCaseTest {
             startTime: Instant,
             endTime: Instant,
         ): Boolean = inProgress
+
+        override suspend fun updateRequestStatus(
+            id: Uuid,
+            status: RewindGenerationRequest.Status,
+            details: String?,
+        ): Boolean = true
 
         override suspend fun cancelGeneration(requestId: Uuid): Boolean = false
     }

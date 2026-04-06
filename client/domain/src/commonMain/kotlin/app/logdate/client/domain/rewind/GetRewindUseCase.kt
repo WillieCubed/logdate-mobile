@@ -43,48 +43,52 @@ class GetRewindUseCase(
             return flow { emit(RewindQueryResult.NotReady) }
         }
 
-        // Check if generation is already in progress and get rewind
         return channelFlow {
-            if (generationManager.isGenerationInProgress(params.start, params.end)) {
-                Napier.d("Generation already in progress for period")
-                send(RewindQueryResult.Generating)
-                return@channelFlow
-            }
+            // Track whether we've already attempted generation to prevent infinite retries
+            var generationAttempted = false
 
-            Napier.d("Checking for existing rewind for period ${params.start} to ${params.end}")
-
-            // Collect the repository flow to check if rewind exists
+            // Always collect from the repository so we pick up newly saved rewinds
             rewindRepository.getRewindBetween(params.start, params.end).collect { rewind ->
                 if (rewind != null) {
                     Napier.d("Found existing rewind for period")
                     send(RewindQueryResult.Success(rewind))
+                    generationAttempted = false // Reset in case preferences change and we re-collect
+                } else if (generationAttempted) {
+                    // We already tried generating and no rewind appeared — nothing more to do
+                    Napier.d("Generation already attempted, no rewind produced")
+                    send(RewindQueryResult.NoneAvailable)
+                } else if (generationManager.isGenerationInProgress(params.start, params.end)) {
+                    // Another caller is generating — wait for the repo to re-emit
+                    Napier.d("Generation already in progress for period, waiting")
+                    send(RewindQueryResult.Generating)
                 } else {
-                    // No rewind exists for this current/past period - trigger instant generation
-                    Napier.d("No rewind exists for period, triggering instant generation")
-
-                    // Immediately emit Generating state for instant UX
+                    // No rewind and no generation in progress — trigger generation once
+                    Napier.d("No rewind exists for period, triggering generation")
+                    generationAttempted = true
                     send(RewindQueryResult.Generating)
 
-                    // Trigger generation in background for seamless experience
                     launch {
                         try {
-                            val result = generateBasicRewindUseCase(params.start, params.end)
-                            when (result) {
+                            when (val result = generateBasicRewindUseCase(params.start, params.end)) {
                                 is GenerateBasicRewindResult.Success -> {
-                                    Napier.i("Successfully generated rewind for period - UI will auto-update")
+                                    Napier.i("Successfully generated rewind — UI will auto-update via repo flow")
                                 }
                                 is GenerateBasicRewindResult.AlreadyInProgress -> {
-                                    Napier.d("Generation already in progress - will continue")
+                                    Napier.d("Generation already in progress")
                                 }
                                 is GenerateBasicRewindResult.NoContent -> {
                                     Napier.w("No content available for rewind period")
+                                    // Emit NoneAvailable so UI stops showing the loading state
+                                    send(RewindQueryResult.NoneAvailable)
                                 }
                                 is GenerateBasicRewindResult.Error -> {
                                     Napier.e("Failed to generate rewind: ${result.error}", result.exception)
+                                    send(RewindQueryResult.NoneAvailable)
                                 }
                             }
                         } catch (e: Exception) {
                             Napier.e("Error during background rewind generation", e)
+                            send(RewindQueryResult.NoneAvailable)
                         }
                     }
                 }

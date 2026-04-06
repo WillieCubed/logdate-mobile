@@ -18,25 +18,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.overview.RewindPreviewUiState
 import app.logdate.ui.theme.Spacing
+import app.logdate.util.formatDateLocalized
+import app.logdate.util.toReadableDateShort
 import logdate.client.feature.rewind.generated.resources.*
 import logdate.client.feature.rewind.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
 
 /**
  * Content layout for a rewind card with dates at the top and title at the bottom.
- *
- * This component manages the internal layout structure of a rewind card, positioning
- * the date range at the top start and the title, label, and message at the bottom start.
- * The layout uses a Box with alignment modifiers to achieve this positioning.
- *
- * ## Layout Structure:
- * - **Top Start**: Date range with arrow separator (e.g., "2024-01-01 → 2024-01-07")
- * - **Bottom Start**: Title, subtitle, and label information
- *
- * ## Visual States:
- * - Different color schemes based on rewind availability
- * - Status indicator dot for unavailable rewinds
- * - Typography weight changes between available/unavailable states
  *
  * @param rewind The rewind data to display
  * @param modifier Modifier for customizing the content container
@@ -53,35 +42,26 @@ fun RewindCoverCard(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.align(Alignment.TopStart),
         ) {
+            val dateColor =
+                if (rewind.rewindAvailable) {
+                    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
             Text(
-                text = rewind.start.toString(),
+                text = rewind.start.toReadableDateShort(),
                 style = MaterialTheme.typography.bodyMedium,
-                color =
-                    if (rewind.rewindAvailable) {
-                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
+                color = dateColor,
             )
             Text(
                 text = stringResource(Res.string.text_3),
                 style = MaterialTheme.typography.bodyMedium,
-                color =
-                    if (rewind.rewindAvailable) {
-                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
+                color = dateColor,
             )
             Text(
-                text = rewind.end.toString(),
+                text = formatDateLocalized(rewind.end),
                 style = MaterialTheme.typography.bodyMedium,
-                color =
-                    if (rewind.rewindAvailable) {
-                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
+                color = dateColor,
             )
         }
 

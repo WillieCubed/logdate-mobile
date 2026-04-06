@@ -1,10 +1,12 @@
 package app.logdate.util
 
+import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.number
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import java.util.Calendar
 import java.util.Locale
 import kotlin.time.Instant
 
@@ -36,4 +38,17 @@ actual fun formatDateLocalized(date: LocalDate): String {
             .ofLocalizedDate(FormatStyle.LONG)
             .withLocale(Locale.getDefault())
     return javaLocalDate.format(formatter)
+}
+
+actual fun getLocaleFirstDayOfWeek(): DayOfWeek {
+    val calendarFirstDay = Calendar.getInstance(Locale.getDefault()).firstDayOfWeek
+    return when (calendarFirstDay) {
+        Calendar.MONDAY -> DayOfWeek.MONDAY
+        Calendar.TUESDAY -> DayOfWeek.TUESDAY
+        Calendar.WEDNESDAY -> DayOfWeek.WEDNESDAY
+        Calendar.THURSDAY -> DayOfWeek.THURSDAY
+        Calendar.FRIDAY -> DayOfWeek.FRIDAY
+        Calendar.SATURDAY -> DayOfWeek.SATURDAY
+        else -> DayOfWeek.SUNDAY
+    }
 }

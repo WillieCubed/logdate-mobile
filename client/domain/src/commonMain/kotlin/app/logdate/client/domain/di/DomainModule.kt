@@ -132,7 +132,10 @@ val domainModule: Module =
         // Rewind
         factory { GetPastRewindsUseCase(get()) }
         factory { GetRewindUseCase(get(), get(), get()) }
-        factory { GetWeekRewindUseCase(get()) }
+        factory {
+            val prefs: app.logdate.client.datastore.LogdatePreferencesDataSource = get()
+            GetWeekRewindUseCase(get(), prefs.observeFirstDayOfWeek())
+        }
         factory { GenerateRewindTitleUseCase() }
 
         // Media indexing

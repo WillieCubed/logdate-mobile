@@ -47,6 +47,7 @@ import kotlin.uuid.Uuid
 
 class GetWeekRewindUseCaseTest {
     private lateinit var rewindRepository: FakeRewindRepository
+    private lateinit var getRewindUseCase: GetRewindUseCase
     private lateinit var useCase: GetWeekRewindUseCase
 
     @BeforeTest
@@ -95,14 +96,23 @@ class GetWeekRewindUseCaseTest {
                 rewindSequencer = rewindSequencer,
                 peopleExtractor = peopleExtractor,
             )
-        val getRewindUseCase =
+        getRewindUseCase =
             GetRewindUseCase(
                 rewindRepository = rewindRepository,
                 generationManager = generationManager,
                 generateBasicRewindUseCase = generateBasicRewindUseCase,
             )
-        useCase = GetWeekRewindUseCase(getRewindUseCase = getRewindUseCase)
+        useCase = createUseCaseWithWeekStart(DayOfWeek.SUNDAY)
     }
+
+    /**
+     * Creates a [GetWeekRewindUseCase] configured with a fixed first day of week preference.
+     */
+    private fun createUseCaseWithWeekStart(dayOfWeek: DayOfWeek): GetWeekRewindUseCase =
+        GetWeekRewindUseCase(
+            getRewindUseCase = getRewindUseCase,
+            firstDayOfWeekPreference = flowOf(dayOfWeek),
+        )
 
     @Test
     fun `invoke should request rewind for current week starting Sunday by default`() =
@@ -131,7 +141,7 @@ class GetWeekRewindUseCaseTest {
             rewindRepository.rewindForPeriod = buildRewind()
 
             // When
-            useCase(weekStart = DayOfWeek.MONDAY).first()
+            createUseCaseWithWeekStart(DayOfWeek.MONDAY)().first()
 
             // Then
             assertEquals(1, rewindRepository.invocations.size)
@@ -147,9 +157,9 @@ class GetWeekRewindUseCaseTest {
             rewindRepository.rewindForPeriod = buildRewind()
 
             // When
-            val result1 = useCase(weekStart = DayOfWeek.SUNDAY).first()
-            val result2 = useCase(weekStart = DayOfWeek.MONDAY).first()
-            val result3 = useCase(weekStart = DayOfWeek.FRIDAY).first()
+            val result1 = createUseCaseWithWeekStart(DayOfWeek.SUNDAY)().first()
+            val result2 = createUseCaseWithWeekStart(DayOfWeek.MONDAY)().first()
+            val result3 = createUseCaseWithWeekStart(DayOfWeek.FRIDAY)().first()
 
             // Then
             assertEquals(3, rewindRepository.invocations.size)
@@ -184,7 +194,7 @@ class GetWeekRewindUseCaseTest {
             rewindRepository.rewindForPeriod = buildRewind()
 
             // When
-            useCase(weekStart = DayOfWeek.WEDNESDAY).first()
+            createUseCaseWithWeekStart(DayOfWeek.WEDNESDAY)().first()
 
             // Then
             assertEquals(1, rewindRepository.invocations.size)
@@ -209,7 +219,7 @@ class GetWeekRewindUseCaseTest {
             // When
             val daysOfWeek = DayOfWeek.entries
             daysOfWeek.forEach { dayOfWeek ->
-                useCase(weekStart = dayOfWeek).first()
+                createUseCaseWithWeekStart(dayOfWeek)().first()
             }
 
             // Then
@@ -330,6 +340,12 @@ class GetWeekRewindUseCaseTest {
             startTime: Instant,
             endTime: Instant,
         ): Boolean = false
+
+        override suspend fun updateRequestStatus(
+            id: Uuid,
+            status: RewindGenerationRequest.Status,
+            details: String?,
+        ): Boolean = true
 
         override suspend fun cancelGeneration(requestId: Uuid): Boolean = false
     }

@@ -50,6 +50,20 @@ interface RewindGenerationManager {
     ): Boolean
 
     /**
+     * Updates the status of a generation request.
+     *
+     * @param id The unique identifier of the request
+     * @param status The new status
+     * @param details Optional details about the status change
+     * @return True if the update was successful, false otherwise
+     */
+    suspend fun updateRequestStatus(
+        id: Uuid,
+        status: RewindGenerationRequest.Status,
+        details: String? = null,
+    ): Boolean
+
+    /**
      * Cancels a pending or in-progress generation request.
      *
      * @param requestId The ID of the request to cancel

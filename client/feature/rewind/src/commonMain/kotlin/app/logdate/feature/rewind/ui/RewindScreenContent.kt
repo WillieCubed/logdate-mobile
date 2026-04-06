@@ -19,10 +19,13 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -52,12 +55,18 @@ import app.logdate.feature.rewind.ui.overview.RewindOverviewScreenUiState
 import app.logdate.feature.rewind.ui.overview.RewindPreviewUiState
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.theme.Spacing
+import app.logdate.util.getLocaleFirstDayOfWeek
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
+import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.rewind.generated.resources.*
 import logdate.client.feature.rewind.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
-import kotlin.math.max
+import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -102,23 +111,29 @@ fun RewindScreenContent(
                             RewindPreviewUiState(
                                 message = "A week to remember",
                                 rewindId = history.uid,
-                                label = history.title,
+                                label = history.label,
                                 title = history.title,
-                                start = LocalDate(2024, 1, 1), // TODO: Get actual dates
-                                end = LocalDate(2024, 1, 7),
+                                start = history.startDate,
+                                end = history.endDate,
                                 rewindAvailable = true,
                             )
                         }
                 }
                 is RewindOverviewScreenUiState.NotReady -> {
+                    val (weekStart, weekEnd) = lastWeekBounds()
                     val currentWeekPlaceholder =
                         RewindPreviewUiState(
-                            message = "Still working on this week's rewind...",
+                            message =
+                                if (state.isGeneratingRewind) {
+                                    "Generating this week's rewind..."
+                                } else {
+                                    "Still working on this week's rewind..."
+                                },
                             rewindId = Uuid.random(),
                             label = "This Week",
                             title = "Coming Soon",
-                            start = LocalDate(2024, 11, 18), // TODO: Calculate actual current week
-                            end = LocalDate(2024, 11, 24),
+                            start = weekStart,
+                            end = weekEnd,
                             rewindAvailable = false,
                         )
 
@@ -127,24 +142,24 @@ fun RewindScreenContent(
                             RewindPreviewUiState(
                                 message = "A week to remember",
                                 rewindId = history.uid,
-                                label = history.title,
+                                label = history.label,
                                 title = history.title,
-                                start = LocalDate(2024, 1, 1),
-                                end = LocalDate(2024, 1, 7),
+                                start = history.startDate,
+                                end = history.endDate,
                                 rewindAvailable = true,
                             )
                         }
                 }
                 RewindOverviewScreenUiState.Loading -> {
-                    // Show placeholder cards even while loading
+                    val (weekStart, weekEnd) = lastWeekBounds()
                     listOf(
                         RewindPreviewUiState(
                             message = "Loading your rewinds...",
                             rewindId = Uuid.random(),
                             label = "This Week",
                             title = "Loading...",
-                            start = LocalDate(2024, 11, 18),
-                            end = LocalDate(2024, 11, 24),
+                            start = weekStart,
+                            end = weekEnd,
                             rewindAvailable = false,
                         ),
                     )
@@ -434,9 +449,9 @@ fun NextCardIndicator(
             Box(
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = stringResource(Res.string.text),
-                    style = MaterialTheme.typography.titleMedium,
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = stringResource(Res.string.more_rewinds_below),
                 )
             }
         }
@@ -572,6 +587,23 @@ fun EmptyRewindContent(
     }
 }
 
+/**
+ * Computes the start and end of the previous complete week, matching [GetWeekRewindUseCase].
+ */
+private fun lastWeekBounds(): Pair<LocalDate, LocalDate> {
+    val today =
+        Clock.System
+            .now()
+            .toLocalDateTime(TimeZone.currentSystemDefault())
+            .date
+    val weekStartDay = getLocaleFirstDayOfWeek()
+    val daysFromWeekStart = (today.dayOfWeek.ordinal - weekStartDay.ordinal + 7) % 7
+    val startOfThisWeek = today.minus(daysFromWeekStart, DateTimeUnit.DAY)
+    val startOfLastWeek = startOfThisWeek.minus(7, DateTimeUnit.DAY)
+    val endOfLastWeek = startOfThisWeek.minus(1, DateTimeUnit.DAY)
+    return startOfLastWeek to endOfLastWeek
+}
+
 @OptIn(ExperimentalUuidApi::class, ExperimentalMaterial3Api::class)
 @Composable
 @Preview
@@ -582,10 +614,22 @@ private fun RewindScreenPreview() {
             RewindOverviewScreenUiState.NotReady(
                 pastRewinds =
                     listOf(
-                        RewindHistoryUiState(Uuid.random(), "Adventures in Barcelona"),
-                        RewindHistoryUiState(Uuid.random(), "A Week in Tokyo"),
-                        RewindHistoryUiState(Uuid.random(), "Mountain Hiking Week"),
-                        RewindHistoryUiState(lastId, "City Life Chronicles"),
+                        RewindHistoryUiState(
+                            Uuid.random(),
+                            "Adventures in Barcelona",
+                            "Week 42",
+                            LocalDate(2024, 10, 14),
+                            LocalDate(2024, 10, 20),
+                        ),
+                        RewindHistoryUiState(Uuid.random(), "A Week in Tokyo", "Week 41", LocalDate(2024, 10, 7), LocalDate(2024, 10, 13)),
+                        RewindHistoryUiState(
+                            Uuid.random(),
+                            "Mountain Hiking Week",
+                            "Week 40",
+                            LocalDate(2024, 9, 30),
+                            LocalDate(2024, 10, 6),
+                        ),
+                        RewindHistoryUiState(lastId, "City Life Chronicles", "Week 39", LocalDate(2024, 9, 23), LocalDate(2024, 9, 29)),
                     ),
             ),
         onOpenRewind = {},

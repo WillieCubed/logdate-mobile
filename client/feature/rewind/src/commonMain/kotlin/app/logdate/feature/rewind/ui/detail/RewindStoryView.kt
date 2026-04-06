@@ -2,18 +2,22 @@
 
 package app.logdate.feature.rewind.ui.detail
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -84,7 +89,6 @@ fun RewindStoryView(
     content: @Composable (panel: RewindPanelUiState) -> Unit,
 ) {
     if (panels.isEmpty()) {
-        // Show empty state and exit
         LaunchedEffect(Unit) {
             onExit()
         }
@@ -92,6 +96,9 @@ fun RewindStoryView(
     }
 
     var currentPanelIndex by remember { mutableIntStateOf(0) }
+    var isPaused by remember { mutableStateOf(false) }
+    // Tracks navigation direction for animation: true = forward, false = backward
+    var navigatingForward by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
 
@@ -99,27 +106,38 @@ fun RewindStoryView(
     var autoAdvanceProgress by remember { mutableFloatStateOf(0f) }
     val progressAnimatable = remember { Animatable(0f) }
 
-    // Handle auto-advance
+    // Auto-advance logic that respects pause state
     LaunchedEffect(currentPanelIndex) {
         progressAnimatable.snapTo(0f)
         autoAdvanceProgress = 0f
+    }
 
-        scope.launch {
-            progressAnimatable.animateTo(
-                targetValue = 1f,
-                animationSpec =
-                    tween(
-                        durationMillis = autoAdvanceDelayMs.toInt(),
-                        easing = LinearEasing,
-                    ),
-            )
+    LaunchedEffect(currentPanelIndex, isPaused) {
+        if (isPaused) {
+            progressAnimatable.stop()
+            return@LaunchedEffect
+        }
 
-            // Auto-advance to next panel
-            if (currentPanelIndex < panels.size - 1) {
-                currentPanelIndex++
-            } else {
-                onExit()
-            }
+        // Resume or start from current progress
+        val currentProgress = progressAnimatable.value
+        val remainingFraction = 1f - currentProgress
+        if (remainingFraction <= 0f) return@LaunchedEffect
+
+        progressAnimatable.animateTo(
+            targetValue = 1f,
+            animationSpec =
+                tween(
+                    durationMillis = (autoAdvanceDelayMs * remainingFraction).toInt(),
+                    easing = LinearEasing,
+                ),
+        )
+
+        // Auto-advance to next panel
+        if (currentPanelIndex < panels.size - 1) {
+            navigatingForward = true
+            currentPanelIndex++
+        } else {
+            onExit()
         }
     }
 
@@ -131,29 +149,42 @@ fun RewindStoryView(
     Box(
         modifier =
             modifier
-                .fillMaxSize()
                 .background(Color.Black)
                 .statusBarsPadding()
+                // Swipe gesture with accumulated drag distance
                 .pointerInput(Unit) {
+                    var accumulatedDrag = 0f
+                    var swipeHandled = false
+
                     detectHorizontalDragGestures(
+                        onDragStart = {
+                            accumulatedDrag = 0f
+                            swipeHandled = false
+                        },
                         onDragEnd = {
-                            // Handle swipe gestures
+                            accumulatedDrag = 0f
+                            swipeHandled = false
+                        },
+                        onDragCancel = {
+                            accumulatedDrag = 0f
+                            swipeHandled = false
                         },
                         onHorizontalDrag = { _, dragAmount ->
-                            val swipeThreshold = with(density) { 100.dp.toPx() }
+                            accumulatedDrag += dragAmount
+                            val swipeThreshold = with(density) { 50.dp.toPx() }
 
-                            if (abs(dragAmount) > swipeThreshold) {
+                            if (!swipeHandled && abs(accumulatedDrag) > swipeThreshold) {
+                                swipeHandled = true
                                 scope.launch {
                                     progressAnimatable.stop()
 
-                                    if (dragAmount > 0 && currentPanelIndex > 0) {
-                                        // Swipe right - previous panel
+                                    if (accumulatedDrag > 0 && currentPanelIndex > 0) {
+                                        navigatingForward = false
                                         currentPanelIndex--
-                                    } else if (dragAmount < 0 && currentPanelIndex < panels.size - 1) {
-                                        // Swipe left - next panel
+                                    } else if (accumulatedDrag < 0 && currentPanelIndex < panels.size - 1) {
+                                        navigatingForward = true
                                         currentPanelIndex++
-                                    } else if (dragAmount < 0 && currentPanelIndex == panels.size - 1) {
-                                        // Last panel, exit
+                                    } else if (accumulatedDrag < 0 && currentPanelIndex == panels.size - 1) {
                                         onExit()
                                     }
                                 }
@@ -162,17 +193,22 @@ fun RewindStoryView(
                     )
                 },
     ) {
-        // Main content area
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { /* Handle tap navigation in overlay */ },
-        ) {
-            content(panels[currentPanelIndex])
+        // Main content area with animated transitions
+        AnimatedContent(
+            targetState = currentPanelIndex,
+            transitionSpec = {
+                if (navigatingForward) {
+                    (slideInHorizontally { width -> width / 4 } + fadeIn(tween(300)))
+                        .togetherWith(slideOutHorizontally { width -> -width / 4 } + fadeOut(tween(300)))
+                } else {
+                    (slideInHorizontally { width -> -width / 4 } + fadeIn(tween(300)))
+                        .togetherWith(slideOutHorizontally { width -> width / 4 } + fadeOut(tween(300)))
+                }
+            },
+            label = "PanelTransition",
+            modifier = Modifier.fillMaxSize(),
+        ) { panelIndex ->
+            content(panels[panelIndex])
         }
 
         // Top overlay with progress indicators and controls
@@ -182,7 +218,6 @@ fun RewindStoryView(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
-            // Progress indicators
             StoryProgressIndicators(
                 totalPanels = panels.size,
                 currentPanelIndex = currentPanelIndex,
@@ -190,7 +225,6 @@ fun RewindStoryView(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            // Top controls
             Row(
                 modifier =
                     Modifier
@@ -199,14 +233,9 @@ fun RewindStoryView(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Spacer to balance close button
                 Box(modifier = Modifier.weight(1f))
 
-                // Close button
-                IconButton(
-                    onClick = onExit,
-                    modifier = Modifier,
-                ) {
+                IconButton(onClick = onExit) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = stringResource(Res.string.close_rewind),
@@ -216,52 +245,45 @@ fun RewindStoryView(
             }
         }
 
-        // Invisible tap areas for navigation
-        Row(
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            // Left tap area - previous panel
-            Box(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) {
-                            scope.launch {
-                                progressAnimatable.stop()
-
-                                if (currentPanelIndex > 0) {
-                                    currentPanelIndex--
+        // Tap and long-press overlay for navigation and pause
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onPress = {
+                                // Long press detection: pause while pressed
+                                isPaused = true
+                                try {
+                                    awaitRelease()
+                                } finally {
+                                    isPaused = false
                                 }
-                            }
-                        },
-            )
-
-            // Right tap area - next panel
-            Box(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) {
-                            scope.launch {
-                                progressAnimatable.stop()
-
-                                if (currentPanelIndex < panels.size - 1) {
-                                    currentPanelIndex++
-                                } else {
-                                    onExit()
+                            },
+                            onTap = { offset ->
+                                scope.launch {
+                                    progressAnimatable.stop()
+                                    if (offset.x < size.width / 2) {
+                                        // Left half: previous
+                                        if (currentPanelIndex > 0) {
+                                            navigatingForward = false
+                                            currentPanelIndex--
+                                        }
+                                    } else {
+                                        // Right half: next
+                                        if (currentPanelIndex < panels.size - 1) {
+                                            navigatingForward = true
+                                            currentPanelIndex++
+                                        } else {
+                                            onExit()
+                                        }
+                                    }
                                 }
-                            }
-                        },
-            )
-        }
+                            },
+                        )
+                    },
+        )
     }
 }
 

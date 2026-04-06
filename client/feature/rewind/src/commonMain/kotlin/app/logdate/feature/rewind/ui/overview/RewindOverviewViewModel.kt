@@ -4,12 +4,15 @@ package app.logdate.feature.rewind.ui.overview
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.domain.rewind.GenerateBasicRewindResult
 import app.logdate.client.domain.rewind.GenerateBasicRewindUseCase
 import app.logdate.client.domain.rewind.GetPastRewindsUseCase
 import app.logdate.client.domain.rewind.GetWeekRewindUseCase
 import app.logdate.client.domain.rewind.RewindQueryResult
 import app.logdate.client.intelligence.rewind.RewindMessageGenerator
+import app.logdate.shared.model.RewindContent
+import app.logdate.util.getLocaleFirstDayOfWeek
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,12 +22,14 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.todayIn
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -64,6 +69,7 @@ class RewindOverviewViewModel(
     private val getPastRewindsUseCase: GetPastRewindsUseCase,
     private val rewindMessageGenerator: RewindMessageGenerator,
     private val generateBasicRewindUseCase: GenerateBasicRewindUseCase,
+    private val preferencesDataSource: LogdatePreferencesDataSource,
 ) : ViewModel() {
     // Tracks whether a rewind generation is in progress
     private val isGeneratingRewindState = MutableStateFlow(false)
@@ -75,6 +81,9 @@ class RewindOverviewViewModel(
                     RewindHistoryUiState(
                         uid = rewind.uid,
                         title = rewind.title,
+                        label = rewind.label,
+                        startDate = rewind.startDate.toLocalDateTime(TimeZone.currentSystemDefault()).date,
+                        endDate = rewind.endDate.toLocalDateTime(TimeZone.currentSystemDefault()).date,
                     )
                 }
             }.stateIn(
@@ -91,35 +100,39 @@ class RewindOverviewViewModel(
         ) { rewindResult, pastRewinds, isGenerating ->
             when (rewindResult) {
                 is RewindQueryResult.Success -> {
+                    val rewind = rewindResult.rewind
+                    val photoCount = rewind.content.count { it is RewindContent.Image }
+                    val textCount = rewind.content.count { it is RewindContent.TextNote }
                     RewindOverviewScreenUiState.Ready(
                         pastRewinds = pastRewinds,
                         mostRecentRewind =
                             RewindPreviewUiState(
-                                rewindId = rewindResult.rewind.uid,
-                                message = rewindMessageGenerator.generateMessage(true),
-                                label = rewindResult.rewind.label,
-                                title = rewindResult.rewind.title,
-                                // Use the startDate and endDate directly from the Rewind model
+                                rewindId = rewind.uid,
+                                message =
+                                    rewindMessageGenerator.generateContextualMessage(
+                                        rewindAvailable = true,
+                                        photoCount = photoCount,
+                                        textCount = textCount,
+                                    ),
+                                label = rewind.label,
+                                title = rewind.title,
                                 start =
-                                    rewindResult.rewind.startDate
+                                    rewind.startDate
                                         .toLocalDateTime(TimeZone.currentSystemDefault())
                                         .date,
                                 end =
-                                    rewindResult.rewind.endDate
+                                    rewind.endDate
                                         .toLocalDateTime(TimeZone.currentSystemDefault())
                                         .date,
-                                // If there's content, indicate rewind is available
-                                rewindAvailable = rewindResult.rewind.content.isNotEmpty(),
+                                rewindAvailable = rewind.content.isNotEmpty(),
                                 // TODO: Add activity states based on rewind content
                             ),
                     )
                 }
 
                 RewindQueryResult.NotReady -> {
-                    // Check if we need to generate a basic rewind
                     if (!isGenerating && !hasRecentlyAttemptedGeneration) {
-                        // Automatically trigger rewind generation if not already in progress
-                        generateCurrentWeekRewind()
+                        generateLastWeekRewind()
                     }
 
                     RewindOverviewScreenUiState.NotReady(
@@ -129,14 +142,18 @@ class RewindOverviewViewModel(
                 }
 
                 RewindQueryResult.Generating -> {
-                    // Handle the Generating state - show NotReady UI with a loading indicator
                     RewindOverviewScreenUiState.NotReady(
                         pastRewinds = pastRewinds,
                         isGeneratingRewind = true,
                     )
                 }
 
-                else -> RewindOverviewScreenUiState.Loading
+                RewindQueryResult.NoneAvailable -> {
+                    RewindOverviewScreenUiState.NotReady(
+                        pastRewinds = pastRewinds,
+                        isGeneratingRewind = false,
+                    )
+                }
             }
         }.stateIn(
             viewModelScope,
@@ -159,32 +176,35 @@ class RewindOverviewViewModel(
         }
 
     /**
-     * Generates a rewind for the current week.
+     * Generates a rewind for the previous complete week.
      *
-     * This method calculates the current week's date range and uses the GenerateBasicRewindUseCase
-     * to create a rewind containing relevant notes and media from this period. The resulting
-     * rewind is saved to the repository and will be automatically picked up by the UI state flow.
+     * Uses the same week boundary calculation as [GetWeekRewindUseCase] to ensure
+     * the generated rewind is found by subsequent queries.
      */
-    fun generateCurrentWeekRewind() {
-        // Don't generate if already in progress
+    fun generateLastWeekRewind() {
         if (isGeneratingRewindState.value) {
             Napier.d("Rewind generation already in progress, skipping request")
             return
         }
 
         viewModelScope.launch {
-            // Mark as generating
             isGeneratingRewindState.update { true }
             lastGenerationAttempt = Clock.System.now()
 
             try {
-                // Calculate time range for the past week
-                val endTime = Clock.System.now()
-                // 7 days, using proper Duration API
-                val oneWeek = 7.days
-                val startTime = endTime - oneWeek
+                // Previous complete week boundaries, aligned to GetWeekRewindUseCase
+                val timezone = TimeZone.currentSystemDefault()
+                val today = Clock.System.todayIn(timezone)
+                val weekStartDay = preferencesDataSource.getFirstDayOfWeek() ?: getLocaleFirstDayOfWeek()
+                val startOfThisWeek =
+                    today.minus(
+                        (today.dayOfWeek.ordinal - weekStartDay.ordinal + 7) % 7,
+                        DateTimeUnit.DAY,
+                    )
+                val startTime = startOfThisWeek.minus(7, DateTimeUnit.DAY).atStartOfDayIn(timezone)
+                val endTime = startOfThisWeek.atStartOfDayIn(timezone)
 
-                Napier.i("Generating rewind for period: $startTime to $endTime")
+                Napier.i("Generating rewind for previous week: $startTime to $endTime")
 
                 // Generate the rewind
                 when (val result = generateBasicRewindUseCase(startTime, endTime)) {
@@ -211,14 +231,13 @@ class RewindOverviewViewModel(
     }
 
     /**
-     * Manually triggers rewind generation for the current week.
+     * Manually triggers rewind generation for the previous week.
      *
      * This method can be called from UI events like a refresh button or pull-to-refresh.
      * It ignores the cooldown period used for automatic generation.
      */
-    fun forceGenerateCurrentWeekRewind() {
-        // Reset the last attempt time to allow generation regardless of cooldown
+    fun forceGenerateLastWeekRewind() {
         lastGenerationAttempt = Clock.System.now() - (generationCooldown * 2)
-        generateCurrentWeekRewind()
+        generateLastWeekRewind()
     }
 }

@@ -1,5 +1,6 @@
 package app.logdate.util
 
+import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.format.MonthNames
@@ -41,4 +42,9 @@ actual fun formatDateLocalized(date: LocalDate): String {
         }
 
     return format.format(date)
+}
+
+actual fun getLocaleFirstDayOfWeek(): DayOfWeek {
+    // Default to Monday for web — no reliable browser API for locale first day of week
+    return DayOfWeek.MONDAY
 }
