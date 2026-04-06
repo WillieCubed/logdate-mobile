@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -103,6 +104,7 @@ fun ImmersiveEditorLayout(
                             Modifier
                                 .fillMaxSize()
                                 .widthIn(max = maxEditorWidth)
+                                .windowInsetsPadding(WindowInsets.displayCutout)
                                 .padding(horizontal = horizontalPadding)
                                 .padding(top = innerTopPadding),
                         horizontalAlignment = Alignment.CenterHorizontally,
