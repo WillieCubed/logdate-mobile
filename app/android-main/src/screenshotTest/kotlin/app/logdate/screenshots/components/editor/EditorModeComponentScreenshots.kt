@@ -54,7 +54,7 @@ private val mockPalette = AudioPalette(
 private val mockCreatedAt = Instant.fromEpochMilliseconds(1_740_000_000_000L)
 
 @PreviewTest
-@Preview(showBackground = true, device = PHONE)
+@ScreenshotPreviewMatrix
 @Composable
 fun EditorMode_Picker() {
     ScreenshotTheme {
@@ -68,7 +68,7 @@ fun EditorMode_Picker() {
 }
 
 @PreviewTest
-@Preview(showBackground = true, device = PHONE)
+@ScreenshotPreviewMatrix
 @Composable
 fun EditorMode_TextFocused() {
     EditorModeFrame {
