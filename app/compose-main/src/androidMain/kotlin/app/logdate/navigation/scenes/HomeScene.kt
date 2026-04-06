@@ -3,18 +3,14 @@
 package app.logdate.navigation.scenes
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -29,14 +25,13 @@ import logdate.app.composemain.generated.resources.new_entry
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * A [Scene] for single-pane content with navigation chrome (bottom nav bar or side rail).
+ * A [Scene] for content with navigation chrome (bottom nav bar or side rail).
  *
  * Used for main tab views (Timeline, Journals, Rewind, Location) and detail-only fallback views.
  * Two-pane list-detail layouts with a selected detail are handled by [ListDetailHomeScene].
  *
- * Special case: on the timeline tab in landscape/expanded mode, this scene shows a two-pane
- * layout with a placeholder in the detail pane, so the user sees the list-detail structure
- * before selecting an entry.
+ * On wider screens (600dp+), wraps content in a rounded panel Surface. Individual screens
+ * are responsible for their own internal responsive layout.
  */
 class HomeScene<T : NavKey>(
     override val key: Any,
@@ -56,11 +51,6 @@ class HomeScene<T : NavKey>(
     @Suppress("ktlint:standard:function-naming")
     @Composable
     private fun HomeSceneContent() {
-        val adaptiveInfo = currentWindowAdaptiveInfo()
-        val showTwoPaneWithPlaceholder =
-            selectedTab == HomeTab.TIMELINE &&
-                adaptiveInfo.windowSizeClass.supportsDualPaneHomeScene()
-
         val snackbarHostState = remember { SnackbarHostState() }
 
         NavigationShell(
@@ -70,54 +60,51 @@ class HomeScene<T : NavKey>(
             snackbarHostState = snackbarHostState,
             visibleTabs = visibleTabs,
         ) {
-            if (showTwoPaneWithPlaceholder) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val showPanel = maxWidth >= 600.dp
                 val panelShape = MaterialTheme.shapes.extraLarge
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .statusBarsPadding()
-                            .padding(top = Spacing.sm)
-                            .padding(horizontal = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Surface(
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .widthIn(min = 320.dp, max = 420.dp)
-                                .fillMaxHeight()
-                                .padding(bottom = 8.dp),
-                        shape = panelShape,
-                        color = MaterialTheme.colorScheme.surface,
-                    ) {
-                        mainEntry.Content()
-                    }
 
-                    Surface(
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .padding(bottom = 8.dp),
-                        shape = panelShape,
-                        color = MaterialTheme.colorScheme.surface,
-                    ) {
-                        DetailPlaceholder()
-                    }
-                }
-            } else {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    mainEntry.Content()
+                when {
+                    showPanel -> {
+                        Surface(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .statusBarsPadding()
+                                    .padding(top = Spacing.sm)
+                                    .padding(horizontal = 8.dp)
+                                    .padding(bottom = 8.dp),
+                            shape = panelShape,
+                            color = MaterialTheme.colorScheme.surface,
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                mainEntry.Content()
 
-                    SharedElementFAB(
-                        onClick = onNewEntry,
-                        contentDescriptionText = stringResource(Res.string.new_entry),
-                        modifier =
-                            Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(16.dp),
-                    )
+                                SharedElementFAB(
+                                    onClick = onNewEntry,
+                                    contentDescriptionText = stringResource(Res.string.new_entry),
+                                    modifier =
+                                        Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .padding(16.dp),
+                                )
+                            }
+                        }
+                    }
+                    else -> {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            mainEntry.Content()
+
+                            SharedElementFAB(
+                                onClick = onNewEntry,
+                                contentDescriptionText = stringResource(Res.string.new_entry),
+                                modifier =
+                                    Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(16.dp),
+                            )
+                        }
+                    }
                 }
             }
         }

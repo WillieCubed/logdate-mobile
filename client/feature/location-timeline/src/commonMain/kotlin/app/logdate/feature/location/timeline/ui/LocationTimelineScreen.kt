@@ -17,12 +17,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -53,7 +52,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -80,6 +78,7 @@ import app.logdate.feature.location.timeline.ui.model.LocationTimelineErrorUiSta
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.adaptive.AdaptivePaneLayout
 import app.logdate.ui.common.transitions.TransitionKeys
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.all_time
@@ -301,83 +300,36 @@ private fun ContentState(
     val listState = rememberLazyListState()
     val hasMapData = uiState.currentLocation != null || uiState.visiblePlaces.isNotEmpty()
 
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val useTwoPane = maxWidth >= 840.dp
-
-        @Composable
-        fun MapOrPlaceholder(modifier: Modifier) {
-            if (hasMapData) {
-                LocationTimelineMap(
-                    places = uiState.visiblePlaces,
-                    currentLocation = uiState.currentLocation,
-                    selectedPlaceId = uiState.selectedPlaceId,
-                    onSelectPlace = onSelectPlace,
-                    modifier = modifier,
-                )
-            } else {
-                MapPlaceholder(modifier = modifier)
-            }
-        }
-
-        if (useTwoPane) {
-            Row(modifier = Modifier.fillMaxSize()) {
-                MapOrPlaceholder(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .fillMaxSize()
-                            .padding(16.dp),
-                )
-                VerticalDivider(modifier = Modifier.fillMaxHeight())
-                PlacesAndHistoryList(
-                    uiState = uiState,
-                    onSelectPlace = onSelectPlace,
-                    onDeleteStop = onDeleteStop,
-                    onSelectFilter = onSelectFilter,
-                    onLoadMorePlaces = onLoadMorePlaces,
-                    listState = listState,
-                    modifier =
-                        Modifier
-                            .widthIn(min = 340.dp, max = 440.dp)
-                            .fillMaxSize(),
-                )
-            }
-        } else {
-            val expandedMapHeight = 320.dp
-            val collapsedMapHeight = 148.dp
-            val collapseRange = expandedMapHeight - collapsedMapHeight
-            val collapseRangePx = with(LocalDensity.current) { collapseRange.toPx() }
-            val mapHeightTarget by remember(listState, collapseRange, collapseRangePx) {
-                derivedStateOf {
-                    val collapseFraction =
-                        when {
-                            listState.firstVisibleItemIndex > 0 -> 1f
-                            collapseRangePx <= 0f -> 0f
-                            else -> (listState.firstVisibleItemScrollOffset / collapseRangePx).coerceIn(0f, 1f)
-                        }
-
-                    expandedMapHeight - (collapseRange * collapseFraction)
-                }
-            }
-            val animatedMapHeight by animateDpAsState(
-                targetValue = mapHeightTarget,
-                animationSpec =
-                    spring(
-                        dampingRatio = 0.92f,
-                        stiffness = Spring.StiffnessMediumLow,
-                    ),
-                label = "LocationTimelineMapHeight",
+    @Composable
+    fun MapOrPlaceholder(modifier: Modifier) {
+        if (hasMapData) {
+            LocationTimelineMap(
+                places = uiState.visiblePlaces,
+                currentLocation = uiState.currentLocation,
+                selectedPlaceId = uiState.selectedPlaceId,
+                onSelectPlace = onSelectPlace,
+                modifier = modifier,
             )
+        } else {
+            MapPlaceholder(modifier = modifier)
+        }
+    }
 
-            Column(modifier = Modifier.fillMaxSize()) {
-                MapOrPlaceholder(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(animatedMapHeight)
-                            .padding(16.dp),
-                )
-                HorizontalDivider()
+    AdaptivePaneLayout(
+        modifier = modifier,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        supportingPaneBreakpoint = 0.dp,
+        supportingPaneWidth = 380.dp,
+        supportingPaneMaxWidth = 440.dp,
+        paneSpacing = 12.dp,
+        contentPadding = PaddingValues(0.dp),
+        mainPaneMinWidth = 320.dp,
+        supportingPane = { _ ->
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = MaterialTheme.shapes.large,
+                modifier = Modifier.fillMaxSize().padding(top = 12.dp, end = 12.dp, bottom = 12.dp),
+            ) {
                 PlacesAndHistoryList(
                     uiState = uiState,
                     onSelectPlace = onSelectPlace,
@@ -388,8 +340,60 @@ private fun ContentState(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-        }
-    }
+        },
+        mainPane = { layoutInfo ->
+            if (layoutInfo.showSupportingPane) {
+                MapOrPlaceholder(
+                    modifier = Modifier.fillMaxSize().padding(start = 12.dp, top = 12.dp, bottom = 12.dp),
+                )
+            } else {
+                val expandedMapHeight = 320.dp
+                val collapsedMapHeight = 148.dp
+                val collapseRange = expandedMapHeight - collapsedMapHeight
+                val collapseRangePx = with(LocalDensity.current) { collapseRange.toPx() }
+                val mapHeightTarget by remember(listState, collapseRange, collapseRangePx) {
+                    derivedStateOf {
+                        val collapseFraction =
+                            when {
+                                listState.firstVisibleItemIndex > 0 -> 1f
+                                collapseRangePx <= 0f -> 0f
+                                else ->
+                                    (listState.firstVisibleItemScrollOffset / collapseRangePx).coerceIn(0f, 1f)
+                            }
+                        expandedMapHeight - (collapseRange * collapseFraction)
+                    }
+                }
+                val animatedMapHeight by animateDpAsState(
+                    targetValue = mapHeightTarget,
+                    animationSpec =
+                        spring(
+                            dampingRatio = 0.92f,
+                            stiffness = Spring.StiffnessMediumLow,
+                        ),
+                    label = "LocationTimelineMapHeight",
+                )
+                Column(modifier = Modifier.fillMaxSize()) {
+                    MapOrPlaceholder(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(animatedMapHeight)
+                                .padding(16.dp),
+                    )
+                    HorizontalDivider()
+                    PlacesAndHistoryList(
+                        uiState = uiState,
+                        onSelectPlace = onSelectPlace,
+                        onDeleteStop = onDeleteStop,
+                        onSelectFilter = onSelectFilter,
+                        onLoadMorePlaces = onLoadMorePlaces,
+                        listState = listState,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        },
+    )
 
     uiState.selectedPlace?.let { place ->
         LocationPlaceDetailSheet(
