@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.LocalAnimatedVisibilityScope
 import app.logdate.feature.editor.ui.LocalSharedTransitionScope
+import app.logdate.feature.editor.ui.common.PlatformBackHandler
 import app.logdate.feature.editor.ui.editor.BlockType
 import app.logdate.feature.editor.ui.layout.ExpandableContentToolbar
 import app.logdate.feature.editor.ui.layout.OverscrollDetector
@@ -69,6 +70,8 @@ fun EditorContentFooter(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+
+    PlatformBackHandler(enabled = expanded) { expanded = false }
 
     // Pre-generate stable IDs for each block type button
     val textId = remember { Uuid.random() }

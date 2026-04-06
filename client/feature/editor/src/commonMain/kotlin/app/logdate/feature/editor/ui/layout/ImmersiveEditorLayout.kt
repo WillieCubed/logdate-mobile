@@ -95,6 +95,7 @@ fun ImmersiveEditorLayout(
                     modifier =
                         Modifier
                             .fillMaxSize()
+                            .windowInsetsPadding(WindowInsets.displayCutout)
                             .padding(top = topOffset)
                             .windowInsetsPadding(WindowInsets.ime),
                     contentAlignment = Alignment.Center,
@@ -104,7 +105,6 @@ fun ImmersiveEditorLayout(
                             Modifier
                                 .fillMaxSize()
                                 .widthIn(max = maxEditorWidth)
-                                .windowInsetsPadding(WindowInsets.displayCutout)
                                 .padding(horizontal = horizontalPadding)
                                 .padding(top = innerTopPadding),
                         horizontalAlignment = Alignment.CenterHorizontally,
