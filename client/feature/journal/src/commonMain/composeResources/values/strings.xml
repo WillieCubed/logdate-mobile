@@ -14,7 +14,7 @@
     <string name="add_media_label">Add media</string>
     <string name="add_media_description">Select photos and videos from your library</string>
     <string name="add_text_notes_label">Add text notes</string>
-    <string name="add_text_notes_description">Add notes you\'ve already written</string>
+    <string name="add_text_notes_description">Add notes you&apos;ve already written</string>
     <string name="select_notes">Select notes</string>
     <string name="add_to_journal">Add to journal</string>
     <string name="done">Done</string>

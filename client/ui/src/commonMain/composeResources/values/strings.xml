@@ -27,7 +27,7 @@
     <string name="view_memory">View Memory</string>
     <string name="suggestion_label_today">Today</string>
     <string name="suggestion_label_draft">Draft</string>
-    <string name="suggestion_draft_fallback">Finish your draft while it\'s still fresh.</string>
+    <string name="suggestion_draft_fallback">Finish your draft while it&apos;s still fresh.</string>
     <string name="finish_draft">Finish Draft</string>
     <string name="suggestion_label_memory">Memory</string>
     <string name="suggestion_near_location">Near %1$s</string>

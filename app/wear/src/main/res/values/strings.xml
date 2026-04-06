@@ -46,7 +46,7 @@
     <string name="wear_complication_quick_capture_label">Quick Capture</string>
     <string name="wear_complication_quick_capture_description">Record a voice note</string>
 
-    <!-- Today\'s Summary Tile -->
+    <!-- Today's Summary Tile -->
     <string name="wear_tile_summary_label">Today\'s Summary</string>
     <string name="wear_tile_summary_title">Today</string>
     <string name="wear_tile_summary_open">Open LogDate</string>
