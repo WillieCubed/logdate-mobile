@@ -3,6 +3,7 @@ package app.logdate.di
 import app.logdate.feature.core.account.di.accountFeatureModule
 import app.logdate.feature.core.di.coreFeatureModule
 import app.logdate.feature.editor.di.editorFeatureModule
+import app.logdate.feature.events.di.eventsFeatureModule
 import app.logdate.feature.journals.di.journalsFeatureModule
 import app.logdate.feature.library.di.libraryFeatureModule
 import app.logdate.feature.location.timeline.di.locationTimelineModule
@@ -43,4 +44,5 @@ internal val defaultModules: Set<Module> =
         searchFeatureModule,
         postcardsFeatureModule,
         stickersFeatureModule,
+        eventsFeatureModule,
     )

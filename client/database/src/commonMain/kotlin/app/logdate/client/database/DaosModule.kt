@@ -33,4 +33,6 @@ val daosModule: Module =
         single { get<LogDateDatabase>().healthSnapshotDao() }
         single { get<LogDateDatabase>().postcardDao() }
         single { get<LogDateDatabase>().stickerDao() }
+        single { get<LogDateDatabase>().eventDao() }
+        single { get<LogDateDatabase>().eventNoteLinkDao() }
     }

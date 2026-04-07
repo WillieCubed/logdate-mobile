@@ -1,6 +1,7 @@
 package app.logdate.ui.timeline
 
 import app.logdate.client.awareness.daylight.DaylightPeriod
+import app.logdate.shared.model.Event
 import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.util.now
@@ -27,7 +28,7 @@ data class TimelineDayUiState(
     val supportingSummary: String? = null,
     val date: LocalDate = LocalDate.now(), // TODO: Don't use default value here
     val people: List<PersonUiState> = emptyList(),
-    val events: List<String> = emptyList(), // TODO: Actually include events
+    val events: List<DayEventUiState> = emptyList(),
     val placesVisited: List<PlaceUiState> = emptyList(),
     val mediaUris: List<MediaObjectUiState> = emptyList(), // TODO: Actually include media
     val notes: List<NoteUiState> = emptyList(),
@@ -41,6 +42,28 @@ data class TimelineDayUiState(
     val moments: List<MomentUiState> = emptyList(),
     val dayPresentation: DayPresentation = DayPresentation.FLOWING,
 )
+
+/**
+ * UI representation of an [app.logdate.shared.model.Event] surfaced in a timeline day.
+ */
+data class DayEventUiState(
+    val eventId: String,
+    val title: String,
+    val description: String? = null,
+    val start: Instant,
+    val end: Instant? = null,
+    val coverImageUri: String? = null,
+)
+
+fun Event.toDayEventUiState(): DayEventUiState =
+    DayEventUiState(
+        eventId = id.toString(),
+        title = title,
+        description = description,
+        start = startTime,
+        end = endTime,
+        coverImageUri = coverImageUri,
+    )
 
 enum class TimelineDayCardLayout {
     MEDIA_LED,

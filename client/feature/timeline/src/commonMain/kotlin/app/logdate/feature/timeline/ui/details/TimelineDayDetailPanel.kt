@@ -43,7 +43,6 @@ import kotlin.uuid.Uuid
 fun TimelineDayDetailPanel(
     uiState: TimelineDayUiState,
     onExit: () -> Unit,
-    events: List<DayEvent> = listOf(),
     onOpenEvent: (eventId: String) -> Unit = {},
     visitedLocations: List<DayLocation> = listOf(),
     onOpenLocations: (() -> Unit)? = null,
@@ -132,12 +131,14 @@ fun TimelineDayDetailPanel(
                     onJournalClick = onJournalClick,
                 )
             }
-//            item {
-//                EventsSection(
-//                    events = events,
-//                    onOpenEvent = onOpenEvent,
-//                )
-//            }
+            if (uiState.events.isNotEmpty()) {
+                item(contentType = "events") {
+                    EventsSection(
+                        events = uiState.events,
+                        onOpenEvent = onOpenEvent,
+                    )
+                }
+            }
             if (resolvedVisitedLocations.isNotEmpty()) {
                 item(
                     contentType = "locations",

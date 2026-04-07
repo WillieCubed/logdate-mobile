@@ -2,6 +2,7 @@ package app.logdate.client.data.di
 
 import app.logdate.client.data.account.StubAccountIdentityRepository
 import app.logdate.client.data.account.StubAccountRepository
+import app.logdate.client.data.events.OfflineFirstEventRepository
 import app.logdate.client.data.journals.JournalUserDataRepository
 import app.logdate.client.data.journals.LocalFirstDraftRepository
 import app.logdate.client.data.journals.OfflineFirstJournalContentRepository
@@ -36,6 +37,7 @@ import app.logdate.client.di.datastoreModule
 import app.logdate.client.permissions.di.permissionsModule
 import app.logdate.client.repository.account.AccountIdentityRepository
 import app.logdate.client.repository.account.AccountRepository
+import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalContentRepository
@@ -127,6 +129,9 @@ actual val dataModule: Module =
 
         // Places
         single<UserPlacesRepository> { OfflineFirstUserPlacesRepository(get()) }
+
+        // Events
+        single<EventRepository> { OfflineFirstEventRepository(get(), get()) }
 
         // Profile
         single<ProfileRepository> { OfflineFirstProfileRepository(get()) }

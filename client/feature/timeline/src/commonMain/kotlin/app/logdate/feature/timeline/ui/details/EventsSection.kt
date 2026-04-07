@@ -8,60 +8,64 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.clip
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.timeline.DayEventUiState
 import logdate.client.feature.timeline.generated.resources.*
 import logdate.client.feature.timeline.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
-import kotlin.time.Instant
 
 @Composable
 internal fun EventsSection(
-    events: List<DayEvent>,
+    events: List<DayEventUiState>,
     onOpenEvent: (eventId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (events.isEmpty()) return
     Column(
         modifier = modifier.padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Text(stringResource(Res.string.events), style = MaterialTheme.typography.titleSmall)
-        // TODO: Find way to make this work
-//        LazyColumn {
-//            items(events) { event ->
-//                EventItem(event = event, onOpenEvent = { onOpenEvent(event.eventId) })
-//            }
-//        }
+        events.forEach { event ->
+            EventItem(event = event, onOpenEvent = { onOpenEvent(event.eventId) })
+        }
     }
 }
 
-data class DayEvent(
-    val eventId: String,
-    val title: String,
-    val start: Instant,
-    val end: Instant,
-)
-
 @Composable
 private fun EventItem(
-    event: DayEvent,
+    event: DayEventUiState,
     onOpenEvent: () -> Unit,
 ) {
     Box(
         modifier =
             Modifier
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                .padding(Spacing.lg)
                 .fillMaxWidth()
-                .height(120.dp)
-                .clickable { onOpenEvent() },
+                .clip(RoundedCornerShape(Spacing.md))
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                .clickable { onOpenEvent() }
+                .padding(Spacing.lg),
     ) {
-        Text(event.title, style = MaterialTheme.typography.bodyMedium)
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Text(
+                text = event.title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            event.description?.takeIf { it.isNotBlank() }?.let { description ->
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }

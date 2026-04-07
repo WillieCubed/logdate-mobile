@@ -15,6 +15,7 @@ import app.logdate.feature.core.settings.navigation.ExportSettingsRoute
 import app.logdate.feature.core.settings.navigation.SettingsRoute
 import app.logdate.feature.core.settings.navigation.settingsGraph
 import app.logdate.feature.editor.ui.EntryEditorContent
+import app.logdate.feature.events.navigation.eventDetailRoute
 import app.logdate.feature.journals.navigation.journalDetailsRoute
 import app.logdate.feature.journals.navigation.journalSettingsRoute
 import app.logdate.feature.journals.navigation.journalsOverviewRoute
@@ -137,6 +138,9 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
             onGoBack = {
                 navController.popBackStack()
             },
+        )
+        eventDetailRoute(
+            onGoBack = { navController.popBackStack() },
         )
 
         profileRoute(

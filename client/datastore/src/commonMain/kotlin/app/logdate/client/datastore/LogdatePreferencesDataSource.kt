@@ -35,6 +35,7 @@ class LogdatePreferencesDataSource(
 
         // Feature flags
         val LIBRARY_ENABLED = booleanPreferencesKey("library_enabled")
+        val EVENTS_ENABLED = booleanPreferencesKey("events_enabled")
 
         // Journal UI keys
         val JOURNAL_LAYOUT_MODE = stringPreferencesKey("journal_layout_mode")
@@ -104,6 +105,25 @@ class LogdatePreferencesDataSource(
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
                 this[LIBRARY_ENABLED] = enabled
+            }
+        }
+    }
+
+    /**
+     * Observes whether the Events feature is enabled.
+     */
+    fun observeEventsEnabled(): Flow<Boolean> =
+        userPreferences.data.map { prefs ->
+            prefs[EVENTS_ENABLED] ?: false
+        }
+
+    /**
+     * Sets whether the Events feature is enabled.
+     */
+    suspend fun setEventsEnabled(enabled: Boolean) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[EVENTS_ENABLED] = enabled
             }
         }
     }

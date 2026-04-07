@@ -39,6 +39,7 @@ import app.logdate.ui.timeline.TimelineLoadingState
 import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.VideoNoteUiState
 import app.logdate.ui.timeline.createSemanticTimelineDayUiState
+import app.logdate.ui.timeline.toDayEventUiState
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -233,6 +234,7 @@ class TimelineViewModel(
         val placeUiStates = placesVisited.map { place -> place.toUiState() }
         val peopleUiStates = people.map(Person::toUiState)
         val momentUiStates = moments.toMomentUiStates(peopleUiStates, membershipMap)
+        val eventUiStates = events.map { it.toDayEventUiState() }
 
         return createSemanticTimelineDayUiState(
             summary = tldr,
@@ -241,6 +243,7 @@ class TimelineViewModel(
             people = peopleUiStates,
             notes = noteUiStates,
             placesVisited = placeUiStates,
+            events = eventUiStates,
             isLoadingSummary = tldr.isEmpty(),
             isLoadingPeople = people.isEmpty() && tldr.isEmpty(),
         )

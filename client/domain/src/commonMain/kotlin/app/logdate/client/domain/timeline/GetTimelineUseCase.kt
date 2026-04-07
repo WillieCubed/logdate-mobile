@@ -1,12 +1,15 @@
 package app.logdate.client.domain.timeline
 
 import app.logdate.client.domain.entities.ExtractPeopleUseCase
+import app.logdate.client.domain.events.ObserveEventsForDateRangeUseCase
 import app.logdate.client.intelligence.AIResult
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.shared.model.Event
 import app.logdate.shared.model.Person
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.transform
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -72,7 +75,7 @@ data class TimelineDay(
     val tldr: String,
     val date: LocalDate,
     val people: List<Person> = emptyList(),
-    val events: List<String> = emptyList(), // TODO: Actually include events
+    val events: List<Event> = emptyList(),
     val placesVisited: List<TimelinePlaceVisit> = emptyList(),
     val moments: List<Moment> = emptyList(),
     val parts: List<DayPart> = emptyList(),
@@ -111,6 +114,7 @@ class GetTimelineDayUseCase(
     private val getMediaUrisUseCase: GetMediaUrisUseCase,
     private val extractPeopleUseCase: ExtractPeopleUseCase,
     private val inferMomentsUseCase: InferMomentsUseCase,
+    private val observeEventsForDateRange: ObserveEventsForDateRangeUseCase,
 ) {
     /**
      * Creates a TimelineDay from journal entries for a specific date.
@@ -153,12 +157,17 @@ class GetTimelineDayUseCase(
         val placesVisited = extractPlacesVisited(entries)
         val moments = inferMomentsUseCase(date, entries, placesVisited)
 
+        val dayStart = entries.minOf { entry -> entry.creationTimestamp }
+        val dayEnd = entries.maxOf { it.creationTimestamp }
+        val dayEvents = observeEventsForDateRange(dayStart, dayEnd).first()
+
         return TimelineDay(
             tldr = summary,
             date = date,
-            start = entries.minOf { entry -> entry.creationTimestamp },
-            end = entries.maxOf { it.creationTimestamp },
+            start = dayStart,
+            end = dayEnd,
             people = people,
+            events = dayEvents,
             placesVisited = placesVisited,
             moments = moments,
             parts = extractDayParts(entries),
