@@ -168,6 +168,21 @@ data class LibraryMediaDetailRoute(
 ) : NavKey
 
 /**
+ * Navigation route for the event detail screen.
+ *
+ * Pushed onto [MainAppNavigator.backStack] when the user taps an event card in the timeline
+ * day detail panel (or, in the future, anywhere else events are surfaced).
+ *
+ * @property eventId The id of the event to display. Serialized as a string via [UuidSerializer]
+ *   so it survives process death and can be restored from saved state.
+ */
+@Serializable
+data class EventDetailRoute(
+    @Serializable(with = UuidSerializer::class)
+    val eventId: Uuid,
+) : NavKey
+
+/**
  * Routes for the postcards feature
  */
 @Serializable

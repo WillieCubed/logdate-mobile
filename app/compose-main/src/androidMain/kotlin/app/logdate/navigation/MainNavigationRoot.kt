@@ -102,6 +102,7 @@ import app.logdate.navigation.routes.core.openDraft
 import app.logdate.navigation.routes.core.openEntryEditor
 import app.logdate.navigation.routes.core.switchToTab
 import app.logdate.navigation.routes.editorRoutes
+import app.logdate.navigation.routes.eventRoutes
 import app.logdate.navigation.routes.finishJournalCreation
 import app.logdate.navigation.routes.journalRoutes
 import app.logdate.navigation.routes.libraryRoutes
@@ -117,6 +118,7 @@ import app.logdate.navigation.routes.openBirthdaySettings
 import app.logdate.navigation.routes.openClearDataSettings
 import app.logdate.navigation.routes.openDayBoundarySettings
 import app.logdate.navigation.routes.openDevicesSettings
+import app.logdate.navigation.routes.openEventDetail
 import app.logdate.navigation.routes.openExportSettings
 import app.logdate.navigation.routes.openJournalDetail
 import app.logdate.navigation.routes.openJournalSettings
@@ -667,6 +669,9 @@ fun MainNavigationRoot(
                                 onOpenLocationTimeline = mainAppNavigator::openLocationTimeline,
                                 onOpenSearch = mainAppNavigator::openSearch,
                                 onImportBackup = mainAppNavigator::openExportSettings,
+                                onOpenEvent = { eventId ->
+                                    mainAppNavigator.openEventDetail(kotlin.uuid.Uuid.parse(eventId))
+                                },
                                 onDecorate = { mainAppNavigator.navigateToPostcardEditor() },
                                 homeViewModel = safeHomeViewModel,
                             )
@@ -697,6 +702,9 @@ fun MainNavigationRoot(
                                     ),
                                 )
                             },
+                        )
+                        eventRoutes(
+                            onBack = mainAppNavigator::goBack,
                         )
                         postcardRoutes(
                             onBack = mainAppNavigator::goBack,

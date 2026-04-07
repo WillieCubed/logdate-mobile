@@ -13,6 +13,7 @@ import app.logdate.client.domain.events.DeleteEventUseCase
 import app.logdate.client.domain.events.GetEventByIdUseCase
 import app.logdate.client.domain.events.ObserveEventsForDateRangeUseCase
 import app.logdate.client.domain.events.ObserveEventsForNoteUseCase
+import app.logdate.client.domain.events.ObserveNotesForEventUseCase
 import app.logdate.client.domain.events.UpdateEventUseCase
 import app.logdate.client.domain.export.ExportUserDataUseCase
 import app.logdate.client.domain.export.GetExportCountsUseCase
@@ -188,6 +189,7 @@ val domainModule: Module =
         factory { UpdateEventUseCase(get()) }
         factory { DeleteEventUseCase(get()) }
         factory { ObserveEventsForNoteUseCase(get()) }
+        factory { ObserveNotesForEventUseCase(get()) }
 
         // Places
         factory { ResolveLocationToPlaceUseCase(get(), get(), get()) }

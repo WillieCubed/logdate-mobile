@@ -49,6 +49,7 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
     onOpenLocationTimeline: () -> Unit,
     onOpenSearch: () -> Unit,
     onImportBackup: () -> Unit,
+    onOpenEvent: (eventId: String) -> Unit,
     onDecorate: () -> Unit = {},
     homeViewModel: HomeViewModel,
 ) {
@@ -86,6 +87,7 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
         TimelineDetailScreen(
             onClose = onCloseTimelineDetail,
             onOpenLocations = onOpenLocationTimeline,
+            onOpenEvent = onOpenEvent,
             onDecorate = onDecorate,
             viewModel = homeViewModel,
         )
@@ -97,6 +99,7 @@ fun EntryProviderScope<NavKey>.timelineRoutes(
 fun TimelineDetailScreen(
     onClose: () -> Unit,
     onOpenLocations: (() -> Unit)? = null,
+    onOpenEvent: (eventId: String) -> Unit = {},
     onDecorate: (() -> Unit)? = null,
     viewModel: HomeViewModel = koinViewModel(),
 ) {
@@ -107,6 +110,7 @@ fun TimelineDetailScreen(
         TimelineDayDetailPanel(
             uiState = selectedDay,
             onExit = onClose,
+            onOpenEvent = onOpenEvent,
             onOpenLocations = onOpenLocations,
             onDecorate = onDecorate,
         )

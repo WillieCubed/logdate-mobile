@@ -62,6 +62,7 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
             // External
+            implementation(libs.coil.compose)
             implementation(libs.napier)
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))
