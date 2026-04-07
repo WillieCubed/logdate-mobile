@@ -28,6 +28,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
@@ -70,7 +71,7 @@ class DefaultPasskeyAccountRepository(
         }
 
         repositoryScope.launch {
-            configRepository.backendUrl.collect {
+            configRepository.backendUrl.drop(1).collect {
                 _currentAccount.value = null
                 _isAuthenticated.value = sessionStorage.getSession() != null
             }
