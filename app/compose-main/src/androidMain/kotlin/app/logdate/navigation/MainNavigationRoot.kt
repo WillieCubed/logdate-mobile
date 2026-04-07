@@ -144,6 +144,7 @@ import app.logdate.navigation.routes.openStreakSettings
 import app.logdate.navigation.routes.openSyncSettings
 import app.logdate.navigation.routes.openTimelineDetail
 import app.logdate.navigation.routes.openTimelineSettings
+import app.logdate.navigation.routes.openVoiceNotesSettings
 import app.logdate.navigation.routes.openWatchNotificationSettings
 import app.logdate.navigation.routes.openWatchSettings
 import app.logdate.navigation.routes.openWatchSyncSettings
@@ -734,6 +735,7 @@ fun MainNavigationRoot(
                             onOpenLocationTimeline = mainAppNavigator::openLocationTimeline,
                             onNavigateToLibrarySettings = mainAppNavigator::openLibrarySettings,
                             onNavigateToMemories = mainAppNavigator::openMemoriesSettings,
+                            onNavigateToVoiceNotes = mainAppNavigator::openVoiceNotesSettings,
                             onNavigateToNotifications = mainAppNavigator::openNotificationSettings,
                             onNavigateToStreaks = mainAppNavigator::openStreakSettings,
                             onNavigateToRewindSettings = mainAppNavigator::openRewindSettings,

@@ -263,6 +263,14 @@ data object NotificationsSettingsRoute : NavKey
 data object MemoriesSettingsRoute : NavKey
 
 /**
+ * Navigation route for the voice notes settings screen — manages the
+ * on-device enhanced audio models (Whisper for transcript refinement, CED
+ * for ambient sound detection).
+ */
+@Serializable
+data object VoiceNotesSettingsRoute : NavKey
+
+/**
  * Navigation route for library settings screen.
  */
 @Serializable

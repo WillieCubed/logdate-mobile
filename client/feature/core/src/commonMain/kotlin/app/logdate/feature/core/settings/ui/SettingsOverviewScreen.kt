@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
@@ -89,6 +90,8 @@ import logdate.client.feature.core.generated.resources.sync_devices_subtitle
 import logdate.client.feature.core.generated.resources.sync_promotion_title
 import logdate.client.feature.core.generated.resources.timeline_settings
 import logdate.client.feature.core.generated.resources.timeline_settings_description
+import logdate.client.feature.core.generated.resources.voice_notes_settings
+import logdate.client.feature.core.generated.resources.voice_notes_settings_description
 import logdate.client.feature.core.generated.resources.watch_settings
 import logdate.client.feature.core.generated.resources.watch_settings_description
 import org.jetbrains.compose.resources.stringResource
@@ -113,6 +116,7 @@ fun SettingsOverviewScreen(
     onNavigateToPrivacy: () -> Unit,
     onNavigateToLibrarySettings: () -> Unit,
     onNavigateToMemories: () -> Unit,
+    onNavigateToVoiceNotes: () -> Unit = {},
     onNavigateToNotifications: (() -> Unit)? = null,
     onNavigateToStreaks: () -> Unit = {},
     onNavigateToRewindSettings: () -> Unit = {},
@@ -138,6 +142,7 @@ fun SettingsOverviewScreen(
         onNavigateToPrivacy = onNavigateToPrivacy,
         onNavigateToLibrarySettings = onNavigateToLibrarySettings,
         onNavigateToMemories = onNavigateToMemories,
+        onNavigateToVoiceNotes = onNavigateToVoiceNotes,
         onNavigateToNotifications = onNavigateToNotifications,
         onNavigateToStreaks = onNavigateToStreaks,
         onNavigateToRewindSettings = onNavigateToRewindSettings,
@@ -169,6 +174,7 @@ fun SettingsOverviewContent(
     onNavigateToLocation: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
     onNavigateToMemories: () -> Unit,
+    onNavigateToVoiceNotes: () -> Unit = {},
     onNavigateToNotifications: (() -> Unit)? = null,
     onNavigateToStreaks: () -> Unit = {},
     onNavigateToRewindSettings: () -> Unit = {},
@@ -215,6 +221,12 @@ fun SettingsOverviewContent(
                     description = stringResource(Res.string.memories_description),
                     icon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
                     onClick = onNavigateToMemories,
+                )
+                SettingsNavigationItem(
+                    title = stringResource(Res.string.voice_notes_settings),
+                    description = stringResource(Res.string.voice_notes_settings_description),
+                    icon = { Icon(Icons.Default.GraphicEq, contentDescription = null) },
+                    onClick = onNavigateToVoiceNotes,
                 )
                 SettingsNavigationItem(
                     title = stringResource(Res.string.timeline_settings),

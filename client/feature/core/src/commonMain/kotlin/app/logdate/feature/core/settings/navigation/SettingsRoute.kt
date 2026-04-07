@@ -32,6 +32,9 @@ data object AdvancedSettingsRoute
 data object MemoriesSettingsRoute
 
 @Serializable
+data object VoiceNotesSettingsRoute
+
+@Serializable
 data object StreakSettingsRoute
 
 @Serializable

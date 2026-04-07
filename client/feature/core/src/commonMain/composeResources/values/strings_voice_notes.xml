@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Voice notes settings -->
+    <string name="voice_notes_settings">Voice notes</string>
+    <string name="voice_notes_settings_description">On-device transcription and ambient sound detection</string>
+
+    <string name="voice_notes_settings_intro">Voice notes work without anything extra. Download these on-device models if you want sharper transcripts and the soundscape each note was captured in — everything stays on your device.</string>
+
+    <string name="voice_notes_model_transcription_title">Sharper transcripts</string>
+    <string name="voice_notes_model_transcription_description">Rewrites your spoken notes after recording with proper punctuation and casing.</string>
+
+    <string name="voice_notes_model_tagging_title">Soundscape detection</string>
+    <string name="voice_notes_model_tagging_description">Tags ambient sounds — birds, traffic, music, rain — alongside each voice note.</string>
+
+    <string name="voice_notes_model_status_ready">Ready</string>
+    <string name="voice_notes_model_status_idle">Not downloaded</string>
+    <string name="voice_notes_model_status_downloading">Downloading…</string>
+    <string name="voice_notes_model_status_extracting">Installing…</string>
+
+    <string name="voice_notes_model_action_download">Download</string>
+    <string name="voice_notes_model_action_retry">Retry</string>
+
+    <string name="voice_notes_model_failed_no_network">No internet. Reconnect and try again.</string>
+    <string name="voice_notes_model_failed_server">The download server is unreachable right now.</string>
+    <string name="voice_notes_model_failed_storage">Not enough storage to install this model.</string>
+    <string name="voice_notes_model_failed_corrupt">The downloaded files were incomplete.</string>
+    <string name="voice_notes_model_failed_unknown">Something went wrong.</string>
+    <string name="voice_notes_model_failed_unsupported">Not supported on this device.</string>
+</resources>

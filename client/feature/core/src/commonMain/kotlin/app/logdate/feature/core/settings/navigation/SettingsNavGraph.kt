@@ -22,6 +22,7 @@ import app.logdate.feature.core.settings.ui.SettingsOverviewScreen
 import app.logdate.feature.core.settings.ui.StreakSettingsScreen
 import app.logdate.feature.core.settings.ui.SyncSettingsScreen
 import app.logdate.feature.core.settings.ui.TimelineSettingsScreen
+import app.logdate.feature.core.settings.ui.VoiceNotesSettingsScreen
 import app.logdate.feature.core.settings.ui.devices.DevicesScreen
 
 /**
@@ -44,6 +45,7 @@ fun NavGraphBuilder.settingsGraph(navController: NavController) {
             onNavigateToPrivacy = { navController.navigate(PrivacySettingsRoute) },
             onNavigateToLibrarySettings = { navController.navigate(LibrarySettingsRoute) },
             onNavigateToMemories = { navController.navigate(MemoriesSettingsRoute) },
+            onNavigateToVoiceNotes = { navController.navigate(VoiceNotesSettingsRoute) },
             onNavigateToNotifications = null, // System notifications not available on desktop
             onNavigateToStreaks = { navController.navigate(StreakSettingsRoute) },
             onNavigateToTimeline = { navController.navigate(TimelineSettingsRoute) },
@@ -85,6 +87,11 @@ fun NavGraphBuilder.settingsGraph(navController: NavController) {
         MemoriesSettingsScreen(
             onBack = { navController.popBackStack() },
             onNavigateToRecommendations = { navController.navigate(RecommendationSettingsRoute) },
+        )
+    }
+    composable<VoiceNotesSettingsRoute> {
+        VoiceNotesSettingsScreen(
+            onBack = { navController.popBackStack() },
         )
     }
     composable<StreakSettingsRoute> {

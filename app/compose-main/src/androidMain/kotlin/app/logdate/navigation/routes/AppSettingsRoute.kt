@@ -38,6 +38,7 @@ import app.logdate.feature.core.settings.ui.StreakSettingsScreen
 import app.logdate.feature.core.settings.ui.SyncSettingsScreen
 import app.logdate.feature.core.settings.ui.TimelineSettingsScreen
 import app.logdate.feature.core.settings.ui.TimelineSettingsViewModel
+import app.logdate.feature.core.settings.ui.VoiceNotesSettingsScreen
 import app.logdate.feature.core.settings.ui.devices.DevicesScreen
 import app.logdate.feature.core.settings.ui.watch.WatchNotificationSettingsScreen
 import app.logdate.feature.core.settings.ui.watch.WatchSettingsScreen
@@ -71,6 +72,7 @@ import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.routes.core.StreakSettingsRoute
 import app.logdate.navigation.routes.core.SyncSettingsRoute
 import app.logdate.navigation.routes.core.TimelineSettingsRoute
+import app.logdate.navigation.routes.core.VoiceNotesSettingsRoute
 import app.logdate.navigation.routes.core.WatchNotificationSettingsRoute
 import app.logdate.navigation.routes.core.WatchSettingsRoute
 import app.logdate.navigation.routes.core.WatchSyncSettingsRoute
@@ -154,6 +156,10 @@ fun MainAppNavigator.openLibrarySettings() {
  */
 fun MainAppNavigator.openMemoriesSettings() {
     backStack.add(MemoriesSettingsRoute)
+}
+
+fun MainAppNavigator.openVoiceNotesSettings() {
+    backStack.add(VoiceNotesSettingsRoute)
 }
 
 /**
@@ -303,6 +309,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onOpenLocationTimeline: () -> Unit,
     onNavigateToLibrarySettings: () -> Unit,
     onNavigateToMemories: () -> Unit,
+    onNavigateToVoiceNotes: () -> Unit,
     onNavigateToNotifications: () -> Unit,
     onNavigateToRecommendations: () -> Unit,
     onNavigateToTimeline: () -> Unit,
@@ -342,6 +349,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onNavigateToPrivacy = onNavigateToPrivacy,
             onNavigateToLibrarySettings = onNavigateToLibrarySettings,
             onNavigateToMemories = onNavigateToMemories,
+            onNavigateToVoiceNotes = onNavigateToVoiceNotes,
             onNavigateToNotifications = onNavigateToNotifications,
             onNavigateToStreaks = onNavigateToStreaks,
             onNavigateToRewindSettings = onNavigateToRewindSettings,
@@ -546,6 +554,15 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
         MemoriesSettingsScreen(
             onBack = onBack,
             onNavigateToRecommendations = onNavigateToRecommendations,
+        )
+    }
+
+    // Voice notes settings detail (detail pane)
+    routeEntry<VoiceNotesSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        VoiceNotesSettingsScreen(
+            onBack = onBack,
         )
     }
 
