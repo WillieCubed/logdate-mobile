@@ -27,20 +27,57 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipInputStream
 
 /**
- * Android-specific implementation for launching data restore using Storage Access Framework and WorkManager.
+ * Android-specific [RestoreLauncher] backed by Storage Access Framework and WorkManager.
+ *
+ * ## Completion signaling
+ *
+ * Terminal outcomes ([RestoreOutcome.Success], [RestoreOutcome.Failure],
+ * [RestoreOutcome.Cancelled]) are delivered to the registered completion callback exactly
+ * once per restore operation, regardless of which path fires first:
+ *
+ * 1. **Direct** — [RestoreWorker] calls [completeRestore] before returning, carrying the
+ *    typed outcome directly.
+ * 2. **Fallback** — The [WorkManager] LiveData observer in [setupWorkObserver] fires when
+ *    the worker's terminal [WorkInfo.State] is delivered. This covers the case where the
+ *    worker is killed before it can call [completeRestore].
+ *
+ * [restoreCompleted] gates the callback via compare-and-set so only the first path to
+ * arrive fires it. It is reset each time [startRestore] is called.
+ *
+ * ## File selection
+ *
+ * [onRestoreSourceSelected] extracts `metadata.json` from the chosen archive for preview
+ * without a full copy to disk. This I/O is dispatched to [launcherScope] so it never
+ * blocks the main thread. Any in-flight extraction is cancelled before a new one begins,
+ * tracked by [metadataExtractionJob].
  */
 class AndroidRestoreLauncher(
     private val context: Context,
 ) : RestoreLauncher {
     private val json = Json { ignoreUnknownKeys = true }
+
+    /**
+     * Scope for metadata extraction coroutines. Lives for the lifetime of this singleton;
+     * individual jobs are tracked via [metadataExtractionJob] and cancelled as needed.
+     */
     private val launcherScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    /**
+     * Guards the completion callback so it fires at most once per restore operation.
+     * Reset in [startRestore]; set atomically in [completeRestore] and the WorkManager
+     * fallback observer.
+     */
     private val restoreCompleted = AtomicBoolean(false)
+
+    /** The active metadata extraction job, if any. Cancelled before starting a new one. */
     private var metadataExtractionJob: Job? = null
 
     private var lastSelectedUri: Uri? = null
-    private var completionCallback: ((RestoreOutcome) -> Unit)? = null
-    private var fileSelectedCallback: ((ArchiveFileInfo?) -> Unit)? = null
     private var workInfoObserver: Observer<List<WorkInfo>>? = null
+
+    @Volatile private var completionCallback: ((RestoreOutcome) -> Unit)? = null
+
+    @Volatile private var fileSelectedCallback: ((ArchiveFileInfo?) -> Unit)? = null
 
     private val _restoreProgress = MutableStateFlow<RestoreProgressInfo>(RestoreProgressInfo.Idle)
     override val restoreProgress: StateFlow<RestoreProgressInfo> = _restoreProgress.asStateFlow()
@@ -48,48 +85,55 @@ class AndroidRestoreLauncher(
     private var openDocumentLauncher: ActivityResultLauncher<Intent>? = null
 
     /**
-     * Sets up the activity result launcher. This should be called from the main activity during setup.
+     * Registers the SAF [launcher] used to open the system file picker.
+     * Must be called from the host activity before [startFileSelection].
      */
     fun setupActivityResultLauncher(launcher: ActivityResultLauncher<Intent>) {
         openDocumentLauncher = launcher
     }
 
     /**
-     * Set up lifecycle observer for the restore work.
-     * This should be called by the MainActivity.
+     * Attaches a lifecycle-aware WorkManager observer for this [lifecycleOwner].
+     *
+     * The observer acts as a fallback completion signal: it fires the callback only if
+     * [completeRestore] was not already called by the worker. Must be called from the
+     * host activity; typically in `onCreate`.
      */
     fun setupWorkObserver(lifecycleOwner: LifecycleOwner) {
-        if (workInfoObserver != null) {
+        workInfoObserver?.let {
             WorkManager
                 .getInstance(context)
                 .getWorkInfosForUniqueWorkLiveData(RestoreWorker.WORK_NAME)
-                .removeObserver(workInfoObserver!!)
+                .removeObserver(it)
         }
 
         workInfoObserver =
             Observer { workInfoList ->
                 if (workInfoList.isEmpty()) return@Observer
-
                 val workInfo = workInfoList[0]
 
                 when (workInfo.state) {
                     WorkInfo.State.SUCCEEDED -> {
                         _restoreProgress.value = RestoreProgressInfo.Idle
-                        // Fallback: only fire if the worker didn't already call completeRestore().
                         if (restoreCompleted.compareAndSet(false, true)) {
                             val summaryJson = workInfo.outputData.getString(RestoreWorker.SUMMARY_JSON_KEY)
-                            if (summaryJson != null) {
-                                val summary =
-                                    runCatching { json.decodeFromString<RestoreSummary>(summaryJson) }
-                                        .getOrNull()
-                                if (summary != null) {
-                                    completionCallback?.invoke(RestoreOutcome.Success(summary))
-                                } else {
-                                    completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.INVALID_SUMMARY))
+                            val summary =
+                                summaryJson?.let {
+                                    runCatching { json.decodeFromString<RestoreSummary>(it) }.getOrNull()
                                 }
-                            } else {
-                                completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.NO_SUMMARY_RETURNED))
-                            }
+                            completionCallback?.invoke(
+                                if (summary != null) {
+                                    RestoreOutcome.Success(summary)
+                                } else {
+                                    RestoreOutcome.Failure(
+                                        if (summaryJson != null) {
+                                            RestoreError.INVALID_SUMMARY
+                                        } else {
+                                            RestoreError.NO_SUMMARY_RETURNED
+                                        },
+                                    )
+                                },
+                            )
                         }
                     }
                     WorkInfo.State.FAILED -> {
@@ -104,9 +148,7 @@ class AndroidRestoreLauncher(
                             completionCallback?.invoke(RestoreOutcome.Cancelled)
                         }
                     }
-                    else -> {
-                        // Still in progress, do nothing
-                    }
+                    else -> Unit
                 }
             }
 
@@ -128,12 +170,17 @@ class AndroidRestoreLauncher(
         _restoreProgress.value = info
     }
 
+    /**
+     * Primary completion signal, called directly by [RestoreWorker] before it returns.
+     *
+     * Fires the completion callback exactly once. If the WorkManager fallback observer
+     * arrives first (rare), this call is a no-op.
+     */
     override fun completeRestore(outcome: RestoreOutcome) {
         _restoreProgress.value = RestoreProgressInfo.Idle
         if (restoreCompleted.compareAndSet(false, true)) {
             completionCallback?.invoke(outcome)
         }
-        Napier.i("Restore completed via direct signal: $outcome")
     }
 
     override fun startFileSelection() {
@@ -197,16 +244,20 @@ class AndroidRestoreLauncher(
         lastSelectedUri = null
         WorkManager.getInstance(context).cancelUniqueWork(RestoreWorker.WORK_NAME)
         _restoreProgress.value = RestoreProgressInfo.Idle
-        completionCallback?.invoke(RestoreOutcome.Cancelled)
+        if (restoreCompleted.compareAndSet(false, true)) {
+            completionCallback?.invoke(RestoreOutcome.Cancelled)
+        }
         Napier.i("Restore cancelled")
     }
 
     /**
-     * Called when the user has selected a restore archive or cancelled the dialog.
+     * Called when the user selects a restore archive or dismisses the file picker.
      *
-     * Instead of immediately starting a restore, this extracts the archive's
-     * metadata and delivers it to the file-selected callback for preview. The
-     * ZIP read is dispatched to [launcherScope] so it never blocks the main thread.
+     * Reads `metadata.json` from the archive on [launcherScope] for preview without a
+     * full archive copy. Any previously in-flight extraction is cancelled first. On
+     * success, delivers an [ArchiveFileInfo] to the file-selected callback. On failure
+     * (unparseable archive, missing entry, or permission error), delivers a null file
+     * info and an [RestoreOutcome.Failure] to the completion callback.
      */
     fun onRestoreSourceSelected(uri: Uri?) {
         if (uri == null) {
@@ -251,10 +302,10 @@ class AndroidRestoreLauncher(
     }
 
     /**
-     * Extracts only the `metadata.json` entry from the archive for preview.
+     * Reads only the `metadata.json` entry from the archive for preview.
      *
-     * Uses [java.util.zip.ZipInputStream] to read sequentially from the content
-     * URI stream, avoiding a full archive copy to disk.
+     * Streams through the ZIP sequentially so the full archive is never loaded into
+     * memory. Returns `null` if the entry is missing or the stream cannot be read.
      */
     private fun extractMetadata(uri: Uri): String? =
         try {

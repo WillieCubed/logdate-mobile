@@ -226,11 +226,23 @@ class RestoreWorker(
                     input.copyTo(output)
                 }
             }
+            val mimeType =
+                resolveMimeType(fileName).let { byExtension ->
+                    if (byExtension == "application/octet-stream") {
+                        detectMimeTypeFromBytes(tempFile).also { detected ->
+                            if (detected != "application/octet-stream") {
+                                Napier.d("Detected MIME type from magic bytes for $fileName: $detected")
+                            }
+                        }
+                    } else {
+                        byExtension
+                    }
+                }
             val savedPath =
                 mediaManager.saveMediaFromFile(
                     sourceFilePath = tempFile.absolutePath,
                     fileName = fileName,
-                    mimeType = resolveMimeType(fileName),
+                    mimeType = mimeType,
                 )
             Napier.d("Successfully imported media from archive: $exportPath")
             return savedPath
@@ -252,4 +264,48 @@ class RestoreWorker(
             }
         return mimeType ?: "application/octet-stream"
     }
+
+    private fun detectMimeTypeFromBytes(file: File): String =
+        try {
+            val header = ByteArray(16)
+            file.inputStream().use { it.read(header) }
+            when {
+                header[0] == 0xFF.toByte() && header[1] == 0xD8.toByte() && header[2] == 0xFF.toByte() ->
+                    "image/jpeg"
+                header[0] == 0x89.toByte() &&
+                    header[1] == 0x50.toByte() &&
+                    header[2] == 0x4E.toByte() &&
+                    header[3] == 0x47.toByte() ->
+                    "image/png"
+                header[0] == 0x52.toByte() &&
+                    header[1] == 0x49.toByte() &&
+                    header[2] == 0x46.toByte() &&
+                    header[3] == 0x46.toByte() &&
+                    header[8] == 0x57.toByte() &&
+                    header[9] == 0x45.toByte() &&
+                    header[10] == 0x42.toByte() &&
+                    header[11] == 0x50.toByte() ->
+                    "image/webp"
+                header[0] == 0x47.toByte() &&
+                    header[1] == 0x49.toByte() &&
+                    header[2] == 0x46.toByte() &&
+                    header[3] == 0x38.toByte() ->
+                    "image/gif"
+                header[4] == 0x66.toByte() &&
+                    header[5] == 0x74.toByte() &&
+                    header[6] == 0x79.toByte() &&
+                    header[7] == 0x70.toByte() -> {
+                    val brand = String(header, 8, 4, Charsets.US_ASCII)
+                    when {
+                        brand.startsWith("hei") || brand.startsWith("mif") || brand.startsWith("avi") -> "image/heic"
+                        brand.startsWith("M4A") || brand.startsWith("m4a") -> "audio/mp4"
+                        else -> "video/mp4"
+                    }
+                }
+                else -> "application/octet-stream"
+            }
+        } catch (e: Exception) {
+            Napier.w("Failed to detect MIME type from magic bytes: ${file.name}", e)
+            "application/octet-stream"
+        }
 }

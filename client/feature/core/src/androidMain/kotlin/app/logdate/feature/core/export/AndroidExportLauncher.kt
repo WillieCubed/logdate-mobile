@@ -19,56 +19,69 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Android-specific implementation for launching data export using Storage Access Framework and WorkManager.
+ * Android-specific [ExportLauncher] backed by Storage Access Framework and WorkManager.
+ *
+ * ## Completion signaling
+ *
+ * Success and failure use distinct channels to preserve [ExportStats] delivery:
+ *
+ * - **Success** — [ExportWorker] calls [updateProgress] with a non-null
+ *   [ExportProgressInfo.completedFilePath]. The ViewModel observes [exportProgress],
+ *   which carries the full stats. The WorkManager observer takes no action on `SUCCEEDED`.
+ * - **Failure / cancellation** — The WorkManager LiveData observer fires [completionCallback]
+ *   with `null`. WorkManager's terminal state is the only signal; there is no direct worker
+ *   call for these cases.
+ *
+ * This asymmetry keeps success single-path (flow only) and failure single-path (observer
+ * only), avoiding the need for a once-fire guard.
  */
 class AndroidExportLauncher(
     private val context: Context,
 ) : ExportLauncher {
     private var pendingExportCallback: (() -> Unit)? = null
     private var lastSelectedUri: Uri? = null
-    private var completionCallback: ((String?) -> Unit)? = null
     private var workInfoObserver: Observer<List<WorkInfo>>? = null
     private var pendingExportOptions: ExportOptions = ExportOptions()
+
+    @Volatile private var completionCallback: ((String?) -> Unit)? = null
 
     private val _exportProgress = MutableStateFlow(ExportProgressInfo())
     override val exportProgress: StateFlow<ExportProgressInfo> = _exportProgress.asStateFlow()
 
-    // This will be created and registered by the activity when this class is instantiated
+    /** SAF launcher for `ACTION_CREATE_DOCUMENT`. Set by the host activity before [startExport]. */
     private var createDocumentLauncher: ActivityResultLauncher<Intent>? = null
 
     /**
-     * Sets up the activity result launcher. This should be called from the main activity during setup.
+     * Registers the SAF [launcher] used to show the system file-save dialog.
+     * Must be called from the host activity before [startExport].
      */
     fun setupActivityResultLauncher(launcher: ActivityResultLauncher<Intent>) {
         createDocumentLauncher = launcher
     }
 
     /**
-     * Set up lifecycle observer for the export work.
-     * This should be called by the MainActivity.
+     * Attaches a lifecycle-aware WorkManager observer for this [lifecycleOwner].
+     *
+     * Handles failure and cancellation only — success is signaled via [updateProgress].
+     * Must be called from the host activity; typically in `onCreate`.
      */
     fun setupWorkObserver(lifecycleOwner: LifecycleOwner) {
-        // Remove previous observer if it exists
-        if (workInfoObserver != null) {
+        workInfoObserver?.let {
             WorkManager
                 .getInstance(context)
                 .getWorkInfosForUniqueWorkLiveData(ExportWorker.WORK_NAME)
-                .removeObserver(workInfoObserver!!)
+                .removeObserver(it)
         }
 
-        // Create new observer for failure and cancellation states only.
-        // Success completion is signaled via ExportLauncher.updateProgress() flow,
-        // which carries stats. This eliminates race conditions and duplication.
         workInfoObserver =
             Observer { workInfoList ->
                 if (workInfoList.isEmpty()) return@Observer
-
                 val workInfo = workInfoList[0]
 
                 when (workInfo.state) {
                     WorkInfo.State.SUCCEEDED -> {
                         // Success is signaled via updateProgress() by the worker.
-                        // Do nothing here — let the flow be the source of truth.
+                        // The exportProgress flow is the source of truth for success.
                         Napier.i("Export work succeeded")
                     }
                     WorkInfo.State.FAILED, WorkInfo.State.CANCELLED -> {
@@ -99,7 +112,6 @@ class AndroidExportLauncher(
         pendingExportOptions = options
         val defaultFileName = generateExportFileName()
 
-        // Create an intent to show the file picker
         val intent =
             Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
@@ -118,47 +130,38 @@ class AndroidExportLauncher(
             }
 
             createDocumentLauncher?.launch(intent) ?: run {
-                // If no launcher is available, fall back to default export
                 Napier.w("No document launcher available, falling back to default export path")
                 startExportWorker(null)
             }
         } catch (e: Exception) {
             Napier.e("Error launching file picker", e)
-            // Fall back to default export if anything goes wrong
             startExportWorker(null)
         }
     }
 
     override fun cancelExport() {
-        // Cancel the pending callback if the file picker is still open
         pendingExportCallback = null
-
-        // Cancel the work if it's running
         WorkManager.getInstance(context).cancelUniqueWork(ExportWorker.WORK_NAME)
-
-        // Reset progress
         _exportProgress.value = ExportProgressInfo()
-
-        // Notify the callback
         completionCallback?.invoke(null)
-
         Napier.i("Export cancelled")
     }
 
     /**
-     * Called when the user has selected a destination or cancelled the dialog
+     * Called when the user selects an export destination or dismisses the file-save dialog.
+     *
+     * Takes a persistent write permission on the URI before starting the worker. If [uri]
+     * is null, the user cancelled and the completion callback is notified.
      */
     fun onExportDestinationSelected(uri: Uri?) {
         lastSelectedUri = uri
 
         if (uri != null) {
             try {
-                // Take a persistent permission to write to this URI
                 context.contentResolver.takePersistableUriPermission(
                     uri,
                     Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
                 )
-
                 Napier.i("User selected export destination: $uri")
                 pendingExportCallback?.invoke()
             } catch (e: Exception) {
@@ -174,7 +177,11 @@ class AndroidExportLauncher(
     }
 
     /**
-     * Starts the export worker with the provided URI
+     * Enqueues an [ExportWorker] with the given destination [uri].
+     *
+     * If [uri] is null, the worker saves to the public Downloads directory instead.
+     * Immediately emits an active progress state so the UI transitions out of [Selecting]
+     * before the worker starts.
      */
     private fun startExportWorker(uri: Uri?) {
         Napier.i("Starting export worker")

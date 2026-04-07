@@ -73,7 +73,7 @@ class SharingEntryPointsE2ETest {
                     MediaDetailContent(
                         state =
                             MediaDetailUiState.ImageContent(
-                                noteId = Uuid.random(),
+                                mediaId = Uuid.random(),
                                 mediaRef = mediaRef,
                                 createdAt = Clock.System.now(),
                                 location = null,
