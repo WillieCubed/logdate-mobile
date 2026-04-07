@@ -18,6 +18,8 @@ import app.logdate.client.intelligence.di.intelligenceModule
 import app.logdate.client.location.di.locationModule
 import app.logdate.client.media.di.audioModule
 import app.logdate.client.networking.di.networkingModule
+import app.logdate.client.rewind.RewindGenerationWorker
+import app.logdate.client.rewind.RewindNotificationCoordinator
 import app.logdate.client.sensor.di.sensorModule
 import app.logdate.client.sync.AndroidPhoneAudioStreamOpener
 import app.logdate.client.sync.DefaultPhoneWearSyncBridge
@@ -80,6 +82,9 @@ actual val appModule: Module =
         single { AmbientPromptScheduler(androidContext(), get()) }
         single { AmbientPromptSchedulingObserver(get(), get(), get()) }
         workerOf(::AmbientPromptWorker)
+
+        single { RewindNotificationCoordinator(androidContext()) }
+        workerOf(::RewindGenerationWorker)
 
         single { NoteDataMapper() }
         single { WearSyncNotificationHelper(androidContext()) }

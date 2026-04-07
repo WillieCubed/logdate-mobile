@@ -54,6 +54,9 @@ import app.logdate.client.media.audio.EXTRA_NOTE_ID
 import app.logdate.client.media.audio.NAV_SOURCE_AUDIO_PLAYBACK
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_ID
+import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_TARGET
+import app.logdate.client.rewind.REWIND_NOTIFICATION_TARGET_DETAIL
 import app.logdate.client.sharing.NoOpSharingLauncher
 import app.logdate.client.sharing.SharingLauncher
 import app.logdate.client.testing.navigation.readNavigationTestDestination
@@ -78,6 +81,7 @@ import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
 import app.logdate.navigation.routes.core.EntryEditor
 import app.logdate.navigation.routes.core.LocationRoute
 import app.logdate.navigation.routes.core.NoteViewerRoute
+import app.logdate.navigation.routes.core.RewindDetailRoute
 import app.logdate.navigation.routes.core.TimelineDetail
 import io.github.aakira.napier.Napier
 import io.github.vinceglb.filekit.core.FileKit
@@ -542,6 +546,11 @@ private fun resolveNavKey(intent: Intent?): NavKey? {
         intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_MEMORY_RECALL -> {
             val dateStr = intent.getStringExtra(EXTRA_AMBIENT_PROMPT_RECALL_DATE) ?: return null
             runCatching { TimelineDetail(kotlinx.datetime.LocalDate.parse(dateStr)) }.getOrNull()
+        }
+
+        intent.getStringExtra(EXTRA_REWIND_NOTIFICATION_TARGET) == REWIND_NOTIFICATION_TARGET_DETAIL -> {
+            val rewindId = intent.getStringExtra(EXTRA_REWIND_NOTIFICATION_ID) ?: return null
+            runCatching { RewindDetailRoute(Uuid.parse(rewindId)) }.getOrNull()
         }
 
         // Deep link URIs: logdate://journal/{id}, logdate://day/{date}, etc.

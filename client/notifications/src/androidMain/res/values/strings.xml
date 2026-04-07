@@ -18,6 +18,12 @@
     <string name="notification_channel_draft_rescue_description">Reminders to finish entries you already started.</string>
     <string name="notification_channel_memory_recall_name">Memory recall</string>
     <string name="notification_channel_memory_recall_description">Prompts to revisit meaningful older entries.</string>
+    <string name="notification_channel_rewind_ready_name">Rewind ready</string>
+    <string name="notification_channel_rewind_ready_description">Lets you know when a new weekly Rewind is ready to watch.</string>
+
+    <string name="notification_rewind_ready_title">Your weekly Rewind is ready</string>
+    <string name="notification_rewind_ready_body">%1$s is waiting for you. Tap to watch the story.</string>
+    <string name="notification_rewind_ready_body_generic">A new weekly Rewind is waiting for you. Tap to watch the story.</string>
     <string name="notification_channel_watch_sync_name">Watch sync</string>
     <string name="notification_channel_watch_sync_description">Alerts when entries arrive from your watch.</string>
     <string name="notification_channel_data_export_name">Data export</string>

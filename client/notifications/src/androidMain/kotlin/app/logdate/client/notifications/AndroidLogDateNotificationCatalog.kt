@@ -112,6 +112,16 @@ object AndroidLogDateNotificationCatalog {
                 lockscreenVisibility = Notification.VISIBILITY_PRIVATE,
             ),
             AndroidLogDateNotificationChannelSpec(
+                key = LogDateNotificationChannelKey.REWIND_READY,
+                nameResId = R.string.notification_channel_rewind_ready_name,
+                descriptionResId = R.string.notification_channel_rewind_ready_description,
+                importance = NotificationManager.IMPORTANCE_DEFAULT,
+                showBadge = true,
+                vibrationEnabled = false,
+                soundEnabled = true,
+                lockscreenVisibility = Notification.VISIBILITY_PRIVATE,
+            ),
+            AndroidLogDateNotificationChannelSpec(
                 key = LogDateNotificationChannelKey.WATCH_SYNC,
                 nameResId = R.string.notification_channel_watch_sync_name,
                 descriptionResId = R.string.notification_channel_watch_sync_description,

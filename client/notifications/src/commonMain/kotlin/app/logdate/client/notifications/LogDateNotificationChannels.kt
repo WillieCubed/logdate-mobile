@@ -56,6 +56,11 @@ enum class LogDateNotificationChannelKey(
         groupKey = LogDateNotificationGroupKey.AMBIENT_INTELLIGENCE,
         notificationId = 4003,
     ),
+    REWIND_READY(
+        id = "ambient_rewind_ready",
+        groupKey = LogDateNotificationGroupKey.AMBIENT_INTELLIGENCE,
+        notificationId = 4004,
+    ),
     WATCH_SYNC(
         id = "wear_sync_channel",
         groupKey = LogDateNotificationGroupKey.CONNECTED_DEVICES,
@@ -81,6 +86,7 @@ object LogDateNotificationChannels {
             LogDateNotificationChannelKey.CAPTURE_NUDGES,
             LogDateNotificationChannelKey.DRAFT_RESCUE,
             LogDateNotificationChannelKey.MEMORY_RECALL,
+            LogDateNotificationChannelKey.REWIND_READY,
             LogDateNotificationChannelKey.WATCH_SYNC,
             LogDateNotificationChannelKey.DATA_EXPORT,
             LogDateNotificationChannelKey.DATA_RESTORE,
