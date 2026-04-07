@@ -43,10 +43,10 @@ import app.logdate.feature.editor.ui.layout.rememberOverscrollDetector
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
-import logdate.client.feature.editor.generated.resources.add_audio
-import logdate.client.feature.editor.generated.resources.add_image
-import logdate.client.feature.editor.generated.resources.add_text
-import logdate.client.feature.editor.generated.resources.add_video
+import logdate.client.feature.editor.generated.resources.editor_action_add_audio
+import logdate.client.feature.editor.generated.resources.editor_action_add_image
+import logdate.client.feature.editor.generated.resources.editor_action_add_text
+import logdate.client.feature.editor.generated.resources.editor_action_add_video
 import logdate.client.feature.editor.generated.resources.take_photo
 import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
@@ -149,7 +149,7 @@ fun EditorContentFooter(
         ) {
             BlockTypeButton(
                 icon = Icons.Rounded.TextFields,
-                contentDescription = stringResource(Res.string.add_text),
+                contentDescription = stringResource(Res.string.editor_action_add_text),
                 modifier = textBounds,
                 onClick = {
                     onAddBlock(BlockType.TEXT, textId)
@@ -159,21 +159,21 @@ fun EditorContentFooter(
 
             BlockTypeButton(
                 icon = Icons.Rounded.Image,
-                contentDescription = stringResource(Res.string.add_image),
+                contentDescription = stringResource(Res.string.editor_action_add_image),
                 modifier = imageBounds,
                 onClick = { onAddBlock(BlockType.IMAGE, imageId) },
             )
 
             BlockTypeButton(
                 icon = Icons.Rounded.AudioFile,
-                contentDescription = stringResource(Res.string.add_audio),
+                contentDescription = stringResource(Res.string.editor_action_add_audio),
                 modifier = audioBounds,
                 onClick = { onAddBlock(BlockType.AUDIO, audioId) },
             )
 
             BlockTypeButton(
                 icon = Icons.Rounded.VideoFile,
-                contentDescription = stringResource(Res.string.add_video),
+                contentDescription = stringResource(Res.string.editor_action_add_video),
                 modifier = videoBounds,
                 onClick = { onAddBlock(BlockType.VIDEO, videoId) },
             )

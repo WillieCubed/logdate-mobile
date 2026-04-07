@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="action_note_create_cancel">Cancel</string>
-    <string name="action_note_create_discard">Discard</string>
-    <string name="action_note_create_discard_confirmation_description">Are you sure you want to discard your changes?</string>
-    <string name="action_note_create_discard_confirmation_title">Discard changes?</string>
+    <string name="editor_action_cancel">Cancel</string>
+    <string name="editor_action_discard">Discard</string>
+    <string name="editor_discard_dialog_description">Are you sure you want to discard your changes?</string>
+    <string name="editor_discard_dialog_title">Discard changes?</string>
     <string name="add_a_caption">Add a caption...</string>
     <string name="add_a_video_to_your_entry">Add a video to your entry</string>
     <string name="add_an_image_to_your_entry">Add an image to your entry</string>
-    <string name="add_audio">Add Audio</string>
+    <string name="editor_action_add_audio">Add Audio</string>
     <string name="audio_recording">Audio Recording</string>
-    <string name="add_image">Add Image</string>
-    <string name="add_photo_from_gallery">Add photo from gallery</string>
-    <string name="add_text">Add Text</string>
-    <string name="add_video">Add Video</string>
+    <string name="editor_action_add_image">Add Image</string>
+    <string name="editor_action_add_photo_gallery">Add photo from gallery</string>
+    <string name="editor_action_add_text">Add Text</string>
+    <string name="editor_action_add_video">Add Video</string>
     <string name="allow_access">Allow Access</string>
     <string name="allow_microphone_access">Allow Microphone Access</string>
     <string name="browse_all_photos">Browse all photos</string>
@@ -116,13 +116,13 @@
     <string name="write_something">Write something</string>
     <string name="you_can_record_audio_notes_after_granting_permission">You can record audio notes after granting permission</string>
     <string name="you_have_unsaved_changes_that_will_be_lost_if_you_exit_now">You have unsaved changes that will be lost if you exit now.</string>
-    <string name="location_chip_content_description">Current location</string>
-    <string name="new_note_action_add_photo">Add photo</string>
-    <string name="new_note_action_add_voice_note">New voice note</string>
-    <string name="new_note_action_finish">Finish</string>
-    <string name="new_note_action_record_video">Record video</string>
-    <string name="text_placeholder_location">Unknown location</string>
-    <string name="text_placeholder_start_writing">Start writing…</string>
+    <string name="editor_cd_location_chip">Current location</string>
+    <string name="editor_action_add_photo">Add photo</string>
+    <string name="editor_action_add_voice_note">New voice note</string>
+    <string name="editor_action_finish">Finish</string>
+    <string name="editor_action_record_video">Record video</string>
+    <string name="editor_placeholder_location">Unknown location</string>
+    <string name="editor_placeholder_text">Start writing…</string>
 
     <!-- Audio label templates -->
     <string name="audio_label_period_recording">%1$s Recording</string>

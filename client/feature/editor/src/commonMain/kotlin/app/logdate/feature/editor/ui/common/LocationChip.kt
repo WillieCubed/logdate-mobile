@@ -20,7 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.editor.generated.resources.Res
-import logdate.client.feature.editor.generated.resources.location_chip_content_description
+import logdate.client.feature.editor.generated.resources.editor_cd_location_chip
 import org.jetbrains.compose.resources.stringResource
 
 @Suppress("ktlint:standard:function-naming")
@@ -52,7 +52,7 @@ fun LocationChip(
             }
         Icon(
             imageVector = icon,
-            contentDescription = stringResource(Res.string.location_chip_content_description),
+            contentDescription = stringResource(Res.string.editor_cd_location_chip),
             modifier = Modifier.size(20.dp),
         )
         if (enabled) {

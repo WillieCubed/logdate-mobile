@@ -42,10 +42,10 @@ import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.layout.LocalEditorIsCompact
 import logdate.client.feature.editor.generated.resources.Res
-import logdate.client.feature.editor.generated.resources.add_photo_from_gallery
 import logdate.client.feature.editor.generated.resources.capture
 import logdate.client.feature.editor.generated.resources.capture_photo_or_video
 import logdate.client.feature.editor.generated.resources.choose_a_photo
+import logdate.client.feature.editor.generated.resources.editor_action_add_photo_gallery
 import logdate.client.feature.editor.generated.resources.gallery
 import logdate.client.feature.editor.generated.resources.photo_or_video
 import logdate.client.feature.editor.generated.resources.record_audio
@@ -346,7 +346,7 @@ private fun PhotoSurface(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Image,
-                    contentDescription = stringResource(Res.string.add_photo_from_gallery),
+                    contentDescription = stringResource(Res.string.editor_action_add_photo_gallery),
                     modifier = Modifier.size(48.dp),
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 )

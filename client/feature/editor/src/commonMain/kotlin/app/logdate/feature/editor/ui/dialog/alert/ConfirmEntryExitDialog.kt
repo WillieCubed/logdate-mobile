@@ -7,12 +7,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import logdate.client.feature.editor.generated.resources.Res
-import logdate.client.feature.editor.generated.resources.action_note_create_cancel
-import logdate.client.feature.editor.generated.resources.action_note_create_discard
-import logdate.client.feature.editor.generated.resources.action_note_create_discard_confirmation_description
-import logdate.client.feature.editor.generated.resources.action_note_create_discard_confirmation_title
+import logdate.client.feature.editor.generated.resources.editor_action_discard
+import logdate.client.feature.editor.generated.resources.editor_discard_dialog_description
+import logdate.client.feature.editor.generated.resources.editor_discard_dialog_title
 import logdate.client.feature.editor.generated.resources.save_draft
+import logdate.client.ui.generated.resources.common_cancel
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * A dialog that informs the user if they have unsaved changes and allows them to dismiss the screen.
@@ -29,8 +30,8 @@ internal fun ConfirmEntryExitDialog(
         when (dialogType) {
             ConfirmDialogType.EXIT_EDITOR ->
                 Pair(
-                    stringResource(Res.string.action_note_create_discard_confirmation_title),
-                    stringResource(Res.string.action_note_create_discard_confirmation_description),
+                    stringResource(Res.string.editor_discard_dialog_title),
+                    stringResource(Res.string.editor_discard_dialog_description),
                 )
             ConfirmDialogType.DELETE_BLOCK ->
                 Pair(
@@ -48,7 +49,7 @@ internal fun ConfirmEntryExitDialog(
                 onClick = onCancel,
                 modifier = Modifier.testTag("exit_dialog_cancel"),
             ) {
-                Text(stringResource(Res.string.action_note_create_cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
         },
         confirmButton = {
@@ -57,7 +58,7 @@ internal fun ConfirmEntryExitDialog(
                     onClick = onConfirm,
                     modifier = Modifier.testTag("exit_dialog_discard"),
                 ) {
-                    Text(stringResource(Res.string.action_note_create_discard))
+                    Text(stringResource(Res.string.editor_action_discard))
                 }
                 TextButton(
                     onClick = onSaveAsDraft,
@@ -72,7 +73,7 @@ internal fun ConfirmEntryExitDialog(
                 ) {
                     Text(
                         when (dialogType) {
-                            ConfirmDialogType.EXIT_EDITOR -> stringResource(Res.string.action_note_create_discard)
+                            ConfirmDialogType.EXIT_EDITOR -> stringResource(Res.string.editor_action_discard)
                             ConfirmDialogType.DELETE_BLOCK -> "Delete"
                         },
                     )
