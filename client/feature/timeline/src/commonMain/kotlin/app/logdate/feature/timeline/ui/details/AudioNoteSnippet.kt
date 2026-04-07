@@ -46,6 +46,7 @@ import logdate.client.ui.generated.resources.common_retry
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
@@ -325,7 +326,7 @@ fun AudioNoteSnippet(
  * Uses [DaylightClassifier] for the period name and relative date context.
  */
 @Composable
-private fun audioRecordingTitle(timestamp: kotlinx.datetime.Instant): String {
+private fun audioRecordingTitle(timestamp: Instant): String {
     val period = DaylightClassifier().classifyWithoutLocation(timestamp)
     val periodName = stringResource(period.stringRes)
 
@@ -351,7 +352,7 @@ private fun audioRecordingTitle(timestamp: kotlinx.datetime.Instant): String {
                     recorded.date.month.name
                         .lowercase()
                         .replaceFirstChar { it.uppercase() }
-                stringResource(Res.string.audio_recording_from_date, periodName, monthName, recorded.date.dayOfMonth)
+                stringResource(Res.string.audio_recording_from_date, periodName, monthName, recorded.date.day)
             }
         }
     }
