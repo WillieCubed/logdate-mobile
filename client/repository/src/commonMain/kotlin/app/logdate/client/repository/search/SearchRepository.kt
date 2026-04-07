@@ -83,6 +83,7 @@ enum class SearchContentType(
     REWIND("rewind"),
     STICKER("sticker"),
     POSTCARD("postcard"),
+    AMBIENT_SOUND("ambient_sound"),
     ;
 
     companion object {

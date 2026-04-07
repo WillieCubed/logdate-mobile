@@ -2,6 +2,7 @@ package app.logdate.client.database
 
 import androidx.room.Room
 import app.logdate.client.database.entities.AudioNoteEntity
+import app.logdate.client.database.entities.AudioTagEntity
 import app.logdate.client.database.entities.TextNoteEntity
 import app.logdate.client.database.entities.TranscriptionEntity
 import app.logdate.client.database.entities.TranscriptionStatus
@@ -84,6 +85,56 @@ class SearchIndexBootstrapperJvmTest {
 
             val afterDelete = database.searchDao().searchRanked("advent*", limit = 10)
             assertTrue(afterDelete.isEmpty())
+        }
+
+    @Test
+    fun ambientSoundTagsAreSearchableAndCascadeWithTheParentAudioNote() =
+        runTest {
+            val database = openDatabase()
+            val audioNote =
+                AudioNoteEntity(
+                    contentUri = "rainwalk.m4a",
+                    uid = Uuid.random(),
+                    created = Instant.fromEpochMilliseconds(30_000),
+                    lastUpdated = Instant.fromEpochMilliseconds(30_000),
+                )
+            val rainTag =
+                AudioTagEntity(
+                    id = Uuid.random(),
+                    noteId = audioNote.uid,
+                    soundName = "Rain",
+                    confidence = 0.92f,
+                    startMs = 0L,
+                    durationMs = 12_000L,
+                    created = Instant.fromEpochMilliseconds(31_000),
+                )
+            val birdsTag =
+                AudioTagEntity(
+                    id = Uuid.random(),
+                    noteId = audioNote.uid,
+                    soundName = "Bird",
+                    confidence = 0.71f,
+                    startMs = 4_000L,
+                    durationMs = 6_000L,
+                    created = Instant.fromEpochMilliseconds(31_500),
+                )
+
+            database.audioNoteDao().addNote(audioNote)
+            database.audioTagDao().insertTags(listOf(rainTag, birdsTag))
+
+            val rainResults = database.searchDao().searchRanked("rain", limit = 10)
+            assertEquals(1, rainResults.size)
+            assertEquals(audioNote.uid.toString(), rainResults.single().uid)
+            assertEquals("ambient_sound", rainResults.single().contentType)
+
+            val birdResults = database.searchDao().searchRanked("bird", limit = 10)
+            assertEquals(1, birdResults.size)
+            assertEquals(audioNote.uid.toString(), birdResults.single().uid)
+
+            database.audioNoteDao().removeNote(audioNote.uid)
+
+            assertTrue(database.searchDao().searchRanked("rain", limit = 10).isEmpty())
+            assertTrue(database.searchDao().searchRanked("bird", limit = 10).isEmpty())
         }
 
     private fun openDatabase(): LogDateDatabase {

@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mail
@@ -90,4 +91,5 @@ private fun SearchContentType.visualInfo(): Pair<ImageVector, String> =
         SearchContentType.REWIND -> Icons.Default.Replay to "Rewind"
         SearchContentType.STICKER -> Icons.Default.Star to "Sticker"
         SearchContentType.POSTCARD -> Icons.Default.Mail to "Postcard"
+        SearchContentType.AMBIENT_SOUND -> Icons.Default.GraphicEq to "Soundscape"
     }

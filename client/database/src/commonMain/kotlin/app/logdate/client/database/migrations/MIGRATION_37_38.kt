@@ -12,6 +12,11 @@ import androidx.sqlite.execSQL
  *
  * Each row is one detected sound (e.g. "Bird", "Rain") attached to an audio
  * note. Cascade-deletes with the parent note. No existing tables are altered.
+ *
+ * Column types match the [AudioTagEntity] declarations: Uuid columns (`id`,
+ * `noteId`) are stored as TEXT — Room's Uuid type converter serializes to a
+ * string. Using BLOB causes Room's compile-time schema validator to reject the
+ * migration with "Migration didn't properly handle: audio_tags".
  */
 val MIGRATION_37_38 =
     object : Migration(37, 38) {
@@ -19,8 +24,8 @@ val MIGRATION_37_38 =
             connection.execSQL(
                 """
                 CREATE TABLE IF NOT EXISTS audio_tags (
-                    id BLOB NOT NULL PRIMARY KEY,
-                    noteId BLOB NOT NULL,
+                    id TEXT NOT NULL PRIMARY KEY,
+                    noteId TEXT NOT NULL,
                     soundName TEXT NOT NULL,
                     confidence REAL NOT NULL,
                     startMs INTEGER NOT NULL,
