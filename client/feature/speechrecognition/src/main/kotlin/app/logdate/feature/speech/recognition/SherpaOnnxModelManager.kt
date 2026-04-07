@@ -22,6 +22,7 @@ class SherpaOnnxModelManager(
 ) {
     private val sttModelDir = File(context.filesDir, STT_MODEL_DIR_NAME)
     private val punctModelDir = File(context.filesDir, PUNCT_MODEL_DIR_NAME)
+    private val vadModelDir = File(context.filesDir, VAD_MODEL_DIR_NAME)
 
     suspend fun getModelPath(): String? {
         if (isSttModelReady()) {
@@ -45,6 +46,24 @@ class SherpaOnnxModelManager(
             if (isPunctModelReady()) punctModelDir.absolutePath else null
         } catch (e: Exception) {
             Napier.e("Failed to extract Sherpa-ONNX punctuation model from assets", e)
+            null
+        }
+    }
+
+    /**
+     * Returns the absolute path to the Silero VAD model file, extracting it from
+     * assets on first use. Returns null if extraction fails.
+     */
+    suspend fun getVadModelPath(): String? {
+        val modelFile = vadModelDir.resolve(VAD_MODEL_FILE_NAME)
+        if (modelFile.exists()) {
+            return modelFile.absolutePath
+        }
+        return try {
+            extractModelFromAssets(VAD_ASSET_NAME, vadModelDir)
+            if (modelFile.exists()) modelFile.absolutePath else null
+        } catch (e: Exception) {
+            Napier.e("Failed to extract Silero VAD model from assets", e)
             null
         }
     }
@@ -132,6 +151,9 @@ class SherpaOnnxModelManager(
         private const val STT_ASSET_NAME = "sherpa-onnx-stt-en.zip"
         private const val PUNCT_MODEL_DIR_NAME = "sherpa-onnx-punct"
         private const val PUNCT_ASSET_NAME = "sherpa-onnx-punct-en.zip"
+        private const val VAD_MODEL_DIR_NAME = "sherpa-onnx-vad"
+        private const val VAD_ASSET_NAME = "silero-vad.zip"
+        private const val VAD_MODEL_FILE_NAME = "silero_vad.onnx"
         private const val BUFFER_SIZE = 8192
     }
 }

@@ -16,6 +16,7 @@ object SpeechRecognitionProvider {
     ): TranscriptionService {
         val accumulator = TranscriptAccumulator()
         val recognizerProvider = SherpaOnnxRecognizerProvider(context)
-        return SherpaOnnxTranscriptionService(context, recognizerProvider, scope, accumulator)
+        val vadProvider = SherpaOnnxVadProvider(context)
+        return SherpaOnnxTranscriptionService(context, recognizerProvider, vadProvider, scope, accumulator)
     }
 }

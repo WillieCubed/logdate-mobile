@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 class SherpaOnnxTranscriptionService(
     private val context: Context,
     private val recognizerProvider: SherpaOnnxRecognizerProvider,
+    private val vadProvider: SherpaOnnxVadProvider,
     private val scope: CoroutineScope,
     private val accumulator: TranscriptAccumulator,
 ) : TranscriptionService {
@@ -59,6 +60,7 @@ class SherpaOnnxTranscriptionService(
 
     override suspend fun warmUp() {
         recognizerProvider.ensureInitialized()
+        vadProvider.ensureInitialized()
     }
 
     override fun getTranscriptionFlow(): SharedFlow<TranscriptionResult> = _transcriptionFlow.asSharedFlow()
@@ -90,6 +92,7 @@ class SherpaOnnxTranscriptionService(
                     val initJob =
                         launch {
                             recognizerProvider.ensureInitialized()
+                            vadProvider.ensureInitialized()
                         }
 
                     while (isActive && isListening && initJob.isActive) {
@@ -101,16 +104,12 @@ class SherpaOnnxTranscriptionService(
 
                     if (!isActive || !isListening) return@launch
 
-                    // Phase 2: models ready — create stream and drain buffer
+                    // Phase 2: models ready — create stream and drain buffer through VAD
                     val s = recognizerProvider.createStream()
                     stream = s
 
                     for (samples in preBuffer) {
-                        acceptWaveform(s, samples)
-                        while (recognizerProvider.isReady(s)) {
-                            recognizerProvider.decode(s)
-                        }
-                        processEndpointResults(s)
+                        processSamples(s, samples)
                     }
                     preBuffer.clear()
 
@@ -119,12 +118,7 @@ class SherpaOnnxTranscriptionService(
                         val shortsRead = ar.read(shortBuffer, 0, shortBuffer.size)
                         if (shortsRead <= 0) continue
 
-                        acceptWaveform(s, shortsToFloats(shortBuffer, shortsRead))
-
-                        while (recognizerProvider.isReady(s)) {
-                            recognizerProvider.decode(s)
-                        }
-                        processEndpointResults(s)
+                        processSamples(s, shortsToFloats(shortBuffer, shortsRead))
                     }
                 }
 
@@ -147,6 +141,21 @@ class SherpaOnnxTranscriptionService(
         // Wait for the recognition coroutine to finish before touching the stream
         recognitionJob?.join()
         recognitionJob = null
+
+        // Flush any trailing VAD segments through the recognizer
+        try {
+            val s = stream
+            if (s != null) {
+                vadProvider.flush()
+                while (!vadProvider.isEmpty()) {
+                    val segment = vadProvider.front()
+                    vadProvider.pop()
+                    acceptWaveform(s, segment.samples)
+                }
+            }
+        } catch (e: Exception) {
+            Napier.e("Error flushing VAD on stop", e)
+        }
 
         // Now safe to get final result from the stream
         try {
@@ -176,6 +185,7 @@ class SherpaOnnxTranscriptionService(
         currentStreamStartMs = samplesToMs(totalAcceptedSamples)
         currentStreamAcceptedSamples = 0L
 
+        vadProvider.reset()
         releaseStream()
     }
 
@@ -187,6 +197,7 @@ class SherpaOnnxTranscriptionService(
         recognitionJob?.cancel()
         recognitionJob = null
         stopAudioRecord()
+        vadProvider.reset()
         releaseStream()
     }
 
@@ -219,6 +230,7 @@ class SherpaOnnxTranscriptionService(
         recognitionJob = null
         stopAudioRecord()
         releaseStream()
+        vadProvider.release()
         accumulator.reset()
         totalAcceptedSamples = 0L
         currentStreamStartMs = 0L
@@ -251,6 +263,27 @@ class SherpaOnnxTranscriptionService(
         ar.startRecording()
         audioRecord = ar
         return ar
+    }
+
+    /**
+     * Routes raw PCM samples through the VAD, then forwards detected speech
+     * segments to the recognizer. Silence is dropped before reaching the
+     * recognizer, eliminating hallucinated tokens during pauses.
+     */
+    private suspend fun processSamples(
+        s: OnlineStream,
+        samples: FloatArray,
+    ) {
+        vadProvider.acceptWaveform(samples)
+        while (!vadProvider.isEmpty()) {
+            val segment = vadProvider.front()
+            vadProvider.pop()
+            acceptWaveform(s, segment.samples)
+            while (recognizerProvider.isReady(s)) {
+                recognizerProvider.decode(s)
+            }
+            processEndpointResults(s)
+        }
     }
 
     private suspend fun processEndpointResults(s: OnlineStream) {

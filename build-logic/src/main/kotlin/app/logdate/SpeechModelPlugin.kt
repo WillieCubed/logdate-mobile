@@ -48,10 +48,10 @@ abstract class DownloadSpeechModelTask : DefaultTask() {
             }
 
             val url = model.url
-            if (url.endsWith(".tar.bz2")) {
-                downloadAndRepackageTarBz2(url, dest, model.excludePatterns)
-            } else {
-                downloadDirect(url, dest)
+            when {
+                url.endsWith(".tar.bz2") -> downloadAndRepackageTarBz2(url, dest, model.excludePatterns)
+                url.endsWith(".onnx") && dest.name.endsWith(".zip") -> downloadAndWrapInZip(url, dest)
+                else -> downloadDirect(url, dest)
             }
         }
     }
@@ -64,6 +64,19 @@ abstract class DownloadSpeechModelTask : DefaultTask() {
             }
         }
         logger.lifecycle("Downloaded speech model to ${dest.absolutePath}")
+    }
+
+    private fun downloadAndWrapInZip(url: String, dest: File) {
+        logger.lifecycle("Downloading speech model: ${dest.name} (wrapping bare .onnx in zip)")
+        val internalName = url.substringAfterLast('/')
+        ZipOutputStream(dest.outputStream().buffered()).use { zipOut ->
+            zipOut.putNextEntry(ZipEntry(internalName))
+            URI(url).toURL().openStream().use { input ->
+                input.copyTo(zipOut)
+            }
+            zipOut.closeEntry()
+        }
+        logger.lifecycle("Wrapped speech model to ${dest.absolutePath}")
     }
 
     private fun downloadAndRepackageTarBz2(url: String, dest: File, excludePatterns: List<String>) {
@@ -198,6 +211,10 @@ class SpeechModelPlugin : Plugin<Project> {
                     "model.int8.onnx",
                     "README.md",
                 ),
+            ),
+            SpeechModel(
+                url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+                assetName = "silero-vad.zip",
             ),
         )
     }
