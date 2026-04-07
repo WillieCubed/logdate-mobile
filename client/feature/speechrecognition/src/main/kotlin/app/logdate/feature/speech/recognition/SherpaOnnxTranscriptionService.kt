@@ -8,6 +8,7 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
+import app.logdate.client.media.audio.download.ModelDownloadStatus
 import app.logdate.client.media.audio.transcription.TimedTranscriptBuilder
 import app.logdate.client.media.audio.transcription.TimedUtterance
 import app.logdate.client.media.audio.transcription.TranscriptAccumulator
@@ -20,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -315,6 +317,11 @@ class SherpaOnnxTranscriptionService(
     override val supportsLiveTranscription: Boolean = true
 
     override val supportsFileTranscription: Boolean = false
+
+    override val isOfflineModelAvailable: Boolean
+        get() = offlineRecognizerProvider.isAvailable
+
+    override fun downloadOfflineModel(): Flow<ModelDownloadStatus> = SherpaOnnxModelManager(context).downloadWhisperModel()
 
     override suspend fun resetTranscription() {
         accumulator.reset()

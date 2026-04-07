@@ -1,6 +1,7 @@
 package app.logdate.client.media.audio.tagging
 
 import android.content.Context
+import app.logdate.client.media.audio.download.ModelDownloadStatus
 import com.google.android.play.core.splitinstall.SplitInstallManagerFactory
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
@@ -50,6 +51,13 @@ class OnDemandAudioTaggingService(
         }
         val current = delegate ?: return flowOf(AudioTaggingResult.Unavailable)
         return current.tagAudio(audioUri)
+    }
+
+    override fun downloadModel(): Flow<ModelDownloadStatus> {
+        if (delegate == null && isModuleInstalled()) {
+            loadDelegate()
+        }
+        return delegate?.downloadModel() ?: flowOf(ModelDownloadStatus.NotSupported)
     }
 
     override fun release() {

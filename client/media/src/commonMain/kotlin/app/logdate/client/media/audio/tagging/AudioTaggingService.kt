@@ -1,6 +1,8 @@
 package app.logdate.client.media.audio.tagging
 
+import app.logdate.client.media.audio.download.ModelDownloadStatus
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * A non-voice ambient sound detected in an audio recording, e.g. "Bird",
@@ -74,6 +76,15 @@ interface AudioTaggingService {
      * cancel mid-stream.
      */
     fun tagAudio(audioUri: String): Flow<AudioTaggingResult>
+
+    /**
+     * Downloads the on-device tagging model and emits [ModelDownloadStatus]
+     * updates as it progresses. The flow runs to
+     * [ModelDownloadStatus.Completed] on success or [ModelDownloadStatus.Failed]
+     * on error. Default returns Failed for implementations without a
+     * downloadable model.
+     */
+    fun downloadModel(): Flow<ModelDownloadStatus> = flowOf(ModelDownloadStatus.NotSupported)
 
     /** Releases native resources held by the underlying model. */
     fun release()

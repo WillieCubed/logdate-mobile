@@ -16,4 +16,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.androidx.annotation)
     implementation(libs.androidx.core.ktx)
+    // Runtime tar.bz2 extraction for on-demand model downloads (Whisper, CED).
+    // Only loaded when this dynamic feature is installed; not in the base APK.
+    implementation(libs.commons.compress)
 }

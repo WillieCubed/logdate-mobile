@@ -1,6 +1,7 @@
 package app.logdate.feature.speech.recognition
 
 import android.content.Context
+import app.logdate.client.media.audio.download.ModelDownloadStatus
 import app.logdate.client.media.audio.tagging.AudioTaggingResult
 import app.logdate.client.media.audio.tagging.AudioTaggingService
 import app.logdate.client.media.audio.tagging.DetectedSound
@@ -79,6 +80,8 @@ class SherpaOnnxAudioTaggingService(
             Napier.d("Sherpa-ONNX audio tagging loaded")
             true
         }
+
+    override fun downloadModel(): Flow<ModelDownloadStatus> = modelManager.downloadAudioTaggingModel()
 
     override fun tagAudio(audioUri: String): Flow<AudioTaggingResult> =
         flow {

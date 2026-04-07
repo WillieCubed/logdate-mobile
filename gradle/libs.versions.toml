@@ -136,6 +136,7 @@ okio = "3.16.4"
 zxing = "3.5.3"
 
 sherpaOnnx = "8.2.0"
+commonsCompress = "1.28.0"
 
 [libraries]
 desugar_jdk_libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar_jdk_libs" }
@@ -381,6 +382,7 @@ androidx-watchface-complications-data-source-ktx = { group = "androidx.wear.watc
 androidx-ui-android = { group = "androidx.compose.ui", name = "ui-android", version.ref = "uiAndroid" }
 
 sherpa-onnx = { module = "com.bihe0832.android:lib-sherpa-onnx", version.ref = "sherpaOnnx" }
+commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

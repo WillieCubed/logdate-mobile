@@ -1,6 +1,9 @@
 package app.logdate.client.media.audio.transcription
 
+import app.logdate.client.media.audio.download.ModelDownloadStatus
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * Result of a transcription request, including status and text if available
@@ -102,6 +105,27 @@ interface TranscriptionService {
      * Implementations should make this idempotent. The default is a no-op.
      */
     suspend fun warmUp() {}
+
+    /**
+     * Whether the higher-accuracy offline model (Whisper, etc.) is present on
+     * device. When false, transcription falls back to the streaming pass only
+     * and the refinement step is skipped. The UI can use this to decide
+     * whether to prompt for the model download.
+     *
+     * Default is `false`; implementations that don't have an offline pass at
+     * all leave this alone and never need to expose the download flow.
+     */
+    val isOfflineModelAvailable: Boolean
+        get() = false
+
+    /**
+     * Downloads the offline model used for the refinement pass and emits
+     * [ModelDownloadStatus] updates as it progresses. The flow runs to
+     * [ModelDownloadStatus.Completed] on success or [ModelDownloadStatus.Failed]
+     * on error. Default emits [ModelDownloadStatus.Failed] for implementations
+     * that don't support an offline model.
+     */
+    fun downloadOfflineModel(): Flow<ModelDownloadStatus> = flowOf(ModelDownloadStatus.NotSupported)
 
     /**
      * Releases resources when the service is no longer needed

@@ -1,10 +1,13 @@
 package app.logdate.client.media.audio.transcription
 
 import android.content.Context
+import app.logdate.client.media.audio.download.ModelDownloadStatus
 import com.google.android.play.core.splitinstall.SplitInstallManagerFactory
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * [TranscriptionService] proxy that loads the Sherpa-ONNX implementation from the
@@ -65,6 +68,20 @@ class OnDemandTranscriptionService(
     override suspend fun resetTranscription() = resolvedDelegate().resetTranscription()
 
     override suspend fun warmUp() = resolvedDelegate().warmUp()
+
+    override val isOfflineModelAvailable: Boolean
+        get() = delegate?.isOfflineModelAvailable == true
+
+    override fun downloadOfflineModel(): Flow<ModelDownloadStatus> {
+        // The download lives in the dynamic feature module — if the user
+        // hasn't installed it yet, we have nowhere to put the model. The
+        // model download UX should kick the split install first; until then,
+        // surface NotSupported so the UI can prompt for the dynamic feature.
+        if (delegate == null && isModuleInstalled()) {
+            loadDelegate()
+        }
+        return delegate?.downloadOfflineModel() ?: flowOf(ModelDownloadStatus.NotSupported)
+    }
 
     override fun release() {
         delegate?.release()
