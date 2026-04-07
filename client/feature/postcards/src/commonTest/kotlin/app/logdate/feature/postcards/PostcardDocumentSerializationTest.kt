@@ -3,6 +3,7 @@ package app.logdate.feature.postcards.model
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -191,9 +192,9 @@ class PostcardDocumentSerializationTest {
         val decoded = json.decodeFromString(PostcardDocument.serializer(), encoded)
 
         assertEquals(3, decoded.elements.size)
-        assert(decoded.elements[0] is CanvasElement.Photo)
-        assert(decoded.elements[1] is CanvasElement.Text)
-        assert(decoded.elements[2] is CanvasElement.Sticker)
+        assertTrue(decoded.elements[0] is CanvasElement.Photo)
+        assertTrue(decoded.elements[1] is CanvasElement.Text)
+        assertTrue(decoded.elements[2] is CanvasElement.Sticker)
         assertEquals(document, decoded)
     }
 }
