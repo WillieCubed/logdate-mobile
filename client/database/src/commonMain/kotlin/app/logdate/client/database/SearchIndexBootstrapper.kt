@@ -2,6 +2,7 @@ package app.logdate.client.database
 
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.execSQL
+import io.github.aakira.napier.Napier
 import kotlin.time.Clock
 
 internal object SearchIndexBootstrapper {
@@ -11,7 +12,14 @@ internal object SearchIndexBootstrapper {
 
     fun bootstrap(connection: SQLiteConnection) {
         createMetadataTable(connection)
-        createFtsTable(connection)
+
+        if (!createFtsTable(connection)) {
+            // FTS5 unavailable on this SQLite build (typically the framework SQLite used by
+            // the in-memory recovery fallback). Skip the rest of search bootstrap so the app
+            // can continue running without crashing — search will be disabled until recovery.
+            Napier.w("SearchIndexBootstrapper: FTS5 unavailable; search index disabled")
+            return
+        }
         createVocabularyTable(connection)
 
         val schemaVersion = readSchemaVersion(connection)
@@ -37,7 +45,10 @@ internal object SearchIndexBootstrapper {
             )
             """.trimIndent(),
         )
-        runCatching {
+        // Older databases were created before the generation column existed. Add it only when
+        // missing — checking via PRAGMA avoids the noisy "duplicate column" SQLite log that
+        // a blind ALTER + runCatching would otherwise emit.
+        if (!hasColumn(connection, METADATA_TABLE, "generation")) {
             connection.execSQL(
                 """
                 ALTER TABLE $METADATA_TABLE
@@ -54,19 +65,38 @@ internal object SearchIndexBootstrapper {
         )
     }
 
-    private fun createFtsTable(connection: SQLiteConnection) {
-        connection.execSQL(
-            """
-            CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(
-                uid UNINDEXED,
-                content,
-                created UNINDEXED,
-                contentType UNINDEXED,
-                tokenize = 'porter unicode61'
+    /**
+     * Creates the FTS5 virtual table. Returns true on success, false if FTS5 is unavailable
+     * on this SQLite build (e.g. the in-memory recovery fallback running on framework SQLite).
+     */
+    private fun createFtsTable(connection: SQLiteConnection): Boolean =
+        runCatching {
+            connection.execSQL(
+                """
+                CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(
+                    uid UNINDEXED,
+                    content,
+                    created UNINDEXED,
+                    contentType UNINDEXED,
+                    tokenize = 'porter unicode61'
+                )
+                """.trimIndent(),
             )
-            """.trimIndent(),
-        )
-    }
+        }.onFailure { error ->
+            Napier.w("SearchIndexBootstrapper: failed to create FTS5 table", error)
+        }.isSuccess
+
+    private fun hasColumn(
+        connection: SQLiteConnection,
+        tableName: String,
+        columnName: String,
+    ): Boolean =
+        connection.prepare("PRAGMA table_info($tableName)").use { stmt ->
+            while (stmt.step()) {
+                if (stmt.getText(1) == columnName) return true
+            }
+            false
+        }
 
     private fun createVocabularyTable(connection: SQLiteConnection) {
         runCatching {
