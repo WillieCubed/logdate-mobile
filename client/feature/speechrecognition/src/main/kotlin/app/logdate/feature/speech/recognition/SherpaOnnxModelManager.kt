@@ -24,6 +24,7 @@ class SherpaOnnxModelManager(
     private val punctModelDir = File(context.filesDir, PUNCT_MODEL_DIR_NAME)
     private val vadModelDir = File(context.filesDir, VAD_MODEL_DIR_NAME)
     private val whisperModelDir = File(context.filesDir, WHISPER_MODEL_DIR_NAME)
+    private val taggingModelDir = File(context.filesDir, TAGGING_MODEL_DIR_NAME)
 
     suspend fun getModelPath(): String? {
         if (isSttModelReady()) {
@@ -85,6 +86,22 @@ class SherpaOnnxModelManager(
             whisperModelDir.resolve(WHISPER_TOKENS_NAME).exists() &&
             whisperModelDir.resolve(WHISPER_ENCODER_NAME).exists() &&
             whisperModelDir.resolve(WHISPER_DECODER_NAME).exists()
+
+    /**
+     * Returns the absolute path to the CED-small audio tagging model
+     * directory if a complete model is present in internal storage, or null
+     * otherwise.
+     *
+     * The model is not bundled with the app — it is downloaded on demand and
+     * placed at this path. Until that happens, callers should treat ambient
+     * sound detection as unavailable.
+     */
+    fun getAudioTaggingModelPath(): String? = if (isAudioTaggingModelReady()) taggingModelDir.absolutePath else null
+
+    fun isAudioTaggingModelReady(): Boolean =
+        taggingModelDir.exists() &&
+            taggingModelDir.resolve(TAGGING_MODEL_FILE_NAME).exists() &&
+            taggingModelDir.resolve(TAGGING_LABELS_FILE_NAME).exists()
 
     private fun isSttModelReady(): Boolean =
         sttModelDir.exists() &&
@@ -177,6 +194,10 @@ class SherpaOnnxModelManager(
         const val WHISPER_ENCODER_NAME = "small.en-encoder.int8.onnx"
         const val WHISPER_DECODER_NAME = "small.en-decoder.int8.onnx"
         const val WHISPER_TOKENS_NAME = "small.en-tokens.txt"
+
+        const val TAGGING_MODEL_DIR_NAME = "sherpa-onnx-ced-small"
+        const val TAGGING_MODEL_FILE_NAME = "model.onnx"
+        const val TAGGING_LABELS_FILE_NAME = "class_labels_indices.csv"
 
         private const val BUFFER_SIZE = 8192
     }
