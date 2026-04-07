@@ -46,6 +46,8 @@ test|test:verify|Verify coverage meets threshold|./gradlew koverVerify
 test|test:bench:phone|Run managed phone macrobenchmarks|./gradlew managedPhoneBenchmark
 test|test:bench:wear|Run managed Wear OS macrobenchmarks|./gradlew managedWearBenchmark
 test|test:bench:micro|Run Android microbenchmarks|./gradlew managedMicroBenchmark
+test|test:screenshots|Validate screenshot tests|./gradlew :app:android-main:validateDebugScreenshotTest
+test|test:screenshots:update|Regenerate golden screenshots|./gradlew :app:android-main:updateDebugScreenshotTest
 
 quality|lint|Run Android lint|./gradlew lint
 quality|lint:check|Check Kotlin code style|./gradlew ktlintCheck
