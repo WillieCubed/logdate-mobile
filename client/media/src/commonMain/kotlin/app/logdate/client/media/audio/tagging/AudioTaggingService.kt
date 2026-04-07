@@ -2,6 +2,9 @@ package app.logdate.client.media.audio.tagging
 
 import app.logdate.client.media.audio.download.ModelDownloadStatus
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
 
 /**
@@ -78,14 +81,39 @@ interface AudioTaggingService {
     fun tagAudio(audioUri: String): Flow<AudioTaggingResult>
 
     /**
-     * Downloads the on-device tagging model and emits [ModelDownloadStatus]
-     * updates as it progresses. The flow runs to
-     * [ModelDownloadStatus.Completed] on success or [ModelDownloadStatus.Failed]
-     * on error. Default returns Failed for implementations without a
-     * downloadable model.
+     * Live status of the tagging model download. View models observe this
+     * directly to render a download banner or progress indicator. Default
+     * sits at [ModelDownloadStatus.NotSupported] for implementations that
+     * don't ship a downloadable tagger.
      */
-    fun downloadModel(): Flow<ModelDownloadStatus> = flowOf(ModelDownloadStatus.NotSupported)
+    val modelDownloadStatus: StateFlow<ModelDownloadStatus>
+        get() = NotSupportedAudioTaggingDownloadStatus
+
+    /**
+     * Idempotently kicks the tagging model download. If a download is
+     * already in flight or the model is already on disk, this is a no-op.
+     * Progress flows out via [modelDownloadStatus].
+     */
+    fun startModelDownload() = Unit
 
     /** Releases native resources held by the underlying model. */
     fun release()
+}
+
+private val NotSupportedAudioTaggingDownloadStatus: StateFlow<ModelDownloadStatus> =
+    MutableStateFlow(ModelDownloadStatus.NotSupported).asStateFlow()
+
+/**
+ * Stub [AudioTaggingService] for platforms that don't ship the on-device
+ * tagger (iOS, desktop, JVM tests). Stateless — exposed as a singleton
+ * object so DI bindings don't allocate per resolution.
+ */
+object NoopAudioTaggingService : AudioTaggingService {
+    override val isAvailable: Boolean = false
+
+    override suspend fun warmUp(): Boolean = false
+
+    override fun tagAudio(audioUri: String): Flow<AudioTaggingResult> = flowOf(AudioTaggingResult.Unavailable)
+
+    override fun release() = Unit
 }

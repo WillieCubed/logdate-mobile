@@ -8,6 +8,8 @@ import app.logdate.client.media.audio.DesktopAudioDurationResolver
 import app.logdate.client.media.audio.DesktopAudioPlaybackManager
 import app.logdate.client.media.audio.DesktopAudioRecordingManager
 import app.logdate.client.media.audio.DesktopAudioStorage
+import app.logdate.client.media.audio.tagging.AudioTaggingService
+import app.logdate.client.media.audio.tagging.NoopAudioTaggingService
 import app.logdate.client.media.audio.transcription.DesktopTranscriptionService
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import org.koin.core.module.Module
@@ -26,4 +28,8 @@ actual val audioModule: Module =
 
         // Provide the Desktop implementation of TranscriptionService
         factory<TranscriptionService> { DesktopTranscriptionService() }
+
+        // Desktop doesn't ship the on-device ambient sound tagger; the stub
+        // reports unavailable and the banner stays "not supported".
+        single<AudioTaggingService> { NoopAudioTaggingService }
     }

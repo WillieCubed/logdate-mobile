@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackMetadata
+import app.logdate.client.media.audio.download.ModelDownloadStatus
+import app.logdate.client.media.audio.tagging.AudioTaggingService
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import io.github.aakira.napier.Napier
@@ -12,6 +14,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -30,6 +33,7 @@ class AudioViewModel(
     private val audioPlaybackManager: AudioPlaybackManager,
     private val audioDurationResolver: AudioDurationResolver,
     private val transcriptionService: TranscriptionService,
+    private val audioTaggingService: AudioTaggingService,
 ) : ViewModel() {
     // StateFlow to expose immutable UI state
     private val _uiState = MutableStateFlow(AudioUiState())
@@ -47,6 +51,37 @@ class AudioViewModel(
     init {
         audioRecordingManager.setTranscriptionService(transcriptionService)
         startTranscriptionCollector()
+        observeEnhancedModelDownloads()
+    }
+
+    /**
+     * Combines the two services' download status flows so the editor can
+     * render a single banner. The flows live on each service's own
+     * application-scoped state, so a download started in one editor session
+     * is still visible the next time the user opens an audio note.
+     */
+    private fun observeEnhancedModelDownloads() {
+        viewModelScope.launch {
+            combine(
+                transcriptionService.offlineModelDownloadStatus,
+                audioTaggingService.modelDownloadStatus,
+            ) { transcription, tagging ->
+                deriveEnhancedAudioModelStatus(transcription, tagging)
+            }.distinctUntilChanged()
+                .collect { combined ->
+                    _uiState.update { it.copy(enhancedModelStatus = combined) }
+                }
+        }
+    }
+
+    /**
+     * User tap on the "Download enhanced models" CTA. Both services dedupe
+     * concurrent triggers internally, so kicking both unconditionally is safe
+     * and keeps the call site simple.
+     */
+    fun downloadEnhancedAudioModels() {
+        transcriptionService.startOfflineModelDownload()
+        audioTaggingService.startModelDownload()
     }
 
     /**
@@ -471,4 +506,49 @@ class AudioViewModel(
                     }
             }
     }
+}
+
+/**
+ * Combines the per-model download statuses into the single
+ * [EnhancedAudioModelStatus] the audio editor banner reads. The banner
+ * disappears once both models are present, and otherwise reflects the
+ * highest-priority state across the two — a failure wins over a download in
+ * progress, which wins over an idle missing model.
+ */
+internal fun deriveEnhancedAudioModelStatus(
+    transcription: ModelDownloadStatus,
+    tagging: ModelDownloadStatus,
+): EnhancedAudioModelStatus {
+    val both = listOf(transcription, tagging)
+
+    val failure = both.firstOrNull { it is ModelDownloadStatus.Failure }
+    if (failure != null) return EnhancedAudioModelStatus.Failed(failure)
+
+    val downloads = both.filterIsInstance<ModelDownloadStatus.Downloading>()
+    if (downloads.isNotEmpty()) {
+        // Single pass: bail to indeterminate (null) the moment we see an
+        // unknown total; otherwise accumulate the sum and divide once.
+        var sum = 0.0
+        var hasUnknown = false
+        for (download in downloads) {
+            val fraction = download.fraction
+            if (fraction == null) {
+                hasUnknown = true
+                break
+            }
+            sum += fraction
+        }
+        val combined = if (hasUnknown) null else (sum / downloads.size).toFloat()
+        return EnhancedAudioModelStatus.Downloading(combined)
+    }
+
+    if (both.any { it == ModelDownloadStatus.Extracting }) {
+        return EnhancedAudioModelStatus.Downloading(null)
+    }
+
+    if (both.all { it == ModelDownloadStatus.Completed }) {
+        return EnhancedAudioModelStatus.Ready
+    }
+
+    return EnhancedAudioModelStatus.NotDownloaded
 }

@@ -1,5 +1,6 @@
 package app.logdate.feature.editor.ui.audio
 
+import app.logdate.client.media.audio.download.ModelDownloadStatus
 import app.logdate.client.media.audio.transcription.TimedTranscript
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.ZERO
@@ -22,6 +23,10 @@ data class AudioUiState(
     val error: String? = null,
     // Transcription state
     val transcriptionState: TranscriptionState = TranscriptionState.NotRequested,
+    // Combined state of the on-device enhanced model downloads (Whisper for
+    // transcription refinement, CED for ambient sound tagging). Drives the
+    // download banner shown above the recording controls.
+    val enhancedModelStatus: EnhancedAudioModelStatus = EnhancedAudioModelStatus.Ready,
 ) {
     /**
      * States for transcription UI.
@@ -84,4 +89,41 @@ data class AudioUiState(
         get() =
             transcriptionState is TranscriptionState.InProgress ||
                 transcriptionState is TranscriptionState.Pending
+}
+
+/**
+ * Combined download state for the two on-device enhanced audio models. The
+ * audio editor uses this to decide whether to show a download CTA, a
+ * progress bar, or nothing at all.
+ *
+ * The status reflects the *worst* of the two models — if either is missing
+ * or downloading, the banner is shown; only when both are present does it
+ * disappear.
+ */
+sealed interface EnhancedAudioModelStatus {
+    /** Both models are on disk. The banner is hidden. */
+    data object Ready : EnhancedAudioModelStatus
+
+    /**
+     * At least one model isn't on disk and no download is in flight. The
+     * banner offers the download.
+     */
+    data object NotDownloaded : EnhancedAudioModelStatus
+
+    /**
+     * A download is in flight. [fraction] is the combined progress fraction
+     * across both models in [0, 1], or null if any in-flight download has
+     * unknown total bytes.
+     */
+    data class Downloading(
+        val fraction: Float?,
+    ) : EnhancedAudioModelStatus
+
+    /**
+     * The most recent download attempt ended in failure. The banner shows a
+     * retry CTA along with a localized message keyed off [reason].
+     */
+    data class Failed(
+        val reason: ModelDownloadStatus,
+    ) : EnhancedAudioModelStatus
 }

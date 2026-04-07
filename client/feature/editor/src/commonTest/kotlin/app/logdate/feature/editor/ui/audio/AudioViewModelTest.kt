@@ -4,6 +4,7 @@ import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.media.audio.AudioRecordingManager
+import app.logdate.client.media.audio.tagging.NoopAudioTaggingService
 import app.logdate.client.media.audio.transcription.TimedTranscript
 import app.logdate.client.media.audio.transcription.TimedUtterance
 import app.logdate.client.media.audio.transcription.TimedWord
@@ -60,6 +61,7 @@ class AudioViewModelTest {
                     audioPlaybackManager = FakeAudioPlaybackManager(),
                     audioDurationResolver = FakeAudioDurationResolver(),
                     transcriptionService = FakeTranscriptionService(),
+                    audioTaggingService = NoopAudioTaggingService,
                 )
 
             viewModel.startRecording()
@@ -86,6 +88,7 @@ class AudioViewModelTest {
                     audioPlaybackManager = FakeAudioPlaybackManager(),
                     audioDurationResolver = FakeAudioDurationResolver(),
                     transcriptionService = FakeTranscriptionService(),
+                    audioTaggingService = NoopAudioTaggingService,
                 )
 
             viewModel.startRecording()
@@ -113,6 +116,7 @@ class AudioViewModelTest {
                     audioPlaybackManager = FakeAudioPlaybackManager(),
                     audioDurationResolver = FakeAudioDurationResolver(),
                     transcriptionService = FakeTranscriptionService(),
+                    audioTaggingService = NoopAudioTaggingService,
                 )
 
             viewModel.startRecording()
@@ -152,6 +156,7 @@ class AudioViewModelTest {
                     audioPlaybackManager = FakeAudioPlaybackManager(),
                     audioDurationResolver = FakeAudioDurationResolver(),
                     transcriptionService = FakeTranscriptionService(),
+                    audioTaggingService = NoopAudioTaggingService,
                 )
 
             viewModel.startRecording()
@@ -204,6 +209,7 @@ class AudioViewModelTest {
                     audioPlaybackManager = playbackManager,
                     audioDurationResolver = FakeAudioDurationResolver(),
                     transcriptionService = FakeTranscriptionService(),
+                    audioTaggingService = NoopAudioTaggingService,
                 )
 
             viewModel.seekToPositionMs(positionMs = 2_500L, durationMs = 10_000L)

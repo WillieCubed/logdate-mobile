@@ -5,6 +5,9 @@ import app.logdate.client.media.audio.download.ModelDownloadStatus
 import com.google.android.play.core.splitinstall.SplitInstallManagerFactory
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
 
 /**
@@ -22,6 +25,9 @@ class OnDemandAudioTaggingService(
     companion object {
         private const val MODULE_NAME = "speech_recognition"
         private const val PROVIDER_CLASS = "app.logdate.feature.speech.recognition.SpeechRecognitionProvider"
+
+        private val NotSupportedDownloadStatus: StateFlow<ModelDownloadStatus> =
+            MutableStateFlow(ModelDownloadStatus.NotSupported).asStateFlow()
     }
 
     private val splitInstallManager = SplitInstallManagerFactory.create(context)
@@ -53,11 +59,19 @@ class OnDemandAudioTaggingService(
         return current.tagAudio(audioUri)
     }
 
-    override fun downloadModel(): Flow<ModelDownloadStatus> {
+    override val modelDownloadStatus: StateFlow<ModelDownloadStatus>
+        get() {
+            if (delegate == null && isModuleInstalled()) {
+                loadDelegate()
+            }
+            return delegate?.modelDownloadStatus ?: NotSupportedDownloadStatus
+        }
+
+    override fun startModelDownload() {
         if (delegate == null && isModuleInstalled()) {
             loadDelegate()
         }
-        return delegate?.downloadModel() ?: flowOf(ModelDownloadStatus.NotSupported)
+        delegate?.startModelDownload()
     }
 
     override fun release() {

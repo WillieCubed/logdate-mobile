@@ -1,9 +1,10 @@
 package app.logdate.client.media.audio.transcription
 
 import app.logdate.client.media.audio.download.ModelDownloadStatus
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Result of a transcription request, including status and text if available
@@ -109,29 +110,42 @@ interface TranscriptionService {
     /**
      * Whether the higher-accuracy offline model (Whisper, etc.) is present on
      * device. When false, transcription falls back to the streaming pass only
-     * and the refinement step is skipped. The UI can use this to decide
-     * whether to prompt for the model download.
-     *
-     * Default is `false`; implementations that don't have an offline pass at
-     * all leave this alone and never need to expose the download flow.
+     * and the refinement step is skipped.
      */
     val isOfflineModelAvailable: Boolean
         get() = false
 
     /**
-     * Downloads the offline model used for the refinement pass and emits
-     * [ModelDownloadStatus] updates as it progresses. The flow runs to
-     * [ModelDownloadStatus.Completed] on success or [ModelDownloadStatus.Failed]
-     * on error. Default emits [ModelDownloadStatus.Failed] for implementations
-     * that don't support an offline model.
+     * Live status of the offline model download. View models observe this
+     * directly to render a download banner or progress indicator. Default
+     * sits at [ModelDownloadStatus.NotSupported] for implementations that
+     * don't ship a downloadable offline pass.
      */
-    fun downloadOfflineModel(): Flow<ModelDownloadStatus> = flowOf(ModelDownloadStatus.NotSupported)
+    val offlineModelDownloadStatus: StateFlow<ModelDownloadStatus>
+        get() = NotSupportedDownloadStatus
+
+    /**
+     * Idempotently kicks the offline model download. If a download is
+     * already in flight or the model is already on disk, this is a no-op.
+     * Progress flows out via [offlineModelDownloadStatus]. Default is a
+     * no-op for implementations without a downloadable offline pass.
+     */
+    fun startOfflineModelDownload() = Unit
 
     /**
      * Releases resources when the service is no longer needed
      */
     fun release()
 }
+
+/**
+ * Shared "no-op" download state used by [TranscriptionService] and
+ * [app.logdate.client.media.audio.tagging.AudioTaggingService] implementations
+ * that don't ship a downloadable model. Allocated once so every stub doesn't
+ * have to declare its own field.
+ */
+private val NotSupportedDownloadStatus: StateFlow<ModelDownloadStatus> =
+    MutableStateFlow(ModelDownloadStatus.NotSupported).asStateFlow()
 
 /**
  * TranscriptionOptions for configuring the transcription service

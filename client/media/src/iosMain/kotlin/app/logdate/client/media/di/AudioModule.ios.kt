@@ -8,6 +8,8 @@ import app.logdate.client.media.audio.IosAudioDurationResolver
 import app.logdate.client.media.audio.IosAudioPlaybackManager
 import app.logdate.client.media.audio.IosAudioRecordingManager
 import app.logdate.client.media.audio.IosAudioStorage
+import app.logdate.client.media.audio.tagging.AudioTaggingService
+import app.logdate.client.media.audio.tagging.NoopAudioTaggingService
 import app.logdate.client.media.audio.transcription.IosTranscriptionService
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import org.koin.core.module.Module
@@ -25,4 +27,10 @@ actual val audioModule: Module =
 
         // Provide the iOS implementation of TranscriptionService
         factory<TranscriptionService> { IosTranscriptionService() }
+
+        // iOS doesn't have an on-device ambient sound tagger yet — wire the
+        // stub object so the rest of the audio editor compiles and degrades
+        // cleanly. The download banner stays in NotSupported until a real
+        // iOS provider lands.
+        single<AudioTaggingService> { NoopAudioTaggingService }
     }

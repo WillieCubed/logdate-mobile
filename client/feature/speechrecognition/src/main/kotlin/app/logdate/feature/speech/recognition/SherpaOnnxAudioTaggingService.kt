@@ -10,12 +10,19 @@ import com.k2fsa.sherpa.onnx.AudioTagging
 import com.k2fsa.sherpa.onnx.AudioTaggingConfig
 import com.k2fsa.sherpa.onnx.AudioTaggingModelConfig
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -50,6 +57,35 @@ class SherpaOnnxAudioTaggingService(
     override val isAvailable: Boolean
         get() = modelManager.isAudioTaggingModelReady()
 
+    // Owns its own scope so a tagger model download survives a single
+    // editor session — it's a process-lifetime singleton, so the scope
+    // intentionally lives forever.
+    private val downloadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val _modelDownloadStatus = MutableStateFlow<ModelDownloadStatus>(ModelDownloadStatus.Idle)
+
+    override val modelDownloadStatus: StateFlow<ModelDownloadStatus> = _modelDownloadStatus.asStateFlow()
+
+    private var modelDownloadJob: Job? = null
+
+    override fun startModelDownload() {
+        if (modelDownloadJob?.isActive == true) return
+        if (isAvailable) {
+            _modelDownloadStatus.value = ModelDownloadStatus.Completed
+            return
+        }
+        modelDownloadJob =
+            downloadScope.launch {
+                try {
+                    modelManager.downloadAudioTaggingModel().collect { status ->
+                        _modelDownloadStatus.value = status
+                    }
+                } catch (e: Exception) {
+                    Napier.e("CED tagging model download crashed", e)
+                    _modelDownloadStatus.value = ModelDownloadStatus.UnknownError
+                }
+            }
+    }
+
     override suspend fun warmUp(): Boolean = ensureInitialized()
 
     private suspend fun ensureInitialized(): Boolean =
@@ -80,8 +116,6 @@ class SherpaOnnxAudioTaggingService(
             Napier.d("Sherpa-ONNX audio tagging loaded")
             true
         }
-
-    override fun downloadModel(): Flow<ModelDownloadStatus> = modelManager.downloadAudioTaggingModel()
 
     override fun tagAudio(audioUri: String): Flow<AudioTaggingResult> =
         flow {

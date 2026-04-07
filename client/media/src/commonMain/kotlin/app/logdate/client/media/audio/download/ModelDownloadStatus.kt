@@ -35,23 +35,28 @@ sealed interface ModelDownloadStatus {
     /** The model is on disk and ready to use. */
     data object Completed : ModelDownloadStatus
 
-    // --- Failure terminal states. The UI maps each to a localized string. ---
+    /**
+     * Terminal failure states. Marker sub-interface so call sites can check
+     * `state is Failure` instead of comparing every case by hand. The UI maps
+     * each concrete case to a localized string.
+     */
+    sealed interface Failure : ModelDownloadStatus
 
     /** No internet, DNS failure, or host unreachable. */
-    data object NoNetwork : ModelDownloadStatus
+    data object NoNetwork : Failure
 
     /** The host returned a non-success status (gone, server error, etc.). */
-    data object ServerUnavailable : ModelDownloadStatus
+    data object ServerUnavailable : Failure
 
     /** Not enough free storage to fit the extracted model. */
-    data object OutOfStorage : ModelDownloadStatus
+    data object OutOfStorage : Failure
 
     /** The downloaded archive failed to unpack — corrupt or unexpected layout. */
-    data object ArchiveCorrupt : ModelDownloadStatus
+    data object ArchiveCorrupt : Failure
 
     /** This implementation doesn't support a downloadable model at all. */
-    data object NotSupported : ModelDownloadStatus
+    data object NotSupported : Failure
 
     /** Anything else. The triggering exception is in the logs. */
-    data object UnknownError : ModelDownloadStatus
+    data object UnknownError : Failure
 }

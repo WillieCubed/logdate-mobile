@@ -5,9 +5,10 @@ import app.logdate.client.media.audio.download.ModelDownloadStatus
 import com.google.android.play.core.splitinstall.SplitInstallManagerFactory
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * [TranscriptionService] proxy that loads the Sherpa-ONNX implementation from the
@@ -23,6 +24,9 @@ class OnDemandTranscriptionService(
     companion object {
         private const val MODULE_NAME = "speech_recognition"
         private const val PROVIDER_CLASS = "app.logdate.feature.speech.recognition.SpeechRecognitionProvider"
+
+        private val NotSupportedDownloadStatus: StateFlow<ModelDownloadStatus> =
+            MutableStateFlow(ModelDownloadStatus.NotSupported).asStateFlow()
     }
 
     private val splitInstallManager = SplitInstallManagerFactory.create(context)
@@ -72,15 +76,23 @@ class OnDemandTranscriptionService(
     override val isOfflineModelAvailable: Boolean
         get() = delegate?.isOfflineModelAvailable == true
 
-    override fun downloadOfflineModel(): Flow<ModelDownloadStatus> {
+    override val offlineModelDownloadStatus: StateFlow<ModelDownloadStatus>
+        get() {
+            if (delegate == null && isModuleInstalled()) {
+                loadDelegate()
+            }
+            return delegate?.offlineModelDownloadStatus ?: NotSupportedDownloadStatus
+        }
+
+    override fun startOfflineModelDownload() {
         // The download lives in the dynamic feature module — if the user
         // hasn't installed it yet, we have nowhere to put the model. The
-        // model download UX should kick the split install first; until then,
-        // surface NotSupported so the UI can prompt for the dynamic feature.
+        // download UX should kick the split install first; until then this
+        // is a no-op and the StateFlow stays at NotSupported.
         if (delegate == null && isModuleInstalled()) {
             loadDelegate()
         }
-        return delegate?.downloadOfflineModel() ?: flowOf(ModelDownloadStatus.NotSupported)
+        delegate?.startOfflineModelDownload()
     }
 
     override fun release() {

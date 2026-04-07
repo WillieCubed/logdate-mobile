@@ -21,10 +21,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -321,7 +323,32 @@ class SherpaOnnxTranscriptionService(
     override val isOfflineModelAvailable: Boolean
         get() = offlineRecognizerProvider.isAvailable
 
-    override fun downloadOfflineModel(): Flow<ModelDownloadStatus> = SherpaOnnxModelManager(context).downloadWhisperModel()
+    private val modelManager by lazy { SherpaOnnxModelManager(context) }
+
+    private val _offlineModelDownloadStatus = MutableStateFlow<ModelDownloadStatus>(ModelDownloadStatus.Idle)
+
+    override val offlineModelDownloadStatus: StateFlow<ModelDownloadStatus> = _offlineModelDownloadStatus.asStateFlow()
+
+    private var offlineDownloadJob: Job? = null
+
+    override fun startOfflineModelDownload() {
+        if (offlineDownloadJob?.isActive == true) return
+        if (isOfflineModelAvailable) {
+            _offlineModelDownloadStatus.value = ModelDownloadStatus.Completed
+            return
+        }
+        offlineDownloadJob =
+            scope.launch(Dispatchers.IO) {
+                try {
+                    modelManager.downloadWhisperModel().collect { status ->
+                        _offlineModelDownloadStatus.value = status
+                    }
+                } catch (e: Exception) {
+                    Napier.e("Whisper download crashed", e)
+                    _offlineModelDownloadStatus.value = ModelDownloadStatus.UnknownError
+                }
+            }
+    }
 
     override suspend fun resetTranscription() {
         accumulator.reset()
