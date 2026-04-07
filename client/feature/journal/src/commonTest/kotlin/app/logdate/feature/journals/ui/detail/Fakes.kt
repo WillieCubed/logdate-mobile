@@ -5,6 +5,8 @@ import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.media.audio.AudioPlaybackStatus
 import app.logdate.client.media.audio.AudioPlaybackStatusProvider
+import app.logdate.client.repository.audio.AudioTag
+import app.logdate.client.repository.audio.AudioTagRepository
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -225,22 +227,18 @@ class FakeWaveformStorage : WaveformStorage {
 }
 
 class FakeAudioTagRepository(
-    private val tags: List<app.logdate.client.repository.audio.AudioTag> = emptyList(),
-) : app.logdate.client.repository.audio.AudioTagRepository {
+    private val tags: List<AudioTag> = emptyList(),
+) : AudioTagRepository {
     override suspend fun replaceTagsForNote(
-        noteId: kotlin.uuid.Uuid,
-        tags: List<app.logdate.client.repository.audio.AudioTag>,
+        noteId: Uuid,
+        tags: List<AudioTag>,
     ) = Unit
 
-    override suspend fun getTagsForNote(noteId: kotlin.uuid.Uuid): List<app.logdate.client.repository.audio.AudioTag> =
-        tags.filter { it.noteId == noteId }
+    override suspend fun getTagsForNote(noteId: Uuid): List<AudioTag> = tags.filter { it.noteId == noteId }
 
-    override fun observeTagsForNote(
-        noteId: kotlin.uuid.Uuid,
-    ): kotlinx.coroutines.flow.Flow<List<app.logdate.client.repository.audio.AudioTag>> =
-        kotlinx.coroutines.flow.flowOf(tags.filter { it.noteId == noteId })
+    override fun observeTagsForNote(noteId: Uuid): Flow<List<AudioTag>> = flowOf(tags.filter { it.noteId == noteId })
 
-    override suspend fun findNotesBySoundName(soundName: String): List<kotlin.uuid.Uuid> =
+    override suspend fun findNotesBySoundName(soundName: String): List<Uuid> =
         tags
             .filter { it.soundName.equals(soundName, ignoreCase = true) }
             .map { it.noteId }

@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.uuid.Uuid
 import app.logdate.client.media.audio.AudioRecordingManager as MediaAudioRecordingManager
 
 /**
@@ -41,7 +42,7 @@ class AudioViewModel(
      * Held across stop/restart so a [restartRecording] call still persists the
      * refined transcript under the same eventual note id.
      */
-    private var lastTargetNoteId: kotlin.uuid.Uuid? = null
+    private var lastTargetNoteId: Uuid? = null
 
     init {
         audioRecordingManager.setTranscriptionService(transcriptionService)
@@ -57,7 +58,7 @@ class AudioViewModel(
      *   shows up the next time the note is loaded — even if this view model
      *   has long since been cleared.
      */
-    fun startRecording(targetNoteId: kotlin.uuid.Uuid? = null) {
+    fun startRecording(targetNoteId: Uuid? = null) {
         viewModelScope.launch {
             Napier.d("AudioViewModel: Starting recording")
             try {

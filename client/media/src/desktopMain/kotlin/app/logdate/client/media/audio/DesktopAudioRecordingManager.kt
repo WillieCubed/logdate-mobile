@@ -23,6 +23,7 @@ import javax.sound.sampled.LineUnavailableException
 import javax.sound.sampled.TargetDataLine
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.uuid.Uuid
 
 /**
  * Desktop implementation of AudioRecordingManager using JavaSound API
@@ -81,7 +82,7 @@ class DesktopAudioRecordingManager(
         }
     }
 
-    override suspend fun startRecording(targetNoteId: kotlin.uuid.Uuid?): Boolean {
+    override suspend fun startRecording(targetNoteId: Uuid?): Boolean {
         if (recordingActive) return false
 
         try {

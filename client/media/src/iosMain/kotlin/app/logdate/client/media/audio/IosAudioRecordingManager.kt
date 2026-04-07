@@ -28,6 +28,7 @@ import platform.Foundation.NSURL
 import platform.Foundation.timeIntervalSinceDate
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.uuid.Uuid
 
 /**
  * iOS implementation of AudioRecordingManager that supports background audio recording
@@ -59,7 +60,7 @@ class IosAudioRecordingManager(
         Napier.d("IosAudioRecordingManager initialized")
     }
 
-    override suspend fun startRecording(targetNoteId: kotlin.uuid.Uuid?): Boolean {
+    override suspend fun startRecording(targetNoteId: Uuid?): Boolean {
         try {
             Napier.d("Starting iOS recording")
 

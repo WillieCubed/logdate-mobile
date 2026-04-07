@@ -4,6 +4,7 @@ import android.content.Context
 import app.logdate.client.media.audio.tagging.AudioTaggingResult
 import app.logdate.client.media.audio.tagging.AudioTaggingService
 import app.logdate.client.media.audio.tagging.DetectedSound
+import com.k2fsa.sherpa.onnx.AudioEvent
 import com.k2fsa.sherpa.onnx.AudioTagging
 import com.k2fsa.sherpa.onnx.AudioTaggingConfig
 import com.k2fsa.sherpa.onnx.AudioTaggingModelConfig
@@ -136,7 +137,7 @@ class SherpaOnnxAudioTaggingService(
             }
         }.flowOn(Dispatchers.Default)
 
-    private fun tagWindow(tagger: AudioTagging, window: FloatArray): Array<com.k2fsa.sherpa.onnx.AudioEvent> {
+    private fun tagWindow(tagger: AudioTagging, window: FloatArray): Array<AudioEvent> {
         val stream = tagger.createStream()
         try {
             stream.acceptWaveform(window, AudioDecoder.TARGET_SAMPLE_RATE)
