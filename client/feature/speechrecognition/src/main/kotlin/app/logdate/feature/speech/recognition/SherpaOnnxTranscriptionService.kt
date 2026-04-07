@@ -273,7 +273,7 @@ class SherpaOnnxTranscriptionService(
             currentStreamAcceptedSamples = 0L
             recognizerProvider.reset(s)
         } else if (result.text.isNotBlank()) {
-            accumulator.setPartial(result.text.lowercase())
+            accumulator.setPartial(result.text)
             _transcriptionFlow.emit(
                 TranscriptionResult.Success(
                     text = accumulator.build(),

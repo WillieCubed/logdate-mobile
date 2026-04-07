@@ -123,7 +123,7 @@ class SherpaOnnxRecognizerProvider(
             punctuation?.addPunctuation(lowered) ?: lowered
         } catch (e: Exception) {
             Napier.e("Punctuation model error, returning raw text", e)
-            text.lowercase()
+            text
         }
 
     internal fun release() {
