@@ -11,6 +11,11 @@ import androidx.sqlite.execSQL
  *
  * Events are time-bound things (recitals, parties, trips) that media and notes attach to.
  * Both tables are new — no existing tables are altered.
+ *
+ * Column types match the [EventEntity] / `EventNoteLinkEntity` declarations: Uuid columns are
+ * stored as TEXT (Room's Uuid type converter serializes to a string), and `sync_version` carries
+ * its default in Kotlin rather than as a SQL DEFAULT — Room's schema validator rejects DEFAULTs
+ * the entity didn't declare.
  */
 val MIGRATION_36_37 =
     object : Migration(36, 37) {
@@ -18,18 +23,18 @@ val MIGRATION_36_37 =
             connection.execSQL(
                 """
                 CREATE TABLE IF NOT EXISTS events (
-                    id BLOB NOT NULL PRIMARY KEY,
+                    id TEXT NOT NULL PRIMARY KEY,
                     title TEXT NOT NULL,
                     description TEXT,
                     start_time INTEGER NOT NULL,
                     end_time INTEGER,
-                    place_id BLOB,
+                    place_id TEXT,
                     cover_image_uri TEXT,
                     external_calendar_id TEXT,
                     external_calendar_source TEXT,
                     created INTEGER NOT NULL,
                     last_updated INTEGER NOT NULL,
-                    sync_version INTEGER NOT NULL DEFAULT 0,
+                    sync_version INTEGER NOT NULL,
                     last_synced INTEGER,
                     deleted_at INTEGER,
                     FOREIGN KEY(place_id) REFERENCES places(id) ON DELETE SET NULL
@@ -45,9 +50,9 @@ val MIGRATION_36_37 =
             connection.execSQL(
                 """
                 CREATE TABLE IF NOT EXISTS event_note_links (
-                    event_id BLOB NOT NULL,
-                    note_id BLOB NOT NULL,
-                    sync_version INTEGER NOT NULL DEFAULT 0,
+                    event_id TEXT NOT NULL,
+                    note_id TEXT NOT NULL,
+                    sync_version INTEGER NOT NULL,
                     last_synced INTEGER,
                     deleted_at INTEGER,
                     PRIMARY KEY(event_id, note_id),
