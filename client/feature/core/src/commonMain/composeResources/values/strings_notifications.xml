@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Memories & recommendations -->
+    <string name="memories">Memories</string>
+    <string name="memories_description">Personalize recommendations and memory recall</string>
+    <string name="recommendations">Recommendations</string>
+    <string name="recommendations_summary_on">Suggestions based on drafts, memories, and location</string>
+    <string name="recommendations_summary_off">No timeline suggestions</string>
+    <string name="recommendations_detail_description">Get personalized suggestions on your timeline based on your drafts, past memories, and current location. Your theme will adapt as you use the app.</string>
+    <string name="use_recommendations">Use recommendations</string>
+    <string name="on">On</string>
+    <string name="off">Off</string>
+    <string name="recommendations_privacy_note">Recommendations are generated entirely on your device. No data leaves your phone.</string>
+
+    <!-- Ambient prompts -->
+    <string name="ambient_prompts">Ambient prompts</string>
+    <string name="ambient_prompts_description">Let LogDate suggest timely nudges, draft follow-ups, and memory recall notifications.</string>
+    <string name="capture_nudges">Capture nudges</string>
+    <string name="capture_nudges_description">Prompt you to write while a day, place, or moment is still fresh.</string>
+    <string name="draft_rescue">Draft rescue</string>
+    <string name="draft_rescue_description">Remind you when you started an entry but never finished it.</string>
+    <string name="memory_recall_notifications">Memory recall notifications</string>
+    <string name="memory_recall_notifications_description">Send a notification when LogDate finds an older entry worth revisiting.</string>
+
+    <!-- Prompt schedule -->
+    <string name="prompt_schedule">Prompt schedule</string>
+    <string name="morning_prompt">Morning prompt</string>
+    <string name="morning_prompt_description">Nudge you in the morning if the day is still empty.</string>
+    <string name="morning_prompt_time">Morning time</string>
+    <string name="morning_prompt_time_description">Choose when LogDate should check in first.</string>
+    <string name="evening_prompt">Evening prompt</string>
+    <string name="evening_prompt_description">Invite reflection before the day fades.</string>
+    <string name="evening_prompt_time">Evening time</string>
+    <string name="evening_prompt_time_description">Choose when LogDate should send the evening nudge.</string>
+
+    <!-- Recall -->
+    <string name="recall_options">Recall options</string>
+    <string name="smart_recall">Smart recall</string>
+    <string name="smart_recall_description">Surface more relevant past memories beyond simple date matching</string>
+
+    <!-- Notification settings -->
+    <string name="notifications_settings">Notifications</string>
+    <string name="notifications_settings_description">Manage Android alerts and notification categories</string>
+</resources>

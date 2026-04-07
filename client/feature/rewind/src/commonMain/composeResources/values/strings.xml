@@ -1,16 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="back">Back</string>
+    <!-- Rewind screens -->
     <string name="close_rewind">Close rewind</string>
+    <string name="past_rewind">Past rewind</string>
+    <string name="more_rewinds_below">More rewinds below</string>
+    <string name="youve_reviewed_all_your_weekly_rewinds">You&apos;ve reviewed all your weekly rewinds</string>
+
+    <!-- State messages -->
     <string name="congrats_youve_reached_the_end">Congrats, you&apos;ve reached the end!</string>
     <string name="go_live_a_little_will_ya">Go live a little, will ya?</string>
-    <string name="past_rewind">Past rewind</string>
-    <string name="share_something">Share something</string>
     <string name="still_working_on_the_rewind_go_touch_some_grass_in_the_meantime">Still working on the Rewind. Go touch some grass in the meantime.</string>
-    <string name="more_rewinds_below">More rewinds below</string>
+    <string name="unsupported_panel_type">Unsupported panel type</string>
+
+    <!-- Actions -->
+    <string name="back">Back</string>
+    <string name="share_something">Share something</string>
+
+    <!-- Icon labels -->
     <string name="text">↓</string>
     <string name="text_2">🎉</string>
     <string name="text_3">→</string>
-    <string name="unsupported_panel_type">Unsupported panel type</string>
-    <string name="youve_reviewed_all_your_weekly_rewinds">You&apos;ve reviewed all your weekly rewinds</string>
 </resources>

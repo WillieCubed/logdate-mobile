@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Server selection -->
+    <string name="server">Server</string>
+    <string name="server_address">Server Address</string>
+    <string name="server_configuration">Server Configuration</string>
+    <string name="server_connected">Connected</string>
+    <string name="server_connected_version">Connected (v%1$s)</string>
+    <string name="server_url">Server URL</string>
+    <string name="server_sign_in_title">Sign in to %1$s</string>
+    <string name="server_domain_sign_in_hint">Use your passkey for accounts on %1$s.</string>
+    <string name="server_switching_info">Switching servers keeps your local data intact. Data is stored separately per server and will not automatically sync between different servers.</string>
+    <string name="logdate_cloud">LogDate Cloud</string>
+    <string name="logdate_cloud_settings_description">Use the hosted LogDate service.</string>
+    <string name="keep_using_logdate_cloud">Keep using LogDate Cloud</string>
+    <string name="you_are_using_a_non_production_server_your_data_will_not_sync_with_logdate_cloud">Hosted-only features depend on the selected server and may differ from LogDate Cloud.</string>
+
+    <!-- Custom server setup -->
+    <string name="custom_server">Custom server</string>
+    <string name="custom_server_settings_description">Connect to your own LogDate server.</string>
+    <string name="double_click_to_use_a_custom_server">Double-click to use a custom server</string>
+    <string name="use_custom_server">Use custom server</string>
+    <string name="custom_server_info_title">Use a custom server</string>
+    <string name="custom_server_info_intro_title">What this is</string>
+    <string name="custom_server_info_intro_body">A custom server is your own LogDate-compatible server. It is still LogDate, just running on a different origin.</string>
+    <string name="custom_server_info_changes_title">What changes</string>
+    <string name="custom_server_info_changes_body">Sign-in, sync, passkeys, handles, and server policies come from the server you choose.</string>
+    <string name="custom_server_info_missing_title">What may be missing</string>
+    <string name="custom_server_info_missing_body">Hosted-only features like billing or managed quotas may not exist on a custom server.</string>
+    <string name="custom_server_info_what_stays_local_title">What stays on this device</string>
+    <string name="custom_server_info_what_stays_local_body">Your local journals stay on this device, and remote state is stored separately for each server you use.</string>
+    <string name="custom_server_info_url_title">What URL to enter</string>
+    <string name="custom_server_info_url_body">Enter the server root origin only, such as https://journal.example.com. Do not include /api paths.</string>
+
+    <!-- Connection test -->
+    <string name="test_connection">Test Connection</string>
+    <string name="test_connection_before_saving">Test connection before saving</string>
+    <string name="testing_connection">Testing connection...</string>
+
+    <!-- URL examples -->
+    <string name="localhost_8765">localhost:8765</string>
+    <string name="https_your_server_example_com">https://your-server.example.com</string>
+</resources>

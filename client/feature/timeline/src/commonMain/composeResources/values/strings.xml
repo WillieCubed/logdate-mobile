@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Entry actions -->
     <string name="add_new_entry">Add new entry</string>
     <string name="are_you_sure_you_want_to_delete_this_entry">Are you sure you want to delete this entry?</string>
     <string name="cancel">Cancel</string>
@@ -8,38 +9,50 @@
     <string name="converting_to_text">Converting to text...</string>
     <string name="delete">Delete</string>
     <string name="delete_entry">Delete entry?</string>
+    <string name="more">More</string>
+    <string name="open_in_new_window">Open in New Window</string>
+    <string name="retry">Retry</string>
+    <string name="stop">Stop</string>
+
+    <!-- Entry metadata labels -->
     <string name="events">Events</string>
     <string name="locations_visited">Locations Visited</string>
     <string name="view_all_locations">View all locations</string>
     <string name="map_preview_available_on_android">Map preview available on Android</string>
-    <string name="more">More</string>
     <string name="no_people_encountered">No people encountered</string>
     <string name="notes">Notes</string>
-    <string name="open_in_new_window">Open in New Window</string>
     <string name="people">People</string>
     <string name="people_encountered">People Encountered</string>
     <string name="places">Places</string>
-    <string name="retry">Retry</string>
-    <string name="rewind">Rewind</string>
-    <string name="stop">Stop</string>
-    <string name="tl_dr">TL;DR</string>
-    <string name="transcript">Transcript:</string>
-    <string name="transcription_failed">Transcription failed</string>
-    <string name="video_recording">Video recording</string>
+    <string name="metadata_notes_count">%1$d notes</string>
+    <string name="metadata_people_count">%1$d people</string>
+    <string name="metadata_places_count">%1$d places</string>
+
+    <!-- Audio recording labels -->
     <string name="audio_recording">Audio Recording</string>
     <string name="audio_recording_today">%1$s recording</string>
     <string name="audio_recording_from_yesterday">%1$s recording from yesterday</string>
     <string name="audio_recording_from_day">%1$s recording from %2$s</string>
     <string name="audio_recording_from_date">%1$s recording from %2$s %3$d</string>
+    <string name="video_recording">Video recording</string>
+    <string name="timestamp_minutes_seconds">%1$d:%2$02d</string>
+
+    <!-- Transcript & summary -->
+    <string name="tl_dr">TL;DR</string>
+    <string name="transcript">Transcript:</string>
+    <string name="transcription_failed">Transcription failed</string>
+
+    <!-- Period labels -->
     <string name="period_last_week">Last Week</string>
     <string name="period_this_week">This Week</string>
     <string name="period_years_ago">%1$s years ago</string>
+
+    <!-- Special sections -->
+    <string name="rewind">Rewind</string>
     <string name="special_section_default_action_text">Take a peek</string>
     <string name="timeline_origin_day_birthday_message">Happy actual birthday!</string>
-    <string name="metadata_notes_count">%1$d notes</string>
-    <string name="metadata_people_count">%1$d people</string>
-    <string name="metadata_places_count">%1$d places</string>
-    <string name="timestamp_minutes_seconds">%1$d:%2$02d</string>
+
+    <!-- Plurals -->
     <plurals name="period_weeks_ago">
         <item quantity="one">%1$s week ago</item>
         <item quantity="other">%1$s weeks ago</item>

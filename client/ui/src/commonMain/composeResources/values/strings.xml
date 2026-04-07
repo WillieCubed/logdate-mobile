@@ -1,30 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="a_long_time_passed">A long time passed...</string>
-    <string name="add_to_memories">Add to Memories</string>
-    <string name="add_your_birthday_in_settings_to_see_something_special_here">Add your birthday in settings to see something special here.</string>
+    <!-- Navigation -->
     <string name="back">Back</string>
-    <string name="back_to_today">Back to today</string>
-    <string name="congrats_curious_explorer">Congrats, curious explorer!</string>
-    <string name="expanded_content">Expanded content</string>
-    <string name="happy_birthday">Happy birthday.</string>
     <string name="home">Home</string>
-    <string name="location_history">Location History</string>
-    <string name="manage_your_profile_settings">Manage your profile settings</string>
-    <string name="materialcontainer_examples">MaterialContainer Examples</string>
-    <string name="navigate_to_home_screen">Navigate to home screen</string>
     <string name="options">Options</string>
-    <string name="photo_of_name">Photo of %1$s</string>
     <string name="profile">Profile</string>
-    <string name="sample_content">Sample Content</string>
     <string name="scroll_to_top">Scroll to top</string>
     <string name="search">Search</string>
-    <string name="section_1">Section 1</string>
-    <string name="section_2">Section 2</string>
     <string name="settings">Settings</string>
+    <string name="timeline">Timeline</string>
+    <string name="navigate_to_home_screen">Navigate to home screen</string>
+    <string name="manage_your_profile_settings">Manage your profile settings</string>
+    <string name="location_history">Location History</string>
+
+    <!-- Global actions -->
     <string name="share_link">Share link</string>
     <string name="start_writing">Start Writing</string>
     <string name="view_memory">View Memory</string>
+    <string name="add_to_memories">Add to Memories</string>
+
+    <!-- Suggestion cards -->
     <string name="suggestion_label_today">Today</string>
     <string name="suggestion_label_draft">Draft</string>
     <string name="suggestion_draft_fallback">Finish your draft while it&apos;s still fresh.</string>
@@ -32,18 +27,38 @@
     <string name="suggestion_label_memory">Memory</string>
     <string name="suggestion_near_location">Near %1$s</string>
     <string name="suggestion_media_item">Memory photo</string>
+
+    <!-- Playback controls -->
+    <string name="audio_recording">Audio Recording</string>
     <string name="preview_transcript">Preview Transcript</string>
     <string name="hide_transcript">Hide Transcript</string>
-    <string name="simple_container_item_1">Simple container item 1</string>
-    <string name="simple_container_item_2">Simple container item 2</string>
-    <string name="text_10_places">10 places</string>
-    <string name="text_2_people">2 people</string>
-    <string name="timeline">Timeline</string>
-    <string name="audio_recording">Audio Recording</string>
+
+    <!-- Timeline narrative -->
+    <string name="a_long_time_passed">A long time passed...</string>
+    <string name="back_to_today">Back to today</string>
+    <string name="congrats_curious_explorer">Congrats, curious explorer!</string>
+    <string name="expanded_content">Expanded content</string>
+    <string name="happy_birthday">Happy birthday.</string>
     <string name="youve_reached_the_end">You&apos;ve reached the end</string>
     <string name="journey_days_count">You&apos;ve been on this journey for %1$d days.</string>
+    <string name="add_your_birthday_in_settings_to_see_something_special_here">Add your birthday in settings to see something special here.</string>
+
+    <!-- Post-restore screens -->
     <string name="post_restore_welcome_back">Welcome back</string>
     <string name="post_restore_import_message">Your journals are stored locally and weren&apos;t included in this restore. Import from a backup to pick up where you left off, or start fresh.</string>
     <string name="post_restore_import_action">Import from Backup</string>
     <string name="post_restore_start_fresh">Start Fresh</string>
+
+    <!-- Profile -->
+    <string name="photo_of_name">Photo of %1$s</string>
+
+    <!-- Demo / placeholder content -->
+    <string name="materialcontainer_examples">MaterialContainer Examples</string>
+    <string name="sample_content">Sample Content</string>
+    <string name="section_1">Section 1</string>
+    <string name="section_2">Section 2</string>
+    <string name="simple_container_item_1">Simple container item 1</string>
+    <string name="simple_container_item_2">Simple container item 2</string>
+    <string name="text_10_places">10 places</string>
+    <string name="text_2_people">2 people</string>
 </resources>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Widget settings (settings screen) -->
+    <string name="widget_settings">Widget</string>
+    <string name="widget_content_types">Content to show</string>
+    <string name="widget_content_type_text">Text notes</string>
+    <string name="widget_content_type_text_description">Written entries and journal text</string>
+    <string name="widget_content_type_photos">Photos</string>
+    <string name="widget_content_type_photos_description">Images attached to your entries</string>
+    <string name="widget_content_type_audio">Audio notes</string>
+    <string name="widget_content_type_audio_description">Voice recordings and audio clips</string>
+
+    <!-- Recall mode -->
+    <string name="recall_mode">Recall mode</string>
+    <string name="recall_mode_on_this_day">On This Day</string>
+    <string name="recall_mode_on_this_day_description">Surface entries near today&apos;s date from prior years</string>
+    <string name="recall_mode_rediscover">From the archive</string>
+    <string name="recall_mode_rediscover_description">Surface the most recent notable older memory, regardless of date</string>
+</resources>

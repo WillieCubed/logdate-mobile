@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Cloud sync -->
+    <string name="cloud_sync">Cloud Sync</string>
+    <string name="background_sync">Background Sync</string>
+    <string name="automatically_sync_your_data_in_the_background">Automatically sync your data in the background</string>
+    <string name="sync_and_backup">Sync &amp; Backup</string>
+    <string name="sync_and_backup_description">Sync status, background sync, and conflict resolution</string>
+    <string name="sync_now">Sync Now</string>
+    <string name="sync_status">Sync Status</string>
+    <string name="syncing">Syncing...</string>
+    <string name="last_synced_time">Last synced: %1$s</string>
+    <string name="last_sync_failed">Last sync failed</string>
+    <string name="never_synced">Never synced</string>
+
+    <!-- Sync promotion -->
+    <string name="sync_promotion_title">Sync your journals across devices</string>
+    <string name="sync_promotion_description">Sign in to back up your data and access it from anywhere</string>
+    <string name="sync_feature_backup">Automatic cloud backup keeps your data safe</string>
+    <string name="sync_feature_access">Access your journals from any device</string>
+    <string name="sync_feature_sync">Changes sync seamlessly in the background</string>
+    <string name="connect_your_account_to_sync_your_journals_access_them_from_anywhere_and_unlock_powerful_cloud_features">Connect your account to sync your journals, access them from anywhere, and unlock powerful cloud features.</string>
+    <string name="securely_sync_your_journals_notes_and_memories_across_all_your_devices">Securely sync your journals, notes, and memories across all your devices.</string>
+
+    <!-- Conflicts -->
+    <string name="sync_conflicts">Sync Conflicts</string>
+    <string name="queued_conflicts">Queued conflicts</string>
+    <string name="conflict_entity_with_id">%1$s %2$s</string>
+    <string name="conflicts_need_review">%1$d conflict%2$s need review</string>
+    <string name="no_conflicts_waiting">No conflicts waiting for review</string>
+    <string name="loading_conflicts">Loading conflicts...</string>
+    <string name="showing_three_of_conflicts">Showing 3 of %1$d conflicts</string>
+
+    <!-- Device management -->
+    <string name="device_name">Device Name</string>
+    <string name="devices">Devices</string>
+    <string name="devices_settings_description">Manage your connected devices</string>
+    <string name="this_device">(This device)</string>
+    <string name="loading_devices">Loading devices...</string>
+    <string name="last_active_label">Last active: %1$s</string>
+    <string name="enter_a_new_name_for_this_device">Enter a new name for this device:</string>
+    <string name="remove_device">Remove device</string>
+    <string name="remove_device_2">Remove Device</string>
+    <string name="remove_device_confirmation">Are you sure you want to remove &quot;%1$s&quot; from your account? This device will no longer receive notifications or sync data.</string>
+    <string name="rename_device">Rename device</string>
+    <string name="rename_device_2">Rename Device</string>
+
+    <!-- Debug / developer -->
+    <string name="app_version_label">App version: %1$s</string>
+    <string name="detected_timestamp">Detected %1$s</string>
+    <string name="platform_label">Platform: %1$s</string>
+    <string name="total_usage">Total Usage</string>
+    <string name="quota_usage_block">Quota Usage Block</string>
+    <string name="separator_pipe"> | </string>
+</resources>

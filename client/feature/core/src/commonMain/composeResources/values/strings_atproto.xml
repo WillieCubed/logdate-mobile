@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AT Protocol identity -->
+    <string name="at">@</string>
+    <string name="at_logdate_app">@logdate.app</string>
+    <string name="atproto_did">DID</string>
+    <string name="atproto_handle">Handle</string>
+    <string name="atproto_identity">AT Protocol Identity</string>
+    <string name="atproto_identity_export_bundle">Encrypted signing key bundle</string>
+    <string name="atproto_identity_loading">Loading identity status…</string>
+    <string name="atproto_not_registered">Not registered</string>
+    <string name="atproto_refresh_identity">Refresh</string>
+    <string name="connected_to_the_fediverse">Connected to the Fediverse</string>
+    <string name="logdate_uses_activitypub_the_same_technology_that_powers_mastodon_pixelfed_and_other_social_networks_this_means_you_can_interact_with_a_global_community_while_keeping_control_of_your_data">LogDate uses ActivityPub, the same technology that powers Mastodon, Pixelfed, and other social networks. This means you can interact with a global community while keeping control of your data.</string>
+
+    <!-- Signing key management -->
+    <string name="atproto_import_signing_key">Import Signing Key</string>
+    <string name="atproto_import_signing_key_with_recovery">Import Signing Key With Recovery Phrase</string>
+    <string name="atproto_passphrase">Passphrase</string>
+    <string name="atproto_rotate_signing_key">Rotate Signing Key</string>
+    <string name="atproto_signing_key">Signing key</string>
+    <string name="atproto_signing_key_json">Signing key JSON</string>
+
+    <!-- PLC recovery -->
+    <string name="atproto_derive_plc_recovery_key">Derive PLC Recovery Key</string>
+    <string name="atproto_derived_plc_recovery_key">Derived PLC recovery key</string>
+    <string name="atproto_plc_recovery_key">PLC recovery key</string>
+    <string name="atproto_recovery_phrase">Recovery phrase</string>
+    <string name="atproto_recovery_guidance_body">Sign in with any existing passkey on this server first. After you are signed in, open Settings, then Account &amp; Profile, then AT Protocol Identity to export, import, rotate, or register a PLC recovery key.</string>
+    <string name="atproto_recovery_guidance_title">Account Recovery</string>
+    <string name="atproto_register_derived_plc_recovery_key">Register Derived PLC Recovery Key</string>
+    <string name="atproto_register_plc_recovery_key">Register PLC Recovery Key</string>
+
+    <!-- PLC operation history -->
+    <string name="atproto_no_plc_operations">No hosted PLC operations recorded yet.</string>
+    <string name="atproto_operation_history">Hosted PLC Operation History</string>
+    <string name="atproto_plc_operation_count">PLC operations</string>
+</resources>

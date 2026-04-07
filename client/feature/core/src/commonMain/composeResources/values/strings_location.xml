@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Location settings -->
+    <string name="location_privacy">Location Privacy</string>
+    <string name="location_services">Location Services</string>
+    <string name="location_settings">Location Settings</string>
+    <string name="location_settings_description">Manage location tracking and history settings</string>
+    <string name="location_timeline">Locations</string>
+    <string name="location_timeline_description">See your saved places and recent movement</string>
+    <string name="view_location_timeline">View Locations</string>
+    <string name="manage_location_tracking_and_privacy_preferences">Location tracking and privacy preferences</string>
+    <string name="navigate_to_location_settings">Navigate to Location Settings</string>
+
+    <!-- Tracking mode -->
+    <string name="location_capture_mode">Tracking mode</string>
+    <string name="location_capture_mode_passive">Passive</string>
+    <string name="location_capture_mode_passive_description">Saves battery. Records location only when other apps request it.</string>
+    <string name="location_capture_mode_active">Active</string>
+    <string name="location_capture_mode_active_description">High accuracy. Adapts to your movement — walks, drives, and stops.</string>
+    <string name="location_enable_background_tracking">Enable Background Location Tracking</string>
+    <string name="location_enable_background_tracking_description">Allow the app to track your location in the background for better context and features.</string>
+    <string name="location_track_journal_entries">Track Location for Journal Entries</string>
+    <string name="location_track_journal_entries_description">Attach location to new entries</string>
+    <string name="location_track_timeline_review">Track Location for Timeline Review</string>
+    <string name="location_track_timeline_review_description">Record location when reviewing timeline</string>
+
+    <!-- Tracking interval -->
+    <string name="location_update_interval">Update Interval</string>
+    <string name="location_update_interval_description">How often location data is saved</string>
+    <string name="location_update_frequency">Minimum persist interval: %1$d minutes</string>
+    <string name="location_tracking_battery_note">More frequent persistence uses more battery.</string>
+    <string name="tracking_interval">Tracking Interval</string>
+    <string name="text_120_min">120 min</string>
+
+    <!-- Tracking options -->
+    <string name="location_tracking_options">Tracking Options</string>
+    <string name="location_tracking_options_description">Choose what triggers location tracking</string>
+    <string name="location_background_tracking_description">Adds location context to entries and timeline</string>
+    <string name="location_advanced">Advanced</string>
+    <string name="location_advanced_description">Experiments and server-assisted tracking</string>
+    <string name="location_server_assist">Optional server nudges</string>
+    <string name="location_server_assist_description">Allow server nudges for background capture</string>
+
+    <!-- Privacy -->
+    <string name="location_data_stored_on_device">Location data is stored on your device</string>
+    <string name="location_data_privacy_note">Your location data is only stored locally on your device. If you enable cloud sync, your location data will be encrypted before being sent to the cloud.</string>
+</resources>

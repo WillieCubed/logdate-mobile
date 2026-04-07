@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Export -->
+    <string name="export">Export</string>
+    <string name="export_and_import">Export &amp; Import</string>
+    <string name="export_and_import_description">Export archive, restore from backup, and integrity check</string>
+    <string name="export_options_title">Export your data</string>
+    <string name="export_options_description">Choose what to include in the export.</string>
+    <string name="export_category_journals">Journals</string>
+    <string name="export_category_notes">Notes</string>
+    <string name="export_category_drafts">Drafts</string>
+    <string name="export_category_media">Media</string>
+    <string name="export_category_item_count">%1$d items</string>
+    <string name="export_date_range_label">Date range</string>
+    <string name="export_date_range_all_time">All time</string>
+    <string name="export_date_range_last_30_days">Last 30 days</string>
+    <string name="export_date_range_last_90_days">Last 90 days</string>
+    <string name="export_date_range_last_year">Last year</string>
+    <string name="export_date_range_all_time_hint">All notes and drafts will be included.</string>
+    <string name="export_date_range_filtered_hint">Notes and drafts will be filtered by creation date. Journals are always fully exported.</string>
+    <string name="export_progress_title">Exporting\u2026</string>
+    <string name="export_complete_title">Export complete</string>
+    <string name="export_complete_description">Your data has been saved.</string>
+    <string name="export_failed_title">Export failed</string>
+    <string name="waiting_for_export_destination">Choose where to save your export…</string>
+    <string name="action_browse">Open</string>
+
+    <!-- Import / restore -->
+    <string name="import">Import</string>
+    <string name="import_backup">Import backup</string>
+    <string name="importing">Importing...</string>
+    <string name="restore_entries_from_a_logdate_export_archive">Restore entries from a LogDate export archive</string>
+    <string name="restoring_backup">Restoring backup...</string>
+    <string name="restore_choose_file">Choose file</string>
+    <string name="restore_confirm_description">Data from the backup will be merged with your existing data. Nothing will be deleted or replaced.</string>
+    <string name="restore_merge_info">Duplicate entries are skipped automatically.</string>
+    <string name="restore_preview_description">Review what&apos;s in this archive.</string>
+    <string name="restore_import_options_label">Import options</string>
+    <string name="restore_confirm_import">Import</string>
+    <string name="restore_progress_title">Importing\u2026</string>
+    <string name="restore_progress_description">Restoring your data\u2026</string>
+    <string name="restore_complete_title">Import complete</string>
+    <string name="restore_complete_description">Your data has been restored.</string>
+    <string name="restore_failed_title">Import failed</string>
+    <string name="restore_warnings_title">Warnings</string>
+    <string name="restore_integrity_mismatch">Expected %1$d %2$s but found %3$d in archive</string>
+    <string name="waiting_for_backup_selection">Waiting for backup selection...</string>
+
+    <!-- Restore stages -->
+    <string name="restore_stage_preparing">Preparing restore\u2026</string>
+    <string name="restore_stage_copying">Copying archive\u2026</string>
+    <string name="restore_stage_opening">Opening archive\u2026</string>
+    <string name="restore_stage_reading">Reading archive contents\u2026</string>
+    <string name="restore_stage_journals">Restoring journals\u2026</string>
+    <string name="restore_stage_notes">Restoring notes\u2026</string>
+    <string name="restore_stage_links">Restoring journal links\u2026</string>
+    <string name="restore_stage_drafts">Restoring drafts\u2026</string>
+    <string name="restore_stage_profile">Restoring profile\u2026</string>
+    <string name="restore_stage_places">Restoring places\u2026</string>
+    <string name="restore_stage_location_history">Restoring location history\u2026</string>
+    <string name="restore_stage_media">Importing media\u2026</string>
+
+    <!-- Restore errors -->
+    <string name="restore_error_invalid_archive">The selected file doesn&apos;t appear to be a valid LogDate export archive.</string>
+    <string name="restore_error_missing_source">No file was selected for restore.</string>
+    <string name="restore_error_file_not_accessible">Unable to access the selected file.</string>
+    <string name="restore_error_file_picker_unavailable">A file picker is required to select a backup.</string>
+    <string name="restore_error_file_picker_failed">Could not open the file picker.</string>
+    <string name="restore_error_invalid_summary">Restore completed, but the result could not be read.</string>
+    <string name="restore_error_no_summary">Restore completed, but no summary was returned.</string>
+    <string name="restore_error_ios_requires_folder">Restore on this device requires a folder export.</string>
+    <string name="restore_error_unsupported_version">This archive was created by a newer version of LogDate. Update the app to import it.</string>
+    <string name="restore_error_generic">Something went wrong during restore.</string>
+
+    <!-- Integrity check -->
+    <string name="integrity_check">Integrity check</string>
+    <string name="audit_and_repair_local_links_and_sync_metadata">Audit and repair local links and sync metadata</string>
+    <string name="repair">Repair</string>
+    <string name="repairing">Repairing...</string>
+    <string name="last_check_issue_count">Last check: %1$s | %2$d issues</string>
+
+    <!-- Export summary labels -->
+    <string name="exported_label">Exported: </string>
+    <string name="journals_count_with_comma">%1$d journals, </string>
+    <string name="media_count">%1$d media</string>
+    <string name="notes_count_with_comma">%1$d notes, </string>
+    <string name="last_export_path">Last export: %1$s</string>
+    <string name="warnings_count">Warnings: %1$d</string>
+</resources>

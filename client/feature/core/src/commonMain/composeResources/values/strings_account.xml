@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Account overview -->
+    <string name="account_actions">Account Actions</string>
+    <string name="account_and_profile">Account &amp; Profile</string>
+    <string name="account_and_sign_in">Account &amp; Sign-In</string>
+    <string name="account_created">Account Created!</string>
+    <string name="account_created_signed_in_as">Your account has been successfully created. You are now signed in as %1$s.</string>
+    <string name="account_information">Account Information</string>
+    <string name="account_recovery">Account Recovery</string>
+    <string name="account_settings_description">Sign-in, server, passkeys, and AT Protocol identity</string>
+    <string name="authentication">Authentication</string>
+    <string name="app_security">App Security</string>
+
+    <!-- Account creation -->
+    <string name="almost_ready">Almost ready!</string>
+    <string name="complete_your_profile">Complete Your Profile</string>
+    <string name="create_a_cloud_account">Create a Cloud Account</string>
+    <string name="create_account">Create Account</string>
+    <string name="create_account_with_passkey">Create Account with Passkey</string>
+    <string name="create_an_account_to_sync_your_journals_across_devices_and_unlock_additional_features">Create an account to sync your journals across devices and unlock additional features.</string>
+    <string name="create_logdate_cloud_account">Create LogDate Cloud Account</string>
+    <string name="create_new_account">Create New Account</string>
+    <string name="create_your_account_with_a_passkey_for_secure_password_free_access_to_logdate_cloud">Create your account with a passkey for secure, password-free access to LogDate Cloud.</string>
+    <string name="creating_account">Creating Account...</string>
+    <string name="creating_your_logdate_cloud_account">Creating your LogDate Cloud account...</string>
+    <string name="review_your_details_and_create_your_secure_passkey_to_complete_your_logdate_cloud_account">Review your details and create your secure passkey to complete your %1$s account.</string>
+    <string name="secure_your_account">Secure Your Account</string>
+    <string name="your_logdate_cloud_account">Your LogDate Cloud Account</string>
+    <string name="your_logdate_cloud_account_has_been_successfully_created">Your LogDate Cloud account has been successfully created. </string>
+    <string name="welcome_to_logdate">Welcome to LogDate</string>
+    <string name="welcome_to_logdate_cloud">Welcome to LogDate Cloud</string>
+    <string name="welcome_back">Welcome Back</string>
+    <string name="coming_soon_account_recovery_features_are_being_developed">Coming soon! Account recovery features are being developed.</string>
+    <string name="dont_have_an_account">Don&apos;t have an account?</string>
+
+    <!-- Sign in -->
+    <string name="sign_in">Sign In</string>
+    <string name="sign_in_required">Sign in required</string>
+    <string name="sign_in_to_logdate_cloud">Sign In to LogDate Cloud</string>
+    <string name="sign_in_to_your_logdate_cloud_account_to_enable_sync">Sign in to your LogDate Cloud account to enable sync</string>
+    <string name="sign_in_to_your_logdate_cloud_account_using_your_passkey">Sign in to your LogDate Cloud account using your passkey.</string>
+    <string name="sign_in_with_passkey">Sign In with Passkey</string>
+    <string name="sign_in_without_username">Sign In without Username</string>
+    <string name="signing_in">Signing In...</string>
+    <string name="sign_in_to_enable_cloud_backup">Sign in to enable cloud backup and sync.</string>
+    <string name="not_signed_in_to_logdate_cloud">Not signed in to LogDate Cloud</string>
+    <string name="sign_in_to_set_display_name">Sign in to set your display name and username, and sync your journal across devices.</string>
+    <string name="sign_in_to_logdate_cloud_settings_summary">Sync, backup, and access your journal anywhere</string>
+
+    <!-- Sign out -->
+    <string name="sign_out">Sign out</string>
+    <string name="sign_out_2">Sign out?</string>
+    <string name="sign_out_of_your_logdate_cloud_account_on_this_device">Sign out of your LogDate Cloud account on this device</string>
+    <string name="sign_out_failed">Failed to sign out. Please try again.</string>
+    <string name="signing_out">Signing out...</string>
+    <string name="youll_need_to_sign_in_again_to_sync_data_on_this_device">You&apos;ll need to sign in again to sync data on this device.</string>
+
+    <!-- Passkeys -->
+    <string name="about_passkeys">About Passkeys</string>
+    <string name="passkeys">Passkeys</string>
+    <string name="passkeys_are_a_quick_and_secure_way_to_sign_into_your_logdate_account">Passkeys are a quick and secure way to sign into your LogDate Account.</string>
+    <string name="passkeys_are_a_secure_way_to_sign_in_without_passwords">Passkeys are a secure way to sign in without passwords. </string>
+    <string name="passkeys_not_supported">Passkeys Not Supported</string>
+    <string name="passkey_not_supported_banner">Your device doesn&apos;t support passkeys. Account creation requires a device with passkey support.</string>
+    <string name="your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key">Your device doesn&apos;t support passkeys. Please use a device with biometric authentication or a security key.</string>
+    <string name="create_a_passkey">Create a Passkey</string>
+    <string name="create_a_passkey_2">Create a passkey</string>
+    <string name="create_a_passkey_to_securely_sign_in_to_your_account_across_all_your_devices">Create a passkey to securely sign in to your account across all your devices.</string>
+    <string name="create_passkey">Create Passkey</string>
+    <string name="creating_your_passkey">Creating your passkey...</string>
+    <string name="with_passkeys_you_dont_need_to_remember_your_password_instead_use_your_fingerprint_face_or_screen_lock_to_sign_in">With passkeys, you don&apos;t need to remember your password. Instead, use your fingerprint, face, or screen lock to sign in.</string>
+    <string name="operation_passkey">%1$s passkey...</string>
+    <string name="your_passkeys">Your passkeys</string>
+    <string name="passkey_stored_on_device">Stored on %1$s • Last used %2$s</string>
+    <string name="passkey_last_used">Last used %1$s</string>
+    <string name="collapse_passkey_options">Collapse passkey options</string>
+    <string name="expand_passkey_options">Expand passkey options</string>
+    <string name="passkey_created_successfully">Passkey created successfully!</string>
+    <string name="passkey_created_successfully_2">Passkey successfully created</string>
+    <string name="passkey_create_failed">Failed to create passkey: %1$s</string>
+    <string name="passkey_removed_successfully">Passkey successfully removed</string>
+    <string name="passkey_remove_failed">Failed to remove passkey: %1$s</string>
+    <string name="remove_passkey">Remove passkey?</string>
+    <string name="remove_passkey_from_device">This will remove your passkey from &apos;%1$s&apos;. You&apos;ll no longer be able to use it to sign in.</string>
+    <string name="passkey_operation_creating">Creating</string>
+    <string name="passkey_operation_creating_message">Please wait while we create your passkey</string>
+    <string name="passkey_operation_removing">Removing</string>
+    <string name="passkey_operation_removing_message">Please wait while we remove your passkey</string>
+
+    <!-- Profile -->
+    <string name="profile">Profile</string>
+    <string name="profile_information">Profile Information</string>
+    <string name="profile_settings_description">Name, birthday, and photo</string>
+    <string name="profile_update_failed">Failed to update profile</string>
+    <string name="profile_updated_successfully">Profile updated successfully</string>
+    <string name="profile_photo">Profile photo</string>
+    <string name="no_display_name">No display name</string>
+    <string name="display_name">Display Name</string>
+    <string name="your_display_name">Your Display Name</string>
+    <string name="your_display_name_is_how_youll_appear_to_others_when_sharing_journal_entries_you_can_always_change_this_later">Your display name is how you&apos;ll appear to others when sharing journal entries. You can always change this later.</string>
+    <string name="edit_display_name">Edit display name</string>
+    <string name="edit_profile">Edit profile</string>
+    <string name="edit_profile_2">Edit Profile</string>
+    <string name="update_profile">Update Profile</string>
+    <string name="refresh_profile">Refresh profile</string>
+    <string name="manage_your_display_name_and_username">Manage your display name and username.</string>
+    <string name="this_is_how_youll_appear_to_others_you_can_change_this_anytime">This is how you&apos;ll appear to others. You can change this anytime.</string>
+    <string name="this_is_how_your_name_will_appear_to_others">This is how your name will appear to others</string>
+    <string name="personal_information">Personal Information</string>
+    <string name="enter_your_name">Enter your name</string>
+    <string name="your_full_name">Your full name</string>
+    <string name="logging_since">logging since %1$s</string>
+
+    <!-- Username -->
+    <string name="username">Username</string>
+    <string name="username_2">username</string>
+    <string name="username_optional">Username (Optional)</string>
+    <string name="username_handle">@%1$s</string>
+    <string name="username_available">Username available</string>
+    <string name="username_is_already_taken">Username is already taken</string>
+    <string name="username_is_available">Username is available</string>
+    <string name="username_is_available_2">✓ Username is available</string>
+    <string name="username_is_available_3">Username is available!</string>
+    <string name="username_taken">Username taken</string>
+    <string name="username_tips">💡 Username tips:</string>
+    <string name="choose_a_username">Choose a Username</string>
+    <string name="choose_a_username_2">Choose a username</string>
+    <string name="choose_your_username">Choose your username</string>
+    <string name="what_should_we_call_you">What should we call you?</string>
+    <string name="check_availability">Check Availability</string>
+    <string name="error_checking_availability">Error checking availability</string>
+    <string name="error_checking_username">Error checking username</string>
+    <string name="providing_your_username_helps_find_your_passkey_faster">Providing your username helps find your passkey faster</string>
+    <string name="profile_username_hint">This will be your @%1$s</string>
+    <string name="unique_address_username">Your unique address will be @%1$s@%2$s</string>
+    <string name="your_unique_address_on_the_logdate_network_this_is_how_others_will_find_and_mention_you">Your unique address on the LogDate network. This is how others will find and mention you.</string>
+    <string name="this_username_will_identify_you_on_logdate_cloud_you_can_change_it_later">This username will identify you on LogDate Cloud. You can change it later.</string>
+    <string name="this_will_be_your_unique_identifier_on_logdate_cloud">This will be your unique identifier on LogDate Cloud.</string>
+    <string name="your_username">your_username</string>
+    <string name="your_username_2">your-username</string>
+
+    <!-- Birthday -->
+    <string name="birthday">Birthday</string>
+    <string name="birthday_detail_description">Your birthday marks where your story begins. LogDate uses it to anchor your timeline, celebrate with you each year, and shape memories around the moments of your life.</string>
+    <string name="birthday_not_set">Not set</string>
+    <string name="birthday_updated">Birthday updated successfully</string>
+    <string name="birthday_update_failed">Failed to update birthday</string>
+    <string name="your_birthday">Your birthday</string>
+    <string name="set_your_birthday">Set your birthday!</string>
+    <string name="when_were_you_born">When were you born?</string>
+
+    <!-- Bio -->
+    <string name="bio_optional">Bio (Optional)</string>
+    <string name="share_something_about_yourself_with_the_logdate_community">Share something about yourself with the LogDate community</string>
+    <string name="tell_others_about_yourself">Tell others about yourself...</string>
+    <string name="tell_others_about_yourself_2">Tell others about yourself</string>
+    <string name="this_helps_us_personalize_your_experience">This helps us personalize your experience</string>
+
+    <!-- Biometric lock -->
+    <string name="disable_biometric_lock_title">Disable biometric lock?</string>
+    <string name="disable_biometric_lock_message">Anyone with access to your device will be able to open LogDate.</string>
+
+    <!-- Data reset -->
+    <string name="clear">Clear</string>
+    <string name="clear_all_data">Clear All Data</string>
+    <string name="clear_all_data_2">Clear All Data?</string>
+    <string name="clear_all_your_data_while_keeping_your_account">Clear all your data while keeping your account</string>
+    <string name="clear_data">Clear Data</string>
+    <string name="clear_data_warning_message">This action cannot be undone.\n\nThis will permanently delete all your journals, entries, photos, and settings.\n\nYour account will remain active.\n\nAre you absolutely sure you want to continue?</string>
+    <string name="clear_data_acknowledgement">I understand this will permanently delete all my data</string>
+    <string name="clear_data_explanation">Permanently deletes all journals, entries, and photos from this device. Your account and sign-in will not be affected.</string>
+    <string name="clear_data_success">All local data has been cleared</string>
+    <string name="clear_data_failed">Failed to clear data. Please try again.</string>
+    <string name="yes_clear_all_data">Yes, Clear All Data</string>
+    <string name="reset_device_id">Reset Device ID</string>
+    <string name="reset_device_id_confirmation">Are you sure you want to reset this device&apos;s ID? This is primarily used for privacy purposes and will generate a new unique identifier for this device. This won&apos;t affect your data but may require re-syncing with LogDate Cloud.</string>
+</resources>
