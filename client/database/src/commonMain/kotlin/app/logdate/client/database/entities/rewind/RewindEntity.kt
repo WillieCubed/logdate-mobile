@@ -55,4 +55,12 @@ data class RewindEntity(
      * A user-friendly title for the rewind.
      */
     val title: String,
+    /**
+     * JSON-serialized intelligence metadata for this rewind.
+     *
+     * Contains detected activities, location summary, milestones, and highlighted people.
+     * Null if metadata has not been generated.
+     */
+    @ColumnInfo(name = "metadata", defaultValue = "NULL")
+    val metadata: String? = null,
 )

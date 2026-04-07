@@ -21,10 +21,14 @@ import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.location.LocationHistoryItem
+import app.logdate.client.repository.location.LocationHistoryRepository
+import app.logdate.client.repository.location.LocationLogRecord
 import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.repository.rewind.RewindGenerationManager
 import app.logdate.client.repository.rewind.RewindRepository
+import app.logdate.shared.model.Location
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindGenerationRequest
 import kotlinx.coroutines.flow.Flow
@@ -91,6 +95,7 @@ class GetRewindUseCaseTest {
                 narrativeSynthesizer = narrativeSynthesizer,
                 rewindSequencer = rewindSequencer,
                 peopleExtractor = peopleExtractor,
+                locationHistoryRepository = FakeLocationHistoryRepository(),
             )
         useCase =
             GetRewindUseCase(
@@ -499,5 +504,45 @@ class GetRewindUseCaseTest {
             fileName: String,
             mimeType: String,
         ): String = "file:///tmp/$fileName"
+    }
+
+    private class FakeLocationHistoryRepository : LocationHistoryRepository {
+        override suspend fun getAllLocationHistory(): List<LocationHistoryItem> = emptyList()
+
+        override fun observeLocationHistory(): Flow<List<LocationHistoryItem>> = flowOf(emptyList())
+
+        override suspend fun getRecentLocationHistory(limit: Int): List<LocationHistoryItem> = emptyList()
+
+        override suspend fun getLocationHistoryBetween(
+            startTime: Instant,
+            endTime: Instant,
+        ): List<LocationHistoryItem> = emptyList()
+
+        override suspend fun getLastLocation(): LocationHistoryItem? = null
+
+        override fun observeLastLocation(): Flow<LocationHistoryItem?> = flowOf(null)
+
+        override suspend fun logLocation(
+            location: Location,
+            userId: String,
+            deviceId: String,
+            confidence: Float,
+            isGenuine: Boolean,
+        ): Result<Unit> = Result.success(Unit)
+
+        override suspend fun logLocation(record: LocationLogRecord): Result<Unit> = Result.success(Unit)
+
+        override suspend fun deleteLocationEntry(
+            userId: String,
+            deviceId: String,
+            timestamp: Instant,
+        ): Result<Unit> = Result.success(Unit)
+
+        override suspend fun deleteLocationsBetween(
+            startTime: Instant,
+            endTime: Instant,
+        ): Result<Unit> = Result.success(Unit)
+
+        override suspend fun getLocationCount(): Int = 0
     }
 }

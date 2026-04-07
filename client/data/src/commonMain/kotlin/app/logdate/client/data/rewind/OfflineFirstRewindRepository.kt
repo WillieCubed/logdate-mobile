@@ -6,8 +6,11 @@ import app.logdate.client.database.entities.rewind.RewindImageContentEntity
 import app.logdate.client.database.entities.rewind.RewindTextContentEntity
 import app.logdate.client.database.entities.rewind.RewindVideoContentEntity
 import app.logdate.client.repository.rewind.RewindRepository
+import app.logdate.shared.model.ActivityType
+import app.logdate.shared.model.LocationSummary
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
+import app.logdate.shared.model.RewindMetadata
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -163,6 +166,13 @@ class OfflineFirstRewindRepository(
         // Sort by timestamp to maintain chronological order
         val sortedContent = content.sortedBy { it.timestamp }
 
+        val rewindMetadata =
+            metadata?.let { json ->
+                runCatching { contentJson.decodeFromString<SerializableRewindMetadata>(json) }
+                    .map { it.toDomainModel() }
+                    .getOrNull()
+            }
+
         return Rewind(
             uid = uid,
             startDate = startDate,
@@ -171,6 +181,7 @@ class OfflineFirstRewindRepository(
             label = label,
             title = title,
             content = sortedContent,
+            metadata = rewindMetadata,
         )
     }
 
@@ -185,6 +196,10 @@ class OfflineFirstRewindRepository(
             generationDate = generationDate,
             label = label,
             title = title,
+            metadata =
+                metadata?.let { meta ->
+                    contentJson.encodeToString(SerializableRewindMetadata.fromDomainModel(meta))
+                },
         )
 
     /**
@@ -361,6 +376,56 @@ class OfflineFirstRewindRepository(
     @Serializable
     private data class TransitionPayload(
         val transitionText: String,
+    )
+
+    @Serializable
+    private data class SerializableRewindMetadata(
+        val detectedActivities: List<String>,
+        val locationSummary: SerializableLocationSummary?,
+        val milestones: List<String>,
+        val peopleHighlighted: List<String>,
+    ) {
+        fun toDomainModel(): RewindMetadata =
+            RewindMetadata(
+                detectedActivities =
+                    detectedActivities.mapNotNull { name ->
+                        runCatching { ActivityType.valueOf(name) }.getOrNull()
+                    },
+                locationSummary =
+                    locationSummary?.let {
+                        LocationSummary(
+                            distinctLocations = it.distinctLocations,
+                            newPlaces = it.newPlaces,
+                            primaryLocation = it.primaryLocation,
+                        )
+                    },
+                milestones = milestones,
+                peopleHighlighted = peopleHighlighted,
+            )
+
+        companion object {
+            fun fromDomainModel(metadata: RewindMetadata): SerializableRewindMetadata =
+                SerializableRewindMetadata(
+                    detectedActivities = metadata.detectedActivities.map { it.name },
+                    locationSummary =
+                        metadata.locationSummary?.let {
+                            SerializableLocationSummary(
+                                distinctLocations = it.distinctLocations,
+                                newPlaces = it.newPlaces,
+                                primaryLocation = it.primaryLocation,
+                            )
+                        },
+                    milestones = metadata.milestones,
+                    peopleHighlighted = metadata.peopleHighlighted,
+                )
+        }
+    }
+
+    @Serializable
+    private data class SerializableLocationSummary(
+        val distinctLocations: Int,
+        val newPlaces: Int,
+        val primaryLocation: String?,
     )
 
     private companion object {

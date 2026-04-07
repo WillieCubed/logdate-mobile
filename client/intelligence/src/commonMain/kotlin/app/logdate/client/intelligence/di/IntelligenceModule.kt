@@ -5,8 +5,6 @@ import app.logdate.client.intelligence.entity.moments.MomentExtractor
 import app.logdate.client.intelligence.entity.people.PeopleExtractor
 import app.logdate.client.intelligence.narrative.RewindSequencer
 import app.logdate.client.intelligence.narrative.WeekNarrativeSynthesizer
-import app.logdate.client.intelligence.rewind.DefaultRewindGenerator
-import app.logdate.client.intelligence.rewind.RewindGenerator
 import app.logdate.client.intelligence.rewind.RewindMessageGenerator
 import app.logdate.client.intelligence.rewind.WittyRewindMessageGenerator
 import org.koin.core.module.Module
@@ -20,7 +18,6 @@ val intelligenceModule: Module =
         includes(clientsModule)
         includes(cacheModule)
 
-        single<RewindGenerator> { DefaultRewindGenerator() }
         single<RewindMessageGenerator> { WittyRewindMessageGenerator() }
         single { EntrySummarizer(get(), get(), networkAvailabilityMonitor = get(), dataUsagePolicy = get()) }
         single { MomentExtractor(get(), get(), networkAvailabilityMonitor = get(), dataUsagePolicy = get()) }

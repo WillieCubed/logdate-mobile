@@ -9,6 +9,11 @@ import app.logdate.client.domain.di.locationDomainModule
 import app.logdate.client.domain.editor.ObserveEditorDataUseCase
 import app.logdate.client.domain.editor.SaveEntryUseCase
 import app.logdate.client.domain.entities.ExtractPeopleUseCase
+import app.logdate.client.domain.events.DeleteEventUseCase
+import app.logdate.client.domain.events.GetEventByIdUseCase
+import app.logdate.client.domain.events.ObserveEventsForDateRangeUseCase
+import app.logdate.client.domain.events.ObserveEventsForNoteUseCase
+import app.logdate.client.domain.events.UpdateEventUseCase
 import app.logdate.client.domain.export.ExportUserDataUseCase
 import app.logdate.client.domain.export.GetExportCountsUseCase
 import app.logdate.client.domain.identity.ObserveUserIdentityUseCase
@@ -147,7 +152,7 @@ val domainModule: Module =
         single<RewindGenerationManager> { StubRewindGenerationManager() }
 
         // Create the GenerateBasicRewindUseCase with all its dependencies
-        factory { GenerateBasicRewindUseCase(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+        factory { GenerateBasicRewindUseCase(get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 
         // Timeline
         factory { GetJournalMembershipUseCase(get()) }
@@ -157,7 +162,7 @@ val domainModule: Module =
         factory { GetStreamingTimelineUseCase(get(), get(), get()) }
         factory { GetTimelinePageUseCase(get(), get()) }
         factory { InferMomentsUseCase(get()) }
-        factory { GetTimelineDayUseCase(get(), get(), get(), get()) }
+        factory { GetTimelineDayUseCase(get(), get(), get(), get(), get()) }
         factory { SummarizeJournalEntriesUseCase(get()) }
 
         // Include health domain module
@@ -176,6 +181,13 @@ val domainModule: Module =
         factory { GetJournalByIdUseCase(get()) }
         factory { UpdateJournalUseCase(get()) }
         factory { DeleteJournalUseCase(get()) }
+
+        // Events
+        factory { ObserveEventsForDateRangeUseCase(get()) }
+        factory { GetEventByIdUseCase(get()) }
+        factory { UpdateEventUseCase(get()) }
+        factory { DeleteEventUseCase(get()) }
+        factory { ObserveEventsForNoteUseCase(get()) }
 
         // Places
         factory { ResolveLocationToPlaceUseCase(get(), get(), get()) }

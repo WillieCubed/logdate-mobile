@@ -12,7 +12,6 @@ import platform.Foundation.NSDateFormatterNoStyle
 import platform.Foundation.NSDateFormatterShortStyle
 import platform.Foundation.NSLocale
 import platform.Foundation.NSTimeZone
-import platform.Foundation.currentCalendar
 import platform.Foundation.currentLocale
 import platform.Foundation.dateWithTimeIntervalSince1970
 import platform.Foundation.timeZoneWithName
@@ -69,7 +68,7 @@ actual fun formatDateLocalized(date: LocalDate): String {
 
 actual fun getLocaleFirstDayOfWeek(): DayOfWeek {
     // NSCalendar firstWeekday: 1 = Sunday, 2 = Monday, ..., 7 = Saturday
-    val firstWeekday = NSCalendar.currentCalendar.firstWeekday.toInt()
+    val firstWeekday = NSCalendar.currentCalendar().firstWeekday.toInt()
     return when (firstWeekday) {
         1 -> DayOfWeek.SUNDAY
         2 -> DayOfWeek.MONDAY

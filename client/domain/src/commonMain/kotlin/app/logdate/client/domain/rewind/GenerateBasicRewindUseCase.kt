@@ -7,13 +7,18 @@ import app.logdate.client.intelligence.entity.people.PeopleExtractor
 import app.logdate.client.intelligence.narrative.RewindSequencer
 import app.logdate.client.intelligence.narrative.WeekNarrativeSynthesizer
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.repository.rewind.RewindGenerationManager
 import app.logdate.client.repository.rewind.RewindRepository
+import app.logdate.shared.model.ActivityType
+import app.logdate.shared.model.LocationSummary
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
 import app.logdate.shared.model.RewindGenerationRequest
+import app.logdate.shared.model.RewindMetadata
+import app.logdate.shared.model.WeekNarrative
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -51,6 +56,7 @@ class GenerateBasicRewindUseCase(
     private val narrativeSynthesizer: WeekNarrativeSynthesizer,
     private val rewindSequencer: RewindSequencer,
     private val peopleExtractor: PeopleExtractor,
+    private val locationHistoryRepository: LocationHistoryRepository,
 ) {
     private companion object {
         /**
@@ -233,6 +239,16 @@ class GenerateBasicRewindUseCase(
             // Generate a title and label based on the period
             val titleInfo = generateRewindTitle(startTime, endTime)
 
+            // Build intelligence metadata from collected data
+            val narrative = (narrativeResult as? AIResult.Success)?.value
+            val metadata =
+                buildMetadata(
+                    narrative = narrative,
+                    people = people,
+                    startTime = startTime,
+                    endTime = endTime,
+                )
+
             // Create the rewind with narrative-driven content
             val rewind =
                 Rewind(
@@ -243,6 +259,7 @@ class GenerateBasicRewindUseCase(
                     label = titleInfo.label,
                     title = titleInfo.title,
                     content = narrativeContent,
+                    metadata = metadata,
                 )
 
             // Save the rewind to the repository
@@ -269,6 +286,61 @@ class GenerateBasicRewindUseCase(
             )
         }
     }
+
+    /**
+     * Builds intelligence metadata from the data collected during generation.
+     */
+    private suspend fun buildMetadata(
+        narrative: WeekNarrative?,
+        people: List<app.logdate.shared.model.Person>,
+        startTime: Instant,
+        endTime: Instant,
+    ): RewindMetadata {
+        // Derive activity types from narrative themes
+        val activities =
+            narrative?.themes?.let { deriveActivities(it) }
+                ?: listOf(ActivityType.MIXED)
+
+        // Extract milestones from story beats
+        val milestones =
+            narrative
+                ?.storyBeats
+                ?.filter { it.emotionalWeight.lowercase() in setOf("triumphant", "milestone", "significant", "proud") }
+                ?.map { it.moment }
+                ?: emptyList()
+
+        // Build location summary from location history
+        val locationSummary =
+            try {
+                val locations = locationHistoryRepository.getLocationHistoryBetween(startTime, endTime)
+                if (locations.isNotEmpty()) {
+                    LocationSummary(
+                        distinctLocations =
+                            locations
+                                .map {
+                                    "${it.location.latitude.toInt()},${it.location.longitude.toInt()}"
+                                }.distinct()
+                                .size,
+                        newPlaces = 0, // Would require historical comparison
+                        primaryLocation = null, // Would require reverse geocoding
+                    )
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                Napier.w("Failed to build location summary for metadata", e)
+                null
+            }
+
+        return RewindMetadata(
+            detectedActivities = activities,
+            locationSummary = locationSummary,
+            milestones = milestones,
+            peopleHighlighted = people.map { it.name },
+        )
+    }
+
+    private fun deriveActivities(themes: List<String>): List<ActivityType> = deriveActivitiesFromThemes(themes)
 
     /**
      * Waits for an existing rewind generation to complete.
@@ -329,6 +401,49 @@ class GenerateBasicRewindUseCase(
             Napier.e("Failed to update generation status", e)
         }
     }
+}
+
+/**
+ * Derives activity types from a list of narrative themes.
+ *
+ * Pure function — exposed at file scope so it can be unit tested without standing up
+ * the full use case dependency graph. Returns [ActivityType.MIXED] when no specific
+ * activities can be inferred from the themes.
+ */
+internal fun deriveActivitiesFromThemes(themes: List<String>): List<ActivityType> {
+    val activities = mutableSetOf<ActivityType>()
+    val lowerThemes = themes.map { it.lowercase() }
+
+    for (theme in lowerThemes) {
+        when {
+            theme.contains("travel") ||
+                theme.contains("trip") ||
+                theme.contains("vacation") ||
+                theme.contains("flight") ||
+                theme.contains("road") -> activities.add(ActivityType.TRAVEL)
+            theme.contains("social") ||
+                theme.contains("friend") ||
+                theme.contains("party") ||
+                theme.contains("gathering") ||
+                theme.contains("dinner") -> activities.add(ActivityType.SOCIAL)
+            theme.contains("work") ||
+                theme.contains("project") ||
+                theme.contains("deadline") ||
+                theme.contains("focus") ||
+                theme.contains("productive") -> activities.add(ActivityType.FOCUSED_WORK)
+            theme.contains("quiet") ||
+                theme.contains("rest") ||
+                theme.contains("relax") ||
+                theme.contains("solitude") -> activities.add(ActivityType.QUIET)
+            theme.contains("milestone") ||
+                theme.contains("achievement") ||
+                theme.contains("graduation") ||
+                theme.contains("birthday") ||
+                theme.contains("anniversary") -> activities.add(ActivityType.MILESTONE)
+        }
+    }
+
+    return activities.toList().ifEmpty { listOf(ActivityType.MIXED) }
 }
 
 /**

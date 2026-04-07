@@ -12,6 +12,7 @@ import app.logdate.client.image.DataSaverImageInterceptor
 import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.notifications.LogDateNotificationRegistrar
+import app.logdate.client.rewind.RewindGenerationScheduler
 import app.logdate.di.initializeKoin
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
@@ -74,6 +75,13 @@ class LogdateApplication :
             get<LocationTrackingManager>().startTracking()
         }.onFailure { error ->
             Napier.w("Failed to start location tracking manager on app startup", error)
+        }
+        runCatching {
+            val rewindScheduler = RewindGenerationScheduler(this)
+            rewindScheduler.schedulePeriodicGeneration()
+            rewindScheduler.enqueueImmediateCheck()
+        }.onFailure { error ->
+            Napier.w("Failed to initialize rewind generation scheduling", error)
         }
     }
 }
