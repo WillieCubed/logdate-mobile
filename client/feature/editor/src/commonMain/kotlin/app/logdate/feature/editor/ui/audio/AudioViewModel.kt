@@ -388,10 +388,14 @@ class AudioViewModel(
             if (audioRecordingManager.isRecording || _uiState.value.isRecording) {
                 audioRecordingManager.requestStopRecording()
             }
-            // Playback is a separate singleton concern; keep the original
-            // teardown semantics for now so navigating away still stops any
-            // audio that was playing in this editor.
-            audioPlaybackManager.release()
+            // AudioPlaybackManager is also a process-lifetime singleton.
+            // Stop the current track so the user doesn't hear it after
+            // leaving the editor, but never call release() — that tears
+            // down the controller and the underlying MediaSessionService
+            // is meant to outlive any single view model.
+            if (_uiState.value.isPlaying) {
+                audioPlaybackManager.stopPlayback()
+            }
         } catch (e: Exception) {
             Napier.e("Error cleaning up audio resources: ${e.message}", e)
         }

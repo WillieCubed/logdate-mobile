@@ -349,7 +349,12 @@ class AudioNoteViewerViewModel(
     override fun onCleared() {
         super.onCleared()
         audioProcessingJob?.cancel()
-        audioPlaybackManager.release()
+        // AudioPlaybackManager is a process-lifetime singleton; stop the
+        // currently-playing track so the user doesn't hear it after the
+        // viewer closes, but don't tear the singleton down.
+        if (cachedPlaybackState.isPlaying) {
+            audioPlaybackManager.stopPlayback()
+        }
     }
 
     private companion object {

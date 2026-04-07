@@ -410,6 +410,19 @@ class SherpaOnnxModelManager(
         const val TAGGING_MODEL_FILE_NAME = "model.onnx"
         const val TAGGING_LABELS_FILE_NAME = "class_labels_indices.csv"
 
+        // Sherpa-ONNX release page URLs for the on-demand downloads.
+        private const val WHISPER_DOWNLOAD_URL =
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2"
+        private const val TAGGING_DOWNLOAD_URL =
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/audio-tagging-models/" +
+                "sherpa-onnx-ced-small-audio-tagging-2024-04-19.tar.bz2"
+
+        private const val HTTP_CONNECT_TIMEOUT_MS = 30_000
+        private const val HTTP_READ_TIMEOUT_MS = 60_000
+        private const val DOWNLOAD_BUFFER_SIZE = 64 * 1024
+        // Emit a Downloading update every ~512 KB so the UI feels responsive
+        // without spamming Compose with hundreds of state changes per second.
+        private const val PROGRESS_EMIT_INTERVAL_BYTES = 512L * 1024
         private const val BUFFER_SIZE = 8192
     }
 }

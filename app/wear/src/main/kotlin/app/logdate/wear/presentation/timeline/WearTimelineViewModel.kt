@@ -202,7 +202,11 @@ class WearTimelineViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        audioPlaybackManager.release()
+        // AudioPlaybackManager is a process-lifetime singleton on the
+        // Wear app too — stop the current track so it doesn't keep
+        // playing after this view model goes away, but never call
+        // release() on the singleton itself.
+        audioPlaybackManager.stopPlayback()
         audioOutputMonitor.unregister()
     }
 
