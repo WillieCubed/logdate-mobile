@@ -29,11 +29,21 @@ import app.logdate.feature.rewind.ui.RewindDetailUiState
 import app.logdate.feature.rewind.ui.RewindDetailViewModel
 import app.logdate.feature.rewind.ui.RewindPanelUiState
 import app.logdate.ui.common.AspectRatios
+import app.logdate.util.toReadableDateShort
 import kotlinx.coroutines.launch
 import logdate.client.feature.rewind.generated.resources.Res
 import logdate.client.feature.rewind.generated.resources.share_rewind_chooser_title
 import logdate.client.feature.rewind.generated.resources.share_rewind_panel_caption
 import logdate.client.feature.rewind.generated.resources.share_rewind_panel_text_template
+import logdate.client.feature.rewind.generated.resources.share_rewind_stats_caption
+import logdate.client.feature.rewind.generated.resources.share_rewind_stats_chooser_title
+import logdate.client.feature.rewind.generated.resources.share_rewind_stats_heading_location
+import logdate.client.feature.rewind.generated.resources.share_rewind_stats_heading_theme
+import logdate.client.feature.rewind.generated.resources.share_rewind_stats_label_entries
+import logdate.client.feature.rewind.generated.resources.share_rewind_stats_label_people
+import logdate.client.feature.rewind.generated.resources.share_rewind_stats_label_photos
+import logdate.client.feature.rewind.generated.resources.share_rewind_stats_subtitle_template
+import logdate.client.feature.rewind.generated.resources.share_rewind_stats_text_template
 import org.jetbrains.compose.resources.getString
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
@@ -75,6 +85,8 @@ fun RewindDetailScreen(
     }
 
     val coroutineScope = rememberCoroutineScope()
+    val currentRewind by viewModel.currentRewind.collectAsStateWithLifecycle()
+
     val onSharePanel: (RewindPanelUiState) -> Unit = { panel ->
         val shareContent = panel.toShareContent()
         if (shareContent != null) {
@@ -91,10 +103,37 @@ fun RewindDetailScreen(
         }
     }
 
+    val onShareRewindStats: (() -> Unit)? =
+        currentRewind?.let { rewind ->
+            {
+                coroutineScope.launch {
+                    val request =
+                        RewindStatsShareRequest(
+                            text = getString(Res.string.share_rewind_stats_text_template, rewind.title),
+                            title = getString(Res.string.share_rewind_stats_caption),
+                            chooserTitle = getString(Res.string.share_rewind_stats_chooser_title),
+                            subtitle =
+                                getString(
+                                    Res.string.share_rewind_stats_subtitle_template,
+                                    rewind.startDate.toReadableDateShort(),
+                                    rewind.endDate.toReadableDateShort(),
+                                ),
+                            entriesLabel = getString(Res.string.share_rewind_stats_label_entries),
+                            photosLabel = getString(Res.string.share_rewind_stats_label_photos),
+                            peopleLabel = getString(Res.string.share_rewind_stats_label_people),
+                            themeHeadingLabel = getString(Res.string.share_rewind_stats_heading_theme),
+                            locationHeadingLabel = getString(Res.string.share_rewind_stats_heading_location),
+                        )
+                    viewModel.shareRewindStats(request)
+                }
+            }
+        }
+
     RewindDetailScreenContent(
         uiState = uiState,
         onExitRewind = onExitRewind,
         onSharePanel = onSharePanel,
+        onShareRewindStats = onShareRewindStats,
         modifier = modifier,
     )
 }
@@ -105,6 +144,7 @@ fun RewindDetailScreenContent(
     onExitRewind: () -> Unit,
     modifier: Modifier = Modifier,
     onSharePanel: ((panel: RewindPanelUiState) -> Unit)? = null,
+    onShareRewindStats: (() -> Unit)? = null,
 ) {
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
     val isWideScreen = windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND)
@@ -125,6 +165,7 @@ fun RewindDetailScreenContent(
                         panels = currentState.panels,
                         onExit = onExitRewind,
                         onSharePanel = onSharePanel,
+                        onShareRewindStats = onShareRewindStats,
                         content = { panel ->
                             RewindStoryContent(panel = panel)
                         },
@@ -140,6 +181,7 @@ fun RewindDetailScreenContent(
                     panels = currentState.panels,
                     onExit = onExitRewind,
                     onSharePanel = onSharePanel,
+                    onShareRewindStats = onShareRewindStats,
                     content = { panel ->
                         RewindStoryContent(panel = panel)
                     },

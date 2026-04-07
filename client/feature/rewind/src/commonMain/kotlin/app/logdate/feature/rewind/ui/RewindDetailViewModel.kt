@@ -7,9 +7,12 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.rewind.GetRewindUseCase
 import app.logdate.client.sharing.RewindQuote
 import app.logdate.client.sharing.RewindQuoteCardRenderer
+import app.logdate.client.sharing.RewindStatsSummary
+import app.logdate.client.sharing.RewindStatsSummaryRenderer
 import app.logdate.client.sharing.SharingLauncher
 import app.logdate.feature.rewind.ui.detail.RewindShareRequest
 import app.logdate.feature.rewind.ui.detail.RewindShareVisual
+import app.logdate.feature.rewind.ui.detail.RewindStatsShareRequest
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
 import io.github.aakira.napier.Napier
@@ -52,9 +55,18 @@ class RewindDetailViewModel(
     private val getRewindUseCase: GetRewindUseCase,
     private val sharingLauncher: SharingLauncher,
     private val quoteCardRenderer: RewindQuoteCardRenderer,
+    private val statsSummaryRenderer: RewindStatsSummaryRenderer,
 //    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val rewindIdState = MutableStateFlow<Uuid?>(null)
+    private val latestRewind = MutableStateFlow<Rewind?>(null)
+
+    /**
+     * The most recently loaded rewind, or null before [loadRewind] resolves. The composable
+     * reads this to format date ranges for the stats summary share — keeping locale-aware
+     * formatting in the UI layer where compose resources live.
+     */
+    val currentRewind: StateFlow<Rewind?> = latestRewind
 
 //    private val rewindData = savedStateHandle.toRoute<RewindDetailRoute>()
 
@@ -68,7 +80,9 @@ class RewindDetailViewModel(
                     // Use the rewindId to fetch data
                     getRewindUseCase(rewindId)
                         .map { rewind ->
-                            // Transform rewind data into story panels
+                            // Cache the raw rewind so stats summary share can read its metadata
+                            // without re-fetching.
+                            latestRewind.value = rewind
                             val panels = transformRewindToStoryPanels(rewind)
 
                             if (panels.isEmpty()) {
@@ -123,6 +137,76 @@ class RewindDetailViewModel(
 
     private fun RewindShareVisual.Quote.toRewindQuote(): RewindQuote =
         RewindQuote(text = text, dateLabel = dateLabel, accentSeed = accentSeed)
+
+    /**
+     * Shares the current rewind as a single stats summary card.
+     *
+     * Reads the cached latest [Rewind], hands it (along with the localized labels resolved by
+     * the composable) to the [RewindStatsSummaryRenderer], and then launches the system share
+     * sheet with whatever URI the renderer produces. Falls back to the request's plain text
+     * when the renderer is unavailable or returns null.
+     */
+    fun shareRewindStats(request: RewindStatsShareRequest) {
+        val rewind = latestRewind.value ?: return
+        viewModelScope.launch {
+            val summary = buildStatsSummary(rewind, request)
+            val mediaUri = statsSummaryRenderer.render(summary)
+            sharingLauncher.shareContent(
+                text = request.text,
+                mediaUris = mediaUri?.let { listOf(it) } ?: emptyList(),
+                title = request.title,
+                chooserTitle = request.chooserTitle,
+            )
+        }
+    }
+
+    private fun buildStatsSummary(
+        rewind: Rewind,
+        request: RewindStatsShareRequest,
+    ): RewindStatsSummary {
+        val textCount = rewind.content.count { it is RewindContent.TextNote }
+        val photoCount = rewind.content.count { it is RewindContent.Image || it is RewindContent.Video }
+        val peopleCount = rewind.metadata?.peopleHighlighted?.size ?: 0
+
+        val counters =
+            buildList {
+                if (textCount > 0) add(RewindStatsSummary.Counter(request.entriesLabel, textCount))
+                if (photoCount > 0) add(RewindStatsSummary.Counter(request.photosLabel, photoCount))
+                if (peopleCount > 0) add(RewindStatsSummary.Counter(request.peopleLabel, peopleCount))
+            }
+
+        val highlights =
+            buildList {
+                rewind.metadata
+                    ?.detectedActivities
+                    ?.firstOrNull()
+                    ?.name
+                    ?.let { activity ->
+                        add(
+                            RewindStatsSummary.Highlight(
+                                heading = request.themeHeadingLabel,
+                                value = activity.lowercase().replace('_', ' '),
+                            ),
+                        )
+                    }
+                rewind.metadata?.locationSummary?.primaryLocation?.let { location ->
+                    add(
+                        RewindStatsSummary.Highlight(
+                            heading = request.locationHeadingLabel,
+                            value = location,
+                        ),
+                    )
+                }
+            }
+
+        return RewindStatsSummary(
+            title = rewind.title,
+            subtitle = request.subtitle,
+            counters = counters,
+            highlights = highlights,
+            accentSeed = rewind.uid.hashCode(),
+        )
+    }
 
     /**
      * Transforms a Rewind domain model into UI panel states.

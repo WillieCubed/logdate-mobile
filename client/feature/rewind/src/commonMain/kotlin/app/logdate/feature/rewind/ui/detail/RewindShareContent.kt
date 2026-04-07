@@ -62,6 +62,26 @@ data class RewindShareRequest(
 )
 
 /**
+ * Everything the share path needs to launch a system share sheet for a rewind's stats summary.
+ *
+ * The composable resolves every label through compose resources before assembling this object;
+ * the view model just plugs the values into the [app.logdate.client.sharing.RewindStatsSummary]
+ * the renderer expects. There are no nullable text fields here on purpose — empty strings would
+ * draw blank space, so the composable should omit a label entirely if it doesn't apply.
+ */
+data class RewindStatsShareRequest(
+    val text: String,
+    val title: String,
+    val chooserTitle: String,
+    val subtitle: String,
+    val entriesLabel: String,
+    val photosLabel: String,
+    val peopleLabel: String,
+    val themeHeadingLabel: String,
+    val locationHeadingLabel: String,
+)
+
+/**
  * Extracts shareable content from a rewind panel. Returns null when the panel has nothing
  * meaningful to share (e.g. a pure decorative big-stat card with empty fields).
  */

@@ -2,9 +2,11 @@ package app.logdate.client.sharing.di
 
 import app.logdate.client.media.di.mediaModule
 import app.logdate.client.sharing.AndroidRewindQuoteCardRenderer
+import app.logdate.client.sharing.AndroidRewindStatsSummaryRenderer
 import app.logdate.client.sharing.AndroidShareAssetGenerator
 import app.logdate.client.sharing.AndroidSharingLauncher
 import app.logdate.client.sharing.RewindQuoteCardRenderer
+import app.logdate.client.sharing.RewindStatsSummaryRenderer
 import app.logdate.client.sharing.ShareAssetInterface
 import app.logdate.client.sharing.SharingLauncher
 import org.koin.android.ext.koin.androidContext
@@ -20,5 +22,8 @@ actual val sharingModule: Module =
         includes(mediaModule)
         factory<ShareAssetInterface> { AndroidShareAssetGenerator(androidContext(), get(named("io-dispatcher"))) }
         factory<RewindQuoteCardRenderer> { AndroidRewindQuoteCardRenderer(androidContext(), get(named("io-dispatcher"))) }
+        factory<RewindStatsSummaryRenderer> {
+            AndroidRewindStatsSummaryRenderer(androidContext(), get(named("io-dispatcher")))
+        }
         factory<SharingLauncher> { AndroidSharingLauncher(get(), get(), get(), get()) }
     }

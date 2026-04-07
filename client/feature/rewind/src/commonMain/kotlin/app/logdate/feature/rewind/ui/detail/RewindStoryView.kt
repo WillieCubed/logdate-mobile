@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -87,6 +88,7 @@ fun RewindStoryView(
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
     onSharePanel: ((panel: RewindPanelUiState) -> Unit)? = null,
+    onShareRewindStats: (() -> Unit)? = null,
     autoAdvanceDelayMs: Long = 5000L,
     content: @Composable (panel: RewindPanelUiState) -> Unit,
 ) {
@@ -236,6 +238,21 @@ fun RewindStoryView(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(modifier = Modifier.weight(1f))
+
+                if (onShareRewindStats != null) {
+                    IconButton(
+                        onClick = {
+                            isPaused = true
+                            onShareRewindStats()
+                        },
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoLibrary,
+                            contentDescription = stringResource(Res.string.share_rewind_stats),
+                            tint = Color.White,
+                        )
+                    }
+                }
 
                 if (onSharePanel != null) {
                     IconButton(

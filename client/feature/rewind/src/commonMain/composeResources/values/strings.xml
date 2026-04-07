@@ -27,6 +27,18 @@
     <string name="share_rewind_panel_text_template">From my LogDate Rewind: %1$s</string>
     <string name="share_rewind_panel_caption">A moment from my Rewind</string>
 
+    <!-- Stats summary share -->
+    <string name="share_rewind_stats">Share Rewind summary</string>
+    <string name="share_rewind_stats_chooser_title">Share Rewind summary</string>
+    <string name="share_rewind_stats_caption">My Rewind</string>
+    <string name="share_rewind_stats_text_template">My latest Rewind: %1$s</string>
+    <string name="share_rewind_stats_subtitle_template">%1$s — %2$s</string>
+    <string name="share_rewind_stats_label_entries">entries</string>
+    <string name="share_rewind_stats_label_photos">photos</string>
+    <string name="share_rewind_stats_label_people">people</string>
+    <string name="share_rewind_stats_heading_theme">theme</string>
+    <string name="share_rewind_stats_heading_location">where</string>
+
     <!-- Icon labels -->
     <string name="text">↓</string>
     <string name="text_2">🎉</string>
