@@ -162,7 +162,7 @@ val domainModule: Module =
         factory { GetTimelineUseCase(get(), get(), get(), get()) }
         factory { GetStreamingTimelineUseCase(get(), get(), get()) }
         factory { GetTimelinePageUseCase(get(), get()) }
-        factory { InferMomentsUseCase(get()) }
+        factory { InferMomentsUseCase(get(), get()) }
         factory { GetTimelineDayUseCase(get(), get(), get(), get()) }
         factory { SummarizeJournalEntriesUseCase(get()) }
 

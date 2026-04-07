@@ -79,12 +79,14 @@ fun RewindDetailScreen(
         val shareContent = panel.toShareContent()
         if (shareContent != null) {
             coroutineScope.launch {
-                viewModel.sharePanel(
-                    text = getString(Res.string.share_rewind_panel_text_template, shareContent.text),
-                    mediaUri = shareContent.mediaUri,
-                    title = getString(Res.string.share_rewind_panel_caption),
-                    chooserTitle = getString(Res.string.share_rewind_chooser_title),
-                )
+                val request =
+                    RewindShareRequest(
+                        text = getString(Res.string.share_rewind_panel_text_template, shareContent.text),
+                        title = getString(Res.string.share_rewind_panel_caption),
+                        chooserTitle = getString(Res.string.share_rewind_chooser_title),
+                        visual = shareContent.visual,
+                    )
+                viewModel.sharePanel(request)
             }
         }
     }

@@ -55,7 +55,7 @@ class InferMomentsUseCaseTest {
             val afternoonNote = textNote("Lunch meeting", afternoonTime)
             val eveningNote = textNote("Dinner", eveningTime)
 
-            val useCase = InferMomentsUseCase(FailingMomentExtractor())
+            val useCase = InferMomentsUseCase(FailingMomentExtractor(), FakeAudioTagRepository())
             val moments = useCase(date, listOf(morningNote, afternoonNote, eveningNote), emptyList())
 
             assertEquals(3, moments.size)
@@ -71,7 +71,7 @@ class InferMomentsUseCaseTest {
             val note1 = textNote("First thought", morningTime)
             val note2 = textNote("Second thought", morningTime + 1.hours)
 
-            val useCase = InferMomentsUseCase(FailingMomentExtractor())
+            val useCase = InferMomentsUseCase(FailingMomentExtractor(), FakeAudioTagRepository())
             val moments = useCase(date, listOf(note1, note2), emptyList())
 
             assertEquals(1, moments.size)
@@ -102,7 +102,7 @@ class InferMomentsUseCaseTest {
                     TimelinePlaceVisit(id = placeId.toString(), name = "Blue Bottle Coffee", latitude = 30.2672, longitude = -97.7431),
                 )
 
-            val useCase = InferMomentsUseCase(FailingMomentExtractor())
+            val useCase = InferMomentsUseCase(FailingMomentExtractor(), FakeAudioTagRepository())
             val moments = useCase(date, listOf(noteWithPlace), places)
 
             assertEquals(1, moments.size)
@@ -127,7 +127,7 @@ class InferMomentsUseCaseTest {
                     lastUpdated = baseTimestamp + 1.hours,
                 )
 
-            val useCase = InferMomentsUseCase(FailingMomentExtractor())
+            val useCase = InferMomentsUseCase(FailingMomentExtractor(), FakeAudioTagRepository())
             val moments = useCase(date, listOf(imageNote, videoNote), emptyList())
 
             assertEquals(1, moments.size)
@@ -148,7 +148,7 @@ class InferMomentsUseCaseTest {
                     lastUpdated = baseTimestamp,
                 )
 
-            val useCase = InferMomentsUseCase(FailingMomentExtractor())
+            val useCase = InferMomentsUseCase(FailingMomentExtractor(), FakeAudioTagRepository())
             val moments = useCase(date, listOf(audioNote), emptyList())
 
             assertEquals(1, moments.size)
@@ -160,7 +160,7 @@ class InferMomentsUseCaseTest {
     @Test
     fun `heuristic returns empty list for empty entries`() =
         runTest {
-            val useCase = InferMomentsUseCase(FailingMomentExtractor())
+            val useCase = InferMomentsUseCase(FailingMomentExtractor(), FakeAudioTagRepository())
             val moments = useCase(date, emptyList(), emptyList())
 
             assertTrue(moments.isEmpty())
@@ -171,7 +171,7 @@ class InferMomentsUseCaseTest {
         runTest {
             val note = textNote("Hello", baseTimestamp)
 
-            val useCase = InferMomentsUseCase(FailingMomentExtractor())
+            val useCase = InferMomentsUseCase(FailingMomentExtractor(), FakeAudioTagRepository())
             val moments = useCase(date, listOf(note), emptyList())
 
             assertEquals(MomentInferenceSource.TIME_OF_DAY_FALLBACK, moments[0].inferenceSource)
@@ -207,7 +207,7 @@ class InferMomentsUseCaseTest {
                     ),
                 )
 
-            val useCase = InferMomentsUseCase(SucceedingMomentExtractor(extracted))
+            val useCase = InferMomentsUseCase(SucceedingMomentExtractor(extracted), FakeAudioTagRepository())
             val moments = useCase(date, listOf(note1), emptyList())
 
             assertEquals(2, moments.size)
@@ -241,7 +241,7 @@ class InferMomentsUseCaseTest {
                     ),
                 )
 
-            val useCase = InferMomentsUseCase(SucceedingMomentExtractor(extracted))
+            val useCase = InferMomentsUseCase(SucceedingMomentExtractor(extracted), FakeAudioTagRepository())
             val moments = useCase(date, listOf(note), emptyList())
 
             assertEquals(2, moments.size)
@@ -255,7 +255,7 @@ class InferMomentsUseCaseTest {
         runTest {
             val note = textNote("Something happened", baseTimestamp)
 
-            val useCase = InferMomentsUseCase(SucceedingMomentExtractor(emptyList()))
+            val useCase = InferMomentsUseCase(SucceedingMomentExtractor(emptyList()), FakeAudioTagRepository())
             val moments = useCase(date, listOf(note), emptyList())
 
             assertEquals(1, moments.size)
@@ -267,7 +267,7 @@ class InferMomentsUseCaseTest {
         runTest {
             val note = textNote("Something happened", baseTimestamp)
 
-            val useCase = InferMomentsUseCase(UnavailableMomentExtractor())
+            val useCase = InferMomentsUseCase(UnavailableMomentExtractor(), FakeAudioTagRepository())
             val moments = useCase(date, listOf(note), emptyList())
 
             assertEquals(1, moments.size)
@@ -298,7 +298,7 @@ class InferMomentsUseCaseTest {
                     ),
                 )
 
-            val useCase = InferMomentsUseCase(SucceedingMomentExtractor(extracted))
+            val useCase = InferMomentsUseCase(SucceedingMomentExtractor(extracted), FakeAudioTagRepository())
             val moments = useCase(date, listOf(note), emptyList())
 
             // Ghost moment is dropped because its source notes don't exist

@@ -363,6 +363,7 @@ class GetTimelineUseCaseTest {
                                 override suspend fun currentMode() = DataUsageMode.Unrestricted
                             },
                     ),
+                audioTagRepository = FakeAudioTagRepository(),
             )
         return GetTimelineDayUseCase(
             summarizeJournalEntriesUseCase = summarizeUseCase,

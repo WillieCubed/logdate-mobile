@@ -1,6 +1,8 @@
 package app.logdate.client.sharing.di
 
 import app.logdate.client.sharing.DesktopSharingLauncher
+import app.logdate.client.sharing.NoOpRewindQuoteCardRenderer
+import app.logdate.client.sharing.RewindQuoteCardRenderer
 import app.logdate.client.sharing.SharingLauncher
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -15,4 +17,5 @@ actual val sharingModule: Module =
                 journalRepository = get(),
             )
         }
+        single<RewindQuoteCardRenderer> { NoOpRewindQuoteCardRenderer }
     }

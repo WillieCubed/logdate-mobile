@@ -3,6 +3,8 @@ package app.logdate.client.domain.timeline
 import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.entity.moments.ExtractedMoment
 import app.logdate.client.intelligence.entity.moments.MomentExtractor
+import app.logdate.client.repository.audio.AudioTag
+import app.logdate.client.repository.audio.AudioTagRepository
 import app.logdate.client.repository.journals.JournalNote
 import io.github.aakira.napier.Napier
 import kotlinx.datetime.LocalDate
@@ -20,6 +22,7 @@ import kotlin.uuid.Uuid
  */
 class InferMomentsUseCase(
     private val momentExtractor: MomentExtractor,
+    private val audioTagRepository: AudioTagRepository,
 ) {
     suspend operator fun invoke(
         date: LocalDate,
@@ -28,7 +31,8 @@ class InferMomentsUseCase(
     ): List<Moment> {
         if (entries.isEmpty()) return emptyList()
 
-        val serialized = serializeEntries(entries)
+        val ambientSoundsByNote = collectAmbientSounds(entries)
+        val serialized = serializeEntries(entries, ambientSoundsByNote)
         val documentId = "moments_${date.toEpochDays()}"
 
         return when (val result = momentExtractor.extractMoments(documentId, serialized)) {
@@ -49,6 +53,21 @@ class InferMomentsUseCase(
                 Napier.e(tag = TAG, message = "AI error for $date, using heuristic fallback")
                 inferMomentsHeuristically(date, entries, places)
             }
+        }
+    }
+
+    /**
+     * Pulls the ambient sound detections (birds, rain, traffic, …) for every
+     * audio note in [entries] from the on-device tagger's persisted output, so
+     * the moment extractor can weave them into the narrative copy. Notes with
+     * no detections — older recordings, or ones captured before the tagger
+     * model was downloaded — simply contribute an empty list.
+     */
+    private suspend fun collectAmbientSounds(entries: List<JournalNote>): Map<Uuid, List<AudioTag>> {
+        val audioNotes = entries.filterIsInstance<JournalNote.Audio>()
+        if (audioNotes.isEmpty()) return emptyMap()
+        return audioNotes.associate { audio ->
+            audio.uid to runCatching { audioTagRepository.getTagsForNote(audio.uid) }.getOrDefault(emptyList())
         }
     }
 }
@@ -214,7 +233,10 @@ private fun JournalNote.toMomentAudio(): List<MomentAudio> =
         is JournalNote.Text, is JournalNote.Image, is JournalNote.Video -> emptyList()
     }
 
-private fun serializeEntries(entries: List<JournalNote>): String =
+private fun serializeEntries(
+    entries: List<JournalNote>,
+    ambientSoundsByNote: Map<Uuid, List<AudioTag>>,
+): String =
     buildString {
         appendLine("Journal entries for the day:")
         appendLine()
@@ -240,11 +262,28 @@ private fun serializeEntries(entries: List<JournalNote>): String =
                     appendLine("Type: audio recording")
                     appendLine("Duration: ${note.durationMs}ms")
                     note.location?.displayName?.let { appendLine("Location: $it") }
+                    val sounds = ambientSoundsByNote[note.uid].orEmpty()
+                    if (sounds.isNotEmpty()) {
+                        // Top few high-confidence labels in plain language so the
+                        // moment extractor can weave them into the narrative
+                        // (e.g. "morning walk with birdsong").
+                        val phrase =
+                            sounds
+                                .filter { it.confidence >= AMBIENT_NARRATIVE_CONFIDENCE }
+                                .take(MAX_AMBIENT_LABELS)
+                                .joinToString(", ") { it.soundName.lowercase() }
+                        if (phrase.isNotEmpty()) {
+                            appendLine("Ambient sounds: $phrase")
+                        }
+                    }
                 }
             }
             appendLine()
         }
     }
+
+private const val AMBIENT_NARRATIVE_CONFIDENCE = 0.4f
+private const val MAX_AMBIENT_LABELS = 4
 
 private enum class HeuristicTimeBucket(
     val label: String,

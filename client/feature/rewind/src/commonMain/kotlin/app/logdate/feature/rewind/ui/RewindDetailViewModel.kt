@@ -5,7 +5,11 @@ package app.logdate.feature.rewind.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.rewind.GetRewindUseCase
+import app.logdate.client.sharing.RewindQuote
+import app.logdate.client.sharing.RewindQuoteCardRenderer
 import app.logdate.client.sharing.SharingLauncher
+import app.logdate.feature.rewind.ui.detail.RewindShareRequest
+import app.logdate.feature.rewind.ui.detail.RewindShareVisual
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
 import io.github.aakira.napier.Napier
@@ -18,6 +22,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Month
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -46,6 +51,7 @@ import kotlin.uuid.Uuid
 class RewindDetailViewModel(
     private val getRewindUseCase: GetRewindUseCase,
     private val sharingLauncher: SharingLauncher,
+    private val quoteCardRenderer: RewindQuoteCardRenderer,
 //    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val rewindIdState = MutableStateFlow<Uuid?>(null)
@@ -93,23 +99,30 @@ class RewindDetailViewModel(
     /**
      * Shares a rewind panel through the platform share sheet.
      *
-     * The composable resolves the localized strings before calling this; the ViewModel
-     * just owns the [SharingLauncher] dependency so composables don't have to reach
-     * into Koin themselves.
+     * When the request's visual is a [RewindShareVisual.Quote], the view model first asks the
+     * [RewindQuoteCardRenderer] to turn the user's words into a styled image so apps that
+     * prefer media (Stories, Notes, Photos) get something visual to attach. If rendering is
+     * unavailable the share still goes through with text only.
      */
-    fun sharePanel(
-        text: String,
-        mediaUri: String? = null,
-        title: String? = null,
-        chooserTitle: String? = null,
-    ) {
-        sharingLauncher.shareContent(
-            text = text,
-            mediaUris = mediaUri?.let { listOf(it) } ?: emptyList(),
-            title = title,
-            chooserTitle = chooserTitle,
-        )
+    fun sharePanel(request: RewindShareRequest) {
+        viewModelScope.launch {
+            val resolvedMedia =
+                when (val visual = request.visual) {
+                    is RewindShareVisual.ExistingMedia -> visual.uri
+                    is RewindShareVisual.Quote -> quoteCardRenderer.render(visual.toRewindQuote())
+                    RewindShareVisual.None -> null
+                }
+            sharingLauncher.shareContent(
+                text = request.text,
+                mediaUris = resolvedMedia?.let { listOf(it) } ?: emptyList(),
+                title = request.title,
+                chooserTitle = request.chooserTitle,
+            )
+        }
     }
+
+    private fun RewindShareVisual.Quote.toRewindQuote(): RewindQuote =
+        RewindQuote(text = text, dateLabel = dateLabel, accentSeed = accentSeed)
 
     /**
      * Transforms a Rewind domain model into UI panel states.
