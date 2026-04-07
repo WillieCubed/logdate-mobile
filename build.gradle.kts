@@ -490,7 +490,7 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                             ),
                             ManagedVirtualDeviceConfig(
                                 deviceName = "flagshipPhoneApi36",
-                                hardwareProfile = "Pixel 10 Pro",
+                                hardwareProfile = "Pixel 9 Pro",
                                 apiLevel = 36,
                                 systemImageSource = "google",
                             ),
