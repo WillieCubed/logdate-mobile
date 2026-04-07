@@ -119,13 +119,19 @@ private fun Context.readGoogleMapsManifestApiKey(): String? =
             packageManager
                 .getApplicationInfo(packageName, PackageManager.GET_META_DATA)
                 .metaData
+                ?: return@runCatching null
 
-        val resourceId = metaData?.getInt("com.google.android.geo.API_KEY") ?: 0
-        when {
-            resourceId != 0 -> readStringResource(resourceId).ifBlank { null }
-            else -> metaData?.getString("com.google.android.geo.API_KEY")?.ifBlank { null }
-        }
+        // The manifest meta-data can be either a literal string ("AIza…") or a resource reference
+        // ("@string/google_maps_key"). Try the string form first because Bundle.getInt blows up
+        // with ClassCastException — not 0 — when the value is actually a string, and that exception
+        // would be silently swallowed by the surrounding runCatching, defeating any fallback path.
+        metaData.getString(GOOGLE_MAPS_MANIFEST_KEY)?.ifBlank { null }?.let { return@runCatching it }
+
+        val resourceId = runCatching { metaData.getInt(GOOGLE_MAPS_MANIFEST_KEY, 0) }.getOrDefault(0)
+        if (resourceId != 0) readStringResource(resourceId).ifBlank { null } else null
     }.getOrNull()
+
+private const val GOOGLE_MAPS_MANIFEST_KEY = "com.google.android.geo.API_KEY"
 
 private fun Context.readStringResource(name: String): String {
     val resourceId = resources.getIdentifier(name, "string", packageName)
