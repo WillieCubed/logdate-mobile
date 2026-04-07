@@ -5,8 +5,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
+import app.logdate.client.media.audio.tagging.AudioTaggingResult
+import app.logdate.client.media.audio.tagging.AudioTaggingService
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
+import app.logdate.client.repository.audio.AudioTag
+import app.logdate.client.repository.audio.AudioTagRepository
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.transcription.TranscriptionStatus
 import io.github.aakira.napier.Napier
@@ -17,6 +21,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
@@ -31,7 +36,9 @@ import kotlin.uuid.Uuid
 class AndroidAudioRecordingManager(
     private val context: Context,
     private val audioStorage: AudioStorage,
-    private val transcriptionRepository: TranscriptionRepository? = null,
+    private val transcriptionRepository: TranscriptionRepository,
+    private val audioTaggingService: AudioTaggingService,
+    private val audioTagRepository: AudioTagRepository,
 ) : AudioRecordingManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val audioLevelFlow = MutableStateFlow(0f)
@@ -139,6 +146,49 @@ class AndroidAudioRecordingManager(
     }
 
     /**
+     * Streams the recorded file through the on-device ambient sound tagger
+     * and persists each cumulative result to the audio tag repository under
+     * [noteId]. The tagger emits progressively as windows complete, so the
+     * note's tag set in the database fills in over the seconds after the
+     * user stops recording. Errors and "unavailable" results are dropped
+     * silently — ambient tagging is enrichment, not critical path.
+     */
+    private fun runAmbientTagging(
+        audioPath: String,
+        noteId: Uuid,
+    ) {
+        scope.launch {
+            try {
+                audioTaggingService.tagAudio(audioPath).collect { result ->
+                    when (result) {
+                        is AudioTaggingResult.Success -> {
+                            val domainTags =
+                                result.sounds.map { sound ->
+                                    AudioTag(
+                                        noteId = noteId,
+                                        soundName = sound.name,
+                                        confidence = sound.confidence,
+                                        startMs = sound.startMs,
+                                        durationMs = sound.durationMs,
+                                    )
+                                }
+                            audioTagRepository.replaceTagsForNote(noteId, domainTags)
+                        }
+                        is AudioTaggingResult.Error -> {
+                            Napier.w("Audio tagging failed for $noteId: ${result.message}")
+                        }
+                        AudioTaggingResult.Unavailable -> {
+                            // Model not on device yet — silently skip.
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Napier.e("Audio tagging coroutine failed for $noteId", e)
+            }
+        }
+    }
+
+    /**
      * Writes a transcription result to the repository under the current
      * session's [sessionTargetNoteId], so the polished text survives the
      * editor view model and is visible to any later viewer that loads the
@@ -152,7 +202,6 @@ class AndroidAudioRecordingManager(
      */
     private suspend fun persistRefinedTranscript(result: TranscriptionResult.Success) {
         val noteId = sessionTargetNoteId ?: return
-        val repository = transcriptionRepository ?: return
         if (result.text.isBlank()) return
         val status =
             if (result.isFinal && !result.isRefining) {
@@ -161,7 +210,7 @@ class AndroidAudioRecordingManager(
                 TranscriptionStatus.IN_PROGRESS
             }
         try {
-            repository.updateTranscription(
+            transcriptionRepository.updateTranscription(
                 noteId = noteId,
                 text = result.text,
                 status = status,
@@ -263,6 +312,13 @@ class AndroidAudioRecordingManager(
                         structuredTranscriptionFlow.value = result
                     }
                 }
+            }
+
+            // Kick off ambient sound detection on the saved recording. Runs on
+            // the singleton's own scope so it survives the editor view model.
+            val noteIdForTagging = sessionTargetNoteId
+            if (filePath != null && noteIdForTagging != null) {
+                runAmbientTagging(filePath, noteIdForTagging)
             }
 
             return filePath

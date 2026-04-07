@@ -14,6 +14,7 @@ import app.logdate.client.database.converters.MediaDimensionsConverter
 import app.logdate.client.database.converters.TimestampConverter
 import app.logdate.client.database.converters.UuidConverter
 import app.logdate.client.database.dao.AudioNoteDao
+import app.logdate.client.database.dao.AudioTagDao
 import app.logdate.client.database.dao.EventDao
 import app.logdate.client.database.dao.EventNoteLinkDao
 import app.logdate.client.database.dao.HealthSnapshotDao
@@ -41,6 +42,7 @@ import app.logdate.client.database.dao.rewind.CachedRewindDao
 import app.logdate.client.database.dao.rewind.RewindGenerationRequestDao
 import app.logdate.client.database.dao.sync.SyncMetadataDao
 import app.logdate.client.database.entities.AudioNoteEntity
+import app.logdate.client.database.entities.AudioTagEntity
 import app.logdate.client.database.entities.EventEntity
 import app.logdate.client.database.entities.EventNoteLinkEntity
 import app.logdate.client.database.entities.HealthSnapshotEntity
@@ -100,6 +102,7 @@ import app.logdate.client.database.migrations.MIGRATION_33_34
 import app.logdate.client.database.migrations.MIGRATION_34_35
 import app.logdate.client.database.migrations.MIGRATION_35_36
 import app.logdate.client.database.migrations.MIGRATION_36_37
+import app.logdate.client.database.migrations.MIGRATION_37_38
 import app.logdate.client.database.migrations.MIGRATION_3_4
 import app.logdate.client.database.migrations.MIGRATION_4_5
 import app.logdate.client.database.migrations.MIGRATION_5_6
@@ -159,8 +162,10 @@ import kotlinx.coroutines.IO
         // Events
         EventEntity::class,
         EventNoteLinkEntity::class,
+        // Ambient sound tags on audio notes
+        AudioTagEntity::class,
     ],
-    version = 37,
+    version = 38,
     exportSchema = true,
 )
 @TypeConverters(
@@ -225,6 +230,8 @@ abstract class LogDateDatabase : RoomDatabase() {
     abstract fun eventDao(): EventDao
 
     abstract fun eventNoteLinkDao(): EventNoteLinkDao
+
+    abstract fun audioTagDao(): AudioTagDao
 }
 
 /**
@@ -297,6 +304,7 @@ fun getRoomDatabase(
                 MIGRATION_34_35,
                 MIGRATION_35_36,
                 MIGRATION_36_37,
+                MIGRATION_37_38,
             ).addCallback(FtsTableCallback)
             .fallbackToDestructiveMigration(destroyTablesOnUpgrade)
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)
