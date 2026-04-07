@@ -198,7 +198,15 @@ class AndroidPlatformSearchIndexManager(
     private suspend fun rebuildIndex(appSearchSession: AppSearchSession) {
         clearIndexedDocuments(appSearchSession)
 
-        val indexedEntries = searchDao.getIndexedEntries()
+        // The Room DAO query backing this hits `entries_fts`. When the database is in recovery
+        // mode (in-memory framework SQLite, which lacks FTS5), SearchIndexBootstrapper skips the
+        // virtual table entirely and the query throws "no such table". Tolerate it so the
+        // AppSearch index just stays empty until recovery restores the encrypted database.
+        val indexedEntries =
+            runCatching { searchDao.getIndexedEntries() }
+                .onFailure { error ->
+                    Napier.w("Failed to read FTS-backed entries; AppSearch index will be empty until recovery", error)
+                }.getOrDefault(emptyList())
         if (indexedEntries.isEmpty()) {
             appSearchSession.requestFlushAsync().awaitValue()
             return
