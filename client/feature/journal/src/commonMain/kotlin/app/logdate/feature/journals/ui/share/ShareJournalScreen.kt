@@ -282,7 +282,7 @@ fun ShareJournalContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = stringResource(Res.string.bring_your_devices_together_to_invite_someone_to_add_stuff),
+                text = stringResource(Res.string.journal_invite_description),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

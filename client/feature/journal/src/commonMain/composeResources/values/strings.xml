@@ -21,9 +21,9 @@
     <string name="notes_selected">%1$d selected</string>
     <string name="all_journals">All Journals</string>
     <string name="also_sharing_to_nearby_logdate_contacts">Also sharing to nearby LogDate contacts.</string>
-    <string name="are_you_sure_you_want_to_delete_this_entry_this_action_cannot_be_undone">Are you sure you want to delete this entry? This action cannot be undone.</string>
+    <string name="journal_entry_delete_confirmation">Are you sure you want to delete this entry? This action cannot be undone.</string>
     <string name="audio_note">Audio note</string>
-    <string name="bring_your_devices_together_to_invite_someone_to_add_stuff">Bring your devices together to invite someone to add stuff.</string>
+    <string name="journal_invite_description">Bring your devices together to invite someone to add stuff.</string>
     <string name="close">Close</string>
     <string name="create_journal">Create Journal</string>
     <string name="create_new_journal">Create new journal</string>

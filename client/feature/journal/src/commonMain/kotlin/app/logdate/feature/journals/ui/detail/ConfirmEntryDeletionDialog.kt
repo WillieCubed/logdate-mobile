@@ -34,7 +34,7 @@ fun ConfirmEntryDeletionDialog(
             Text(text = stringResource(Res.string.journal_entry_delete_title))
         },
         text = {
-            Text(text = stringResource(Res.string.are_you_sure_you_want_to_delete_this_entry_this_action_cannot_be_undone))
+            Text(text = stringResource(Res.string.journal_entry_delete_confirmation))
         },
         onDismissRequest = onDismissRequest,
         confirmButton = {

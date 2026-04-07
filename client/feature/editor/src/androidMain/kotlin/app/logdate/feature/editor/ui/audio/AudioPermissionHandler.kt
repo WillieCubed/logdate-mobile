@@ -30,8 +30,8 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.allow_microphone_access
+import logdate.client.feature.editor.generated.resources.editor_audio_post_grant_description
 import logdate.client.feature.editor.generated.resources.open_app_settings
-import logdate.client.feature.editor.generated.resources.you_can_record_audio_notes_after_granting_permission
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
@@ -132,7 +132,7 @@ actual fun AudioPermissionWrapper(content: @Composable () -> Unit) {
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = stringResource(Res.string.you_can_record_audio_notes_after_granting_permission),
+                        text = stringResource(Res.string.editor_audio_post_grant_description),
                         style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),

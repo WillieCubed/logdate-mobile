@@ -24,13 +24,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.account_display_name_description
 import logdate.client.feature.core.generated.resources.account_username_display_name_prompt
 import logdate.client.feature.core.generated.resources.display_name
 import logdate.client.feature.core.generated.resources.enter_your_name
 import logdate.client.feature.core.generated.resources.examples
 import logdate.client.feature.core.generated.resources.text_1_of_3
 import logdate.client.feature.core.generated.resources.this_is_how_your_name_will_appear_to_others
-import logdate.client.feature.core.generated.resources.your_display_name_is_how_youll_appear_to_others_when_sharing_journal_entries_you_can_always_change_this_later
 import logdate.client.ui.generated.resources.common_continue
 import logdate.client.ui.generated.resources.common_go_back
 import org.jetbrains.compose.resources.stringResource
@@ -127,7 +127,7 @@ private fun DisplayNameSetupContent(
                 val displayNameInfo =
                     stringResource(
                         Res.string
-                            .your_display_name_is_how_youll_appear_to_others_when_sharing_journal_entries_you_can_always_change_this_later,
+                            .account_display_name_description,
                     )
                 Text(
                     text = displayNameInfo,

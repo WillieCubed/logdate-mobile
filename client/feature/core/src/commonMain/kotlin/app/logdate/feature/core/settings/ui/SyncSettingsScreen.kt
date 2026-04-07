@@ -54,11 +54,11 @@ import logdate.client.feature.core.generated.resources.loading_conflicts
 import logdate.client.feature.core.generated.resources.never_synced
 import logdate.client.feature.core.generated.resources.no_conflicts_waiting
 import logdate.client.feature.core.generated.resources.queued_conflicts
-import logdate.client.feature.core.generated.resources.securely_sync_your_journals_notes_and_memories_across_all_your_devices
 import logdate.client.feature.core.generated.resources.showing_three_of_conflicts
 import logdate.client.feature.core.generated.resources.sign_in
 import logdate.client.feature.core.generated.resources.sync_and_backup
 import logdate.client.feature.core.generated.resources.sync_conflicts
+import logdate.client.feature.core.generated.resources.sync_devices_subtitle
 import logdate.client.feature.core.generated.resources.sync_feature_access
 import logdate.client.feature.core.generated.resources.sync_feature_backup
 import logdate.client.feature.core.generated.resources.sync_feature_sync
@@ -197,7 +197,7 @@ private fun SyncPromoContent(
         Spacer(modifier = Modifier.height(Spacing.lg))
 
         Text(
-            text = stringResource(Res.string.securely_sync_your_journals_notes_and_memories_across_all_your_devices),
+            text = stringResource(Res.string.sync_devices_subtitle),
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
         )

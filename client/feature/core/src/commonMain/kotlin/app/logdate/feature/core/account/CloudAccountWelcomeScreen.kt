@@ -37,7 +37,7 @@ import app.logdate.feature.core.settings.ui.ServerSelectionCard
 import app.logdate.feature.core.settings.ui.ServerSelectionState
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.connect_your_account_to_sync_your_journals_access_them_from_anywhere_and_unlock_powerful_cloud_features
+import logdate.client.feature.core.generated.resources.account_cloud_sync_promotion_description
 import logdate.client.feature.core.generated.resources.create_new_account
 import logdate.client.feature.core.generated.resources.passkey_not_supported_banner
 import logdate.client.feature.core.generated.resources.sign_in
@@ -134,7 +134,7 @@ fun CloudAccountWelcomeContent(
                     text =
                         stringResource(
                             Res.string
-                                .connect_your_account_to_sync_your_journals_access_them_from_anywhere_and_unlock_powerful_cloud_features,
+                                .account_cloud_sync_promotion_description,
                         ),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,

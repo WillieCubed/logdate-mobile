@@ -19,8 +19,8 @@
     <string name="sync_feature_backup">Automatic cloud backup keeps your data safe</string>
     <string name="sync_feature_access">Access your journals from any device</string>
     <string name="sync_feature_sync">Changes sync seamlessly in the background</string>
-    <string name="connect_your_account_to_sync_your_journals_access_them_from_anywhere_and_unlock_powerful_cloud_features">Connect your account to sync your journals, access them from anywhere, and unlock powerful cloud features.</string>
-    <string name="securely_sync_your_journals_notes_and_memories_across_all_your_devices">Securely sync your journals, notes, and memories across all your devices.</string>
+    <string name="account_cloud_sync_promotion_description">Connect your account to sync your journals, access them from anywhere, and unlock powerful cloud features.</string>
+    <string name="sync_devices_subtitle">Securely sync your journals, notes, and memories across all your devices.</string>
 
     <!-- Conflicts -->
     <string name="sync_conflicts">Sync Conflicts</string>

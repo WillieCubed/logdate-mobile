@@ -31,9 +31,9 @@ import androidx.compose.ui.unit.dp
 import logdate.client.permissions.generated.resources.Res
 import logdate.client.permissions.generated.resources.allow_location_access
 import logdate.client.permissions.generated.resources.location_permission_required
+import logdate.client.permissions.generated.resources.location_privacy_description
 import logdate.client.permissions.generated.resources.open_settings
 import logdate.client.permissions.generated.resources.privacy_first
-import logdate.client.permissions.generated.resources.your_location_data_is_stored_locally_on_your_device_and_is_never_shared_without_your_explicit_consent
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -150,7 +150,7 @@ fun LocationPermissionRequiredScreen(
                 val privacyText =
                     stringResource(
                         Res.string
-                            .your_location_data_is_stored_locally_on_your_device_and_is_never_shared_without_your_explicit_consent,
+                            .location_privacy_description,
                     )
                 Text(
                     text = privacyText,

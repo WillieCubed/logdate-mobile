@@ -257,7 +257,7 @@ private fun InfoSection() {
                 Text(
                     text =
                         stringResource(
-                            Res.string.keep_your_memories_safe_and_accessible_across_all_your_devices_logdate_cloud_syncs_your_entries_photos_and_settings_securely,
+                            Res.string.onboarding_cloud_sync_description,
                         ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -288,7 +288,7 @@ private fun InfoSection() {
                 Text(
                     text =
                         stringResource(
-                            Res.string.no_passwords_to_remember_use_your_devices_biometric_authentication_face_id_touch_id_or_fingerprint_for_secure_convenient_access,
+                            Res.string.account_passkey_biometric_description,
                         ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -436,7 +436,7 @@ private fun MainContent(
                             Text(stringResource(Res.string.continue_without_cloud_sync))
                         }
                         Text(
-                            text = stringResource(Res.string.you_can_always_set_up_cloud_sync_later_in_settings),
+                            text = stringResource(Res.string.onboarding_sync_later_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,

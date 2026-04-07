@@ -82,7 +82,7 @@ import logdate.client.feature.core.generated.resources.streaks
 import logdate.client.feature.core.generated.resources.streaks_description
 import logdate.client.feature.core.generated.resources.sync_and_backup
 import logdate.client.feature.core.generated.resources.sync_and_backup_description
-import logdate.client.feature.core.generated.resources.sync_promotion_description
+import logdate.client.feature.core.generated.resources.sync_devices_subtitle
 import logdate.client.feature.core.generated.resources.sync_promotion_title
 import logdate.client.feature.core.generated.resources.timeline_settings
 import logdate.client.feature.core.generated.resources.timeline_settings_description
@@ -345,7 +345,7 @@ private fun SyncPromotionCard(
             color = MaterialTheme.colorScheme.onSecondaryContainer,
         )
         Text(
-            text = stringResource(Res.string.sync_promotion_description),
+            text = stringResource(Res.string.sync_devices_subtitle),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
         )

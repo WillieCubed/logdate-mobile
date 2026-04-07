@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_username_choose_screen_title
+import logdate.client.feature.core.generated.resources.account_username_network_address_description
 import logdate.client.feature.core.generated.resources.at
 import logdate.client.feature.core.generated.resources.connected_to_the_fediverse
 import logdate.client.feature.core.generated.resources.error_checking_username
@@ -38,7 +39,6 @@ import logdate.client.feature.core.generated.resources.username_is_already_taken
 import logdate.client.feature.core.generated.resources.username_is_available_2
 import logdate.client.feature.core.generated.resources.username_taken
 import logdate.client.feature.core.generated.resources.username_tips
-import logdate.client.feature.core.generated.resources.your_unique_address_on_the_logdate_network_this_is_how_others_will_find_and_mention_you
 import logdate.client.feature.core.generated.resources.your_username
 import logdate.client.ui.generated.resources.common_continue
 import logdate.client.ui.generated.resources.common_go_back
@@ -142,7 +142,7 @@ private fun UsernameSetupContent(
                 Text(
                     text =
                         stringResource(
-                            Res.string.your_unique_address_on_the_logdate_network_this_is_how_others_will_find_and_mention_you,
+                            Res.string.account_username_network_address_description,
                         ),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,

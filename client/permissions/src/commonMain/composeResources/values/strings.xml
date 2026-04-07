@@ -4,5 +4,5 @@
     <string name="location_permission_required">Location Permission Required</string>
     <string name="open_settings">Open Settings</string>
     <string name="privacy_first">🔒 Privacy First</string>
-    <string name="your_location_data_is_stored_locally_on_your_device_and_is_never_shared_without_your_explicit_consent">Your location data is stored locally on your device and is never shared without your explicit consent.</string>
+    <string name="location_privacy_description">Your location data is stored locally on your device and is never shared without your explicit consent.</string>
 </resources>

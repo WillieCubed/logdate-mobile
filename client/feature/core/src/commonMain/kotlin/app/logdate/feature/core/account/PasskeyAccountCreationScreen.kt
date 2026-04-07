@@ -53,10 +53,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.about_passkeys
+import logdate.client.feature.core.generated.resources.account_passkey_create_screen_description
+import logdate.client.feature.core.generated.resources.account_passkey_not_supported_description
 import logdate.client.feature.core.generated.resources.bio_optional
 import logdate.client.feature.core.generated.resources.create_account
 import logdate.client.feature.core.generated.resources.create_logdate_cloud_account
-import logdate.client.feature.core.generated.resources.create_your_account_with_a_passkey_for_secure_password_free_access_to_logdate_cloud
 import logdate.client.feature.core.generated.resources.display_name
 import logdate.client.feature.core.generated.resources.error_checking_username
 import logdate.client.feature.core.generated.resources.passkeys_not_supported
@@ -64,7 +65,6 @@ import logdate.client.feature.core.generated.resources.tell_others_about_yoursel
 import logdate.client.feature.core.generated.resources.username
 import logdate.client.feature.core.generated.resources.username_available
 import logdate.client.feature.core.generated.resources.username_taken
-import logdate.client.feature.core.generated.resources.your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key
 import logdate.client.ui.generated.resources.common_dismiss
 import logdate.client.ui.generated.resources.common_go_back
 import org.jetbrains.compose.resources.stringResource
@@ -171,7 +171,7 @@ private fun PasskeyAccountCreationContent(
                     val noPasskeyMsg =
                         stringResource(
                             Res.string
-                                .your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key,
+                                .account_passkey_not_supported_description,
                         )
                     Text(
                         text = noPasskeyMsg,
@@ -204,7 +204,7 @@ private fun PasskeyAccountCreationContent(
                     )
                 }
                 Text(
-                    text = stringResource(Res.string.create_your_account_with_a_passkey_for_secure_password_free_access_to_logdate_cloud),
+                    text = stringResource(Res.string.account_passkey_create_screen_description),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

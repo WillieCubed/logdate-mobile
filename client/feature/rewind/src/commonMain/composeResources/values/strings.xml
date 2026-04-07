@@ -9,7 +9,7 @@
     <!-- State messages -->
     <string name="congrats_youve_reached_the_end">Congrats, you&apos;ve reached the end!</string>
     <string name="go_live_a_little_will_ya">Go live a little, will ya?</string>
-    <string name="still_working_on_the_rewind_go_touch_some_grass_in_the_meantime">Still working on the Rewind. Go touch some grass in the meantime.</string>
+    <string name="rewind_empty_description">Still working on the Rewind. Go touch some grass in the meantime.</string>
     <string name="unsupported_panel_type">Unsupported panel type</string>
 
     <!-- Actions -->

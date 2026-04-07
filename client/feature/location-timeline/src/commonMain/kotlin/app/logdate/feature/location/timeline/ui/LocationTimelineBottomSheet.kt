@@ -37,11 +37,11 @@ import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.close
 import logdate.client.feature.location.timeline.generated.resources.current_location
 import logdate.client.feature.location.timeline.generated.resources.location_timeline
+import logdate.client.feature.location.timeline.generated.resources.location_timeline_empty_description
 import logdate.client.feature.location.timeline.generated.resources.memories_count
 import logdate.client.feature.location.timeline.generated.resources.no_location_history_yet
 import logdate.client.feature.location.timeline.generated.resources.open_full_location_timeline
 import logdate.client.feature.location.timeline.generated.resources.recent_memories
-import logdate.client.feature.location.timeline.generated.resources.your_location_timeline_will_appear_here_as_you_move_around
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -188,7 +188,7 @@ private fun QuickPeekContentState(
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
-                    text = stringResource(Res.string.your_location_timeline_will_appear_here_as_you_move_around),
+                    text = stringResource(Res.string.location_timeline_empty_description),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

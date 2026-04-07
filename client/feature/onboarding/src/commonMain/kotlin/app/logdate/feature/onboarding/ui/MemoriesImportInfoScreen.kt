@@ -85,14 +85,14 @@ fun MemoriesImportInfoScreen(
                     verticalArrangement = Arrangement.spacedBy(Spacing.md),
                 ) {
                     Text(
-                        text = stringResource(Res.string.by_importing_your_memories_youll_be_able_to_see_memories_from_your_past),
+                        text = stringResource(Res.string.onboarding_import_memories_description),
                         style = MaterialTheme.typography.bodyLarge,
                     )
 
                     Text(
                         text =
                             stringResource(
-                                Res.string.weve_taken_the_effort_of_finding_some_photos_from_your_past_you_can_choose_which_ones_get_backed_up,
+                                Res.string.onboarding_import_photos_description,
                             ),
                         style = MaterialTheme.typography.bodyLarge,
                     )

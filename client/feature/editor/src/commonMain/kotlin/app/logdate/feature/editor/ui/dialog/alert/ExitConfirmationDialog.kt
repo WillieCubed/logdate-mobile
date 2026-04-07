@@ -21,10 +21,10 @@ import androidx.compose.ui.text.style.TextAlign
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.discard
+import logdate.client.feature.editor.generated.resources.editor_unsaved_changes_description
 import logdate.client.feature.editor.generated.resources.save_draft
 import logdate.client.feature.editor.generated.resources.unsaved_changes
 import logdate.client.feature.editor.generated.resources.would_you_like_to_save_your_changes_as_a_draft
-import logdate.client.feature.editor.generated.resources.you_have_unsaved_changes_that_will_be_lost_if_you_exit_now
 import logdate.client.ui.generated.resources.common_cancel
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
@@ -61,7 +61,7 @@ fun ExitConfirmationDialog(
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 Text(
-                    text = stringResource(Res.string.you_have_unsaved_changes_that_will_be_lost_if_you_exit_now),
+                    text = stringResource(Res.string.editor_unsaved_changes_description),
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.bodyLarge,
                 )

@@ -52,16 +52,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.about_passkeys
+import logdate.client.feature.core.generated.resources.account_passkey_not_supported_description
+import logdate.client.feature.core.generated.resources.account_sign_in_with_passkey_description
+import logdate.client.feature.core.generated.resources.account_username_passkey_hint
 import logdate.client.feature.core.generated.resources.create_account
 import logdate.client.feature.core.generated.resources.dont_have_an_account
 import logdate.client.feature.core.generated.resources.passkeys_not_supported
-import logdate.client.feature.core.generated.resources.providing_your_username_helps_find_your_passkey_faster
 import logdate.client.feature.core.generated.resources.sign_in
-import logdate.client.feature.core.generated.resources.sign_in_to_your_logdate_cloud_account_using_your_passkey
 import logdate.client.feature.core.generated.resources.sign_in_without_username
 import logdate.client.feature.core.generated.resources.username_optional
 import logdate.client.feature.core.generated.resources.welcome_back
-import logdate.client.feature.core.generated.resources.your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key
 import logdate.client.ui.generated.resources.common_dismiss
 import logdate.client.ui.generated.resources.common_go_back
 import org.jetbrains.compose.resources.stringResource
@@ -169,7 +169,7 @@ private fun PasskeyAuthenticationContent(
                     val noPasskeyMsg =
                         stringResource(
                             Res.string
-                                .your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key,
+                                .account_passkey_not_supported_description,
                         )
                     Text(
                         text = noPasskeyMsg,
@@ -202,7 +202,7 @@ private fun PasskeyAuthenticationContent(
                     )
                 }
                 Text(
-                    text = stringResource(Res.string.sign_in_to_your_logdate_cloud_account_using_your_passkey),
+                    text = stringResource(Res.string.account_sign_in_with_passkey_description),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -221,7 +221,7 @@ private fun PasskeyAuthenticationContent(
                 )
             },
             supportingText = {
-                Text(stringResource(Res.string.providing_your_username_helps_find_your_passkey_faster))
+                Text(stringResource(Res.string.account_username_passkey_hint))
             },
             keyboardOptions =
                 KeyboardOptions(

@@ -85,7 +85,7 @@ fun BackupSyncScreenContent(
                 ) {
                     Text(
                         stringResource(
-                            Res.string.all_your_memories_are_stored_securely_on_your_device_by_default_sign_up_for_a_logdate_account_so_you_never_lose_your_memories,
+                            Res.string.onboarding_cloud_backup_description,
                         ),
                     )
                 }

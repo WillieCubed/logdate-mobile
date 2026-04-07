@@ -49,7 +49,7 @@
     <string name="loading_camera">Loading camera...</string>
     <string name="loading_drafts">Loading drafts...</string>
     <string name="loading_recent_photos">Loading recent photos...</string>
-    <string name="logdate_needs_access_to_your_microphone_to_record_audio">LogDate needs access to your microphone to record audio.</string>
+    <string name="editor_audio_permission_description">LogDate needs access to your microphone to record audio.</string>
     <string name="manage_drafts">Manage drafts</string>
     <string name="microphone_access">Microphone Access</string>
     <string name="more_options">More options</string>
@@ -85,7 +85,7 @@
     <string name="editor_media_select_image_title">Select Image</string>
     <string name="skip_back_10_seconds">Skip back 10 seconds</string>
     <string name="skip_forward_10_seconds">Skip forward 10 seconds</string>
-    <string name="show_your_recent_photos_here_after_you_allow_library_access">Show your recent photos here after you allow library access.</string>
+    <string name="editor_image_permission_prompt">Show your recent photos here after you allow library access.</string>
     <string name="start_recording">Start Recording</string>
     <string name="start_text_entry">Start text entry</string>
     <string name="start_writing_to_create_your_first_draft">Start writing to create your first draft.</string>
@@ -114,8 +114,8 @@
     <string name="whats_on_your_mind">What&apos;s on your mind?</string>
     <string name="would_you_like_to_save_your_changes_as_a_draft">Would you like to save your changes as a draft?</string>
     <string name="write_something">Write something</string>
-    <string name="you_can_record_audio_notes_after_granting_permission">You can record audio notes after granting permission</string>
-    <string name="you_have_unsaved_changes_that_will_be_lost_if_you_exit_now">You have unsaved changes that will be lost if you exit now.</string>
+    <string name="editor_audio_post_grant_description">You can record audio notes after granting permission</string>
+    <string name="editor_unsaved_changes_description">You have unsaved changes that will be lost if you exit now.</string>
     <string name="editor_cd_location_chip">Current location</string>
     <string name="editor_action_add_photo">Add photo</string>
     <string name="editor_action_add_voice_note">New voice note</string>

@@ -40,12 +40,12 @@ import coil3.compose.AsyncImage
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.allow_access
 import logdate.client.feature.editor.generated.resources.browse_all_photos
+import logdate.client.feature.editor.generated.resources.editor_image_permission_prompt
 import logdate.client.feature.editor.generated.resources.loading_recent_photos
 import logdate.client.feature.editor.generated.resources.no_recent_photos_found
 import logdate.client.feature.editor.generated.resources.open_app_settings
 import logdate.client.feature.editor.generated.resources.pick_from_your_library_or_browse_all_your_photos
 import logdate.client.feature.editor.generated.resources.recent_photos
-import logdate.client.feature.editor.generated.resources.show_your_recent_photos_here_after_you_allow_library_access
 import logdate.client.feature.editor.generated.resources.we_couldnt_load_your_recent_photos
 import logdate.client.ui.generated.resources.common_try_again
 import org.jetbrains.compose.resources.stringResource
@@ -174,7 +174,7 @@ internal fun ImagePickerBrowser(
                                 modifier = Modifier.size(28.dp),
                             )
                         },
-                        message = stringResource(Res.string.show_your_recent_photos_here_after_you_allow_library_access),
+                        message = stringResource(Res.string.editor_image_permission_prompt),
                         action =
                             when {
                                 state.permanentlyDenied && onOpenSettings != null -> {

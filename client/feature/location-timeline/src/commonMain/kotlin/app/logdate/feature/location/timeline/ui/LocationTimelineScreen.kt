@@ -96,6 +96,7 @@ import logdate.client.feature.location.timeline.generated.resources.location_per
 import logdate.client.feature.location.timeline.generated.resources.location_services_disabled
 import logdate.client.feature.location.timeline.generated.resources.location_services_disabled_description
 import logdate.client.feature.location.timeline.generated.resources.location_timeline
+import logdate.client.feature.location.timeline.generated.resources.location_timeline_empty_description
 import logdate.client.feature.location.timeline.generated.resources.locations_temporarily_unavailable_description
 import logdate.client.feature.location.timeline.generated.resources.memories_count
 import logdate.client.feature.location.timeline.generated.resources.no_location_history_yet
@@ -107,7 +108,6 @@ import logdate.client.feature.location.timeline.generated.resources.samples_coun
 import logdate.client.feature.location.timeline.generated.resources.unable_to_load_location_timeline
 import logdate.client.feature.location.timeline.generated.resources.view_note
 import logdate.client.feature.location.timeline.generated.resources.year_to_date
-import logdate.client.feature.location.timeline.generated.resources.your_location_timeline_will_appear_here_as_you_move_around
 import logdate.client.ui.generated.resources.common_cancel
 import logdate.client.ui.generated.resources.common_try_again
 import org.jetbrains.compose.resources.stringResource
@@ -477,7 +477,7 @@ private fun PlacesAndHistoryList(
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
-                            text = stringResource(Res.string.your_location_timeline_will_appear_here_as_you_move_around),
+                            text = stringResource(Res.string.location_timeline_empty_description),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -980,7 +980,7 @@ private fun EmptyLocationTimeline(modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.headlineSmall,
             )
             Text(
-                text = stringResource(Res.string.your_location_timeline_will_appear_here_as_you_move_around),
+                text = stringResource(Res.string.location_timeline_empty_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

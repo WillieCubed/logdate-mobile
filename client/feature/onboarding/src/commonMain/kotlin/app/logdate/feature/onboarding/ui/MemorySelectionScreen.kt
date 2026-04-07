@@ -234,7 +234,7 @@ private fun SharedTransitionScope.MemorySelectionContent(
                 Text(
                     text =
                         stringResource(
-                            Res.string.weve_found_some_photos_and_videos_that_might_have_special_meaning_to_you_select_the_ones_youd_like_to_import,
+                            Res.string.onboarding_import_media_description,
                         ),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -466,7 +466,7 @@ private fun SharedTransitionScope.AICuratedMemoriesSection(
         Text(
             text =
                 stringResource(
-                    Res.string.our_ai_identified_these_as_potentially_meaningful_memories_based_on_visual_content_timing_and_context,
+                    Res.string.onboarding_import_smart_selection_description,
                 ),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

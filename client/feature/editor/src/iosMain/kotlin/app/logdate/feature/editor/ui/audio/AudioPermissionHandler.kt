@@ -25,8 +25,8 @@ import app.logdate.client.permissions.PermissionStatus
 import app.logdate.client.permissions.PermissionType
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.editor_audio_permission_description
 import logdate.client.feature.editor.generated.resources.grant_permission
-import logdate.client.feature.editor.generated.resources.logdate_needs_access_to_your_microphone_to_record_audio
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
@@ -78,7 +78,7 @@ actual fun AudioPermissionWrapper(content: @Composable () -> Unit) {
                 modifier = Modifier.padding(16.dp),
             ) {
                 Text(
-                    text = stringResource(Res.string.logdate_needs_access_to_your_microphone_to_record_audio),
+                    text = stringResource(Res.string.editor_audio_permission_description),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                 )

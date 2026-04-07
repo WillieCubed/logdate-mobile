@@ -575,7 +575,7 @@ fun EmptyRewindContent(
                 textAlign = TextAlign.Center,
             )
             Text(
-                text = stringResource(Res.string.still_working_on_the_rewind_go_touch_some_grass_in_the_meantime),
+                text = stringResource(Res.string.rewind_empty_description),
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

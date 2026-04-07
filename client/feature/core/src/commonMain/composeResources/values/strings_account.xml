@@ -18,13 +18,13 @@
     <string name="create_a_cloud_account">Create a Cloud Account</string>
     <string name="create_account">Create Account</string>
     <string name="create_account_with_passkey">Create Account with Passkey</string>
-    <string name="create_an_account_to_sync_your_journals_across_devices_and_unlock_additional_features">Create an account to sync your journals across devices and unlock additional features.</string>
+    <string name="account_cloud_create_description">Create an account to sync your journals across devices and unlock additional features.</string>
     <string name="create_logdate_cloud_account">Create LogDate Cloud Account</string>
     <string name="create_new_account">Create New Account</string>
-    <string name="create_your_account_with_a_passkey_for_secure_password_free_access_to_logdate_cloud">Create your account with a passkey for secure, password-free access to LogDate Cloud.</string>
+    <string name="account_passkey_create_screen_description">Create your account with a passkey for secure, password-free access to LogDate Cloud.</string>
     <string name="creating_account">Creating Account...</string>
     <string name="creating_your_logdate_cloud_account">Creating your LogDate Cloud account...</string>
-    <string name="review_your_details_and_create_your_secure_passkey_to_complete_your_logdate_cloud_account">Review your details and create your secure passkey to complete your %1$s account.</string>
+    <string name="account_passkey_create_review_description">Review your details and create your secure passkey to complete your %1$s account.</string>
     <string name="secure_your_account">Secure Your Account</string>
     <string name="your_logdate_cloud_account">Your LogDate Cloud Account</string>
     <string name="your_logdate_cloud_account_has_been_successfully_created">Your LogDate Cloud account has been successfully created. </string>
@@ -38,8 +38,8 @@
     <string name="sign_in">Sign In</string>
     <string name="sign_in_required">Sign in required</string>
     <string name="sign_in_to_logdate_cloud">Sign In to LogDate Cloud</string>
-    <string name="sign_in_to_your_logdate_cloud_account_to_enable_sync">Sign in to your LogDate Cloud account to enable sync</string>
-    <string name="sign_in_to_your_logdate_cloud_account_using_your_passkey">Sign in to your LogDate Cloud account using your passkey.</string>
+    <string name="account_sign_in_to_enable_sync">Sign in to your LogDate Cloud account to enable sync</string>
+    <string name="account_sign_in_with_passkey_description">Sign in to your LogDate Cloud account using your passkey.</string>
     <string name="sign_in_with_passkey">Sign In with Passkey</string>
     <string name="sign_in_without_username">Sign In without Username</string>
     <string name="signing_in">Signing In...</string>
@@ -51,25 +51,25 @@
     <!-- Sign out -->
     <string name="account_sign_out_action">Sign out</string>
     <string name="account_sign_out_dialog_title">Sign out?</string>
-    <string name="sign_out_of_your_logdate_cloud_account_on_this_device">Sign out of your LogDate Cloud account on this device</string>
+    <string name="account_sign_out_description">Sign out of your LogDate Cloud account on this device</string>
     <string name="sign_out_failed">Failed to sign out. Please try again.</string>
     <string name="signing_out">Signing out...</string>
-    <string name="youll_need_to_sign_in_again_to_sync_data_on_this_device">You&apos;ll need to sign in again to sync data on this device.</string>
+    <string name="account_sign_out_sync_warning">You&apos;ll need to sign in again to sync data on this device.</string>
 
     <!-- Passkeys -->
     <string name="about_passkeys">About Passkeys</string>
     <string name="passkeys">Passkeys</string>
-    <string name="passkeys_are_a_quick_and_secure_way_to_sign_into_your_logdate_account">Passkeys are a quick and secure way to sign into your LogDate Account.</string>
-    <string name="passkeys_are_a_secure_way_to_sign_in_without_passwords">Passkeys are a secure way to sign in without passwords. </string>
+    <string name="account_passkey_overview_description">Passkeys are a quick and secure way to sign into your LogDate Account.</string>
+    <string name="account_passkey_summary">Passkeys are a secure way to sign in without passwords. </string>
     <string name="passkeys_not_supported">Passkeys Not Supported</string>
     <string name="passkey_not_supported_banner">Your device doesn&apos;t support passkeys. Account creation requires a device with passkey support.</string>
-    <string name="your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key">Your device doesn&apos;t support passkeys. Please use a device with biometric authentication or a security key.</string>
+    <string name="account_passkey_not_supported_description">Your device doesn&apos;t support passkeys. Please use a device with biometric authentication or a security key.</string>
     <string name="account_passkey_create_title">Create a Passkey</string>
     <string name="account_passkey_create_label">Create a passkey</string>
-    <string name="create_a_passkey_to_securely_sign_in_to_your_account_across_all_your_devices">Create a passkey to securely sign in to your account across all your devices.</string>
+    <string name="account_passkey_create_description">Create a passkey to securely sign in to your account across all your devices.</string>
     <string name="create_passkey">Create Passkey</string>
     <string name="creating_your_passkey">Creating your passkey...</string>
-    <string name="with_passkeys_you_dont_need_to_remember_your_password_instead_use_your_fingerprint_face_or_screen_lock_to_sign_in">With passkeys, you don&apos;t need to remember your password. Instead, use your fingerprint, face, or screen lock to sign in.</string>
+    <string name="account_passkey_sign_in_description">With passkeys, you don&apos;t need to remember your password. Instead, use your fingerprint, face, or screen lock to sign in.</string>
     <string name="operation_passkey">%1$s passkey...</string>
     <string name="your_passkeys">Your passkeys</string>
     <string name="passkey_stored_on_device">Stored on %1$s • Last used %2$s</string>
@@ -98,7 +98,7 @@
     <string name="no_display_name">No display name</string>
     <string name="display_name">Display Name</string>
     <string name="your_display_name">Your Display Name</string>
-    <string name="your_display_name_is_how_youll_appear_to_others_when_sharing_journal_entries_you_can_always_change_this_later">Your display name is how you&apos;ll appear to others when sharing journal entries. You can always change this later.</string>
+    <string name="account_display_name_description">Your display name is how you&apos;ll appear to others when sharing journal entries. You can always change this later.</string>
     <string name="edit_display_name">Edit display name</string>
     <string name="account_profile_edit_label">Edit profile</string>
     <string name="account_profile_edit_action">Edit Profile</string>
@@ -131,10 +131,10 @@
     <string name="check_availability">Check Availability</string>
     <string name="error_checking_availability">Error checking availability</string>
     <string name="error_checking_username">Error checking username</string>
-    <string name="providing_your_username_helps_find_your_passkey_faster">Providing your username helps find your passkey faster</string>
+    <string name="account_username_passkey_hint">Providing your username helps find your passkey faster</string>
     <string name="profile_username_hint">This will be your @%1$s</string>
     <string name="unique_address_username">Your unique address will be @%1$s@%2$s</string>
-    <string name="your_unique_address_on_the_logdate_network_this_is_how_others_will_find_and_mention_you">Your unique address on the LogDate network. This is how others will find and mention you.</string>
+    <string name="account_username_network_address_description">Your unique address on the LogDate network. This is how others will find and mention you.</string>
     <string name="this_username_will_identify_you_on_logdate_cloud_you_can_change_it_later">This username will identify you on LogDate Cloud. You can change it later.</string>
     <string name="this_will_be_your_unique_identifier_on_logdate_cloud">This will be your unique identifier on LogDate Cloud.</string>
     <string name="your_username">your_username</string>
@@ -152,7 +152,7 @@
 
     <!-- Bio -->
     <string name="bio_optional">Bio (Optional)</string>
-    <string name="share_something_about_yourself_with_the_logdate_community">Share something about yourself with the LogDate community</string>
+    <string name="account_bio_community_placeholder">Share something about yourself with the LogDate community</string>
     <string name="tell_others_about_yourself">Tell others about yourself...</string>
     <string name="tell_others_about_yourself_2">Tell others about yourself</string>
     <string name="this_helps_us_personalize_your_experience">This helps us personalize your experience</string>

@@ -46,6 +46,7 @@ import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.account_sign_in_to_enable_sync
 import logdate.client.feature.core.generated.resources.audit_and_repair_local_links_and_sync_metadata
 import logdate.client.feature.core.generated.resources.automatically_sync_your_data_in_the_background
 import logdate.client.feature.core.generated.resources.background_sync
@@ -77,7 +78,6 @@ import logdate.client.feature.core.generated.resources.settings_export_entries_d
 import logdate.client.feature.core.generated.resources.settings_export_entries_label
 import logdate.client.feature.core.generated.resources.showing_three_of_conflicts
 import logdate.client.feature.core.generated.resources.sign_in
-import logdate.client.feature.core.generated.resources.sign_in_to_your_logdate_cloud_account_to_enable_sync
 import logdate.client.feature.core.generated.resources.sync_conflicts
 import logdate.client.feature.core.generated.resources.sync_feature_access
 import logdate.client.feature.core.generated.resources.sync_feature_backup
@@ -560,7 +560,7 @@ private fun SyncSettingsSection(
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 Text(
-                    text = stringResource(Res.string.sign_in_to_your_logdate_cloud_account_to_enable_sync),
+                    text = stringResource(Res.string.account_sign_in_to_enable_sync),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

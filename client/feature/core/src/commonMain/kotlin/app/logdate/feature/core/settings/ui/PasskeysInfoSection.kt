@@ -34,6 +34,8 @@ import app.logdate.ui.common.MaterialContainerScope
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_passkey_create_label
+import logdate.client.feature.core.generated.resources.account_passkey_overview_description
+import logdate.client.feature.core.generated.resources.account_passkey_sign_in_description
 import logdate.client.feature.core.generated.resources.collapse_passkey_options
 import logdate.client.feature.core.generated.resources.create_passkey
 import logdate.client.feature.core.generated.resources.expand_passkey_options
@@ -41,8 +43,6 @@ import logdate.client.feature.core.generated.resources.learn_more
 import logdate.client.feature.core.generated.resources.passkey_last_used
 import logdate.client.feature.core.generated.resources.passkey_stored_on_device
 import logdate.client.feature.core.generated.resources.passkeys
-import logdate.client.feature.core.generated.resources.passkeys_are_a_quick_and_secure_way_to_sign_into_your_logdate_account
-import logdate.client.feature.core.generated.resources.with_passkeys_you_dont_need_to_remember_your_password_instead_use_your_fingerprint_face_or_screen_lock_to_sign_in
 import logdate.client.feature.core.generated.resources.your_passkeys
 import logdate.client.ui.generated.resources.common_delete
 import org.jetbrains.compose.resources.stringResource
@@ -94,7 +94,7 @@ fun PasskeysInfoSection(
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                text = stringResource(Res.string.passkeys_are_a_quick_and_secure_way_to_sign_into_your_logdate_account),
+                text = stringResource(Res.string.account_passkey_overview_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -119,7 +119,7 @@ fun PasskeysInfoSection(
                         val passkeysText =
                             stringResource(
                                 Res.string
-                                    .with_passkeys_you_dont_need_to_remember_your_password_instead_use_your_fingerprint_face_or_screen_lock_to_sign_in,
+                                    .account_passkey_sign_in_description,
                             )
                         Text(
                             text = passkeysText,
