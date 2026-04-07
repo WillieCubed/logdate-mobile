@@ -331,7 +331,30 @@ class RewindDetailViewModel(
             }
         }
 
-        // 4. Add closing panel
+        // 4. Surface verbatim quotes the AI pulled from the user's actual entries.
+        rewind.metadata?.highlightedQuotes?.forEachIndexed { index, quote ->
+            panels.add(
+                HighlightedQuoteRewindPanelUiState(
+                    text = quote.text,
+                    whyItHits = quote.whyItHits,
+                    sourceEntryId = quote.sourceEntryId,
+                    accentSeed = rewind.uid.hashCode() xor index.inv(),
+                ),
+            )
+        }
+
+        // 5. Add AI-invented noticing prompts as the final beats of the story.
+        rewind.metadata?.reflectionPrompts?.forEachIndexed { index, prompt ->
+            panels.add(
+                ReflectionPromptRewindPanelUiState(
+                    observation = prompt.observation,
+                    invitation = prompt.invitation,
+                    accentSeed = rewind.uid.hashCode() xor index,
+                ),
+            )
+        }
+
+        // 5. Add closing panel
         panels.add(
             BasicTextRewindPanelUiState(
                 text = "This week brought new experiences, personal growth, and countless small moments that make life beautiful. Here's to next week's adventures!",

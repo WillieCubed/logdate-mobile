@@ -2,9 +2,11 @@ package app.logdate.feature.rewind.ui.detail
 
 import app.logdate.feature.rewind.ui.BasicTextRewindPanelUiState
 import app.logdate.feature.rewind.ui.BigStatisticRewindPanelUiState
+import app.logdate.feature.rewind.ui.HighlightedQuoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.ImageNoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.ImageRewindPanelUiState
 import app.logdate.feature.rewind.ui.NarrativeContextRewindPanelUiState
+import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindPanelUiState
 import app.logdate.feature.rewind.ui.SubtitledRewindPanelUiState
 import app.logdate.feature.rewind.ui.TextNoteRewindPanelUiState
@@ -124,6 +126,16 @@ fun RewindPanelUiState.toShareContent(): RewindShareContent? =
             RewindShareContent(
                 text = transitionText,
                 visual = RewindShareVisual.Quote(text = transitionText, accentSeed = sourceId.hashCode()),
+            )
+        is ReflectionPromptRewindPanelUiState ->
+            RewindShareContent(
+                text = invitation,
+                visual = RewindShareVisual.Quote(text = invitation, accentSeed = accentSeed),
+            )
+        is HighlightedQuoteRewindPanelUiState ->
+            RewindShareContent(
+                text = text,
+                visual = RewindShareVisual.Quote(text = text, accentSeed = accentSeed),
             )
         is SubtitledRewindPanelUiState ->
             RewindShareContent(

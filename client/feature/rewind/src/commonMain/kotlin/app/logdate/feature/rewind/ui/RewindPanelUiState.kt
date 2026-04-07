@@ -143,6 +143,45 @@ data class TransitionRewindPanelUiState(
 ) : RewindPanelUiState
 
 /**
+ * UI state for a verbatim line the AI pulled from one of the user's actual journal
+ * entries this period. Renders as a quiet "you wrote this and it landed" beat.
+ *
+ * @property text The exact line as the user typed it. Never edited or paraphrased.
+ * @property whyItHits A one-line note from the AI about why this line was picked out
+ *   of the surrounding entry. Drawn small underneath the quote.
+ * @property sourceEntryId The journal entry the quote came from. Future-proofed for
+ *   tap-to-deep-link, unused for now.
+ * @property accentSeed Used to vary the per-card hue so consecutive quote panels look
+ *   distinct.
+ */
+data class HighlightedQuoteRewindPanelUiState(
+    val text: String,
+    val whyItHits: String,
+    val sourceEntryId: String,
+    val accentSeed: Int = 0,
+) : RewindPanelUiState
+
+/**
+ * UI state for an AI-invented noticing prompt drawn from the rewind's actual content.
+ *
+ * Each prompt has two parts: an [observation] line that grounds the prompt in something
+ * specific from the user's week ("Sarah came up in five entries this week, the last on
+ * Friday at the bookshop") and an open-ended [invitation] that the observation leads
+ * into ("What stayed with you?"). The renderer draws the observation quietly above the
+ * invitation so the connection-to-real-data is visible at a glance.
+ *
+ * @property observation The factual line drawn from the user's actual content.
+ * @property invitation The open-ended question the observation leads into.
+ * @property accentSeed Used to vary background hue between prompts so consecutive prompt
+ *   panels look distinct.
+ */
+data class ReflectionPromptRewindPanelUiState(
+    val observation: String,
+    val invitation: String,
+    val accentSeed: Int = 0,
+) : RewindPanelUiState
+
+/**
  * Background styling information for rewind panels.
  *
  * Defines the visual appearance of a panel's background, supporting either

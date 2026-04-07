@@ -337,6 +337,8 @@ class GenerateBasicRewindUseCase(
             locationSummary = locationSummary,
             milestones = milestones,
             peopleHighlighted = people.map { it.name },
+            reflectionPrompts = narrative?.reflectionPrompts ?: emptyList(),
+            highlightedQuotes = narrative?.highlightedQuotes ?: emptyList(),
         )
     }
 

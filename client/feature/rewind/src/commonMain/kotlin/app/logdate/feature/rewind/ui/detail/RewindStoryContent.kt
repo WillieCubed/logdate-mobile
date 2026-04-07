@@ -23,8 +23,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.BasicTextRewindPanelUiState
 import app.logdate.feature.rewind.ui.BigStatisticRewindPanelUiState
+import app.logdate.feature.rewind.ui.HighlightedQuoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.ImageRewindPanelUiState
 import app.logdate.feature.rewind.ui.NarrativeContextRewindPanelUiState
+import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindPanelUiState
 import app.logdate.feature.rewind.ui.SubtitledRewindPanelUiState
 import app.logdate.feature.rewind.ui.TextNoteRewindPanelUiState
@@ -122,6 +124,24 @@ fun RewindStoryContent(
         is TransitionRewindPanelUiState -> {
             TransitionPanel(
                 transitionText = panel.transitionText,
+                modifier = modifier,
+            )
+        }
+
+        is HighlightedQuoteRewindPanelUiState -> {
+            HighlightedQuotePanel(
+                text = panel.text,
+                whyItHits = panel.whyItHits,
+                accentSeed = panel.accentSeed,
+                modifier = modifier,
+            )
+        }
+
+        is ReflectionPromptRewindPanelUiState -> {
+            ReflectionPromptPanel(
+                observation = panel.observation,
+                invitation = panel.invitation,
+                accentSeed = panel.accentSeed,
                 modifier = modifier,
             )
         }

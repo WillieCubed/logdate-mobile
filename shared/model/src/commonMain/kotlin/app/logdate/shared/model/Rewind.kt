@@ -73,6 +73,20 @@ data class RewindMetadata(
      * Names of people highlighted in this rewind.
      */
     val peopleHighlighted: List<String>,
+    /**
+     * AI-invented noticing prompts the synthesizer drew from the period's actual content.
+     *
+     * Empty when synthesis didn't produce prompts. The Rewind UI shows these as panels at
+     * the end of the story; an empty list means no prompt panels are shown at all.
+     */
+    val reflectionPrompts: List<ReflectionPrompt> = emptyList(),
+    /**
+     * Verbatim lines the AI pulled from the user's actual journal entries this period.
+     *
+     * Empty when synthesis didn't surface any quotes. The Rewind UI shows these as
+     * highlighted quote panels woven into the story.
+     */
+    val highlightedQuotes: List<HighlightedQuote> = emptyList(),
 )
 
 /**

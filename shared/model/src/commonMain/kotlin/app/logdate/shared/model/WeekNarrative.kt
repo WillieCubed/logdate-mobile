@@ -47,6 +47,72 @@ data class WeekNarrative(
      * you'd been planning. Sometimes the best trips are the ones you've dreamed about."
      */
     val overallNarrative: String,
+    /**
+     * 2-3 noticing prompts the AI invented from this week's actual content.
+     *
+     * These are NOT templated reflection / gratitude / growth questions — those are the
+     * tired wellness-app playbook every journaling app already ships. They're connections
+     * the AI drew between specific moments in the user's week and surfaced as invitations
+     * to look closer. The prompt should feel like the rewind itself is paying attention:
+     *
+     *  - "You wrote about the rain three times this week. What was different about
+     *     Wednesday's storm?"
+     *  - "Sarah came up in five entries. The last was Friday at the bookshop. What
+     *     stayed with you?"
+     *  - "You spent more nights at the coffee shop than your apartment this week. Was
+     *     that on purpose?"
+     *
+     * Empty when synthesis didn't produce prompts. The Rewind UI shows these as panels at
+     * the end of the story; an empty list means no prompt panels are shown at all — there
+     * are no template fallbacks.
+     */
+    val reflectionPrompts: List<ReflectionPrompt> = emptyList(),
+    /**
+     * 2-4 verbatim lines pulled straight from the user's own journal entries this week.
+     *
+     * Not paraphrased, not reworded — the actual sentence as the user typed it, surfaced
+     * as a highlight because it captures something the AI noticed was sharper or more
+     * honest than the surrounding prose. This is the "Spotify Wrapped" beat where the user
+     * sees their own best line back at them and recognizes it as something they wrote.
+     *
+     * Empty when synthesis didn't surface any quotes.
+     */
+    val highlightedQuotes: List<HighlightedQuote> = emptyList(),
+)
+
+/**
+ * One AI-invented "noticing" tied to a specific week's content.
+ *
+ * Each prompt has two parts. [observation] is the connection the AI noticed in the user's
+ * data — short, factual, framed in their own life ("You spent four nights writing past
+ * midnight"). [invitation] is the open-ended question the observation leads into ("Was
+ * that on purpose, or did the week run away from you?"). The split lets the UI render
+ * both parts with different weight: the observation as a quiet header that grounds the
+ * prompt in real data, the invitation as the call to actually look.
+ *
+ * No category, no taxonomy — every prompt is unique to the week that produced it.
+ */
+@Serializable
+data class ReflectionPrompt(
+    val observation: String,
+    val invitation: String,
+)
+
+/**
+ * A verbatim quote pulled from one of the user's actual journal entries.
+ *
+ * The point of a highlighted quote is recognition — the user reads the line and goes
+ * "oh yeah, I wrote that, and it's true". So [text] must be the exact characters the
+ * user typed. The AI may not edit, paraphrase, or summarize. [whyItHits] is a one-line
+ * note from the AI explaining why it picked this line out of the surrounding entry —
+ * displayed quietly underneath as the rewind's reason for caring. [sourceEntryId] ties
+ * the quote back to the entry it came from so the UI could deep-link if the user taps it.
+ */
+@Serializable
+data class HighlightedQuote(
+    val text: String,
+    val whyItHits: String,
+    val sourceEntryId: String,
 )
 
 /**
