@@ -4,6 +4,8 @@ package app.logdate.client.feature.widgets
 
 import android.content.ComponentName
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
@@ -106,7 +108,12 @@ private fun MemoryContent(state: OnThisDayWidgetState.HasMemory) {
     val launchIntent = createWidgetLaunchIntent(dateIso = state.dateIso)
     val size = LocalSize.current
     val isCompact = size.height < 120.dp
-    val hasThumbnail = state.thumbnailUri != null
+    // Decode the thumbnail from the internal file path. Glance composition runs on a
+    // background coroutine (not the main thread), so file IO here is safe. We use
+    // ImageProvider(Bitmap) instead of ImageProvider(Uri) because file:// URIs cannot
+    // be shared with the launcher process via RemoteViews.setImageViewUri().
+    val thumbnailBitmap = state.thumbnailUri?.let { loadScaledThumbnail(it) }
+    val hasThumbnail = thumbnailBitmap != null
 
     WidgetContainer(onClick = launchIntent) {
         // Header
@@ -149,7 +156,7 @@ private fun MemoryContent(state: OnThisDayWidgetState.HasMemory) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Image(
-                    provider = androidx.glance.appwidget.ImageProvider(Uri.parse(state.thumbnailUri)),
+                    provider = ImageProvider(thumbnailBitmap!!),
                     contentDescription = null,
                     contentScale = androidx.glance.layout.ContentScale.Crop,
                     modifier =
@@ -315,5 +322,27 @@ private fun EmptyStateBody(
         )
     }
 }
+
+/**
+ * Decodes the image at [uriString] into a downsampled [Bitmap] suitable for
+ * embedding in a widget's [RemoteViews].
+ *
+ * Uses [inSampleSize] = 4 to keep the embedded bitmap small enough to avoid
+ * [android.os.TransactionTooLargeException] when the widget is updated.
+ *
+ * Returns null if the file cannot be decoded (missing file, unsupported format, etc.).
+ */
+private fun loadScaledThumbnail(uriString: String): Bitmap? =
+    try {
+        val path =
+            if (uriString.startsWith("file://")) {
+                Uri.parse(uriString).path ?: uriString
+            } else {
+                uriString
+            }
+        BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = 4 })
+    } catch (_: Exception) {
+        null
+    }
 
 // endregion
