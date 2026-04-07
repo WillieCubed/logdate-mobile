@@ -1,15 +1,24 @@
 package app.logdate.feature.events.ui
 
 import app.logdate.client.domain.events.DeleteEventUseCase
+import app.logdate.client.domain.events.GetAttachableNotesForEventUseCase
 import app.logdate.client.domain.events.GetEventByIdUseCase
-import app.logdate.client.domain.events.ObserveNotesForEventUseCase
+import app.logdate.client.domain.events.LinkNoteToEventUseCase
+import app.logdate.client.domain.events.ObserveLinkedNotesForEventUseCase
+import app.logdate.client.domain.events.ObserveUserPlacesUseCase
+import app.logdate.client.domain.events.UnlinkNoteFromEventUseCase
 import app.logdate.client.domain.events.UpdateEventUseCase
 import app.logdate.client.repository.events.EventRepository
+import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.places.UserPlacesRepository
 import app.logdate.shared.model.Event
+import app.logdate.shared.model.Place
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -23,13 +32,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
  * Unit tests for [EventDetailViewModel].
  *
- * Each test wires a fresh [FakeEventRepository] into the real domain use cases and into a new
+ * Each test wires fresh fake repositories into the real domain use cases and into a new
  * [EventDetailViewModel], drives the ViewModel through `runTest`, and inspects the final
  * [EventDetailUiState] via direct `value` reads. The dispatcher is overridden to a
  * [StandardTestDispatcher] so `advanceUntilIdle()` deterministically flushes coroutines
@@ -57,8 +67,7 @@ class EventDetailViewModelTest {
     fun loadEvent_existing_id_transitions_to_loaded() =
         runTest {
             val event = sampleEvent(title = "Recital")
-            val repo = FakeEventRepository(events = listOf(event))
-            val viewModel = newViewModel(repo)
+            val viewModel = newViewModel(events = listOf(event))
 
             viewModel.loadEvent(event.id)
             advanceUntilIdle()
@@ -75,8 +84,7 @@ class EventDetailViewModelTest {
     @Test
     fun loadEvent_missing_id_transitions_to_not_found() =
         runTest {
-            val repo = FakeEventRepository()
-            val viewModel = newViewModel(repo)
+            val viewModel = newViewModel()
 
             viewModel.loadEvent(Uuid.random())
             advanceUntilIdle()
@@ -92,8 +100,8 @@ class EventDetailViewModelTest {
     fun updateTitle_mutates_loaded_draft_without_persisting() =
         runTest {
             val event = sampleEvent(title = "Old")
-            val repo = FakeEventRepository(events = listOf(event))
-            val viewModel = newViewModel(repo)
+            val eventRepo = FakeEventRepository(events = listOf(event))
+            val viewModel = newViewModel(eventRepo = eventRepo)
             viewModel.loadEvent(event.id)
             advanceUntilIdle()
 
@@ -102,7 +110,206 @@ class EventDetailViewModelTest {
 
             val state = viewModel.uiState.value as EventDetailUiState.Loaded
             assertEquals("New", state.event.title)
-            assertNull(repo.lastUpdated, "save should not be called yet")
+            assertNull(eventRepo.lastUpdated, "save should not be called yet")
+        }
+
+    /**
+     * Pulling the start time earlier (still before the existing end) leaves the end alone — a
+     * common edit when the user realizes the event started sooner than they remembered.
+     */
+    @Test
+    fun updateStartTime_keeps_end_when_still_after_start() =
+        runTest {
+            val event = sampleEvent()
+            val viewModel = newViewModel(events = listOf(event))
+            viewModel.loadEvent(event.id)
+            advanceUntilIdle()
+
+            val newStart = event.startTime - 1.hours
+            viewModel.updateStartTime(newStart)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as EventDetailUiState.Loaded
+            assertEquals(newStart, state.event.startTime)
+            assertEquals(event.endTime, state.event.endTime)
+        }
+
+    /**
+     * Pulling the start time past the existing end drops the end so the editor doesn't end
+     * up in an inverted-range state. The next end-time pick re-establishes a range.
+     */
+    @Test
+    fun updateStartTime_drops_end_when_pulled_past_it() =
+        runTest {
+            val event = sampleEvent()
+            val viewModel = newViewModel(events = listOf(event))
+            viewModel.loadEvent(event.id)
+            advanceUntilIdle()
+
+            val newStart = event.endTime!! + 1.hours
+            viewModel.updateStartTime(newStart)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as EventDetailUiState.Loaded
+            assertEquals(newStart, state.event.startTime)
+            assertNull(state.event.endTime)
+        }
+
+    /**
+     * Toggling point-in-time on clears the end time; toggling it back off restores a default
+     * one-hour range.
+     */
+    @Test
+    fun togglePointInTime_clears_end_when_on_and_restores_when_off() =
+        runTest {
+            val event = sampleEvent()
+            val viewModel = newViewModel(events = listOf(event))
+            viewModel.loadEvent(event.id)
+            advanceUntilIdle()
+
+            viewModel.togglePointInTime(true)
+            advanceUntilIdle()
+            assertNull((viewModel.uiState.value as EventDetailUiState.Loaded).event.endTime)
+
+            viewModel.togglePointInTime(false)
+            advanceUntilIdle()
+            val state = viewModel.uiState.value as EventDetailUiState.Loaded
+            assertNotNull(state.event.endTime)
+            assertEquals(state.event.startTime + 1.hours, state.event.endTime)
+        }
+
+    /**
+     * Picking a new place stages the place id on the draft event without persisting it; the
+     * change goes to the repository only when the user taps Save.
+     */
+    @Test
+    fun updatePlace_stages_place_id_in_draft() =
+        runTest {
+            val event = sampleEvent()
+            val placeId = Uuid.random()
+            val viewModel = newViewModel(events = listOf(event))
+            viewModel.loadEvent(event.id)
+            advanceUntilIdle()
+
+            viewModel.updatePlace(placeId)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as EventDetailUiState.Loaded
+            assertEquals(placeId, state.event.placeId)
+        }
+
+    /**
+     * Opening and dismissing the place picker flips the visibility flag in the loaded state.
+     * The flag lives on state (not local Compose state) so configuration changes don't
+     * dismiss the picker mid-edit.
+     */
+    @Test
+    fun openPlacePicker_then_dismiss_toggles_visibility_flag() =
+        runTest {
+            val event = sampleEvent()
+            val viewModel = newViewModel(events = listOf(event))
+            viewModel.loadEvent(event.id)
+            advanceUntilIdle()
+
+            viewModel.openPlacePicker()
+            assertTrue((viewModel.uiState.value as EventDetailUiState.Loaded).isPlacePickerOpen)
+
+            viewModel.dismissPlacePicker()
+            assertEquals(
+                false,
+                (viewModel.uiState.value as EventDetailUiState.Loaded).isPlacePickerOpen,
+            )
+        }
+
+    /**
+     * Opening the attach sheet kicks off a one-shot fetch of nearby notes scoped to the
+     * current draft's start time, and the resulting list lands on the loaded state for the
+     * picker to render.
+     */
+    @Test
+    fun openAttachSheet_loads_attachable_notes_for_current_draft() =
+        runTest {
+            val event = sampleEvent()
+            val nearbyNote = textNote(creationTime = event.startTime + 1.hours, content = "Nearby")
+            val viewModel =
+                newViewModel(
+                    events = listOf(event),
+                    notes = listOf(nearbyNote),
+                )
+            viewModel.loadEvent(event.id)
+            advanceUntilIdle()
+
+            viewModel.openAttachSheet()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as EventDetailUiState.Loaded
+            assertTrue(state.isAttachSheetOpen)
+            assertEquals(listOf(nearbyNote), state.attachableNotes)
+        }
+
+    /**
+     * Dismissing the attach sheet clears the loaded candidate list so the next open re-fetches
+     * against whatever the user's draft looks like by then.
+     */
+    @Test
+    fun dismissAttachSheet_clears_loaded_candidates() =
+        runTest {
+            val event = sampleEvent()
+            val nearbyNote = textNote(creationTime = event.startTime + 1.hours)
+            val viewModel = newViewModel(events = listOf(event), notes = listOf(nearbyNote))
+            viewModel.loadEvent(event.id)
+            advanceUntilIdle()
+            viewModel.openAttachSheet()
+            advanceUntilIdle()
+
+            viewModel.dismissAttachSheet()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as EventDetailUiState.Loaded
+            assertEquals(false, state.isAttachSheetOpen)
+            assertEquals(emptyList(), state.attachableNotes)
+        }
+
+    /**
+     * Linking a note persists immediately through the repository — it's NOT staged like the
+     * other field edits. This codifies the "Save semantics" comment on the ViewModel: the
+     * user expects an Attach tap to stick the moment they tap it.
+     */
+    @Test
+    fun linkNote_persists_immediately_through_repository() =
+        runTest {
+            val event = sampleEvent()
+            val noteId = Uuid.random()
+            val eventRepo = FakeEventRepository(events = listOf(event))
+            val viewModel = newViewModel(eventRepo = eventRepo)
+            viewModel.loadEvent(event.id)
+            advanceUntilIdle()
+
+            viewModel.linkNote(noteId)
+            advanceUntilIdle()
+
+            assertEquals(setOf(event.id to noteId), eventRepo.linkedPairs)
+        }
+
+    /**
+     * Unlinking a note also persists immediately, mirroring the link behavior so the two
+     * sides of the same operation behave consistently.
+     */
+    @Test
+    fun unlinkNote_persists_immediately_through_repository() =
+        runTest {
+            val event = sampleEvent()
+            val noteId = Uuid.random()
+            val eventRepo = FakeEventRepository(events = listOf(event))
+            eventRepo.linkedPairs.add(event.id to noteId)
+            val viewModel = newViewModel(eventRepo = eventRepo)
+            viewModel.loadEvent(event.id)
+            advanceUntilIdle()
+
+            viewModel.unlinkNote(noteId)
+            advanceUntilIdle()
+
+            assertEquals(emptySet(), eventRepo.linkedPairs)
         }
 
     /**
@@ -113,8 +320,8 @@ class EventDetailViewModelTest {
     fun save_success_clears_isSaving_and_keeps_loaded_state() =
         runTest {
             val event = sampleEvent()
-            val repo = FakeEventRepository(events = listOf(event))
-            val viewModel = newViewModel(repo)
+            val eventRepo = FakeEventRepository(events = listOf(event))
+            val viewModel = newViewModel(eventRepo = eventRepo)
             viewModel.loadEvent(event.id)
             advanceUntilIdle()
 
@@ -124,7 +331,7 @@ class EventDetailViewModelTest {
             val state = viewModel.uiState.value as EventDetailUiState.Loaded
             assertEquals(false, state.isSaving)
             assertNull(state.errorMessage)
-            assertNotNull(repo.lastUpdated)
+            assertNotNull(eventRepo.lastUpdated)
         }
 
     /**
@@ -135,8 +342,7 @@ class EventDetailViewModelTest {
     fun save_failure_surfaces_error_message() =
         runTest {
             val event = sampleEvent()
-            val repo = FakeEventRepository(events = listOf(event), failUpdates = true)
-            val viewModel = newViewModel(repo)
+            val viewModel = newViewModel(eventRepo = FakeEventRepository(events = listOf(event), failUpdates = true))
             viewModel.loadEvent(event.id)
             advanceUntilIdle()
 
@@ -156,8 +362,8 @@ class EventDetailViewModelTest {
     fun delete_success_invokes_callback() =
         runTest {
             val event = sampleEvent()
-            val repo = FakeEventRepository(events = listOf(event))
-            val viewModel = newViewModel(repo)
+            val eventRepo = FakeEventRepository(events = listOf(event))
+            val viewModel = newViewModel(eventRepo = eventRepo)
             viewModel.loadEvent(event.id)
             advanceUntilIdle()
             var deletedFired = false
@@ -166,7 +372,7 @@ class EventDetailViewModelTest {
             advanceUntilIdle()
 
             assertTrue(deletedFired)
-            assertEquals(event.id, repo.lastDeleted)
+            assertEquals(event.id, eventRepo.lastDeleted)
         }
 
     /**
@@ -177,8 +383,7 @@ class EventDetailViewModelTest {
     fun delete_failure_surfaces_error_message() =
         runTest {
             val event = sampleEvent()
-            val repo = FakeEventRepository(events = listOf(event), failDeletes = true)
-            val viewModel = newViewModel(repo)
+            val viewModel = newViewModel(eventRepo = FakeEventRepository(events = listOf(event), failDeletes = true))
             viewModel.loadEvent(event.id)
             advanceUntilIdle()
 
@@ -190,44 +395,53 @@ class EventDetailViewModelTest {
         }
 
     /**
-     * The linked-note count is reactive: pushing new note ids through the upstream flow
-     * updates `linkedNoteCount` on the loaded state without re-issuing `loadEvent`.
+     * The linked notes section is reactive: pushing new note ids through the upstream junction
+     * flow updates `linkedNotes` on the loaded state without re-issuing `loadEvent`.
      */
     @Test
-    fun linkedNoteCount_updates_when_notes_flow_emits() =
+    fun linked_notes_update_when_repository_emits() =
         runTest {
             val event = sampleEvent()
-            val noteIdsFlow = MutableStateFlow<List<Uuid>>(emptyList())
-            val repo = FakeEventRepository(events = listOf(event), notesForEventFlow = noteIdsFlow)
-            val viewModel = newViewModel(repo)
+            val firstNote = textNote(content = "first")
+            val notesFlow = MutableStateFlow<List<Uuid>>(emptyList())
+            val eventRepo = FakeEventRepository(events = listOf(event), notesForEventFlow = notesFlow)
+            val notesRepo = FakeJournalNotesRepository(notes = listOf(firstNote))
+            val viewModel = newViewModel(eventRepo = eventRepo, notesRepo = notesRepo)
 
             viewModel.loadEvent(event.id)
             advanceUntilIdle()
-            assertEquals(0, (viewModel.uiState.value as EventDetailUiState.Loaded).linkedNoteCount)
+            assertEquals(emptyList(), (viewModel.uiState.value as EventDetailUiState.Loaded).linkedNotes)
 
-            noteIdsFlow.value = listOf(Uuid.random(), Uuid.random())
+            notesFlow.value = listOf(firstNote.uid)
             advanceUntilIdle()
 
-            assertEquals(2, (viewModel.uiState.value as EventDetailUiState.Loaded).linkedNoteCount)
+            val state = viewModel.uiState.value as EventDetailUiState.Loaded
+            assertEquals(listOf(firstNote), state.linkedNotes)
         }
 
     /**
      * Helper that constructs a [EventDetailViewModel] wired to the real domain use cases over
-     * the supplied fake repository. Keeps individual tests focused on assertions rather than
-     * boilerplate.
+     * the supplied fake repositories. Keeps individual tests focused on assertions.
      */
-    private fun newViewModel(repo: FakeEventRepository): EventDetailViewModel =
+    private fun newViewModel(
+        events: List<Event> = emptyList(),
+        notes: List<JournalNote> = emptyList(),
+        places: List<Place.UserDefined> = emptyList(),
+        eventRepo: FakeEventRepository = FakeEventRepository(events = events),
+        notesRepo: FakeJournalNotesRepository = FakeJournalNotesRepository(notes = notes),
+        placesRepo: FakeUserPlacesRepository = FakeUserPlacesRepository(places = places),
+    ): EventDetailViewModel =
         EventDetailViewModel(
-            getEventById = GetEventByIdUseCase(repo),
-            observeNotesForEvent = ObserveNotesForEventUseCase(repo),
-            updateEvent = UpdateEventUseCase(repo),
-            deleteEvent = DeleteEventUseCase(repo),
+            getEventById = GetEventByIdUseCase(eventRepo),
+            observeLinkedNotesForEvent = ObserveLinkedNotesForEventUseCase(eventRepo, notesRepo),
+            getAttachableNotesForEvent = GetAttachableNotesForEventUseCase(notesRepo, eventRepo),
+            observeUserPlaces = ObserveUserPlacesUseCase(placesRepo),
+            updateEvent = UpdateEventUseCase(eventRepo),
+            deleteEvent = DeleteEventUseCase(eventRepo),
+            linkNoteToEvent = LinkNoteToEventUseCase(eventRepo),
+            unlinkNoteFromEvent = UnlinkNoteFromEventUseCase(eventRepo),
         )
 
-    /**
-     * Builds an [Event] with a deterministic time range so tests don't depend on the system
-     * clock. Override `id` or `title` for cases that need specific values.
-     */
     private fun sampleEvent(
         id: Uuid = Uuid.random(),
         title: String = "Sample",
@@ -235,28 +449,35 @@ class EventDetailViewModelTest {
         Event(
             id = id,
             title = title,
-            startTime = Instant.fromEpochSeconds(1_000),
-            endTime = Instant.fromEpochSeconds(2_000),
+            startTime = Instant.fromEpochSeconds(10_000),
+            endTime = Instant.fromEpochSeconds(20_000),
             created = Instant.fromEpochSeconds(0),
             lastUpdated = Instant.fromEpochSeconds(0),
+        )
+
+    private fun textNote(
+        uid: Uuid = Uuid.random(),
+        creationTime: Instant = Instant.fromEpochSeconds(15_000),
+        content: String = "note",
+    ): JournalNote.Text =
+        JournalNote.Text(
+            uid = uid,
+            content = content,
+            creationTimestamp = creationTime,
+            lastUpdated = creationTime,
         )
 }
 
 /**
- * Tiny in-memory [EventRepository] used only by [EventDetailViewModelTest].
- *
- * Holds a list of pre-seeded events plus knobs for forcing failure on updates and deletes.
- * The `notesForEventFlow` is exposed so tests can drive the linked-note count after the
- * ViewModel has subscribed.
- *
- * Mutations are recorded via `lastUpdated` / `lastDeleted` and successful writes mutate the
- * shared state flow so subsequent observers see the change.
+ * In-memory [EventRepository] used by [EventDetailViewModelTest]. Tracks links via a mutable
+ * `Set<Pair<eventId, noteId>>` so tests can assert immediate persistence.
  */
 private class FakeEventRepository(
     events: List<Event> = emptyList(),
     private val failUpdates: Boolean = false,
     private val failDeletes: Boolean = false,
-    private val notesForEventFlow: MutableStateFlow<List<Uuid>> = MutableStateFlow(emptyList()),
+    val linkedPairs: MutableSet<Pair<Uuid, Uuid>> = mutableSetOf(),
+    private val notesForEventFlow: MutableStateFlow<List<Uuid>>? = null,
 ) : EventRepository {
     private val state = MutableStateFlow(events)
 
@@ -290,15 +511,96 @@ private class FakeEventRepository(
 
     override fun observeEventsForNote(noteId: Uuid): Flow<List<Event>> = MutableStateFlow(emptyList())
 
-    override fun observeNotesForEvent(eventId: Uuid): Flow<List<Uuid>> = notesForEventFlow
+    override fun observeNotesForEvent(eventId: Uuid): Flow<List<Uuid>> =
+        notesForEventFlow ?: MutableStateFlow(linkedPairs.filter { it.first == eventId }.map { it.second })
 
     override suspend fun linkNoteToEvent(
         eventId: Uuid,
         noteId: Uuid,
-    ): Result<Unit> = Result.success(Unit)
+    ): Result<Unit> {
+        linkedPairs.add(eventId to noteId)
+        return Result.success(Unit)
+    }
 
     override suspend fun unlinkNoteFromEvent(
         eventId: Uuid,
         noteId: Uuid,
-    ): Result<Unit> = Result.success(Unit)
+    ): Result<Unit> {
+        linkedPairs.remove(eventId to noteId)
+        return Result.success(Unit)
+    }
+}
+
+/**
+ * Minimal [JournalNotesRepository] used by [EventDetailViewModelTest]. Only the methods the
+ * ViewModel actually exercises are real; the rest throw to surface unexpected calls in tests.
+ */
+private class FakeJournalNotesRepository(
+    private val notes: List<JournalNote> = emptyList(),
+) : JournalNotesRepository {
+    override val allNotesObserved: Flow<List<JournalNote>>
+        get() = flowOf(notes)
+
+    override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> = flowOf(emptyList())
+
+    override fun observeNotesInRange(
+        start: Instant,
+        end: Instant,
+    ): Flow<List<JournalNote>> = flowOf(notes.filter { it.creationTimestamp in start..end })
+
+    override fun observeNotesPage(
+        pageSize: Int,
+        offset: Int,
+    ): Flow<List<JournalNote>> = flowOf(emptyList())
+
+    override fun observeNotesStream(pageSize: Int): Flow<List<JournalNote>> = flowOf(emptyList())
+
+    override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = flowOf(emptyList())
+
+    override suspend fun create(note: JournalNote): Uuid = note.uid
+
+    override suspend fun create(
+        note: JournalNote,
+        journalId: Uuid,
+    ) = Unit
+
+    override suspend fun remove(note: JournalNote) = Unit
+
+    override suspend fun removeById(noteId: Uuid) = Unit
+
+    override suspend fun removeFromJournal(
+        noteId: Uuid,
+        journalId: Uuid,
+    ) = Unit
+
+    override suspend fun getNoteById(noteId: Uuid): JournalNote? = notes.firstOrNull { it.uid == noteId }
+
+    override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
+}
+
+/**
+ * In-memory [UserPlacesRepository] for tests. Only `observeAllPlaces` is real.
+ */
+private class FakeUserPlacesRepository(
+    private val places: List<Place.UserDefined> = emptyList(),
+) : UserPlacesRepository {
+    override fun observeAllPlaces(): Flow<List<Place>> = flowOf(places)
+
+    override suspend fun getAllPlaces(): List<Place> = places
+
+    override suspend fun getPlacesNear(
+        latitude: Double,
+        longitude: Double,
+        radiusMeters: Double,
+    ): List<Place> = emptyList()
+
+    override suspend fun getPlaceById(placeId: String): Place? = null
+
+    override suspend fun createPlace(place: Place): Result<Place> = Result.success(place)
+
+    override suspend fun updatePlace(place: Place): Result<Place> = Result.success(place)
+
+    override suspend fun deletePlace(placeId: String): Result<Unit> = Result.success(Unit)
+
+    override suspend fun searchPlaces(query: String): List<Place> = emptyList()
 }

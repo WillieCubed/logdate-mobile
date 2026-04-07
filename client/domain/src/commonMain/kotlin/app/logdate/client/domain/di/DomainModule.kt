@@ -10,10 +10,15 @@ import app.logdate.client.domain.editor.ObserveEditorDataUseCase
 import app.logdate.client.domain.editor.SaveEntryUseCase
 import app.logdate.client.domain.entities.ExtractPeopleUseCase
 import app.logdate.client.domain.events.DeleteEventUseCase
+import app.logdate.client.domain.events.GetAttachableNotesForEventUseCase
 import app.logdate.client.domain.events.GetEventByIdUseCase
+import app.logdate.client.domain.events.LinkNoteToEventUseCase
 import app.logdate.client.domain.events.ObserveEventsForDateRangeUseCase
 import app.logdate.client.domain.events.ObserveEventsForNoteUseCase
+import app.logdate.client.domain.events.ObserveLinkedNotesForEventUseCase
 import app.logdate.client.domain.events.ObserveNotesForEventUseCase
+import app.logdate.client.domain.events.ObserveUserPlacesUseCase
+import app.logdate.client.domain.events.UnlinkNoteFromEventUseCase
 import app.logdate.client.domain.events.UpdateEventUseCase
 import app.logdate.client.domain.export.ExportUserDataUseCase
 import app.logdate.client.domain.export.GetExportCountsUseCase
@@ -190,6 +195,11 @@ val domainModule: Module =
         factory { DeleteEventUseCase(get()) }
         factory { ObserveEventsForNoteUseCase(get()) }
         factory { ObserveNotesForEventUseCase(get()) }
+        factory { LinkNoteToEventUseCase(get()) }
+        factory { UnlinkNoteFromEventUseCase(get()) }
+        factory { ObserveLinkedNotesForEventUseCase(get(), get()) }
+        factory { GetAttachableNotesForEventUseCase(get(), get()) }
+        factory { ObserveUserPlacesUseCase(get()) }
 
         // Places
         factory { ResolveLocationToPlaceUseCase(get(), get(), get()) }
