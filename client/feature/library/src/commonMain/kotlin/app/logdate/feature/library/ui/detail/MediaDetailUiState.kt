@@ -15,7 +15,7 @@ sealed interface MediaDetailUiState {
     ) : MediaDetailUiState
 
     data class ImageContent(
-        val noteId: Uuid,
+        val mediaId: Uuid,
         val mediaRef: String,
         val createdAt: Instant,
         val location: NoteLocation?,
@@ -25,7 +25,7 @@ sealed interface MediaDetailUiState {
     ) : MediaDetailUiState
 
     data class VideoContent(
-        val noteId: Uuid,
+        val mediaId: Uuid,
         val mediaRef: String,
         val createdAt: Instant,
         val location: NoteLocation?,
@@ -62,14 +62,39 @@ data class PresenterState(
     val isPresenting: Boolean = false,
     val currentIndex: Int = 0,
     val totalItems: Int = 0,
-    val mediaItems: List<PresenterMediaItem> = emptyList(),
+    val mediaItems: List<MediaViewerItem> = emptyList(),
 )
 
 /**
- * A media item in the presenter navigation strip.
+ * A media item available to the mobile viewer and presenter strip.
  */
-data class PresenterMediaItem(
+data class MediaViewerItem(
     val uid: Uuid,
     val uri: String,
     val isVideo: Boolean,
 )
+
+/**
+ * Viewer state for paging across visible Library media.
+ */
+data class MediaViewerState(
+    val currentIndex: Int = 0,
+    val totalItems: Int = 0,
+    val mediaItems: List<MediaViewerItem> = emptyList(),
+)
+
+/**
+ * UI state for compact-screen viewer chrome.
+ */
+data class MediaViewerChromeState(
+    val isVisible: Boolean = true,
+)
+
+/**
+ * A media item in the presenter navigation strip.
+ *
+ * Kept as a typealias so the existing presenter concept stays readable while viewer and presenter
+ * share the same underlying item model.
+ */
+typealias PresenterMediaItem =
+    MediaViewerItem

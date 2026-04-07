@@ -12,10 +12,10 @@ import kotlin.uuid.Uuid
  */
 val libraryFeatureModule: Module =
     module {
-        viewModel { LibraryViewModel(notesRepository = get()) }
-        viewModel { (noteId: Uuid) ->
+        viewModel { LibraryViewModel(notesRepository = get(), indexedMediaRepository = get()) }
+        viewModel { (mediaId: Uuid) ->
             MediaDetailViewModel(
-                noteId = noteId,
+                mediaId = mediaId,
                 notesRepository = get(),
                 journalContentRepository = get(),
                 indexedMediaRepository = get(),

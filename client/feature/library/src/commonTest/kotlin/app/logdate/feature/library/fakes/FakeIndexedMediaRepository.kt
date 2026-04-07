@@ -1,5 +1,6 @@
 package app.logdate.feature.library.fakes
 
+import app.logdate.client.repository.media.ExifMetadata
 import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
 import kotlinx.coroutines.flow.Flow
@@ -16,9 +17,17 @@ class FakeIndexedMediaRepository(
     initialMedia: List<IndexedMedia> = emptyList(),
 ) : IndexedMediaRepository {
     private val mediaFlow = MutableStateFlow(initialMedia)
+    private val exifMetadataByUid = mutableMapOf<Uuid, ExifMetadata>()
 
     fun setMedia(media: List<IndexedMedia>) {
         mediaFlow.value = media
+    }
+
+    fun setExifMetadata(
+        uid: Uuid,
+        metadata: ExifMetadata,
+    ) {
+        exifMetadataByUid[uid] = metadata
     }
 
     override suspend fun indexImage(
@@ -67,5 +76,5 @@ class FakeIndexedMediaRepository(
 
     override fun getMediaCount(): Flow<Int> = mediaFlow.map { it.size }
 
-    override suspend fun getExifMetadata(uid: Uuid): app.logdate.client.repository.media.ExifMetadata? = null
+    override suspend fun getExifMetadata(uid: Uuid): ExifMetadata? = exifMetadataByUid[uid]
 }

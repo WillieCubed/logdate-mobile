@@ -37,7 +37,7 @@ object LibraryScreenshotData {
 
     val imageDetail =
         MediaDetailUiState.ImageContent(
-            noteId = Uuid.parse("00000000-0000-0000-0000-000000000101"),
+            mediaId = Uuid.parse("00000000-0000-0000-0000-000000000101"),
             mediaRef = "content://media/external/images/media/1",
             createdAt = march2026,
             location = null,

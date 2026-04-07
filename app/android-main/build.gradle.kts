@@ -256,6 +256,7 @@ dependencies {
     screenshotTestImplementation(libs.compose.components.resources)
     screenshotTestImplementation(libs.compose.runtime)
     screenshotTestImplementation(libs.compose.foundation)
+    screenshotTestImplementation(projects.client.awareness)
     screenshotTestImplementation(projects.client.feature.editor)
     screenshotTestImplementation(projects.client.feature.core)
     screenshotTestImplementation(projects.client.feature.onboarding)

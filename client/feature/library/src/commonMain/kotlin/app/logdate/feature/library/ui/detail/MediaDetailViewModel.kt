@@ -9,7 +9,10 @@ import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
+import app.logdate.feature.library.ui.LibraryMediaSource
+import app.logdate.feature.library.ui.buildLibraryMediaSources
 import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
@@ -30,11 +33,11 @@ import kotlin.uuid.Uuid
 /**
  * ViewModel for the media detail screen.
  *
- * Loads a single image or video note by its ID and exposes its content, metadata,
- * the journals it appears in, camera EXIF data, and resolved location names.
+ * Loads a single indexed image or video by its ID and exposes its content, indexed metadata,
+ * optional journal-derived enrichment, and resolved location names.
  */
 class MediaDetailViewModel(
-    private val noteId: Uuid,
+    private val mediaId: Uuid,
     private val notesRepository: JournalNotesRepository,
     private val journalContentRepository: JournalContentRepository,
     private val indexedMediaRepository: IndexedMediaRepository,
@@ -43,35 +46,32 @@ class MediaDetailViewModel(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<MediaDetailUiState>(MediaDetailUiState.Loading)
     val uiState: StateFlow<MediaDetailUiState> = _uiState.asStateFlow()
+    private val currentMediaId = MutableStateFlow(mediaId)
+    private val _viewerState = MutableStateFlow(MediaViewerState())
+    val viewerState: StateFlow<MediaViewerState> = _viewerState.asStateFlow()
 
-    /** All media notes for presenter navigation. */
-    private val allMediaNotes = MutableStateFlow<List<JournalNote>>(emptyList())
+    /** All library media for presenter navigation. */
+    private val allMediaItems = MutableStateFlow<List<LibraryMediaSource>>(emptyList())
 
     /** Presenter mode state. */
     val presenterState: StateFlow<PresenterState> =
         combine(
             remoteDisplayManager.observeExternalDisplays(),
             remoteDisplayManager.observeIsPresenting(),
-            allMediaNotes,
-        ) { displays, isPresenting, mediaNotes ->
+            viewerState,
+        ) { displays, isPresenting, viewer ->
             val items =
-                mediaNotes.map { note ->
+                viewer.mediaItems.map { media ->
                     PresenterMediaItem(
-                        uid = note.uid,
-                        uri =
-                            when (note) {
-                                is JournalNote.Image -> note.mediaRef
-                                is JournalNote.Video -> note.mediaRef
-                                else -> ""
-                            },
-                        isVideo = note is JournalNote.Video,
+                        uid = media.uid,
+                        uri = media.uri,
+                        isVideo = media.isVideo,
                     )
                 }
-            val currentIndex = items.indexOfFirst { it.uid == noteId }.coerceAtLeast(0)
             PresenterState(
                 isExternalDisplayAvailable = displays.isNotEmpty(),
                 isPresenting = isPresenting,
-                currentIndex = currentIndex,
+                currentIndex = viewer.currentIndex,
                 totalItems = items.size,
                 mediaItems = items,
             )
@@ -82,7 +82,7 @@ class MediaDetailViewModel(
         )
 
     init {
-        observeNote()
+        observeMedia()
     }
 
     /** Start presenting the current media on the first available external display. */
@@ -91,8 +91,7 @@ class MediaDetailViewModel(
             try {
                 val displays = remoteDisplayManager.observeExternalDisplays().first()
                 val displayId = displays.firstOrNull()?.id ?: return@launch
-                val state = presenterState.value
-                val item = state.mediaItems.getOrNull(state.currentIndex) ?: return@launch
+                val item = viewerState.value.mediaItems.getOrNull(viewerState.value.currentIndex) ?: return@launch
                 val mimeType = if (item.isVideo) "video/*" else "image/*"
                 remoteDisplayManager.present(displayId, item.uri, mimeType)
             } catch (e: Exception) {
@@ -103,10 +102,7 @@ class MediaDetailViewModel(
 
     /** Navigate to a specific item in presenter mode and update the external display. */
     fun presentItem(index: Int) {
-        val items = presenterState.value.mediaItems
-        val item = items.getOrNull(index) ?: return
-        val mimeType = if (item.isVideo) "video/*" else "image/*"
-        remoteDisplayManager.updatePresentation(item.uri, mimeType)
+        selectMedia(index, updatePresentation = true)
     }
 
     /** Stop presenting and dismiss the external display. */
@@ -114,101 +110,127 @@ class MediaDetailViewModel(
         remoteDisplayManager.dismiss()
     }
 
+    fun selectMedia(index: Int) {
+        selectMedia(index, updatePresentation = presenterState.value.isPresenting)
+    }
+
     override fun onCleared() {
         super.onCleared()
         remoteDisplayManager.dismiss()
     }
 
-    private fun observeNote() {
+    private fun observeMedia() {
         viewModelScope.launch {
-            notesRepository.allNotesObserved
-                .catch { error ->
-                    Napier.e("Failed to load media detail", error)
-                    _uiState.value = MediaDetailUiState.Error("Could not load this photo or video.")
-                }.collect { notes ->
-                    // Update the media notes list for presenter navigation
-                    allMediaNotes.value =
-                        notes
-                            .filter { it is JournalNote.Image || it is JournalNote.Video }
-                            .sortedByDescending { it.creationTimestamp }
+            combine(
+                indexedMediaRepository.observeAllMedia(),
+                notesRepository.allNotesObserved,
+                currentMediaId,
+            ) { mediaItems, notes, selectedMediaId ->
+                Triple(mediaItems, notes, selectedMediaId)
+            }.catch { error ->
+                Napier.e("Failed to load media detail", error)
+                _uiState.value = MediaDetailUiState.Error("Could not load this photo or video.")
+            }.collect { (mediaItems, notes, selectedMediaId) ->
+                val libraryMedia = buildLibraryMediaSources(mediaItems, notes)
+                allMediaItems.value = libraryMedia
+                updateViewerState(libraryMedia, selectedMediaId)
 
-                    val note = notes.find { it.uid == noteId }
-                    if (note == null) {
-                        _uiState.value = MediaDetailUiState.Error("Media not found.")
-                    } else {
-                        updateForNote(note)
+                val media =
+                    libraryMedia.find { it.id == selectedMediaId }
+                        ?: libraryMedia.firstOrNull()
+                if (media == null) {
+                    _viewerState.value = MediaViewerState()
+                    _uiState.value = MediaDetailUiState.Error("Media not found.")
+                } else {
+                    if (media.id != selectedMediaId) {
+                        currentMediaId.value = media.id
                     }
+                    updateForMedia(media)
                 }
+            }
         }
     }
 
-    private suspend fun updateForNote(note: JournalNote) =
+    private suspend fun updateForMedia(media: LibraryMediaSource) =
         coroutineScope {
-            val journalsDeferred =
-                async {
-                    try {
-                        journalContentRepository
-                            .observeJournalsForContent(note.uid)
-                            .first()
-                            .map { JournalReference(id = it.id, title = it.title) }
-                    } catch (e: Exception) {
-                        Napier.e("Failed to load cross-references", e)
-                        emptyList()
-                    }
-                }
+            val primaryNote = media.matchingNotes.firstOrNull()
 
+            val journalsDeferred = async { loadJournals(media.matchingNotes) }
             val exifDeferred =
                 async {
-                    if (note is JournalNote.Image) {
-                        try {
-                            indexedMediaRepository.getExifMetadata(note.uid)?.let { metadata ->
-                                ExifDisplayData(
-                                    cameraMake = metadata.cameraMake,
-                                    cameraModel = metadata.cameraModel,
-                                    aperture = metadata.aperture,
-                                    iso = metadata.iso,
-                                    focalLength = metadata.focalLength,
-                                    shutterSpeed = metadata.shutterSpeed,
-                                )
-                            }
-                        } catch (e: Exception) {
-                            Napier.e("Failed to load EXIF data", e)
-                            null
-                        }
+                    if (media.indexedMedia is IndexedMedia.Image) {
+                        loadExif(media.indexedMedia.uid)
                     } else {
                         null
                     }
                 }
-
-            val locationDeferred = async { resolveLocationName(note.location) }
+            val locationDeferred = async { resolveLocationName(primaryNote?.location) }
 
             val journals = journalsDeferred.await()
             val exif = exifDeferred.await()
             val locationDisplayName = locationDeferred.await()
 
             _uiState.value =
-                when (note) {
-                    is JournalNote.Image ->
+                when {
+                    media.isVideo ->
+                        MediaDetailUiState.VideoContent(
+                            mediaId = media.id,
+                            mediaRef = media.uri,
+                            createdAt = media.timestamp,
+                            location = primaryNote?.location,
+                            locationDisplayName = locationDisplayName,
+                            journals = journals,
+                        )
+                    media.indexedMedia is IndexedMedia.Image ->
                         MediaDetailUiState.ImageContent(
-                            noteId = note.uid,
-                            mediaRef = note.mediaRef,
-                            createdAt = note.creationTimestamp,
-                            location = note.location,
+                            mediaId = media.id,
+                            mediaRef = media.uri,
+                            createdAt = media.timestamp,
+                            location = primaryNote?.location,
                             locationDisplayName = locationDisplayName,
                             journals = journals,
                             exif = exif,
                         )
-                    is JournalNote.Video ->
-                        MediaDetailUiState.VideoContent(
-                            noteId = note.uid,
-                            mediaRef = note.mediaRef,
-                            createdAt = note.creationTimestamp,
-                            location = note.location,
+                    else ->
+                        MediaDetailUiState.ImageContent(
+                            mediaId = media.id,
+                            mediaRef = media.uri,
+                            createdAt = media.timestamp,
+                            location = primaryNote?.location,
                             locationDisplayName = locationDisplayName,
                             journals = journals,
+                            exif = exif,
                         )
-                    else -> MediaDetailUiState.Error("Not a photo or video.")
                 }
+        }
+
+    private suspend fun loadJournals(notes: List<JournalNote>): List<JournalReference> =
+        notes
+            .flatMap { note ->
+                try {
+                    journalContentRepository.observeJournalsForContent(note.uid).first()
+                } catch (e: Exception) {
+                    Napier.e("Failed to load cross-references", e)
+                    emptyList()
+                }
+            }.distinctBy { it.id }
+            .map { JournalReference(id = it.id, title = it.title) }
+
+    private suspend fun loadExif(mediaId: Uuid): ExifDisplayData? =
+        try {
+            indexedMediaRepository.getExifMetadata(mediaId)?.let { metadata ->
+                ExifDisplayData(
+                    cameraMake = metadata.cameraMake,
+                    cameraModel = metadata.cameraModel,
+                    aperture = metadata.aperture,
+                    iso = metadata.iso,
+                    focalLength = metadata.focalLength,
+                    shutterSpeed = metadata.shutterSpeed,
+                )
+            }
+        } catch (e: Exception) {
+            Napier.e("Failed to load EXIF data", e)
+            null
         }
 
     /**
@@ -248,5 +270,45 @@ class MediaDetailViewModel(
 
         return noteLocation.displayName
             ?: coords?.let { "${it.latitude}, ${it.longitude}" }
+    }
+
+    private fun updateViewerState(
+        libraryMedia: List<LibraryMediaSource>,
+        selectedMediaId: Uuid,
+    ) {
+        val items =
+            libraryMedia.map { media ->
+                MediaViewerItem(
+                    uid = media.id,
+                    uri = media.uri,
+                    isVideo = media.isVideo,
+                )
+            }
+        val currentIndex =
+            items
+                .indexOfFirst { it.uid == selectedMediaId }
+                .takeIf { it >= 0 }
+                ?: 0
+        _viewerState.value =
+            MediaViewerState(
+                currentIndex = currentIndex,
+                totalItems = items.size,
+                mediaItems = items,
+            )
+    }
+
+    private fun selectMedia(
+        index: Int,
+        updatePresentation: Boolean,
+    ) {
+        val item = viewerState.value.mediaItems.getOrNull(index) ?: return
+        if (item.uid != currentMediaId.value) {
+            currentMediaId.value = item.uid
+        }
+
+        if (updatePresentation) {
+            val mimeType = if (item.isVideo) "video/*" else "image/*"
+            remoteDisplayManager.updatePresentation(item.uri, mimeType)
+        }
     }
 }

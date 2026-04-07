@@ -1,6 +1,8 @@
 package app.logdate.feature.library.ui
 
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.media.IndexedMedia
+import app.logdate.feature.library.fakes.FakeIndexedMediaRepository
 import app.logdate.feature.library.fakes.FakeJournalNotesRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -15,6 +17,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -35,16 +38,18 @@ class LibraryViewModelTest {
     @Test
     fun initialStateIsLoading() =
         runTest(testDispatcher) {
-            val repository = FakeJournalNotesRepository()
-            val viewModel = LibraryViewModel(repository)
+            val notesRepository = FakeJournalNotesRepository()
+            val repository = FakeIndexedMediaRepository()
+            val viewModel = LibraryViewModel(notesRepository, repository)
             assertEquals(LibraryUiState.Loading, viewModel.uiState.value)
         }
 
     @Test
     fun emptyRepositoryProducesEmptyState() =
         runTest(testDispatcher) {
-            val repository = FakeJournalNotesRepository(emptyList())
-            val viewModel = LibraryViewModel(repository)
+            val notesRepository = FakeJournalNotesRepository(emptyList())
+            val repository = FakeIndexedMediaRepository(emptyList())
+            val viewModel = LibraryViewModel(notesRepository, repository)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -54,47 +59,24 @@ class LibraryViewModelTest {
         }
 
     @Test
-    fun textOnlyNotesProduceEmptyState() =
+    fun indexedMediaProducesContentState() =
         runTest(testDispatcher) {
-            val notes =
+            val media =
                 listOf(
-                    JournalNote.Text(
+                    IndexedMedia.Image(
                         uid = Uuid.random(),
-                        creationTimestamp = Instant.fromEpochMilliseconds(1710000000000),
-                        lastUpdated = Instant.fromEpochMilliseconds(1710000000000),
-                        content = "Hello world",
+                        uri = "content://media/external/images/1",
+                        timestamp = Instant.fromEpochMilliseconds(1710000000000),
+                    ),
+                    IndexedMedia.Video(
+                        uid = Uuid.random(),
+                        uri = "content://media/external/video/1",
+                        timestamp = Instant.fromEpochMilliseconds(1710100000000),
+                        duration = 3.seconds,
                     ),
                 )
-            val repository = FakeJournalNotesRepository(notes)
-            val viewModel = LibraryViewModel(repository)
-
-            val collectJob = launch { viewModel.uiState.collect {} }
-            advanceUntilIdle()
-
-            assertIs<LibraryUiState.Empty>(viewModel.uiState.value)
-            collectJob.cancel()
-        }
-
-    @Test
-    fun imageNotesProduceContentState() =
-        runTest(testDispatcher) {
-            val notes =
-                listOf(
-                    JournalNote.Image(
-                        uid = Uuid.random(),
-                        creationTimestamp = Instant.fromEpochMilliseconds(1710000000000),
-                        lastUpdated = Instant.fromEpochMilliseconds(1710000000000),
-                        mediaRef = "content://media/external/images/1",
-                    ),
-                    JournalNote.Video(
-                        uid = Uuid.random(),
-                        creationTimestamp = Instant.fromEpochMilliseconds(1710100000000),
-                        lastUpdated = Instant.fromEpochMilliseconds(1710100000000),
-                        mediaRef = "content://media/external/video/1",
-                    ),
-                )
-            val repository = FakeJournalNotesRepository(notes)
-            val viewModel = LibraryViewModel(repository)
+            val repository = FakeIndexedMediaRepository(media)
+            val viewModel = LibraryViewModel(FakeJournalNotesRepository(emptyList()), repository)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -108,25 +90,99 @@ class LibraryViewModelTest {
         }
 
     @Test
-    fun mediaGroupedByMonth() =
+    fun noteOnlyMediaStillAppearsWhenIndexedStoreIsEmpty() =
         runTest(testDispatcher) {
             val notes =
                 listOf(
                     JournalNote.Image(
                         uid = Uuid.random(),
-                        creationTimestamp = Instant.fromEpochMilliseconds(1710000000000), // March 2024
+                        creationTimestamp = Instant.fromEpochMilliseconds(1710000000000),
                         lastUpdated = Instant.fromEpochMilliseconds(1710000000000),
-                        mediaRef = "content://media/external/images/1",
-                    ),
-                    JournalNote.Image(
-                        uid = Uuid.random(),
-                        creationTimestamp = Instant.fromEpochMilliseconds(1704067200000), // January 2024
-                        lastUpdated = Instant.fromEpochMilliseconds(1704067200000),
-                        mediaRef = "content://media/external/images/2",
+                        mediaRef = "content://media/external/images/note-only",
                     ),
                 )
-            val repository = FakeJournalNotesRepository(notes)
-            val viewModel = LibraryViewModel(repository)
+            val viewModel =
+                LibraryViewModel(
+                    FakeJournalNotesRepository(notes),
+                    FakeIndexedMediaRepository(emptyList()),
+                )
+
+            val collectJob = launch { viewModel.uiState.collect {} }
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertIs<LibraryUiState.Content>(state)
+            val firstGroup = state.groups.first()
+            val firstItem = firstGroup.items.first()
+            assertEquals(1, state.totalCount)
+            assertEquals(
+                "content://media/external/images/note-only",
+                firstItem.uri,
+            )
+            collectJob.cancel()
+        }
+
+    @Test
+    fun indexedMediaPreferredOverDuplicateNoteUri() =
+        runTest(testDispatcher) {
+            val sharedUri = "content://media/external/images/shared"
+            val indexedId = Uuid.random()
+            val notes =
+                listOf(
+                    JournalNote.Image(
+                        uid = Uuid.random(),
+                        creationTimestamp = Instant.fromEpochMilliseconds(1710000000000),
+                        lastUpdated = Instant.fromEpochMilliseconds(1710000000000),
+                        mediaRef = sharedUri,
+                    ),
+                )
+            val indexedMedia =
+                listOf(
+                    IndexedMedia.Image(
+                        uid = indexedId,
+                        uri = sharedUri,
+                        timestamp = Instant.fromEpochMilliseconds(1710100000000),
+                    ),
+                )
+            val viewModel =
+                LibraryViewModel(
+                    FakeJournalNotesRepository(notes),
+                    FakeIndexedMediaRepository(indexedMedia),
+                )
+
+            val collectJob = launch { viewModel.uiState.collect {} }
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertIs<LibraryUiState.Content>(state)
+            val firstGroup = state.groups.first()
+            val firstItem = firstGroup.items.first()
+            assertEquals(1, state.totalCount)
+            assertEquals(
+                indexedId,
+                firstItem.uid,
+            )
+            collectJob.cancel()
+        }
+
+    @Test
+    fun mediaGroupedByMonth() =
+        runTest(testDispatcher) {
+            val media =
+                listOf(
+                    IndexedMedia.Image(
+                        uid = Uuid.random(),
+                        uri = "content://media/external/images/1",
+                        timestamp = Instant.fromEpochMilliseconds(1710000000000), // March 2024
+                    ),
+                    IndexedMedia.Image(
+                        uid = Uuid.random(),
+                        uri = "content://media/external/images/2",
+                        timestamp = Instant.fromEpochMilliseconds(1704067200000), // January 2024
+                    ),
+                )
+            val repository = FakeIndexedMediaRepository(media)
+            val viewModel = LibraryViewModel(FakeJournalNotesRepository(emptyList()), repository)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
@@ -140,17 +196,17 @@ class LibraryViewModelTest {
     @Test
     fun videoItemsMarkedAsVideo() =
         runTest(testDispatcher) {
-            val notes =
+            val media =
                 listOf(
-                    JournalNote.Video(
+                    IndexedMedia.Video(
                         uid = Uuid.random(),
-                        creationTimestamp = Instant.fromEpochMilliseconds(1710000000000),
-                        lastUpdated = Instant.fromEpochMilliseconds(1710000000000),
-                        mediaRef = "content://media/external/video/1",
+                        uri = "content://media/external/video/1",
+                        timestamp = Instant.fromEpochMilliseconds(1710000000000),
+                        duration = 5.seconds,
                     ),
                 )
-            val repository = FakeJournalNotesRepository(notes)
-            val viewModel = LibraryViewModel(repository)
+            val repository = FakeIndexedMediaRepository(media)
+            val viewModel = LibraryViewModel(FakeJournalNotesRepository(emptyList()), repository)
 
             val collectJob = launch { viewModel.uiState.collect {} }
             advanceUntilIdle()

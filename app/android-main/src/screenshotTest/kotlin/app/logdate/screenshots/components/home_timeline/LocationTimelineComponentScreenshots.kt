@@ -13,6 +13,7 @@ import app.logdate.feature.location.timeline.ui.model.LocationPlaceUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationStopUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineErrorUiState
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
+import app.logdate.screenshots.common.LargeScreenAuditPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
 import app.logdate.ui.maps.LocalGoogleMapsAvailabilityOverride
@@ -310,6 +311,24 @@ fun LocationTimeline_NoMapConfigured() {
         CompositionLocalProvider(LocalGoogleMapsAvailabilityOverride provides false) {
             LocationTimelineContent(
                 uiState = sampleLocationSelectedState,
+                onSelectPlace = {},
+                onDismissPlaceDetail = {},
+                onDeleteStop = {},
+                onSelectFilter = {},
+                onLoadMorePlaces = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun LocationTimeline_Content_LargeScreen() {
+    ScreenshotTheme {
+        CompositionLocalProvider(LocalGoogleMapsAvailabilityOverride provides false) {
+            LocationTimelineContent(
+                uiState = sampleLocationContentState,
                 onSelectPlace = {},
                 onDismissPlaceDetail = {},
                 onDeleteStop = {},
