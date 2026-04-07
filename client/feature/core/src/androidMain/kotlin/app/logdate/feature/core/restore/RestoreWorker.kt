@@ -72,6 +72,7 @@ class RestoreWorker(
             runCatching { ZipFile(tempFile) }
                 .getOrElse { error ->
                     tempFile.delete()
+                    restoreLauncher.completeRestore(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
                     return failure("Unable to open restore archive: ${error.message}")
                 }
 
