@@ -71,15 +71,16 @@ class SherpaOnnxTranscriptionService(
      * the buffer is dropped and refinement is skipped — the streaming text
      * stands as final.
      */
-    private val utterancePcmBuffer = mutableListOf<FloatArray>()
+    private var utterancePcmBuffer: ArrayList<FloatArray> = ArrayList()
     private var bufferedSampleCount: Long = 0
     private var bufferOverflowed = false
 
     override suspend fun warmUp() {
         recognizerProvider.ensureInitialized()
         vadProvider.ensureInitialized()
-        // Best-effort pre-warm; refinement is optional and the call is a no-op
-        // if the Whisper model is not present on device.
+        // Refinement is optional. If the Whisper model hasn't been downloaded
+        // yet, ensureInitialized() returns false instead of throwing — the app
+        // falls back to streaming-only transcription without the user noticing.
         offlineRecognizerProvider.ensureInitialized()
     }
 
@@ -96,13 +97,9 @@ class SherpaOnnxTranscriptionService(
             return false
         }
 
-        // Reset PCM buffer for the new recording session
-        utterancePcmBuffer.clear()
-        bufferedSampleCount = 0
-        bufferOverflowed = false
-
-        // Cancel any in-flight refinement from a previous recording. The user
-        // started a new session, so old refinement results are no longer relevant.
+        clearRefinementBuffer()
+        // The user is starting a new session — any in-flight refinement from
+        // the previous one is no longer relevant.
         refinementJob?.cancel()
         refinementJob = null
 
@@ -112,10 +109,10 @@ class SherpaOnnxTranscriptionService(
             isListening = true
             _transcriptionFlow.emit(TranscriptionResult.InProgress)
 
-            // Pre-warm the Whisper model in the background while the user records.
-            // By the time they tap stop, the model is already in memory and the
-            // first refinement chunk can begin within milliseconds.
-            scope.launch(Dispatchers.IO) {
+            // Pre-warm Whisper while the user records. Runs on Default (CPU-bound
+            // model load), not IO, so it doesn't serialize behind the audio capture
+            // loop which also lives on Dispatchers.IO.
+            scope.launch(Dispatchers.Default) {
                 try {
                     offlineRecognizerProvider.ensureInitialized()
                 } catch (e: Exception) {
@@ -183,8 +180,10 @@ class SherpaOnnxTranscriptionService(
         recognitionJob?.join()
         recognitionJob = null
 
-        // Flush any trailing VAD segments through the recognizer (and into the
-        // refinement buffer)
+        // Drain any speech the VAD was still mid-window on when audio capture
+        // stopped — without flush() these trailing samples would be silently
+        // dropped and the user's last few words would never reach the recognizer
+        // (or the refinement buffer).
         try {
             val s = stream
             if (s != null) {
@@ -238,10 +237,11 @@ class SherpaOnnxTranscriptionService(
         releaseStream()
 
         if (canRefine) {
-            // Hand the buffered utterances off to the refinement pass. We
-            // snapshot here so subsequent recordings don't race with this job.
-            val utterances = utterancePcmBuffer.toList()
-            utterancePcmBuffer.clear()
+            // Hand the buffer off to the refinement pass by swapping in a fresh
+            // ArrayList. The refinement coroutine owns the old reference exclusively
+            // — no copy, no doubled peak memory under the cap.
+            val utterances = utterancePcmBuffer
+            utterancePcmBuffer = ArrayList()
             bufferedSampleCount = 0
             refinementJob =
                 scope.launch(Dispatchers.Default) {
@@ -299,13 +299,8 @@ class SherpaOnnxTranscriptionService(
 
     override fun cancelTranscription() {
         isListening = false
-        recognitionJob?.cancel()
-        recognitionJob = null
-        refinementJob?.cancel()
-        refinementJob = null
-        utterancePcmBuffer.clear()
-        bufferedSampleCount = 0
-        bufferOverflowed = false
+        cancelJobs()
+        clearRefinementBuffer()
         stopAudioRecord()
         vadProvider.reset()
         releaseStream()
@@ -336,13 +331,8 @@ class SherpaOnnxTranscriptionService(
 
     override fun release() {
         isListening = false
-        recognitionJob?.cancel()
-        recognitionJob = null
-        refinementJob?.cancel()
-        refinementJob = null
-        utterancePcmBuffer.clear()
-        bufferedSampleCount = 0
-        bufferOverflowed = false
+        cancelJobs()
+        clearRefinementBuffer()
         stopAudioRecord()
         releaseStream()
         vadProvider.release()
@@ -351,6 +341,19 @@ class SherpaOnnxTranscriptionService(
         totalAcceptedSamples = 0L
         currentStreamStartMs = 0L
         currentStreamAcceptedSamples = 0L
+    }
+
+    private fun cancelJobs() {
+        recognitionJob?.cancel()
+        recognitionJob = null
+        refinementJob?.cancel()
+        refinementJob = null
+    }
+
+    private fun clearRefinementBuffer() {
+        utterancePcmBuffer.clear()
+        bufferedSampleCount = 0
+        bufferOverflowed = false
     }
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)

@@ -172,35 +172,30 @@ private fun TranscriptionSuccessUi(
     isRefining: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    OutlinedCard(
         modifier =
             modifier
                 .fillMaxWidth()
                 .padding(Spacing.sm),
     ) {
-        OutlinedCard(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            AnimatedContent(
-                targetState = text,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                modifier = Modifier.padding(Spacing.md),
-                label = "transcript-refinement",
-            ) { current ->
-                Text(
-                    text = current,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color =
-                        if (isRefining) {
-                            // Subtly soften the text while it's still being
-                            // refined — telegraphs that the words are about
-                            // to change without using a spinner or label.
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                )
-            }
+        AnimatedContent(
+            targetState = text,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            modifier = Modifier.padding(Spacing.md),
+            label = "transcript-refinement",
+        ) { current ->
+            Text(
+                text = current,
+                style = MaterialTheme.typography.bodyMedium,
+                color =
+                    if (isRefining) {
+                        // Soften while refinement is still rewriting parts of the
+                        // text — telegraphs upcoming change without a spinner.
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+            )
         }
     }
 }

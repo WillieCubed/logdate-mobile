@@ -12,6 +12,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
@@ -400,39 +401,46 @@ class AudioViewModel(
         if (structuredTranscriptionJob != null) return
         structuredTranscriptionJob =
             viewModelScope.launch {
-                audioRecordingManager.getStructuredTranscriptionFlow().collect { result ->
-                    when (result) {
-                        is TranscriptionResult.Success -> {
-                            _uiState.update {
-                                it.copy(
-                                    transcriptionState =
-                                        AudioUiState.TranscriptionState.Success(
-                                            text = result.text,
-                                            timedTranscript = result.timedTranscript,
-                                            isFinal = result.isFinal,
-                                            isRefining = result.isRefining,
-                                        ),
-                                )
+                audioRecordingManager
+                    .getStructuredTranscriptionFlow()
+                    // Whisper refinement emits one Success per utterance, but consecutive
+                    // utterances often produce identical text (or differ only in trailing
+                    // partial). Skipping no-op updates avoids spurious StateFlow emissions
+                    // and the AnimatedContent crossfade re-running for nothing.
+                    .distinctUntilChanged()
+                    .collect { result ->
+                        when (result) {
+                            is TranscriptionResult.Success -> {
+                                _uiState.update {
+                                    it.copy(
+                                        transcriptionState =
+                                            AudioUiState.TranscriptionState.Success(
+                                                text = result.text,
+                                                timedTranscript = result.timedTranscript,
+                                                isFinal = result.isFinal,
+                                                isRefining = result.isRefining,
+                                            ),
+                                    )
+                                }
                             }
-                        }
-                        is TranscriptionResult.Error -> {
-                            _uiState.update {
-                                it.copy(
-                                    transcriptionState = AudioUiState.TranscriptionState.Error(result.message),
-                                )
+                            is TranscriptionResult.Error -> {
+                                _uiState.update {
+                                    it.copy(
+                                        transcriptionState = AudioUiState.TranscriptionState.Error(result.message),
+                                    )
+                                }
                             }
-                        }
-                        is TranscriptionResult.InProgress -> {
-                            _uiState.update {
-                                if (it.transcriptionState is AudioUiState.TranscriptionState.Success) {
-                                    it
-                                } else {
-                                    it.copy(transcriptionState = AudioUiState.TranscriptionState.InProgress)
+                            is TranscriptionResult.InProgress -> {
+                                _uiState.update {
+                                    if (it.transcriptionState is AudioUiState.TranscriptionState.Success) {
+                                        it
+                                    } else {
+                                        it.copy(transcriptionState = AudioUiState.TranscriptionState.InProgress)
+                                    }
                                 }
                             }
                         }
                     }
-                }
             }
     }
 }
