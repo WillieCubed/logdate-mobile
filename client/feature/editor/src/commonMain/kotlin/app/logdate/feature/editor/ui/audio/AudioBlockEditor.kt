@@ -1,7 +1,9 @@
 package app.logdate.feature.editor.ui.audio
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -150,14 +152,21 @@ fun AudioBlockEditor(
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
-                AudioRecordingControls(
-                    recordingState = recordingState,
-                    audioLevels = audioLevels,
-                    recordingDuration = audioUiState.duration,
-                    onStartRecording = { audioViewModel.startRecording(targetNoteId = block.id) },
-                    onStopRecording = { audioViewModel.stopRecording() },
-                    modifier = Modifier.fillMaxSize(),
-                )
+                Column(modifier = Modifier.fillMaxSize()) {
+                    EnhancedAudioModelBanner(
+                        status = audioUiState.enhancedModelStatus,
+                        onDownload = { audioViewModel.downloadEnhancedAudioModels() },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    AudioRecordingControls(
+                        recordingState = recordingState,
+                        audioLevels = audioLevels,
+                        recordingDuration = audioUiState.duration,
+                        onStartRecording = { audioViewModel.startRecording(targetNoteId = block.id) },
+                        onStopRecording = { audioViewModel.stopRecording() },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
     }
