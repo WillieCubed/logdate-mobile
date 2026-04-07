@@ -6,9 +6,20 @@ import kotlinx.datetime.toInstant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class AudioLabelResolverTest {
     private val resolver = AudioLabelResolver()
+    private val validPeriods =
+        setOf(
+            DaylightPeriod.DAWN,
+            DaylightPeriod.MORNING,
+            DaylightPeriod.MIDDAY,
+            DaylightPeriod.AFTERNOON,
+            DaylightPeriod.GOLDEN_HOUR,
+            DaylightPeriod.EVENING,
+            DaylightPeriod.NIGHT,
+        )
 
     // 2024-06-21 at 10:00 local time — should classify as MORNING or MIDDAY
     private val morningInstant =
@@ -82,10 +93,7 @@ class AudioLabelResolverTest {
         val result = resolver.resolve(createdAt = morningInstant)
         assertIs<AudioLabelResult.Contextual>(result)
         // Should produce a valid DaylightPeriod regardless of system timezone
-        val validPeriods = DaylightPeriod.entries.toSet()
-        assert(result.period in validPeriods) {
-            "Expected a valid DaylightPeriod, got ${result.period}"
-        }
+        assertTrue(result.period in validPeriods, "Expected a valid DaylightPeriod, got ${result.period}")
     }
 
     @Test
@@ -97,10 +105,7 @@ class AudioLabelResolverTest {
                 latitude = 40.7128,
                 longitude = -74.006,
             )
-        val validPeriods = DaylightPeriod.entries.toSet()
-        assert(period in validPeriods) {
-            "Expected a valid DaylightPeriod, got $period"
-        }
+        assertTrue(period in validPeriods, "Expected a valid DaylightPeriod, got $period")
     }
 
     @Test
@@ -109,9 +114,6 @@ class AudioLabelResolverTest {
             resolver.classifyPeriod(
                 createdAt = morningInstant,
             )
-        val validPeriods = DaylightPeriod.entries.toSet()
-        assert(period in validPeriods) {
-            "Expected a valid DaylightPeriod, got $period"
-        }
+        assertTrue(period in validPeriods, "Expected a valid DaylightPeriod, got $period")
     }
 }
