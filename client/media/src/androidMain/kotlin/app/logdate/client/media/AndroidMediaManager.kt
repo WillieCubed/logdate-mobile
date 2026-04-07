@@ -88,9 +88,9 @@ class AndroidMediaManager(
 
             MediaObject.Image(
                 uri = uri.toString(),
-                name = it.requireString(nameIndex, MediaStore.Images.Media.DISPLAY_NAME, uri),
-                size = it.requireInt(sizeIndex, MediaStore.Images.Media.SIZE, uri),
-                timestamp = requireTimestamp(dateTakenIndex, dateIndex, it, uri, "image"),
+                name = it.resolveDisplayName(nameIndex, MediaStore.Images.Media.DISPLAY_NAME, uri),
+                size = it.resolveSize(sizeIndex, MediaStore.Images.Media.SIZE, uri),
+                timestamp = resolveTimestampWithFallback(dateTakenIndex, dateIndex, it, uri, "image"),
             )
         } ?: throw IllegalStateException("Unable to query image metadata for URI: $uri")
     }
@@ -127,10 +127,10 @@ class AndroidMediaManager(
 
             MediaObject.Video(
                 uri = uri.toString(),
-                name = it.requireString(nameIndex, MediaStore.Video.Media.DISPLAY_NAME, uri),
-                size = it.requireInt(sizeIndex, MediaStore.Video.Media.SIZE, uri),
-                duration = it.requireLong(durationIndex, MediaStore.Video.Media.DURATION, uri).milliseconds,
-                timestamp = requireTimestamp(dateTakenIndex, dateIndex, it, uri, "video"),
+                name = it.resolveDisplayName(nameIndex, MediaStore.Video.Media.DISPLAY_NAME, uri),
+                size = it.resolveSize(sizeIndex, MediaStore.Video.Media.SIZE, uri),
+                duration = resolveVideoDuration(it, durationIndex, uri),
+                timestamp = resolveTimestampWithFallback(dateTakenIndex, dateIndex, it, uri, "video"),
             )
         } ?: throw IllegalStateException("Unable to query video metadata for URI: $uri")
     }
@@ -254,17 +254,21 @@ class AndroidMediaManager(
                 val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
 
                 while (cursor.moveToNext()) {
-                    mediaItems.add(
-                        imageFromCursor(
-                            collectionUri = imageCollection,
-                            cursor = cursor,
-                            idColumn = idColumn,
-                            nameColumn = nameColumn,
-                            sizeColumn = sizeColumn,
-                            dateTakenColumn = dateTakenColumn,
-                            dateAddedColumn = dateColumn,
-                        ),
-                    )
+                    try {
+                        mediaItems.add(
+                            imageFromCursor(
+                                collectionUri = imageCollection,
+                                cursor = cursor,
+                                idColumn = idColumn,
+                                nameColumn = nameColumn,
+                                sizeColumn = sizeColumn,
+                                dateTakenColumn = dateTakenColumn,
+                                dateAddedColumn = dateColumn,
+                            ),
+                        )
+                    } catch (error: Exception) {
+                        Napier.e("Unable to materialize Android image row even with fallbacks", error)
+                    }
                 }
             }
 
@@ -305,18 +309,22 @@ class AndroidMediaManager(
                 val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
 
                 while (cursor.moveToNext()) {
-                    mediaItems.add(
-                        videoFromCursor(
-                            collectionUri = videoCollection,
-                            cursor = cursor,
-                            idColumn = idColumn,
-                            nameColumn = nameColumn,
-                            sizeColumn = sizeColumn,
-                            durationColumn = durationColumn,
-                            dateTakenColumn = dateTakenColumn,
-                            dateAddedColumn = dateColumn,
-                        ),
-                    )
+                    try {
+                        mediaItems.add(
+                            videoFromCursor(
+                                collectionUri = videoCollection,
+                                cursor = cursor,
+                                idColumn = idColumn,
+                                nameColumn = nameColumn,
+                                sizeColumn = sizeColumn,
+                                durationColumn = durationColumn,
+                                dateTakenColumn = dateTakenColumn,
+                                dateAddedColumn = dateColumn,
+                            ),
+                        )
+                    } catch (error: Exception) {
+                        Napier.e("Unable to materialize Android video row even with fallbacks", error)
+                    }
                 }
             }
 
@@ -352,17 +360,21 @@ class AndroidMediaManager(
                 val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
 
                 while (cursor.moveToNext()) {
-                    mediaItems.add(
-                        imageFromCursor(
-                            collectionUri = imageCollection,
-                            cursor = cursor,
-                            idColumn = idColumn,
-                            nameColumn = nameColumn,
-                            sizeColumn = sizeColumn,
-                            dateTakenColumn = dateTakenColumn,
-                            dateAddedColumn = dateColumn,
-                        ),
-                    )
+                    try {
+                        mediaItems.add(
+                            imageFromCursor(
+                                collectionUri = imageCollection,
+                                cursor = cursor,
+                                idColumn = idColumn,
+                                nameColumn = nameColumn,
+                                sizeColumn = sizeColumn,
+                                dateTakenColumn = dateTakenColumn,
+                                dateAddedColumn = dateColumn,
+                            ),
+                        )
+                    } catch (error: Exception) {
+                        Napier.e("Unable to materialize Android image row even with fallbacks", error)
+                    }
                 }
             }
 
@@ -392,18 +404,22 @@ class AndroidMediaManager(
                 val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
 
                 while (cursor.moveToNext()) {
-                    mediaItems.add(
-                        videoFromCursor(
-                            collectionUri = videoCollection,
-                            cursor = cursor,
-                            idColumn = idColumn,
-                            nameColumn = nameColumn,
-                            sizeColumn = sizeColumn,
-                            durationColumn = durationColumn,
-                            dateTakenColumn = dateTakenColumn,
-                            dateAddedColumn = dateColumn,
-                        ),
-                    )
+                    try {
+                        mediaItems.add(
+                            videoFromCursor(
+                                collectionUri = videoCollection,
+                                cursor = cursor,
+                                idColumn = idColumn,
+                                nameColumn = nameColumn,
+                                sizeColumn = sizeColumn,
+                                durationColumn = durationColumn,
+                                dateTakenColumn = dateTakenColumn,
+                                dateAddedColumn = dateColumn,
+                            ),
+                        )
+                    } catch (error: Exception) {
+                        Napier.e("Unable to materialize Android video row even with fallbacks", error)
+                    }
                 }
             }
 
@@ -864,27 +880,72 @@ class AndroidMediaManager(
         return resolvedMimeType
     }
 
-    private fun requireTimestamp(
+    /**
+     * Resolves a timestamp from MediaStore. Falls back to the current time so
+     * a media row never disappears from the gallery just because both DATE_TAKEN
+     * and DATE_ADDED are missing. This loses precise chronology for the affected
+     * row but preserves the data — and the user keeps seeing their photo or video.
+     */
+    private fun resolveTimestampWithFallback(
         dateTakenColumn: Int,
         dateAddedColumn: Int,
         cursor: Cursor,
         uri: Uri,
         mediaLabel: String,
-    ): Instant =
-        resolveTimestampOrNull(dateTakenColumn, dateAddedColumn, cursor)
-            ?: throw IllegalStateException("Missing $mediaLabel timestamp metadata for URI: $uri")
+    ): Instant {
+        val resolved = resolveTimestampOrNull(dateTakenColumn, dateAddedColumn, cursor)
+        if (resolved != null) return resolved
 
+        Napier.w("Missing $mediaLabel timestamp metadata for URI: $uri — defaulting to now to keep the row visible")
+        return Clock.System.now()
+    }
+
+    /**
+     * Resolves a video's duration when the source is a file:// URI. Falls back to
+     * [Duration.ZERO] on any failure so the user never loses access to the video
+     * just because we can't read its duration metadata.
+     */
     private fun resolveFileVideoDuration(uri: Uri): Duration {
         val retriever = MediaMetadataRetriever()
         try {
             retriever.setDataSource(requireFileFromUri(uri).absolutePath)
-            return retriever
+            val parsed =
+                retriever
+                    .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                    ?.toLongOrNull()
+                    ?.milliseconds
+            if (parsed != null) return parsed
+
+            Napier.w("Missing video duration metadata for file URI: $uri — defaulting to zero so the video stays visible")
+            return Duration.ZERO
+        } catch (error: RuntimeException) {
+            Napier.w("Unable to resolve video duration for file URI: $uri — defaulting to zero so the video stays visible", error)
+            return Duration.ZERO
+        } finally {
+            try {
+                retriever.release()
+            } catch (error: RuntimeException) {
+                Napier.e("Failed to release MediaMetadataRetriever", error)
+            }
+        }
+    }
+
+    /**
+     * Resolves a video's duration by opening the underlying content URI through
+     * [MediaMetadataRetriever]. Returns null on any failure since this is itself
+     * a fallback path for rows whose MediaStore DURATION column is null.
+     */
+    private fun extractContentVideoDurationOrNull(uri: Uri): Duration? {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(context, uri)
+            retriever
                 .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                 ?.toLongOrNull()
                 ?.milliseconds
-                ?: throw IllegalStateException("Missing video duration metadata for URI: $uri")
         } catch (error: RuntimeException) {
-            throw IllegalStateException("Unable to resolve video duration for URI: $uri", error)
+            Napier.w("Unable to read video duration directly from URI: $uri", error)
+            null
         } finally {
             try {
                 retriever.release()
@@ -922,9 +983,9 @@ class AndroidMediaManager(
         val uri = Uri.withAppendedPath(collectionUri, cursor.getLong(idColumn).toString())
         return MediaObject.Image(
             uri = uri.toString(),
-            name = cursor.requireString(nameColumn, MediaStore.Images.Media.DISPLAY_NAME, uri),
-            size = cursor.requireInt(sizeColumn, MediaStore.Images.Media.SIZE, uri),
-            timestamp = requireTimestamp(dateTakenColumn, dateAddedColumn, cursor, uri, "image"),
+            name = cursor.resolveDisplayName(nameColumn, MediaStore.Images.Media.DISPLAY_NAME, uri),
+            size = cursor.resolveSize(sizeColumn, MediaStore.Images.Media.SIZE, uri),
+            timestamp = resolveTimestampWithFallback(dateTakenColumn, dateAddedColumn, cursor, uri, "image"),
         )
     }
 
@@ -941,47 +1002,83 @@ class AndroidMediaManager(
         val uri = Uri.withAppendedPath(collectionUri, cursor.getLong(idColumn).toString())
         return MediaObject.Video(
             uri = uri.toString(),
-            name = cursor.requireString(nameColumn, MediaStore.Video.Media.DISPLAY_NAME, uri),
-            size = cursor.requireInt(sizeColumn, MediaStore.Video.Media.SIZE, uri),
-            duration = cursor.requireLong(durationColumn, MediaStore.Video.Media.DURATION, uri).milliseconds,
-            timestamp = requireTimestamp(dateTakenColumn, dateAddedColumn, cursor, uri, "video"),
+            name = cursor.resolveDisplayName(nameColumn, MediaStore.Video.Media.DISPLAY_NAME, uri),
+            size = cursor.resolveSize(sizeColumn, MediaStore.Video.Media.SIZE, uri),
+            duration = resolveVideoDuration(cursor, durationColumn, uri),
+            timestamp = resolveTimestampWithFallback(dateTakenColumn, dateAddedColumn, cursor, uri, "video"),
         )
     }
 
-    private fun Cursor.requireString(
+    /**
+     * Reads a display name from MediaStore. Falls back to the URI's last path
+     * segment and finally to a generic placeholder so a media row never disappears
+     * from the gallery just because its DISPLAY_NAME column is null or blank.
+     */
+    private fun Cursor.resolveDisplayName(
         index: Int,
         columnName: String,
         uri: Uri,
     ): String {
-        if (isNull(index)) {
-            throw IllegalStateException("Missing $columnName metadata for URI: $uri")
-        }
+        val cursorName =
+            if (!isNull(index)) {
+                getString(index)?.takeIf { it.isNotBlank() }
+            } else {
+                null
+            }
+        if (cursorName != null) return cursorName
 
-        return getString(index)?.takeIf { it.isNotBlank() }
-            ?: throw IllegalStateException("Blank $columnName metadata for URI: $uri")
+        Napier.w("Missing $columnName for URI: $uri — falling back to URI segment")
+        return uri.lastPathSegment?.takeIf { it.isNotBlank() } ?: "Untitled"
     }
 
-    private fun Cursor.requireInt(
+    /**
+     * Reads a size in bytes from MediaStore. Falls back to a stat against the
+     * file descriptor and finally to 0 so a media row never disappears from the
+     * gallery just because its SIZE column is null. Size is purely informational
+     * in the picker, so a zero fallback is harmless.
+     */
+    private fun Cursor.resolveSize(
         index: Int,
         columnName: String,
         uri: Uri,
     ): Int {
-        if (isNull(index)) {
-            throw IllegalStateException("Missing $columnName metadata for URI: $uri")
+        if (!isNull(index)) {
+            return getInt(index)
         }
 
-        return getInt(index)
+        Napier.w("Missing $columnName for URI: $uri — falling back to file descriptor stat")
+        val fromStat =
+            try {
+                contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize.toInt() }
+            } catch (error: Exception) {
+                Napier.w("Unable to stat file descriptor for URI: $uri", error)
+                null
+            }
+        return fromStat ?: 0
     }
 
-    private fun Cursor.requireLong(
-        index: Int,
-        columnName: String,
+    /**
+     * Resolves a video's duration from a MediaStore cursor. Falls back to reading
+     * the underlying file directly with [MediaMetadataRetriever] and finally to
+     * [Duration.ZERO], so the user never sees a video disappear from the gallery
+     * just because its cached duration metadata is missing or stale.
+     */
+    private fun resolveVideoDuration(
+        cursor: Cursor,
+        durationColumn: Int,
         uri: Uri,
-    ): Long {
-        if (isNull(index)) {
-            throw IllegalStateException("Missing $columnName metadata for URI: $uri")
+    ): Duration {
+        if (!cursor.isNull(durationColumn)) {
+            return cursor.getLong(durationColumn).milliseconds
         }
 
-        return getLong(index)
+        Napier.w("Missing duration metadata for URI: $uri — reading directly from the file")
+        val fromRetriever = extractContentVideoDurationOrNull(uri)
+        if (fromRetriever != null) return fromRetriever
+
+        // Both MediaStore and MediaMetadataRetriever returned null. The file is inaccessible
+        // or corrupt. Throw so the call site logs this at error level — showing Duration.ZERO
+        // would display an incorrect 0-second duration to the user.
+        throw IllegalStateException("Unable to resolve duration for URI: $uri")
     }
 }
