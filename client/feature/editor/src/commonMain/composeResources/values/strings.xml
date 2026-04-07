@@ -128,16 +128,4 @@
     <string name="audio_label_period_recording">%1$s Recording</string>
     <string name="audio_label_period_at_location">%1$s at %2$s</string>
 
-    <!-- Enhanced audio model download banner -->
-    <string name="audio_models_banner_title">Better voice notes</string>
-    <string name="audio_models_banner_body">Download a one-time set of on-device models so transcripts get cleaner and notes pick up the soundscape they were recorded in.</string>
-    <string name="audio_models_banner_action_download">Download</string>
-    <string name="audio_models_banner_action_retry">Try again</string>
-    <string name="audio_models_banner_downloading">Downloading enhanced models</string>
-    <string name="audio_models_banner_extracting">Almost ready</string>
-    <string name="audio_models_banner_failed_no_network">No internet connection. Reconnect and try again.</string>
-    <string name="audio_models_banner_failed_server">The download server is unreachable right now. Try again later.</string>
-    <string name="audio_models_banner_failed_storage">Not enough storage to install the models. Free up space and try again.</string>
-    <string name="audio_models_banner_failed_corrupt">The downloaded files were incomplete. Try again.</string>
-    <string name="audio_models_banner_failed_unknown">Something went wrong. Try again.</string>
 </resources>
