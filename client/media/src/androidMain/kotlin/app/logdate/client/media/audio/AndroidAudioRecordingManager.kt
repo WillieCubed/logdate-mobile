@@ -280,6 +280,22 @@ class AndroidAudioRecordingManager(
 
     override fun getStructuredTranscriptionFlow(): Flow<TranscriptionResult> = structuredTranscriptionFlow.filterNotNull()
 
+    override fun requestStopRecording() {
+        // Caller is in a context with no usable coroutine scope (typically
+        // ViewModel.onCleared after viewModelScope has died). Run the stop on
+        // the singleton's own scope so the foreground service is released and
+        // the Whisper refinement coroutine — already launched on the long-lived
+        // transcription service scope — keeps running to completion.
+        if (!recordingActive && !startRequested) return
+        scope.launch {
+            try {
+                stopRecording()
+            } catch (e: Exception) {
+                Napier.e("Error stopping recording from background request", e)
+            }
+        }
+    }
+
     override fun release() {
         scope.cancel()
         serviceStateJob?.cancel()

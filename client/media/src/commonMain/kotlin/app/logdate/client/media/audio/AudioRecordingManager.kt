@@ -59,6 +59,17 @@ interface AudioRecordingManager {
     fun release()
 
     /**
+     * Fire-and-forget request to stop any in-progress recording. Useful from
+     * lifecycle hooks (e.g. ViewModel.onCleared) where there is no live
+     * coroutine scope to await a suspending [stopRecording] call.
+     *
+     * Implementations should perform the stop on their own internal scope so
+     * the foreground service is released cleanly without dragging an in-flight
+     * Whisper refinement pass down with it. Default is a no-op.
+     */
+    fun requestStopRecording() {}
+
+    /**
      * Pauses the current recording if supported by the platform.
      * Default implementation does nothing and returns false.
      *

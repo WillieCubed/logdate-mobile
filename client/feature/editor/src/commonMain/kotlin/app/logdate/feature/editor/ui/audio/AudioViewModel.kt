@@ -321,13 +321,27 @@ class AudioViewModel(
 
     /**
      * Clean up resources when ViewModel is cleared.
+     *
+     * AudioRecordingManager and the underlying TranscriptionService are
+     * application-scoped singletons — they MUST outlive any individual
+     * ViewModel so an in-flight Whisper refinement pass can run to completion
+     * after the user navigates away from the editor. We only release things
+     * that this ViewModel actually owns: the local flow collectors. If a
+     * recording is still active when the screen goes away, we ask the
+     * singleton to stop it on its own scope (the foreground service would
+     * otherwise dangle), but we never tear the singleton itself down here.
      */
     override fun onCleared() {
         super.onCleared()
         Napier.d("AudioViewModel: Being cleared")
         try {
             stopRecordingCollectors()
-            audioRecordingManager.release()
+            if (audioRecordingManager.isRecording || _uiState.value.isRecording) {
+                audioRecordingManager.requestStopRecording()
+            }
+            // Playback is a separate singleton concern; keep the original
+            // teardown semantics for now so navigating away still stops any
+            // audio that was playing in this editor.
             audioPlaybackManager.release()
         } catch (e: Exception) {
             Napier.e("Error cleaning up audio resources: ${e.message}", e)
