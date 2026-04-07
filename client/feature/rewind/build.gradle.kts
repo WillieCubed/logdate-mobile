@@ -55,6 +55,7 @@ kotlin {
             implementation(projects.client.domain)
             implementation(projects.client.logdateDatastore)
             implementation(projects.client.intelligence)
+            implementation(projects.client.sharing)
             implementation(projects.client.util)
             // Compose plugin dependencies
             implementation(libs.compose.runtime)

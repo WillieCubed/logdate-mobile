@@ -4,6 +4,7 @@ import app.logdate.client.domain.di.domainModule
 import app.logdate.client.intelligence.di.intelligenceModule
 import app.logdate.client.intelligence.rewind.RewindMessageGenerator
 import app.logdate.client.intelligence.rewind.WittyRewindMessageGenerator
+import app.logdate.client.sharing.di.sharingModule
 import app.logdate.feature.rewind.ui.RewindDetailViewModel
 import app.logdate.feature.rewind.ui.overview.RewindOverviewViewModel
 import app.logdate.feature.rewind.ui.settings.RewindSettingsViewModel
@@ -18,6 +19,7 @@ val rewindFeatureModule: Module =
     module {
         includes(domainModule)
         includes(intelligenceModule)
+        includes(sharingModule)
 
         // Ensure we have a RewindMessageGenerator implementation
         single<RewindMessageGenerator> { WittyRewindMessageGenerator() }

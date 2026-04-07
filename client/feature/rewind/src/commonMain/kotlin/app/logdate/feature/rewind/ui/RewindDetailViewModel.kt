@@ -5,6 +5,7 @@ package app.logdate.feature.rewind.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.rewind.GetRewindUseCase
+import app.logdate.client.sharing.SharingLauncher
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
 import io.github.aakira.napier.Napier
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.datetime.Month
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
@@ -43,6 +45,7 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalCoroutinesApi::class)
 class RewindDetailViewModel(
     private val getRewindUseCase: GetRewindUseCase,
+    private val sharingLauncher: SharingLauncher,
 //    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val rewindIdState = MutableStateFlow<Uuid?>(null)
@@ -85,6 +88,27 @@ class RewindDetailViewModel(
      */
     fun loadRewind(rewindId: Uuid) {
         rewindIdState.value = rewindId
+    }
+
+    /**
+     * Shares a rewind panel through the platform share sheet.
+     *
+     * The composable resolves the localized strings before calling this; the ViewModel
+     * just owns the [SharingLauncher] dependency so composables don't have to reach
+     * into Koin themselves.
+     */
+    fun sharePanel(
+        text: String,
+        mediaUri: String? = null,
+        title: String? = null,
+        chooserTitle: String? = null,
+    ) {
+        sharingLauncher.shareContent(
+            text = text,
+            mediaUris = mediaUri?.let { listOf(it) } ?: emptyList(),
+            title = title,
+            chooserTitle = chooserTitle,
+        )
     }
 
     /**
@@ -234,18 +258,18 @@ class RewindDetailViewModel(
         val localDateTime = timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
         val month =
             when (localDateTime.month) {
-                kotlinx.datetime.Month.JANUARY -> "Jan"
-                kotlinx.datetime.Month.FEBRUARY -> "Feb"
-                kotlinx.datetime.Month.MARCH -> "Mar"
-                kotlinx.datetime.Month.APRIL -> "Apr"
-                kotlinx.datetime.Month.MAY -> "May"
-                kotlinx.datetime.Month.JUNE -> "Jun"
-                kotlinx.datetime.Month.JULY -> "Jul"
-                kotlinx.datetime.Month.AUGUST -> "Aug"
-                kotlinx.datetime.Month.SEPTEMBER -> "Sep"
-                kotlinx.datetime.Month.OCTOBER -> "Oct"
-                kotlinx.datetime.Month.NOVEMBER -> "Nov"
-                kotlinx.datetime.Month.DECEMBER -> "Dec"
+                Month.JANUARY -> "Jan"
+                Month.FEBRUARY -> "Feb"
+                Month.MARCH -> "Mar"
+                Month.APRIL -> "Apr"
+                Month.MAY -> "May"
+                Month.JUNE -> "Jun"
+                Month.JULY -> "Jul"
+                Month.AUGUST -> "Aug"
+                Month.SEPTEMBER -> "Sep"
+                Month.OCTOBER -> "Oct"
+                Month.NOVEMBER -> "Nov"
+                Month.DECEMBER -> "Dec"
             }
 
         return "$month ${localDateTime.day}, ${localDateTime.year}"
@@ -267,18 +291,18 @@ class RewindDetailViewModel(
 
         val startMonth =
             when (startLocal.month) {
-                kotlinx.datetime.Month.JANUARY -> "January"
-                kotlinx.datetime.Month.FEBRUARY -> "February"
-                kotlinx.datetime.Month.MARCH -> "March"
-                kotlinx.datetime.Month.APRIL -> "April"
-                kotlinx.datetime.Month.MAY -> "May"
-                kotlinx.datetime.Month.JUNE -> "June"
-                kotlinx.datetime.Month.JULY -> "July"
-                kotlinx.datetime.Month.AUGUST -> "August"
-                kotlinx.datetime.Month.SEPTEMBER -> "September"
-                kotlinx.datetime.Month.OCTOBER -> "October"
-                kotlinx.datetime.Month.NOVEMBER -> "November"
-                kotlinx.datetime.Month.DECEMBER -> "December"
+                Month.JANUARY -> "January"
+                Month.FEBRUARY -> "February"
+                Month.MARCH -> "March"
+                Month.APRIL -> "April"
+                Month.MAY -> "May"
+                Month.JUNE -> "June"
+                Month.JULY -> "July"
+                Month.AUGUST -> "August"
+                Month.SEPTEMBER -> "September"
+                Month.OCTOBER -> "October"
+                Month.NOVEMBER -> "November"
+                Month.DECEMBER -> "December"
             }
 
         // If same month
@@ -289,18 +313,18 @@ class RewindDetailViewModel(
         // Different months
         val endMonth =
             when (endLocal.month) {
-                kotlinx.datetime.Month.JANUARY -> "January"
-                kotlinx.datetime.Month.FEBRUARY -> "February"
-                kotlinx.datetime.Month.MARCH -> "March"
-                kotlinx.datetime.Month.APRIL -> "April"
-                kotlinx.datetime.Month.MAY -> "May"
-                kotlinx.datetime.Month.JUNE -> "June"
-                kotlinx.datetime.Month.JULY -> "July"
-                kotlinx.datetime.Month.AUGUST -> "August"
-                kotlinx.datetime.Month.SEPTEMBER -> "September"
-                kotlinx.datetime.Month.OCTOBER -> "October"
-                kotlinx.datetime.Month.NOVEMBER -> "November"
-                kotlinx.datetime.Month.DECEMBER -> "December"
+                Month.JANUARY -> "January"
+                Month.FEBRUARY -> "February"
+                Month.MARCH -> "March"
+                Month.APRIL -> "April"
+                Month.MAY -> "May"
+                Month.JUNE -> "June"
+                Month.JULY -> "July"
+                Month.AUGUST -> "August"
+                Month.SEPTEMBER -> "September"
+                Month.OCTOBER -> "October"
+                Month.NOVEMBER -> "November"
+                Month.DECEMBER -> "December"
             }
 
         return "$startMonth ${startLocal.day} - $endMonth ${endLocal.day}, ${endLocal.year}"

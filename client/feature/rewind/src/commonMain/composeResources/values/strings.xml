@@ -22,6 +22,10 @@
 
     <!-- Actions -->
     <string name="share_something">Share something</string>
+    <string name="share_rewind_panel">Share this moment</string>
+    <string name="share_rewind_chooser_title">Share moment</string>
+    <string name="share_rewind_panel_text_template">From my LogDate Rewind: %1$s</string>
+    <string name="share_rewind_panel_caption">A moment from my Rewind</string>
 
     <!-- Icon labels -->
     <string name="text">↓</string>
