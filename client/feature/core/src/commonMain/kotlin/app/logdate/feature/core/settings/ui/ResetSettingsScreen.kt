@@ -18,7 +18,7 @@ import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.clear_all_data
+import logdate.client.feature.core.generated.resources.account_data_clear_action
 import logdate.client.feature.core.generated.resources.clear_all_your_data_while_keeping_your_account
 import logdate.client.feature.core.generated.resources.navigate_to_title
 import logdate.client.feature.core.generated.resources.reset
@@ -55,7 +55,7 @@ fun ResetSettingsScreen(
                         )
                     },
                     headlineContent = {
-                        Text(stringResource(Res.string.clear_all_data))
+                        Text(stringResource(Res.string.account_data_clear_action))
                     },
                     supportingContent = {
                         Text(
@@ -70,7 +70,7 @@ fun ResetSettingsScreen(
                             contentDescription =
                                 stringResource(
                                     Res.string.navigate_to_title,
-                                    stringResource(Res.string.clear_all_data),
+                                    stringResource(Res.string.account_data_clear_action),
                                 ),
                         )
                     },

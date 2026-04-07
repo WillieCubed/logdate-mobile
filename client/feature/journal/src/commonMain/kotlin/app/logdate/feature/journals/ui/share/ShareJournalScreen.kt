@@ -111,7 +111,7 @@ fun ShareJournalScreenContent(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(Res.string.share_journal_2)) },
+                title = { Text(stringResource(Res.string.journal_share_label)) },
                 navigationIcon = {
                     IconButton(onClick = onGoBack) {
                         Icon(

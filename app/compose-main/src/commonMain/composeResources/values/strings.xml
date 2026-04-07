@@ -4,8 +4,8 @@
     <string name="encrypted_data_recovery_required">Encrypted data recovery required</string>
     <string name="i_understand_reset">I understand, reset</string>
     <string name="open_recovery_tools">Open recovery tools</string>
-    <string name="reset_encrypted_storage">Reset encrypted storage</string>
-    <string name="reset_encrypted_storage_2">Reset encrypted storage?</string>
+    <string name="account_storage_reset_action">Reset encrypted storage</string>
+    <string name="account_storage_reset_dialog_title">Reset encrypted storage?</string>
 
     <!-- Lock screen -->
     <string name="lock_screen_welcome_back">Welcome back, %1$s.</string>

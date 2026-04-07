@@ -81,8 +81,8 @@
     <string name="save_entry">Save entry</string>
     <string name="saving">Saving...</string>
     <string name="search_transcript">Search transcript</string>
-    <string name="select_image">Select image</string>
-    <string name="select_image_2">Select Image</string>
+    <string name="editor_media_select_image_label">Select image</string>
+    <string name="editor_media_select_image_title">Select Image</string>
     <string name="skip_back_10_seconds">Skip back 10 seconds</string>
     <string name="skip_forward_10_seconds">Skip forward 10 seconds</string>
     <string name="show_your_recent_photos_here_after_you_allow_library_access">Show your recent photos here after you allow library access.</string>

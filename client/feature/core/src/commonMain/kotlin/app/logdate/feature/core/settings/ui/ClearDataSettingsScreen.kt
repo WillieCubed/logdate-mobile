@@ -22,7 +22,7 @@ import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.clear_all_data
+import logdate.client.feature.core.generated.resources.account_data_clear_action
 import logdate.client.feature.core.generated.resources.clear_data
 import logdate.client.feature.core.generated.resources.clear_data_explanation
 import logdate.client.feature.core.generated.resources.clear_data_failed
@@ -53,7 +53,7 @@ fun ClearDataSettingsContent(
     var showDialog by remember { mutableStateOf(false) }
 
     SettingsScaffold(
-        title = stringResource(Res.string.clear_all_data),
+        title = stringResource(Res.string.account_data_clear_action),
         onBack = onBack,
         snackbarHostState = snackbarHostState,
     ) {

@@ -25,8 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.account_data_clear_dialog_title
 import logdate.client.feature.core.generated.resources.action_reset_app
-import logdate.client.feature.core.generated.resources.clear_all_data_2
 import logdate.client.feature.core.generated.resources.clear_data_acknowledgement
 import logdate.client.feature.core.generated.resources.clear_data_warning_message
 import logdate.client.feature.core.generated.resources.yes_clear_all_data
@@ -74,7 +74,7 @@ fun ClearDataConfirmationDialog(
     DangerConfirmationDialog(
         onDismissRequest = onDismissRequest,
         onConfirmation = onConfirmation,
-        title = stringResource(Res.string.clear_all_data_2),
+        title = stringResource(Res.string.account_data_clear_dialog_title),
         message = stringResource(Res.string.clear_data_warning_message),
         confirmButtonText = stringResource(Res.string.yes_clear_all_data),
         icon = Icons.Default.WarningAmber,

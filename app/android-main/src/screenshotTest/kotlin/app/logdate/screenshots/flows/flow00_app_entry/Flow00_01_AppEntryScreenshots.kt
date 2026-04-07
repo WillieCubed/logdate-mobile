@@ -35,7 +35,7 @@ import kotlin.uuid.Uuid
 import logdate.app.composemain.generated.resources.Res
 import logdate.app.composemain.generated.resources.encrypted_data_recovery_required
 import logdate.app.composemain.generated.resources.open_recovery_tools
-import logdate.app.composemain.generated.resources.reset_encrypted_storage
+import logdate.app.composemain.generated.resources.account_storage_reset_action
 import logdate.app.composemain.generated.resources.restart
 import logdate.app.composemain.generated.resources.update_ready_restart_to_finish_installing
 import org.jetbrains.compose.resources.stringResource
@@ -169,7 +169,7 @@ private fun RootPreviewFrame(
             },
             dismissButton = {
                 TextButton(onClick = {}) {
-                    Text(stringResource(Res.string.reset_encrypted_storage))
+                    Text(stringResource(Res.string.account_storage_reset_action))
                 }
             },
         )

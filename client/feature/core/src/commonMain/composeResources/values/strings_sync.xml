@@ -39,11 +39,11 @@
     <string name="loading_devices">Loading devices...</string>
     <string name="last_active_label">Last active: %1$s</string>
     <string name="enter_a_new_name_for_this_device">Enter a new name for this device:</string>
-    <string name="remove_device">Remove device</string>
-    <string name="remove_device_2">Remove Device</string>
+    <string name="sync_device_remove_label">Remove device</string>
+    <string name="sync_device_remove_title">Remove Device</string>
     <string name="remove_device_confirmation">Are you sure you want to remove &quot;%1$s&quot; from your account? This device will no longer receive notifications or sync data.</string>
-    <string name="rename_device">Rename device</string>
-    <string name="rename_device_2">Rename Device</string>
+    <string name="sync_device_rename_label">Rename device</string>
+    <string name="sync_device_rename_title">Rename Device</string>
 
     <!-- Debug / developer -->
     <string name="app_version_label">App version: %1$s</string>

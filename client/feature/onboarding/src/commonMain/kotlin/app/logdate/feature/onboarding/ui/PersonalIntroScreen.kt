@@ -298,7 +298,7 @@ private fun NameStep(
             value = name,
             onValueChange = onNameChanged,
             label = { Text(stringResource(Res.string.your_name)) },
-            placeholder = { Text(stringResource(Res.string.what_should_we_call_you)) },
+            placeholder = { Text(stringResource(Res.string.account_username_display_name_prompt)) },
             isError = nameError != null,
             supportingText = nameError?.let { { Text(it) } },
             modifier =

@@ -28,9 +28,9 @@
     <string name="create_journal">Create Journal</string>
     <string name="create_new_journal">Create new journal</string>
     <string name="danger_zone">Danger Zone</string>
-    <string name="delete_entry_2">Delete Entry</string>
-    <string name="delete_journal">Delete Journal</string>
-    <string name="delete_journal_2">Delete journal</string>
+    <string name="journal_entry_delete_title">Delete Entry</string>
+    <string name="journal_delete_action">Delete Journal</string>
+    <string name="journal_delete_label">Delete journal</string>
     <string name="description">Description</string>
     <string name="journal_description_hint">What is this journal about?</string>
     <string name="journal_insights_title">About this journal</string>
@@ -60,8 +60,8 @@
     <string name="visibility">Visibility</string>
     <string name="journal_visibility_private">Only you can see this journal.</string>
     <string name="journal_visibility_shared_hint">Use the Share button to give others access.</string>
-    <string name="journal_settings">Journal Settings</string>
-    <string name="journal_settings_2">Journal settings</string>
+    <string name="journal_settings_title">Journal Settings</string>
+    <string name="journal_settings_label">Journal settings</string>
     <string name="location">Location</string>
     <string name="new_journal">New Journal</string>
     <string name="no_entries_in_this_journal_yet">No entries in this journal yet</string>
@@ -74,8 +74,8 @@
     <string name="see_all_journals">See All Journals</string>
     <string name="share">Share</string>
     <string name="share_qr_code">Share QR code</string>
-    <string name="share_journal">Share Journal</string>
-    <string name="share_journal_2">Share journal</string>
+    <string name="journal_share_action">Share Journal</string>
+    <string name="journal_share_label">Share journal</string>
     <string name="share_to_instagram">Share to Instagram</string>
     <string name="last_updated_prefix">Last updated %1$s</string>
     <string name="this_journal_is_available_on_the_web_anyone_with_the_link_can_view_it">This journal is available on the web. Anyone with the link can view it.</string>

@@ -33,8 +33,8 @@ import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.MaterialContainerScope
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.account_passkey_create_label
 import logdate.client.feature.core.generated.resources.collapse_passkey_options
-import logdate.client.feature.core.generated.resources.create_a_passkey_2
 import logdate.client.feature.core.generated.resources.create_passkey
 import logdate.client.feature.core.generated.resources.expand_passkey_options
 import logdate.client.feature.core.generated.resources.learn_more
@@ -112,7 +112,7 @@ fun PasskeysInfoSection(
                         modifier = Modifier.padding(Spacing.lg),
                     ) {
                         Text(
-                            text = stringResource(Res.string.create_a_passkey_2),
+                            text = stringResource(Res.string.account_passkey_create_label),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                         )

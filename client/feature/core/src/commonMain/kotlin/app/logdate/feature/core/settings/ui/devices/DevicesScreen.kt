@@ -51,15 +51,15 @@ import logdate.client.feature.core.generated.resources.enter_a_new_name_for_this
 import logdate.client.feature.core.generated.resources.last_active_label
 import logdate.client.feature.core.generated.resources.loading_devices
 import logdate.client.feature.core.generated.resources.platform_label
-import logdate.client.feature.core.generated.resources.remove_device
-import logdate.client.feature.core.generated.resources.remove_device_2
 import logdate.client.feature.core.generated.resources.remove_device_confirmation
 import logdate.client.feature.core.generated.resources.rename
-import logdate.client.feature.core.generated.resources.rename_device
-import logdate.client.feature.core.generated.resources.rename_device_2
 import logdate.client.feature.core.generated.resources.reset
 import logdate.client.feature.core.generated.resources.reset_device_id
 import logdate.client.feature.core.generated.resources.reset_device_id_confirmation
+import logdate.client.feature.core.generated.resources.sync_device_remove_label
+import logdate.client.feature.core.generated.resources.sync_device_remove_title
+import logdate.client.feature.core.generated.resources.sync_device_rename_label
+import logdate.client.feature.core.generated.resources.sync_device_rename_title
 import logdate.client.feature.core.generated.resources.this_device
 import logdate.client.ui.generated.resources.common_cancel
 import logdate.client.ui.generated.resources.common_remove
@@ -269,14 +269,14 @@ private fun DeviceItem(
                         IconButton(onClick = onRenameClick) {
                             Icon(
                                 imageVector = Icons.Default.Edit,
-                                contentDescription = stringResource(Res.string.rename_device),
+                                contentDescription = stringResource(Res.string.sync_device_rename_label),
                             )
                         }
                         if (!device.isCurrentDevice) {
                             IconButton(onClick = onRemoveClick) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
-                                    contentDescription = stringResource(Res.string.remove_device),
+                                    contentDescription = stringResource(Res.string.sync_device_remove_label),
                                 )
                             }
                         }
@@ -298,7 +298,7 @@ fun RenameDeviceDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(Res.string.rename_device_2)) },
+        title = { Text(stringResource(Res.string.sync_device_rename_title)) },
         text = {
             Column {
                 Text(stringResource(Res.string.enter_a_new_name_for_this_device))
@@ -339,7 +339,7 @@ fun RemoveDeviceDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(Res.string.remove_device_2)) },
+        title = { Text(stringResource(Res.string.sync_device_remove_title)) },
         text = {
             Text(
                 stringResource(

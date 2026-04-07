@@ -71,11 +71,11 @@ import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.flow.distinctUntilChanged
 import logdate.app.composemain.generated.resources.Res
+import logdate.app.composemain.generated.resources.account_storage_reset_action
+import logdate.app.composemain.generated.resources.account_storage_reset_dialog_title
 import logdate.app.composemain.generated.resources.encrypted_data_recovery_required
 import logdate.app.composemain.generated.resources.i_understand_reset
 import logdate.app.composemain.generated.resources.open_recovery_tools
-import logdate.app.composemain.generated.resources.reset_encrypted_storage
-import logdate.app.composemain.generated.resources.reset_encrypted_storage_2
 import logdate.app.composemain.generated.resources.restart
 import logdate.app.composemain.generated.resources.update_ready_restart_to_finish_installing
 import logdate.client.ui.generated.resources.common_cancel
@@ -260,7 +260,7 @@ fun MainActivityUiRoot(
                         },
                         dismissButton = {
                             TextButton(onClick = { showResetConfirmation = true }) {
-                                Text(stringResource(Res.string.reset_encrypted_storage))
+                                Text(stringResource(Res.string.account_storage_reset_action))
                             }
                         },
                     )
@@ -269,7 +269,7 @@ fun MainActivityUiRoot(
                 if (showResetConfirmation) {
                     AlertDialog(
                         onDismissRequest = { showResetConfirmation = false },
-                        title = { Text(stringResource(Res.string.reset_encrypted_storage_2)) },
+                        title = { Text(stringResource(Res.string.account_storage_reset_dialog_title)) },
                         text = {
                             Text(
                                 "This will clear the local encryption key and move the current " +

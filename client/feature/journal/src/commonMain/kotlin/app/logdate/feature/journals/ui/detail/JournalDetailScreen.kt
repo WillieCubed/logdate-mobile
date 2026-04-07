@@ -261,7 +261,7 @@ fun JournalDetailScreenContent(
                                 IconButton(onClick = { showOverflowMenu = true }) {
                                     Icon(
                                         Icons.Rounded.MoreVert,
-                                        contentDescription = stringResource(Res.string.journal_settings_2),
+                                        contentDescription = stringResource(Res.string.journal_settings_label),
                                     )
                                 }
                                 DropdownMenu(
@@ -269,7 +269,7 @@ fun JournalDetailScreenContent(
                                     onDismissRequest = { showOverflowMenu = false },
                                 ) {
                                     DropdownMenuItem(
-                                        text = { Text(stringResource(Res.string.share_journal_2)) },
+                                        text = { Text(stringResource(Res.string.journal_share_label)) },
                                         onClick = {
                                             showOverflowMenu = false
                                             onNavigateToShare(uiState.journalId)
@@ -279,7 +279,7 @@ fun JournalDetailScreenContent(
                                         },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text(stringResource(Res.string.journal_settings_2)) },
+                                        text = { Text(stringResource(Res.string.journal_settings_label)) },
                                         onClick = {
                                             showOverflowMenu = false
                                             onNavigateToSettings(uiState.journalId)
@@ -289,7 +289,7 @@ fun JournalDetailScreenContent(
                                         },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text(stringResource(Res.string.delete_journal_2)) },
+                                        text = { Text(stringResource(Res.string.journal_delete_label)) },
                                         onClick = {
                                             showOverflowMenu = false
                                             onRequestDelete()
@@ -946,7 +946,7 @@ private fun EntryOverflowMenu(
         IconButton(onClick = onShowMenu) {
             Icon(
                 Icons.Rounded.MoreVert,
-                contentDescription = stringResource(Res.string.journal_settings_2),
+                contentDescription = stringResource(Res.string.journal_settings_label),
             )
         }
         DropdownMenu(

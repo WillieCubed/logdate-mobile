@@ -51,11 +51,11 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_and_sign_in
+import logdate.client.feature.core.generated.resources.account_profile_edit_label
 import logdate.client.feature.core.generated.resources.account_settings_description
 import logdate.client.feature.core.generated.resources.create_account
 import logdate.client.feature.core.generated.resources.devices
 import logdate.client.feature.core.generated.resources.devices_settings_description
-import logdate.client.feature.core.generated.resources.edit_profile
 import logdate.client.feature.core.generated.resources.export_and_import
 import logdate.client.feature.core.generated.resources.export_and_import_description
 import logdate.client.feature.core.generated.resources.location_settings
@@ -489,7 +489,7 @@ private fun SettingsIdentityCard(
         }
 
         FilledTonalButton(onClick = onEditProfile) {
-            Text(stringResource(Res.string.edit_profile))
+            Text(stringResource(Res.string.account_profile_edit_label))
         }
     }
 }

@@ -54,7 +54,7 @@
     <string name="weve_found_some_photos_and_videos_that_might_have_special_meaning_to_you_select_the_ones_youd_like_to_import">We&apos;ve found some photos and videos that might have special meaning to you. Select the ones you&apos;d like to import.</string>
     <string name="weve_taken_the_effort_of_finding_some_photos_from_your_past_you_can_choose_which_ones_get_backed_up">We&apos;ve taken the effort of finding some photos from your past. You can choose which ones get backed up.</string>
     <string name="what_makes_you_you_share_whatever_feels_right">What makes you, you? Share whatever feels right</string>
-    <string name="what_should_we_call_you">What should we call you?</string>
+    <string name="account_username_display_name_prompt">What should we call you?</string>
     <string name="who_are_you">Who are you?</string>
     <string name="word_number">Word #%1$d</string>
     <string name="write_these_12_words_on_paper_and_store_them_safely_youll_need_them_to_recover_your_data_if_you_lose_your_device">Write these 12 words on paper and store them safely. You&apos;ll need them to recover your data if you lose your device.</string>

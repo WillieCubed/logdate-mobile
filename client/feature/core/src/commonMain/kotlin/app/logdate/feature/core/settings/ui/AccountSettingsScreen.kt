@@ -30,8 +30,8 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_actions
 import logdate.client.feature.core.generated.resources.account_and_sign_in
 import logdate.client.feature.core.generated.resources.account_information
-import logdate.client.feature.core.generated.resources.sign_out
-import logdate.client.feature.core.generated.resources.sign_out_2
+import logdate.client.feature.core.generated.resources.account_sign_out_action
+import logdate.client.feature.core.generated.resources.account_sign_out_dialog_title
 import logdate.client.feature.core.generated.resources.sign_out_failed
 import logdate.client.feature.core.generated.resources.sign_out_of_your_logdate_cloud_account_on_this_device
 import logdate.client.feature.core.generated.resources.username_handle
@@ -200,7 +200,7 @@ fun AccountSettingsContent(
                 modifier = Modifier.padding(horizontal = Spacing.lg),
             ) {
                 ListItem(
-                    headlineContent = { Text(stringResource(Res.string.sign_out)) },
+                    headlineContent = { Text(stringResource(Res.string.account_sign_out_action)) },
                     supportingContent = {
                         Text(stringResource(Res.string.sign_out_of_your_logdate_cloud_account_on_this_device))
                     },
@@ -208,7 +208,7 @@ fun AccountSettingsContent(
                         OutlinedButton(
                             onClick = { showSignOutDialog = true },
                         ) {
-                            Text(stringResource(Res.string.sign_out))
+                            Text(stringResource(Res.string.account_sign_out_action))
                         }
                     },
                 )
@@ -221,7 +221,7 @@ fun AccountSettingsContent(
         val signOutFailedMessage = stringResource(Res.string.sign_out_failed)
         AlertDialog(
             onDismissRequest = { showSignOutDialog = false },
-            title = { Text(stringResource(Res.string.sign_out_2)) },
+            title = { Text(stringResource(Res.string.account_sign_out_dialog_title)) },
             text = { Text(stringResource(Res.string.youll_need_to_sign_in_again_to_sync_data_on_this_device)) },
             confirmButton = {
                 TextButton(
@@ -235,7 +235,7 @@ fun AccountSettingsContent(
                     },
                 ) {
                     Text(
-                        stringResource(Res.string.sign_out),
+                        stringResource(Res.string.account_sign_out_action),
                         color = MaterialTheme.colorScheme.error,
                     )
                 }

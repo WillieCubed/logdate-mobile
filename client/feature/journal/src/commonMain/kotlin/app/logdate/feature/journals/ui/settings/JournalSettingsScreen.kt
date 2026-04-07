@@ -148,7 +148,7 @@ fun JournalSettingsScreenContent(
             Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = { Text(stringResource(Res.string.journal_settings)) },
+                        title = { Text(stringResource(Res.string.journal_settings_title)) },
                         navigationIcon = {
                             IconButton(onClick = onGoBack) {
                                 Icon(
@@ -406,10 +406,10 @@ private fun JournalDangerZone(
         ) {
             Icon(
                 imageVector = Icons.Default.Delete,
-                contentDescription = stringResource(Res.string.delete_journal),
+                contentDescription = stringResource(Res.string.journal_delete_action),
                 modifier = Modifier.padding(end = Spacing.sm),
             )
-            Text(stringResource(Res.string.delete_journal))
+            Text(stringResource(Res.string.journal_delete_action))
         }
     }
 }
@@ -475,10 +475,10 @@ private fun JournalOverviewSection(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Share,
-                        contentDescription = stringResource(Res.string.share_journal),
+                        contentDescription = stringResource(Res.string.journal_share_action),
                         modifier = Modifier.padding(end = Spacing.sm),
                     )
-                    Text(stringResource(Res.string.share_journal))
+                    Text(stringResource(Res.string.journal_share_action))
                 }
             }
         }
@@ -542,7 +542,7 @@ fun DeleteConfirmationDialog(
             )
         },
         title = {
-            Text(stringResource(Res.string.delete_journal))
+            Text(stringResource(Res.string.journal_delete_action))
         },
         text = {
             Text(

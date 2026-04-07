@@ -25,8 +25,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.account_username_choose_screen_title
 import logdate.client.feature.core.generated.resources.at
-import logdate.client.feature.core.generated.resources.choose_your_username
 import logdate.client.feature.core.generated.resources.connected_to_the_fediverse
 import logdate.client.feature.core.generated.resources.error_checking_username
 import logdate.client.feature.core.generated.resources.logdate_uses_activitypub_the_same_technology_that_powers_mastodon_pixelfed_and_other_social_networks_this_means_you_can_interact_with_a_global_community_while_keeping_control_of_your_data
@@ -133,7 +133,7 @@ private fun UsernameSetupContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = stringResource(Res.string.choose_your_username),
+                    text = stringResource(Res.string.account_username_choose_screen_title),
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,

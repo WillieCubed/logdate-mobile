@@ -33,6 +33,7 @@ import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.account_passkey_create_success_title
 import logdate.client.feature.core.generated.resources.app_security
 import logdate.client.feature.core.generated.resources.disable_biometric_lock_message
 import logdate.client.feature.core.generated.resources.disable_biometric_lock_title
@@ -41,7 +42,6 @@ import logdate.client.feature.core.generated.resources.location_settings
 import logdate.client.feature.core.generated.resources.manage_location_tracking_and_privacy_preferences
 import logdate.client.feature.core.generated.resources.navigate_to_location_settings
 import logdate.client.feature.core.generated.resources.operation_passkey
-import logdate.client.feature.core.generated.resources.passkey_created_successfully_2
 import logdate.client.feature.core.generated.resources.passkey_operation_creating
 import logdate.client.feature.core.generated.resources.passkey_operation_creating_message
 import logdate.client.feature.core.generated.resources.passkey_operation_removing
@@ -203,7 +203,7 @@ fun PrivacySettingsContent(
     var showDisableBiometricsDialog by remember { mutableStateOf(false) }
 
     val passkeyRemovedMessage = stringResource(Res.string.passkey_removed_successfully)
-    val passkeyCreatedMessage = stringResource(Res.string.passkey_created_successfully_2)
+    val passkeyCreatedMessage = stringResource(Res.string.account_passkey_create_success_title)
 
     // Show feedback for passkey operations
     LaunchedEffect(revocationState) {
