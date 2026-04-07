@@ -693,6 +693,7 @@ fun AudioNoteViewerContent(
                 durationMs = uiState.durationMs,
                 createdAt = uiState.createdAt,
                 segments = uiState.context.segments,
+                detectedSounds = uiState.detectedSounds,
                 onPlayPause = onPlayPause,
                 onSeek = onSeek,
                 onSkipBack = onSkipBack,

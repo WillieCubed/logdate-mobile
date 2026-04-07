@@ -50,6 +50,7 @@ val journalsFeatureModule: Module =
                 durationResolver = get(),
                 audioPlaybackManager = get(),
                 getJournalMembership = get(),
+                audioTagRepository = get(),
             )
         }
         viewModel {

@@ -1,14 +1,18 @@
 package app.logdate.feature.editor.ui.audio.expansion
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Forward10
@@ -30,6 +35,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -81,6 +87,7 @@ fun ImmersiveAudioScreen(
     createdAt: Instant,
     modifier: Modifier = Modifier,
     segments: List<AudioSegment> = emptyList(),
+    detectedSounds: List<String> = emptyList(),
     onPlayPause: () -> Unit = {},
     onSeek: (Float) -> Unit = {},
     onSkipBack: () -> Unit = {},
@@ -167,6 +174,26 @@ fun ImmersiveAudioScreen(
                 style = MaterialTheme.typography.headlineSmall,
                 color = onBackgroundColor,
             )
+
+            // Ambient sound chips, written to the database by the on-device tagger
+            // after the recording stops. The list typically fills in over the few
+            // seconds after stop, so we crossfade as it changes — the user sees
+            // chips appear without a loading state.
+            AnimatedContent(
+                targetState = detectedSounds,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "ambient-sound-chips",
+            ) { sounds ->
+                if (sounds.isEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                } else {
+                    AmbientSoundChips(
+                        sounds = sounds,
+                        contentColor = onBackgroundColor,
+                        modifier = Modifier.padding(top = 16.dp),
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(48.dp))
 
@@ -338,3 +365,42 @@ private fun formatDaylightPeriod(period: DaylightPeriod): String =
         DaylightPeriod.EVENING -> "Evening"
         DaylightPeriod.NIGHT -> "Night"
     }
+
+/**
+ * A wrapping row of pill-shaped chips listing the ambient sounds the
+ * on-device tagger detected on this recording. Tinted by the immersive
+ * background's content color so they read against the gradient without an
+ * extra theme dependency.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Suppress("ktlint:standard:function-naming")
+@Composable
+private fun AmbientSoundChips(
+    sounds: List<String>,
+    contentColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        for (sound in sounds) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = contentColor.copy(alpha = 0.12f),
+                contentColor = contentColor,
+            ) {
+                Text(
+                    text = sound,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier =
+                        Modifier.padding(
+                            horizontal = 12.dp,
+                            vertical = 6.dp,
+                        ),
+                )
+            }
+        }
+    }
+}

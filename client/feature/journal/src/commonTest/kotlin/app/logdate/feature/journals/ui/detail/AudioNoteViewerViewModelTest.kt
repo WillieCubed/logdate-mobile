@@ -64,6 +64,7 @@ class AudioNoteViewerViewModelTest {
                     durationResolver = durationResolver,
                     audioPlaybackManager = audioPlaybackManager,
                     getJournalMembership = GetJournalMembershipUseCase(FakeDetailJournalContentRepository()),
+                    audioTagRepository = FakeAudioTagRepository(),
                 )
 
             advanceUntilIdle()
@@ -103,6 +104,7 @@ class AudioNoteViewerViewModelTest {
                     durationResolver = FakeAudioDurationResolver(durationMs = 1000L),
                     audioPlaybackManager = audioPlaybackManager,
                     getJournalMembership = GetJournalMembershipUseCase(FakeDetailJournalContentRepository()),
+                    audioTagRepository = FakeAudioTagRepository(),
                 )
 
             advanceUntilIdle()
@@ -144,6 +146,7 @@ class AudioNoteViewerViewModelTest {
                     durationResolver = FakeAudioDurationResolver(durationMs = 1000L),
                     audioPlaybackManager = audioPlaybackManager,
                     getJournalMembership = GetJournalMembershipUseCase(FakeDetailJournalContentRepository()),
+                    audioTagRepository = FakeAudioTagRepository(),
                 )
 
             advanceUntilIdle()
@@ -183,6 +186,7 @@ class AudioNoteViewerViewModelTest {
                     durationResolver = FakeAudioDurationResolver(durationMs = 1000L),
                     audioPlaybackManager = audioPlaybackManager,
                     getJournalMembership = GetJournalMembershipUseCase(FakeDetailJournalContentRepository()),
+                    audioTagRepository = FakeAudioTagRepository(),
                 )
 
             advanceUntilIdle()

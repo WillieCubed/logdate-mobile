@@ -223,3 +223,26 @@ class FakeWaveformStorage : WaveformStorage {
 
     override suspend fun delete(audioUri: String) = Unit
 }
+
+class FakeAudioTagRepository(
+    private val tags: List<app.logdate.client.repository.audio.AudioTag> = emptyList(),
+) : app.logdate.client.repository.audio.AudioTagRepository {
+    override suspend fun replaceTagsForNote(
+        noteId: kotlin.uuid.Uuid,
+        tags: List<app.logdate.client.repository.audio.AudioTag>,
+    ) = Unit
+
+    override suspend fun getTagsForNote(noteId: kotlin.uuid.Uuid): List<app.logdate.client.repository.audio.AudioTag> =
+        tags.filter { it.noteId == noteId }
+
+    override fun observeTagsForNote(
+        noteId: kotlin.uuid.Uuid,
+    ): kotlinx.coroutines.flow.Flow<List<app.logdate.client.repository.audio.AudioTag>> =
+        kotlinx.coroutines.flow.flowOf(tags.filter { it.noteId == noteId })
+
+    override suspend fun findNotesBySoundName(soundName: String): List<kotlin.uuid.Uuid> =
+        tags
+            .filter { it.soundName.equals(soundName, ignoreCase = true) }
+            .map { it.noteId }
+            .distinct()
+}

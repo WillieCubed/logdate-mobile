@@ -7,6 +7,7 @@ import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.media.audio.AudioPlaybackStatusProvider
+import app.logdate.client.repository.audio.AudioTagRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.feature.editor.audio.AudioContext
@@ -39,6 +40,7 @@ class AudioNoteViewerViewModel(
     private val durationResolver: AudioDurationResolver,
     private val audioPlaybackManager: AudioPlaybackManager,
     private val getJournalMembership: GetJournalMembershipUseCase,
+    private val audioTagRepository: AudioTagRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<AudioNoteViewerUiState>(AudioNoteViewerUiState.Loading)
     val uiState: StateFlow<AudioNoteViewerUiState> = _uiState.asStateFlow()
@@ -53,12 +55,32 @@ class AudioNoteViewerViewModel(
     private var cachedLatitude: Double? = null
     private var cachedLongitude: Double? = null
     private var cachedJournalNames: List<String> = emptyList()
+    private var cachedDetectedSounds: List<String> = emptyList()
     private val labelResolver = AudioLabelResolver()
 
     init {
         observeNote()
         observePlaybackStatus()
         observeJournalMembership()
+        observeDetectedSounds()
+    }
+
+    private fun observeDetectedSounds() {
+        viewModelScope.launch {
+            audioTagRepository.observeTagsForNote(noteId).collect { tags ->
+                // Tags arrive ordered by confidence desc from the DAO. Cap at the
+                // top six so the chip row stays a quick glance, not a label dump.
+                cachedDetectedSounds =
+                    tags
+                        .filter { it.confidence >= MIN_CHIP_CONFIDENCE }
+                        .take(MAX_CHIPS)
+                        .map { it.soundName }
+                _uiState.update { state ->
+                    val ready = state as? AudioNoteViewerUiState.Ready ?: return@update state
+                    ready.copy(detectedSounds = cachedDetectedSounds)
+                }
+            }
+        }
     }
 
     private fun observeNote() {
@@ -125,6 +147,7 @@ class AudioNoteViewerViewModel(
                         createdAt = note.creationTimestamp,
                         context = initialContext,
                         playbackState = cachedPlaybackState,
+                        detectedSounds = cachedDetectedSounds,
                     )
                 processAudioContext(note, durationMs)
             } else {
@@ -135,6 +158,7 @@ class AudioNoteViewerViewModel(
                         createdAt = note.creationTimestamp,
                         context = cachedAudioContext ?: return@launch,
                         playbackState = cachedPlaybackState,
+                        detectedSounds = cachedDetectedSounds,
                     )
             }
         }
@@ -327,6 +351,11 @@ class AudioNoteViewerViewModel(
         audioProcessingJob?.cancel()
         audioPlaybackManager.release()
     }
+
+    private companion object {
+        const val MIN_CHIP_CONFIDENCE = 0.4f
+        const val MAX_CHIPS = 6
+    }
 }
 
 /**
@@ -349,6 +378,11 @@ sealed interface AudioNoteViewerUiState {
 
     /**
      * Ready state for audio notes with context and playback status.
+     *
+     * @param detectedSounds names of ambient sounds the on-device tagger
+     *   found on this recording, ordered by confidence. Empty until the
+     *   tagger has finished scanning (or always empty for older notes
+     *   captured before tagging existed).
      */
     data class Ready(
         val mediaRef: String,
@@ -356,5 +390,6 @@ sealed interface AudioNoteViewerUiState {
         val createdAt: Instant,
         val context: AudioContext,
         val playbackState: AudioPlaybackUiState,
+        val detectedSounds: List<String> = emptyList(),
     ) : AudioNoteViewerUiState
 }
