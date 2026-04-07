@@ -35,6 +35,7 @@ import kotlin.time.Clock
 class GetMemoryRecallUseCase(
     private val notesRepository: JournalNotesRepository,
     private val aiRecallProvider: AiRecallProvider? = null,
+    private val now: () -> kotlin.time.Instant = { Clock.System.now() },
 ) {
     companion object {
         private const val SUMMARY_MAX_LENGTH = 120
@@ -212,9 +213,5 @@ class GetMemoryRecallUseCase(
             }
         }
 
-    private fun currentLocalDate(): LocalDate =
-        Clock.System
-            .now()
-            .toLocalDateTime(TimeZone.currentSystemDefault())
-            .date
+    private fun currentLocalDate(): LocalDate = now().toLocalDateTime(TimeZone.currentSystemDefault()).date
 }

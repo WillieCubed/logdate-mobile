@@ -174,7 +174,7 @@ private class AmbientPromptTestHarness(
             memoriesSettingsRepository = settingsRepository,
             hasNotesForToday = HasNotesForTodayUseCase(notesRepository),
             fetchMostRecentDraft = FetchMostRecentDraftUseCase(draftRepository),
-            getMemoryRecall = GetMemoryRecallUseCase(notesRepository),
+            getMemoryRecall = GetMemoryRecallUseCase(notesRepository, now = { now }),
             observeLocationStops = ObserveLocationStopsUseCase(ObserveLocationHistoryUseCase(locationRepository)),
             notesRepository = notesRepository,
             placeResolutionCache = placeResolutionCache,
