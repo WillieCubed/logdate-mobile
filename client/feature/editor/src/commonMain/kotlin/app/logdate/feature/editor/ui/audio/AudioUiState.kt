@@ -44,11 +44,17 @@ data class AudioUiState(
 
         /**
          * Transcription completed successfully.
+         *
+         * @param isRefining true while a higher-accuracy refinement pass is
+         *   still rewriting parts of [text] in the background. The UI should
+         *   accept that the text may continue to change visibly while this
+         *   flag is true and crossfade between values smoothly.
          */
         data class Success(
             val text: String,
             val timedTranscript: TimedTranscript? = null,
             val isFinal: Boolean = false,
+            val isRefining: Boolean = false,
         ) : TranscriptionState()
 
         /**

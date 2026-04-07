@@ -19,6 +19,7 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -41,6 +42,7 @@ class SherpaOnnxTranscriptionService(
     private val context: Context,
     private val recognizerProvider: SherpaOnnxRecognizerProvider,
     private val vadProvider: SherpaOnnxVadProvider,
+    private val offlineRecognizerProvider: SherpaOnnxOfflineRecognizerProvider,
     private val scope: CoroutineScope,
     private val accumulator: TranscriptAccumulator,
 ) : TranscriptionService {
@@ -49,6 +51,7 @@ class SherpaOnnxTranscriptionService(
     private var stream: OnlineStream? = null
     private var audioRecord: AudioRecord? = null
     private var recognitionJob: Job? = null
+    private var refinementJob: Job? = null
     private var totalAcceptedSamples: Long = 0L
     private var currentStreamStartMs: Long = 0L
     private var currentStreamAcceptedSamples: Long = 0L
@@ -58,9 +61,26 @@ class SherpaOnnxTranscriptionService(
 
     private val floatBuffer = FloatArray(BUFFER_SIZE_SHORTS)
 
+    /**
+     * Per-utterance PCM buffers captured during the live pass and consumed by
+     * the Whisper refinement pass after recording stops. Each entry corresponds
+     * to one VAD-detected speech segment, giving Whisper a clean utterance to
+     * decode without trailing silence.
+     *
+     * Capped at [MAX_BUFFERED_SAMPLES] (~15 minutes of speech). If exceeded,
+     * the buffer is dropped and refinement is skipped — the streaming text
+     * stands as final.
+     */
+    private val utterancePcmBuffer = mutableListOf<FloatArray>()
+    private var bufferedSampleCount: Long = 0
+    private var bufferOverflowed = false
+
     override suspend fun warmUp() {
         recognizerProvider.ensureInitialized()
         vadProvider.ensureInitialized()
+        // Best-effort pre-warm; refinement is optional and the call is a no-op
+        // if the Whisper model is not present on device.
+        offlineRecognizerProvider.ensureInitialized()
     }
 
     override fun getTranscriptionFlow(): SharedFlow<TranscriptionResult> = _transcriptionFlow.asSharedFlow()
@@ -76,11 +96,32 @@ class SherpaOnnxTranscriptionService(
             return false
         }
 
+        // Reset PCM buffer for the new recording session
+        utterancePcmBuffer.clear()
+        bufferedSampleCount = 0
+        bufferOverflowed = false
+
+        // Cancel any in-flight refinement from a previous recording. The user
+        // started a new session, so old refinement results are no longer relevant.
+        refinementJob?.cancel()
+        refinementJob = null
+
         return try {
             // Start capturing audio immediately so no speech is lost during model init
             val ar = createAndStartAudioRecord()
             isListening = true
             _transcriptionFlow.emit(TranscriptionResult.InProgress)
+
+            // Pre-warm the Whisper model in the background while the user records.
+            // By the time they tap stop, the model is already in memory and the
+            // first refinement chunk can begin within milliseconds.
+            scope.launch(Dispatchers.IO) {
+                try {
+                    offlineRecognizerProvider.ensureInitialized()
+                } catch (e: Exception) {
+                    Napier.w("Whisper pre-warm failed; refinement will be unavailable", e)
+                }
+            }
 
             // Buffer audio samples while models load
             val preBuffer = ArrayDeque<FloatArray>()
@@ -142,7 +183,8 @@ class SherpaOnnxTranscriptionService(
         recognitionJob?.join()
         recognitionJob = null
 
-        // Flush any trailing VAD segments through the recognizer
+        // Flush any trailing VAD segments through the recognizer (and into the
+        // refinement buffer)
         try {
             val s = stream
             if (s != null) {
@@ -150,6 +192,7 @@ class SherpaOnnxTranscriptionService(
                 while (!vadProvider.isEmpty()) {
                     val segment = vadProvider.front()
                     vadProvider.pop()
+                    bufferUtteranceForRefinement(segment.samples)
                     acceptWaveform(s, segment.samples)
                 }
             }
@@ -169,24 +212,86 @@ class SherpaOnnxTranscriptionService(
                     val punctuated = recognizerProvider.addPunctuation(result.text)
                     val utterance = buildTimedUtterance(result, punctuated)
                     accumulator.addSegment(punctuated, utterance)
-                    _transcriptionFlow.emit(
-                        TranscriptionResult.Success(
-                            text = accumulator.build(),
-                            timedTranscript = accumulator.buildTimedTranscript(),
-                            isFinal = true,
-                        ),
-                    )
                 }
             }
         } catch (e: Exception) {
             Napier.e("Error getting final transcription result", e)
         }
 
+        // Decide whether to refine. If Whisper is loaded and the buffer fits,
+        // emit the streaming result with isRefining=true and start the
+        // background rewrite. Otherwise emit a final-only Success.
+        val canRefine = !bufferOverflowed && utterancePcmBuffer.isNotEmpty() && offlineRecognizerProvider.isAvailable
+        _transcriptionFlow.emit(
+            TranscriptionResult.Success(
+                text = accumulator.build(),
+                timedTranscript = accumulator.buildTimedTranscript(),
+                isFinal = true,
+                isRefining = canRefine,
+            ),
+        )
+
         currentStreamStartMs = samplesToMs(totalAcceptedSamples)
         currentStreamAcceptedSamples = 0L
 
         vadProvider.reset()
         releaseStream()
+
+        if (canRefine) {
+            // Hand the buffered utterances off to the refinement pass. We
+            // snapshot here so subsequent recordings don't race with this job.
+            val utterances = utterancePcmBuffer.toList()
+            utterancePcmBuffer.clear()
+            bufferedSampleCount = 0
+            refinementJob =
+                scope.launch(Dispatchers.Default) {
+                    runRefinement(utterances)
+                }
+        }
+    }
+
+    /**
+     * The refinement pass. Walks the buffered VAD utterances in order, sending
+     * each one through Whisper and replacing the corresponding portion of the
+     * accumulator with the refined text. After every utterance, emits an
+     * updated [TranscriptionResult.Success] so the UI can crossfade the change
+     * in place — the user sees the transcript visibly correcting itself.
+     */
+    private suspend fun runRefinement(utterances: List<FloatArray>) {
+        try {
+            // Make sure Whisper is actually loaded before we touch it
+            if (!offlineRecognizerProvider.ensureInitialized()) {
+                Napier.w("Whisper not available for refinement; keeping streaming text")
+                return
+            }
+
+            // Reset the accumulator so we can rebuild it utterance-by-utterance
+            // with refined text. We do this AFTER the streaming Success was
+            // emitted above, so the UI keeps showing the streaming text until
+            // the first refined chunk arrives.
+            val refinedAccumulator = TranscriptAccumulator()
+
+            for ((index, samples) in utterances.withIndex()) {
+                if (!currentCoroutineContext().isActive) return
+
+                val result = offlineRecognizerProvider.transcribe(samples) ?: continue
+                if (result.text.isBlank()) continue
+
+                refinedAccumulator.addSegment(result.text)
+
+                val isLast = index == utterances.lastIndex
+                _transcriptionFlow.emit(
+                    TranscriptionResult.Success(
+                        text = refinedAccumulator.build(),
+                        timedTranscript = refinedAccumulator.buildTimedTranscript(),
+                        isFinal = true,
+                        isRefining = !isLast,
+                    ),
+                )
+            }
+        } catch (e: Exception) {
+            Napier.e("Refinement pass failed; keeping streaming text", e)
+        }
     }
 
     override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult =
@@ -196,6 +301,11 @@ class SherpaOnnxTranscriptionService(
         isListening = false
         recognitionJob?.cancel()
         recognitionJob = null
+        refinementJob?.cancel()
+        refinementJob = null
+        utterancePcmBuffer.clear()
+        bufferedSampleCount = 0
+        bufferOverflowed = false
         stopAudioRecord()
         vadProvider.reset()
         releaseStream()
@@ -228,9 +338,15 @@ class SherpaOnnxTranscriptionService(
         isListening = false
         recognitionJob?.cancel()
         recognitionJob = null
+        refinementJob?.cancel()
+        refinementJob = null
+        utterancePcmBuffer.clear()
+        bufferedSampleCount = 0
+        bufferOverflowed = false
         stopAudioRecord()
         releaseStream()
         vadProvider.release()
+        offlineRecognizerProvider.release()
         accumulator.reset()
         totalAcceptedSamples = 0L
         currentStreamStartMs = 0L
@@ -278,12 +394,38 @@ class SherpaOnnxTranscriptionService(
         while (!vadProvider.isEmpty()) {
             val segment = vadProvider.front()
             vadProvider.pop()
+            bufferUtteranceForRefinement(segment.samples)
             acceptWaveform(s, segment.samples)
             while (recognizerProvider.isReady(s)) {
                 recognizerProvider.decode(s)
             }
             processEndpointResults(s)
         }
+    }
+
+    /**
+     * Captures a VAD utterance into the in-memory buffer that the Whisper
+     * refinement pass will consume. Each entry is one speech segment, so
+     * Whisper sees clean utterances without trailing silence padding.
+     *
+     * Drops the buffer entirely if total buffered audio exceeds
+     * [MAX_BUFFERED_SAMPLES] — refinement is skipped for very long recordings
+     * to keep memory bounded. The streaming text remains the final result.
+     */
+    private fun bufferUtteranceForRefinement(samples: FloatArray) {
+        if (bufferOverflowed || samples.isEmpty()) return
+        if (bufferedSampleCount + samples.size > MAX_BUFFERED_SAMPLES) {
+            Napier.w("Refinement buffer exceeded ${MAX_BUFFERED_SAMPLES / SherpaOnnxRecognizerProvider.SAMPLE_RATE}s; dropping")
+            utterancePcmBuffer.clear()
+            bufferedSampleCount = 0
+            bufferOverflowed = true
+            return
+        }
+        // Defensive copy: the FloatArray returned by SpeechSegment is owned by
+        // the VAD/native side and may be reused. We need our own copy to keep
+        // around for the refinement pass.
+        utterancePcmBuffer += samples.copyOf()
+        bufferedSampleCount += samples.size
     }
 
     private suspend fun processEndpointResults(s: OnlineStream) {
@@ -372,5 +514,12 @@ class SherpaOnnxTranscriptionService(
     companion object {
         private const val BUFFER_SIZE_SHORTS = 2048
         private const val BUFFER_SIZE_BYTES = BUFFER_SIZE_SHORTS * 2
+
+        /**
+         * Maximum samples retained in memory for the refinement pass.
+         * 15 minutes at 16kHz mono = ~57 MB of float data. Beyond this, the
+         * buffer is dropped and the streaming text becomes the final result.
+         */
+        private const val MAX_BUFFERED_SAMPLES = 15L * 60 * SherpaOnnxRecognizerProvider.SAMPLE_RATE
     }
 }

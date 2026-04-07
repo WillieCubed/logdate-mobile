@@ -23,6 +23,7 @@ class SherpaOnnxModelManager(
     private val sttModelDir = File(context.filesDir, STT_MODEL_DIR_NAME)
     private val punctModelDir = File(context.filesDir, PUNCT_MODEL_DIR_NAME)
     private val vadModelDir = File(context.filesDir, VAD_MODEL_DIR_NAME)
+    private val whisperModelDir = File(context.filesDir, WHISPER_MODEL_DIR_NAME)
 
     suspend fun getModelPath(): String? {
         if (isSttModelReady()) {
@@ -67,6 +68,23 @@ class SherpaOnnxModelManager(
             null
         }
     }
+
+    /**
+     * Returns the absolute path to the Whisper small.en model directory if a
+     * complete model is present in internal storage, or null otherwise.
+     *
+     * The model is not bundled with the app — it is downloaded on demand and
+     * placed at this path by [downloadWhisperModel]. Until that happens,
+     * callers should treat refinement as unavailable and fall back to
+     * streaming-only transcription.
+     */
+    fun getWhisperModelPath(): String? = if (isWhisperModelReady()) whisperModelDir.absolutePath else null
+
+    fun isWhisperModelReady(): Boolean =
+        whisperModelDir.exists() &&
+            whisperModelDir.resolve(WHISPER_TOKENS_NAME).exists() &&
+            whisperModelDir.resolve(WHISPER_ENCODER_NAME).exists() &&
+            whisperModelDir.resolve(WHISPER_DECODER_NAME).exists()
 
     private fun isSttModelReady(): Boolean =
         sttModelDir.exists() &&
@@ -154,6 +172,12 @@ class SherpaOnnxModelManager(
         private const val VAD_MODEL_DIR_NAME = "sherpa-onnx-vad"
         private const val VAD_ASSET_NAME = "silero-vad.zip"
         private const val VAD_MODEL_FILE_NAME = "silero_vad.onnx"
+
+        const val WHISPER_MODEL_DIR_NAME = "sherpa-onnx-whisper-small-en"
+        const val WHISPER_ENCODER_NAME = "small.en-encoder.int8.onnx"
+        const val WHISPER_DECODER_NAME = "small.en-decoder.int8.onnx"
+        const val WHISPER_TOKENS_NAME = "small.en-tokens.txt"
+
         private const val BUFFER_SIZE = 8192
     }
 }

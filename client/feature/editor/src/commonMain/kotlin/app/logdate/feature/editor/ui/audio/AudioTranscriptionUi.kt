@@ -67,7 +67,10 @@ fun AudioTranscriptionUi(
                 TranscriptionInProgressUi()
             }
             is AudioUiState.TranscriptionState.Success -> {
-                TranscriptionSuccessUi(state.text)
+                TranscriptionSuccessUi(
+                    text = state.text,
+                    isRefining = state.isRefining,
+                )
             }
             is AudioUiState.TranscriptionState.Error -> {
                 TranscriptionErrorUi(
@@ -156,11 +159,17 @@ private fun TranscriptionInProgressUi(modifier: Modifier = Modifier) {
 
 /**
  * UI when transcription is successful.
+ *
+ * When [isRefining] is true, a higher-accuracy refinement pass is still
+ * rewriting parts of [text] in the background. We crossfade the text on every
+ * update so each replacement feels like the words are correcting themselves
+ * live in front of the user, instead of a loading state.
  */
 @Suppress("ktlint:standard:function-naming")
 @Composable
 private fun TranscriptionSuccessUi(
     text: String,
+    isRefining: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -172,11 +181,26 @@ private fun TranscriptionSuccessUi(
         OutlinedCard(
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyMedium,
+            AnimatedContent(
+                targetState = text,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
                 modifier = Modifier.padding(Spacing.md),
-            )
+                label = "transcript-refinement",
+            ) { current ->
+                Text(
+                    text = current,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color =
+                        if (isRefining) {
+                            // Subtly soften the text while it's still being
+                            // refined — telegraphs that the words are about
+                            // to change without using a spinner or label.
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                )
+            }
         }
     }
 }

@@ -410,6 +410,7 @@ class AudioViewModel(
                                             text = result.text,
                                             timedTranscript = result.timedTranscript,
                                             isFinal = result.isFinal,
+                                            isRefining = result.isRefining,
                                         ),
                                 )
                             }

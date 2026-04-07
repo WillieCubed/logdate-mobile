@@ -12,12 +12,19 @@ sealed class TranscriptionResult {
     object InProgress : TranscriptionResult()
 
     /**
-     * Transcription is complete with text result
+     * Transcription is complete with text result.
+     *
+     * @param text the transcript so far
+     * @param isFinal true once no further updates are expected for this recording
+     * @param isRefining true while a higher-accuracy pass is still rewriting parts
+     *   of the transcript in the background. The UI should accept that [text]
+     *   may continue to change visibly even after [isFinal] is true.
      */
     data class Success(
         val text: String,
         val timedTranscript: TimedTranscript? = null,
         val isFinal: Boolean = false,
+        val isRefining: Boolean = false,
     ) : TranscriptionResult()
 
     /**
