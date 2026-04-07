@@ -154,7 +154,7 @@ fun AudioBlockEditor(
                     recordingState = recordingState,
                     audioLevels = audioLevels,
                     recordingDuration = audioUiState.duration,
-                    onStartRecording = { audioViewModel.startRecording() },
+                    onStartRecording = { audioViewModel.startRecording(targetNoteId = block.id) },
                     onStopRecording = { audioViewModel.stopRecording() },
                     modifier = Modifier.fillMaxSize(),
                 )

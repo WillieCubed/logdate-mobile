@@ -5,16 +5,25 @@ import app.logdate.client.media.audio.transcription.TranscriptionService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlin.time.Duration
+import kotlin.uuid.Uuid
 
 /**
  * Interface for audio recording functionality across platforms
  */
 interface AudioRecordingManager {
     /**
-     * Starts audio recording
+     * Starts audio recording.
+     *
+     * @param targetNoteId The UUID that the eventual saved audio note will use.
+     *   When supplied, the recording manager persists refined transcription
+     *   results to [app.logdate.client.repository.transcription.TranscriptionRepository]
+     *   under this id, so the polished transcript survives the editor view
+     *   model lifecycle, process death, and any later viewer that loads the
+     *   note. If null, refinement is in-memory only and is lost when the
+     *   recording session ends.
      * @return True if recording started successfully
      */
-    suspend fun startRecording(): Boolean
+    suspend fun startRecording(targetNoteId: Uuid? = null): Boolean
 
     /**
      * Stops audio recording

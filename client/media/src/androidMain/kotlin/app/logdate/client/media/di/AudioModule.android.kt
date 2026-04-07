@@ -21,7 +21,13 @@ actual val audioModule: Module =
     module {
         single<AudioStorage> { AndroidAudioStorage(androidContext()) }
         // Provide the Android implementation of AudioRecordingManager as a singleton
-        single<AudioRecordingManager> { AndroidAudioRecordingManager(androidContext(), get()) }
+        single<AudioRecordingManager> {
+            AndroidAudioRecordingManager(
+                context = androidContext(),
+                audioStorage = get(),
+                transcriptionRepository = getOrNull(),
+            )
+        }
         single<AudioPlaybackManager> { AndroidAudioPlaybackManager(androidContext(), get()) }
         single<AudioDurationResolver> { AndroidAudioDurationResolver(androidContext()) }
 

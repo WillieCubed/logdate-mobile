@@ -37,6 +37,12 @@ class AudioViewModel(
     private var durationJob: Job? = null
     private var structuredTranscriptionJob: Job? = null
 
+    /**
+     * Held across stop/restart so a [restartRecording] call still persists the
+     * refined transcript under the same eventual note id.
+     */
+    private var lastTargetNoteId: kotlin.uuid.Uuid? = null
+
     init {
         audioRecordingManager.setTranscriptionService(transcriptionService)
         startTranscriptionCollector()
@@ -44,8 +50,14 @@ class AudioViewModel(
 
     /**
      * Starts audio recording and updates the UI state.
+     *
+     * @param targetNoteId The UUID that the eventual saved audio note will use.
+     *   When supplied, the recording manager persists refined transcription
+     *   results to the database under this id, so the polished transcript
+     *   shows up the next time the note is loaded — even if this view model
+     *   has long since been cleared.
      */
-    fun startRecording() {
+    fun startRecording(targetNoteId: kotlin.uuid.Uuid? = null) {
         viewModelScope.launch {
             Napier.d("AudioViewModel: Starting recording")
             try {
@@ -54,7 +66,8 @@ class AudioViewModel(
                     audioPlaybackManager.stopPlayback()
                 }
 
-                val started = audioRecordingManager.startRecording()
+                lastTargetNoteId = targetNoteId
+                val started = audioRecordingManager.startRecording(targetNoteId)
                 if (!started) {
                     _uiState.update { it.copy(isRecording = false, error = "Failed to start recording") }
                     return@launch
@@ -192,7 +205,7 @@ class AudioViewModel(
                     recordedAudioUri = null,
                 )
             }
-            startRecording()
+            startRecording(targetNoteId = lastTargetNoteId)
         }
     }
 

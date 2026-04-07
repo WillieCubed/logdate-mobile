@@ -7,6 +7,8 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
+import app.logdate.client.repository.transcription.TranscriptionRepository
+import app.logdate.client.repository.transcription.TranscriptionStatus
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.uuid.Uuid
 
 /**
  * Implementation of AudioRecordingManager for Android
@@ -28,6 +31,7 @@ import kotlin.time.Duration.Companion.milliseconds
 class AndroidAudioRecordingManager(
     private val context: Context,
     private val audioStorage: AudioStorage,
+    private val transcriptionRepository: TranscriptionRepository? = null,
 ) : AudioRecordingManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val audioLevelFlow = MutableStateFlow(0f)
@@ -36,6 +40,15 @@ class AndroidAudioRecordingManager(
     private val structuredTranscriptionFlow = MutableStateFlow<TranscriptionResult?>(null)
     private var transcriptionService: TranscriptionService? = null
     private var recordingTarget: AudioRecordingTarget? = null
+
+    /**
+     * The eventual saved-note UUID for the current recording session, captured
+     * at [startRecording] time. Refined transcription emissions are written to
+     * the repository under this id so the polished transcript persists across
+     * the editor view-model lifecycle and shows up in the saved note later.
+     * Cleared when a new session begins or recording stops without a target.
+     */
+    private var sessionTargetNoteId: Uuid? = null
 
     // Service connection
     private var recordingService: AudioRecordingService? = null
@@ -100,13 +113,17 @@ class AndroidAudioRecordingManager(
             }
         }
 
-        // Listen for transcription updates
+        // Listen for transcription updates. This collector lives on the
+        // singleton's own scope so a Whisper refinement pass that is still
+        // mid-utterance when the editor view model goes away will continue
+        // to flow through here and get persisted to the database.
         scope.launch {
             service.getTranscriptionFlow().collectLatest { result ->
                 when (result) {
                     is TranscriptionResult.Success -> {
                         transcriptionFlow.value = result.text
                         structuredTranscriptionFlow.value = result
+                        persistRefinedTranscript(result)
                     }
                     is TranscriptionResult.Error -> {
                         Napier.e("Transcription error: ${result.message}")
@@ -121,7 +138,40 @@ class AndroidAudioRecordingManager(
         }
     }
 
-    override suspend fun startRecording(): Boolean {
+    /**
+     * Writes a transcription result to the repository under the current
+     * session's [sessionTargetNoteId], so the polished text survives the
+     * editor view model and is visible to any later viewer that loads the
+     * note. Skipped when no note id was supplied to [startRecording] (e.g.
+     * Wear OS, tests) or when no repository was injected.
+     *
+     * Status is COMPLETED once refinement finishes (or when refinement
+     * isn't running because the Whisper model isn't on device); it's
+     * IN_PROGRESS while utterances are still being rewritten so any UI
+     * observing the note can show the right state.
+     */
+    private suspend fun persistRefinedTranscript(result: TranscriptionResult.Success) {
+        val noteId = sessionTargetNoteId ?: return
+        val repository = transcriptionRepository ?: return
+        if (result.text.isBlank()) return
+        val status =
+            if (result.isFinal && !result.isRefining) {
+                TranscriptionStatus.COMPLETED
+            } else {
+                TranscriptionStatus.IN_PROGRESS
+            }
+        try {
+            repository.updateTranscription(
+                noteId = noteId,
+                text = result.text,
+                status = status,
+            )
+        } catch (e: Exception) {
+            Napier.e("Failed to persist refined transcript for $noteId", e)
+        }
+    }
+
+    override suspend fun startRecording(targetNoteId: Uuid?): Boolean {
         if (recordingActive || startRequested) {
             Napier.w("Attempted to start recording while already recording or start pending")
             return false
@@ -130,6 +180,7 @@ class AndroidAudioRecordingManager(
         startRequested = true
         try {
             recordingTarget = audioStorage.createRecordingTarget()
+            sessionTargetNoteId = targetNoteId
             transcriptionFlow.value = null
             structuredTranscriptionFlow.value = null
             // Start foreground service for recording

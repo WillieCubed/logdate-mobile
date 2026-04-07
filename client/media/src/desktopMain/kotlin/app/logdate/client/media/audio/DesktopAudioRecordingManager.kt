@@ -81,7 +81,7 @@ class DesktopAudioRecordingManager(
         }
     }
 
-    override suspend fun startRecording(): Boolean {
+    override suspend fun startRecording(targetNoteId: kotlin.uuid.Uuid?): Boolean {
         if (recordingActive) return false
 
         try {
