@@ -12,14 +12,18 @@ import app.logdate.client.database.entities.MediaCaptionEntity
 import app.logdate.client.database.entities.TextNoteEntity
 import app.logdate.client.database.entities.VideoNoteEntity
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
+import app.logdate.client.media.MediaManager
+import app.logdate.client.media.MediaObject
 import app.logdate.client.repository.journals.ExportableJournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.NotePlace
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
+import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.sync.NoOpSyncManager
 import app.logdate.client.sync.SyncManager
+import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
@@ -57,6 +61,9 @@ class OfflineFirstJournalNotesRepository(
     private val journalRepository: JournalRepository,
     private val mediaCaptionDao: MediaCaptionDao,
     private val notePlaceResolver: NotePlaceResolver = EmptyNotePlaceResolver,
+    private val indexedMediaRepository: IndexedMediaRepository? = null,
+    private val mediaManager: MediaManager? = null,
+    private val transactionManager: SyncTransactionManager = PassthroughSyncTransactionManager,
     private val syncManagerProvider: () -> SyncManager = { NoOpSyncManager },
     private val syncMetadataService: SyncMetadataService,
     private val syncScope: CoroutineScope = CoroutineScope(Dispatchers.Default),
@@ -233,6 +240,26 @@ class OfflineFirstJournalNotesRepository(
     }
 
     override suspend fun create(note: JournalNote): Uuid {
+        val pendingMediaIndex = buildPendingMediaIndex(note)
+        val noteId =
+            transactionManager.withTransaction {
+                // Keep note persistence, optional index creation, and sync metadata aligned so a
+                // local write failure cannot leave orphaned indexed media behind.
+                createNoteRecord(
+                    note = note,
+                    pendingMediaIndex = pendingMediaIndex,
+                )
+            }
+
+        triggerContentSync()
+
+        return noteId
+    }
+
+    private suspend fun createNoteRecord(
+        note: JournalNote,
+        pendingMediaIndex: PendingMediaIndex?,
+    ): Uuid {
         val noteId =
             when (note) {
                 is JournalNote.Text -> {
@@ -262,15 +289,65 @@ class OfflineFirstJournalNotesRepository(
                 }
             }
 
+        indexPendingMediaIfNeeded(pendingMediaIndex)
         syncMetadataService.enqueuePending(
             entityId = note.uid.toString(),
             entityType = EntityType.NOTE,
             operation = PendingOperation.CREATE,
         )
 
-        triggerContentSync()
-
         return noteId
+    }
+
+    private suspend fun buildPendingMediaIndex(note: JournalNote): PendingMediaIndex? {
+        val manager = mediaManager ?: return null
+        indexedMediaRepository ?: return null
+
+        return when (note) {
+            is JournalNote.Image -> {
+                manager
+                    .getMedia(note.mediaRef)
+                    .also { check(it is MediaObject.Image) { "Expected image media for ${note.mediaRef}" } }
+                PendingMediaIndex.Image(
+                    uri = note.mediaRef,
+                    timestamp = note.creationTimestamp,
+                )
+            }
+
+            is JournalNote.Video -> {
+                val media =
+                    manager
+                        .getMedia(note.mediaRef)
+                        .also { check(it is MediaObject.Video) { "Expected video media for ${note.mediaRef}" } } as MediaObject.Video
+                PendingMediaIndex.Video(
+                    uri = note.mediaRef,
+                    timestamp = note.creationTimestamp,
+                    duration = media.duration,
+                )
+            }
+
+            else -> null
+        }
+    }
+
+    private suspend fun indexPendingMediaIfNeeded(pendingMediaIndex: PendingMediaIndex?) {
+        val repository = indexedMediaRepository ?: return
+        val pending = pendingMediaIndex ?: return
+        if (repository.isIndexed(pending.uri)) return
+
+        when (pending) {
+            is PendingMediaIndex.Image ->
+                repository.indexImage(
+                    uri = pending.uri,
+                    timestamp = pending.timestamp,
+                )
+            is PendingMediaIndex.Video ->
+                repository.indexVideo(
+                    uri = pending.uri,
+                    timestamp = pending.timestamp,
+                    duration = pending.duration,
+                )
+        }
     }
 
     override suspend fun remove(note: JournalNote) {
@@ -353,18 +430,21 @@ class OfflineFirstJournalNotesRepository(
         note: JournalNote,
         journalId: Uuid,
     ) {
-        // Add the note first
-        create(note)
+        val pendingMediaIndex = buildPendingMediaIndex(note)
+        transactionManager.withTransaction {
+            createNoteRecord(
+                note = note,
+                pendingMediaIndex = pendingMediaIndex,
+            )
+            journalContentDao.addContentToJournal(JournalContentEntityLink(journalId, note.uid))
+            syncMetadataService.enqueuePending(
+                entityId = AssociationPendingKey(journalId, note.uid).toPendingId(),
+                entityType = EntityType.ASSOCIATION,
+                operation = PendingOperation.CREATE,
+            )
+        }
 
-        // Link it to the journal
-        journalContentDao.addContentToJournal(JournalContentEntityLink(journalId, note.uid))
-
-        syncMetadataService.enqueuePending(
-            entityId = AssociationPendingKey(journalId, note.uid).toPendingId(),
-            entityType = EntityType.ASSOCIATION,
-            operation = PendingOperation.CREATE,
-        )
-
+        triggerContentSync()
         triggerAssociationSync()
     }
 
@@ -572,6 +652,26 @@ class OfflineFirstJournalNotesRepository(
 
         writeExportFile(destination, jsonContent, overwrite)
     }
+}
+
+private sealed interface PendingMediaIndex {
+    val uri: String
+    val timestamp: Instant
+
+    data class Image(
+        override val uri: String,
+        override val timestamp: Instant,
+    ) : PendingMediaIndex
+
+    data class Video(
+        override val uri: String,
+        override val timestamp: Instant,
+        val duration: kotlin.time.Duration,
+    ) : PendingMediaIndex
+}
+
+private object PassthroughSyncTransactionManager : SyncTransactionManager {
+    override suspend fun <T> withTransaction(block: suspend () -> T): T = block()
 }
 
 @Serializable

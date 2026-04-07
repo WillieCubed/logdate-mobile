@@ -54,6 +54,7 @@ kotlin {
         commonMain.dependencies {
             // Project dependencies
             implementation(projects.shared.model)
+            implementation(projects.client.util)
             implementation(projects.client.permissions)
             implementation(projects.client.repository)
             implementation(projects.client.media)

@@ -23,9 +23,9 @@ class DataModuleTest {
             koinApplication {
                 allowOverride(true)
                 modules(
-                    dataModule,
                     module {
                         single<PlaceDao> { FakePlaceDao() }
+                        single<NotePlaceResolver> { DatabaseNotePlaceResolver(get()) }
                         single<DataStore<Preferences>>(named("mainDataStore")) { FakePreferencesDataStore() }
                     },
                 )

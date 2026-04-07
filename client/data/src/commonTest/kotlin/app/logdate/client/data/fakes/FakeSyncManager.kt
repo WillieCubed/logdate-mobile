@@ -16,6 +16,7 @@ class FakeSyncManager : SyncManager {
     var syncContentCalls = 0
     var syncJournalsCalls = 0
     var syncAssociationsCalls = 0
+    var syncDraftsCalls = 0
     var fullSyncCalls = 0
     var getSyncStatusCalls = 0
     var syncResult: SyncResult = SyncResult(success = true)
@@ -60,6 +61,11 @@ class FakeSyncManager : SyncManager {
         return syncResult
     }
 
+    override suspend fun syncDrafts(): SyncResult {
+        syncDraftsCalls++
+        return syncResult
+    }
+
     override suspend fun fullSync(): SyncResult {
         fullSyncCalls++
         return syncResult
@@ -97,6 +103,7 @@ class FakeSyncManager : SyncManager {
         syncContentCalls = 0
         syncJournalsCalls = 0
         syncAssociationsCalls = 0
+        syncDraftsCalls = 0
         fullSyncCalls = 0
         getSyncStatusCalls = 0
         syncResult = SyncResult(success = true)

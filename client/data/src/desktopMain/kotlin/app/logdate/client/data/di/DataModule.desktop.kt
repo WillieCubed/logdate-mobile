@@ -105,6 +105,9 @@ actual val dataModule: Module =
                 get(), // journalRepository
                 get(), // mediaCaptionDao
                 get(), // notePlaceResolver
+                get(), // indexedMediaRepository
+                get(), // mediaManager
+                get(), // transactionManager
                 syncManagerProvider = { get() },
                 syncMetadataService = get(),
             )

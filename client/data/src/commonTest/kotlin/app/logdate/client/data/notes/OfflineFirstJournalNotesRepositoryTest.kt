@@ -9,12 +9,20 @@ import app.logdate.client.data.fakes.FakeSyncManager
 import app.logdate.client.data.fakes.FakeSyncMetadataService
 import app.logdate.client.data.fakes.FakeTextNoteDao
 import app.logdate.client.data.fakes.FakeVideoNoteDao
+import app.logdate.client.database.dao.ImageNoteDao
 import app.logdate.client.database.entities.JournalEntity
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
+import app.logdate.client.media.MediaManager
+import app.logdate.client.media.MediaObject
+import app.logdate.client.media.MediaPayload
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
+import app.logdate.client.repository.media.ExifMetadata
+import app.logdate.client.repository.media.IndexedMedia
+import app.logdate.client.repository.media.IndexedMediaRepository
+import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -24,6 +32,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
@@ -53,6 +62,8 @@ class OfflineFirstJournalNotesRepositoryTest {
     private lateinit var journalRepository: FakeJournalRepository
     private lateinit var syncManager: FakeSyncManager
     private lateinit var syncMetadataService: FakeSyncMetadataService
+    private lateinit var indexedMediaRepository: FakeIndexedMediaRepository
+    private lateinit var mediaManager: FakeMediaManager
     private lateinit var repository: OfflineFirstJournalNotesRepository
 
     @BeforeTest
@@ -65,6 +76,8 @@ class OfflineFirstJournalNotesRepositoryTest {
         journalRepository = FakeJournalRepository()
         syncManager = FakeSyncManager()
         syncMetadataService = FakeSyncMetadataService()
+        indexedMediaRepository = FakeIndexedMediaRepository()
+        mediaManager = FakeMediaManager()
 
         repository = createRepository()
     }
@@ -207,12 +220,44 @@ class OfflineFirstJournalNotesRepositoryTest {
                     lastUpdated = Clock.System.now(),
                     mediaRef = "file:///video.mp4",
                 )
+            mediaManager.mediaByUri[videoNote.mediaRef] =
+                MediaObject.Video(
+                    name = "video.mp4",
+                    uri = videoNote.mediaRef,
+                    size = 1024,
+                    timestamp = videoNote.creationTimestamp,
+                    duration = 5.seconds,
+                )
 
             val noteId = repository.create(videoNote)
 
             assertEquals(videoNote.uid, noteId)
             val allNotes = repository.allNotesObserved.first()
             assertTrue(allNotes.any { it.uid == videoNote.uid })
+        }
+
+    @Test
+    fun create_videoNote_indexesMediaAutomatically() =
+        runTest {
+            val videoNote =
+                JournalNote.Video(
+                    uid = Uuid.random(),
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                    mediaRef = "file:///video-indexed.mp4",
+                )
+            mediaManager.mediaByUri[videoNote.mediaRef] =
+                MediaObject.Video(
+                    name = "video-indexed.mp4",
+                    uri = videoNote.mediaRef,
+                    size = 1024,
+                    timestamp = videoNote.creationTimestamp,
+                    duration = 42.seconds,
+                )
+
+            repository.create(videoNote)
+
+            assertTrue(indexedMediaRepository.isIndexed(videoNote.mediaRef))
         }
 
     /**
@@ -240,6 +285,13 @@ class OfflineFirstJournalNotesRepositoryTest {
     fun create_imageNote_addsToDatabase() =
         runTest {
             val imageNote = createTestImageNote()
+            mediaManager.mediaByUri[imageNote.mediaRef] =
+                MediaObject.Image(
+                    uri = imageNote.mediaRef,
+                    size = 128,
+                    name = "test-image.jpg",
+                    timestamp = imageNote.creationTimestamp,
+                )
 
             val noteId = repository.create(imageNote)
 
@@ -247,6 +299,72 @@ class OfflineFirstJournalNotesRepositoryTest {
             val allNotes = repository.allNotesObserved.first()
             assertEquals(1, allNotes.size)
             assertEquals(imageNote.mediaRef, (allNotes.first() as JournalNote.Image).mediaRef)
+        }
+
+    @Test
+    fun create_imageNote_indexesMediaAutomatically() =
+        runTest {
+            val imageNote = createTestImageNote()
+            mediaManager.mediaByUri[imageNote.mediaRef] =
+                MediaObject.Image(
+                    uri = imageNote.mediaRef,
+                    size = 128,
+                    name = "test-image.jpg",
+                    timestamp = imageNote.creationTimestamp,
+                )
+
+            repository.create(imageNote)
+
+            assertTrue(indexedMediaRepository.isIndexed(imageNote.mediaRef))
+        }
+
+    @Test
+    fun create_imageNote_doesNotDuplicateAlreadyIndexedMedia() =
+        runTest {
+            val imageNote = createTestImageNote()
+            mediaManager.mediaByUri[imageNote.mediaRef] =
+                MediaObject.Image(
+                    uri = imageNote.mediaRef,
+                    size = 128,
+                    name = "test-image.jpg",
+                    timestamp = imageNote.creationTimestamp,
+                )
+            indexedMediaRepository.indexImage(
+                uri = imageNote.mediaRef,
+                timestamp = imageNote.creationTimestamp,
+            )
+
+            repository.create(imageNote)
+
+            assertEquals(1, indexedMediaRepository.observeAllMedia().first().size)
+        }
+
+    @Test
+    fun create_imageNote_rollsBackIndexedMediaWhenNotePersistenceFails() =
+        runTest {
+            val imageNote = createTestImageNote()
+            mediaManager.mediaByUri[imageNote.mediaRef] =
+                MediaObject.Image(
+                    uri = imageNote.mediaRef,
+                    size = 128,
+                    name = "test-image.jpg",
+                    timestamp = imageNote.creationTimestamp,
+                )
+            repository =
+                createRepository(
+                    imageNoteDao =
+                        object : ImageNoteDao by FakeImageNoteDao() {
+                            override suspend fun addNote(note: app.logdate.client.database.entities.ImageNoteEntity): Unit =
+                                throw IllegalStateException("image note write failed")
+                        },
+                    transactionManager = IndexedMediaRollbackTransactionManager(indexedMediaRepository),
+                )
+
+            assertFailsWith<IllegalStateException> {
+                repository.create(imageNote)
+            }
+
+            assertTrue(!indexedMediaRepository.isIndexed(imageNote.mediaRef))
         }
 
     @Test
@@ -417,19 +535,25 @@ class OfflineFirstJournalNotesRepositoryTest {
             lastUpdated = lastUpdated,
         )
 
-    private fun createRepository(notePlaceResolver: NotePlaceResolver = EmptyNotePlaceResolver) =
-        OfflineFirstJournalNotesRepository(
-            textNoteDao = textNoteDao,
-            imageNoteDao = imageNoteDao,
-            audioNoteDao = FakeAudioNoteDao(),
-            videoNoteDao = videoNoteDao,
-            journalContentDao = journalContentDao,
-            journalRepository = journalRepository,
-            notePlaceResolver = notePlaceResolver,
-            syncManagerProvider = { syncManager },
-            syncMetadataService = syncMetadataService,
-            mediaCaptionDao = mediaCaptionDao,
-        )
+    private fun createRepository(
+        notePlaceResolver: NotePlaceResolver = EmptyNotePlaceResolver,
+        imageNoteDao: ImageNoteDao = this.imageNoteDao,
+        transactionManager: SyncTransactionManager = PassthroughTransactionManager,
+    ) = OfflineFirstJournalNotesRepository(
+        textNoteDao = textNoteDao,
+        imageNoteDao = imageNoteDao,
+        audioNoteDao = FakeAudioNoteDao(),
+        videoNoteDao = videoNoteDao,
+        journalContentDao = journalContentDao,
+        journalRepository = journalRepository,
+        mediaCaptionDao = mediaCaptionDao,
+        notePlaceResolver = notePlaceResolver,
+        indexedMediaRepository = indexedMediaRepository,
+        mediaManager = mediaManager,
+        transactionManager = transactionManager,
+        syncManagerProvider = { syncManager },
+        syncMetadataService = syncMetadataService,
+    )
 
     private class FakeNotePlaceResolver(
         private val places: Map<Uuid, NotePlace>,
@@ -439,5 +563,104 @@ class OfflineFirstJournalNotesRepositoryTest {
         override suspend fun get(placeId: Uuid): NotePlace? = places[placeId]
 
         override fun observeAll(): Flow<Map<Uuid, NotePlace>> = flowOf(places)
+    }
+
+    private class FakeIndexedMediaRepository : IndexedMediaRepository {
+        private val media = mutableListOf<IndexedMedia>()
+
+        override suspend fun indexImage(
+            uri: String,
+            timestamp: kotlin.time.Instant,
+        ): IndexedMedia.Image {
+            val image = IndexedMedia.Image(uid = Uuid.random(), uri = uri, timestamp = timestamp)
+            media.removeAll { it.uri == uri }
+            media += image
+            return image
+        }
+
+        override suspend fun indexVideo(
+            uri: String,
+            timestamp: kotlin.time.Instant,
+            duration: kotlin.time.Duration,
+        ): IndexedMedia.Video {
+            val video = IndexedMedia.Video(uid = Uuid.random(), uri = uri, timestamp = timestamp, duration = duration)
+            media.removeAll { it.uri == uri }
+            media += video
+            return video
+        }
+
+        override suspend fun getByUid(uid: Uuid): IndexedMedia? = media.find { it.uid == uid }
+
+        override fun getForPeriod(
+            startTime: kotlin.time.Instant,
+            endTime: kotlin.time.Instant,
+        ): Flow<List<IndexedMedia>> = flowOf(media.filter { it.timestamp in startTime..endTime })
+
+        override suspend fun isIndexed(uri: String): Boolean = media.any { it.uri == uri }
+
+        override suspend fun remove(uid: Uuid): Boolean = media.removeIf { it.uid == uid }
+
+        override suspend fun updateCaption(
+            uid: Uuid,
+            caption: String?,
+        ): IndexedMedia? = media.find { it.uid == uid }
+
+        override fun observeAllMedia(): Flow<List<IndexedMedia>> = flowOf(media.toList())
+
+        override fun getMediaCount(): Flow<Int> = flowOf(media.size)
+
+        override suspend fun getExifMetadata(uid: Uuid): ExifMetadata? = null
+
+        fun snapshot(): List<IndexedMedia> = media.toList()
+
+        fun restore(snapshot: List<IndexedMedia>) {
+            media.clear()
+            media.addAll(snapshot)
+        }
+    }
+
+    private class FakeMediaManager : MediaManager {
+        val mediaByUri = mutableMapOf<String, MediaObject>()
+
+        override suspend fun getMedia(uri: String): MediaObject = mediaByUri.getValue(uri)
+
+        override suspend fun exists(mediaId: String): Boolean = mediaByUri.containsKey(mediaId)
+
+        override suspend fun getRecentMedia(): Flow<List<MediaObject>> = flowOf(mediaByUri.values.toList())
+
+        override suspend fun queryMediaByDate(
+            start: kotlin.time.Instant,
+            end: kotlin.time.Instant,
+        ): Flow<List<MediaObject>> = flowOf(mediaByUri.values.filter { it.timestamp in start..end })
+
+        override suspend fun addToDefaultCollection(uri: String) = Unit
+
+        override suspend fun readMedia(uri: String): MediaPayload = throw UnsupportedOperationException()
+
+        override suspend fun saveMedia(payload: MediaPayload): String = throw UnsupportedOperationException()
+
+        override suspend fun saveMediaFromFile(
+            sourceFilePath: String,
+            fileName: String,
+            mimeType: String,
+        ): String = throw UnsupportedOperationException()
+    }
+
+    private class IndexedMediaRollbackTransactionManager(
+        private val indexedMediaRepository: FakeIndexedMediaRepository,
+    ) : SyncTransactionManager {
+        override suspend fun <T> withTransaction(block: suspend () -> T): T {
+            val snapshot = indexedMediaRepository.snapshot()
+            return try {
+                block()
+            } catch (error: Throwable) {
+                indexedMediaRepository.restore(snapshot)
+                throw error
+            }
+        }
+    }
+
+    private object PassthroughTransactionManager : SyncTransactionManager {
+        override suspend fun <T> withTransaction(block: suspend () -> T): T = block()
     }
 }

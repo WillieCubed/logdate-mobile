@@ -80,5 +80,8 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.koin.test)
         }
+        findByName("androidHostTest")?.dependencies {
+            implementation(libs.androidx.test.core)
+        }
     }
 }
