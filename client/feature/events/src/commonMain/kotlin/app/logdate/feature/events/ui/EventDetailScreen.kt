@@ -34,12 +34,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.logdate.shared.model.ExternalCalendarSource
+import app.logdate.shared.model.displayLabel
 import app.logdate.ui.theme.Spacing
-import app.logdate.util.toReadableDateTimeShort
+import app.logdate.util.toReadableDateTimeRangeShort
 import coil3.compose.AsyncImage
 import org.koin.compose.viewmodel.koinViewModel
-import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -173,7 +172,7 @@ private fun EventDetailContent(
         )
 
         Text(
-            text = formatTimeRange(state.event.startTime, state.event.endTime),
+            text = state.event.startTime.toReadableDateTimeRangeShort(state.event.endTime),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -210,38 +209,5 @@ private fun EventDetailContent(
         ) {
             Text(if (state.isSaving) "Saving…" else "Save")
         }
-    }
-}
-
-/**
- * Human-readable label for an external calendar source. Used by the source chip on the event
- * detail screen so the user can see at a glance where a grounded event came from.
- */
-private fun ExternalCalendarSource.displayLabel(): String =
-    when (this) {
-        ExternalCalendarSource.GOOGLE_CALENDAR -> "Google Calendar"
-        ExternalCalendarSource.APPLE_CALENDAR -> "Apple Calendar"
-    }
-
-/**
- * Formats an event's time bounds for the read-only time line on the detail screen.
- *
- * Three cases:
- * - `end` is `null` → render the start timestamp alone (point-in-time event).
- * - `end == start` → render the start timestamp alone (zero-duration event).
- * - otherwise → render `"start – end"` separated by an en-dash.
- *
- * Both timestamps are converted to the device's local time zone via
- * [toReadableDateTimeShort].
- */
-private fun formatTimeRange(
-    start: Instant,
-    end: Instant?,
-): String {
-    val startText = start.toReadableDateTimeShort()
-    return if (end == null || end == start) {
-        startText
-    } else {
-        "$startText – ${end.toReadableDateTimeShort()}"
     }
 }

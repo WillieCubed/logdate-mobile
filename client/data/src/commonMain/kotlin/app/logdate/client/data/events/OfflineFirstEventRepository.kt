@@ -10,7 +10,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -54,15 +53,10 @@ class OfflineFirstEventRepository(
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeEventsForNote(noteId: Uuid): Flow<List<Event>> =
         eventNoteLinkDao.getEventsForNote(noteId).flatMapLatest { eventIds ->
-            if (eventIds.isEmpty()) {
-                flowOf(emptyList())
-            } else {
-                // The cardinality of events per note is expected to be small (typically 0–2).
-                // A dedicated batch query can replace this if profiling shows it matters.
-                flow {
-                    val events = eventIds.mapNotNull { id -> eventDao.getById(id)?.toModel() }
-                    emit(events)
-                }
+            flow {
+                val events =
+                    if (eventIds.isEmpty()) emptyList() else eventDao.getByIds(eventIds).map { it.toModel() }
+                emit(events)
             }
         }
 

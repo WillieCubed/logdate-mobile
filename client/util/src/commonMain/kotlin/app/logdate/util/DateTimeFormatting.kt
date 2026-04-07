@@ -86,6 +86,22 @@ fun Instant.toReadableDateTimeShort(): String {
     return "${localDatetime.toReadableDateShort()}, $localTime"
 }
 
+/**
+ * Formats a time range as a single short string. Returns the start timestamp alone when
+ * the range collapses to a single moment (no end, or end equal to start). Otherwise returns
+ * `"start – end"` separated by an en-dash.
+ *
+ * Both bounds are converted to the device's local time zone via [toReadableDateTimeShort].
+ */
+fun Instant.toReadableDateTimeRangeShort(end: Instant?): String {
+    val startText = toReadableDateTimeShort()
+    return if (end == null || end == this) {
+        startText
+    } else {
+        "$startText – ${end.toReadableDateTimeShort()}"
+    }
+}
+
 val Instant.localTime: String
     get() {
         val localDateTime = toLocalDateTime(TimeZone.currentSystemDefault()).time

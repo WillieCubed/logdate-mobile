@@ -1,7 +1,6 @@
 package app.logdate.client.domain.timeline
 
 import app.logdate.client.domain.entities.ExtractPeopleUseCase
-import app.logdate.client.domain.events.ObserveEventsForDateRangeUseCase
 import app.logdate.client.intelligence.AIError
 import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.EntrySummarizer
@@ -631,7 +630,6 @@ class GetStreamingTimelineUseCaseTest {
             getMediaUrisUseCase = getMediaUrisUseCase,
             extractPeopleUseCase = extractPeopleUseCase,
             inferMomentsUseCase = inferMomentsUseCase,
-            observeEventsForDateRange = ObserveEventsForDateRangeUseCase(NoOpEventRepository),
         )
     }
 

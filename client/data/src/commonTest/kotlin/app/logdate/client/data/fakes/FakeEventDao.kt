@@ -41,6 +41,9 @@ class FakeEventDao : EventDao {
 
     override suspend fun getById(id: Uuid): EventEntity? = events[id]?.takeIf { it.deletedAt == null }
 
+    override suspend fun getByIds(ids: List<Uuid>): List<EventEntity> =
+        ids.mapNotNull { events[it]?.takeIf { entity -> entity.deletedAt == null } }
+
     override fun observeById(id: Uuid): Flow<EventEntity?> = eventsFlow.map { list -> list.find { it.id == id } }
 
     override fun observeAll(): Flow<List<EventEntity>> = eventsFlow.map { list -> list.sortedByDescending { it.startTime } }

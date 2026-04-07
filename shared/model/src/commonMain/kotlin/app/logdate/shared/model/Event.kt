@@ -42,3 +42,13 @@ enum class ExternalCalendarSource {
     GOOGLE_CALENDAR,
     APPLE_CALENDAR,
 }
+
+/**
+ * Human-readable label for an [ExternalCalendarSource], suitable for showing in chips,
+ * badges, or attribution lines next to a grounded event.
+ */
+fun ExternalCalendarSource.displayLabel(): String =
+    when (this) {
+        ExternalCalendarSource.GOOGLE_CALENDAR -> "Google Calendar"
+        ExternalCalendarSource.APPLE_CALENDAR -> "Apple Calendar"
+    }

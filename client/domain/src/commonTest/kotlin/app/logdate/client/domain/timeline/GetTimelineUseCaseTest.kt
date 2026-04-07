@@ -1,7 +1,6 @@
 package app.logdate.client.domain.timeline
 
 import app.logdate.client.domain.entities.ExtractPeopleUseCase
-import app.logdate.client.domain.events.ObserveEventsForDateRangeUseCase
 import app.logdate.client.intelligence.AIError
 import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.EntrySummarizer
@@ -20,11 +19,13 @@ import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.networking.NetworkState
+import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
+import app.logdate.shared.model.Event
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,6 +58,7 @@ class GetTimelineUseCaseTest {
                 notesRepository = mockNotesRepository,
                 getTimelineDayUseCase = getTimelineDayUseCase,
                 groupNotesByDayBoundsUseCase = calendarDateGrouper(),
+                eventRepository = StubEventRepository(),
             )
     }
 
@@ -367,7 +369,6 @@ class GetTimelineUseCaseTest {
             getMediaUrisUseCase = getMediaUrisUseCase,
             extractPeopleUseCase = extractPeopleUseCase,
             inferMomentsUseCase = inferMomentsUseCase,
-            observeEventsForDateRange = ObserveEventsForDateRangeUseCase(NoOpEventRepository),
         )
     }
 
@@ -412,6 +413,41 @@ class GetTimelineUseCaseTest {
         override suspend fun getNoteById(noteId: Uuid): JournalNote? = null
 
         override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
+    }
+
+    /**
+     * Empty [EventRepository] used by the timeline tests — these tests don't care about
+     * events, only about how notes are grouped into days.
+     */
+    private class StubEventRepository : EventRepository {
+        override fun observeAllEvents() = flowOf(emptyList<Event>())
+
+        override fun observeEvent(eventId: Uuid) = flowOf<Event?>(null)
+
+        override fun observeEventsForDateRange(
+            start: Instant,
+            end: Instant,
+        ) = flowOf(emptyList<Event>())
+
+        override suspend fun getEventById(eventId: Uuid): Event? = null
+
+        override suspend fun updateEvent(event: Event) = Result.success(Unit)
+
+        override suspend fun deleteEvent(eventId: Uuid) = Result.success(Unit)
+
+        override fun observeEventsForNote(noteId: Uuid) = flowOf(emptyList<Event>())
+
+        override fun observeNotesForEvent(eventId: Uuid) = flowOf(emptyList<Uuid>())
+
+        override suspend fun linkNoteToEvent(
+            eventId: Uuid,
+            noteId: Uuid,
+        ) = Result.success(Unit)
+
+        override suspend fun unlinkNoteFromEvent(
+            eventId: Uuid,
+            noteId: Uuid,
+        ) = Result.success(Unit)
     }
 
     private class FakeGenerativeAICache : GenerativeAICache {

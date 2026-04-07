@@ -1,16 +1,15 @@
 package app.logdate.client.domain.timeline
 
 import app.logdate.client.domain.entities.ExtractPeopleUseCase
-import app.logdate.client.domain.events.ObserveEventsForDateRangeUseCase
 import app.logdate.client.intelligence.AIResult
+import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.shared.model.Event
 import app.logdate.shared.model.Person
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.transform
+import kotlinx.coroutines.flow.combine
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -27,25 +26,34 @@ class GetTimelineUseCase(
     private val notesRepository: JournalNotesRepository,
     private val getTimelineDayUseCase: GetTimelineDayUseCase,
     private val groupNotesByDayBoundsUseCase: GroupNotesByDayBoundsUseCase,
+    private val eventRepository: EventRepository,
 ) {
     operator fun invoke(sortOrder: TimelineSortOrder = TimelineSortOrder.REVERSE_CHRONOLOGICAL): Flow<Timeline> =
-        notesRepository.allNotesObserved
-            .transform { allNotes ->
-                val notesByDay = groupNotesByDayBoundsUseCase(allNotes)
+        combine(
+            notesRepository.allNotesObserved,
+            eventRepository.observeAllEvents(),
+        ) { allNotes, allEvents ->
+            val notesByDay = groupNotesByDayBoundsUseCase(allNotes)
 
-                val timelineDays =
-                    notesByDay.map { (date, entries) ->
-                        getTimelineDayUseCase(date, entries)
-                    }
+            val timelineDays =
+                notesByDay.map { (date, entries) ->
+                    val dayStart = entries.minOf { it.creationTimestamp }
+                    val dayEnd = entries.maxOf { it.creationTimestamp }
+                    val dayEvents =
+                        allEvents.filter { event ->
+                            event.startTime < dayEnd && (event.endTime ?: event.startTime) >= dayStart
+                        }
+                    getTimelineDayUseCase(date, entries, dayEvents)
+                }
 
-                val sortedDays =
-                    when (sortOrder) {
-                        TimelineSortOrder.CHRONOLOGICAL -> timelineDays.sortedBy { it.date }
-                        TimelineSortOrder.REVERSE_CHRONOLOGICAL -> timelineDays.sortedByDescending { it.date }
-                    }
+            val sortedDays =
+                when (sortOrder) {
+                    TimelineSortOrder.CHRONOLOGICAL -> timelineDays.sortedBy { it.date }
+                    TimelineSortOrder.REVERSE_CHRONOLOGICAL -> timelineDays.sortedByDescending { it.date }
+                }
 
-                emit(Timeline(sortedDays))
-            }
+            Timeline(sortedDays)
+        }
 }
 
 data class Timeline(
@@ -114,18 +122,21 @@ class GetTimelineDayUseCase(
     private val getMediaUrisUseCase: GetMediaUrisUseCase,
     private val extractPeopleUseCase: ExtractPeopleUseCase,
     private val inferMomentsUseCase: InferMomentsUseCase,
-    private val observeEventsForDateRange: ObserveEventsForDateRangeUseCase,
 ) {
     /**
      * Creates a TimelineDay from journal entries for a specific date.
      *
      * @param date The date for which to create the TimelineDay
      * @param entries The journal entries for the date
+     * @param events Events that overlap this day, pre-filtered by the caller. Defaults to
+     *   empty so callers that don't surface events (such as the streaming and paged variants)
+     *   stay simple.
      * @return A TimelineDay object representing the aggregated data for the day
      */
     suspend operator fun invoke(
         date: LocalDate,
         entries: List<JournalNote>,
+        events: List<Event> = emptyList(),
     ): TimelineDay {
         val summary =
             when (val result = summarizeJournalEntriesUseCase(entries)) {
@@ -157,17 +168,13 @@ class GetTimelineDayUseCase(
         val placesVisited = extractPlacesVisited(entries)
         val moments = inferMomentsUseCase(date, entries, placesVisited)
 
-        val dayStart = entries.minOf { entry -> entry.creationTimestamp }
-        val dayEnd = entries.maxOf { it.creationTimestamp }
-        val dayEvents = observeEventsForDateRange(dayStart, dayEnd).first()
-
         return TimelineDay(
             tldr = summary,
             date = date,
-            start = dayStart,
-            end = dayEnd,
+            start = entries.minOf { entry -> entry.creationTimestamp },
+            end = entries.maxOf { it.creationTimestamp },
             people = people,
-            events = dayEvents,
+            events = events,
             placesVisited = placesVisited,
             moments = moments,
             parts = extractDayParts(entries),

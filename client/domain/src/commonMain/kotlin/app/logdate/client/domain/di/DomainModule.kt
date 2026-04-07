@@ -159,11 +159,11 @@ val domainModule: Module =
         factory { GetJournalMembershipUseCase(get()) }
         factory { GetMediaUrisUseCase(get()) }
         factory { GroupNotesByDayBoundsUseCase(get(), get()) }
-        factory { GetTimelineUseCase(get(), get(), get()) }
+        factory { GetTimelineUseCase(get(), get(), get(), get()) }
         factory { GetStreamingTimelineUseCase(get(), get(), get()) }
         factory { GetTimelinePageUseCase(get(), get()) }
         factory { InferMomentsUseCase(get()) }
-        factory { GetTimelineDayUseCase(get(), get(), get(), get(), get()) }
+        factory { GetTimelineDayUseCase(get(), get(), get(), get()) }
         factory { SummarizeJournalEntriesUseCase(get()) }
 
         // Include health domain module

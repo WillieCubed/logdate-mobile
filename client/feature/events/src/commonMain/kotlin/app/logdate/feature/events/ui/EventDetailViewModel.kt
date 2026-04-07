@@ -11,6 +11,7 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
@@ -121,21 +122,21 @@ class EventDetailViewModel(
      */
     fun loadEvent(eventId: Uuid) {
         viewModelScope.launch {
-            getEventById(eventId).collect { event ->
+            // Combine the event lookup and the linked-note observation so the screen never
+            // sees a Loaded state with a stale or zero count flashing in before the real
+            // count arrives.
+            combine(getEventById(eventId), observeNotesForEvent(eventId)) { event, noteIds ->
+                event to noteIds.size
+            }.collect { (event, count) ->
                 _uiState.update { current ->
-                    if (event == null) {
-                        EventDetailUiState.NotFound
-                    } else {
-                        val previousCount = (current as? EventDetailUiState.Loaded)?.linkedNoteCount ?: 0
-                        EventDetailUiState.Loaded(event = event, linkedNoteCount = previousCount)
+                    when {
+                        event == null -> EventDetailUiState.NotFound
+                        // Once the user is editing, keep their draft and only refresh the
+                        // linked-note count from upstream — otherwise their typing would be
+                        // clobbered by an unrelated re-emit.
+                        current is EventDetailUiState.Loaded -> current.copy(linkedNoteCount = count)
+                        else -> EventDetailUiState.Loaded(event = event, linkedNoteCount = count)
                     }
-                }
-            }
-        }
-        viewModelScope.launch {
-            observeNotesForEvent(eventId).collect { noteIds ->
-                _uiState.update { current ->
-                    if (current is EventDetailUiState.Loaded) current.copy(linkedNoteCount = noteIds.size) else current
                 }
             }
         }

@@ -21,6 +21,9 @@ interface EventDao {
     @Query("SELECT * FROM events WHERE id = :id AND deleted_at IS NULL")
     suspend fun getById(id: Uuid): EventEntity?
 
+    @Query("SELECT * FROM events WHERE id IN (:ids) AND deleted_at IS NULL")
+    suspend fun getByIds(ids: List<Uuid>): List<EventEntity>
+
     @Query("SELECT * FROM events WHERE id = :id AND deleted_at IS NULL")
     fun observeById(id: Uuid): Flow<EventEntity?>
 
