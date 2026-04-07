@@ -136,6 +136,7 @@ import app.logdate.navigation.routes.openProfile
 import app.logdate.navigation.routes.openRecommendationSettings
 import app.logdate.navigation.routes.openResetAppSettings
 import app.logdate.navigation.routes.openResetSettings
+import app.logdate.navigation.routes.openRewindSettings
 import app.logdate.navigation.routes.openSearch
 import app.logdate.navigation.routes.openSettings
 import app.logdate.navigation.routes.openShareJournal
@@ -735,6 +736,7 @@ fun MainNavigationRoot(
                             onNavigateToMemories = mainAppNavigator::openMemoriesSettings,
                             onNavigateToNotifications = mainAppNavigator::openNotificationSettings,
                             onNavigateToStreaks = mainAppNavigator::openStreakSettings,
+                            onNavigateToRewindSettings = mainAppNavigator::openRewindSettings,
                             onNavigateToRecommendations = mainAppNavigator::openRecommendationSettings,
                             onNavigateToTimeline = mainAppNavigator::openTimelineSettings,
                             onNavigateToDayBoundary = mainAppNavigator::openDayBoundarySettings,

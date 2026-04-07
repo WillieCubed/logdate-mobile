@@ -280,6 +280,12 @@ data object RecommendationSettingsRoute : NavKey
 @Serializable
 data object StreakSettingsRoute : NavKey
 
+/**
+ * Navigation route for the rewind settings detail screen.
+ */
+@Serializable
+data object RewindSettingsRoute : NavKey
+
 @Serializable
 data object TimelineSettingsRoute : NavKey
 

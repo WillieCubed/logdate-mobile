@@ -6,6 +6,7 @@ import app.logdate.client.intelligence.rewind.RewindMessageGenerator
 import app.logdate.client.intelligence.rewind.WittyRewindMessageGenerator
 import app.logdate.feature.rewind.ui.RewindDetailViewModel
 import app.logdate.feature.rewind.ui.overview.RewindOverviewViewModel
+import app.logdate.feature.rewind.ui.settings.RewindSettingsViewModel
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
@@ -24,4 +25,5 @@ val rewindFeatureModule: Module =
         // ViewModels using standard Koin viewModelOf DSL
         viewModelOf(::RewindOverviewViewModel)
         viewModelOf(::RewindDetailViewModel)
+        viewModelOf(::RewindSettingsViewModel)
     }

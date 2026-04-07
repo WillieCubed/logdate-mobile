@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Rewind settings (entry on the main settings overview) -->
+    <string name="rewind_settings_overview_title">Rewind</string>
+    <string name="rewind_settings_overview_description">Choose how often weekly Rewinds get made and whether you&apos;re notified.</string>
+</resources>

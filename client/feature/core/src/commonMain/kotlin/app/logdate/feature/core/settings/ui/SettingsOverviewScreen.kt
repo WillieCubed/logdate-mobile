@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Timeline
@@ -72,6 +73,8 @@ import logdate.client.feature.core.generated.resources.profile
 import logdate.client.feature.core.generated.resources.profile_settings_description
 import logdate.client.feature.core.generated.resources.reset
 import logdate.client.feature.core.generated.resources.reset_description
+import logdate.client.feature.core.generated.resources.rewind_settings_overview_description
+import logdate.client.feature.core.generated.resources.rewind_settings_overview_title
 import logdate.client.feature.core.generated.resources.screen_title_settings
 import logdate.client.feature.core.generated.resources.settings_group_data_storage
 import logdate.client.feature.core.generated.resources.settings_group_personal
@@ -112,6 +115,7 @@ fun SettingsOverviewScreen(
     onNavigateToMemories: () -> Unit,
     onNavigateToNotifications: (() -> Unit)? = null,
     onNavigateToStreaks: () -> Unit = {},
+    onNavigateToRewindSettings: () -> Unit = {},
     onNavigateToTimeline: () -> Unit,
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
@@ -136,6 +140,7 @@ fun SettingsOverviewScreen(
         onNavigateToMemories = onNavigateToMemories,
         onNavigateToNotifications = onNavigateToNotifications,
         onNavigateToStreaks = onNavigateToStreaks,
+        onNavigateToRewindSettings = onNavigateToRewindSettings,
         onNavigateToTimeline = onNavigateToTimeline,
         onNavigateToSync = onNavigateToSync,
         onNavigateToExport = onNavigateToExport,
@@ -166,6 +171,7 @@ fun SettingsOverviewContent(
     onNavigateToMemories: () -> Unit,
     onNavigateToNotifications: (() -> Unit)? = null,
     onNavigateToStreaks: () -> Unit = {},
+    onNavigateToRewindSettings: () -> Unit = {},
     onNavigateToTimeline: () -> Unit = {},
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
@@ -221,6 +227,12 @@ fun SettingsOverviewContent(
                     description = stringResource(Res.string.streaks_description),
                     icon = { Icon(Icons.Default.LocalFireDepartment, contentDescription = null) },
                     onClick = onNavigateToStreaks,
+                )
+                SettingsNavigationItem(
+                    title = stringResource(Res.string.rewind_settings_overview_title),
+                    description = stringResource(Res.string.rewind_settings_overview_description),
+                    icon = { Icon(Icons.Default.Replay, contentDescription = null) },
+                    onClick = onNavigateToRewindSettings,
                 )
                 SettingsNavigationItem(
                     title = "Your library",

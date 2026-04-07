@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Rewind settings -->
+    <string name="rewind_settings_title">Rewind</string>
+    <string name="rewind_settings_description">Choose how often LogDate puts together your weekly Rewind and whether you want to be told when one is ready.</string>
+    <string name="rewind_settings_auto_generation_label">Generate weekly rewinds automatically</string>
+    <string name="rewind_settings_auto_generation_helper">Each week, LogDate quietly stitches your entries into a story so it&apos;s waiting for you when you open the app. Turn this off and rewinds only get made when you ask for them.</string>
+    <string name="rewind_settings_notifications_label">Notify me when a Rewind is ready</string>
+    <string name="rewind_settings_notifications_helper">Get a tap-to-watch notification the moment your latest weekly Rewind finishes. This is on top of Android&apos;s notification controls; turning it off here stops the app from posting one at all.</string>
+
     <!-- Rewind screens -->
     <string name="close_rewind">Close rewind</string>
     <string name="past_rewind">Past rewind</string>

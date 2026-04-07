@@ -51,6 +51,10 @@ class LogdatePreferencesDataSource(
         // Calendar preferences
         val FIRST_DAY_OF_WEEK = stringPreferencesKey("first_day_of_week")
 
+        // Rewind preferences
+        val REWIND_AUTO_GENERATION_ENABLED = booleanPreferencesKey("rewind_auto_generation_enabled")
+        val REWIND_NOTIFICATIONS_ENABLED = booleanPreferencesKey("rewind_notifications_enabled")
+
         // Android AppSearch metadata
         val ANDROID_PLATFORM_SEARCH_INDEX_GENERATION = longPreferencesKey("android_platform_search_index_generation")
         val ANDROID_PLATFORM_SEARCH_SCHEMA_VERSION = intPreferencesKey("android_platform_search_schema_version")
@@ -420,6 +424,48 @@ class LogdatePreferencesDataSource(
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
                 this[FIRST_DAY_OF_WEEK] = dayOfWeek.name
+            }
+        }
+    }
+
+    /**
+     * Observes whether weekly rewinds should be generated automatically in the background.
+     *
+     * Defaults to true so existing users keep getting weekly rewinds without opt-in.
+     */
+    fun observeRewindAutoGenerationEnabled(): Flow<Boolean> =
+        userPreferences.data.map { prefs ->
+            prefs[REWIND_AUTO_GENERATION_ENABLED] ?: true
+        }
+
+    suspend fun isRewindAutoGenerationEnabled(): Boolean = observeRewindAutoGenerationEnabled().first()
+
+    suspend fun setRewindAutoGenerationEnabled(enabled: Boolean) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[REWIND_AUTO_GENERATION_ENABLED] = enabled
+            }
+        }
+    }
+
+    /**
+     * Observes whether the user wants a notification when a new weekly rewind is ready.
+     *
+     * Defaults to true. Independent of the system-level notification channel: this gates
+     * whether the app even tries to post the notification, so users who turn rewinds off
+     * here also stop seeing them in the notification settings flow.
+     */
+    fun observeRewindNotificationsEnabled(): Flow<Boolean> =
+        userPreferences.data.map { prefs ->
+            prefs[REWIND_NOTIFICATIONS_ENABLED] ?: true
+        }
+
+    suspend fun isRewindNotificationsEnabled(): Boolean = observeRewindNotificationsEnabled().first()
+
+    suspend fun setRewindNotificationsEnabled(enabled: Boolean) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[REWIND_NOTIFICATIONS_ENABLED] = enabled
             }
         }
     }

@@ -40,6 +40,11 @@ class RewindGenerationWorker(
     override suspend fun doWork(): Result {
         Napier.d("RewindGenerationWorker: checking if weekly rewind needs generation")
 
+        if (!preferences.isRewindAutoGenerationEnabled()) {
+            Napier.d("RewindGenerationWorker: auto-generation disabled by user, skipping")
+            return Result.success()
+        }
+
         val (start, end) = lastWeekBounds()
 
         // If a rewind already exists for last week, nothing to do.
@@ -51,7 +56,11 @@ class RewindGenerationWorker(
         return when (val result = generateRewind(start, end)) {
             is GenerateBasicRewindResult.Success -> {
                 Napier.d("RewindGenerationWorker: generated weekly rewind ${result.rewind.uid}")
-                notificationCoordinator.postRewindReady(result.rewind)
+                if (preferences.isRewindNotificationsEnabled()) {
+                    notificationCoordinator.postRewindReady(result.rewind)
+                } else {
+                    Napier.d("RewindGenerationWorker: rewind notifications disabled, skipping notification")
+                }
                 Result.success()
             }
             is GenerateBasicRewindResult.AlreadyInProgress -> {

@@ -45,6 +45,7 @@ import app.logdate.feature.core.settings.ui.watch.WatchSettingsViewModel
 import app.logdate.feature.core.settings.ui.watch.WatchSyncSettingsScreen
 import app.logdate.feature.core.settings.ui.watch.WatchTroubleshootingScreen
 import app.logdate.feature.location.timeline.ui.LocationTimelineBottomSheet
+import app.logdate.feature.rewind.ui.settings.RewindSettingsScreen
 import app.logdate.navigation.MainAppNavigator
 import app.logdate.navigation.routes.core.AccountSettingsRoute
 import app.logdate.navigation.routes.core.AdvancedSettingsRoute
@@ -65,6 +66,7 @@ import app.logdate.navigation.routes.core.PrivacySettingsRoute
 import app.logdate.navigation.routes.core.RecommendationSettingsRoute
 import app.logdate.navigation.routes.core.ResetAppSettingsRoute
 import app.logdate.navigation.routes.core.ResetSettingsRoute
+import app.logdate.navigation.routes.core.RewindSettingsRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.routes.core.StreakSettingsRoute
 import app.logdate.navigation.routes.core.SyncSettingsRoute
@@ -187,6 +189,13 @@ fun MainAppNavigator.openRecommendationSettings() {
  */
 fun MainAppNavigator.openStreakSettings() {
     backStack.add(StreakSettingsRoute)
+}
+
+/**
+ * Opens the rewind settings detail screen.
+ */
+fun MainAppNavigator.openRewindSettings() {
+    backStack.add(RewindSettingsRoute)
 }
 
 fun MainAppNavigator.openTimelineSettings() {
@@ -312,6 +321,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToWatchNotifications: () -> Unit,
     onNavigateToWatchTroubleshooting: () -> Unit,
     onNavigateToStreaks: () -> Unit = {},
+    onNavigateToRewindSettings: () -> Unit = {},
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
 ) {
@@ -334,6 +344,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onNavigateToMemories = onNavigateToMemories,
             onNavigateToNotifications = onNavigateToNotifications,
             onNavigateToStreaks = onNavigateToStreaks,
+            onNavigateToRewindSettings = onNavigateToRewindSettings,
             onNavigateToTimeline = onNavigateToTimeline,
             onNavigateToSync = onNavigateToSync,
             onNavigateToExport = onNavigateToExport,
@@ -543,6 +554,15 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
         metadata = ListDetailSceneStrategy.detailPane(),
     ) { _ ->
         StreakSettingsScreen(
+            onBack = onBack,
+        )
+    }
+
+    // Rewind settings detail (detail pane)
+    routeEntry<RewindSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        RewindSettingsScreen(
             onBack = onBack,
         )
     }
