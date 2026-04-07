@@ -72,9 +72,7 @@ import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_information
 import logdate.client.feature.core.generated.resources.authentication
-import logdate.client.feature.core.generated.resources.back
 import logdate.client.feature.core.generated.resources.birthday
-import logdate.client.feature.core.generated.resources.cancel
 import logdate.client.feature.core.generated.resources.current_streak
 import logdate.client.feature.core.generated.resources.display_name
 import logdate.client.feature.core.generated.resources.edit_display_name
@@ -84,12 +82,15 @@ import logdate.client.feature.core.generated.resources.personal_information
 import logdate.client.feature.core.generated.resources.profile
 import logdate.client.feature.core.generated.resources.profile_photo
 import logdate.client.feature.core.generated.resources.profile_updated_successfully
-import logdate.client.feature.core.generated.resources.save
 import logdate.client.feature.core.generated.resources.streak_day_count
 import logdate.client.feature.core.generated.resources.username_handle
+import logdate.client.ui.generated.resources.common_back
+import logdate.client.ui.generated.resources.common_cancel
+import logdate.client.ui.generated.resources.common_save
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Instant
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
 fun ProfileScreen(
@@ -164,7 +165,7 @@ fun ProfileScreenContent(
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(Res.string.back),
+                            contentDescription = stringResource(UiRes.string.common_back),
                         )
                     }
                 },
@@ -390,10 +391,10 @@ private fun ProfileHeader(
                         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
                     ) {
                         IconButton(onClick = onCancelEditing) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(Res.string.cancel))
+                            Icon(Icons.Default.Close, contentDescription = stringResource(UiRes.string.common_cancel))
                         }
                         IconButton(onClick = { onSaveDisplayName(editedName) }) {
-                            Icon(Icons.Default.Check, contentDescription = stringResource(Res.string.save))
+                            Icon(Icons.Default.Check, contentDescription = stringResource(UiRes.string.common_save))
                         }
                     }
                 }

@@ -32,7 +32,10 @@ import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
+import logdate.client.ui.generated.resources.common_back
+import logdate.client.ui.generated.resources.common_continue
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 const val MEMORIES_IMPORT_INFO_ROOT_TAG = "onboarding_memory_import_root"
 const val MEMORIES_IMPORT_INFO_CONTINUE_TAG = "onboarding_memory_import_continue"
@@ -54,7 +57,7 @@ fun MemoriesImportInfoScreen(
                 title = { Text(stringResource(Res.string.memories_import)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.back))
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
                     }
                 },
             )
@@ -104,7 +107,7 @@ fun MemoriesImportInfoScreen(
                         .fillMaxWidth()
                         .testTag(MEMORIES_IMPORT_INFO_CONTINUE_TAG),
             ) {
-                Text(stringResource(Res.string.`continue`))
+                Text(stringResource(UiRes.string.common_continue))
             }
         }
     }

@@ -60,12 +60,14 @@ import logdate.client.feature.timeline.generated.resources.period_months_ago
 import logdate.client.feature.timeline.generated.resources.period_this_week
 import logdate.client.feature.timeline.generated.resources.period_weeks_ago
 import logdate.client.feature.timeline.generated.resources.period_years_ago
+import logdate.client.ui.generated.resources.common_delete
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Checks that there is an entry within the past eight hours.
@@ -186,7 +188,7 @@ private fun EntryDropdownMenu(
 //        )
         DropdownMenuItem(
             text = {
-                Text(stringResource(Res.string.delete))
+                Text(stringResource(UiRes.string.common_delete))
             },
             onClick = onDelete,
             leadingIcon = {

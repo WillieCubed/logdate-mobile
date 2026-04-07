@@ -50,10 +50,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import logdate.client.feature.journal.generated.resources.*
+import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.ui.generated.resources.common_back
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
 fun JournalCreationScreen(
@@ -123,7 +126,7 @@ fun JournalCreationScreenContent(
                 title = { Text(stringResource(Res.string.new_journal)) },
                 navigationIcon = {
                     IconButton(onClick = { onGoBack() }) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.back))
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
                     }
                 },
             )

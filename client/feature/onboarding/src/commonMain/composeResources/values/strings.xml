@@ -4,13 +4,11 @@
     <string name="about_you">About you</string>
     <string name="all_memories">All memories</string>
     <string name="all_your_memories_are_stored_securely_on_your_device_by_default_sign_up_for_a_logdate_account_so_you_never_lose_your_memories">All your memories are stored securely on your device by default. Sign up for a LogDate Account so you never lose your memories.</string>
-    <string name="back">Back</string>
     <string name="backup_and_sync">Backup &amp; Sync</string>
     <string name="by_importing_your_memories_youll_be_able_to_see_memories_from_your_past">By importing your memories, you&apos;ll be able to see memories from your past.</string>
     <string name="choose_how_youd_like_to_proceed">Choose how you&apos;d like to proceed:</string>
     <string name="choose_memories_to_import">Choose memories to import</string>
     <string name="choose_your_storage_plan">Choose Your Storage Plan:</string>
-    <string name="continue">Continue</string>
     <string name="continue_with_memories_count">Continue with %1$d memories</string>
     <string name="continue_without_importing_memories">Continue without importing</string>
     <string name="continue_without_cloud_sync">Continue Without Cloud Sync</string>
@@ -21,7 +19,6 @@
     <string name="enter_recovery_phrase">Enter Recovery Phrase</string>
     <string name="enter_the_following_words_from_your_recovery_phrase_to_confirm_youve_written_it_down_correctly">Enter the following words from your recovery phrase to confirm you&apos;ve written it down correctly.</string>
     <string name="enter_your_12_word_recovery_phrase_to_restore_your_encryption_keys_and_decrypt_your_data">Enter your 12-word recovery phrase to restore your encryption keys and decrypt your data.</string>
-    <string name="get_started">Get Started</string>
     <string name="i_have_written_down_my_recovery_phrase">I have written down my recovery phrase</string>
     <string name="i_love_coffee_hiking_and_terrible_movies">I love coffee, hiking, and terrible movies...</string>
     <string name="journal_notifications">Journal notifications</string>
@@ -36,7 +33,6 @@
     <string name="memory_access_needed_body">LogDate needs access to your photos and videos before it can suggest memories to import.</string>
     <string name="memory_load_failed_body">We couldn&apos;t load your photos and videos right now.</string>
     <string name="memory_no_recent_items_body">We couldn&apos;t find any photos or videos to import on this device.</string>
-    <string name="retry">Retry</string>
     <string name="no_passwords_to_remember_use_your_devices_biometric_authentication_face_id_touch_id_or_fingerprint_for_secure_convenient_access">No passwords to remember. Use your device&apos;s biometric authentication (Face ID, Touch ID, or fingerprint) for secure, convenient access.</string>
     <string name="now_lets_import_your_memories">Now let&apos;s import your memories.</string>
     <string name="one_more_thing">One more thing...</string>

@@ -50,8 +50,11 @@ import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
+import logdate.client.ui.generated.resources.common_back
+import logdate.client.ui.generated.resources.common_continue
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import logdate.client.ui.generated.resources.Res as UiRes
 
 const val ONBOARDING_NOTIFICATIONS_ROOT_TAG = "onboarding_notifications_root"
 const val ONBOARDING_NOTIFICATIONS_PRIMARY_TAG = "onboarding_notifications_primary"
@@ -137,7 +140,7 @@ fun OnboardingNotificationsContent(
         }
     val primaryActionLabel =
         if (hasDecision) {
-            stringResource(Res.string.`continue`)
+            stringResource(UiRes.string.common_continue)
         } else {
             stringResource(Res.string.onboarding_notifications_enable)
         }
@@ -150,7 +153,7 @@ fun OnboardingNotificationsContent(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.back))
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
                     }
                 },
                 scrollBehavior = scrollBehavior,

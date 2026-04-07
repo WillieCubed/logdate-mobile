@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="clear_search">Clear search</string>
-    <string name="go_back">Go back</string>
     <string name="search">Search</string>
     <string name="search_entries">Search entries...</string>
     <string name="search_for_entries">Search for entries</string>

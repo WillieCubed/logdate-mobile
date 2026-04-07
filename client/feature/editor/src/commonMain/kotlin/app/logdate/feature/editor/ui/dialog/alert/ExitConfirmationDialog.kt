@@ -20,13 +20,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.editor.generated.resources.Res
-import logdate.client.feature.editor.generated.resources.cancel
 import logdate.client.feature.editor.generated.resources.discard
 import logdate.client.feature.editor.generated.resources.save_draft
 import logdate.client.feature.editor.generated.resources.unsaved_changes
 import logdate.client.feature.editor.generated.resources.would_you_like_to_save_your_changes_as_a_draft
 import logdate.client.feature.editor.generated.resources.you_have_unsaved_changes_that_will_be_lost_if_you_exit_now
+import logdate.client.ui.generated.resources.common_cancel
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Confirmation dialog that appears when a user tries to exit the editor with unsaved changes.
@@ -81,7 +82,7 @@ fun ExitConfirmationDialog(
             ) {
                 // Cancel button - continue editing
                 TextButton(onClick = onDismiss) {
-                    Text(stringResource(Res.string.cancel))
+                    Text(stringResource(UiRes.string.common_cancel))
                 }
 
                 Spacer(modifier = Modifier.width(Spacing.sm))

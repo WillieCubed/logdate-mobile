@@ -34,8 +34,6 @@ import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.app_security
-import logdate.client.feature.core.generated.resources.cancel
-import logdate.client.feature.core.generated.resources.confirm
 import logdate.client.feature.core.generated.resources.disable_biometric_lock_message
 import logdate.client.feature.core.generated.resources.disable_biometric_lock_title
 import logdate.client.feature.core.generated.resources.location_privacy
@@ -51,7 +49,6 @@ import logdate.client.feature.core.generated.resources.passkey_operation_removin
 import logdate.client.feature.core.generated.resources.passkey_removed_successfully
 import logdate.client.feature.core.generated.resources.privacy_and_security
 import logdate.client.feature.core.generated.resources.privacy_security_description
-import logdate.client.feature.core.generated.resources.remove
 import logdate.client.feature.core.generated.resources.remove_passkey
 import logdate.client.feature.core.generated.resources.remove_passkey_from_device
 import logdate.client.feature.core.generated.resources.settings_biometric_description
@@ -59,8 +56,12 @@ import logdate.client.feature.core.generated.resources.settings_biometric_label
 import logdate.client.feature.core.generated.resources.system_search_visibility_description
 import logdate.client.feature.core.generated.resources.system_search_visibility_label
 import logdate.client.feature.core.generated.resources.system_search_visibility_section
+import logdate.client.ui.generated.resources.common_cancel
+import logdate.client.ui.generated.resources.common_confirm
+import logdate.client.ui.generated.resources.common_remove
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Privacy and security settings screen.
@@ -127,12 +128,12 @@ private fun PasskeyDeletionConfirmationDialog(
             },
             confirmButton = {
                 TextButton(onClick = onConfirm) {
-                    Text(stringResource(Res.string.remove))
+                    Text(stringResource(UiRes.string.common_remove))
                 }
             },
             dismissButton = {
                 TextButton(onClick = onDismiss) {
-                    Text(stringResource(Res.string.cancel))
+                    Text(stringResource(UiRes.string.common_cancel))
                 }
             },
         )
@@ -361,12 +362,12 @@ fun PrivacySettingsContent(
                         showDisableBiometricsDialog = false
                     },
                 ) {
-                    Text(stringResource(Res.string.confirm))
+                    Text(stringResource(UiRes.string.common_confirm))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDisableBiometricsDialog = false }) {
-                    Text(stringResource(Res.string.cancel))
+                    Text(stringResource(UiRes.string.common_cancel))
                 }
             },
         )

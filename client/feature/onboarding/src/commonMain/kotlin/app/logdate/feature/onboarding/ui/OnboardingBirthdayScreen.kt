@@ -61,9 +61,11 @@ import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
+import logdate.client.ui.generated.resources.common_back
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Instant
+import logdate.client.ui.generated.resources.Res as UiRes
 
 const val ONBOARDING_BIRTHDAY_ROOT_TAG = "onboarding_birthday_root"
 const val ONBOARDING_BIRTHDAY_SET_TAG = "onboarding_birthday_set"
@@ -132,7 +134,7 @@ fun OnboardingBirthdayContent(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.back))
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
                     }
                 },
                 scrollBehavior = scrollBehavior,

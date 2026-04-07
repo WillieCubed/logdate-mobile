@@ -46,11 +46,12 @@ import logdate.client.feature.editor.generated.resources.open_app_settings
 import logdate.client.feature.editor.generated.resources.pick_from_your_library_or_browse_all_your_photos
 import logdate.client.feature.editor.generated.resources.recent_photos
 import logdate.client.feature.editor.generated.resources.show_your_recent_photos_here_after_you_allow_library_access
-import logdate.client.feature.editor.generated.resources.try_again
 import logdate.client.feature.editor.generated.resources.we_couldnt_load_your_recent_photos
+import logdate.client.ui.generated.resources.common_try_again
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
+import logdate.client.ui.generated.resources.Res as UiRes
 
 internal const val RECENT_IMAGE_PREVIEW_LIMIT = 24
 
@@ -230,7 +231,7 @@ internal fun ImagePickerBrowser(
                             onRetryLoading?.let { retry ->
                                 {
                                     OutlinedButton(onClick = retry) {
-                                        Text(stringResource(Res.string.try_again))
+                                        Text(stringResource(UiRes.string.common_try_again))
                                     }
                                 }
                             },

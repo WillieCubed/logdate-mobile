@@ -59,8 +59,11 @@ import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
+import logdate.client.ui.generated.resources.common_back
+import logdate.client.ui.generated.resources.common_continue
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import logdate.client.ui.generated.resources.Res as UiRes
 
 const val PERSONAL_INTRO_ROOT_TAG = "onboarding_personal_intro_root"
 const val PERSONAL_INTRO_NAME_FIELD_TAG = "onboarding_personal_intro_name_field"
@@ -325,14 +328,14 @@ private fun NameStep(
             enabled = canContinue,
             modifier = Modifier.fillMaxWidth().testTag(PERSONAL_INTRO_NAME_CONTINUE_TAG),
         ) {
-            Text(stringResource(Res.string.`continue`))
+            Text(stringResource(UiRes.string.common_continue))
         }
 
         TextButton(
             onClick = onBack,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(stringResource(Res.string.back))
+            Text(stringResource(UiRes.string.common_back))
         }
     }
 }
@@ -444,7 +447,7 @@ private fun BioStep(
             onClick = onBack,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(stringResource(Res.string.back))
+            Text(stringResource(UiRes.string.common_back))
         }
     }
 }

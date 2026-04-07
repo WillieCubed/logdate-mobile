@@ -45,8 +45,9 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.onboarding.generated.resources.*
-import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.ui.generated.resources.book_open
+import logdate.client.ui.generated.resources.common_back
+import logdate.client.ui.generated.resources.common_continue
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as coreRes
@@ -78,7 +79,7 @@ fun OnboardingOverviewScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.back))
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(coreRes.string.common_back))
                     }
                 },
                 modifier = Modifier.then(if (useSplitScreen) Modifier.fillMaxHeight() else Modifier),
@@ -143,7 +144,7 @@ fun OnboardingOverviewScreen(
                             onClick = onNext,
                             modifier = Modifier.testTag(ONBOARDING_OVERVIEW_CONTINUE_TAG),
                         ) {
-                            Text(text = stringResource(Res.string.`continue`))
+                            Text(text = stringResource(coreRes.string.common_continue))
                         }
                     }
                 }

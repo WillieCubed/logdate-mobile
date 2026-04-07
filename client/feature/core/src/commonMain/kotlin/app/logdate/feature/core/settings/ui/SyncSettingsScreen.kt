@@ -50,12 +50,10 @@ import logdate.client.feature.core.generated.resources.create_account
 import logdate.client.feature.core.generated.resources.detected_timestamp
 import logdate.client.feature.core.generated.resources.last_sync_failed
 import logdate.client.feature.core.generated.resources.last_synced_time
-import logdate.client.feature.core.generated.resources.loading
 import logdate.client.feature.core.generated.resources.loading_conflicts
 import logdate.client.feature.core.generated.resources.never_synced
 import logdate.client.feature.core.generated.resources.no_conflicts_waiting
 import logdate.client.feature.core.generated.resources.queued_conflicts
-import logdate.client.feature.core.generated.resources.refresh
 import logdate.client.feature.core.generated.resources.securely_sync_your_journals_notes_and_memories_across_all_your_devices
 import logdate.client.feature.core.generated.resources.showing_three_of_conflicts
 import logdate.client.feature.core.generated.resources.sign_in
@@ -67,9 +65,12 @@ import logdate.client.feature.core.generated.resources.sync_feature_sync
 import logdate.client.feature.core.generated.resources.sync_now
 import logdate.client.feature.core.generated.resources.sync_status
 import logdate.client.feature.core.generated.resources.syncing
+import logdate.client.ui.generated.resources.common_loading
+import logdate.client.ui.generated.resources.common_refresh
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Instant
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Sync & Backup settings screen.
@@ -330,7 +331,7 @@ private fun SyncStatusText(syncStatus: app.logdate.client.sync.SyncStatus?) {
                     },
             )
         }
-    } ?: Text(stringResource(Res.string.loading), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    } ?: Text(stringResource(UiRes.string.common_loading), color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable
@@ -410,7 +411,7 @@ private fun ConflictsSummaryItem(
         trailingContent = {
             Row {
                 TextButton(onClick = onRefreshConflicts) {
-                    Text(stringResource(Res.string.refresh))
+                    Text(stringResource(UiRes.string.common_refresh))
                 }
                 TextButton(
                     onClick = onClearConflicts,

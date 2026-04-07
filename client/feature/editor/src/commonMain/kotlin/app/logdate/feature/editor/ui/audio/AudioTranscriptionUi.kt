@@ -31,9 +31,10 @@ import logdate.client.feature.editor.generated.resources.convert_to_text
 import logdate.client.feature.editor.generated.resources.error
 import logdate.client.feature.editor.generated.resources.transcribing_audio
 import logdate.client.feature.editor.generated.resources.transcription_queued
-import logdate.client.feature.editor.generated.resources.try_again
 import logdate.client.feature.editor.generated.resources.we_couldnt_convert_this_recording_to_text
+import logdate.client.ui.generated.resources.common_try_again
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Displays transcription UI for an audio note, handling various transcription states.
@@ -223,7 +224,7 @@ private fun TranscriptionErrorUi(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Refresh,
-                    contentDescription = stringResource(Res.string.try_again),
+                    contentDescription = stringResource(UiRes.string.common_try_again),
                     tint = MaterialTheme.colorScheme.primary,
                 )
             }

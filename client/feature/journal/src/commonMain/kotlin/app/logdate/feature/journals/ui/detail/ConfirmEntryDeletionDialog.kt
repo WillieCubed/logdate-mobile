@@ -12,7 +12,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import logdate.client.feature.journal.generated.resources.*
 import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.ui.generated.resources.common_cancel
+import logdate.client.ui.generated.resources.common_delete
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * A dialog that asks the user to confirm deletion of a journal entry.
@@ -38,14 +41,14 @@ fun ConfirmEntryDeletionDialog(
             TextButton(
                 onClick = onConfirmation,
             ) {
-                Text(stringResource(Res.string.delete))
+                Text(stringResource(UiRes.string.common_delete))
             }
         },
         dismissButton = {
             TextButton(
                 onClick = onDismissRequest,
             ) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
         },
     )

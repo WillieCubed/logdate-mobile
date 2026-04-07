@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Navigation -->
-    <string name="back">Back</string>
     <string name="home">Home</string>
     <string name="options">Options</string>
     <string name="profile">Profile</string>

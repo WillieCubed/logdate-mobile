@@ -19,7 +19,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import logdate.client.feature.rewind.generated.resources.*
 import logdate.client.feature.rewind.generated.resources.Res
+import logdate.client.ui.generated.resources.common_back
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
 fun PastRewindsRoute(onGoBack: () -> Unit) {
@@ -35,7 +37,7 @@ fun PastRewindsScreen(onGoBack: () -> Unit) {
                 title = { Text(stringResource(Res.string.past_rewind)) },
                 navigationIcon = {
                     IconButton(onClick = { onGoBack() }) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.back))
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
                     }
                 },
             )

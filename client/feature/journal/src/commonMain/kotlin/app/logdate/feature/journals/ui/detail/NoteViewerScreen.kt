@@ -69,7 +69,6 @@ import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.add_to_journal
-import logdate.client.feature.journal.generated.resources.back
 import logdate.client.feature.journal.generated.resources.cd_next_entry
 import logdate.client.feature.journal.generated.resources.cd_previous_entry
 import logdate.client.feature.journal.generated.resources.error
@@ -78,12 +77,14 @@ import logdate.client.feature.journal.generated.resources.location
 import logdate.client.feature.journal.generated.resources.open_in_locations
 import logdate.client.feature.journal.generated.resources.pinned_location
 import logdate.client.feature.journal.generated.resources.share
+import logdate.client.ui.generated.resources.common_back
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 import kotlin.math.absoluteValue
 import kotlin.math.roundToLong
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Viewer screen that renders notes with type-specific presentation.
@@ -452,7 +453,7 @@ private fun NoteViewerToolbar(
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = stringResource(Res.string.back),
+                contentDescription = stringResource(UiRes.string.common_back),
             )
         }
 

@@ -53,14 +53,15 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.birthday
 import logdate.client.feature.core.generated.resources.birthday_detail_description
 import logdate.client.feature.core.generated.resources.birthday_not_set
-import logdate.client.feature.core.generated.resources.cancel
-import logdate.client.feature.core.generated.resources.confirm
 import logdate.client.feature.core.generated.resources.your_birthday
+import logdate.client.ui.generated.resources.common_cancel
+import logdate.client.ui.generated.resources.common_confirm
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.floor
 import kotlin.time.Clock
 import kotlin.time.Instant
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Detail screen for birthday personalization.
@@ -261,12 +262,12 @@ fun BirthdaySettingsContent(
                         showDatePicker = false
                     },
                 ) {
-                    Text(stringResource(Res.string.confirm))
+                    Text(stringResource(UiRes.string.common_confirm))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) {
-                    Text(stringResource(Res.string.cancel))
+                    Text(stringResource(UiRes.string.common_cancel))
                 }
             },
         ) {

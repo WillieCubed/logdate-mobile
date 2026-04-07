@@ -62,12 +62,13 @@ import app.logdate.feature.editor.audio.formatAudioLabel
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.formatMediaDuration
 import logdate.client.feature.editor.generated.resources.Res
-import logdate.client.feature.editor.generated.resources.delete
 import logdate.client.feature.editor.generated.resources.no_audio_recorded_yet
 import logdate.client.feature.editor.generated.resources.search_transcript
 import logdate.client.feature.editor.generated.resources.text_00_00
+import logdate.client.ui.generated.resources.common_delete
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+import logdate.client.ui.generated.resources.Res as UiRes
 
 // Default height constants for audio visualizations
 private val COLLAPSED_WAVEFORM_MIN_HEIGHT = 32.dp
@@ -362,7 +363,7 @@ private fun ExpandedAudioContent(
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.DeleteOutline,
-                        contentDescription = stringResource(Res.string.delete),
+                        contentDescription = stringResource(UiRes.string.common_delete),
                         tint = MaterialTheme.colorScheme.error,
                     )
                 }

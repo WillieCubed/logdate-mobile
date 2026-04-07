@@ -40,7 +40,6 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.cancel
 import logdate.client.feature.core.generated.resources.display_name
 import logdate.client.feature.core.generated.resources.edit_profile
 import logdate.client.feature.core.generated.resources.edit_profile_2
@@ -48,12 +47,14 @@ import logdate.client.feature.core.generated.resources.go_to_account_settings
 import logdate.client.feature.core.generated.resources.manage_your_display_name_and_username
 import logdate.client.feature.core.generated.resources.profile
 import logdate.client.feature.core.generated.resources.profile_username_hint
-import logdate.client.feature.core.generated.resources.save
 import logdate.client.feature.core.generated.resources.sign_in_to_logdate_cloud_settings_summary
 import logdate.client.feature.core.generated.resources.username
 import logdate.client.feature.core.generated.resources.username_2
 import logdate.client.feature.core.generated.resources.your_full_name
+import logdate.client.ui.generated.resources.common_cancel
+import logdate.client.ui.generated.resources.common_save
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 data class UserProfile(
     val name: String,
@@ -333,12 +334,12 @@ private fun EditProfileDialog(
                     }
                 },
             ) {
-                Text(stringResource(Res.string.save))
+                Text(stringResource(UiRes.string.common_save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
         },
     )

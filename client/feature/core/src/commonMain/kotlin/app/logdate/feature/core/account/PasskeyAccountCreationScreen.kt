@@ -57,17 +57,18 @@ import logdate.client.feature.core.generated.resources.bio_optional
 import logdate.client.feature.core.generated.resources.create_account
 import logdate.client.feature.core.generated.resources.create_logdate_cloud_account
 import logdate.client.feature.core.generated.resources.create_your_account_with_a_passkey_for_secure_password_free_access_to_logdate_cloud
-import logdate.client.feature.core.generated.resources.dismiss
 import logdate.client.feature.core.generated.resources.display_name
 import logdate.client.feature.core.generated.resources.error_checking_username
-import logdate.client.feature.core.generated.resources.go_back
 import logdate.client.feature.core.generated.resources.passkeys_not_supported
 import logdate.client.feature.core.generated.resources.tell_others_about_yourself_2
 import logdate.client.feature.core.generated.resources.username
 import logdate.client.feature.core.generated.resources.username_available
 import logdate.client.feature.core.generated.resources.username_taken
 import logdate.client.feature.core.generated.resources.your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key
+import logdate.client.ui.generated.resources.common_dismiss
+import logdate.client.ui.generated.resources.common_go_back
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
 fun PasskeyAccountCreationScreen(
@@ -127,7 +128,7 @@ private fun PasskeyAccountCreationContent(
             IconButton(onClick = onNavigateBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Default.ArrowBack,
-                    contentDescription = stringResource(Res.string.go_back),
+                    contentDescription = stringResource(UiRes.string.common_go_back),
                 )
             }
 
@@ -345,7 +346,7 @@ private fun PasskeyAccountCreationContent(
                     IconButton(onClick = onClearError) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = stringResource(Res.string.dismiss),
+                            contentDescription = stringResource(UiRes.string.common_dismiss),
                             tint = MaterialTheme.colorScheme.onErrorContainer,
                         )
                     }

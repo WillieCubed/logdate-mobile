@@ -48,7 +48,6 @@ import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_recovery
 import logdate.client.feature.core.generated.resources.at
-import logdate.client.feature.core.generated.resources.go_back
 import logdate.client.feature.core.generated.resources.privacy_policy
 import logdate.client.feature.core.generated.resources.server_domain_sign_in_hint
 import logdate.client.feature.core.generated.resources.server_sign_in_title
@@ -56,10 +55,12 @@ import logdate.client.feature.core.generated.resources.sign_in_with_passkey
 import logdate.client.feature.core.generated.resources.signing_in
 import logdate.client.feature.core.generated.resources.terms_of_service
 import logdate.client.feature.core.generated.resources.text_4
-import logdate.client.feature.core.generated.resources.try_again
 import logdate.client.feature.core.generated.resources.username
 import logdate.client.feature.core.generated.resources.your_username_2
+import logdate.client.ui.generated.resources.common_go_back
+import logdate.client.ui.generated.resources.common_try_again
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
 fun CloudAccountSignInScreen(
@@ -136,7 +137,7 @@ fun CloudAccountSignInContent(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(Res.string.go_back),
+                            contentDescription = stringResource(UiRes.string.common_go_back),
                         )
                     }
                 }
@@ -237,7 +238,7 @@ fun CloudAccountSignInContent(
                                 Text(stringResource(Res.string.signing_in))
                             }
                         } else if (errorMessage != null) {
-                            Text(stringResource(Res.string.try_again))
+                            Text(stringResource(UiRes.string.common_try_again))
                         } else {
                             Text(stringResource(Res.string.sign_in_with_passkey))
                         }

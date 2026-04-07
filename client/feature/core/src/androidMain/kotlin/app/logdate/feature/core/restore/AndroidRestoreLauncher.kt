@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.result.ActivityResultLauncher
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
 import androidx.work.Data
@@ -15,10 +14,16 @@ import androidx.work.WorkManager
 import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.export.ExportFormat
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipInputStream
 
 /**
@@ -28,6 +33,9 @@ class AndroidRestoreLauncher(
     private val context: Context,
 ) : RestoreLauncher {
     private val json = Json { ignoreUnknownKeys = true }
+    private val launcherScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val restoreCompleted = AtomicBoolean(false)
+    private var metadataExtractionJob: Job? = null
 
     private var lastSelectedUri: Uri? = null
     private var completionCallback: ((RestoreOutcome) -> Unit)? = null
@@ -67,27 +75,34 @@ class AndroidRestoreLauncher(
                 when (workInfo.state) {
                     WorkInfo.State.SUCCEEDED -> {
                         _restoreProgress.value = RestoreProgressInfo.Idle
-                        val summaryJson = workInfo.outputData.getString(RestoreWorker.SUMMARY_JSON_KEY)
-                        if (summaryJson != null) {
-                            val summary =
-                                runCatching { json.decodeFromString<RestoreSummary>(summaryJson) }
-                                    .getOrNull()
-                            if (summary != null) {
-                                completionCallback?.invoke(RestoreOutcome.Success(summary))
+                        // Fallback: only fire if the worker didn't already call completeRestore().
+                        if (restoreCompleted.compareAndSet(false, true)) {
+                            val summaryJson = workInfo.outputData.getString(RestoreWorker.SUMMARY_JSON_KEY)
+                            if (summaryJson != null) {
+                                val summary =
+                                    runCatching { json.decodeFromString<RestoreSummary>(summaryJson) }
+                                        .getOrNull()
+                                if (summary != null) {
+                                    completionCallback?.invoke(RestoreOutcome.Success(summary))
+                                } else {
+                                    completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.INVALID_SUMMARY))
+                                }
                             } else {
-                                completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.INVALID_SUMMARY))
+                                completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.NO_SUMMARY_RETURNED))
                             }
-                        } else {
-                            completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.NO_SUMMARY_RETURNED))
                         }
                     }
                     WorkInfo.State.FAILED -> {
                         _restoreProgress.value = RestoreProgressInfo.Idle
-                        completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
+                        if (restoreCompleted.compareAndSet(false, true)) {
+                            completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
+                        }
                     }
                     WorkInfo.State.CANCELLED -> {
                         _restoreProgress.value = RestoreProgressInfo.Idle
-                        completionCallback?.invoke(RestoreOutcome.Cancelled)
+                        if (restoreCompleted.compareAndSet(false, true)) {
+                            completionCallback?.invoke(RestoreOutcome.Cancelled)
+                        }
                     }
                     else -> {
                         // Still in progress, do nothing
@@ -95,12 +110,10 @@ class AndroidRestoreLauncher(
                 }
             }
 
-        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-            WorkManager
-                .getInstance(context)
-                .getWorkInfosForUniqueWorkLiveData(RestoreWorker.WORK_NAME)
-                .observe(lifecycleOwner, workInfoObserver!!)
-        }
+        WorkManager
+            .getInstance(context)
+            .getWorkInfosForUniqueWorkLiveData(RestoreWorker.WORK_NAME)
+            .observe(lifecycleOwner, workInfoObserver!!)
     }
 
     override fun setRestoreCompletionCallback(callback: (RestoreOutcome) -> Unit) {
@@ -117,7 +130,9 @@ class AndroidRestoreLauncher(
 
     override fun completeRestore(outcome: RestoreOutcome) {
         _restoreProgress.value = RestoreProgressInfo.Idle
-        completionCallback?.invoke(outcome)
+        if (restoreCompleted.compareAndSet(false, true)) {
+            completionCallback?.invoke(outcome)
+        }
         Napier.i("Restore completed via direct signal: $outcome")
     }
 
@@ -148,6 +163,7 @@ class AndroidRestoreLauncher(
                 return
             }
 
+        restoreCompleted.set(false)
         completionCallback?.invoke(RestoreOutcome.Started)
         _restoreProgress.value = RestoreProgressInfo.Idle
 
@@ -176,6 +192,8 @@ class AndroidRestoreLauncher(
     }
 
     override fun cancelRestore() {
+        metadataExtractionJob?.cancel()
+        metadataExtractionJob = null
         lastSelectedUri = null
         WorkManager.getInstance(context).cancelUniqueWork(RestoreWorker.WORK_NAME)
         _restoreProgress.value = RestoreProgressInfo.Idle
@@ -187,7 +205,8 @@ class AndroidRestoreLauncher(
      * Called when the user has selected a restore archive or cancelled the dialog.
      *
      * Instead of immediately starting a restore, this extracts the archive's
-     * metadata and delivers it to the file-selected callback for preview.
+     * metadata and delivers it to the file-selected callback for preview. The
+     * ZIP read is dispatched to [launcherScope] so it never blocks the main thread.
      */
     fun onRestoreSourceSelected(uri: Uri?) {
         if (uri == null) {
@@ -210,21 +229,25 @@ class AndroidRestoreLauncher(
         lastSelectedUri = uri
         val displayName = context.contentResolver.resolveDisplayName(uri) ?: uri.lastPathSegment ?: "archive"
 
-        val metadataJson = extractMetadata(uri)
-        if (metadataJson == null) {
-            Napier.w("Could not extract metadata from selected archive")
-            fileSelectedCallback?.invoke(null)
-            completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.INVALID_ARCHIVE))
-            return
-        }
+        metadataExtractionJob?.cancel()
+        metadataExtractionJob =
+            launcherScope.launch {
+                val metadataJson = extractMetadata(uri)
+                if (metadataJson == null) {
+                    Napier.w("Could not extract metadata from selected archive")
+                    fileSelectedCallback?.invoke(null)
+                    completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.INVALID_ARCHIVE))
+                    return@launch
+                }
 
-        fileSelectedCallback?.invoke(
-            ArchiveFileInfo(
-                displayName = displayName,
-                uri = uri.toString(),
-                metadataJson = metadataJson,
-            ),
-        )
+                fileSelectedCallback?.invoke(
+                    ArchiveFileInfo(
+                        displayName = displayName,
+                        uri = uri.toString(),
+                        metadataJson = metadataJson,
+                    ),
+                )
+            }
     }
 
     /**

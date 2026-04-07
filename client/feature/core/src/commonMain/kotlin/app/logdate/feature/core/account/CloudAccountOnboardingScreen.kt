@@ -19,8 +19,9 @@ import app.logdate.shared.model.ServerDescriptor
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.atproto_recovery_guidance_body
 import logdate.client.feature.core.generated.resources.atproto_recovery_guidance_title
-import logdate.client.feature.core.generated.resources.dismiss
+import logdate.client.ui.generated.resources.common_dismiss
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 private const val FALLBACK_HANDLE_DOMAIN = "logdate.app"
 private const val FALLBACK_PRIVACY_POLICY_URL = "https://logdate.app/privacy"
@@ -76,7 +77,7 @@ fun CloudAccountOnboardingScreen(
             text = { Text(stringResource(Res.string.atproto_recovery_guidance_body)) },
             confirmButton = {
                 TextButton(onClick = { showRecoveryInfo.value = false }) {
-                    Text(stringResource(Res.string.dismiss))
+                    Text(stringResource(UiRes.string.common_dismiss))
                 }
             },
         )

@@ -38,7 +38,9 @@ import kotlinx.coroutines.delay
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.feature.onboarding.generated.resources.onboarding_action_sign_in
+import logdate.client.ui.generated.resources.common_get_started
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 private const val DELAY_TIME = 1_000L
 const val ONBOARDING_START_ROOT_TAG = "onboarding_start_root"
@@ -212,7 +214,7 @@ private fun OnboardingLandingContent(
                                 contentDescription = ONBOARDING_START_GET_STARTED_TAG
                             },
                 ) {
-                    Text(stringResource(Res.string.get_started))
+                    Text(stringResource(UiRes.string.common_get_started))
                 }
                 OutlinedButton(
                     onClick = onStartFromBackup,

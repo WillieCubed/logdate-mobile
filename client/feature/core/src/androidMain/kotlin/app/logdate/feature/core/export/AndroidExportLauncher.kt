@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.result.ActivityResultLauncher
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
 import androidx.work.Data
@@ -81,13 +80,10 @@ class AndroidExportLauncher(
                 }
             }
 
-        // Register observer if lifecycle is at least STARTED
-        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-            WorkManager
-                .getInstance(context)
-                .getWorkInfosForUniqueWorkLiveData(ExportWorker.WORK_NAME)
-                .observe(lifecycleOwner, workInfoObserver!!)
-        }
+        WorkManager
+            .getInstance(context)
+            .getWorkInfosForUniqueWorkLiveData(ExportWorker.WORK_NAME)
+            .observe(lifecycleOwner, workInfoObserver!!)
     }
 
     override fun updateProgress(info: ExportProgressInfo) {

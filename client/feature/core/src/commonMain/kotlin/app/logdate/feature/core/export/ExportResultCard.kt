@@ -25,11 +25,12 @@ import app.logdate.feature.core.common.OperationFailureCard
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.action_browse
-import logdate.client.feature.core.generated.resources.action_done
 import logdate.client.feature.core.generated.resources.export_complete_description
 import logdate.client.feature.core.generated.resources.export_complete_title
 import logdate.client.feature.core.generated.resources.export_failed_title
+import logdate.client.ui.generated.resources.common_done
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
 internal fun ExportSuccessCard(
@@ -90,7 +91,7 @@ internal fun ExportSuccessCard(
             onClick = onDismiss,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(stringResource(Res.string.action_done))
+            Text(stringResource(UiRes.string.common_done))
         }
     }
 }

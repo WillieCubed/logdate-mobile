@@ -37,10 +37,8 @@ import kotlinx.datetime.todayIn
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.ambient_prompts
 import logdate.client.feature.core.generated.resources.ambient_prompts_description
-import logdate.client.feature.core.generated.resources.cancel
 import logdate.client.feature.core.generated.resources.capture_nudges
 import logdate.client.feature.core.generated.resources.capture_nudges_description
-import logdate.client.feature.core.generated.resources.confirm
 import logdate.client.feature.core.generated.resources.draft_rescue
 import logdate.client.feature.core.generated.resources.draft_rescue_description
 import logdate.client.feature.core.generated.resources.evening_prompt
@@ -60,9 +58,12 @@ import logdate.client.feature.core.generated.resources.recommendations_detail_de
 import logdate.client.feature.core.generated.resources.smart_recall
 import logdate.client.feature.core.generated.resources.smart_recall_description
 import logdate.client.feature.core.generated.resources.use_recommendations
+import logdate.client.ui.generated.resources.common_cancel
+import logdate.client.ui.generated.resources.common_confirm
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Clock
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Detail screen for the Recommendations setting group.
@@ -298,12 +299,12 @@ private fun PromptTimePickerDialog(
                     onConfirm(AmbientPromptTime(hour = state.hour, minute = state.minute))
                 },
             ) {
-                Text(stringResource(Res.string.confirm))
+                Text(stringResource(UiRes.string.common_confirm))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
         },
         text = {

@@ -28,8 +28,10 @@ import app.logdate.ui.theme.Spacing
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.feature.onboarding.generated.resources.section_title_backup_sync
+import logdate.client.ui.generated.resources.common_back
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
 fun BackupSyncScreen(
@@ -64,7 +66,7 @@ fun BackupSyncScreenContent(
                             IconButton(onClick = onBack) {
                                 Icon(
                                     Icons.AutoMirrored.Default.ArrowBack,
-                                    contentDescription = stringResource(Res.string.back),
+                                    contentDescription = stringResource(UiRes.string.common_back),
                                 )
                             }
                         },
@@ -100,7 +102,7 @@ fun BackupSyncScreenContent(
                                 IconButton(onClick = onBack) {
                                     Icon(
                                         Icons.AutoMirrored.Default.ArrowBack,
-                                        contentDescription = stringResource(Res.string.back),
+                                        contentDescription = stringResource(UiRes.string.common_back),
                                     )
                                 }
                             },

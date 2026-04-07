@@ -55,8 +55,12 @@ import app.logdate.ui.common.applyStandardContentWidth
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
 import logdate.client.feature.journal.generated.resources.*
+import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.ui.generated.resources.common_go_back
+import logdate.client.ui.generated.resources.common_loading
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Screen for sharing a journal with others.
@@ -112,7 +116,7 @@ fun ShareJournalScreenContent(
                     IconButton(onClick = onGoBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(Res.string.go_back),
+                            contentDescription = stringResource(UiRes.string.common_go_back),
                         )
                     }
                 },
@@ -125,7 +129,7 @@ fun ShareJournalScreenContent(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(stringResource(Res.string.loading))
+                    Text(stringResource(UiRes.string.common_loading))
                 }
             }
             is ShareJournalUiState.Error -> {

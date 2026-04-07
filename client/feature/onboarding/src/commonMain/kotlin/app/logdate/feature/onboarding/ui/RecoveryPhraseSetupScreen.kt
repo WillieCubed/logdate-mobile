@@ -12,7 +12,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
+import logdate.client.ui.generated.resources.common_continue
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
 fun RecoveryPhraseSetupScreen(onPhraseContinue: (List<String>) -> Unit) {
@@ -135,7 +137,7 @@ private fun RecoveryPhraseDisplayContent(
             enabled = userConfirmed,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(stringResource(Res.string.`continue`))
+            Text(stringResource(UiRes.string.common_continue))
         }
     }
 }

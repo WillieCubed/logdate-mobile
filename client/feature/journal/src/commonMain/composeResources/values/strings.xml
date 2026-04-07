@@ -17,21 +17,17 @@
     <string name="add_text_notes_description">Add notes you&apos;ve already written</string>
     <string name="select_notes">Select notes</string>
     <string name="add_to_journal">Add to journal</string>
-    <string name="done">Done</string>
     <string name="no_other_journals">No other journals available</string>
     <string name="notes_selected">%1$d selected</string>
     <string name="all_journals">All Journals</string>
     <string name="also_sharing_to_nearby_logdate_contacts">Also sharing to nearby LogDate contacts.</string>
     <string name="are_you_sure_you_want_to_delete_this_entry_this_action_cannot_be_undone">Are you sure you want to delete this entry? This action cannot be undone.</string>
     <string name="audio_note">Audio note</string>
-    <string name="back">Back</string>
     <string name="bring_your_devices_together_to_invite_someone_to_add_stuff">Bring your devices together to invite someone to add stuff.</string>
-    <string name="cancel">Cancel</string>
     <string name="close">Close</string>
     <string name="create_journal">Create Journal</string>
     <string name="create_new_journal">Create new journal</string>
     <string name="danger_zone">Danger Zone</string>
-    <string name="delete">Delete</string>
     <string name="delete_entry_2">Delete Entry</string>
     <string name="delete_journal">Delete Journal</string>
     <string name="delete_journal_2">Delete journal</string>
@@ -56,7 +52,6 @@
     <string name="error">Error</string>
     <string name="failed_to_load_journal">Failed to load journal</string>
     <string name="finish">Finish</string>
-    <string name="go_back">Go back</string>
     <string name="image">Image</string>
     <string name="image_note">Image note</string>
     <string name="journal_entries">Journal Entries</string>
@@ -67,7 +62,6 @@
     <string name="journal_visibility_shared_hint">Use the Share button to give others access.</string>
     <string name="journal_settings">Journal Settings</string>
     <string name="journal_settings_2">Journal settings</string>
-    <string name="loading">Loading...</string>
     <string name="location">Location</string>
     <string name="new_journal">New Journal</string>
     <string name="no_entries_in_this_journal_yet">No entries in this journal yet</string>

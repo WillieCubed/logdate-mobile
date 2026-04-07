@@ -26,7 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import app.logdate.ui.theme.Spacing
 import logdate.client.ui.generated.resources.Res
-import logdate.client.ui.generated.resources.back
+import logdate.client.ui.generated.resources.common_back
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -68,7 +68,7 @@ fun SettingsScaffold(
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(Res.string.back),
+                            contentDescription = stringResource(Res.string.common_back),
                         )
                     }
                 },

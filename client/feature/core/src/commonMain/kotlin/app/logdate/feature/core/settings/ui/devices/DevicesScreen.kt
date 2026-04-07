@@ -45,14 +45,12 @@ import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.app_version_label
-import logdate.client.feature.core.generated.resources.cancel
 import logdate.client.feature.core.generated.resources.device_name
 import logdate.client.feature.core.generated.resources.devices
 import logdate.client.feature.core.generated.resources.enter_a_new_name_for_this_device
 import logdate.client.feature.core.generated.resources.last_active_label
 import logdate.client.feature.core.generated.resources.loading_devices
 import logdate.client.feature.core.generated.resources.platform_label
-import logdate.client.feature.core.generated.resources.remove
 import logdate.client.feature.core.generated.resources.remove_device
 import logdate.client.feature.core.generated.resources.remove_device_2
 import logdate.client.feature.core.generated.resources.remove_device_confirmation
@@ -63,8 +61,11 @@ import logdate.client.feature.core.generated.resources.reset
 import logdate.client.feature.core.generated.resources.reset_device_id
 import logdate.client.feature.core.generated.resources.reset_device_id_confirmation
 import logdate.client.feature.core.generated.resources.this_device
+import logdate.client.ui.generated.resources.common_cancel
+import logdate.client.ui.generated.resources.common_remove
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Screen that displays device information and allows management of devices.
@@ -324,7 +325,7 @@ fun RenameDeviceDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
         },
     )
@@ -349,12 +350,12 @@ fun RemoveDeviceDialog(
         },
         confirmButton = {
             Button(onClick = onConfirm) {
-                Text(stringResource(Res.string.remove))
+                Text(stringResource(UiRes.string.common_remove))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
         },
     )
@@ -380,7 +381,7 @@ fun ResetDeviceIdDialog(
         },
         dismissButton = {
             OutlinedButton(onClick = onDismiss) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
         },
     )

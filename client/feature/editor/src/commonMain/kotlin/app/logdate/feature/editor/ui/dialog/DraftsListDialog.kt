@@ -41,7 +41,6 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.clear_all
-import logdate.client.feature.editor.generated.resources.delete
 import logdate.client.feature.editor.generated.resources.loading_drafts
 import logdate.client.feature.editor.generated.resources.no_drafts_found
 import logdate.client.feature.editor.generated.resources.photo
@@ -49,8 +48,10 @@ import logdate.client.feature.editor.generated.resources.previous_drafts
 import logdate.client.feature.editor.generated.resources.record_audio
 import logdate.client.feature.editor.generated.resources.start_writing_to_create_your_first_draft
 import logdate.client.feature.editor.generated.resources.video
+import logdate.client.ui.generated.resources.common_delete
 import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Bottom sheet for viewing and managing drafts.
@@ -228,7 +229,7 @@ private fun SwipeToDeleteDraftItem(
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = stringResource(Res.string.delete),
+                    text = stringResource(UiRes.string.common_delete),
                     style = MaterialTheme.typography.labelMedium,
                 )
             }

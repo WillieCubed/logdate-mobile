@@ -77,9 +77,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
+import logdate.client.ui.generated.resources.common_back
+import logdate.client.ui.generated.resources.common_retry
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 import kotlin.time.Duration
+import logdate.client.ui.generated.resources.Res as UiRes
 
 const val MEMORY_SELECTION_ROOT_TAG = "onboarding_memory_selection_root"
 const val MEMORY_SELECTION_PERMISSION_ACTION_TAG = "onboarding_memory_selection_permission_action"
@@ -142,7 +145,7 @@ fun MemorySelectionScreen(
                             IconButton(onClick = onBack) {
                                 Icon(
                                     Icons.AutoMirrored.Default.ArrowBack,
-                                    contentDescription = stringResource(Res.string.back),
+                                    contentDescription = stringResource(UiRes.string.common_back),
                                 )
                             }
                         },
@@ -275,7 +278,7 @@ private fun SharedTransitionScope.MemorySelectionContent(
                 MemorySelectionStatusCard(
                     title = stringResource(Res.string.select_memories),
                     body = stringResource(Res.string.memory_load_failed_body),
-                    actionLabel = stringResource(Res.string.retry),
+                    actionLabel = stringResource(UiRes.string.common_retry),
                     onAction = onRetryLoad,
                     actionTag = MEMORY_SELECTION_STATUS_ACTION_TAG,
                 )
@@ -291,7 +294,7 @@ private fun SharedTransitionScope.MemorySelectionContent(
                 MemorySelectionStatusCard(
                     title = stringResource(Res.string.select_memories),
                     body = stringResource(Res.string.memory_no_recent_items_body),
-                    actionLabel = stringResource(Res.string.retry),
+                    actionLabel = stringResource(UiRes.string.common_retry),
                     onAction = onRetryLoad,
                     actionTag = MEMORY_SELECTION_STATUS_ACTION_TAG,
                 )

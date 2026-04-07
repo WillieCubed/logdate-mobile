@@ -34,7 +34,6 @@ import androidx.compose.ui.Modifier
 import app.logdate.client.domain.export.ExportCounts
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.cancel
 import logdate.client.feature.core.generated.resources.export
 import logdate.client.feature.core.generated.resources.export_category_drafts
 import logdate.client.feature.core.generated.resources.export_category_item_count
@@ -50,7 +49,9 @@ import logdate.client.feature.core.generated.resources.export_date_range_last_90
 import logdate.client.feature.core.generated.resources.export_date_range_last_year
 import logdate.client.feature.core.generated.resources.export_options_description
 import logdate.client.feature.core.generated.resources.export_options_title
+import logdate.client.ui.generated.resources.common_cancel
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Bottom sheet that contains the entire export session lifecycle:
@@ -235,7 +236,7 @@ private fun ExportConfigContent(
                 onClick = onDismiss,
                 enabled = buttonsEnabled,
             ) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
             Button(
                 onClick = onConfirm,

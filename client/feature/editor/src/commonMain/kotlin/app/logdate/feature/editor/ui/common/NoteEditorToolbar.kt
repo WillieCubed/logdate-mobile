@@ -41,7 +41,6 @@ import app.logdate.feature.editor.ui.editor.AutoSaveStatus
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
 import logdate.client.feature.editor.generated.resources.Res
-import logdate.client.feature.editor.generated.resources.back
 import logdate.client.feature.editor.generated.resources.changes_saved
 import logdate.client.feature.editor.generated.resources.error_saving
 import logdate.client.feature.editor.generated.resources.load_drafts
@@ -49,7 +48,9 @@ import logdate.client.feature.editor.generated.resources.manage_drafts
 import logdate.client.feature.editor.generated.resources.more_options
 import logdate.client.feature.editor.generated.resources.save_entry
 import logdate.client.feature.editor.generated.resources.saving
+import logdate.client.ui.generated.resources.common_back
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Top toolbar for the note editor.
@@ -85,7 +86,7 @@ fun NoteEditorToolbar(
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = stringResource(Res.string.back),
+                contentDescription = stringResource(UiRes.string.common_back),
             )
         }
 

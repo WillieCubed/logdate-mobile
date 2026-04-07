@@ -30,14 +30,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.action_retry
-import logdate.client.feature.core.generated.resources.cancel
-import logdate.client.feature.core.generated.resources.dismiss
 import logdate.client.feature.core.generated.resources.export_category_drafts
 import logdate.client.feature.core.generated.resources.export_category_journals
 import logdate.client.feature.core.generated.resources.export_category_media
 import logdate.client.feature.core.generated.resources.export_category_notes
+import logdate.client.ui.generated.resources.common_cancel
+import logdate.client.ui.generated.resources.common_dismiss
+import logdate.client.ui.generated.resources.common_retry
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
 internal fun DataTransferProgressCard(
@@ -103,7 +104,7 @@ internal fun DataTransferProgressCard(
                 horizontalArrangement = Arrangement.End,
             ) {
                 TextButton(onClick = onCancel) {
-                    Text(stringResource(Res.string.cancel))
+                    Text(stringResource(UiRes.string.common_cancel))
                 }
             }
         }
@@ -231,13 +232,13 @@ internal fun OperationFailureCard(
                 horizontalArrangement = Arrangement.End,
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text(stringResource(Res.string.dismiss))
+                    Text(stringResource(UiRes.string.common_dismiss))
                 }
                 Button(
                     onClick = onRetry,
                     modifier = Modifier.padding(start = Spacing.sm),
                 ) {
-                    Text(stringResource(Res.string.action_retry))
+                    Text(stringResource(UiRes.string.common_retry))
                 }
             }
         }

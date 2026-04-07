@@ -21,13 +21,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.grant_permission
-import logdate.client.feature.editor.generated.resources.not_now
 import logdate.client.feature.editor.generated.resources.open_app_settings
 import logdate.client.feature.editor.generated.resources.permission_permanently_denied_camera
 import logdate.client.feature.editor.generated.resources.permission_permanently_denied_gallery
 import logdate.client.feature.editor.generated.resources.permission_permanently_denied_microphone
 import logdate.client.feature.editor.generated.resources.permission_required
+import logdate.client.ui.generated.resources.common_not_now
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * A reusable component for requesting permissions with explanation.
@@ -114,7 +115,7 @@ fun PermissionRequestContent(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
-                        text = stringResource(Res.string.not_now),
+                        text = stringResource(UiRes.string.common_not_now),
                         style = MaterialTheme.typography.labelLarge,
                     )
                 }

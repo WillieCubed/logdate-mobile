@@ -80,7 +80,6 @@ class ExportWorker(
                     dateRangeCutoff = dateRangeCutoff,
                 ).catch { exception ->
                     Napier.e("Export failed", exception)
-                    emitProgress(0, "Export failed: ${exception.message}")
                     finalResult =
                         Result.failure(
                             workDataOf(

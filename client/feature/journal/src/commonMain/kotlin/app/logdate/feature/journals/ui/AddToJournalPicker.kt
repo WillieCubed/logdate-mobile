@@ -29,10 +29,11 @@ import app.logdate.shared.model.Journal
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.add_to_journal
-import logdate.client.feature.journal.generated.resources.done
 import logdate.client.feature.journal.generated.resources.no_other_journals
+import logdate.client.ui.generated.resources.common_done
 import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Adaptive picker for adding a note to one or more journals.
@@ -130,7 +131,7 @@ private fun AddToJournalDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(Res.string.done))
+                Text(stringResource(UiRes.string.common_done))
             }
         },
     )

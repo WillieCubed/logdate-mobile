@@ -42,9 +42,11 @@ import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.timeline.generated.resources.*
 import logdate.client.feature.timeline.generated.resources.Res
+import logdate.client.ui.generated.resources.common_retry
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Displays an audio note in the timeline with enhanced playback controls and transcription.
@@ -297,7 +299,7 @@ fun AudioNoteSnippet(
                                     onClick = { transcriptionState.requestTranscription(uiState.noteId) },
                                     modifier = Modifier.fillMaxWidth(),
                                 ) {
-                                    Text(stringResource(Res.string.retry))
+                                    Text(stringResource(UiRes.string.common_retry))
                                 }
                             }
                         }

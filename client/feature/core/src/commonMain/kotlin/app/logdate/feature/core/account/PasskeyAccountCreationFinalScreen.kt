@@ -28,19 +28,20 @@ import logdate.client.feature.core.generated.resources.almost_ready
 import logdate.client.feature.core.generated.resources.bio_optional
 import logdate.client.feature.core.generated.resources.create_account_with_passkey
 import logdate.client.feature.core.generated.resources.creating_account
-import logdate.client.feature.core.generated.resources.dismiss
 import logdate.client.feature.core.generated.resources.display_name
-import logdate.client.feature.core.generated.resources.go_back
 import logdate.client.feature.core.generated.resources.passkeys_not_supported
 import logdate.client.feature.core.generated.resources.review_your_details_and_create_your_secure_passkey_to_complete_your_logdate_cloud_account
 import logdate.client.feature.core.generated.resources.share_something_about_yourself_with_the_logdate_community
 import logdate.client.feature.core.generated.resources.tell_others_about_yourself
 import logdate.client.feature.core.generated.resources.text_3_of_3
-import logdate.client.feature.core.generated.resources.try_again
 import logdate.client.feature.core.generated.resources.unique_address_username
 import logdate.client.feature.core.generated.resources.username
 import logdate.client.feature.core.generated.resources.your_device_doesnt_support_passkeys_please_use_a_device_with_biometric_authentication_or_a_security_key
+import logdate.client.ui.generated.resources.common_dismiss
+import logdate.client.ui.generated.resources.common_go_back
+import logdate.client.ui.generated.resources.common_try_again
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
 fun PasskeyAccountCreationFinalContent(
@@ -79,7 +80,7 @@ fun PasskeyAccountCreationFinalContent(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(Res.string.go_back),
+                        contentDescription = stringResource(UiRes.string.common_go_back),
                     )
                 }
 
@@ -295,7 +296,7 @@ fun PasskeyAccountCreationFinalContent(
                         IconButton(onClick = onClearError) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = stringResource(Res.string.dismiss),
+                                contentDescription = stringResource(UiRes.string.common_dismiss),
                                 tint = MaterialTheme.colorScheme.onErrorContainer,
                             )
                         }
@@ -358,7 +359,7 @@ fun PasskeyAccountCreationFinalContent(
                 Spacer(modifier = Modifier.width(Spacing.sm))
                 Text(stringResource(Res.string.creating_account))
             } else if (errorMessage != null) {
-                Text(stringResource(Res.string.try_again))
+                Text(stringResource(UiRes.string.common_try_again))
             } else {
                 Icon(
                     imageVector = Icons.Default.Key,

@@ -24,16 +24,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.`continue`
 import logdate.client.feature.core.generated.resources.display_name
 import logdate.client.feature.core.generated.resources.enter_your_name
 import logdate.client.feature.core.generated.resources.examples
-import logdate.client.feature.core.generated.resources.go_back
 import logdate.client.feature.core.generated.resources.text_1_of_3
 import logdate.client.feature.core.generated.resources.this_is_how_your_name_will_appear_to_others
 import logdate.client.feature.core.generated.resources.what_should_we_call_you
 import logdate.client.feature.core.generated.resources.your_display_name_is_how_youll_appear_to_others_when_sharing_journal_entries_you_can_always_change_this_later
+import logdate.client.ui.generated.resources.common_continue
+import logdate.client.ui.generated.resources.common_go_back
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
 fun DisplayNameSetupScreen(
@@ -90,7 +91,7 @@ private fun DisplayNameSetupContent(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(Res.string.go_back),
+                        contentDescription = stringResource(UiRes.string.common_go_back),
                     )
                 }
 
@@ -207,7 +208,7 @@ private fun DisplayNameSetupContent(
             enabled = isValid && displayName.isNotBlank(),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(stringResource(Res.string.`continue`))
+            Text(stringResource(UiRes.string.common_continue))
         }
     }
 }

@@ -30,7 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.save
 import logdate.client.feature.core.generated.resources.server_configuration
 import logdate.client.feature.core.generated.resources.server_connected
 import logdate.client.feature.core.generated.resources.server_connected_version
@@ -39,7 +38,9 @@ import logdate.client.feature.core.generated.resources.test_connection
 import logdate.client.feature.core.generated.resources.test_connection_before_saving
 import logdate.client.feature.core.generated.resources.testing_connection
 import logdate.client.feature.core.generated.resources.you_are_using_a_non_production_server_your_data_will_not_sync_with_logdate_cloud
+import logdate.client.ui.generated.resources.common_save
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Server configuration section used by Account & Sign-In settings.
@@ -225,7 +226,7 @@ private fun ValidationStatusSection(
                 Text(
                     text =
                         when (validationState) {
-                            is ServerValidationState.Success -> stringResource(Res.string.save)
+                            is ServerValidationState.Success -> stringResource(UiRes.string.common_save)
                             else -> stringResource(Res.string.test_connection)
                         },
                 )

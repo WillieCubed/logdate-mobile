@@ -41,9 +41,10 @@ import logdate.client.feature.core.generated.resources.connect_your_account_to_s
 import logdate.client.feature.core.generated.resources.create_new_account
 import logdate.client.feature.core.generated.resources.passkey_not_supported_banner
 import logdate.client.feature.core.generated.resources.sign_in
-import logdate.client.feature.core.generated.resources.skip_for_now
 import logdate.client.feature.core.generated.resources.welcome_to_logdate
+import logdate.client.ui.generated.resources.common_skip
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
 fun CloudAccountWelcomeScreen(
@@ -213,7 +214,7 @@ fun CloudAccountWelcomeContent(
                 onClick = onSkip,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(stringResource(Res.string.skip_for_now))
+                Text(stringResource(UiRes.string.common_skip))
             }
         }
     }

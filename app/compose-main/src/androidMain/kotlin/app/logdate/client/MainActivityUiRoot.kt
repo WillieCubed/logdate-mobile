@@ -71,7 +71,6 @@ import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.flow.distinctUntilChanged
 import logdate.app.composemain.generated.resources.Res
-import logdate.app.composemain.generated.resources.cancel
 import logdate.app.composemain.generated.resources.encrypted_data_recovery_required
 import logdate.app.composemain.generated.resources.i_understand_reset
 import logdate.app.composemain.generated.resources.open_recovery_tools
@@ -79,8 +78,10 @@ import logdate.app.composemain.generated.resources.reset_encrypted_storage
 import logdate.app.composemain.generated.resources.reset_encrypted_storage_2
 import logdate.app.composemain.generated.resources.restart
 import logdate.app.composemain.generated.resources.update_ready_restart_to_finish_installing
+import logdate.client.ui.generated.resources.common_cancel
 import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Renders the Android root UI once startup gates have produced a loaded app state.
@@ -289,7 +290,7 @@ fun MainActivityUiRoot(
                         },
                         dismissButton = {
                             TextButton(onClick = { showResetConfirmation = false }) {
-                                Text(stringResource(Res.string.cancel))
+                                Text(stringResource(UiRes.string.common_cancel))
                             }
                         },
                     )

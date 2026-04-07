@@ -62,12 +62,13 @@ import logdate.client.feature.core.generated.resources.atproto_register_plc_reco
 import logdate.client.feature.core.generated.resources.atproto_rotate_signing_key
 import logdate.client.feature.core.generated.resources.atproto_signing_key
 import logdate.client.feature.core.generated.resources.atproto_signing_key_json
-import logdate.client.feature.core.generated.resources.cancel
-import logdate.client.feature.core.generated.resources.confirm
-import logdate.client.feature.core.generated.resources.dismiss
 import logdate.client.feature.core.generated.resources.export
-import logdate.client.feature.core.generated.resources.save
+import logdate.client.ui.generated.resources.common_cancel
+import logdate.client.ui.generated.resources.common_confirm
+import logdate.client.ui.generated.resources.common_dismiss
+import logdate.client.ui.generated.resources.common_save
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -218,7 +219,7 @@ fun AtprotoIdentitySection(
                             modifier = Modifier.fillMaxWidth(),
                         )
                         TextButton(onClick = onClearExportedKeyJson) {
-                            Text(stringResource(Res.string.dismiss))
+                            Text(stringResource(UiRes.string.common_dismiss))
                         }
                     }
                 }
@@ -245,7 +246,7 @@ fun AtprotoIdentitySection(
                             Text(stringResource(Res.string.atproto_register_derived_plc_recovery_key))
                         }
                         TextButton(onClick = onClearDerivedRecoveryDidKey) {
-                            Text(stringResource(Res.string.dismiss))
+                            Text(stringResource(UiRes.string.common_dismiss))
                         }
                     }
                 }
@@ -410,7 +411,7 @@ private fun StatusCard(
             )
             onDismiss?.let {
                 TextButton(onClick = it) {
-                    Text(stringResource(Res.string.dismiss))
+                    Text(stringResource(UiRes.string.common_dismiss))
                 }
             }
         }
@@ -447,12 +448,12 @@ private fun PassphraseDialog(
                 onClick = { onConfirm(passphrase) },
                 enabled = passphrase.isNotBlank(),
             ) {
-                Text(stringResource(Res.string.confirm))
+                Text(stringResource(UiRes.string.common_confirm))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
         },
     )
@@ -515,12 +516,12 @@ private fun ImportSigningKeyDialog(
                         exportedKeyJson.isNotBlank() &&
                         (!requireRecoveryPhrase || recoveryPhrase.isNotBlank()),
             ) {
-                Text(stringResource(Res.string.confirm))
+                Text(stringResource(UiRes.string.common_confirm))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
         },
     )
@@ -551,12 +552,12 @@ private fun RecoveryPhraseDialog(
                 onClick = { onConfirm(recoveryPhrase) },
                 enabled = recoveryPhrase.isNotBlank(),
             ) {
-                Text(stringResource(Res.string.confirm))
+                Text(stringResource(UiRes.string.common_confirm))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
         },
     )
@@ -585,12 +586,12 @@ private fun RecoveryDidKeyDialog(
                 onClick = { onConfirm(recoveryDidKey) },
                 enabled = recoveryDidKey.isNotBlank(),
             ) {
-                Text(stringResource(Res.string.save))
+                Text(stringResource(UiRes.string.common_save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
         },
     )

@@ -42,8 +42,6 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.todayIn
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.cancel
-import logdate.client.feature.core.generated.resources.confirm
 import logdate.client.feature.core.generated.resources.day_schedule
 import logdate.client.feature.core.generated.resources.day_schedule_detail_description
 import logdate.client.feature.core.generated.resources.day_schedule_disabled_explanation
@@ -57,9 +55,12 @@ import logdate.client.feature.core.generated.resources.day_schedule_health_not_a
 import logdate.client.feature.core.generated.resources.day_schedule_health_not_available_detail
 import logdate.client.feature.core.generated.resources.day_schedule_health_permissions_needed
 import logdate.client.feature.core.generated.resources.use_sleep_schedule
+import logdate.client.ui.generated.resources.common_cancel
+import logdate.client.ui.generated.resources.common_confirm
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Clock
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
 fun DayBoundarySettingsScreen(
@@ -296,12 +297,12 @@ private fun TimePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(onClick = { onConfirm(state.hour) }) {
-                Text(stringResource(Res.string.confirm))
+                Text(stringResource(UiRes.string.common_confirm))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
         },
         text = {

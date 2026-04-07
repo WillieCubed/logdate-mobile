@@ -39,7 +39,6 @@ import app.logdate.client.domain.restore.ArchivePreview
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.cancel
 import logdate.client.feature.core.generated.resources.export_category_drafts
 import logdate.client.feature.core.generated.resources.export_category_item_count
 import logdate.client.feature.core.generated.resources.export_category_media
@@ -60,7 +59,9 @@ import logdate.client.feature.core.generated.resources.restore_error_unsupported
 import logdate.client.feature.core.generated.resources.restore_import_options_label
 import logdate.client.feature.core.generated.resources.restore_merge_info
 import logdate.client.feature.core.generated.resources.restore_preview_description
+import logdate.client.ui.generated.resources.common_cancel
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -197,7 +198,7 @@ private fun RestoreConfirmContent(
                 onClick = onDismiss,
                 enabled = buttonsEnabled,
             ) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
             Button(
                 onClick = onSelectFile,
@@ -319,7 +320,7 @@ private fun RestorePreviewContent(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
             Button(
                 onClick = onConfirmImport,

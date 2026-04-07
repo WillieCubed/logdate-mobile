@@ -26,12 +26,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.action_reset_app
-import logdate.client.feature.core.generated.resources.cancel
 import logdate.client.feature.core.generated.resources.clear_all_data_2
 import logdate.client.feature.core.generated.resources.clear_data_acknowledgement
 import logdate.client.feature.core.generated.resources.clear_data_warning_message
 import logdate.client.feature.core.generated.resources.yes_clear_all_data
+import logdate.client.ui.generated.resources.common_cancel
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Dialog for confirming application reset.
@@ -154,7 +155,7 @@ fun DangerConfirmationDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismissRequest) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
         },
     )

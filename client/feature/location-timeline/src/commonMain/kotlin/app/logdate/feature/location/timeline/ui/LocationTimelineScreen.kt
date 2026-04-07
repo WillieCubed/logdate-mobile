@@ -82,7 +82,6 @@ import app.logdate.ui.adaptive.AdaptivePaneLayout
 import app.logdate.ui.common.transitions.TransitionKeys
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.all_time
-import logdate.client.feature.location.timeline.generated.resources.cancel
 import logdate.client.feature.location.timeline.generated.resources.current_location
 import logdate.client.feature.location.timeline.generated.resources.custom_range
 import logdate.client.feature.location.timeline.generated.resources.delete_location
@@ -105,14 +104,16 @@ import logdate.client.feature.location.timeline.generated.resources.pinned_memor
 import logdate.client.feature.location.timeline.generated.resources.recent_memories
 import logdate.client.feature.location.timeline.generated.resources.recent_stays
 import logdate.client.feature.location.timeline.generated.resources.samples_count
-import logdate.client.feature.location.timeline.generated.resources.try_again
 import logdate.client.feature.location.timeline.generated.resources.unable_to_load_location_timeline
 import logdate.client.feature.location.timeline.generated.resources.view_note
 import logdate.client.feature.location.timeline.generated.resources.year_to_date
 import logdate.client.feature.location.timeline.generated.resources.your_location_timeline_will_appear_here_as_you_move_around
+import logdate.client.ui.generated.resources.common_cancel
+import logdate.client.ui.generated.resources.common_try_again
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -230,14 +231,14 @@ internal fun LocationTimelineErrorCard(
         LocationTimelineErrorUiState.LocationServicesDisabled -> {
             title = stringResource(Res.string.location_services_disabled)
             description = stringResource(Res.string.location_services_disabled_description)
-            actionLabel = stringResource(Res.string.try_again)
+            actionLabel = stringResource(UiRes.string.common_try_again)
             action = onRetry
         }
 
         LocationTimelineErrorUiState.TemporarilyUnavailable -> {
             title = stringResource(Res.string.unable_to_load_location_timeline)
             description = stringResource(Res.string.locations_temporarily_unavailable_description)
-            actionLabel = stringResource(Res.string.try_again)
+            actionLabel = stringResource(UiRes.string.common_try_again)
             action = onRetry
         }
     }
@@ -781,7 +782,7 @@ private fun StopCard(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirmation = false }) {
-                    Text(stringResource(Res.string.cancel))
+                    Text(stringResource(UiRes.string.common_cancel))
                 }
             },
         )

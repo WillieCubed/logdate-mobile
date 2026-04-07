@@ -70,9 +70,14 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
 import logdate.client.feature.journal.generated.resources.*
 import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.ui.generated.resources.common_back
+import logdate.client.ui.generated.resources.common_cancel
+import logdate.client.ui.generated.resources.common_delete
+import logdate.client.ui.generated.resources.common_loading
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * A settings screen that allows a user to change various properties of a journal.
@@ -135,7 +140,7 @@ fun JournalSettingsScreenContent(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(stringResource(Res.string.loading))
+                Text(stringResource(UiRes.string.common_loading))
             }
         }
 
@@ -148,7 +153,7 @@ fun JournalSettingsScreenContent(
                             IconButton(onClick = onGoBack) {
                                 Icon(
                                     Icons.AutoMirrored.Default.ArrowBack,
-                                    contentDescription = stringResource(Res.string.back),
+                                    contentDescription = stringResource(UiRes.string.common_back),
                                 )
                             }
                         },
@@ -552,12 +557,12 @@ fun DeleteConfirmationDialog(
                         contentColor = MaterialTheme.colorScheme.error,
                     ),
             ) {
-                Text(stringResource(Res.string.delete))
+                Text(stringResource(UiRes.string.common_delete))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismissRequest) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
         },
         onDismissRequest = onDismissRequest,

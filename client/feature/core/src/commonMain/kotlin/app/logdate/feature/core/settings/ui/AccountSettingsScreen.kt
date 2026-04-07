@@ -30,15 +30,16 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_actions
 import logdate.client.feature.core.generated.resources.account_and_sign_in
 import logdate.client.feature.core.generated.resources.account_information
-import logdate.client.feature.core.generated.resources.cancel
 import logdate.client.feature.core.generated.resources.sign_out
 import logdate.client.feature.core.generated.resources.sign_out_2
 import logdate.client.feature.core.generated.resources.sign_out_failed
 import logdate.client.feature.core.generated.resources.sign_out_of_your_logdate_cloud_account_on_this_device
 import logdate.client.feature.core.generated.resources.username_handle
 import logdate.client.feature.core.generated.resources.youll_need_to_sign_in_again_to_sync_data_on_this_device
+import logdate.client.ui.generated.resources.common_cancel
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Account and sign-in settings screen.
@@ -241,7 +242,7 @@ fun AccountSettingsContent(
             },
             dismissButton = {
                 TextButton(onClick = { showSignOutDialog = false }) {
-                    Text(stringResource(Res.string.cancel))
+                    Text(stringResource(UiRes.string.common_cancel))
                 }
             },
         )

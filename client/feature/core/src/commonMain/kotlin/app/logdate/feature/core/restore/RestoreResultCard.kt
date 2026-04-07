@@ -30,7 +30,6 @@ import app.logdate.feature.core.common.OperationFailureCard
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.action_done
 import logdate.client.feature.core.generated.resources.export_category_drafts
 import logdate.client.feature.core.generated.resources.export_category_journals
 import logdate.client.feature.core.generated.resources.export_category_media
@@ -40,8 +39,10 @@ import logdate.client.feature.core.generated.resources.restore_complete_title
 import logdate.client.feature.core.generated.resources.restore_failed_title
 import logdate.client.feature.core.generated.resources.restore_integrity_mismatch
 import logdate.client.feature.core.generated.resources.restore_warnings_title
+import logdate.client.ui.generated.resources.common_done
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Instant
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
 internal fun RestoreSuccessCard(
@@ -128,7 +129,7 @@ internal fun RestoreSuccessCard(
         Spacer(modifier = Modifier.height(Spacing.xl))
 
         TextButton(onClick = onDismiss) {
-            Text(stringResource(Res.string.action_done))
+            Text(stringResource(UiRes.string.common_done))
         }
     }
 }

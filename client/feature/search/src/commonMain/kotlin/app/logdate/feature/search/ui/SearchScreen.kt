@@ -49,15 +49,16 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.search.generated.resources.Res
 import logdate.client.feature.search.generated.resources.clear_search
-import logdate.client.feature.search.generated.resources.go_back
 import logdate.client.feature.search.generated.resources.search
 import logdate.client.feature.search.generated.resources.search_entries
 import logdate.client.feature.search.generated.resources.search_for_entries
 import logdate.client.feature.search.generated.resources.search_no_results
 import logdate.client.feature.search.generated.resources.searching_entries
+import logdate.client.ui.generated.resources.common_go_back
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 const val SEARCH_SCREEN_INPUT_ACCESSIBILITY_TAG = "search_screen_input"
 
@@ -179,7 +180,7 @@ fun SearchScreenContent(
                         IconButton(onClick = onGoBack) {
                             Icon(
                                 Icons.AutoMirrored.Default.ArrowBack,
-                                contentDescription = stringResource(Res.string.go_back),
+                                contentDescription = stringResource(UiRes.string.common_go_back),
                             )
                         }
                     },

@@ -99,10 +99,14 @@ import coil3.compose.AsyncImage
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.journal.generated.resources.*
+import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.ui.generated.resources.common_back
+import logdate.client.ui.generated.resources.common_cancel
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * The main screen to view a journal's contents.
@@ -226,7 +230,7 @@ fun JournalDetailScreenContent(
                             IconButton(onClick = onGoBack) {
                                 Icon(
                                     Icons.AutoMirrored.Rounded.ArrowBack,
-                                    contentDescription = stringResource(Res.string.back),
+                                    contentDescription = stringResource(UiRes.string.common_back),
                                 )
                             }
                         },
@@ -992,7 +996,7 @@ fun DeleteConfirmationDialog(
             TextButton(
                 onClick = onDismissRequest,
             ) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
         },
     )
@@ -1036,7 +1040,7 @@ private fun RemoveNoteFromJournalDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismissRequest) {
-                Text(stringResource(Res.string.cancel))
+                Text(stringResource(UiRes.string.common_cancel))
             }
         },
     )
