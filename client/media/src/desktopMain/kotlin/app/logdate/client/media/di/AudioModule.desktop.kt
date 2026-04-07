@@ -8,9 +8,9 @@ import app.logdate.client.media.audio.DesktopAudioDurationResolver
 import app.logdate.client.media.audio.DesktopAudioPlaybackManager
 import app.logdate.client.media.audio.DesktopAudioRecordingManager
 import app.logdate.client.media.audio.DesktopAudioStorage
+import app.logdate.client.media.audio.sherpa.DesktopSherpaAudioTaggingService
+import app.logdate.client.media.audio.sherpa.DesktopSherpaTranscriptionService
 import app.logdate.client.media.audio.tagging.AudioTaggingService
-import app.logdate.client.media.audio.tagging.NoopAudioTaggingService
-import app.logdate.client.media.audio.transcription.DesktopTranscriptionService
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -26,10 +26,16 @@ actual val audioModule: Module =
         single<AudioPlaybackManager> { DesktopAudioPlaybackManager() }
         single<AudioDurationResolver> { DesktopAudioDurationResolver() }
 
-        // Provide the Desktop implementation of TranscriptionService
-        factory<TranscriptionService> { DesktopTranscriptionService() }
+        // Real on-device Whisper transcription via Sherpa-ONNX JVM. The
+        // service handles its own download lifecycle and degrades cleanly
+        // (live transcription off, file transcription off until the model
+        // is downloaded) when the user hasn't pulled the model from
+        // Settings → Voice notes yet.
+        single<TranscriptionService> { DesktopSherpaTranscriptionService() }
 
-        // Desktop doesn't ship the on-device ambient sound tagger; the stub
-        // reports unavailable and the banner stays "not supported".
-        single<AudioTaggingService> { NoopAudioTaggingService }
+        // Real on-device ambient sound tagger via Sherpa-ONNX CED. The
+        // service handles its own download lifecycle and degrades cleanly
+        // (no detected sounds) when the user hasn't pulled the model from
+        // Settings → Voice notes yet.
+        single<AudioTaggingService> { DesktopSherpaAudioTaggingService() }
     }

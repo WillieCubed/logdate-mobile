@@ -77,5 +77,17 @@ kotlin {
             implementation(libs.play.feature.delivery.ktx)
             implementation(libs.kotlinx.coroutines.play.services)
         }
+        desktopMain.dependencies {
+            // Sherpa-ONNX JVM bindings (Java classes wrapping the JNI surface).
+            // The native libs needed for runtime live in the per-platform
+            // sherpa-onnx-native-lib-* jars below — Sherpa's LibraryUtils picks
+            // up whichever one matches the host OS at first use.
+            implementation(files("${rootProject.projectDir}/libs/sherpa-onnx-v1.12.35.jar"))
+            implementation(files("${rootProject.projectDir}/libs/sherpa-onnx-native-lib-osx-aarch64-v1.12.35.jar"))
+            // Runtime tar.bz2 unpacking for the on-demand model downloads,
+            // mirroring the dependency the speechrecognition dynamic feature
+            // module already pulls in on Android.
+            implementation(libs.commons.compress)
+        }
     }
 }
