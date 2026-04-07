@@ -569,6 +569,13 @@ class HomeViewModel(
                     mediaUris = mediaUris.map { uri -> MediaObjectUiState(uid = uri, uri = uri) },
                     isAiGenerated = isAiGenerated,
                 )
+            is HomeRecommendation.UpcomingEvent ->
+                TimelineSuggestionBlock.UpcomingEvent(
+                    eventId = eventId.toString(),
+                    title = title,
+                    startTime = startTime,
+                    placeName = placeName,
+                )
             HomeRecommendation.None -> null
         }
 }

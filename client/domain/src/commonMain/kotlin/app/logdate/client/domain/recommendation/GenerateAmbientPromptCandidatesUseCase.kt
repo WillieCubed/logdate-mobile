@@ -1,10 +1,12 @@
 package app.logdate.client.domain.recommendation
 
+import app.logdate.client.domain.events.ObserveUpcomingEventsUseCase
 import app.logdate.client.domain.location.ObserveLocationStopsUseCase
 import app.logdate.client.domain.notes.HasNotesForTodayUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.places.PlaceResolutionCache
 import app.logdate.client.domain.places.PlaceResolutionResult
+import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.JournalNotesRepository
 import kotlinx.coroutines.flow.first
 import kotlin.time.Clock
@@ -18,6 +20,8 @@ class GenerateAmbientPromptCandidatesUseCase(
     private val fetchMostRecentDraft: FetchMostRecentDraftUseCase,
     private val getMemoryRecall: GetMemoryRecallUseCase,
     private val observeLocationStops: ObserveLocationStopsUseCase,
+    private val observeUpcomingEvents: ObserveUpcomingEventsUseCase,
+    private val eventRepository: EventRepository,
     private val notesRepository: JournalNotesRepository,
     private val placeResolutionCache: PlaceResolutionCache,
     private val placeFamiliarityRepository: PlaceFamiliarityRepository,
@@ -97,6 +101,32 @@ class GenerateAmbientPromptCandidatesUseCase(
                             AmbientPromptPayload.MemoryRecall(
                                 date = recall.date,
                                 summary = recall.summary,
+                            ),
+                    )
+            }
+        }
+
+        if (triggerContext == AmbientPromptTriggerContext.PERIODIC && settings.eventNudgesEnabled) {
+            val upcoming = observeUpcomingEvents().first()
+            for (event in upcoming) {
+                // Skip events the user has already captured for — once a note is attached the
+                // nudge no longer makes sense. Done as a one-shot fetch on the small candidate
+                // set so we don't subscribe to a junction observation per event.
+                val hasCaptures = eventRepository.observeNotesForEvent(event.id).first().isNotEmpty()
+                if (hasCaptures) continue
+                candidates +=
+                    AmbientPromptCandidate(
+                        family = AmbientPromptFamily.EVENT_NUDGE,
+                        // Above MEMORY_RECALL (80), below DRAFT_RESCUE (100): an upcoming event
+                        // is more time-sensitive than a generic recall but less urgent than
+                        // recovering work the user already started.
+                        score = 90,
+                        dedupeKey = "event:${event.id}",
+                        payload =
+                            AmbientPromptPayload.EventNudge(
+                                eventId = event.id,
+                                title = event.title,
+                                startTime = event.startTime,
                             ),
                     )
             }

@@ -32,6 +32,10 @@ interface MemoriesSettingsRepository {
         updateSettings(getSettings().copy(memoryRecallNotificationsEnabled = enabled))
     }
 
+    suspend fun setEventNudgesEnabled(enabled: Boolean) {
+        updateSettings(getSettings().copy(eventNudgesEnabled = enabled))
+    }
+
     suspend fun setMorningPromptEnabled(enabled: Boolean) {
         updateSettings(getSettings().copy(morningPromptEnabled = enabled))
     }

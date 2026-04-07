@@ -47,4 +47,5 @@
     <string name="ambient_prompt_draft_rescue_body">You already started writing. Pick it back up before the details fade.</string>
     <string name="ambient_prompt_memory_recall_title">Revisit a memory</string>
     <string name="ambient_prompt_memory_recall_body">Open an older entry worth revisiting today.</string>
+    <string name="ambient_prompt_event_nudge_body">Starts at %1$s. Tap to capture something for it.</string>
 </resources>

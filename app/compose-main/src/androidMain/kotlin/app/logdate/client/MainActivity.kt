@@ -26,9 +26,11 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation3.runtime.NavKey
 import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_DRAFT
+import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_EVENT_DETAIL
 import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_MEMORY_RECALL
 import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_NEW_ENTRY
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_DRAFT_ID
+import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_EVENT_ID
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_RECALL_DATE
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_TARGET
 import app.logdate.client.database.DatabaseRecoveryController
@@ -79,6 +81,7 @@ import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
 import app.logdate.navigation.routes.core.EntryEditor
+import app.logdate.navigation.routes.core.EventDetailRoute
 import app.logdate.navigation.routes.core.LocationRoute
 import app.logdate.navigation.routes.core.NoteViewerRoute
 import app.logdate.navigation.routes.core.RewindDetailRoute
@@ -546,6 +549,11 @@ private fun resolveNavKey(intent: Intent?): NavKey? {
         intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_MEMORY_RECALL -> {
             val dateStr = intent.getStringExtra(EXTRA_AMBIENT_PROMPT_RECALL_DATE) ?: return null
             runCatching { TimelineDetail(kotlinx.datetime.LocalDate.parse(dateStr)) }.getOrNull()
+        }
+
+        intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_EVENT_DETAIL -> {
+            val eventId = intent.getStringExtra(EXTRA_AMBIENT_PROMPT_EVENT_ID) ?: return null
+            runCatching { EventDetailRoute(Uuid.parse(eventId)) }.getOrNull()
         }
 
         intent.getStringExtra(EXTRA_REWIND_NOTIFICATION_TARGET) == REWIND_NOTIFICATION_TARGET_DETAIL -> {

@@ -40,6 +40,7 @@ import kotlinx.datetime.LocalDate
 import logdate.client.ui.generated.resources.*
 import logdate.client.ui.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Instant
 
 /**
  * Represents different types of timeline suggestion blocks that can be shown to users.
@@ -70,6 +71,17 @@ sealed interface TimelineSuggestionBlock {
         val mediaUris: List<MediaObjectUiState> = emptyList(),
         val isAiGenerated: Boolean = false,
     ) : TimelineSuggestionBlock
+
+    /**
+     * An event the user has on their calendar that's about to start. Surfaces a "Capture for
+     * this" action so the user can jump straight into recording before the event begins.
+     */
+    data class UpcomingEvent(
+        val eventId: String,
+        val title: String,
+        val startTime: Instant,
+        val placeName: String? = null,
+    ) : TimelineSuggestionBlock
 }
 
 data class TimelineSuggestionBlockUiState(
@@ -81,6 +93,8 @@ data class TimelineSuggestionBlockUiState(
     val people: List<String> = emptyList(),
     val mediaUris: List<MediaObjectUiState> = emptyList(),
     val isAiGenerated: Boolean = false,
+    val eventId: String? = null,
+    val eventStartTime: Instant? = null,
 )
 
 enum class TimelineSuggestionBlockType {
@@ -98,6 +112,11 @@ enum class TimelineSuggestionBlockType {
      * A past memory worth revisiting — "on this day" style.
      */
     MEMORY_RECALL,
+
+    /**
+     * An upcoming event the user can capture media for.
+     */
+    UPCOMING_EVENT,
 }
 
 /**
@@ -118,6 +137,7 @@ fun TimelineSuggestionBlock(
             TimelineSuggestionBlockType.COMPLETE_DRAFT -> stringResource(Res.string.suggestion_label_draft)
             TimelineSuggestionBlockType.EMPTY_DAY -> stringResource(Res.string.suggestion_label_today)
             TimelineSuggestionBlockType.MEMORY_RECALL -> stringResource(Res.string.suggestion_label_memory)
+            TimelineSuggestionBlockType.UPCOMING_EVENT -> "Coming up"
         }
 
     val containerColor =
@@ -320,6 +340,19 @@ private fun SuggestionActions(
                     leadingIcon = {
                         Icon(
                             Icons.Default.Share,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    },
+                )
+            }
+            TimelineSuggestionBlockType.UPCOMING_EVENT -> {
+                AssistChip(
+                    onClick = onStartWriting,
+                    label = { Text("Capture for this") },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.EditNote,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                         )

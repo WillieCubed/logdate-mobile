@@ -1,6 +1,7 @@
 package app.logdate.client.domain.recommendation
 
 import app.logdate.client.datastore.KeyValueStorage
+import app.logdate.client.domain.events.ObserveUpcomingEventsUseCase
 import app.logdate.client.domain.notes.HasNotesForTodayUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.places.PlaceResolutionCache
@@ -50,6 +51,8 @@ class GetHomeRecommendationUseCaseTest {
                 hasNotesForToday = HasNotesForTodayUseCase(mockNotesRepository),
                 fetchMostRecentDraft = FetchMostRecentDraftUseCase(mockDraftRepository),
                 getMemoryRecall = GetMemoryRecallUseCase(mockNotesRepository),
+                observeUpcomingEvents = ObserveUpcomingEventsUseCase(StubEventRepository),
+                eventRepository = StubEventRepository,
                 clientLocationProvider = StubLocationProvider,
                 placeResolutionCache = PlaceResolutionCache(resolveLocationToPlaceUseCase),
                 memoriesSettingsRepository = DefaultMemoriesSettingsRepository(MockKeyValueStorage()),

@@ -1,5 +1,6 @@
 package app.logdate.client.domain.recommendation
 
+import app.logdate.client.domain.events.ObserveUpcomingEventsUseCase
 import app.logdate.client.domain.location.ObserveLocationHistoryUseCase
 import app.logdate.client.domain.location.ObserveLocationStopsUseCase
 import app.logdate.client.domain.notes.HasNotesForTodayUseCase
@@ -9,6 +10,7 @@ import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
 import app.logdate.client.location.places.GeocodedAddress
 import app.logdate.client.location.places.PlaceSuggestion
 import app.logdate.client.location.places.ReverseGeocodingProvider
+import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
@@ -20,6 +22,7 @@ import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.location.LocationLogRecord
 import app.logdate.client.repository.places.UserPlacesRepository
 import app.logdate.shared.model.AltitudeUnit
+import app.logdate.shared.model.Event
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
 import app.logdate.shared.model.Place
@@ -31,6 +34,7 @@ import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -144,6 +148,71 @@ class GenerateAmbientPromptCandidatesUseCaseTest {
             assertEquals(AmbientCaptureNudgeStyle.NOVEL_PLACE, payload.style)
             assertEquals("Red Rock Canyon", payload.placeName)
         }
+
+    @Test
+    fun `periodic evaluation emits an event nudge for an upcoming uncaptured event`() =
+        runTest {
+            val now = Instant.parse("2026-04-02T18:00:00Z")
+            val event = sampleEvent(startTime = now + 2.hours, title = "Piano recital")
+            val harness = testHarness(now = now, events = listOf(event))
+
+            val candidates = harness.createUseCase()(AmbientPromptTriggerContext.PERIODIC)
+
+            val nudge = candidates.first { it.family == AmbientPromptFamily.EVENT_NUDGE }
+            val payload = assertIs<AmbientPromptPayload.EventNudge>(nudge.payload)
+            assertEquals(event.id, payload.eventId)
+            assertEquals("Piano recital", payload.title)
+            assertEquals("event:${event.id}", nudge.dedupeKey)
+            assertEquals(90, nudge.score)
+        }
+
+    @Test
+    fun `periodic evaluation skips events that already have captures attached`() =
+        runTest {
+            val now = Instant.parse("2026-04-02T18:00:00Z")
+            val event = sampleEvent(startTime = now + 2.hours)
+            val harness =
+                testHarness(
+                    now = now,
+                    events = listOf(event),
+                    notesByEvent = mapOf(event.id to listOf(Uuid.random())),
+                )
+
+            val candidates = harness.createUseCase()(AmbientPromptTriggerContext.PERIODIC)
+
+            assertTrue(candidates.none { it.family == AmbientPromptFamily.EVENT_NUDGE })
+        }
+
+    @Test
+    fun `periodic evaluation skips events when eventNudgesEnabled is false`() =
+        runTest {
+            val now = Instant.parse("2026-04-02T18:00:00Z")
+            val event = sampleEvent(startTime = now + 2.hours)
+            val harness =
+                testHarness(
+                    now = now,
+                    events = listOf(event),
+                    settings = MemoriesSettings(eventNudgesEnabled = false),
+                )
+
+            val candidates = harness.createUseCase()(AmbientPromptTriggerContext.PERIODIC)
+
+            assertTrue(candidates.none { it.family == AmbientPromptFamily.EVENT_NUDGE })
+        }
+
+    private fun sampleEvent(
+        startTime: Instant,
+        endTime: Instant? = startTime + 1.hours,
+        title: String = "Sample event",
+    ): Event =
+        Event(
+            id = Uuid.random(),
+            title = title,
+            startTime = startTime,
+            endTime = endTime,
+            created = Instant.fromEpochSeconds(0),
+            lastUpdated = Instant.fromEpochSeconds(0),
+        )
 }
 
 private class AmbientPromptTestHarness(
@@ -153,6 +222,8 @@ private class AmbientPromptTestHarness(
     settings: MemoriesSettings = MemoriesSettings(),
     locationHistory: List<LocationHistoryItem> = emptyList(),
     externalSuggestions: Map<String, List<PlaceSuggestion>> = emptyMap(),
+    events: List<Event> = emptyList(),
+    notesByEvent: Map<Uuid, List<Uuid>> = emptyMap(),
 ) {
     private val notesRepository = TestJournalNotesRepository(notes)
     private val draftRepository = TestEntryDraftRepository(drafts)
@@ -167,6 +238,12 @@ private class AmbientPromptTestHarness(
                 reverseGeocodingProvider = EmptyReverseGeocodingProvider(),
             ),
         )
+    private val eventRepository: EventRepository =
+        if (events.isEmpty() && notesByEvent.isEmpty()) {
+            StubEventRepository
+        } else {
+            SeedableEventRepository(events, notesByEvent)
+        }
 
     suspend fun createUseCase(): GenerateAmbientPromptCandidatesUseCase {
         settingsRepository.updateSettings(settings)
@@ -176,6 +253,8 @@ private class AmbientPromptTestHarness(
             fetchMostRecentDraft = FetchMostRecentDraftUseCase(draftRepository),
             getMemoryRecall = GetMemoryRecallUseCase(notesRepository, now = { now }),
             observeLocationStops = ObserveLocationStopsUseCase(ObserveLocationHistoryUseCase(locationRepository)),
+            observeUpcomingEvents = ObserveUpcomingEventsUseCase(eventRepository, now = { now }),
+            eventRepository = eventRepository,
             notesRepository = notesRepository,
             placeResolutionCache = placeResolutionCache,
             placeFamiliarityRepository = placeFamiliarityRepository,
@@ -193,9 +272,13 @@ private fun testHarness(
     settings: MemoriesSettings = MemoriesSettings(),
     locationHistory: List<LocationHistoryItem> = emptyList(),
     externalSuggestions: Map<String, List<PlaceSuggestion>> = emptyMap(),
+    events: List<Event> = emptyList(),
+    notesByEvent: Map<Uuid, List<Uuid>> = emptyMap(),
 ): AmbientPromptTestHarness =
     AmbientPromptTestHarness(
         now = now,
+        events = events,
+        notesByEvent = notesByEvent,
         notes = notes,
         drafts = drafts,
         settings = settings,

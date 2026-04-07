@@ -187,6 +187,14 @@ fun TimelineList(
                         mediaUris = timelineSuggestion.mediaUris,
                         isAiGenerated = timelineSuggestion.isAiGenerated,
                     )
+                is TimelineSuggestionBlock.UpcomingEvent ->
+                    TimelineSuggestionBlockUiState(
+                        type = TimelineSuggestionBlockType.UPCOMING_EVENT,
+                        message = timelineSuggestion.title,
+                        eventId = timelineSuggestion.eventId,
+                        eventStartTime = timelineSuggestion.startTime,
+                        location = timelineSuggestion.placeName,
+                    )
                 null -> null
             }
         }

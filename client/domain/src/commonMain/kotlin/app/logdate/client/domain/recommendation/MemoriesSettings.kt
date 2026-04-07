@@ -9,6 +9,7 @@ data class MemoriesSettings(
     val captureNudgesEnabled: Boolean = true,
     val draftRescueEnabled: Boolean = true,
     val memoryRecallNotificationsEnabled: Boolean = true,
+    val eventNudgesEnabled: Boolean = true,
     val morningPromptEnabled: Boolean = true,
     val eveningPromptEnabled: Boolean = true,
     val morningPromptTime: AmbientPromptTime = AmbientPromptTime(hour = 8, minute = 0),

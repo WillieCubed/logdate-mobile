@@ -18,6 +18,7 @@ class DefaultMemoriesSettingsRepository(
         private const val KEY_CAPTURE_NUDGES_ENABLED = "memories_capture_nudges_enabled"
         private const val KEY_DRAFT_RESCUE_ENABLED = "memories_draft_rescue_enabled"
         private const val KEY_MEMORY_RECALL_NOTIFICATIONS_ENABLED = "memories_memory_recall_notifications_enabled"
+        private const val KEY_EVENT_NUDGES_ENABLED = "memories_event_nudges_enabled"
         private const val KEY_MORNING_PROMPT_ENABLED = "memories_morning_prompt_enabled"
         private const val KEY_EVENING_PROMPT_ENABLED = "memories_evening_prompt_enabled"
         private const val KEY_MORNING_PROMPT_TIME = "memories_morning_prompt_time"
@@ -39,6 +40,8 @@ class DefaultMemoriesSettingsRepository(
                 keyValueStorage.getBoolean(KEY_DRAFT_RESCUE_ENABLED, true),
             memoryRecallNotificationsEnabled =
                 keyValueStorage.getBoolean(KEY_MEMORY_RECALL_NOTIFICATIONS_ENABLED, true),
+            eventNudgesEnabled =
+                keyValueStorage.getBoolean(KEY_EVENT_NUDGES_ENABLED, true),
             morningPromptEnabled =
                 keyValueStorage.getBoolean(KEY_MORNING_PROMPT_ENABLED, true),
             eveningPromptEnabled =
@@ -53,26 +56,34 @@ class DefaultMemoriesSettingsRepository(
 
     override fun observeSettings(): Flow<MemoriesSettings> =
         combine(
+            // Outer combine of two slices because the typed combine() tops out at five flows
+            // and ambient settings now has six.
             combine(
-                keyValueStorage.observeBoolean(KEY_CONTEXTUAL_RECOMMENDATIONS_ENABLED, true),
-                keyValueStorage.observeBoolean(KEY_AMBIENT_PROMPTS_ENABLED, true),
-                keyValueStorage.observeBoolean(KEY_CAPTURE_NUDGES_ENABLED, true),
-                keyValueStorage.observeBoolean(KEY_DRAFT_RESCUE_ENABLED, true),
-                keyValueStorage.observeBoolean(KEY_MEMORY_RECALL_NOTIFICATIONS_ENABLED, true),
-            ) {
-                contextualRecommendationsEnabled,
-                ambientPromptsEnabled,
-                captureNudgesEnabled,
-                draftRescueEnabled,
-                memoryRecallNotificationsEnabled,
-                ->
-                AmbientSettingsState(
-                    contextualRecommendationsEnabled = contextualRecommendationsEnabled,
-                    ambientPromptsEnabled = ambientPromptsEnabled,
-                    captureNudgesEnabled = captureNudgesEnabled,
-                    draftRescueEnabled = draftRescueEnabled,
-                    memoryRecallNotificationsEnabled = memoryRecallNotificationsEnabled,
-                )
+                combine(
+                    keyValueStorage.observeBoolean(KEY_CONTEXTUAL_RECOMMENDATIONS_ENABLED, true),
+                    keyValueStorage.observeBoolean(KEY_AMBIENT_PROMPTS_ENABLED, true),
+                    keyValueStorage.observeBoolean(KEY_CAPTURE_NUDGES_ENABLED, true),
+                    keyValueStorage.observeBoolean(KEY_DRAFT_RESCUE_ENABLED, true),
+                    keyValueStorage.observeBoolean(KEY_MEMORY_RECALL_NOTIFICATIONS_ENABLED, true),
+                ) {
+                    contextualRecommendationsEnabled,
+                    ambientPromptsEnabled,
+                    captureNudgesEnabled,
+                    draftRescueEnabled,
+                    memoryRecallNotificationsEnabled,
+                    ->
+                    AmbientSettingsState(
+                        contextualRecommendationsEnabled = contextualRecommendationsEnabled,
+                        ambientPromptsEnabled = ambientPromptsEnabled,
+                        captureNudgesEnabled = captureNudgesEnabled,
+                        draftRescueEnabled = draftRescueEnabled,
+                        memoryRecallNotificationsEnabled = memoryRecallNotificationsEnabled,
+                        eventNudgesEnabled = true,
+                    )
+                },
+                keyValueStorage.observeBoolean(KEY_EVENT_NUDGES_ENABLED, true),
+            ) { base, eventNudgesEnabled ->
+                base.copy(eventNudgesEnabled = eventNudgesEnabled)
             },
             combine(
                 keyValueStorage.observeBoolean(KEY_MORNING_PROMPT_ENABLED, true),
@@ -109,6 +120,7 @@ class DefaultMemoriesSettingsRepository(
                 captureNudgesEnabled = ambientSettings.captureNudgesEnabled,
                 draftRescueEnabled = ambientSettings.draftRescueEnabled,
                 memoryRecallNotificationsEnabled = ambientSettings.memoryRecallNotificationsEnabled,
+                eventNudgesEnabled = ambientSettings.eventNudgesEnabled,
                 morningPromptEnabled = promptSchedule.morningPromptEnabled,
                 eveningPromptEnabled = promptSchedule.eveningPromptEnabled,
                 morningPromptTime = promptSchedule.morningPromptTime,
@@ -126,6 +138,7 @@ class DefaultMemoriesSettingsRepository(
         keyValueStorage.putBoolean(KEY_CAPTURE_NUDGES_ENABLED, settings.captureNudgesEnabled)
         keyValueStorage.putBoolean(KEY_DRAFT_RESCUE_ENABLED, settings.draftRescueEnabled)
         keyValueStorage.putBoolean(KEY_MEMORY_RECALL_NOTIFICATIONS_ENABLED, settings.memoryRecallNotificationsEnabled)
+        keyValueStorage.putBoolean(KEY_EVENT_NUDGES_ENABLED, settings.eventNudgesEnabled)
         keyValueStorage.putBoolean(KEY_MORNING_PROMPT_ENABLED, settings.morningPromptEnabled)
         keyValueStorage.putBoolean(KEY_EVENING_PROMPT_ENABLED, settings.eveningPromptEnabled)
         keyValueStorage.putString(KEY_MORNING_PROMPT_TIME, settings.morningPromptTime.toStorageString())
@@ -153,6 +166,10 @@ class DefaultMemoriesSettingsRepository(
 
     override suspend fun setMemoryRecallNotificationsEnabled(enabled: Boolean) {
         keyValueStorage.putBoolean(KEY_MEMORY_RECALL_NOTIFICATIONS_ENABLED, enabled)
+    }
+
+    override suspend fun setEventNudgesEnabled(enabled: Boolean) {
+        keyValueStorage.putBoolean(KEY_EVENT_NUDGES_ENABLED, enabled)
     }
 
     override suspend fun setMorningPromptEnabled(enabled: Boolean) {
@@ -219,6 +236,7 @@ private data class AmbientSettingsState(
     val captureNudgesEnabled: Boolean,
     val draftRescueEnabled: Boolean,
     val memoryRecallNotificationsEnabled: Boolean,
+    val eventNudgesEnabled: Boolean,
 )
 
 private data class PromptScheduleState(

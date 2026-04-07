@@ -17,6 +17,7 @@ import app.logdate.client.domain.events.ObserveEventsForDateRangeUseCase
 import app.logdate.client.domain.events.ObserveEventsForNoteUseCase
 import app.logdate.client.domain.events.ObserveLinkedNotesForEventUseCase
 import app.logdate.client.domain.events.ObserveNotesForEventUseCase
+import app.logdate.client.domain.events.ObserveUpcomingEventsUseCase
 import app.logdate.client.domain.events.ObserveUserPlacesUseCase
 import app.logdate.client.domain.events.UnlinkNoteFromEventUseCase
 import app.logdate.client.domain.events.UpdateEventUseCase
@@ -200,6 +201,7 @@ val domainModule: Module =
         factory { ObserveLinkedNotesForEventUseCase(get(), get()) }
         factory { GetAttachableNotesForEventUseCase(get(), get()) }
         factory { ObserveUserPlacesUseCase(get()) }
+        factory { ObserveUpcomingEventsUseCase(get()) }
 
         // Places
         factory { ResolveLocationToPlaceUseCase(get(), get(), get()) }
@@ -220,8 +222,8 @@ val domainModule: Module =
 
         // Recommendations
         factory { GetMemoryRecallUseCase(get(), getOrNull()) }
-        factory { GetHomeRecommendationUseCase(get(), get(), get(), get(), get(), get()) }
-        factory { GenerateAmbientPromptCandidatesUseCase(get(), get(), get(), get(), get(), get(), get(), get()) }
+        factory { GetHomeRecommendationUseCase(get(), get(), get(), get(), get(), get(), get(), get()) }
+        factory { GenerateAmbientPromptCandidatesUseCase(get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
         single<AmbientPromptHistoryRepository> { DefaultAmbientPromptHistoryRepository(get()) }
         single<PlaceFamiliarityRepository> { DefaultPlaceFamiliarityRepository(get()) }
         single<MemoriesSettingsRepository> { DefaultMemoriesSettingsRepository(get()) }

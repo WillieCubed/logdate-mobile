@@ -317,6 +317,8 @@ class TimelineViewModel(
                     isAiGenerated = isAiGenerated,
                 )
             HomeRecommendation.None -> null
+            // No timeline card for upcoming events yet — the events UI block is not built.
+            is HomeRecommendation.UpcomingEvent -> null
         }
 
     private fun List<JournalNote>.toUiState(

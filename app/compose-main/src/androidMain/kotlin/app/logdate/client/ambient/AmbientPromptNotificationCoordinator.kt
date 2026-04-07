@@ -11,6 +11,7 @@ import app.logdate.client.domain.recommendation.AmbientPromptCandidate
 import app.logdate.client.domain.recommendation.AmbientPromptFamily
 import app.logdate.client.domain.recommendation.AmbientPromptPayload
 import app.logdate.client.notifications.LogDateNotificationChannelKey
+import app.logdate.util.toReadableDateTimeShort
 import io.github.aakira.napier.Napier
 import app.logdate.client.notifications.R as NotificationResources
 
@@ -58,6 +59,10 @@ class AmbientPromptNotificationCoordinator(
                         putExtra(EXTRA_AMBIENT_PROMPT_TARGET, AMBIENT_PROMPT_TARGET_MEMORY_RECALL)
                         putExtra(EXTRA_AMBIENT_PROMPT_RECALL_DATE, payload.date.toString())
                     }
+                    is AmbientPromptPayload.EventNudge -> {
+                        putExtra(EXTRA_AMBIENT_PROMPT_TARGET, AMBIENT_PROMPT_TARGET_EVENT_DETAIL)
+                        putExtra(EXTRA_AMBIENT_PROMPT_EVENT_ID, payload.eventId.toString())
+                    }
                 }
             }
 
@@ -74,6 +79,10 @@ class AmbientPromptNotificationCoordinator(
             AmbientPromptFamily.CAPTURE_NUDGES -> LogDateNotificationChannelKey.CAPTURE_NUDGES
             AmbientPromptFamily.DRAFT_RESCUE -> LogDateNotificationChannelKey.DRAFT_RESCUE
             AmbientPromptFamily.MEMORY_RECALL -> LogDateNotificationChannelKey.MEMORY_RECALL
+            // Event nudges live on the capture-nudge channel — they're the same kind of
+            // "act now" reminder semantically, and the user already groups channel preferences
+            // for capture nudges; piggybacking avoids forcing them to manage another channel.
+            AmbientPromptFamily.EVENT_NUDGE -> LogDateNotificationChannelKey.CAPTURE_NUDGES
         }
 
     private fun notificationContent(candidate: AmbientPromptCandidate): AmbientNotificationContent =
@@ -116,6 +125,16 @@ class AmbientPromptNotificationCoordinator(
                     title = context.getString(NotificationResources.string.ambient_prompt_memory_recall_title),
                     body = payload.summary.ifBlank { context.getString(NotificationResources.string.ambient_prompt_memory_recall_body) },
                     category = NotificationCompat.CATEGORY_RECOMMENDATION,
+                )
+            is AmbientPromptPayload.EventNudge ->
+                AmbientNotificationContent(
+                    title = payload.title,
+                    body =
+                        context.getString(
+                            NotificationResources.string.ambient_prompt_event_nudge_body,
+                            payload.startTime.toReadableDateTimeShort(),
+                        ),
+                    category = NotificationCompat.CATEGORY_REMINDER,
                 )
         }
 }
