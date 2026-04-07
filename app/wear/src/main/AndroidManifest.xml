@@ -41,15 +41,10 @@
 
         <!--
             Remove auto-initializers merged from transitive dependencies.
-            Firebase, Google Maps, WorkManager, and Emoji2 are not used on Wear OS
+            Google Maps, WorkManager, and Emoji2 are not used on Wear OS
             but their ContentProviders run before Application.onCreate(), adding
             500-1500ms of startup latency on constrained Wear hardware.
         -->
-        <provider
-            android:name="com.google.firebase.provider.FirebaseInitProvider"
-            android:authorities="${applicationId}.firebaseinitprovider"
-            android:exported="false"
-            tools:node="remove" />
 
         <provider
             android:name="androidx.startup.InitializationProvider"
