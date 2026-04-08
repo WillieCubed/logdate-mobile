@@ -195,6 +195,7 @@ class AndroidTranscriptionService(
         withContext(Dispatchers.Main) {
             isListening = false
             speechRecognizer?.stopListening()
+            Unit
         }
 
     override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult {

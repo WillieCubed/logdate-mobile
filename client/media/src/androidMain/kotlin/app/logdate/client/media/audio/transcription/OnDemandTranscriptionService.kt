@@ -3,6 +3,9 @@ package app.logdate.client.media.audio.transcription
 import android.content.Context
 import app.logdate.client.media.audio.download.ModelDownloadStatus
 import com.google.android.play.core.splitinstall.SplitInstallManagerFactory
+import com.google.android.play.core.splitinstall.SplitInstallRequest
+import com.google.android.play.core.splitinstall.SplitInstallStateUpdatedListener
+import com.google.android.play.core.splitinstall.model.SplitInstallSessionStatus
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -15,17 +18,19 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * [TranscriptionService] proxy that loads the Sherpa-ONNX implementation from the
- * `speech_recognition` dynamic feature module when it is installed.
+ * [TranscriptionService] proxy that loads the Sherpa-ONNX implementation from
+ * the `speech_recognition` dynamic feature module.
  *
- * When the module is not yet installed, delegates to [AndroidTranscriptionService]
- * (Android's built-in SpeechRecognizer) as a fallback.
+ * On debug/sideloaded builds the module class is always in the APK, so the
+ * delegate loads immediately in [init]. On Play Store builds the module may
+ * need to be installed first; when [startLiveTranscription] is called without
+ * a loaded delegate, the install is requested automatically and the caller
+ * receives [TranscriptionResult.InProgress] while the download runs. Once the
+ * module installs, transcription starts without any further user action.
  *
- * Owns a stable [_transcriptionFlow] that observers subscribe to once. When
- * [startLiveTranscription] runs, a forwarding coroutine is started that pipes
- * the active delegate's emissions into this stable flow. Without this, a
- * delegate switch between [getTranscriptionFlow] and [startLiveTranscription]
- * leaves the observer watching the wrong flow and receiving nothing.
+ * Owns a stable [_transcriptionFlow] so observers never need to re-subscribe
+ * when the delegate switches. Results from whichever delegate is active are
+ * forwarded here via [forwardingJob].
  */
 class OnDemandTranscriptionService(
     private val context: Context,
@@ -40,37 +45,77 @@ class OnDemandTranscriptionService(
     }
 
     private val splitInstallManager = SplitInstallManagerFactory.create(context)
-    private val fallback: TranscriptionService by lazy { AndroidTranscriptionService(context) }
 
     @Volatile
     private var delegate: TranscriptionService? = null
 
-    // Stable flow that external observers always collect from. Forwarded-to
-    // from whichever delegate is actually running live transcription.
+    @Volatile
+    private var pendingLiveTranscription = false
+
     private val _transcriptionFlow = MutableSharedFlow<TranscriptionResult>(replay = 1)
     private var forwardingJob: Job? = null
 
-    init {
-        if (isModuleInstalled()) {
-            loadDelegate()
+    private val installListener =
+        SplitInstallStateUpdatedListener { state ->
+            when (state.status()) {
+                SplitInstallSessionStatus.INSTALLED -> {
+                    Napier.i("speech_recognition module installed — loading delegate")
+                    loadDelegate()
+                    if (pendingLiveTranscription) {
+                        pendingLiveTranscription = false
+                        scope.launch { startAndForward() }
+                    }
+                }
+                SplitInstallSessionStatus.FAILED -> {
+                    Napier.e("speech_recognition module install failed (error ${state.errorCode()})")
+                    pendingLiveTranscription = false
+                    scope.launch {
+                        _transcriptionFlow.emit(
+                            TranscriptionResult.Error("Transcription engine failed to download"),
+                        )
+                    }
+                }
+                SplitInstallSessionStatus.DOWNLOADING -> {
+                    val total = state.totalBytesToDownload()
+                    val done = state.bytesDownloaded()
+                    if (total > 0) Napier.d("Downloading speech_recognition: $done/$total bytes")
+                }
+                else -> Unit
+            }
         }
+
+    init {
+        splitInstallManager.registerListener(installListener)
+        // Attempt immediate load — succeeds on debug/sideloaded builds where
+        // the class is in the APK, and on Play Store builds after the module
+        // has been installed previously.
+        loadDelegate()
     }
 
-    private fun resolvedDelegate(): TranscriptionService = delegate ?: fallback
+    private fun resolvedDelegate(): TranscriptionService =
+        delegate ?: error("speech_recognition module not loaded — use startLiveTranscription() to trigger install")
 
     override fun getTranscriptionFlow(): SharedFlow<TranscriptionResult> = _transcriptionFlow.asSharedFlow()
 
     override suspend fun startLiveTranscription(): Boolean {
-        if (delegate == null && isModuleInstalled()) {
-            loadDelegate()
+        if (delegate == null) {
+            // Module not in the APK yet — request install and let the
+            // installListener handle starting transcription once it arrives.
+            Napier.i("speech_recognition module not ready — requesting install")
+            requestModuleInstall()
+            pendingLiveTranscription = true
+            _transcriptionFlow.emit(TranscriptionResult.InProgress)
+            return false
         }
-        val active = resolvedDelegate()
+        return startAndForward()
+    }
 
-        // Replace the forwarding subscription so results from this specific
-        // delegate instance reach the stable _transcriptionFlow. The previous
-        // job is canceled — its delegate is no longer driving transcription.
-        // We intentionally start forwarding BEFORE calling startLiveTranscription
-        // so no early emissions are missed.
+    /**
+     * Wires the active delegate's flow into [_transcriptionFlow] and starts
+     * live transcription on that delegate.
+     */
+    private suspend fun startAndForward(): Boolean {
+        val active = requireNotNull(delegate) { "delegate must be non-null when startAndForward() is called" }
         forwardingJob?.cancel()
         forwardingJob =
             scope.launch {
@@ -78,65 +123,82 @@ class OnDemandTranscriptionService(
                     _transcriptionFlow.emit(result)
                 }
             }
-
         return active.startLiveTranscription()
     }
 
-    override suspend fun stopLiveTranscription() = resolvedDelegate().stopLiveTranscription()
+    private fun requestModuleInstall() {
+        val request =
+            SplitInstallRequest
+                .newBuilder()
+                .addModule(MODULE_NAME)
+                .build()
+        splitInstallManager
+            .startInstall(request)
+            .addOnSuccessListener { sessionId ->
+                Napier.i("Module install session started (id=$sessionId)")
+            }.addOnFailureListener { e ->
+                Napier.e("Module install request failed", e)
+                pendingLiveTranscription = false
+                scope.launch {
+                    _transcriptionFlow.emit(
+                        TranscriptionResult.Error("Failed to start transcription engine download"),
+                    )
+                }
+            }
+    }
 
-    override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult = resolvedDelegate().transcribeAudioFile(audioUri)
+    override suspend fun stopLiveTranscription() {
+        delegate?.stopLiveTranscription()
+        pendingLiveTranscription = false
+    }
 
-    override fun cancelTranscription() = resolvedDelegate().cancelTranscription()
+    override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult =
+        delegate?.transcribeAudioFile(audioUri)
+            ?: TranscriptionResult.Error("Transcription engine not available")
 
-    override fun getSupportedLanguages(): List<String> = resolvedDelegate().getSupportedLanguages()
+    override fun cancelTranscription() {
+        pendingLiveTranscription = false
+        delegate?.cancelTranscription()
+    }
 
-    override fun setLanguage(languageCode: String) = resolvedDelegate().setLanguage(languageCode)
+    override fun getSupportedLanguages(): List<String> = delegate?.getSupportedLanguages() ?: emptyList()
+
+    override fun setLanguage(languageCode: String) {
+        delegate?.setLanguage(languageCode)
+    }
 
     override val supportsLiveTranscription: Boolean
-        get() = resolvedDelegate().supportsLiveTranscription
+        get() = delegate?.supportsLiveTranscription ?: false
 
     override val supportsFileTranscription: Boolean
-        get() = resolvedDelegate().supportsFileTranscription
+        get() = delegate?.supportsFileTranscription ?: false
 
-    override suspend fun resetTranscription() = resolvedDelegate().resetTranscription()
+    override suspend fun resetTranscription() {
+        delegate?.resetTranscription()
+    }
 
-    override suspend fun warmUp() = resolvedDelegate().warmUp()
+    override suspend fun warmUp() {
+        delegate?.warmUp()
+    }
 
     override val isOfflineModelAvailable: Boolean
         get() = delegate?.isOfflineModelAvailable == true
 
     override val offlineModelDownloadStatus: StateFlow<ModelDownloadStatus>
-        get() {
-            if (delegate == null && isModuleInstalled()) {
-                loadDelegate()
-            }
-            return delegate?.offlineModelDownloadStatus ?: NotSupportedDownloadStatus
-        }
+        get() = delegate?.offlineModelDownloadStatus ?: NotSupportedDownloadStatus
 
     override fun startOfflineModelDownload() {
-        // The download lives in the dynamic feature module — if the user
-        // hasn't installed it yet, we have nowhere to put the model. The
-        // download UX should kick the split install first; until then this
-        // is a no-op and the StateFlow stays at NotSupported.
-        if (delegate == null && isModuleInstalled()) {
-            loadDelegate()
-        }
         delegate?.startOfflineModelDownload()
     }
 
     override fun release() {
+        splitInstallManager.unregisterListener(installListener)
         forwardingJob?.cancel()
         forwardingJob = null
         delegate?.release()
-        // Don't release fallback eagerly — it's lazy-initialized
     }
 
-    /**
-     * Whether the Sherpa-ONNX dynamic module is available on device.
-     */
-    fun isSherpaOnnxAvailable(): Boolean = delegate != null || isModuleInstalled()
-
-    private fun isModuleInstalled(): Boolean = splitInstallManager.installedModules.contains(MODULE_NAME)
+    fun isSherpaOnnxAvailable(): Boolean = delegate != null
 
     private fun loadDelegate() {
         try {
@@ -150,9 +212,11 @@ class OnDemandTranscriptionService(
                 )
             val service = createMethod.invoke(instance, context, scope) as TranscriptionService
             delegate = service
-            Napier.i("Sherpa-ONNX transcription module loaded successfully")
+            Napier.i("Sherpa-ONNX transcription module loaded")
+        } catch (e: ClassNotFoundException) {
+            Napier.i("speech_recognition module class not found — will install on demand")
         } catch (e: Exception) {
-            Napier.e("Failed to load Sherpa-ONNX transcription module; using fallback", e)
+            Napier.e("Failed to load speech_recognition module", e)
         }
     }
 }
