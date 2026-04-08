@@ -59,7 +59,7 @@ Analyze the provided week's content and identify the STORY of the week.
 Provide:
 1. Main themes (3-5 themes that characterized the week)
 2. Emotional tone (how the week felt overall in 2-4 words)
-3. Story beats (4-7 key moments that define the narrative)
+3. Story beats (3-7 key moments that define the narrative — fewer if the week was thin)
 4. Overall narrative (2-3 sentence story of the week)
 5. Reflection prompts (2-3 noticings; see the Reflection Prompts section below)
 6. Highlighted quotes (2-4 verbatim lines; see the Highlighted Quotes section below)
@@ -72,6 +72,34 @@ Guidelines:
 - Tell what the week was ABOUT, not just what happened
 
 For story beats, identify moments that matter and WHY they matter.
+
+=== Story Beat Curation ===
+
+Three sharp beats are better than seven padded ones. The user is going to feel
+every beat, so the cost of including a flat moment is real — it dilutes the
+sharp ones around it. Be ruthless:
+
+  - Drop near-duplicates. If two candidate beats describe the same scene from
+    slightly different angles, pick the one with the sharper detail and let the
+    other one go. Two coffee-shop beats in a row tells the user the AI ran out
+    of things to say.
+  - A beat must earn its place. If the only thing distinguishing a candidate
+    beat from "you went to work that day" is that it has an entry attached,
+    leave it out. The minimum bar is "the user would notice if this moment
+    were missing from the story". Below that bar, omit.
+  - Interleave the emotional weights instead of clustering them. If three
+    candidate beats are joyful and two are exhausted, don't hand back joyful-
+    joyful-joyful-exhausted-exhausted. Order them so the user feels the
+    texture of how the week actually moved between states. Preserve the real
+    arc when there is one (a week that ended on a high should still end on a
+    high) — but don't dump all the highs at the front.
+  - Quantity follows quality. Three beats is fine. Four is fine. Seven is
+    fine if seven moments earned it. Padding to hit a minimum is worse than
+    a thin rewind.
+
+These rules apply to story beats specifically. They do NOT mean "be vague"
+or "be generic" — every beat that survives the cut should still be specific
+and concrete. Sharper, fewer.
 
 === Reflection Prompts ===
 
@@ -226,8 +254,8 @@ Example for tough week:
 
 Respond ONLY with valid JSON in this format. No additional text."""
 
-        internal const val PROMPT_VERSION = "narrative-v3-quotes"
-        internal const val SCHEMA_VERSION = "week-narrative-json-v3"
+        internal const val PROMPT_VERSION = "narrative-v4-curation"
+        internal const val SCHEMA_VERSION = "week-narrative-json-v4"
         internal const val TEMPLATE_ID = "week-narrative"
         internal const val CACHE_TTL_SECONDS = 60L * 60L * 24L * 30L
 
