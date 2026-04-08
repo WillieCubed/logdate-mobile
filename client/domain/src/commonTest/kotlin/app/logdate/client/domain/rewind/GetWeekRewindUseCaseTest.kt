@@ -314,6 +314,13 @@ class GetWeekRewindUseCaseTest {
             }
         }
 
+        override suspend fun tagAsMilestone(
+            uid: Uuid,
+            signal: String,
+        ) {
+            // No-op stub for tests that don't exercise the milestone path.
+        }
+
         private fun buildFallbackRewind(uid: Uuid): Rewind {
             val now = Clock.System.now()
             return Rewind(

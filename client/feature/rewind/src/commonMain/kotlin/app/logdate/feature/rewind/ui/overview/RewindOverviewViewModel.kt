@@ -10,6 +10,8 @@ import app.logdate.client.domain.rewind.GenerateBasicRewindUseCase
 import app.logdate.client.domain.rewind.GetPastRewindsUseCase
 import app.logdate.client.domain.rewind.GetWeekRewindUseCase
 import app.logdate.client.domain.rewind.RewindQueryResult
+import app.logdate.client.intelligence.milestones.MilestoneKind
+import app.logdate.client.intelligence.milestones.parseMilestoneSignal
 import app.logdate.client.intelligence.rewind.RewindMessageGenerator
 import app.logdate.shared.model.RewindContent
 import app.logdate.util.getLocaleFirstDayOfWeek
@@ -78,12 +80,23 @@ class RewindOverviewViewModel(
         getPastRewindsUseCase()
             .map { pastRewinds ->
                 pastRewinds.map { rewind ->
+                    val milestoneSignal = parseMilestoneSignal(rewind.metadata?.milestones?.firstOrNull())
                     RewindHistoryUiState(
                         uid = rewind.uid,
                         title = rewind.title,
                         label = rewind.label,
                         startDate = rewind.startDate.toLocalDateTime(TimeZone.currentSystemDefault()).date,
                         endDate = rewind.endDate.toLocalDateTime(TimeZone.currentSystemDefault()).date,
+                        milestone =
+                            milestoneSignal?.let {
+                                MilestoneSummaryUiState(
+                                    kind =
+                                        when (it.kind) {
+                                            MilestoneKind.LOCATION_CHANGE -> MilestoneKindUiState.LOCATION_CHANGE
+                                        },
+                                    summary = it.summary,
+                                )
+                            },
                     )
                 }
             }.stateIn(

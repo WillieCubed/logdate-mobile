@@ -328,6 +328,11 @@ class GetRewindUseCaseTest {
 
         override suspend fun deleteRewind(uid: Uuid) {}
 
+        override suspend fun tagAsMilestone(
+            uid: Uuid,
+            signal: String,
+        ) {}
+
         private fun buildFallbackRewind(): Rewind {
             val now = Clock.System.now()
             return Rewind(

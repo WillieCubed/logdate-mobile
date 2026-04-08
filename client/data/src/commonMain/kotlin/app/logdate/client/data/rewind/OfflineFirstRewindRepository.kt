@@ -20,6 +20,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -155,6 +156,34 @@ class OfflineFirstRewindRepository(
         withContext(ioDispatcher) {
             cachedRewindDao.deleteRewind(uid)
             Napier.d("Deleted rewind: $uid")
+        }
+
+    override suspend fun tagAsMilestone(
+        uid: Uuid,
+        signal: String,
+    ): Unit =
+        withContext(ioDispatcher) {
+            // Read the existing rewind, prepend the signal to its metadata.milestones,
+            // and re-save. The cascade-friendly path is `saveRewind` which re-inserts
+            // the panel content rows; for a one-time tag operation that's acceptable.
+            val rewind = cachedRewindDao.getRewindById(uid).firstOrNull() ?: return@withContext
+            val metadataObject =
+                rewind.metadata?.let { json ->
+                    runCatching { contentJson.decodeFromString<SerializableRewindMetadata>(json) }
+                        .getOrNull()
+                }
+            val updated =
+                metadataObject?.let {
+                    it.copy(milestones = listOf(signal) + it.milestones)
+                } ?: SerializableRewindMetadata(
+                    detectedActivities = emptyList(),
+                    locationSummary = null,
+                    milestones = listOf(signal),
+                    peopleHighlighted = emptyList(),
+                )
+            val encoded = contentJson.encodeToString(updated)
+            cachedRewindDao.insertRewind(rewind.copy(metadata = encoded))
+            Napier.d("Tagged rewind $uid as milestone: $signal")
         }
 
     /**

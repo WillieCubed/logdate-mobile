@@ -216,6 +216,11 @@ class GetPastRewindsUseCaseTest {
 
         override suspend fun deleteRewind(uid: Uuid) {}
 
+        override suspend fun tagAsMilestone(
+            uid: Uuid,
+            signal: String,
+        ) {}
+
         private fun createTestRewind(title: String) =
             Rewind(
                 uid = Uuid.random(),

@@ -36,6 +36,7 @@ class RewindGenerationWorker(
     private val generateRewind: GenerateBasicRewindUseCase by inject()
     private val preferences: LogdatePreferencesDataSource by inject()
     private val notificationCoordinator: RewindNotificationCoordinator by inject()
+    private val milestoneCoordinator: MilestoneRewindCoordinator by inject()
 
     override suspend fun doWork(): Result {
         Napier.d("RewindGenerationWorker: checking if weekly rewind needs generation")
@@ -53,29 +54,42 @@ class RewindGenerationWorker(
             return Result.success()
         }
 
-        return when (val result = generateRewind(start, end)) {
-            is GenerateBasicRewindResult.Success -> {
-                Napier.d("RewindGenerationWorker: generated weekly rewind ${result.rewind.uid}")
-                if (preferences.isRewindNotificationsEnabled()) {
-                    notificationCoordinator.postRewindReady(result.rewind)
-                } else {
-                    Napier.d("RewindGenerationWorker: rewind notifications disabled, skipping notification")
+        val weeklyResult = generateRewind(start, end)
+        val workerResult =
+            when (weeklyResult) {
+                is GenerateBasicRewindResult.Success -> {
+                    Napier.d("RewindGenerationWorker: generated weekly rewind ${weeklyResult.rewind.uid}")
+                    if (preferences.isRewindNotificationsEnabled()) {
+                        notificationCoordinator.postRewindReady(weeklyResult.rewind)
+                    } else {
+                        Napier.d("RewindGenerationWorker: rewind notifications disabled, skipping notification")
+                    }
+                    Result.success()
                 }
-                Result.success()
+                is GenerateBasicRewindResult.AlreadyInProgress -> {
+                    Napier.d("RewindGenerationWorker: generation already in progress")
+                    Result.success()
+                }
+                is GenerateBasicRewindResult.NoContent -> {
+                    Napier.d("RewindGenerationWorker: no content for last week, skipping")
+                    Result.success()
+                }
+                is GenerateBasicRewindResult.Error -> {
+                    Napier.w("RewindGenerationWorker: generation failed — ${weeklyResult.error}")
+                    Result.retry()
+                }
             }
-            is GenerateBasicRewindResult.AlreadyInProgress -> {
-                Napier.d("RewindGenerationWorker: generation already in progress")
-                Result.success()
-            }
-            is GenerateBasicRewindResult.NoContent -> {
-                Napier.d("RewindGenerationWorker: no content for last week, skipping")
-                Result.success()
-            }
-            is GenerateBasicRewindResult.Error -> {
-                Napier.w("RewindGenerationWorker: generation failed — ${result.error}")
-                Result.retry()
-            }
+
+        // Best-effort milestone detection runs after the weekly check regardless of
+        // whether the weekly run produced a rewind. Failures here are logged but never
+        // fail the worker — milestone rewinds are bonus content, not critical path.
+        try {
+            milestoneCoordinator.detectAndGenerate(now = Clock.System.now())
+        } catch (e: Exception) {
+            Napier.w("RewindGenerationWorker: milestone detection failed", e)
         }
+
+        return workerResult
     }
 
     private suspend fun lastWeekBounds(): Pair<Instant, Instant> {

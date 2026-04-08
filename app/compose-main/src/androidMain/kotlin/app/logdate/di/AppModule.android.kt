@@ -17,6 +17,7 @@ import app.logdate.client.domain.di.locationDomainModule
 import app.logdate.client.domain.di.quotaDomainModule
 import app.logdate.client.domain.events.CalendarImportLauncher
 import app.logdate.client.domain.events.EventInferenceLauncher
+import app.logdate.client.domain.journals.GetCurrentUserJournalsUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.rewind.GetWeekRewindUseCase
 import app.logdate.client.events.AndroidEventInferenceLauncher
@@ -30,6 +31,7 @@ import app.logdate.client.intelligence.di.intelligenceModule
 import app.logdate.client.location.di.locationModule
 import app.logdate.client.media.di.audioModule
 import app.logdate.client.networking.di.networkingModule
+import app.logdate.client.rewind.MilestoneRewindCoordinator
 import app.logdate.client.rewind.RewindGenerationWorker
 import app.logdate.client.rewind.RewindNotificationCoordinator
 import app.logdate.client.sensor.di.sensorModule
@@ -55,6 +57,7 @@ import app.logdate.dynamic.DynamicFeatureLoader
 import app.logdate.dynamic.PlayDynamicFeatureLoader
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
 import app.logdate.feature.core.settings.updates.AppUpdateController
+import coil3.SingletonImageLoader
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import org.koin.android.ext.koin.androidContext
@@ -99,6 +102,7 @@ actual val appModule: Module =
         workerOf(::AmbientPromptWorker)
 
         single { RewindNotificationCoordinator(androidContext()) }
+        single { MilestoneRewindCoordinator(detectors = get(), rewindRepository = get(), generateRewind = get()) }
         workerOf(::RewindGenerationWorker)
 
         single { EventInferenceScheduler(androidContext()) }
@@ -111,12 +115,19 @@ actual val appModule: Module =
 
         single {
             val fetchMostRecentDraft: FetchMostRecentDraftUseCase = get()
+            val getCurrentUserJournals: GetCurrentUserJournalsUseCase = get()
             DynamicShortcutPublisher(
                 fetchMostRecentDraft = { fetchMostRecentDraft() },
                 currentWeekRewind = { get<GetWeekRewindUseCase>().invoke() },
+                observeJournals = { getCurrentUserJournals() },
             )
         }
-        single { AndroidDynamicShortcutApplier(androidContext()) }
+        single {
+            AndroidDynamicShortcutApplier(
+                context = androidContext(),
+                imageLoader = SingletonImageLoader.get(androidContext()),
+            )
+        }
         workerOf(::DynamicShortcutRefreshWorker)
 
         single { NoteDataMapper() }
