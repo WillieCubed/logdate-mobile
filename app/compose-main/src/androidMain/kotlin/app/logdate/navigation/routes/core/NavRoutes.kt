@@ -300,6 +300,24 @@ data object RewindSettingsRoute : NavKey
 @Serializable
 data object EventsSettingsRoute : NavKey
 
+/**
+ * Navigation route for the device calendar sync overview screen.
+ */
+@Serializable
+data object CalendarSyncSettingsRoute : NavKey
+
+/**
+ * Navigation route for the per-calendar selection screen.
+ */
+@Serializable
+data object CalendarSyncCalendarsRoute : NavKey
+
+/**
+ * Navigation route for the recent imported calendar events list.
+ */
+@Serializable
+data object CalendarSyncActivityRoute : NavKey
+
 @Serializable
 data object TimelineSettingsRoute : NavKey
 

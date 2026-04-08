@@ -86,6 +86,7 @@ kotlin {
             implementation(projects.client.sharing)
             implementation(projects.client.sync)
             implementation(projects.client.healthConnect)
+            implementation(projects.client.calendarSync)
             implementation(projects.client.util)
             implementation(projects.shared.model)
             // External dependencies

@@ -43,6 +43,15 @@ interface EventRepository {
     suspend fun getEventById(eventId: Uuid): Event?
 
     /**
+     * Looks up an existing event by its [Event.externalCalendarId]. Used by the device
+     * calendar import worker to dedupe — when a re-sync sees an event whose external id
+     * already maps to a LogDate event, the worker updates the existing row in place
+     * instead of creating a duplicate. Returns `null` if no event has that external id
+     * (or if the matching event has been soft-deleted).
+     */
+    suspend fun findByExternalCalendarId(externalId: String): Event?
+
+    /**
      * Persists a new event.
      *
      * **Not for direct use from UI code.** Events are not user-created — call sites should be

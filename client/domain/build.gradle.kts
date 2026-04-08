@@ -64,6 +64,7 @@ kotlin {
             implementation(projects.client.device)
             implementation(projects.client.logdateDatastore)
             implementation(projects.client.healthConnect)
+            implementation(projects.client.calendarSync)
             // External dependencies
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.core)

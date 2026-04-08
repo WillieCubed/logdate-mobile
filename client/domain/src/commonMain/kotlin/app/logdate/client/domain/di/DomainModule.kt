@@ -12,10 +12,12 @@ import app.logdate.client.domain.entities.ExtractPeopleUseCase
 import app.logdate.client.domain.events.DeleteEventUseCase
 import app.logdate.client.domain.events.GetAttachableNotesForEventUseCase
 import app.logdate.client.domain.events.GetEventByIdUseCase
+import app.logdate.client.domain.events.ImportDeviceCalendarEventsUseCase
 import app.logdate.client.domain.events.InferEventsUseCase
 import app.logdate.client.domain.events.LinkNoteToEventUseCase
 import app.logdate.client.domain.events.ObserveEventsForDateRangeUseCase
 import app.logdate.client.domain.events.ObserveEventsForNoteUseCase
+import app.logdate.client.domain.events.ObserveImportedEventsUseCase
 import app.logdate.client.domain.events.ObserveLinkedNotesForEventUseCase
 import app.logdate.client.domain.events.ObserveNotesForEventUseCase
 import app.logdate.client.domain.events.ObserveUpcomingEventsUseCase
@@ -219,6 +221,8 @@ val domainModule: Module =
                 suggestEventName = { cluster -> namingExtractor.suggestName(cluster) },
             )
         }
+        factory { ImportDeviceCalendarEventsUseCase(get(), get()) }
+        factory { ObserveImportedEventsUseCase(get()) }
 
         // Places
         factory { ResolveLocationToPlaceUseCase(get(), get(), get()) }

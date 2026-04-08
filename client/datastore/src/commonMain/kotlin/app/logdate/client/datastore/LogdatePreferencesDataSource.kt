@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import app.logdate.shared.model.user.AppSecurityLevel
 import app.logdate.shared.model.user.UserData
 import io.github.aakira.napier.Napier
@@ -62,6 +63,14 @@ class LogdatePreferencesDataSource(
         val EVENT_INFERENCE_LAST_CREATED_COUNT = intPreferencesKey("event_inference_last_created_count")
         val EVENT_INFERENCE_RECENT_CREATED_COUNT = intPreferencesKey("event_inference_recent_created_count")
         val EVENT_INFERENCE_LAST_ERROR = stringPreferencesKey("event_inference_last_error")
+
+        // Device calendar sync preferences
+        val DEVICE_CALENDAR_SYNC_ENABLED = booleanPreferencesKey("device_calendar_sync_enabled")
+        val DEVICE_CALENDAR_ENABLED_IDS = stringSetPreferencesKey("device_calendar_enabled_ids")
+        val DEVICE_CALENDAR_SYNC_LAST_RUN_AT = longPreferencesKey("device_calendar_sync_last_run_at")
+        val DEVICE_CALENDAR_SYNC_LAST_CREATED_COUNT = intPreferencesKey("device_calendar_sync_last_created_count")
+        val DEVICE_CALENDAR_SYNC_LAST_UPDATED_COUNT = intPreferencesKey("device_calendar_sync_last_updated_count")
+        val DEVICE_CALENDAR_SYNC_LAST_ERROR = stringPreferencesKey("device_calendar_sync_last_error")
 
         // Android AppSearch metadata
         val ANDROID_PLATFORM_SEARCH_INDEX_GENERATION = longPreferencesKey("android_platform_search_index_generation")
@@ -557,6 +566,84 @@ class LogdatePreferencesDataSource(
                     this[EVENT_INFERENCE_LAST_ERROR] = error
                 } else {
                     this.remove(EVENT_INFERENCE_LAST_ERROR)
+                }
+            }
+        }
+    }
+
+    /**
+     * Whether the user has turned on device calendar sync. When `false` the import worker
+     * still gets scheduled, but its first action is to short-circuit out — that keeps the
+     * worker registered so flipping the toggle on takes effect on the next periodic tick
+     * without re-bootstrapping WorkManager.
+     */
+    fun observeDeviceCalendarSyncEnabled(): Flow<Boolean> =
+        userPreferences.data.map { prefs ->
+            prefs[DEVICE_CALENDAR_SYNC_ENABLED] ?: false
+        }
+
+    suspend fun isDeviceCalendarSyncEnabled(): Boolean = observeDeviceCalendarSyncEnabled().first()
+
+    suspend fun setDeviceCalendarSyncEnabled(enabled: Boolean) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[DEVICE_CALENDAR_SYNC_ENABLED] = enabled
+            }
+        }
+    }
+
+    /**
+     * The set of device calendar ids the user has opted into. Empty by default; the
+     * settings overview surfaces an explicit "choose calendars" affordance when nothing's
+     * been picked yet.
+     */
+    fun observeDeviceCalendarEnabledIds(): Flow<Set<String>> =
+        userPreferences.data.map { prefs ->
+            prefs[DEVICE_CALENDAR_ENABLED_IDS] ?: emptySet()
+        }
+
+    suspend fun getDeviceCalendarEnabledIds(): Set<String> = observeDeviceCalendarEnabledIds().first()
+
+    suspend fun setDeviceCalendarEnabledIds(ids: Set<String>) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[DEVICE_CALENDAR_ENABLED_IDS] = ids
+            }
+        }
+    }
+
+    /**
+     * Most recent device calendar import worker run. Surfaced verbatim by the calendar
+     * sync settings status card; the worker writes via [recordDeviceCalendarSyncRun].
+     */
+    fun observeDeviceCalendarSyncStats(): Flow<DeviceCalendarSyncStats> =
+        userPreferences.data.map { prefs ->
+            DeviceCalendarSyncStats(
+                lastRunAt =
+                    prefs[DEVICE_CALENDAR_SYNC_LAST_RUN_AT]?.let { millis ->
+                        if (millis == 0L) null else Instant.fromEpochMilliseconds(millis)
+                    },
+                lastCreatedCount = prefs[DEVICE_CALENDAR_SYNC_LAST_CREATED_COUNT] ?: 0,
+                lastUpdatedCount = prefs[DEVICE_CALENDAR_SYNC_LAST_UPDATED_COUNT] ?: 0,
+                lastError = prefs[DEVICE_CALENDAR_SYNC_LAST_ERROR],
+            )
+        }
+
+    suspend fun recordDeviceCalendarSyncRun(
+        runAt: Instant,
+        created: Int,
+        updated: Int,
+        error: String?,
+    ) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[DEVICE_CALENDAR_SYNC_LAST_RUN_AT] = runAt.toEpochMilliseconds()
+                this[DEVICE_CALENDAR_SYNC_LAST_CREATED_COUNT] = created
+                this[DEVICE_CALENDAR_SYNC_LAST_UPDATED_COUNT] = updated
+                if (error != null) {
+                    this[DEVICE_CALENDAR_SYNC_LAST_ERROR] = error
+                } else {
+                    this.remove(DEVICE_CALENDAR_SYNC_LAST_ERROR)
                 }
             }
         }

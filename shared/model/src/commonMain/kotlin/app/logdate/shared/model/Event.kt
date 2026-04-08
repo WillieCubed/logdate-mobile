@@ -37,10 +37,17 @@ data class Event(
 
 /**
  * The external calendar service that an [Event] is grounded in.
+ *
+ * [DEVICE_CALENDAR] is the catch-all for anything LogDate reads from the OS calendar
+ * provider — Google, iCloud, Outlook, local — without distinguishing the underlying
+ * account type. The OS already aggregates them and the per-account label travels with
+ * the event in [Event.externalCalendarId] (`accountName:externalId`), so a separate enum
+ * variant per account would be more granular than the import flow needs.
  */
 enum class ExternalCalendarSource {
     GOOGLE_CALENDAR,
     APPLE_CALENDAR,
+    DEVICE_CALENDAR,
 }
 
 /**
@@ -51,4 +58,5 @@ fun ExternalCalendarSource.displayLabel(): String =
     when (this) {
         ExternalCalendarSource.GOOGLE_CALENDAR -> "Google Calendar"
         ExternalCalendarSource.APPLE_CALENDAR -> "Apple Calendar"
+        ExternalCalendarSource.DEVICE_CALENDAR -> "Calendar"
     }

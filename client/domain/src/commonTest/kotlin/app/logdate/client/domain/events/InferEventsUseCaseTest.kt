@@ -443,6 +443,8 @@ class InferEventsUseCaseTest {
 
         override suspend fun getEventById(eventId: Uuid): Event? = null
 
+        override suspend fun findByExternalCalendarId(externalId: String): Event? = null
+
         override suspend fun createEvent(event: Event): Result<Unit> {
             created += event
             return Result.success(Unit)

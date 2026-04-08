@@ -115,6 +115,9 @@ import app.logdate.navigation.routes.onboarding
 import app.logdate.navigation.routes.openAccountSettings
 import app.logdate.navigation.routes.openAdvancedSettings
 import app.logdate.navigation.routes.openBirthdaySettings
+import app.logdate.navigation.routes.openCalendarSyncActivity
+import app.logdate.navigation.routes.openCalendarSyncCalendars
+import app.logdate.navigation.routes.openCalendarSyncSettings
 import app.logdate.navigation.routes.openClearDataSettings
 import app.logdate.navigation.routes.openDayBoundarySettings
 import app.logdate.navigation.routes.openDevicesSettings
@@ -741,6 +744,10 @@ fun MainNavigationRoot(
                             onNavigateToStreaks = mainAppNavigator::openStreakSettings,
                             onNavigateToRewindSettings = mainAppNavigator::openRewindSettings,
                             onNavigateToEventsSettings = mainAppNavigator::openEventsSettings,
+                            onNavigateToCalendarSyncSettings = mainAppNavigator::openCalendarSyncSettings,
+                            onNavigateToCalendarSyncCalendars = mainAppNavigator::openCalendarSyncCalendars,
+                            onNavigateToCalendarSyncActivity = mainAppNavigator::openCalendarSyncActivity,
+                            onNavigateToEventDetail = mainAppNavigator::openEventDetail,
                             onNavigateToRecommendations = mainAppNavigator::openRecommendationSettings,
                             onNavigateToTimeline = mainAppNavigator::openTimelineSettings,
                             onNavigateToDayBoundary = mainAppNavigator::openDayBoundarySettings,

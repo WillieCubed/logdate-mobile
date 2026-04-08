@@ -52,6 +52,11 @@ class OfflineFirstEventRepository(
             eventDao.getById(eventId)?.toModel()
         }
 
+    override suspend fun findByExternalCalendarId(externalId: String): Event? =
+        withContext(dispatcher) {
+            eventDao.getByExternalCalendarId(externalId)?.toModel()
+        }
+
     override suspend fun createEvent(event: Event): Result<Unit> =
         withContext(dispatcher) {
             runCatching {

@@ -7,6 +7,7 @@ import android.content.Context
 import android.util.Log
 import app.logdate.client.ambient.AmbientPromptScheduler
 import app.logdate.client.ambient.AmbientPromptSchedulingObserver
+import app.logdate.client.calendar.CalendarImportScheduler
 import app.logdate.client.domain.recommendation.AmbientPromptTriggerContext
 import app.logdate.client.events.EventInferenceScheduler
 import app.logdate.client.image.DataSaverImageInterceptor
@@ -14,6 +15,7 @@ import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.client.rewind.RewindGenerationScheduler
+import app.logdate.client.shortcuts.DynamicShortcutScheduler
 import app.logdate.di.initializeKoin
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
@@ -88,6 +90,18 @@ class LogdateApplication :
             EventInferenceScheduler(this).schedulePeriodicInference()
         }.onFailure { error ->
             Napier.w("Failed to initialize event inference scheduling", error)
+        }
+        runCatching {
+            CalendarImportScheduler(this).schedulePeriodicImport()
+        }.onFailure { error ->
+            Napier.w("Failed to initialize calendar import scheduling", error)
+        }
+        runCatching {
+            val shortcutScheduler = DynamicShortcutScheduler(this)
+            shortcutScheduler.schedulePeriodicRefresh()
+            shortcutScheduler.enqueueImmediateRefresh()
+        }.onFailure { error ->
+            Napier.w("Failed to initialize dynamic shortcut scheduling", error)
         }
     }
 }

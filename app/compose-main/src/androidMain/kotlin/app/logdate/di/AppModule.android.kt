@@ -5,17 +5,25 @@ import app.logdate.client.ambient.AmbientPromptNotificationCoordinator
 import app.logdate.client.ambient.AmbientPromptScheduler
 import app.logdate.client.ambient.AmbientPromptSchedulingObserver
 import app.logdate.client.ambient.AmbientPromptWorker
+import app.logdate.client.calendar.AndroidCalendarImportLauncher
+import app.logdate.client.calendar.CalendarImportScheduler
+import app.logdate.client.calendar.CalendarImportWorker
+import app.logdate.client.calendar.di.calendarSyncModule
 import app.logdate.client.data.di.appDataModule
 import app.logdate.client.device.di.deviceModule
 import app.logdate.client.domain.di.accountDomainModule
 import app.logdate.client.domain.di.domainModule
 import app.logdate.client.domain.di.locationDomainModule
 import app.logdate.client.domain.di.quotaDomainModule
+import app.logdate.client.domain.events.CalendarImportLauncher
 import app.logdate.client.domain.events.EventInferenceLauncher
+import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
+import app.logdate.client.domain.rewind.GetWeekRewindUseCase
 import app.logdate.client.events.AndroidEventInferenceLauncher
 import app.logdate.client.events.EventInferenceScheduler
 import app.logdate.client.events.EventInferenceWorker
 import app.logdate.client.feature.widgets.di.widgetModule
+import app.logdate.client.feature.widgets.shortcuts.DynamicShortcutPublisher
 import app.logdate.client.health.di.androidHealthModule
 import app.logdate.client.health.di.healthModule
 import app.logdate.client.intelligence.di.intelligenceModule
@@ -25,6 +33,8 @@ import app.logdate.client.networking.di.networkingModule
 import app.logdate.client.rewind.RewindGenerationWorker
 import app.logdate.client.rewind.RewindNotificationCoordinator
 import app.logdate.client.sensor.di.sensorModule
+import app.logdate.client.shortcuts.AndroidDynamicShortcutApplier
+import app.logdate.client.shortcuts.DynamicShortcutRefreshWorker
 import app.logdate.client.sync.AndroidPhoneAudioStreamOpener
 import app.logdate.client.sync.DefaultPhoneWearSyncBridge
 import app.logdate.client.sync.GooglePhoneWearTransport
@@ -72,6 +82,7 @@ actual val appModule: Module =
         includes(locationDomainModule) // Location domain depends on data layers
         includes(healthModule) // Common Health Connect implementation
         includes(androidHealthModule) // Android-specific Health Connect implementation
+        includes(calendarSyncModule) // OS calendar reader for the import worker
         includes(domainModule) // Main domain module with no circular deps
 
         // Feature modules
@@ -93,6 +104,20 @@ actual val appModule: Module =
         single { EventInferenceScheduler(androidContext()) }
         single<EventInferenceLauncher> { AndroidEventInferenceLauncher(get()) }
         workerOf(::EventInferenceWorker)
+
+        single { CalendarImportScheduler(androidContext()) }
+        single<CalendarImportLauncher> { AndroidCalendarImportLauncher(get()) }
+        workerOf(::CalendarImportWorker)
+
+        single {
+            val fetchMostRecentDraft: FetchMostRecentDraftUseCase = get()
+            DynamicShortcutPublisher(
+                fetchMostRecentDraft = { fetchMostRecentDraft() },
+                currentWeekRewind = { get<GetWeekRewindUseCase>().invoke() },
+            )
+        }
+        single { AndroidDynamicShortcutApplier(androidContext()) }
+        workerOf(::DynamicShortcutRefreshWorker)
 
         single { NoteDataMapper() }
         single { WearSyncNotificationHelper(androidContext()) }

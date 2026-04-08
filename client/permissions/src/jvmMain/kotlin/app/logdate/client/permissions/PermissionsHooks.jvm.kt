@@ -26,3 +26,12 @@ actual fun rememberMediaLibraryPermissionState(): MediaLibraryPermissionState =
         permissionRequested = false,
         requestPermission = {},
     )
+
+@Composable
+actual fun rememberCalendarPermissionState(): CalendarPermissionState =
+    CalendarPermissionState(
+        hasPermission = false,
+        shouldShowRationale = false,
+        permissionRequested = false,
+        requestPermission = {},
+    )

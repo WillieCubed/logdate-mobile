@@ -1,12 +1,15 @@
 package app.logdate.di
 
+import app.logdate.client.calendar.di.calendarSyncModule
 import app.logdate.client.data.di.appDataModule
 import app.logdate.client.device.di.deviceModule
 import app.logdate.client.domain.di.accountDomainModule
 import app.logdate.client.domain.di.domainModule
 import app.logdate.client.domain.di.locationDomainModule
 import app.logdate.client.domain.di.quotaDomainModule
+import app.logdate.client.domain.events.CalendarImportLauncher
 import app.logdate.client.domain.events.EventInferenceLauncher
+import app.logdate.client.domain.events.NoopCalendarImportLauncher
 import app.logdate.client.domain.events.NoopEventInferenceLauncher
 import app.logdate.client.location.di.locationModule
 import app.logdate.client.media.di.audioModule
@@ -36,9 +39,11 @@ actual val appModule: Module =
         includes(locationDomainModule) // Location domain depends on data layers
         includes(app.logdate.client.health.di.healthModule) // Common Health Connect implementation
         includes(app.logdate.client.health.di.jvmHealthModule) // Desktop-specific Health Connect implementation
+        includes(calendarSyncModule) // No-op DeviceCalendarReader on desktop
         includes(domainModule) // Main domain module with no circular deps
         includes(locationModule)
         includes(audioModule)
 
         single<EventInferenceLauncher> { NoopEventInferenceLauncher }
+        single<CalendarImportLauncher> { NoopCalendarImportLauncher }
     }

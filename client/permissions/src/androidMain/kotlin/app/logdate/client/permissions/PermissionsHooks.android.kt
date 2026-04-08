@@ -84,6 +84,41 @@ actual fun rememberHealthConnectPermissionState(): HealthConnectPermissionState 
 }
 
 @Composable
+actual fun rememberCalendarPermissionState(): CalendarPermissionState {
+    val context = LocalContext.current
+    var permissionGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_CALENDAR,
+            ) == PackageManager.PERMISSION_GRANTED,
+        )
+    }
+    var shouldShowRationale by remember { mutableStateOf(false) }
+    var permissionRequested by remember { mutableStateOf(false) }
+
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            permissionGranted = granted
+            permissionRequested = true
+            if (!granted) {
+                shouldShowRationale = true
+            }
+        }
+
+    return CalendarPermissionState(
+        hasPermission = permissionGranted,
+        shouldShowRationale = shouldShowRationale,
+        permissionRequested = permissionRequested,
+        requestPermission = {
+            permissionLauncher.launch(Manifest.permission.READ_CALENDAR)
+        },
+    )
+}
+
+@Composable
 actual fun rememberMediaLibraryPermissionState(): MediaLibraryPermissionState {
     val context = LocalContext.current
     var permissionGranted by remember { mutableStateOf(hasMediaLibraryPermission(context)) }

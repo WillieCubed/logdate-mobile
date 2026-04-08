@@ -122,6 +122,7 @@ fun SettingsOverviewScreen(
     onNavigateToStreaks: () -> Unit = {},
     onNavigateToRewindSettings: () -> Unit = {},
     onNavigateToEventsSettings: () -> Unit = {},
+    onNavigateToCalendarSyncSettings: () -> Unit = {},
     onNavigateToTimeline: () -> Unit,
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
@@ -149,6 +150,7 @@ fun SettingsOverviewScreen(
         onNavigateToStreaks = onNavigateToStreaks,
         onNavigateToRewindSettings = onNavigateToRewindSettings,
         onNavigateToEventsSettings = onNavigateToEventsSettings,
+        onNavigateToCalendarSyncSettings = onNavigateToCalendarSyncSettings,
         onNavigateToTimeline = onNavigateToTimeline,
         onNavigateToSync = onNavigateToSync,
         onNavigateToExport = onNavigateToExport,
@@ -182,6 +184,7 @@ fun SettingsOverviewContent(
     onNavigateToStreaks: () -> Unit = {},
     onNavigateToRewindSettings: () -> Unit = {},
     onNavigateToEventsSettings: () -> Unit = {},
+    onNavigateToCalendarSyncSettings: () -> Unit = {},
     onNavigateToTimeline: () -> Unit = {},
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
@@ -255,6 +258,12 @@ fun SettingsOverviewContent(
                     description = "Let LogDate notice events from your photos and places",
                     icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
                     onClick = onNavigateToEventsSettings,
+                )
+                SettingsNavigationItem(
+                    title = "Calendar sync",
+                    description = "Mirror events from your device calendars",
+                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                    onClick = onNavigateToCalendarSyncSettings,
                 )
                 SettingsNavigationItem(
                     title = "Your library",

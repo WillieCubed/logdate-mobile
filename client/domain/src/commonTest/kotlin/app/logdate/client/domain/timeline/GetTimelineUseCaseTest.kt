@@ -432,6 +432,8 @@ class GetTimelineUseCaseTest {
 
         override suspend fun getEventById(eventId: Uuid): Event? = null
 
+        override suspend fun findByExternalCalendarId(externalId: String): Event? = null
+
         override suspend fun createEvent(event: Event) = Result.success(Unit)
 
         override suspend fun updateEvent(event: Event) = Result.success(Unit)

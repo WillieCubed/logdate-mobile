@@ -29,4 +29,31 @@
     <string name="events_settings_relative_minutes_ago">%1$d min ago</string>
     <string name="events_settings_relative_hours_ago">%1$dh ago</string>
     <string name="events_settings_relative_days_ago">%1$dd ago</string>
+
+    <string name="calendar_sync_settings_title">Calendar sync</string>
+    <string name="calendar_sync_settings_description">Mirror events from your device\'s calendars (Google, iCloud, local) into LogDate so the things you already plan show up alongside the ones LogDate noticed.</string>
+    <string name="calendar_sync_settings_master_toggle">Sync your calendars into LogDate</string>
+    <string name="calendar_sync_settings_grant_title">Allow access to your calendars</string>
+    <string name="calendar_sync_settings_grant_rationale">LogDate reads your calendars to help you remember what\'s coming up. Nothing leaves your device, and we never write back to your calendars.</string>
+    <string name="calendar_sync_settings_grant_action">Allow access</string>
+    <string name="calendar_sync_settings_denied_action">Open app settings</string>
+    <string name="calendar_sync_settings_status_last_run">Last sync: %1$s</string>
+    <string name="calendar_sync_settings_status_never">Never</string>
+    <string name="calendar_sync_settings_status_created">Imported last sync: %1$d</string>
+    <string name="calendar_sync_settings_status_updated">Updated last sync: %1$d</string>
+    <string name="calendar_sync_settings_status_last_error">Last error: %1$s</string>
+    <string name="calendar_sync_settings_run_now">Sync now</string>
+    <string name="calendar_sync_settings_run_in_progress">Syncing…</string>
+    <string name="calendar_sync_settings_calendars_row_title">Calendars</string>
+    <string name="calendar_sync_settings_calendars_row_subtitle_some">%1$d of %2$d selected</string>
+    <string name="calendar_sync_settings_calendars_row_subtitle_none">Choose calendars to sync</string>
+    <string name="calendar_sync_settings_activity_row_title">Imported events</string>
+    <string name="calendar_sync_settings_activity_row_subtitle">See what LogDate has mirrored from your calendars</string>
+
+    <string name="calendar_sync_calendars_title">Choose calendars</string>
+    <string name="calendar_sync_calendars_save">Save</string>
+    <string name="calendar_sync_calendars_empty">No calendars found on this device.</string>
+
+    <string name="calendar_sync_activity_title">Imported events</string>
+    <string name="calendar_sync_activity_empty">Nothing imported yet. The next sync will pull events from the calendars you selected.</string>
 </resources>

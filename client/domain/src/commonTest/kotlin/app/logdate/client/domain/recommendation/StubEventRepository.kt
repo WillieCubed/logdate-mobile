@@ -25,6 +25,8 @@ internal object StubEventRepository : EventRepository {
 
     override suspend fun getEventById(eventId: Uuid): Event? = null
 
+    override suspend fun findByExternalCalendarId(externalId: String): Event? = null
+
     override suspend fun createEvent(event: Event): Result<Unit> = Result.success(Unit)
 
     override suspend fun updateEvent(event: Event): Result<Unit> = Result.success(Unit)
@@ -68,6 +70,9 @@ internal class SeedableEventRepository(
     ): Flow<List<Event>> = flowOf(eventsFlow.value.filter { it.startTime in start..end })
 
     override suspend fun getEventById(eventId: Uuid): Event? = eventsFlow.value.firstOrNull { it.id == eventId }
+
+    override suspend fun findByExternalCalendarId(externalId: String): Event? =
+        eventsFlow.value.firstOrNull { it.externalCalendarId == externalId }
 
     override suspend fun createEvent(event: Event): Result<Unit> {
         eventsFlow.value = eventsFlow.value + event

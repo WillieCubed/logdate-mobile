@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        Read-only access to the OS calendar provider so the device calendar import worker
+        can mirror the user's existing calendar entries (Google, iCloud, local) into
+        LogDate as grounded events. Localized to this module so the manifest merger only
+        adds it when an app actually depends on :client:calendar-sync; apps that don't
+        ship the feature don't pay the permission cost.
+    -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+
+</manifest>

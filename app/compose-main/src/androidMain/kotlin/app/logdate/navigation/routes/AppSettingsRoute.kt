@@ -45,6 +45,9 @@ import app.logdate.feature.core.settings.ui.watch.WatchSettingsScreen
 import app.logdate.feature.core.settings.ui.watch.WatchSettingsViewModel
 import app.logdate.feature.core.settings.ui.watch.WatchSyncSettingsScreen
 import app.logdate.feature.core.settings.ui.watch.WatchTroubleshootingScreen
+import app.logdate.feature.events.ui.calendarsync.CalendarSyncActivityScreen
+import app.logdate.feature.events.ui.calendarsync.CalendarSyncCalendarsScreen
+import app.logdate.feature.events.ui.calendarsync.CalendarSyncSettingsScreen
 import app.logdate.feature.events.ui.settings.EventsSettingsScreen
 import app.logdate.feature.location.timeline.ui.LocationTimelineBottomSheet
 import app.logdate.feature.rewind.ui.settings.RewindSettingsScreen
@@ -52,6 +55,9 @@ import app.logdate.navigation.MainAppNavigator
 import app.logdate.navigation.routes.core.AccountSettingsRoute
 import app.logdate.navigation.routes.core.AdvancedSettingsRoute
 import app.logdate.navigation.routes.core.BirthdaySettingsRoute
+import app.logdate.navigation.routes.core.CalendarSyncActivityRoute
+import app.logdate.navigation.routes.core.CalendarSyncCalendarsRoute
+import app.logdate.navigation.routes.core.CalendarSyncSettingsRoute
 import app.logdate.navigation.routes.core.ClearDataSettingsRoute
 import app.logdate.navigation.routes.core.DayBoundarySettingsRoute
 import app.logdate.navigation.routes.core.DevicesSettingsRoute
@@ -82,6 +88,7 @@ import app.logdate.navigation.routes.core.WatchTroubleshootingRoute
 import app.logdate.navigation.scenes.SettingsEmptyDetailPane
 import io.github.aakira.napier.Napier
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.uuid.Uuid
 
 /**
  * Resets the app by safely clearing the back stack and navigating to the onboarding start screen.
@@ -213,6 +220,27 @@ fun MainAppNavigator.openEventsSettings() {
     backStack.add(EventsSettingsRoute)
 }
 
+/**
+ * Opens the device calendar sync overview screen.
+ */
+fun MainAppNavigator.openCalendarSyncSettings() {
+    backStack.add(CalendarSyncSettingsRoute)
+}
+
+/**
+ * Opens the per-calendar selection sub-screen.
+ */
+fun MainAppNavigator.openCalendarSyncCalendars() {
+    backStack.add(CalendarSyncCalendarsRoute)
+}
+
+/**
+ * Opens the recent imported events sub-screen.
+ */
+fun MainAppNavigator.openCalendarSyncActivity() {
+    backStack.add(CalendarSyncActivityRoute)
+}
+
 fun MainAppNavigator.openTimelineSettings() {
     backStack.add(TimelineSettingsRoute)
 }
@@ -339,6 +367,10 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToStreaks: () -> Unit = {},
     onNavigateToRewindSettings: () -> Unit = {},
     onNavigateToEventsSettings: () -> Unit = {},
+    onNavigateToCalendarSyncSettings: () -> Unit = {},
+    onNavigateToCalendarSyncCalendars: () -> Unit = {},
+    onNavigateToCalendarSyncActivity: () -> Unit = {},
+    onNavigateToEventDetail: (Uuid) -> Unit = {},
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
 ) {
@@ -601,6 +633,36 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     ) { _ ->
         EventsSettingsScreen(
             onBack = onBack,
+        )
+    }
+
+    // Calendar sync overview (detail pane)
+    routeEntry<CalendarSyncSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        CalendarSyncSettingsScreen(
+            onBack = onBack,
+            onNavigateToCalendars = onNavigateToCalendarSyncCalendars,
+            onNavigateToActivity = onNavigateToCalendarSyncActivity,
+        )
+    }
+
+    // Calendar sync per-calendar picker (detail pane)
+    routeEntry<CalendarSyncCalendarsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        CalendarSyncCalendarsScreen(
+            onBack = onBack,
+        )
+    }
+
+    // Calendar sync recent imports list (detail pane)
+    routeEntry<CalendarSyncActivityRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        CalendarSyncActivityScreen(
+            onBack = onBack,
+            onNavigateToEvent = onNavigateToEventDetail,
         )
     }
 
