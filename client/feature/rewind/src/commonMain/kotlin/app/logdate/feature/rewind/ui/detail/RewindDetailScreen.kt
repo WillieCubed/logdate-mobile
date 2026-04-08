@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,6 +35,10 @@ import app.logdate.ui.common.AspectRatios
 import app.logdate.util.toReadableDateShort
 import kotlinx.coroutines.launch
 import logdate.client.feature.rewind.generated.resources.Res
+import logdate.client.feature.rewind.generated.resources.delete_rewind_dialog_cancel
+import logdate.client.feature.rewind.generated.resources.delete_rewind_dialog_confirm
+import logdate.client.feature.rewind.generated.resources.delete_rewind_dialog_message
+import logdate.client.feature.rewind.generated.resources.delete_rewind_dialog_title
 import logdate.client.feature.rewind.generated.resources.share_rewind_chooser_title
 import logdate.client.feature.rewind.generated.resources.share_rewind_panel_caption
 import logdate.client.feature.rewind.generated.resources.share_rewind_panel_text_template
@@ -46,6 +52,7 @@ import logdate.client.feature.rewind.generated.resources.share_rewind_stats_labe
 import logdate.client.feature.rewind.generated.resources.share_rewind_stats_subtitle_template
 import logdate.client.feature.rewind.generated.resources.share_rewind_stats_text_template
 import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 
@@ -88,6 +95,7 @@ fun RewindDetailScreen(
     val coroutineScope = rememberCoroutineScope()
     val currentRewind by viewModel.currentRewind.collectAsStateWithLifecycle()
     val replySheetState by viewModel.replySheetState.collectAsStateWithLifecycle()
+    val deletePromptVisible by viewModel.deletePromptVisible.collectAsStateWithLifecycle()
 
     val onSharePanel: (RewindPanelUiState) -> Unit = { panel ->
         val shareContent = panel.toShareContent()
@@ -137,7 +145,9 @@ fun RewindDetailScreen(
         onSharePanel = onSharePanel,
         onShareRewindStats = onShareRewindStats,
         onReplyToPrompt = viewModel::onReplyRequested,
-        externalPause = replySheetState is ReflectionReplySheetState.Open,
+        onDeleteRewind = viewModel::onDeleteRequested,
+        externalPause = replySheetState is ReflectionReplySheetState.Open || deletePromptVisible,
+        accentColor = currentRewind?.accentColor() ?: Color.White,
         modifier = modifier,
     )
 
@@ -147,6 +157,26 @@ fun RewindDetailScreen(
             state = openSheet,
             onSave = viewModel::onReplySubmitted,
             onDismiss = viewModel::onReplyDismissed,
+        )
+    }
+
+    if (deletePromptVisible) {
+        AlertDialog(
+            onDismissRequest = viewModel::onDeleteCancelled,
+            title = { Text(stringResource(Res.string.delete_rewind_dialog_title)) },
+            text = { Text(stringResource(Res.string.delete_rewind_dialog_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.onDeleteConfirmed(onDeleted = onExitRewind) },
+                ) {
+                    Text(stringResource(Res.string.delete_rewind_dialog_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::onDeleteCancelled) {
+                    Text(stringResource(Res.string.delete_rewind_dialog_cancel))
+                }
+            },
         )
     }
 }
@@ -159,7 +189,9 @@ fun RewindDetailScreenContent(
     onSharePanel: ((panel: RewindPanelUiState) -> Unit)? = null,
     onShareRewindStats: (() -> Unit)? = null,
     onReplyToPrompt: ((panel: ReflectionPromptRewindPanelUiState) -> Unit)? = null,
+    onDeleteRewind: (() -> Unit)? = null,
     externalPause: Boolean = false,
+    accentColor: Color = Color.White,
 ) {
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
     val isWideScreen = windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND)
@@ -182,7 +214,9 @@ fun RewindDetailScreenContent(
                         onSharePanel = onSharePanel,
                         onShareRewindStats = onShareRewindStats,
                         onReplyToPrompt = onReplyToPrompt,
+                        onDeleteRewind = onDeleteRewind,
                         externalPause = externalPause,
+                        accentColor = accentColor,
                         content = { panel ->
                             RewindStoryContent(panel = panel)
                         },

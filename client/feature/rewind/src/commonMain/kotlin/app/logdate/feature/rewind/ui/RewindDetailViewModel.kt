@@ -5,6 +5,7 @@ package app.logdate.feature.rewind.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.datastore.LogdatePreferencesDataSource
+import app.logdate.client.domain.rewind.DeleteRewindUseCase
 import app.logdate.client.domain.rewind.GetRewindUseCase
 import app.logdate.client.domain.rewind.ObserveReflectionPromptResponsesUseCase
 import app.logdate.client.domain.rewind.SaveReflectionPromptResponseUseCase
@@ -67,6 +68,7 @@ class RewindDetailViewModel(
     private val statsSummaryRenderer: RewindStatsSummaryRenderer,
     private val observeReflectionPromptResponses: ObserveReflectionPromptResponsesUseCase,
     private val saveReflectionPromptResponse: SaveReflectionPromptResponseUseCase,
+    private val deleteRewindUseCase: DeleteRewindUseCase,
     private val preferences: LogdatePreferencesDataSource,
 //    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -89,6 +91,16 @@ class RewindDetailViewModel(
      * view reads it to stay paused while the user is composing a reply.
      */
     val replySheetState: StateFlow<ReflectionReplySheetState> = replySheetStateFlow.asStateFlow()
+
+    private val deletePromptVisibleFlow = MutableStateFlow(false)
+
+    /**
+     * Whether the "delete this rewind?" confirmation dialog is currently visible.
+     *
+     * The story view reads this so auto-advance pauses while the user is making the call,
+     * and the screen renders an [androidx.compose.material3.AlertDialog] when it's true.
+     */
+    val deletePromptVisible: StateFlow<Boolean> = deletePromptVisibleFlow.asStateFlow()
 
 //    private val rewindData = savedStateHandle.toRoute<RewindDetailRoute>()
 
@@ -528,6 +540,38 @@ class RewindDetailViewModel(
     /** Closes the reply sheet without persisting whatever the user had typed. */
     fun onReplyDismissed() {
         replySheetStateFlow.value = ReflectionReplySheetState.Closed
+    }
+
+    /** Opens the "delete this rewind?" confirmation dialog. */
+    fun onDeleteRequested() {
+        deletePromptVisibleFlow.value = true
+    }
+
+    /** Closes the delete confirmation dialog without doing anything. */
+    fun onDeleteCancelled() {
+        deletePromptVisibleFlow.value = false
+    }
+
+    /**
+     * Removes the currently loaded rewind from storage and signals the screen to navigate
+     * away via [onDeleted].
+     *
+     * The screen passes [onDeleted] instead of the view model holding a navigation callback
+     * because navigation belongs to the composable layer; the view model just owns the
+     * "should we exit now" timing.
+     */
+    fun onDeleteConfirmed(onDeleted: () -> Unit) {
+        val rewindId = rewindIdState.value ?: return
+        viewModelScope.launch {
+            try {
+                deleteRewindUseCase(rewindId)
+                onDeleted()
+            } catch (e: Exception) {
+                Napier.e("Failed to delete rewind", e)
+            } finally {
+                deletePromptVisibleFlow.value = false
+            }
+        }
     }
 
     /**

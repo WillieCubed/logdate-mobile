@@ -65,6 +65,7 @@ import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.domain.recommendation.PlaceFamiliarityRepository
 import app.logdate.client.domain.restore.PreviewArchiveUseCase
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
+import app.logdate.client.domain.rewind.DeleteRewindUseCase
 import app.logdate.client.domain.rewind.GenerateBasicRewindUseCase
 import app.logdate.client.domain.rewind.GenerateRewindTitleUseCase
 import app.logdate.client.domain.rewind.GetPastRewindsUseCase
@@ -158,6 +159,7 @@ val domainModule: Module =
         factory { GenerateRewindTitleUseCase() }
         factory { SaveReflectionPromptResponseUseCase(get()) }
         factory { ObserveReflectionPromptResponsesUseCase(get()) }
+        factory { DeleteRewindUseCase(get()) }
 
         // Media indexing
         factory { IndexMediaForPeriodUseCase(get(), get()) }

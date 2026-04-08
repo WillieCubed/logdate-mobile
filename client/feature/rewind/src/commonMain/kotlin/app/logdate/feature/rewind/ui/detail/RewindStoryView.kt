@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Icon
@@ -92,7 +93,9 @@ fun RewindStoryView(
     onSharePanel: ((panel: RewindPanelUiState) -> Unit)? = null,
     onShareRewindStats: (() -> Unit)? = null,
     onReplyToPrompt: ((panel: ReflectionPromptRewindPanelUiState) -> Unit)? = null,
+    onDeleteRewind: (() -> Unit)? = null,
     externalPause: Boolean = false,
+    accentColor: Color = Color.White,
     autoAdvanceDelayMs: Long = 5000L,
     content: @Composable (panel: RewindPanelUiState) -> Unit,
 ) {
@@ -235,6 +238,7 @@ fun RewindStoryView(
                 totalPanels = panels.size,
                 currentPanelIndex = currentPanelIndex,
                 currentPanelProgress = autoAdvanceProgress,
+                color = accentColor,
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -300,6 +304,21 @@ fun RewindStoryView(
                         Icon(
                             imageVector = Icons.Default.IosShare,
                             contentDescription = stringResource(Res.string.share_rewind_panel),
+                            tint = Color.White,
+                        )
+                    }
+                }
+
+                if (onDeleteRewind != null) {
+                    IconButton(
+                        onClick = {
+                            isPaused = true
+                            onDeleteRewind()
+                        },
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = stringResource(Res.string.delete_rewind),
                             tint = Color.White,
                         )
                     }
@@ -380,6 +399,7 @@ private fun StoryProgressIndicators(
     totalPanels: Int,
     currentPanelIndex: Int,
     currentPanelProgress: Float,
+    color: Color,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -401,8 +421,8 @@ private fun StoryProgressIndicators(
                         .weight(1f)
                         .height(3.dp)
                         .clip(RoundedCornerShape(1.5.dp)),
-                color = Color.White,
-                trackColor = Color.White.copy(alpha = 0.3f),
+                color = color,
+                trackColor = color.copy(alpha = 0.3f),
             )
         }
     }

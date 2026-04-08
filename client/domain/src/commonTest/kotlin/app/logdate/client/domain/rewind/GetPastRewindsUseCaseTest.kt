@@ -214,6 +214,8 @@ class GetPastRewindsUseCaseTest {
 
         override suspend fun saveRewind(rewind: Rewind) {}
 
+        override suspend fun deleteRewind(uid: Uuid) {}
+
         private fun createTestRewind(title: String) =
             Rewind(
                 uid = Uuid.random(),

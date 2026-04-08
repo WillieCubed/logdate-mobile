@@ -326,6 +326,8 @@ class GetRewindUseCaseTest {
 
         override suspend fun saveRewind(rewind: Rewind) {}
 
+        override suspend fun deleteRewind(uid: Uuid) {}
+
         private fun buildFallbackRewind(): Rewind {
             val now = Clock.System.now()
             return Rewind(

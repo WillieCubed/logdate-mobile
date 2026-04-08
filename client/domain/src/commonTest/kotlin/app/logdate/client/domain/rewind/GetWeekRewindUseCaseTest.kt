@@ -308,6 +308,12 @@ class GetWeekRewindUseCaseTest {
             rewindForPeriod = rewind
         }
 
+        override suspend fun deleteRewind(uid: Uuid) {
+            if (rewindForPeriod?.uid == uid) {
+                rewindForPeriod = null
+            }
+        }
+
         private fun buildFallbackRewind(uid: Uuid): Rewind {
             val now = Clock.System.now()
             return Rewind(

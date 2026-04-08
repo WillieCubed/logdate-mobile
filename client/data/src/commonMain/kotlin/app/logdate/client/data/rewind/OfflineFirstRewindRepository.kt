@@ -149,6 +149,12 @@ class OfflineFirstRewindRepository(
             }
         }
 
+    override suspend fun deleteRewind(uid: Uuid): Unit =
+        withContext(ioDispatcher) {
+            cachedRewindDao.deleteRewind(uid)
+            Napier.d("Deleted rewind: $uid")
+        }
+
     /**
      * Converts a RewindEntity to a domain Rewind model.
      */

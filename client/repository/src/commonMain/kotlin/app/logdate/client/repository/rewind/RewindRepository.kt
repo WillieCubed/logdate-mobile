@@ -71,4 +71,14 @@ interface RewindRepository {
      * @param rewind The rewind to save
      */
     suspend fun saveRewind(rewind: Rewind)
+
+    /**
+     * Removes a rewind and all of its content from the repository.
+     *
+     * Cascade-delete on the underlying foreign keys takes care of the rewind's text,
+     * image, and video rows along with any prompt replies.
+     *
+     * @param uid The unique identifier of the rewind to delete.
+     */
+    suspend fun deleteRewind(uid: Uuid)
 }
