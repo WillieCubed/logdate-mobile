@@ -45,6 +45,7 @@ import app.logdate.feature.core.settings.ui.watch.WatchSettingsScreen
 import app.logdate.feature.core.settings.ui.watch.WatchSettingsViewModel
 import app.logdate.feature.core.settings.ui.watch.WatchSyncSettingsScreen
 import app.logdate.feature.core.settings.ui.watch.WatchTroubleshootingScreen
+import app.logdate.feature.events.ui.calendar.EventsCalendarScreen
 import app.logdate.feature.events.ui.calendarsync.CalendarSyncActivityScreen
 import app.logdate.feature.events.ui.calendarsync.CalendarSyncCalendarsScreen
 import app.logdate.feature.events.ui.calendarsync.CalendarSyncSettingsScreen
@@ -61,6 +62,7 @@ import app.logdate.navigation.routes.core.CalendarSyncSettingsRoute
 import app.logdate.navigation.routes.core.ClearDataSettingsRoute
 import app.logdate.navigation.routes.core.DayBoundarySettingsRoute
 import app.logdate.navigation.routes.core.DevicesSettingsRoute
+import app.logdate.navigation.routes.core.EventsCalendarRoute
 import app.logdate.navigation.routes.core.EventsSettingsRoute
 import app.logdate.navigation.routes.core.ExportSettingsRoute
 import app.logdate.navigation.routes.core.LibrarySettingsRoute
@@ -241,6 +243,13 @@ fun MainAppNavigator.openCalendarSyncActivity() {
     backStack.add(CalendarSyncActivityRoute)
 }
 
+/**
+ * Opens the events calendar surface (month grid view).
+ */
+fun MainAppNavigator.openEventsCalendar() {
+    backStack.add(EventsCalendarRoute)
+}
+
 fun MainAppNavigator.openTimelineSettings() {
     backStack.add(TimelineSettingsRoute)
 }
@@ -367,6 +376,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToStreaks: () -> Unit = {},
     onNavigateToRewindSettings: () -> Unit = {},
     onNavigateToEventsSettings: () -> Unit = {},
+    onNavigateToEventsCalendar: () -> Unit = {},
     onNavigateToCalendarSyncSettings: () -> Unit = {},
     onNavigateToCalendarSyncCalendars: () -> Unit = {},
     onNavigateToCalendarSyncActivity: () -> Unit = {},
@@ -396,6 +406,8 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onNavigateToStreaks = onNavigateToStreaks,
             onNavigateToRewindSettings = onNavigateToRewindSettings,
             onNavigateToEventsSettings = onNavigateToEventsSettings,
+            onNavigateToEventsCalendar = onNavigateToEventsCalendar,
+            onNavigateToCalendarSyncSettings = onNavigateToCalendarSyncSettings,
             onNavigateToTimeline = onNavigateToTimeline,
             onNavigateToSync = onNavigateToSync,
             onNavigateToExport = onNavigateToExport,
@@ -661,6 +673,16 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
         metadata = ListDetailSceneStrategy.detailPane(),
     ) { _ ->
         CalendarSyncActivityScreen(
+            onBack = onBack,
+            onNavigateToEvent = onNavigateToEventDetail,
+        )
+    }
+
+    // Events calendar month grid (detail pane)
+    routeEntry<EventsCalendarRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        EventsCalendarScreen(
             onBack = onBack,
             onNavigateToEvent = onNavigateToEventDetail,
         )

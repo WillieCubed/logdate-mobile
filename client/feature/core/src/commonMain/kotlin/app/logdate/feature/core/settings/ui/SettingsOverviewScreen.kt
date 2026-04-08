@@ -122,6 +122,7 @@ fun SettingsOverviewScreen(
     onNavigateToStreaks: () -> Unit = {},
     onNavigateToRewindSettings: () -> Unit = {},
     onNavigateToEventsSettings: () -> Unit = {},
+    onNavigateToEventsCalendar: () -> Unit = {},
     onNavigateToCalendarSyncSettings: () -> Unit = {},
     onNavigateToTimeline: () -> Unit,
     onNavigateToSync: () -> Unit,
@@ -150,6 +151,7 @@ fun SettingsOverviewScreen(
         onNavigateToStreaks = onNavigateToStreaks,
         onNavigateToRewindSettings = onNavigateToRewindSettings,
         onNavigateToEventsSettings = onNavigateToEventsSettings,
+        onNavigateToEventsCalendar = onNavigateToEventsCalendar,
         onNavigateToCalendarSyncSettings = onNavigateToCalendarSyncSettings,
         onNavigateToTimeline = onNavigateToTimeline,
         onNavigateToSync = onNavigateToSync,
@@ -184,6 +186,7 @@ fun SettingsOverviewContent(
     onNavigateToStreaks: () -> Unit = {},
     onNavigateToRewindSettings: () -> Unit = {},
     onNavigateToEventsSettings: () -> Unit = {},
+    onNavigateToEventsCalendar: () -> Unit = {},
     onNavigateToCalendarSyncSettings: () -> Unit = {},
     onNavigateToTimeline: () -> Unit = {},
     onNavigateToSync: () -> Unit,
@@ -258,6 +261,12 @@ fun SettingsOverviewContent(
                     description = "Let LogDate notice events from your photos and places",
                     icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
                     onClick = onNavigateToEventsSettings,
+                )
+                SettingsNavigationItem(
+                    title = "Calendar",
+                    description = "Browse a month grid of your events",
+                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                    onClick = onNavigateToEventsCalendar,
                 )
                 SettingsNavigationItem(
                     title = "Calendar sync",

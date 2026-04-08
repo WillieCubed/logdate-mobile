@@ -318,6 +318,13 @@ data object CalendarSyncCalendarsRoute : NavKey
 @Serializable
 data object CalendarSyncActivityRoute : NavKey
 
+/**
+ * Navigation route for the events calendar surface (month grid view of inferred and
+ * imported events).
+ */
+@Serializable
+data object EventsCalendarRoute : NavKey
+
 @Serializable
 data object TimelineSettingsRoute : NavKey
 

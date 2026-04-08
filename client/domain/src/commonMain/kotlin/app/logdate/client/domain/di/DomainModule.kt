@@ -16,6 +16,7 @@ import app.logdate.client.domain.events.ImportDeviceCalendarEventsUseCase
 import app.logdate.client.domain.events.InferEventsUseCase
 import app.logdate.client.domain.events.LinkNoteToEventUseCase
 import app.logdate.client.domain.events.ObserveEventsForDateRangeUseCase
+import app.logdate.client.domain.events.ObserveEventsForMonthUseCase
 import app.logdate.client.domain.events.ObserveEventsForNoteUseCase
 import app.logdate.client.domain.events.ObserveImportedEventsUseCase
 import app.logdate.client.domain.events.ObserveLinkedNotesForEventUseCase
@@ -202,6 +203,7 @@ val domainModule: Module =
 
         // Events
         factory { ObserveEventsForDateRangeUseCase(get()) }
+        factory { ObserveEventsForMonthUseCase(get()) }
         factory { GetEventByIdUseCase(get()) }
         factory { UpdateEventUseCase(get()) }
         factory { DeleteEventUseCase(get()) }

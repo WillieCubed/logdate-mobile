@@ -1,6 +1,7 @@
 package app.logdate.feature.events.di
 
 import app.logdate.feature.events.ui.EventDetailViewModel
+import app.logdate.feature.events.ui.calendar.EventsCalendarViewModel
 import app.logdate.feature.events.ui.calendarsync.CalendarSyncActivityViewModel
 import app.logdate.feature.events.ui.calendarsync.CalendarSyncCalendarsViewModel
 import app.logdate.feature.events.ui.calendarsync.CalendarSyncOverviewViewModel
@@ -28,4 +29,7 @@ val eventsFeatureModule: Module =
         }
         viewModelOf(::CalendarSyncCalendarsViewModel)
         viewModelOf(::CalendarSyncActivityViewModel)
+        // Same `clock` lambda problem as the two settings VMs above — bind explicitly so
+        // the default lambda survives Koin's reflective resolver.
+        viewModel { EventsCalendarViewModel(observeEventsForMonth = get()) }
     }

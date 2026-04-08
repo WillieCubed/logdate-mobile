@@ -122,6 +122,7 @@ import app.logdate.navigation.routes.openClearDataSettings
 import app.logdate.navigation.routes.openDayBoundarySettings
 import app.logdate.navigation.routes.openDevicesSettings
 import app.logdate.navigation.routes.openEventDetail
+import app.logdate.navigation.routes.openEventsCalendar
 import app.logdate.navigation.routes.openEventsSettings
 import app.logdate.navigation.routes.openExportSettings
 import app.logdate.navigation.routes.openJournalDetail
@@ -744,6 +745,7 @@ fun MainNavigationRoot(
                             onNavigateToStreaks = mainAppNavigator::openStreakSettings,
                             onNavigateToRewindSettings = mainAppNavigator::openRewindSettings,
                             onNavigateToEventsSettings = mainAppNavigator::openEventsSettings,
+                            onNavigateToEventsCalendar = mainAppNavigator::openEventsCalendar,
                             onNavigateToCalendarSyncSettings = mainAppNavigator::openCalendarSyncSettings,
                             onNavigateToCalendarSyncCalendars = mainAppNavigator::openCalendarSyncCalendars,
                             onNavigateToCalendarSyncActivity = mainAppNavigator::openCalendarSyncActivity,

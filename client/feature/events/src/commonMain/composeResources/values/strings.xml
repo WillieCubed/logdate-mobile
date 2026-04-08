@@ -64,4 +64,9 @@
     <string name="calendar_sync_failure_permission_denied">LogDate doesn\'t have permission to read your calendars yet.</string>
     <string name="calendar_sync_failure_calendars_unavailable">Couldn\'t reach your calendars on the last sync.</string>
     <string name="calendar_sync_failure_persistence_failed">Couldn\'t save the imported events. They\'ll be retried on the next sync.</string>
+
+    <string name="events_calendar_title">Calendar</string>
+    <string name="events_calendar_previous_month">Previous month</string>
+    <string name="events_calendar_next_month">Next month</string>
+    <string name="events_calendar_empty_day">Nothing on this day yet.</string>
 </resources>
