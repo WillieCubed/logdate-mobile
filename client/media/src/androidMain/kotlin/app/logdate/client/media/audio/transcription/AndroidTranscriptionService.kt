@@ -17,19 +17,14 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 
 /**
- * Android implementation of TranscriptionService using Android's SpeechRecognizer
+ * Fallback transcription service backed by Android's built-in [SpeechRecognizer].
  *
- * TODO: Replace with a more robust speech transcription solution.
- * Android SpeechRecognizer is not intended for continuous recognition as noted in docs:
- * "The implementation of this API is likely to stream audio to remote servers to perform speech
- * recognition. As such this API is not intended to be used for continuous recognition, which would
- * consume a significant amount of battery and bandwidth."
+ * Used by [OnDemandTranscriptionService] before the on-device Sherpa-ONNX model
+ * has been downloaded. Once the model is present this service is no longer called.
  *
- * Consider alternatives like:
- * - ML Kit's Speech Recognition API (on-device option)
- * - Google Cloud Speech-to-Text API (server-based, more robust)
- * - Whisper API from OpenAI (high accuracy)
- * - Custom implementation with a local ML model
+ * Note: Android SpeechRecognizer streams audio to remote servers and is not
+ * designed for continuous recognition, so it is intentionally limited to the
+ * fallback role.
  */
 class AndroidTranscriptionService(
     private val context: Context,
