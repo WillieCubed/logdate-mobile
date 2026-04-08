@@ -9,6 +9,7 @@ import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.shared.model.ActivityType
 import app.logdate.shared.model.HighlightedQuote
 import app.logdate.shared.model.LocationSummary
+import app.logdate.shared.model.MapPoint
 import app.logdate.shared.model.ReflectionPrompt
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
@@ -396,6 +397,7 @@ class OfflineFirstRewindRepository(
         val reflectionPrompts: List<ReflectionPrompt> = emptyList(),
         val highlightedQuotes: List<HighlightedQuote> = emptyList(),
         val weatherContext: WeatherContext? = null,
+        val locationPath: List<MapPoint> = emptyList(),
     ) {
         fun toDomainModel(): RewindMetadata =
             RewindMetadata(
@@ -416,6 +418,7 @@ class OfflineFirstRewindRepository(
                 reflectionPrompts = reflectionPrompts,
                 highlightedQuotes = highlightedQuotes,
                 weatherContext = weatherContext,
+                locationPath = locationPath,
             )
 
         companion object {
@@ -435,6 +438,7 @@ class OfflineFirstRewindRepository(
                     reflectionPrompts = metadata.reflectionPrompts,
                     highlightedQuotes = metadata.highlightedQuotes,
                     weatherContext = metadata.weatherContext,
+                    locationPath = metadata.locationPath,
                 )
         }
     }

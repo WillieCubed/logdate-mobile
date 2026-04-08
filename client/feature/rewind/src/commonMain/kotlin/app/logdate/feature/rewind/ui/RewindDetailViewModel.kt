@@ -18,6 +18,8 @@ import app.logdate.feature.rewind.ui.detail.ReflectionReplySheetState
 import app.logdate.feature.rewind.ui.detail.RewindShareRequest
 import app.logdate.feature.rewind.ui.detail.RewindShareVisual
 import app.logdate.feature.rewind.ui.detail.RewindStatsShareRequest
+import app.logdate.feature.rewind.ui.detail.qualifiesForMapPanel
+import app.logdate.shared.model.MapPoint
 import app.logdate.shared.model.ReflectionPrompt
 import app.logdate.shared.model.ReflectionPromptKey
 import app.logdate.shared.model.ReflectionPromptResponse
@@ -285,6 +287,26 @@ class RewindDetailViewModel(
                 weatherChip = rewind.metadata?.weatherContext?.toChipUiState(),
             ),
         )
+
+        // 1b. Optional map panel — only when the rewind's path is geographically meaningful.
+        // Title strings are placeholders for now; the composable layer will resolve via
+        // compose-resources once translations land. Bare-string placeholders match the
+        // existing pattern used by the title panel above.
+        val mapPoints =
+            rewind.metadata
+                ?.locationPath
+                .orEmpty()
+                .map { it.toPanelPoint() }
+        if (mapPoints.qualifiesForMapPanel()) {
+            panels.add(
+                LocationMapRewindPanelUiState(
+                    points = mapPoints,
+                    title = "Where your week was",
+                    subtitle = "${rewind.metadata?.locationSummary?.distinctLocations ?: mapPoints.size} places",
+                    accentSeed = rewind.uid.hashCode() xor MAP_SEED_OFFSET,
+                ),
+            )
+        }
 
         // 2. Transform content items to panels
         val contentPanels =
@@ -630,6 +652,8 @@ class RewindDetailViewModel(
             ),
         )
 
+    private fun MapPoint.toPanelPoint(): MapPanelPoint = MapPanelPoint(latitude = latitude, longitude = longitude)
+
     private fun WeatherContext.toChipUiState(): WeatherChipUiState =
         WeatherChipUiState(
             category =
@@ -649,5 +673,6 @@ class RewindDetailViewModel(
         // they're stable and distinct.
         const val QUOTE_SEED_OFFSET = 0x517A
         const val PROMPT_SEED_OFFSET = 0x9C0D
+        const val MAP_SEED_OFFSET = 0x3F8C
     }
 }

@@ -5,6 +5,7 @@ import app.logdate.feature.rewind.ui.BigStatisticRewindPanelUiState
 import app.logdate.feature.rewind.ui.HighlightedQuoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.ImageNoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.ImageRewindPanelUiState
+import app.logdate.feature.rewind.ui.LocationMapRewindPanelUiState
 import app.logdate.feature.rewind.ui.NarrativeContextRewindPanelUiState
 import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindPanelUiState
@@ -153,4 +154,8 @@ fun RewindPanelUiState.toShareContent(): RewindShareContent? =
                 val unitsSuffix = if (units.isNotBlank()) " $units" else ""
                 RewindShareContent(text = "$title: $statistic$unitsSuffix — $description")
             }
+        is LocationMapRewindPanelUiState ->
+            // Location maps don't have a useful share format yet — sharing the canvas would
+            // require rasterizing on demand. Skip the share path entirely until that ships.
+            null
     }

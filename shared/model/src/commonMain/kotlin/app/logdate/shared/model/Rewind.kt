@@ -97,6 +97,29 @@ data class RewindMetadata(
      * what the week was actually like outdoors before they read a single beat.
      */
     val weatherContext: WeatherContext? = null,
+    /**
+     * Downsampled location path for the rewind's period, for the map panel renderer.
+     *
+     * The Rewind UI inserts a small visual map of where the user actually was when the
+     * list contains enough distinct points to be interesting (≥3 points spanning at
+     * least a kilometer). Empty list (or fewer points) means no map panel is rendered.
+     * Capped at ~50 points so the metadata blob stays small.
+     */
+    val locationPath: List<MapPoint> = emptyList(),
+)
+
+/**
+ * One geographic point on the rewind's location path.
+ *
+ * Persisted on [RewindMetadata.locationPath] so the map panel can render the user's
+ * actual movement across the rewind period. Stored as raw lat/lon (no projection) so
+ * the renderer can compute its own bounding box and projection at draw time.
+ */
+@Serializable
+data class MapPoint(
+    val latitude: Double,
+    val longitude: Double,
+    val timestamp: Instant,
 )
 
 /**

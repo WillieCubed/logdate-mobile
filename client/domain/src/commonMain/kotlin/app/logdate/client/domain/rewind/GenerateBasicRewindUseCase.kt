@@ -16,6 +16,7 @@ import app.logdate.client.repository.rewind.RewindGenerationManager
 import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.shared.model.ActivityType
 import app.logdate.shared.model.LocationSummary
+import app.logdate.shared.model.MapPoint
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
 import app.logdate.shared.model.RewindGenerationRequest
@@ -70,6 +71,13 @@ class GenerateBasicRewindUseCase(
          * Default polling interval when waiting for a rewind generation to complete.
          */
         private val DEFAULT_POLL_INTERVAL = 1.seconds
+
+        /**
+         * Cap on the number of [MapPoint]s persisted on a rewind so the metadata JSON
+         * blob stays compact. Enough resolution for a coarse weekly path; the renderer
+         * doesn't need higher fidelity to read as a map.
+         */
+        private const val MAP_POINT_LIMIT = 50
     }
 
     /**
@@ -348,7 +356,38 @@ class GenerateBasicRewindUseCase(
             reflectionPrompts = narrative?.reflectionPrompts ?: emptyList(),
             highlightedQuotes = narrative?.highlightedQuotes ?: emptyList(),
             weatherContext = narrative?.weatherContext,
+            locationPath = downsampleToMapPoints(locationHistory),
         )
+    }
+
+    /**
+     * Reduces a raw location history list to at most [MAP_POINT_LIMIT] points by even
+     * sampling, so the metadata blob stays small enough to round-trip cheaply through
+     * the rewinds row's metadata column. The first and last samples are always
+     * preserved so the renderer's polyline still anchors at the period's actual
+     * endpoints.
+     */
+    private fun downsampleToMapPoints(history: List<LocationHistoryItem>): List<MapPoint> {
+        if (history.isEmpty()) return emptyList()
+        val asPoints =
+            history.map { item ->
+                MapPoint(
+                    latitude = item.location.latitude,
+                    longitude = item.location.longitude,
+                    timestamp = item.timestamp,
+                )
+            }
+        if (asPoints.size <= MAP_POINT_LIMIT) return asPoints
+        val step = asPoints.size.toDouble() / MAP_POINT_LIMIT
+        val sampled = mutableListOf<MapPoint>()
+        var index = 0.0
+        while (sampled.size < MAP_POINT_LIMIT - 1 && index.toInt() < asPoints.size) {
+            sampled.add(asPoints[index.toInt()])
+            index += step
+        }
+        // Always include the last point so the polyline ends where the user actually was.
+        if (sampled.lastOrNull() != asPoints.last()) sampled.add(asPoints.last())
+        return sampled
     }
 
     /**

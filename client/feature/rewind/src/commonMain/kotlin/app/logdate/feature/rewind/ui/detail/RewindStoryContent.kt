@@ -26,6 +26,7 @@ import app.logdate.feature.rewind.ui.BasicTextRewindPanelUiState
 import app.logdate.feature.rewind.ui.BigStatisticRewindPanelUiState
 import app.logdate.feature.rewind.ui.HighlightedQuoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.ImageRewindPanelUiState
+import app.logdate.feature.rewind.ui.LocationMapRewindPanelUiState
 import app.logdate.feature.rewind.ui.NarrativeContextRewindPanelUiState
 import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindPanelUiState
@@ -147,6 +148,16 @@ fun RewindStoryContent(
                 accentSeed = panel.accentSeed,
                 modifier = modifier,
                 existingResponse = panel.existingResponse?.takeIf { panel.repliesAllowed },
+            )
+        }
+
+        is LocationMapRewindPanelUiState -> {
+            LocationMapPanel(
+                points = panel.points,
+                title = panel.title,
+                subtitle = panel.subtitle,
+                accentSeed = panel.accentSeed,
+                modifier = modifier,
             )
         }
 

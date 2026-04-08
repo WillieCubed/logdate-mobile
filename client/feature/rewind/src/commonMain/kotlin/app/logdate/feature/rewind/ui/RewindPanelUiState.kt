@@ -218,6 +218,39 @@ data class ReflectionPromptRewindPanelUiState(
 ) : RewindPanelUiState
 
 /**
+ * UI state for a panel that visualizes where the user actually was during the rewind.
+ *
+ * Built from the rewind's downsampled location path. The renderer projects each point
+ * into a bounding-box-relative position on a Compose Canvas — no map tiles, no API
+ * keys, just dots and a polyline on a deep accent background. The point is to give
+ * the user a visceral "this is the shape your week traced" panel without the visual
+ * weight of a real map.
+ *
+ * @property points The downsampled lat/lon path. Order is chronological — the polyline
+ *   connects them in sequence.
+ * @property title Localized headline ("Where your week was") rendered above the canvas.
+ * @property subtitle Localized supporting line (typically "{N} places" or "{N} stops").
+ * @property accentSeed Seed used to vary the canvas background hue per rewind.
+ */
+data class LocationMapRewindPanelUiState(
+    val points: List<MapPanelPoint>,
+    val title: String,
+    val subtitle: String,
+    val accentSeed: Int = 0,
+) : RewindPanelUiState
+
+/**
+ * Plain lat/lon point handed to the [LocationMapPanel] composable.
+ *
+ * Decoupled from the shared model `MapPoint` so the panel state doesn't drag a domain
+ * type into the UI module's API surface. The ViewModel converts.
+ */
+data class MapPanelPoint(
+    val latitude: Double,
+    val longitude: Double,
+)
+
+/**
  * Background styling information for rewind panels.
  *
  * Defines the visual appearance of a panel's background, supporting either
