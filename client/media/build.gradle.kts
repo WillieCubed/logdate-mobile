@@ -69,6 +69,7 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.koin.android)
+            implementation(projects.client.networking)
             implementation(projects.client.notifications)
             implementation(libs.androidx.work.runtime)
             implementation(libs.media3.exoplayer)
@@ -88,6 +89,11 @@ kotlin {
             // mirroring the dependency the speechrecognition dynamic feature
             // module already pulls in on Android.
             implementation(libs.commons.compress)
+        }
+        findByName("androidHostTest")?.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlin.test.junit)
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }

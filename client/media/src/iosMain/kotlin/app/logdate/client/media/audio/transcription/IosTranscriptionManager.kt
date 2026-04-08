@@ -71,7 +71,7 @@ class IosTranscriptionManager(
                         Napier.d("Transcription completed for note $noteId: ${result.text}")
                     }
                     is TranscriptionResult.Error -> {
-                        Napier.e("Transcription failed for note $noteId: ${result.message}")
+                        Napier.e("Transcription failed for note $noteId: ${result.reason}")
                     }
                     is TranscriptionResult.InProgress -> {
                         Napier.d("Transcription in progress for note $noteId")

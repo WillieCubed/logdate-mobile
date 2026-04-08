@@ -2,9 +2,12 @@ package app.logdate.client.media.audio.transcription
 
 import android.content.Context
 import app.logdate.client.media.audio.download.ModelDownloadStatus
+import app.logdate.client.networking.DataUsageMode
+import app.logdate.client.networking.DataUsagePolicy
 import com.google.android.play.core.splitinstall.SplitInstallManagerFactory
 import com.google.android.play.core.splitinstall.SplitInstallRequest
 import com.google.android.play.core.splitinstall.SplitInstallStateUpdatedListener
+import com.google.android.play.core.splitinstall.model.SplitInstallErrorCode
 import com.google.android.play.core.splitinstall.model.SplitInstallSessionStatus
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
@@ -31,10 +34,17 @@ import kotlinx.coroutines.launch
  * Owns a stable [_transcriptionFlow] so observers never need to re-subscribe
  * when the delegate switches. Results from whichever delegate is active are
  * forwarded here via [forwardingJob].
+ *
+ * Downloads are gated on [DataUsagePolicy]: [DataUsageMode.Restricted] (Data
+ * Saver active or no connection) blocks the install immediately with a clear
+ * error. [DataUsageMode.Conservative] (cellular, no Data Saver) and
+ * [DataUsageMode.Unrestricted] (Wi-Fi) both proceed — the module is ~15 MB
+ * and is required for the feature to function at all.
  */
 class OnDemandTranscriptionService(
     private val context: Context,
     private val scope: CoroutineScope,
+    private val dataUsagePolicy: DataUsagePolicy,
 ) : TranscriptionService {
     companion object {
         private const val MODULE_NAME = "speech_recognition"
@@ -66,12 +76,31 @@ class OnDemandTranscriptionService(
                         scope.launch { startAndForward() }
                     }
                 }
-                SplitInstallSessionStatus.FAILED -> {
-                    Napier.e("speech_recognition module install failed (error ${state.errorCode()})")
+                SplitInstallSessionStatus.REQUIRES_USER_CONFIRMATION -> {
+                    // The system confirmation dialog requires an Activity reference that
+                    // the service layer cannot hold. Surface an error so recording can
+                    // continue without transcription; retrying on an unmetered network
+                    // (Wi-Fi) bypasses the confirmation requirement entirely.
+                    Napier.i("speech_recognition download requires user confirmation")
                     pendingLiveTranscription = false
                     scope.launch {
                         _transcriptionFlow.emit(
-                            TranscriptionResult.Error("Transcription engine failed to download"),
+                            TranscriptionResult.Error(TranscriptionFailure.Unknown),
+                        )
+                    }
+                }
+                SplitInstallSessionStatus.FAILED -> {
+                    val failureReason =
+                        when (state.errorCode()) {
+                            SplitInstallErrorCode.NETWORK_ERROR -> TranscriptionFailure.NoNetwork
+                            SplitInstallErrorCode.INSUFFICIENT_STORAGE -> TranscriptionFailure.OutOfStorage
+                            else -> TranscriptionFailure.Unknown
+                        }
+                    Napier.e("speech_recognition module install failed: errorCode=${state.errorCode()}")
+                    pendingLiveTranscription = false
+                    scope.launch {
+                        _transcriptionFlow.emit(
+                            TranscriptionResult.Error(failureReason),
                         )
                     }
                 }
@@ -102,7 +131,7 @@ class OnDemandTranscriptionService(
             // Module not in the APK yet — request install and let the
             // installListener handle starting transcription once it arrives.
             Napier.i("speech_recognition module not ready — requesting install")
-            requestModuleInstall()
+            if (!requestModuleInstall()) return false
             pendingLiveTranscription = true
             _transcriptionFlow.emit(TranscriptionResult.InProgress)
             return false
@@ -126,7 +155,22 @@ class OnDemandTranscriptionService(
         return active.startLiveTranscription()
     }
 
-    private fun requestModuleInstall() {
+    /**
+     * Submits a Play Core install request for the [MODULE_NAME] feature module.
+     *
+     * Returns `false` and emits a [TranscriptionResult.Error] to
+     * [_transcriptionFlow] if a pre-flight check prevents the download (Data
+     * Saver active, or no network connection). Returns `true` if the request
+     * was submitted — the actual outcome arrives via [installListener].
+     */
+    private suspend fun requestModuleInstall(): Boolean {
+        val mode = dataUsagePolicy.currentMode()
+        if (mode is DataUsageMode.Restricted) {
+            Napier.w("speech_recognition download skipped — network restricted (Data Saver or no connection)")
+            _transcriptionFlow.emit(TranscriptionResult.Error(TranscriptionFailure.NoNetwork))
+            return false
+        }
+
         val request =
             SplitInstallRequest
                 .newBuilder()
@@ -141,10 +185,11 @@ class OnDemandTranscriptionService(
                 pendingLiveTranscription = false
                 scope.launch {
                     _transcriptionFlow.emit(
-                        TranscriptionResult.Error("Failed to start transcription engine download"),
+                        TranscriptionResult.Error(TranscriptionFailure.Unknown),
                     )
                 }
             }
+        return true
     }
 
     override suspend fun stopLiveTranscription() {
@@ -154,7 +199,7 @@ class OnDemandTranscriptionService(
 
     override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult =
         delegate?.transcribeAudioFile(audioUri)
-            ?: TranscriptionResult.Error("Transcription engine not available")
+            ?: TranscriptionResult.Error(TranscriptionFailure.NotAvailable)
 
     override fun cancelTranscription() {
         pendingLiveTranscription = false

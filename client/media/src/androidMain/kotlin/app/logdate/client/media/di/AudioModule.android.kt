@@ -37,7 +37,13 @@ actual val audioModule: Module =
 
         // On-demand transcription: loads Sherpa-ONNX from dynamic module when available,
         // falls back to Android's built-in SpeechRecognizer otherwise
-        single<TranscriptionService> { OnDemandTranscriptionService(androidContext(), get()) }
+        single<TranscriptionService> {
+            OnDemandTranscriptionService(
+                context = androidContext(),
+                scope = get(),
+                dataUsagePolicy = get(),
+            )
+        }
 
         // On-device ambient sound tagging. Loads CED from the speech-recognition
         // dynamic feature module when present and reports as unavailable otherwise.

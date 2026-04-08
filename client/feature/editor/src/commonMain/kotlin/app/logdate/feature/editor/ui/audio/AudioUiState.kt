@@ -2,6 +2,7 @@ package app.logdate.feature.editor.ui.audio
 
 import app.logdate.client.media.audio.download.ModelDownloadStatus
 import app.logdate.client.media.audio.transcription.TimedTranscript
+import app.logdate.client.media.audio.transcription.TranscriptionFailure
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.ZERO
 
@@ -66,7 +67,7 @@ data class AudioUiState(
          * Transcription failed.
          */
         data class Error(
-            val message: String,
+            val reason: TranscriptionFailure,
         ) : TranscriptionState()
     }
 

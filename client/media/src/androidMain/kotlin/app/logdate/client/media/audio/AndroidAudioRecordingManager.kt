@@ -133,7 +133,7 @@ class AndroidAudioRecordingManager(
                         persistRefinedTranscript(result)
                     }
                     is TranscriptionResult.Error -> {
-                        Napier.e("Transcription error: ${result.message}")
+                        Napier.e("Transcription error: ${result.reason}")
                         structuredTranscriptionFlow.value = result
                     }
                     is TranscriptionResult.InProgress -> {

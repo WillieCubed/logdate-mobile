@@ -493,7 +493,7 @@ class AudioViewModel(
                             is TranscriptionResult.Error -> {
                                 _uiState.update {
                                     it.copy(
-                                        transcriptionState = AudioUiState.TranscriptionState.Error(result.message),
+                                        transcriptionState = AudioUiState.TranscriptionState.Error(result.reason),
                                     )
                                 }
                             }

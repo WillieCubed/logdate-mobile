@@ -7,6 +7,33 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
+ * Typed reason for a [TranscriptionResult.Error]. The UI maps each case to a
+ * localized string; no raw exception messages should appear in the domain layer.
+ */
+sealed interface TranscriptionFailure {
+    /** No network connection, or Data Saver blocking downloads on cellular. */
+    data object NoNetwork : TranscriptionFailure
+
+    /** Not enough device storage to install or load the transcription engine. */
+    data object OutOfStorage : TranscriptionFailure
+
+    /** Microphone or audio recording permission was denied. */
+    data object PermissionDenied : TranscriptionFailure
+
+    /** Speech recognition is not available on this device or platform. */
+    data object NotAvailable : TranscriptionFailure
+
+    /** This operation is not supported in the current configuration. */
+    data object NotSupported : TranscriptionFailure
+
+    /** An audio capture or processing error. */
+    data object AudioError : TranscriptionFailure
+
+    /** An unexpected error — check logs for the underlying cause. */
+    data object Unknown : TranscriptionFailure
+}
+
+/**
  * Result of a transcription request, including status and text if available
  */
 sealed class TranscriptionResult {
@@ -32,11 +59,11 @@ sealed class TranscriptionResult {
     ) : TranscriptionResult()
 
     /**
-     * Transcription failed with error
+     * Transcription failed with a typed [reason]. Log the underlying cause
+     * at the emission site; surfaces are not passed strings from this layer.
      */
     data class Error(
-        val message: String,
-        val exception: Throwable? = null,
+        val reason: TranscriptionFailure,
     ) : TranscriptionResult()
 }
 

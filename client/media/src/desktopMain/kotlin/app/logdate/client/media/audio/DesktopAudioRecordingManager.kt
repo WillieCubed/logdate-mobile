@@ -72,7 +72,7 @@ class DesktopAudioRecordingManager(
                         transcriptionFlow.value = result.text
                     }
                     is TranscriptionResult.Error -> {
-                        Napier.e("Transcription error: ${result.message}")
+                        Napier.e("Transcription error: ${result.reason}")
                     }
                     is TranscriptionResult.InProgress -> {
                         // Just wait for the text

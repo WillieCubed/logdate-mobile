@@ -12,6 +12,7 @@ import app.logdate.client.media.audio.download.ModelDownloadStatus
 import app.logdate.client.media.audio.transcription.TimedTranscriptBuilder
 import app.logdate.client.media.audio.transcription.TimedUtterance
 import app.logdate.client.media.audio.transcription.TranscriptAccumulator
+import app.logdate.client.media.audio.transcription.TranscriptionFailure
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import com.k2fsa.sherpa.onnx.OnlineRecognizerResult
@@ -97,7 +98,7 @@ class SherpaOnnxTranscriptionService(
             != PackageManager.PERMISSION_GRANTED
         ) {
             Napier.e("RECORD_AUDIO permission not granted for transcription")
-            _transcriptionFlow.emit(TranscriptionResult.Error("Microphone permission not granted"))
+            _transcriptionFlow.emit(TranscriptionResult.Error(TranscriptionFailure.PermissionDenied))
             return false
         }
 
@@ -168,7 +169,7 @@ class SherpaOnnxTranscriptionService(
             true
         } catch (e: Exception) {
             Napier.e("Failed to start Sherpa-ONNX transcription", e)
-            _transcriptionFlow.emit(TranscriptionResult.Error("Failed to start transcription: ${e.message}", e))
+            _transcriptionFlow.emit(TranscriptionResult.Error(TranscriptionFailure.Unknown))
             false
         }
     }
@@ -299,7 +300,7 @@ class SherpaOnnxTranscriptionService(
     }
 
     override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult =
-        TranscriptionResult.Error("File transcription not yet supported with Sherpa-ONNX")
+        TranscriptionResult.Error(TranscriptionFailure.NotSupported)
 
     override fun cancelTranscription() {
         isListening = false

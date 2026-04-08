@@ -57,12 +57,12 @@ internal class IosTranscriptionService : TranscriptionService {
     override suspend fun stopLiveTranscription() = Unit
 
     override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult {
-        val r = recognizer ?: return TranscriptionResult.Error("Speech recognizer unavailable")
+        val r = recognizer ?: return TranscriptionResult.Error(TranscriptionFailure.NotAvailable)
 
         // isAvailable() is an ObjC getter exposed as a function in Kotlin/Native.
         if (!r.isAvailable()) {
             Napier.w("iOS SFSpeechRecognizer not available — locale may be unsupported")
-            return TranscriptionResult.Error("Speech recognizer not available for this locale")
+            return TranscriptionResult.Error(TranscriptionFailure.NotAvailable)
         }
 
         val url = NSURL.fileURLWithPath(audioUri)
@@ -77,7 +77,7 @@ internal class IosTranscriptionService : TranscriptionService {
             TranscriptionResult.Success(text = text, isFinal = true)
         } catch (e: Exception) {
             Napier.e("iOS file transcription failed for $audioUri", e)
-            TranscriptionResult.Error("Transcription failed")
+            TranscriptionResult.Error(TranscriptionFailure.Unknown)
         }
     }
 

@@ -86,12 +86,12 @@ class TranscriptionWorker(
                         Result.success()
                     }
                     is TranscriptionResult.Error -> {
-                        Napier.e("Transcription failed for note $noteId: ${result.message}")
+                        Napier.e("Transcription failed for note $noteId: ${result.reason}")
                         transcriptionRepository.updateTranscription(
                             noteId = noteId,
                             text = null,
                             status = TranscriptionStatus.FAILED,
-                            errorMessage = result.message,
+                            errorMessage = result.reason.toString(),
                         )
                         Result.failure()
                     }

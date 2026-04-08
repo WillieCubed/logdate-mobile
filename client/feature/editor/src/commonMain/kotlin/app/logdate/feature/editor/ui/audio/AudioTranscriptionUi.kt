@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.logdate.client.media.audio.transcription.TranscriptionFailure
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.convert_to_text
@@ -74,7 +75,7 @@ fun AudioTranscriptionUi(
             }
             is AudioUiState.TranscriptionState.Error -> {
                 TranscriptionErrorUi(
-                    errorMessage = state.message,
+                    reason = state.reason,
                     onRetry = onRequestTranscription,
                     modifier = Modifier,
                 )
@@ -206,7 +207,7 @@ private fun TranscriptionSuccessUi(
 @Suppress("ktlint:standard:function-naming")
 @Composable
 private fun TranscriptionErrorUi(
-    errorMessage: String,
+    reason: TranscriptionFailure,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -248,8 +249,5 @@ private fun TranscriptionErrorUi(
                 )
             }
         }
-
-        // Don't show technical error message to the user
-        // Instead, we show the user-friendly error message above
     }
 }

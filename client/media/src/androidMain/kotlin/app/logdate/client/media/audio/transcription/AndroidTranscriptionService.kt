@@ -51,7 +51,7 @@ class AndroidTranscriptionService(
             scope.launch { createSpeechRecognizer() }
         } else {
             scope.launch {
-                _transcriptionFlow.emit(TranscriptionResult.Error("Speech recognition not available on this device"))
+                _transcriptionFlow.emit(TranscriptionResult.Error(TranscriptionFailure.NotAvailable))
             }
             Napier.e("Speech recognition not available on this device")
         }
@@ -64,7 +64,7 @@ class AndroidTranscriptionService(
         } catch (e: Exception) {
             Napier.e("Error creating speech recognizer", e)
             scope.launch {
-                _transcriptionFlow.emit(TranscriptionResult.Error("Failed to create speech recognizer", e))
+                _transcriptionFlow.emit(TranscriptionResult.Error(TranscriptionFailure.AudioError))
             }
         }
     }
@@ -94,24 +94,19 @@ class AndroidTranscriptionService(
             }
 
             override fun onError(error: Int) {
-                val errorMessage =
+                val failure =
                     when (error) {
-                        SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
-                        SpeechRecognizer.ERROR_CLIENT -> "Client side error"
-                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions"
-                        SpeechRecognizer.ERROR_NETWORK -> "Network error"
-                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
-                        SpeechRecognizer.ERROR_NO_MATCH -> "No speech input"
-                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognition service busy"
-                        SpeechRecognizer.ERROR_SERVER -> "Server error"
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input"
-                        else -> "Unknown error: $error"
+                        SpeechRecognizer.ERROR_AUDIO -> TranscriptionFailure.AudioError
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> TranscriptionFailure.PermissionDenied
+                        SpeechRecognizer.ERROR_NETWORK -> TranscriptionFailure.NoNetwork
+                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> TranscriptionFailure.NoNetwork
+                        else -> TranscriptionFailure.Unknown
                     }
 
                 scope.launch {
-                    _transcriptionFlow.emit(TranscriptionResult.Error(errorMessage))
+                    _transcriptionFlow.emit(TranscriptionResult.Error(failure))
                 }
-                Napier.e("Speech recognition error: $errorMessage")
+                Napier.e("Speech recognition error: errorCode=$error")
 
                 // Restart listening if this was a temporary error
                 if (isListening && error != SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
@@ -174,7 +169,7 @@ class AndroidTranscriptionService(
         } catch (e: Exception) {
             Napier.e("Error starting speech recognition", e)
             scope.launch {
-                _transcriptionFlow.emit(TranscriptionResult.Error("Failed to start speech recognition", e))
+                _transcriptionFlow.emit(TranscriptionResult.Error(TranscriptionFailure.AudioError))
             }
         }
     }
@@ -183,7 +178,7 @@ class AndroidTranscriptionService(
         withContext(Dispatchers.Main) {
             if (speechRecognizer == null) createSpeechRecognizer()
             if (speechRecognizer == null) {
-                _transcriptionFlow.emit(TranscriptionResult.Error("Speech recognizer not available"))
+                _transcriptionFlow.emit(TranscriptionResult.Error(TranscriptionFailure.NotAvailable))
                 return@withContext false
             }
             isListening = true
@@ -202,7 +197,7 @@ class AndroidTranscriptionService(
         // Android's SpeechRecognizer doesn't directly support transcribing files
         // We'd need to use a more sophisticated API like Google Cloud Speech-to-Text
         // For now, we'll return an error
-        return TranscriptionResult.Error("File transcription not supported on Android")
+        return TranscriptionResult.Error(TranscriptionFailure.NotSupported)
     }
 
     override fun cancelTranscription() {

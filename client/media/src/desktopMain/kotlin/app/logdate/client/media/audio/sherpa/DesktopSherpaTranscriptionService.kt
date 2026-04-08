@@ -2,6 +2,7 @@ package app.logdate.client.media.audio.sherpa
 
 import app.logdate.client.media.audio.download.ModelDownloadStatus
 import app.logdate.client.media.audio.transcription.TranscriptAccumulator
+import app.logdate.client.media.audio.transcription.TranscriptionFailure
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import io.github.aakira.napier.Napier
@@ -95,15 +96,15 @@ internal class DesktopSherpaTranscriptionService(
 
     override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult {
         if (!offlineRecognizer.ensureInitialized()) {
-            return TranscriptionResult.Error("Whisper model not available on this device")
+            return TranscriptionResult.Error(TranscriptionFailure.NotAvailable)
         }
         if (!vadProvider.ensureInitialized()) {
-            return TranscriptionResult.Error("VAD model not available on this device")
+            return TranscriptionResult.Error(TranscriptionFailure.NotAvailable)
         }
 
         val samples = wavDecoder.decodeToMono16kHz(audioUri)
         if (samples == null || samples.isEmpty()) {
-            return TranscriptionResult.Error("Could not read audio at $audioUri")
+            return TranscriptionResult.Error(TranscriptionFailure.AudioError)
         }
 
         val accumulator = TranscriptAccumulator()
