@@ -21,6 +21,8 @@ import logdate.client.feature.rewind.generated.resources.rewind_settings_auto_ge
 import logdate.client.feature.rewind.generated.resources.rewind_settings_description
 import logdate.client.feature.rewind.generated.resources.rewind_settings_notifications_helper
 import logdate.client.feature.rewind.generated.resources.rewind_settings_notifications_label
+import logdate.client.feature.rewind.generated.resources.rewind_settings_replies_helper
+import logdate.client.feature.rewind.generated.resources.rewind_settings_replies_label
 import logdate.client.feature.rewind.generated.resources.rewind_settings_title
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -40,8 +42,10 @@ fun RewindSettingsScreen(
     RewindSettingsContent(
         autoGenerationEnabled = uiState.autoGenerationEnabled,
         notificationsEnabled = uiState.notificationsEnabled,
+        reflectionRepliesEnabled = uiState.reflectionRepliesEnabled,
         onAutoGenerationToggled = viewModel::setAutoGenerationEnabled,
         onNotificationsToggled = viewModel::setNotificationsEnabled,
+        onReflectionRepliesToggled = viewModel::setReflectionRepliesEnabled,
         onBack = onBack,
         modifier = modifier,
     )
@@ -51,8 +55,10 @@ fun RewindSettingsScreen(
 fun RewindSettingsContent(
     autoGenerationEnabled: Boolean,
     notificationsEnabled: Boolean,
+    reflectionRepliesEnabled: Boolean,
     onAutoGenerationToggled: (Boolean) -> Unit,
     onNotificationsToggled: (Boolean) -> Unit,
+    onReflectionRepliesToggled: (Boolean) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -108,6 +114,28 @@ fun RewindSettingsContent(
                 )
                 Text(
                     text = stringResource(Res.string.rewind_settings_notifications_helper),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+            }
+        }
+
+        item {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                PrimaryTogglePill(
+                    label = stringResource(Res.string.rewind_settings_replies_label),
+                    checked = reflectionRepliesEnabled,
+                    onCheckedChange = onReflectionRepliesToggled,
+                )
+                Text(
+                    text = stringResource(Res.string.rewind_settings_replies_helper),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = Spacing.lg),

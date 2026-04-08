@@ -1,6 +1,7 @@
 package app.logdate.shared.model
 
 import kotlinx.serialization.Serializable
+import kotlin.jvm.JvmInline
 
 /**
  * AI-generated narrative understanding of a week's journal content.
@@ -96,7 +97,51 @@ data class WeekNarrative(
 data class ReflectionPrompt(
     val observation: String,
     val invitation: String,
-)
+) {
+    /**
+     * A stable identifier for this prompt derived purely from its text.
+     *
+     * Two prompts with the same observation and invitation always produce the same key,
+     * which lets a typed response survive a re-synthesis of the rewind: as long as the
+     * AI picks the same noticing again, the saved response reattaches automatically.
+     * If the AI invents a different prompt, the response is intentionally orphaned.
+     */
+    val key: ReflectionPromptKey
+        get() = ReflectionPromptKey.of(this)
+}
+
+/**
+ * A content-derived identifier for a [ReflectionPrompt].
+ *
+ * Wraps a 16-character hex string produced by FNV-1a-64 over the prompt's text. Not
+ * cryptographic — it exists to disambiguate prompts so saved responses can reattach
+ * across re-syntheses, not to defend against tampering.
+ */
+@JvmInline
+@Serializable
+value class ReflectionPromptKey(
+    val value: String,
+) {
+    companion object {
+        fun of(prompt: ReflectionPrompt): ReflectionPromptKey = of(prompt.observation, prompt.invitation)
+
+        fun of(
+            observation: String,
+            invitation: String,
+        ): ReflectionPromptKey {
+            // FNV-1a-64 over UTF-8 bytes of "observation\u0000invitation". The null
+            // separator keeps swapped fields from colliding (e.g. "ab","c" vs "a","bc").
+            val bytes = ("$observation\u0000$invitation").encodeToByteArray()
+            var hash = 0xcbf29ce484222325uL
+            val prime = 0x100000001b3uL
+            for (b in bytes) {
+                hash = hash xor (b.toLong() and 0xffL).toULong()
+                hash = (hash * prime) and 0xffffffffffffffffuL
+            }
+            return ReflectionPromptKey(hash.toString(16).padStart(16, '0'))
+        }
+    }
+}
 
 /**
  * A verbatim quote pulled from one of the user's actual journal entries.

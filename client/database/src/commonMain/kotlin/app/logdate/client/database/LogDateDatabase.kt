@@ -39,6 +39,7 @@ import app.logdate.client.database.dao.maintenance.IntegrityDao
 import app.logdate.client.database.dao.media.IndexedMediaDao
 import app.logdate.client.database.dao.media.MediaExifDao
 import app.logdate.client.database.dao.rewind.CachedRewindDao
+import app.logdate.client.database.dao.rewind.ReflectionPromptResponseDao
 import app.logdate.client.database.dao.rewind.RewindGenerationRequestDao
 import app.logdate.client.database.dao.sync.SyncMetadataDao
 import app.logdate.client.database.entities.AudioNoteEntity
@@ -66,6 +67,7 @@ import app.logdate.client.database.entities.media.IndexedImageEntity
 import app.logdate.client.database.entities.media.IndexedVideoEntity
 import app.logdate.client.database.entities.media.MediaExifMetadataEntity
 import app.logdate.client.database.entities.media.MediaImageEntity
+import app.logdate.client.database.entities.rewind.ReflectionPromptResponseEntity
 import app.logdate.client.database.entities.rewind.RewindEntity
 import app.logdate.client.database.entities.rewind.RewindGenerationRequestEntity
 import app.logdate.client.database.entities.rewind.RewindImageContentEntity
@@ -103,6 +105,7 @@ import app.logdate.client.database.migrations.MIGRATION_34_35
 import app.logdate.client.database.migrations.MIGRATION_35_36
 import app.logdate.client.database.migrations.MIGRATION_36_37
 import app.logdate.client.database.migrations.MIGRATION_37_38
+import app.logdate.client.database.migrations.MIGRATION_38_39
 import app.logdate.client.database.migrations.MIGRATION_3_4
 import app.logdate.client.database.migrations.MIGRATION_4_5
 import app.logdate.client.database.migrations.MIGRATION_5_6
@@ -164,8 +167,10 @@ import kotlinx.coroutines.IO
         EventNoteLinkEntity::class,
         // Ambient sound tags on audio notes
         AudioTagEntity::class,
+        // Typed replies to rewind noticing prompts
+        ReflectionPromptResponseEntity::class,
     ],
-    version = 38,
+    version = 39,
     exportSchema = true,
 )
 @TypeConverters(
@@ -232,6 +237,8 @@ abstract class LogDateDatabase : RoomDatabase() {
     abstract fun eventNoteLinkDao(): EventNoteLinkDao
 
     abstract fun audioTagDao(): AudioTagDao
+
+    abstract fun reflectionPromptResponseDao(): ReflectionPromptResponseDao
 }
 
 /**
@@ -305,6 +312,7 @@ fun getRoomDatabase(
                 MIGRATION_35_36,
                 MIGRATION_36_37,
                 MIGRATION_37_38,
+                MIGRATION_38_39,
             ).addCallback(FtsTableCallback)
             .fallbackToDestructiveMigration(destroyTablesOnUpgrade)
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)

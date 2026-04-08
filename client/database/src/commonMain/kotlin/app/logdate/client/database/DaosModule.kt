@@ -36,4 +36,5 @@ val daosModule: Module =
         single { get<LogDateDatabase>().eventDao() }
         single { get<LogDateDatabase>().eventNoteLinkDao() }
         single { get<LogDateDatabase>().audioTagDao() }
+        single { get<LogDateDatabase>().reflectionPromptResponseDao() }
     }

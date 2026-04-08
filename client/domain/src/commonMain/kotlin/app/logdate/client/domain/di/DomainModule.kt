@@ -70,6 +70,8 @@ import app.logdate.client.domain.rewind.GenerateRewindTitleUseCase
 import app.logdate.client.domain.rewind.GetPastRewindsUseCase
 import app.logdate.client.domain.rewind.GetRewindUseCase
 import app.logdate.client.domain.rewind.GetWeekRewindUseCase
+import app.logdate.client.domain.rewind.ObserveReflectionPromptResponsesUseCase
+import app.logdate.client.domain.rewind.SaveReflectionPromptResponseUseCase
 import app.logdate.client.domain.search.ObserveRecentSearchesUseCase
 import app.logdate.client.domain.search.SearchEntriesUseCase
 import app.logdate.client.domain.search.SearchInJournalUseCase
@@ -154,6 +156,8 @@ val domainModule: Module =
             GetWeekRewindUseCase(get(), prefs.observeFirstDayOfWeek())
         }
         factory { GenerateRewindTitleUseCase() }
+        factory { SaveReflectionPromptResponseUseCase(get()) }
+        factory { ObserveReflectionPromptResponsesUseCase(get()) }
 
         // Media indexing
         factory { IndexMediaForPeriodUseCase(get(), get()) }

@@ -55,6 +55,7 @@ class LogdatePreferencesDataSource(
         // Rewind preferences
         val REWIND_AUTO_GENERATION_ENABLED = booleanPreferencesKey("rewind_auto_generation_enabled")
         val REWIND_NOTIFICATIONS_ENABLED = booleanPreferencesKey("rewind_notifications_enabled")
+        val REWIND_REFLECTION_REPLIES_ENABLED = booleanPreferencesKey("rewind_reflection_replies_enabled")
 
         // Event inference preferences
         val EVENT_INFERENCE_SENSITIVITY = stringPreferencesKey("event_inference_sensitivity")
@@ -485,6 +486,26 @@ class LogdatePreferencesDataSource(
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
                 this[REWIND_NOTIFICATIONS_ENABLED] = enabled
+            }
+        }
+    }
+
+    /**
+     * Observes whether the user wants to be able to type replies to a rewind's noticing prompts.
+     *
+     * Defaults to true. When false, the rewind detail screen still shows the prompts but hides
+     * the reply chrome — useful for people who experience the prompts as decoration rather than
+     * an invitation.
+     */
+    fun observeRewindReflectionRepliesEnabled(): Flow<Boolean> =
+        userPreferences.data.map { prefs ->
+            prefs[REWIND_REFLECTION_REPLIES_ENABLED] ?: true
+        }
+
+    suspend fun setRewindReflectionRepliesEnabled(enabled: Boolean) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[REWIND_REFLECTION_REPLIES_ENABLED] = enabled
             }
         }
     }

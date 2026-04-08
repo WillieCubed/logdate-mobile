@@ -7,6 +7,19 @@
     <string name="rewind_settings_auto_generation_helper">Each week, LogDate quietly stitches your entries into a story so it&apos;s waiting for you when you open the app. Turn this off and rewinds only get made when you ask for them.</string>
     <string name="rewind_settings_notifications_label">Notify me when a Rewind is ready</string>
     <string name="rewind_settings_notifications_helper">Get a tap-to-watch notification the moment your latest weekly Rewind finishes. This is on top of Android&apos;s notification controls; turning it off here stops the app from posting one at all.</string>
+    <string name="rewind_settings_replies_label">Let me reply to noticing prompts</string>
+    <string name="rewind_settings_replies_helper">Each Rewind invents a couple of quiet questions about your week. Leave this on to type your answer back at them right inside the story. Off hides the reply chrome and just shows the prompts.</string>
+
+    <!-- Reflection prompt replies -->
+    <string name="reflection_prompt_reply">Reply</string>
+    <string name="reflection_prompt_reply_edit">Edit your reply</string>
+    <string name="reflection_prompt_reply_sheet_title">Your reply</string>
+    <string name="reflection_prompt_reply_field_label">What you want to say</string>
+    <string name="reflection_prompt_reply_field_placeholder">Whatever comes to mind. Nobody else sees this.</string>
+    <string name="reflection_prompt_reply_save">Save</string>
+    <string name="reflection_prompt_reply_cancel">Cancel</string>
+    <string name="reflection_prompt_reply_clear">Clear reply</string>
+    <string name="reflection_prompt_response_prefix">You wrote:</string>
 
     <!-- Rewind screens -->
     <string name="close_rewind">Close rewind</string>

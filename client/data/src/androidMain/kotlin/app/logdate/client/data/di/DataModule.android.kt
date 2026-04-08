@@ -25,6 +25,7 @@ import app.logdate.client.data.places.OfflineFirstUserPlacesRepository
 import app.logdate.client.data.profile.OfflineFirstProfileRepository
 import app.logdate.client.data.quota.StubRemoteQuotaDataSource
 import app.logdate.client.data.rewind.DefaultRewindGenerationManager
+import app.logdate.client.data.rewind.OfflineFirstReflectionPromptResponseRepository
 import app.logdate.client.data.rewind.OfflineFirstRewindRepository
 import app.logdate.client.data.search.AndroidPlatformSearchIndexManager
 import app.logdate.client.data.search.AndroidPlatformSearchRepository
@@ -59,6 +60,7 @@ import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.repository.places.UserPlacesRepository
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.quota.RemoteQuotaDataSource
+import app.logdate.client.repository.rewind.ReflectionPromptResponseRepository
 import app.logdate.client.repository.rewind.RewindGenerationManager
 import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.client.repository.search.RecentSearchesRepository
@@ -140,6 +142,7 @@ actual val dataModule: Module =
         // Rewind
         single<RewindRepository> { OfflineFirstRewindRepository(get()) }
         single<RewindGenerationManager> { DefaultRewindGenerationManager(get()) }
+        single<ReflectionPromptResponseRepository> { OfflineFirstReflectionPromptResponseRepository(get()) }
 
         // Media
         single<IndexedMediaRepository> { OfflineIndexedMediaRepository(get(), get()) }

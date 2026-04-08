@@ -20,16 +20,19 @@ class RewindSettingsViewModel(
     data class UiState(
         val autoGenerationEnabled: Boolean = true,
         val notificationsEnabled: Boolean = true,
+        val reflectionRepliesEnabled: Boolean = true,
     )
 
     val uiState: StateFlow<UiState> =
         combine(
             preferences.observeRewindAutoGenerationEnabled(),
             preferences.observeRewindNotificationsEnabled(),
-        ) { autoGen, notifications ->
+            preferences.observeRewindReflectionRepliesEnabled(),
+        ) { autoGen, notifications, replies ->
             UiState(
                 autoGenerationEnabled = autoGen,
                 notificationsEnabled = notifications,
+                reflectionRepliesEnabled = replies,
             )
         }.stateIn(
             scope = viewModelScope,
@@ -53,6 +56,16 @@ class RewindSettingsViewModel(
                 preferences.setRewindNotificationsEnabled(enabled)
             } catch (e: Exception) {
                 Napier.e("Failed to update rewind notifications preference", e)
+            }
+        }
+    }
+
+    fun setReflectionRepliesEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                preferences.setRewindReflectionRepliesEnabled(enabled)
+            } catch (e: Exception) {
+                Napier.e("Failed to update rewind reflection replies preference", e)
             }
         }
     }

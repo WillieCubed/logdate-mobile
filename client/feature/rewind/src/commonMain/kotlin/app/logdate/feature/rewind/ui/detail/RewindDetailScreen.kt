@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
+import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindDetailUiState
 import app.logdate.feature.rewind.ui.RewindDetailViewModel
 import app.logdate.feature.rewind.ui.RewindPanelUiState
@@ -86,6 +87,7 @@ fun RewindDetailScreen(
 
     val coroutineScope = rememberCoroutineScope()
     val currentRewind by viewModel.currentRewind.collectAsStateWithLifecycle()
+    val replySheetState by viewModel.replySheetState.collectAsStateWithLifecycle()
 
     val onSharePanel: (RewindPanelUiState) -> Unit = { panel ->
         val shareContent = panel.toShareContent()
@@ -134,8 +136,19 @@ fun RewindDetailScreen(
         onExitRewind = onExitRewind,
         onSharePanel = onSharePanel,
         onShareRewindStats = onShareRewindStats,
+        onReplyToPrompt = viewModel::onReplyRequested,
+        externalPause = replySheetState is ReflectionReplySheetState.Open,
         modifier = modifier,
     )
+
+    val openSheet = replySheetState as? ReflectionReplySheetState.Open
+    if (openSheet != null) {
+        ReflectionPromptReplySheet(
+            state = openSheet,
+            onSave = viewModel::onReplySubmitted,
+            onDismiss = viewModel::onReplyDismissed,
+        )
+    }
 }
 
 @Composable
@@ -145,6 +158,8 @@ fun RewindDetailScreenContent(
     modifier: Modifier = Modifier,
     onSharePanel: ((panel: RewindPanelUiState) -> Unit)? = null,
     onShareRewindStats: (() -> Unit)? = null,
+    onReplyToPrompt: ((panel: ReflectionPromptRewindPanelUiState) -> Unit)? = null,
+    externalPause: Boolean = false,
 ) {
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
     val isWideScreen = windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND)
@@ -166,6 +181,8 @@ fun RewindDetailScreenContent(
                         onExit = onExitRewind,
                         onSharePanel = onSharePanel,
                         onShareRewindStats = onShareRewindStats,
+                        onReplyToPrompt = onReplyToPrompt,
+                        externalPause = externalPause,
                         content = { panel ->
                             RewindStoryContent(panel = panel)
                         },
@@ -182,6 +199,8 @@ fun RewindDetailScreenContent(
                     onExit = onExitRewind,
                     onSharePanel = onSharePanel,
                     onShareRewindStats = onShareRewindStats,
+                    onReplyToPrompt = onReplyToPrompt,
+                    externalPause = externalPause,
                     content = { panel ->
                         RewindStoryContent(panel = panel)
                     },

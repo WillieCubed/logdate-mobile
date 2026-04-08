@@ -4,15 +4,22 @@ package app.logdate.feature.rewind.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.domain.rewind.GetRewindUseCase
+import app.logdate.client.domain.rewind.ObserveReflectionPromptResponsesUseCase
+import app.logdate.client.domain.rewind.SaveReflectionPromptResponseUseCase
 import app.logdate.client.sharing.RewindQuote
 import app.logdate.client.sharing.RewindQuoteCardRenderer
 import app.logdate.client.sharing.RewindStatsSummary
 import app.logdate.client.sharing.RewindStatsSummaryRenderer
 import app.logdate.client.sharing.SharingLauncher
+import app.logdate.feature.rewind.ui.detail.ReflectionReplySheetState
 import app.logdate.feature.rewind.ui.detail.RewindShareRequest
 import app.logdate.feature.rewind.ui.detail.RewindShareVisual
 import app.logdate.feature.rewind.ui.detail.RewindStatsShareRequest
+import app.logdate.shared.model.ReflectionPrompt
+import app.logdate.shared.model.ReflectionPromptKey
+import app.logdate.shared.model.ReflectionPromptResponse
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
 import io.github.aakira.napier.Napier
@@ -20,7 +27,9 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -56,6 +65,9 @@ class RewindDetailViewModel(
     private val sharingLauncher: SharingLauncher,
     private val quoteCardRenderer: RewindQuoteCardRenderer,
     private val statsSummaryRenderer: RewindStatsSummaryRenderer,
+    private val observeReflectionPromptResponses: ObserveReflectionPromptResponsesUseCase,
+    private val saveReflectionPromptResponse: SaveReflectionPromptResponseUseCase,
+    private val preferences: LogdatePreferencesDataSource,
 //    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val rewindIdState = MutableStateFlow<Uuid?>(null)
@@ -68,6 +80,16 @@ class RewindDetailViewModel(
      */
     val currentRewind: StateFlow<Rewind?> = latestRewind
 
+    private val replySheetStateFlow = MutableStateFlow<ReflectionReplySheetState>(ReflectionReplySheetState.Closed)
+
+    /**
+     * Whether the reply sheet is open and what prompt it's targeting.
+     *
+     * The detail screen reads this to decide when to render the bottom sheet, and the story
+     * view reads it to stay paused while the user is composing a reply.
+     */
+    val replySheetState: StateFlow<ReflectionReplySheetState> = replySheetStateFlow.asStateFlow()
+
 //    private val rewindData = savedStateHandle.toRoute<RewindDetailRoute>()
 
     val uiState: StateFlow<RewindDetailUiState> =
@@ -77,23 +99,29 @@ class RewindDetailViewModel(
                     // Return a specific RewindNotSelected error state when rewindId is null
                     flowOf(RewindDetailUiState.Error.RewindNotSelected)
                 } else {
-                    // Use the rewindId to fetch data
-                    getRewindUseCase(rewindId)
-                        .map { rewind ->
-                            // Cache the raw rewind so stats summary share can read its metadata
-                            // without re-fetching.
-                            latestRewind.value = rewind
-                            val panels = transformRewindToStoryPanels(rewind)
+                    // The detail screen needs three things in lockstep: the rewind itself, any
+                    // typed replies the user has saved against its prompts, and the global
+                    // toggle that decides whether reply chrome should appear at all. Combine
+                    // them so the panel list rebuilds the moment any of them change.
+                    combine(
+                        getRewindUseCase(rewindId),
+                        observeReflectionPromptResponses(rewindId),
+                        preferences.observeRewindReflectionRepliesEnabled(),
+                    ) { rewind, responses, repliesEnabled ->
+                        // Cache the raw rewind so stats summary share can read its metadata
+                        // without re-fetching.
+                        latestRewind.value = rewind
+                        val panels = transformRewindToStoryPanels(rewind, responses, repliesEnabled)
 
-                            if (panels.isEmpty()) {
-                                RewindDetailUiState.Error.EmptyContent
-                            } else {
-                                RewindDetailUiState.Success(panels = panels)
-                            }
-                        }.catch { e ->
-                            Napier.e("Error loading rewind", e)
-                            emit(RewindDetailUiState.Error.LoadingFailed)
+                        if (panels.isEmpty()) {
+                            RewindDetailUiState.Error.EmptyContent
+                        } else {
+                            RewindDetailUiState.Success(panels = panels)
                         }
+                    }.catch { e ->
+                        Napier.e("Error loading rewind", e)
+                        emit(RewindDetailUiState.Error.LoadingFailed)
+                    }
                 }
             }.stateIn(
                 viewModelScope,
@@ -216,9 +244,17 @@ class RewindDetailViewModel(
      * appropriately and creates a cohesive story flow.
      *
      * @param rewind The domain Rewind model to transform
+     * @param responses Saved replies for this rewind, keyed by prompt. Used to surface
+     *   the user's previous reply on the matching noticing-prompt panel.
+     * @param repliesEnabled Whether the user wants reply chrome shown at all. When false,
+     *   prompt panels still render but the chip and inline preview are suppressed.
      * @return List of UI panel states in presentation order
      */
-    private fun transformRewindToStoryPanels(rewind: Rewind): List<RewindPanelUiState> {
+    private fun transformRewindToStoryPanels(
+        rewind: Rewind,
+        responses: Map<ReflectionPromptKey, ReflectionPromptResponse>,
+        repliesEnabled: Boolean,
+    ): List<RewindPanelUiState> {
         val panels = mutableListOf<RewindPanelUiState>()
 
         // 1. Add title panel
@@ -344,11 +380,14 @@ class RewindDetailViewModel(
                 )
             }
             metadata.reflectionPrompts.forEachIndexed { index, prompt ->
+                val existingReply = responses[prompt.key]?.responseText
                 panels.add(
                     ReflectionPromptRewindPanelUiState(
                         observation = prompt.observation,
                         invitation = prompt.invitation,
                         accentSeed = rewindSeed xor (PROMPT_SEED_OFFSET + index),
+                        existingResponse = existingReply,
+                        repliesAllowed = repliesEnabled,
                     ),
                 )
             }
@@ -448,6 +487,47 @@ class RewindDetailViewModel(
             }
 
         return "$startMonth ${startLocal.day} - $endMonth ${endLocal.day}, ${endLocal.year}"
+    }
+
+    /**
+     * Opens the reply sheet for [panel] so the user can type a response.
+     *
+     * Pulls the prompt out of the panel state instead of asking the caller for an index;
+     * the prompt's stable [ReflectionPromptKey] takes care of finding any existing reply.
+     */
+    fun onReplyRequested(panel: ReflectionPromptRewindPanelUiState) {
+        val prompt = ReflectionPrompt(observation = panel.observation, invitation = panel.invitation)
+        replySheetStateFlow.value =
+            ReflectionReplySheetState.Open(
+                prompt = prompt,
+                existing = panel.existingResponse,
+            )
+    }
+
+    /**
+     * Persists the user's typed reply to the prompt currently open in the reply sheet.
+     *
+     * Empty input clears the reply through the use case's blank-text contract; in either
+     * case the sheet closes.
+     */
+    fun onReplySubmitted(text: String) {
+        val state = replySheetStateFlow.value
+        if (state !is ReflectionReplySheetState.Open) return
+        val rewindId = rewindIdState.value ?: return
+        viewModelScope.launch {
+            try {
+                saveReflectionPromptResponse(rewindId, state.prompt, text)
+            } catch (e: Exception) {
+                Napier.e("Failed to save reflection prompt response", e)
+            } finally {
+                replySheetStateFlow.value = ReflectionReplySheetState.Closed
+            }
+        }
+    }
+
+    /** Closes the reply sheet without persisting whatever the user had typed. */
+    fun onReplyDismissed() {
+        replySheetStateFlow.value = ReflectionReplySheetState.Closed
     }
 
     /**

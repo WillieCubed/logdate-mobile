@@ -18,6 +18,9 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import logdate.client.feature.rewind.generated.resources.Res
+import logdate.client.feature.rewind.generated.resources.reflection_prompt_response_prefix
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Renders an AI-invented "noticing" prompt as a quiet two-line panel.
@@ -26,6 +29,10 @@ import androidx.compose.ui.unit.dp
  * a count, a recurrence, a contrast. It's drawn small and italic so it reads as the rewind
  * "noticing", not as a wellness banner. The [invitation] sits beneath in larger type as the
  * actual question the user is being asked to consider.
+ *
+ * If the user has already typed a reply (and hasn't disabled reply chrome), it appears as
+ * a quiet third row beneath the invitation so re-opening an old rewind shows the previous
+ * answer at a glance.
  *
  * The background hue varies per prompt via [accentSeed] so a sequence of prompt panels
  * doesn't read as templated.
@@ -36,6 +43,7 @@ fun ReflectionPromptPanel(
     invitation: String,
     accentSeed: Int,
     modifier: Modifier = Modifier,
+    existingResponse: String? = null,
 ) {
     Box(
         modifier = modifier.fillMaxSize().background(panelAccentBackground(accentSeed)),
@@ -62,6 +70,22 @@ fun ReflectionPromptPanel(
                 textAlign = TextAlign.Start,
                 lineHeight = MaterialTheme.typography.headlineMedium.lineHeight,
             )
+            if (existingResponse != null) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = stringResource(Res.string.reflection_prompt_response_prefix),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.55f),
+                    )
+                    Text(
+                        text = existingResponse,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontStyle = FontStyle.Italic,
+                        lineHeight = MaterialTheme.typography.bodyLarge.lineHeight,
+                    )
+                }
+            }
         }
     }
 }

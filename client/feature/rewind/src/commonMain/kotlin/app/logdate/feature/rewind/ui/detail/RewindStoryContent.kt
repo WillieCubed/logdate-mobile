@@ -143,6 +143,7 @@ fun RewindStoryContent(
                 invitation = panel.invitation,
                 accentSeed = panel.accentSeed,
                 modifier = modifier,
+                existingResponse = panel.existingResponse?.takeIf { panel.repliesAllowed },
             )
         }
 

@@ -171,11 +171,18 @@ data class HighlightedQuoteRewindPanelUiState(
  * @property invitation The open-ended question the observation leads into.
  * @property accentSeed Used to vary background hue between prompts so consecutive prompt
  *   panels look distinct.
+ * @property existingResponse What the user previously typed in reply, or null if no reply
+ *   exists yet. Rendered as a quiet preview beneath the invitation when present.
+ * @property repliesAllowed Whether reply chrome should be visible at all. Driven by a
+ *   user preference; when false, the panel still renders the prompt itself but the
+ *   existing-response preview and reply CTA are suppressed.
  */
 data class ReflectionPromptRewindPanelUiState(
     val observation: String,
     val invitation: String,
     val accentSeed: Int = 0,
+    val existingResponse: String? = null,
+    val repliesAllowed: Boolean = true,
 ) : RewindPanelUiState
 
 /**

@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -47,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindPanelUiState
 import kotlinx.coroutines.launch
 import logdate.client.feature.rewind.generated.resources.*
@@ -89,6 +91,8 @@ fun RewindStoryView(
     modifier: Modifier = Modifier,
     onSharePanel: ((panel: RewindPanelUiState) -> Unit)? = null,
     onShareRewindStats: (() -> Unit)? = null,
+    onReplyToPrompt: ((panel: ReflectionPromptRewindPanelUiState) -> Unit)? = null,
+    externalPause: Boolean = false,
     autoAdvanceDelayMs: Long = 5000L,
     content: @Composable (panel: RewindPanelUiState) -> Unit,
 ) {
@@ -116,8 +120,13 @@ fun RewindStoryView(
         autoAdvanceProgress = 0f
     }
 
-    LaunchedEffect(currentPanelIndex, isPaused) {
-        if (isPaused) {
+    // The story stays paused whenever the user is interacting with chrome that lives outside
+    // this composable (the share sheet, the reply sheet) so its contents don't tick away
+    // while attention is elsewhere.
+    val effectivelyPaused = isPaused || externalPause
+
+    LaunchedEffect(currentPanelIndex, effectivelyPaused) {
+        if (effectivelyPaused) {
             progressAnimatable.stop()
             return@LaunchedEffect
         }
@@ -238,6 +247,33 @@ fun RewindStoryView(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(modifier = Modifier.weight(1f))
+
+                val activePanel = panels[currentPanelIndex]
+                if (
+                    onReplyToPrompt != null &&
+                    activePanel is ReflectionPromptRewindPanelUiState &&
+                    activePanel.repliesAllowed
+                ) {
+                    IconButton(
+                        onClick = {
+                            isPaused = true
+                            onReplyToPrompt(activePanel)
+                        },
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Reply,
+                            contentDescription =
+                                stringResource(
+                                    if (activePanel.existingResponse != null) {
+                                        Res.string.reflection_prompt_reply_edit
+                                    } else {
+                                        Res.string.reflection_prompt_reply
+                                    },
+                                ),
+                            tint = Color.White,
+                        )
+                    }
+                }
 
                 if (onShareRewindStats != null) {
                     IconButton(
