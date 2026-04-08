@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /**
@@ -44,7 +45,10 @@ class AndroidTranscriptionService(
 
     init {
         if (SpeechRecognizer.isRecognitionAvailable(context)) {
-            createSpeechRecognizer()
+            // SpeechRecognizer requires the main thread; dispatch via the scope
+            // so construction on a background thread (e.g. lazy init from a
+            // coroutine) doesn't crash.
+            scope.launch { createSpeechRecognizer() }
         } else {
             scope.launch {
                 _transcriptionFlow.emit(TranscriptionResult.Error("Speech recognition not available on this device"))
@@ -177,7 +181,7 @@ class AndroidTranscriptionService(
 
     override suspend fun startLiveTranscription(): Boolean {
         if (speechRecognizer == null) {
-            createSpeechRecognizer()
+            withContext(Dispatchers.Main) { createSpeechRecognizer() }
         }
 
         if (speechRecognizer == null) {
