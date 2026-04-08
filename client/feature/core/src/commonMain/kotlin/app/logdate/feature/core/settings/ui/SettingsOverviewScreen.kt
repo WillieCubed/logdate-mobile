@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Cloud
@@ -34,7 +33,6 @@ import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -47,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.SettingsNavigationItem
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
@@ -66,7 +65,6 @@ import logdate.client.feature.core.generated.resources.location_settings_descrip
 import logdate.client.feature.core.generated.resources.logging_since
 import logdate.client.feature.core.generated.resources.memories
 import logdate.client.feature.core.generated.resources.memories_description
-import logdate.client.feature.core.generated.resources.navigate_to_title
 import logdate.client.feature.core.generated.resources.notifications_settings
 import logdate.client.feature.core.generated.resources.notifications_settings_description
 import logdate.client.feature.core.generated.resources.privacy_and_security
@@ -122,8 +120,6 @@ fun SettingsOverviewScreen(
     onNavigateToStreaks: () -> Unit = {},
     onNavigateToRewindSettings: () -> Unit = {},
     onNavigateToEventsSettings: () -> Unit = {},
-    onNavigateToEventsCalendar: () -> Unit = {},
-    onNavigateToCalendarSyncSettings: () -> Unit = {},
     onNavigateToTimeline: () -> Unit,
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
@@ -151,8 +147,6 @@ fun SettingsOverviewScreen(
         onNavigateToStreaks = onNavigateToStreaks,
         onNavigateToRewindSettings = onNavigateToRewindSettings,
         onNavigateToEventsSettings = onNavigateToEventsSettings,
-        onNavigateToEventsCalendar = onNavigateToEventsCalendar,
-        onNavigateToCalendarSyncSettings = onNavigateToCalendarSyncSettings,
         onNavigateToTimeline = onNavigateToTimeline,
         onNavigateToSync = onNavigateToSync,
         onNavigateToExport = onNavigateToExport,
@@ -186,8 +180,6 @@ fun SettingsOverviewContent(
     onNavigateToStreaks: () -> Unit = {},
     onNavigateToRewindSettings: () -> Unit = {},
     onNavigateToEventsSettings: () -> Unit = {},
-    onNavigateToEventsCalendar: () -> Unit = {},
-    onNavigateToCalendarSyncSettings: () -> Unit = {},
     onNavigateToTimeline: () -> Unit = {},
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
@@ -257,22 +249,10 @@ fun SettingsOverviewContent(
                     onClick = onNavigateToRewindSettings,
                 )
                 SettingsNavigationItem(
-                    title = "Auto-events",
-                    description = "Let LogDate notice events from your photos and places",
+                    title = "Events",
+                    description = "The moments worth remembering, gathered for you",
                     icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
                     onClick = onNavigateToEventsSettings,
-                )
-                SettingsNavigationItem(
-                    title = "Calendar",
-                    description = "Browse a month grid of your events",
-                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
-                    onClick = onNavigateToEventsCalendar,
-                )
-                SettingsNavigationItem(
-                    title = "Calendar sync",
-                    description = "Mirror events from your device calendars",
-                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
-                    onClick = onNavigateToCalendarSyncSettings,
                 )
                 SettingsNavigationItem(
                     title = "Your library",
@@ -412,40 +392,6 @@ private fun SyncPromotionCard(
             }
         }
     }
-}
-
-@Composable
-private fun SettingsNavigationItem(
-    title: String,
-    description: String,
-    icon: @Composable () -> Unit,
-    onClick: () -> Unit,
-) {
-    ListItem(
-        headlineContent = {
-            Text(text = title)
-        },
-        supportingContent = {
-            Text(
-                text = description,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        leadingContent = icon,
-        trailingContent = {
-            Icon(
-                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                contentDescription =
-                    stringResource(
-                        Res.string.navigate_to_title,
-                        title,
-                    ),
-            )
-        },
-        modifier = Modifier.clickable(onClick = onClick),
-    )
 }
 
 @Composable

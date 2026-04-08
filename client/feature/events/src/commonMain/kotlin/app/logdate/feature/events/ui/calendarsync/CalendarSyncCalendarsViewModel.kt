@@ -12,9 +12,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Drives the "choose calendars" screen. Loads the device calendars on entry, tracks a
- * working selection set the user can toggle, and persists the result back to preferences
- * on save. The next periodic worker run picks up the new selection automatically.
+ * Drives the "choose calendars" screen. Loads the device calendars on entry and writes
+ * every toggle through to preferences immediately, so the row state always equals the
+ * saved state and there is no save button to forget.
  */
 class CalendarSyncCalendarsViewModel(
     private val deviceCalendarReader: DeviceCalendarReader,
@@ -37,21 +37,11 @@ class CalendarSyncCalendarsViewModel(
     }
 
     fun toggleCalendar(id: String) {
-        _state.update { current ->
-            val nextIds =
-                if (id in current.selectedIds) {
-                    current.selectedIds - id
-                } else {
-                    current.selectedIds + id
-                }
-            current.copy(selectedIds = nextIds)
-        }
-    }
-
-    fun save(onComplete: () -> Unit) {
+        val current = _state.value.selectedIds
+        val nextIds = if (id in current) current - id else current + id
+        _state.update { it.copy(selectedIds = nextIds) }
         viewModelScope.launch {
-            preferences.setDeviceCalendarEnabledIds(_state.value.selectedIds)
-            onComplete()
+            preferences.setDeviceCalendarEnabledIds(nextIds)
         }
     }
 }

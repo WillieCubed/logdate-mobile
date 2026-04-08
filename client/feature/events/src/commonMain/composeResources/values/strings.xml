@@ -1,70 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="events_settings_title">Auto-events</string>
-    <string name="events_settings_description">LogDate can quietly notice when you spent time somewhere new and captured photos or notes there, then group them into an event you can revisit later.</string>
-    <string name="events_settings_master_toggle">Notice events for me</string>
+    <!-- Events hub (settings entry that gathers everything event-related) -->
+    <string name="events_hub_title">Events</string>
+    <string name="events_hub_description">LogDate quietly notices the things that happen to you — places you spent time, photos you took, plans on your calendar — and groups them into events so it&apos;s easier to look back, reflect, and see how your days connect.</string>
+    <string name="events_hub_master_toggle">Notice events for me</string>
+    <string name="events_hub_smart_names_title">Smart names</string>
+    <string name="events_hub_smart_names_on">Each new event gets a short, descriptive title.</string>
+    <string name="events_hub_smart_names_off">Events use a simple time-and-place label.</string>
+    <string name="events_hub_calendar_row_title">Browse calendar</string>
+    <string name="events_hub_calendar_row_subtitle">See your events on a month grid.</string>
+    <string name="events_hub_sync_row_title">Your calendars</string>
+    <string name="events_hub_sync_row_subtitle">Keep the things you already plan in the same place as everything else.</string>
 
-    <string name="events_settings_status_last_run">Last run: %1$s</string>
-    <string name="events_settings_status_never">Never</string>
-    <string name="events_settings_status_created_last_run">Created last run: %1$d</string>
-    <string name="events_settings_status_created_recently">Created recently: %1$d</string>
-
-    <string name="events_settings_run_now">Run now</string>
-    <string name="events_settings_run_in_progress">Running…</string>
-
-    <string name="events_settings_sensitivity_label">Sensitivity</string>
-    <string name="events_settings_sensitivity_low">Low</string>
-    <string name="events_settings_sensitivity_medium">Medium</string>
-    <string name="events_settings_sensitivity_high">High</string>
-    <string name="events_settings_sensitivity_helper_low">Only when there are several photos or notes alongside a stop. Quietest setting.</string>
-    <string name="events_settings_sensitivity_helper_medium">When there\'s at least a couple of photos or a note alongside a stop. Recommended.</string>
-    <string name="events_settings_sensitivity_helper_high">Even one photo or note at a new place is enough. Most events, more chance of a miss.</string>
-
-    <string name="events_settings_smart_names_title">Smart names</string>
-    <string name="events_settings_smart_names_on">LogDate writes a short title and description for each new event.</string>
-    <string name="events_settings_smart_names_off">Events use a simple time-and-place label.</string>
-
-    <string name="events_settings_relative_just_now">just now</string>
-    <string name="events_settings_relative_minutes_ago">%1$d min ago</string>
-    <string name="events_settings_relative_hours_ago">%1$dh ago</string>
-    <string name="events_settings_relative_days_ago">%1$dd ago</string>
-
-    <string name="events_settings_failure_unknown">Something went wrong on the last run.</string>
-    <string name="events_settings_failure_signal_unavailable">Couldn\'t read enough activity to find new events.</string>
-    <string name="events_settings_failure_naming_failed">Couldn\'t name the new events. They\'ll get a simple label instead.</string>
-    <string name="events_settings_failure_persistence_failed">Couldn\'t save the new events. They\'ll be retried on the next run.</string>
-
-    <string name="calendar_sync_settings_title">Calendar sync</string>
-    <string name="calendar_sync_settings_description">Mirror events from your device\'s calendars (Google, iCloud, local) into LogDate so the things you already plan show up alongside the ones LogDate noticed.</string>
-    <string name="calendar_sync_settings_master_toggle">Sync your calendars into LogDate</string>
-    <string name="calendar_sync_settings_grant_title">Allow access to your calendars</string>
-    <string name="calendar_sync_settings_grant_rationale">LogDate reads your calendars to help you remember what\'s coming up. Nothing leaves your device, and we never write back to your calendars.</string>
+    <!-- Calendar sync overview -->
+    <string name="calendar_sync_settings_title">Your calendars</string>
+    <string name="calendar_sync_settings_description">The plans you keep on your calendar are part of the picture. Bring them into LogDate so they sit alongside everything else, making it easier to look back on what your days were really about.</string>
+    <string name="calendar_sync_settings_master_toggle">Use my calendars in LogDate</string>
+    <string name="calendar_sync_settings_grant_title">Let LogDate read your calendars</string>
+    <string name="calendar_sync_settings_grant_rationale">LogDate reads your calendars so it can help you remember what&apos;s coming up. Nothing leaves your device, and LogDate never writes back to the calendars themselves.</string>
     <string name="calendar_sync_settings_grant_action">Allow access</string>
-    <string name="calendar_sync_settings_denied_action">Open app settings</string>
-    <string name="calendar_sync_settings_status_last_run">Last sync: %1$s</string>
-    <string name="calendar_sync_settings_status_never">Never</string>
-    <string name="calendar_sync_settings_status_created">Imported last sync: %1$d</string>
-    <string name="calendar_sync_settings_status_updated">Updated last sync: %1$d</string>
-    <string name="calendar_sync_settings_run_now">Sync now</string>
-    <string name="calendar_sync_settings_run_in_progress">Syncing…</string>
     <string name="calendar_sync_settings_calendars_row_title">Calendars</string>
     <string name="calendar_sync_settings_calendars_row_subtitle_some">%1$d of %2$d selected</string>
-    <string name="calendar_sync_settings_calendars_row_subtitle_none">Choose calendars to sync</string>
+    <string name="calendar_sync_settings_calendars_row_subtitle_none">Choose which ones to keep</string>
     <string name="calendar_sync_settings_activity_row_title">Imported events</string>
-    <string name="calendar_sync_settings_activity_row_subtitle">See what LogDate has mirrored from your calendars</string>
+    <string name="calendar_sync_settings_activity_row_subtitle">See the events that came from your calendars.</string>
 
+    <!-- Choose calendars -->
     <string name="calendar_sync_calendars_title">Choose calendars</string>
-    <string name="calendar_sync_calendars_save">Save</string>
     <string name="calendar_sync_calendars_empty">No calendars found on this device.</string>
+    <string name="calendar_sync_calendars_default_label">Default calendar</string>
 
+    <!-- Recent imports -->
     <string name="calendar_sync_activity_title">Imported events</string>
     <string name="calendar_sync_activity_empty">Nothing imported yet. The next sync will pull events from the calendars you selected.</string>
 
-    <string name="calendar_sync_failure_unknown">Something went wrong on the last sync.</string>
-    <string name="calendar_sync_failure_permission_denied">LogDate doesn\'t have permission to read your calendars yet.</string>
-    <string name="calendar_sync_failure_calendars_unavailable">Couldn\'t reach your calendars on the last sync.</string>
-    <string name="calendar_sync_failure_persistence_failed">Couldn\'t save the imported events. They\'ll be retried on the next sync.</string>
-
+    <!-- Calendar surface (month grid) -->
     <string name="events_calendar_title">Calendar</string>
     <string name="events_calendar_previous_month">Previous month</string>
     <string name="events_calendar_next_month">Next month</string>

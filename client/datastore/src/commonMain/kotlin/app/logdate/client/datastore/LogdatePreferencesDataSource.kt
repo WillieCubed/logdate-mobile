@@ -136,7 +136,10 @@ class LogdatePreferencesDataSource(
      */
     fun observeEventsEnabled(): Flow<Boolean> =
         userPreferences.data.map { prefs ->
-            prefs[EVENTS_ENABLED] ?: false
+            // Default to on. Auto-events is the headline behavior of the feature; users
+            // shouldn't have to opt in to discover that LogDate is noticing things for
+            // them. They can still turn it off from the auto-events settings screen.
+            prefs[EVENTS_ENABLED] ?: true
         }
 
     suspend fun isEventsEnabled(): Boolean = observeEventsEnabled().first()

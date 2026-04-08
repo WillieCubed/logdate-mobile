@@ -14,22 +14,14 @@ import org.koin.dsl.module
 val eventsFeatureModule: Module =
     module {
         viewModelOf(::EventDetailViewModel)
-        // EventsSettingsViewModel and CalendarSyncOverviewViewModel both take a
-        // `clock: () -> Instant` constructor parameter with a default value for testability.
-        // Koin's `viewModelOf` resolves *every* parameter from the graph, including the
-        // lambda — which it can't, because there's no `Function0<Instant>` binding. Bind
-        // them explicitly instead so the default clock lambda kicks in at production sites.
-        viewModel { EventsSettingsViewModel(preferences = get(), inferenceLauncher = get()) }
-        viewModel {
-            CalendarSyncOverviewViewModel(
-                preferences = get(),
-                launcher = get(),
-                deviceCalendarReader = get(),
-            )
-        }
+        viewModelOf(::EventsSettingsViewModel)
+        viewModelOf(::CalendarSyncOverviewViewModel)
         viewModelOf(::CalendarSyncCalendarsViewModel)
         viewModelOf(::CalendarSyncActivityViewModel)
-        // Same `clock` lambda problem as the two settings VMs above — bind explicitly so
-        // the default lambda survives Koin's reflective resolver.
+        // EventsCalendarViewModel still has a `clock: () -> Instant` constructor parameter
+        // with a default value for testability. Koin's `viewModelOf` resolves *every*
+        // parameter from the graph, including the lambda — which it can't, because there's
+        // no `Function0<Instant>` binding. Bind it explicitly so the default clock lambda
+        // kicks in at production sites.
         viewModel { EventsCalendarViewModel(observeEventsForMonth = get()) }
     }

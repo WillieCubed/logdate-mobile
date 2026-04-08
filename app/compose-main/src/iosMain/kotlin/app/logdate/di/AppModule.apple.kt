@@ -36,7 +36,7 @@ actual val appModule: Module =
         includes(locationDomainModule) // Location domain depends on data layers
         includes(app.logdate.client.health.di.healthModule) // Common Health Connect implementation
         includes(app.logdate.client.health.di.iosHealthModule) // iOS-specific Health Connect implementation
-        includes(calendarSyncModule) // Stub DeviceCalendarReader on iOS until EventKit lands
+        includes(calendarSyncModule) // EventKit-backed DeviceCalendarReader on iOS
         includes(domainModule) // Main domain module with no circular deps
         includes(audioModule)
 

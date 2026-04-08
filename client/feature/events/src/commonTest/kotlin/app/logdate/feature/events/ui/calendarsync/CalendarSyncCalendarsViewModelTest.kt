@@ -79,17 +79,26 @@ class CalendarSyncCalendarsViewModelTest {
         }
 
     @Test
-    fun save_persists_selection_and_invokes_completion_callback() =
+    fun toggleCalendar_persists_selection_immediately() =
         runTest(testDispatcher) {
             reader.calendars = listOf(deviceCalendar("cal-1", "Personal"))
             val viewModel = CalendarSyncCalendarsViewModel(reader, preferences)
+
             viewModel.toggleCalendar("cal-1")
 
-            var completed = false
-            viewModel.save { completed = true }
-
-            assertTrue(completed)
             assertEquals(setOf("cal-1"), preferences.getDeviceCalendarEnabledIds())
+        }
+
+    @Test
+    fun toggleCalendar_off_removes_from_persisted_selection() =
+        runTest(testDispatcher) {
+            reader.calendars = listOf(deviceCalendar("cal-1", "Personal"))
+            preferences.setDeviceCalendarEnabledIds(setOf("cal-1"))
+            val viewModel = CalendarSyncCalendarsViewModel(reader, preferences)
+
+            viewModel.toggleCalendar("cal-1")
+
+            assertTrue(preferences.getDeviceCalendarEnabledIds().isEmpty())
         }
 
     @Test

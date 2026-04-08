@@ -406,8 +406,6 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onNavigateToStreaks = onNavigateToStreaks,
             onNavigateToRewindSettings = onNavigateToRewindSettings,
             onNavigateToEventsSettings = onNavigateToEventsSettings,
-            onNavigateToEventsCalendar = onNavigateToEventsCalendar,
-            onNavigateToCalendarSyncSettings = onNavigateToCalendarSyncSettings,
             onNavigateToTimeline = onNavigateToTimeline,
             onNavigateToSync = onNavigateToSync,
             onNavigateToExport = onNavigateToExport,
@@ -639,12 +637,15 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
         )
     }
 
-    // Auto-events settings detail (detail pane)
+    // Events hub (detail pane). Single entry point that fans out into the calendar grid
+    // and the device-calendar sync flow.
     routeEntry<EventsSettingsRoute>(
         metadata = ListDetailSceneStrategy.detailPane(),
     ) { _ ->
         EventsSettingsScreen(
             onBack = onBack,
+            onNavigateToCalendar = onNavigateToEventsCalendar,
+            onNavigateToCalendarSync = onNavigateToCalendarSyncSettings,
         )
     }
 
