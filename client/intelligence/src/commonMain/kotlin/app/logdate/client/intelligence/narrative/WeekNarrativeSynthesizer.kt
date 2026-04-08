@@ -50,7 +50,7 @@ class WeekNarrativeSynthesizer(
     private val dataUsagePolicy: DataUsagePolicy,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    private companion object {
+    internal companion object {
         private const val SYSTEM_PROMPT = """
 You are a narrative intelligence system that understands life stories from journal entries.
 
@@ -226,10 +226,10 @@ Example for tough week:
 
 Respond ONLY with valid JSON in this format. No additional text."""
 
-        private const val PROMPT_VERSION = "narrative-v3-quotes"
-        private const val SCHEMA_VERSION = "week-narrative-json-v3"
-        private const val TEMPLATE_ID = "week-narrative"
-        private const val CACHE_TTL_SECONDS = 60L * 60L * 24L * 30L
+        internal const val PROMPT_VERSION = "narrative-v3-quotes"
+        internal const val SCHEMA_VERSION = "week-narrative-json-v3"
+        internal const val TEMPLATE_ID = "week-narrative"
+        internal const val CACHE_TTL_SECONDS = 60L * 60L * 24L * 30L
 
         private const val RESPONSE_SCHEMA = """
 {

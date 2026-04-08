@@ -149,15 +149,12 @@ data class TransitionRewindPanelUiState(
  * @property text The exact line as the user typed it. Never edited or paraphrased.
  * @property whyItHits A one-line note from the AI about why this line was picked out
  *   of the surrounding entry. Drawn small underneath the quote.
- * @property sourceEntryId The journal entry the quote came from. Future-proofed for
- *   tap-to-deep-link, unused for now.
  * @property accentSeed Used to vary the per-card hue so consecutive quote panels look
  *   distinct.
  */
 data class HighlightedQuoteRewindPanelUiState(
     val text: String,
     val whyItHits: String,
-    val sourceEntryId: String,
     val accentSeed: Int = 0,
 ) : RewindPanelUiState
 

@@ -386,8 +386,8 @@ class OfflineFirstRewindRepository(
         val locationSummary: SerializableLocationSummary?,
         val milestones: List<String>,
         val peopleHighlighted: List<String>,
-        val reflectionPrompts: List<SerializableReflectionPrompt> = emptyList(),
-        val highlightedQuotes: List<SerializableHighlightedQuote> = emptyList(),
+        val reflectionPrompts: List<ReflectionPrompt> = emptyList(),
+        val highlightedQuotes: List<HighlightedQuote> = emptyList(),
     ) {
         fun toDomainModel(): RewindMetadata =
             RewindMetadata(
@@ -405,12 +405,8 @@ class OfflineFirstRewindRepository(
                     },
                 milestones = milestones,
                 peopleHighlighted = peopleHighlighted,
-                reflectionPrompts =
-                    reflectionPrompts.map { ReflectionPrompt(observation = it.observation, invitation = it.invitation) },
-                highlightedQuotes =
-                    highlightedQuotes.map {
-                        HighlightedQuote(text = it.text, whyItHits = it.whyItHits, sourceEntryId = it.sourceEntryId)
-                    },
+                reflectionPrompts = reflectionPrompts,
+                highlightedQuotes = highlightedQuotes,
             )
 
         companion object {
@@ -427,34 +423,11 @@ class OfflineFirstRewindRepository(
                         },
                     milestones = metadata.milestones,
                     peopleHighlighted = metadata.peopleHighlighted,
-                    reflectionPrompts =
-                        metadata.reflectionPrompts.map {
-                            SerializableReflectionPrompt(observation = it.observation, invitation = it.invitation)
-                        },
-                    highlightedQuotes =
-                        metadata.highlightedQuotes.map {
-                            SerializableHighlightedQuote(
-                                text = it.text,
-                                whyItHits = it.whyItHits,
-                                sourceEntryId = it.sourceEntryId,
-                            )
-                        },
+                    reflectionPrompts = metadata.reflectionPrompts,
+                    highlightedQuotes = metadata.highlightedQuotes,
                 )
         }
     }
-
-    @Serializable
-    private data class SerializableReflectionPrompt(
-        val observation: String,
-        val invitation: String,
-    )
-
-    @Serializable
-    private data class SerializableHighlightedQuote(
-        val text: String,
-        val whyItHits: String,
-        val sourceEntryId: String,
-    )
 
     @Serializable
     private data class SerializableLocationSummary(

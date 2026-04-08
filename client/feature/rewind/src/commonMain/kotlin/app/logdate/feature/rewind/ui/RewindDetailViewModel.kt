@@ -331,27 +331,27 @@ class RewindDetailViewModel(
             }
         }
 
-        // 4. Surface verbatim quotes the AI pulled from the user's actual entries.
-        rewind.metadata?.highlightedQuotes?.forEachIndexed { index, quote ->
-            panels.add(
-                HighlightedQuoteRewindPanelUiState(
-                    text = quote.text,
-                    whyItHits = quote.whyItHits,
-                    sourceEntryId = quote.sourceEntryId,
-                    accentSeed = rewind.uid.hashCode() xor index.inv(),
-                ),
-            )
-        }
-
-        // 5. Add AI-invented noticing prompts as the final beats of the story.
-        rewind.metadata?.reflectionPrompts?.forEachIndexed { index, prompt ->
-            panels.add(
-                ReflectionPromptRewindPanelUiState(
-                    observation = prompt.observation,
-                    invitation = prompt.invitation,
-                    accentSeed = rewind.uid.hashCode() xor index,
-                ),
-            )
+        // 4. Beats the AI invented from the period's content: verbatim quotes first, then noticing prompts.
+        rewind.metadata?.let { metadata ->
+            val rewindSeed = rewind.uid.hashCode()
+            metadata.highlightedQuotes.forEachIndexed { index, quote ->
+                panels.add(
+                    HighlightedQuoteRewindPanelUiState(
+                        text = quote.text,
+                        whyItHits = quote.whyItHits,
+                        accentSeed = rewindSeed xor (QUOTE_SEED_OFFSET + index),
+                    ),
+                )
+            }
+            metadata.reflectionPrompts.forEachIndexed { index, prompt ->
+                panels.add(
+                    ReflectionPromptRewindPanelUiState(
+                        observation = prompt.observation,
+                        invitation = prompt.invitation,
+                        accentSeed = rewindSeed xor (PROMPT_SEED_OFFSET + index),
+                    ),
+                )
+            }
         }
 
         // 5. Add closing panel
@@ -502,4 +502,12 @@ class RewindDetailViewModel(
                     ),
             ),
         )
+
+    private companion object {
+        // Per-panel-type offsets keep quote and prompt accent seeds from colliding when both
+        // are derived from the same rewind uid. The exact values don't matter — only that
+        // they're stable and distinct.
+        const val QUOTE_SEED_OFFSET = 0x517A
+        const val PROMPT_SEED_OFFSET = 0x9C0D
+    }
 }

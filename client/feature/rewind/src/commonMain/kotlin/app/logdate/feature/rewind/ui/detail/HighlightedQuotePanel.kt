@@ -18,7 +18,6 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import kotlin.math.abs
 
 /**
  * Renders a verbatim line the AI pulled from one of the user's actual journal entries.
@@ -39,9 +38,8 @@ fun HighlightedQuotePanel(
     accentSeed: Int,
     modifier: Modifier = Modifier,
 ) {
-    val backgroundColor = quoteBackground(accentSeed)
     Box(
-        modifier = modifier.fillMaxSize().background(backgroundColor),
+        modifier = modifier.fillMaxSize().background(panelAccentBackground(accentSeed)),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -67,21 +65,4 @@ fun HighlightedQuotePanel(
             )
         }
     }
-}
-
-/**
- * Picks a deep, quiet background color from a small palette so the user's words read as
- * the foreground rather than competing with chrome. The palette intentionally avoids
- * bright accents — the line itself is the loudest thing on the panel.
- */
-private fun quoteBackground(seed: Int): Color {
-    val palette =
-        listOf(
-            Color(0xFF14202E), // ink blue
-            Color(0xFF231828), // plum
-            Color(0xFF1B2A1F), // pine
-            Color(0xFF2E1B1B), // cocoa
-            Color(0xFF1F1F26), // charcoal
-        )
-    return palette[abs(seed) % palette.size]
 }
