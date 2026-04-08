@@ -130,7 +130,7 @@ private class FakeAudioRecordingManager(
     override var isRecording: Boolean = false
         private set
 
-    override suspend fun startRecording(): Boolean {
+    override suspend fun startRecording(targetNoteId: Uuid?): Boolean {
         isRecording = true
         durationFlow.value = recordingDuration
         return true
