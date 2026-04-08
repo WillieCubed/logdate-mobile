@@ -23,4 +23,12 @@
     <string name="widget_config_content_text">Text notes</string>
     <string name="widget_config_content_photos">Photos</string>
     <string name="widget_config_content_audio">Audio notes</string>
+
+    <!-- Dynamic launcher shortcuts -->
+    <string name="dynamic_shortcut_continue_draft_short">Continue draft</string>
+    <string name="dynamic_shortcut_continue_draft_long">Continue your latest draft</string>
+    <string name="dynamic_shortcut_today_short">Today</string>
+    <string name="dynamic_shortcut_today_long">Open today\'s timeline</string>
+    <string name="dynamic_shortcut_week_rewind_short">Last week</string>
+    <string name="dynamic_shortcut_week_rewind_long">Open last week\'s rewind</string>
 </resources>

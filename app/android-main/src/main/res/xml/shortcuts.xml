@@ -1,48 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Static launcher shortcut declaration.
+
+  This file used to declare three App Actions / Assistant capabilities
+  (CREATE_THING, CREATE_MEDIA_OBJECT, GET_SOCIAL_MEDIA_PROFILE) plus a "new
+  note" static shortcut, all targeting "app.logdate.mobile.MainActivity" — a
+  class that does not exist in this build (the real entry point is
+  app.logdate.client.MainActivity, applicationId co.reasonabletech.logdate).
+  None of the capabilities had matching parameter handling in MainActivity, so
+  they were entirely dead and have been removed.
+
+  Going forward:
+   - The "new note" entry below is the always-on launcher fallback. It uses the
+     existing AMBIENT_PROMPT_TARGET extras that MainActivity.resolveNavKey
+     already understands, so the click actually opens the entry editor now.
+   - Stateful shortcuts (continue draft, today's timeline, last week's rewind)
+     are published dynamically by DynamicShortcutPublisher /
+     AndroidDynamicShortcutApplier on app startup.
+   - Assistant integration will return as App Functions (androidx.appfunctions)
+     in tier 3 of the system-surface roadmap.
+-->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
-    <capability android:name="actions.intent.CREATE_THING">
-        <intent
-            android:targetClass="app.logdate.mobile.MainActivity"
-            android:targetPackage="app.logdate.mobile">
-            <!-- Eg. name = "Example Entity" -->
-            <parameter
-                android:name="thing.name"
-                android:key="name" />
-            <!-- Eg. description = "Example Destination" -->
-            <parameter
-                android:name="thing.description"
-                android:key="description" />
-        </intent>
-    </capability>
-
-    <capability android:name="actions.intent.CREATE_MEDIA_OBJECT">
-        <intent
-            android:targetClass="app.logdate.mobile.MainActivity"
-            android:targetPackage="app.logdate.mobile">
-            <parameter
-                android:name="mediaObject.captureSetting.name"
-                android:key="name" />
-            <parameter
-                android:name="mediaObject.captureSetting.value"
-                android:key="value" />
-        </intent>
-    </capability>
-
-    <capability android:name="actions.intent.GET_SOCIAL_MEDIA_PROFILE">
-        <intent
-            android:action="android.intent.action.VIEW"
-            android:targetClass="app.logdate.mobile.MainActivity"
-            android:targetPackage="app.logdate.mobile">
-            <parameter android:name="socialMediaProfile.profileOwner.name">
-                <data android:pathPattern="https://logdate.app/profile/.*" />
-            </parameter>
-            <parameter android:name="socialMediaProfile.profileSection.name">
-                <data android:pathPattern="https://logdate.app/journal/.*" />
-            </parameter>
-        </intent>
-    </capability>
-
-
     <shortcut
         android:enabled="true"
         android:icon="@drawable/note_stack_add"
@@ -51,20 +29,12 @@
         android:shortcutLongLabel="@string/shortcut_label_new_note_long"
         android:shortcutShortLabel="@string/shortcut_label_new_note_short">
         <intent
-            android:action="android.intent.action.SEND"
-            android:targetClass="app.logdate.mobile.MainActivity"
-            android:targetPackage="app.logdate.mobile" />
-        <capability-binding android:key="actions.intent.CREATE_THING">
-            <parameter-binding
-                android:key="thing.name"
-                android:value="name" />
-        </capability-binding>
-        <capability-binding android:key="actions.intent.CREATE_DIGITAL_DOCUMENT" />
-
-        <capability-binding android:key="actions.intent.CREATE_MEDIA_OBJECT">
-            <parameter-binding
-                android:key="mediaObject.captureSetting.value"
-                android:value="value" />
-        </capability-binding>
+            android:action="android.intent.action.VIEW"
+            android:targetClass="app.logdate.client.MainActivity"
+            android:targetPackage="co.reasonabletech.logdate">
+            <extra
+                android:name="ambient_prompt_target"
+                android:value="new_entry" />
+        </intent>
     </shortcut>
 </shortcuts>
