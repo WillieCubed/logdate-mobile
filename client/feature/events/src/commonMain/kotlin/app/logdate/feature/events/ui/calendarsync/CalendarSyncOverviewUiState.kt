@@ -1,5 +1,6 @@
 package app.logdate.feature.events.ui.calendarsync
 
+import app.logdate.client.domain.events.CalendarImportFailure
 import app.logdate.feature.events.ui.settings.RelativeAge
 import kotlin.time.Instant
 
@@ -20,7 +21,8 @@ data class CalendarSyncOverviewUiState(
     val lastRunAge: RelativeAge? = null,
     val lastCreatedCount: Int = 0,
     val lastUpdatedCount: Int = 0,
-    val lastError: String? = null,
+    /** Coarse failure category from the most recent worker run, or `null` on success. */
+    val lastFailure: CalendarImportFailure? = null,
     val isRunInFlight: Boolean = false,
 )
 

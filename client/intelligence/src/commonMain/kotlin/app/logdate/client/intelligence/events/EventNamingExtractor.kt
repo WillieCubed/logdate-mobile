@@ -1,25 +1,17 @@
 package app.logdate.client.intelligence.events
 
-import app.logdate.client.intelligence.AIError
 import app.logdate.client.intelligence.AIResult
-import app.logdate.client.intelligence.cache.AICachePolicy
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.cache.GenerativeAICacheContentType
-import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
-import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
-import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
-import app.logdate.client.intelligence.generativeai.GenerativeAIResponseFormat
 import app.logdate.client.intelligence.structured.JsonStructuredOutputParser
+import app.logdate.client.intelligence.structured.StructuredAIExtractor
 import app.logdate.client.intelligence.structured.StructuredOutputResult
-import app.logdate.client.intelligence.unavailableReason
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
-import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -36,12 +28,52 @@ import kotlinx.serialization.json.Json
  * intentionally narrow: serialize a cluster, ask the model, parse, return.
  */
 class EventNamingExtractor(
-    private val generativeAICache: GenerativeAICache,
-    private val generativeAIChatClient: GenerativeAIChatClient,
-    private val networkAvailabilityMonitor: NetworkAvailabilityMonitor,
-    private val dataUsagePolicy: DataUsagePolicy,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-) {
+    generativeAICache: GenerativeAICache,
+    generativeAIChatClient: GenerativeAIChatClient,
+    networkAvailabilityMonitor: NetworkAvailabilityMonitor,
+    dataUsagePolicy: DataUsagePolicy,
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : StructuredAIExtractor<EventCluster, EventName>(
+        generativeAICache = generativeAICache,
+        generativeAIChatClient = generativeAIChatClient,
+        networkAvailabilityMonitor = networkAvailabilityMonitor,
+        dataUsagePolicy = dataUsagePolicy,
+        ioDispatcher = ioDispatcher,
+    ) {
+    override val systemPrompt: String = SYSTEM_PROMPT
+    override val responseSchema: String = RESPONSE_SCHEMA
+    override val responseFormatName: String = "event_naming"
+    override val cacheContentType: GenerativeAICacheContentType = GenerativeAICacheContentType.Events
+    override val promptVersion: String = "events-v1"
+    override val schemaVersion: String = "events-json-v1"
+    override val templateId: String = "event-naming-extractor"
+    override val tag: String = "EventNamingExtractor"
+
+    override fun serializeInput(input: EventCluster): String = input.toPromptSummary()
+
+    override fun parseResponse(raw: String): EventName? {
+        val parser =
+            JsonStructuredOutputParser(
+                json = json,
+                serializer = EventName.serializer(),
+                allowEmbeddedJson = true,
+            )
+        return when (val result = parser.parse(raw)) {
+            is StructuredOutputResult.Success -> result.value
+            StructuredOutputResult.Empty -> null
+            StructuredOutputResult.Invalid -> null
+        }
+    }
+
+    /**
+     * Suggests a name and description for [cluster]. Thin wrapper over [extract] that
+     * keeps the public method name expressive at call sites.
+     */
+    suspend fun suggestName(
+        cluster: EventCluster,
+        useCached: Boolean = true,
+    ): AIResult<EventName> = extract(cluster, useCached)
+
     companion object {
         private const val SYSTEM_PROMPT = """
 You are a naming assistant for a personal journal. You receive a single CLUSTER of signals from one continuous experience the user had: a place name, a time-of-day window, how many photos they took, and a short text snippet from any note they wrote during that window. Your job is to produce a short, human-friendly TITLE and a one-line DESCRIPTION that the user would recognize as that experience in their timeline.
@@ -54,10 +86,6 @@ Guidelines:
 - Never include hashtags, emoji, or quotation marks.
 - If the input is too thin to name confidently, still produce the best title you can from the place and time of day.
 """
-        private const val PROMPT_VERSION = "events-v1"
-        private const val SCHEMA_VERSION = "events-json-v1"
-        private const val TEMPLATE_ID = "event-naming-extractor"
-        private const val CACHE_TTL_SECONDS = 60L * 60L * 24L * 7L // 7 days
         private const val RESPONSE_SCHEMA = """
 {
   "type": "object",
@@ -72,101 +100,7 @@ Guidelines:
 
         private val json = Json { ignoreUnknownKeys = true }
     }
-
-    /**
-     * Suggests a name and description for [cluster].
-     *
-     * @param cluster The cluster signals to summarize.
-     * @param useCached Whether a previous response for the same cluster summary may be reused.
-     * @return The model's suggested name, an [AIError], or [AIResult.Unavailable] if the
-     *  network or data-usage policy disallows the call.
-     */
-    suspend fun suggestName(
-        cluster: EventCluster,
-        useCached: Boolean = true,
-    ): AIResult<EventName> =
-        withContext(ioDispatcher) {
-            val clusterSummary = cluster.toPromptSummary()
-            val cacheRequest =
-                GenerativeAICacheRequest(
-                    contentType = GenerativeAICacheContentType.Events,
-                    inputText = clusterSummary,
-                    providerId = generativeAIChatClient.providerId,
-                    model = generativeAIChatClient.defaultModel,
-                    promptVersion = PROMPT_VERSION,
-                    schemaVersion = SCHEMA_VERSION,
-                    templateId = TEMPLATE_ID,
-                    policy = AICachePolicy(ttlSeconds = CACHE_TTL_SECONDS),
-                )
-            if (useCached) {
-                val cachedResponse = generativeAICache.getEntry(cacheRequest)
-                if (cachedResponse != null) {
-                    val parsed = parseNameResponse(cachedResponse.content)
-                    if (parsed != null) {
-                        return@withContext AIResult.Success(parsed, fromCache = true)
-                    }
-                    Napier.w(tag = TAG, message = "Cached event name response was invalid")
-                }
-            }
-            val unavailableReason = unavailableReason(networkAvailabilityMonitor, dataUsagePolicy)
-            if (unavailableReason != null) {
-                return@withContext AIResult.Unavailable(unavailableReason)
-            }
-            val prompts =
-                listOf(
-                    GenerativeAIChatMessage("system", SYSTEM_PROMPT),
-                    GenerativeAIChatMessage("user", clusterSummary),
-                )
-            val response =
-                generativeAIChatClient.submit(
-                    GenerativeAIRequest(
-                        messages = prompts,
-                        model = cacheRequest.model,
-                        responseFormat =
-                            GenerativeAIResponseFormat.JsonSchema(
-                                name = "event_naming",
-                                schema = RESPONSE_SCHEMA,
-                            ),
-                    ),
-                )
-            when (response) {
-                is AIResult.Success -> {
-                    val content = response.value.content
-                    val parsed =
-                        parseNameResponse(content)
-                            ?: return@withContext AIResult.Error(AIError.InvalidResponse)
-                    Napier.d(tag = TAG, message = "Suggested event name: ${parsed.title}")
-                    generativeAICache.putEntry(cacheRequest, content.trim())
-                    AIResult.Success(parsed, fromCache = false)
-                }
-                is AIResult.Unavailable -> response
-                is AIResult.Error -> {
-                    Napier.e(
-                        tag = TAG,
-                        message = "Failed to suggest event name",
-                        throwable = response.throwable,
-                    )
-                    response
-                }
-            }
-        }
-
-    private fun parseNameResponse(raw: String): EventName? {
-        val parser =
-            JsonStructuredOutputParser(
-                json = json,
-                serializer = EventName.serializer(),
-                allowEmbeddedJson = true,
-            )
-        return when (val result = parser.parse(raw)) {
-            is StructuredOutputResult.Success -> result.value
-            StructuredOutputResult.Empty -> null
-            StructuredOutputResult.Invalid -> null
-        }
-    }
 }
-
-private const val TAG = "EventNamingExtractor"
 
 /**
  * Structured input for [EventNamingExtractor]. The clustering use case fills these fields

@@ -1,5 +1,6 @@
 package app.logdate.feature.events.ui.settings
 
+import app.logdate.client.domain.events.EventInferenceFailure
 import app.logdate.client.domain.events.EventInferenceSensitivity
 import kotlin.time.Instant
 
@@ -24,7 +25,8 @@ data class EventsSettingsUiState(
     val lastRunAge: RelativeAge? = null,
     val lastCreatedCount: Int = 0,
     val recentCreatedCount: Int = 0,
-    val lastError: String? = null,
+    /** Coarse failure category from the most recent worker run, or `null` on success. */
+    val lastFailure: EventInferenceFailure? = null,
     val isRunInFlight: Boolean = false,
 )
 

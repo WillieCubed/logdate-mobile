@@ -8,7 +8,6 @@
     <string name="events_settings_status_never">Never</string>
     <string name="events_settings_status_created_last_run">Created last run: %1$d</string>
     <string name="events_settings_status_created_recently">Created recently: %1$d</string>
-    <string name="events_settings_status_last_error">Last error: %1$s</string>
 
     <string name="events_settings_run_now">Run now</string>
     <string name="events_settings_run_in_progress">Running…</string>
@@ -30,6 +29,11 @@
     <string name="events_settings_relative_hours_ago">%1$dh ago</string>
     <string name="events_settings_relative_days_ago">%1$dd ago</string>
 
+    <string name="events_settings_failure_unknown">Something went wrong on the last run.</string>
+    <string name="events_settings_failure_signal_unavailable">Couldn\'t read enough activity to find new events.</string>
+    <string name="events_settings_failure_naming_failed">Couldn\'t name the new events. They\'ll get a simple label instead.</string>
+    <string name="events_settings_failure_persistence_failed">Couldn\'t save the new events. They\'ll be retried on the next run.</string>
+
     <string name="calendar_sync_settings_title">Calendar sync</string>
     <string name="calendar_sync_settings_description">Mirror events from your device\'s calendars (Google, iCloud, local) into LogDate so the things you already plan show up alongside the ones LogDate noticed.</string>
     <string name="calendar_sync_settings_master_toggle">Sync your calendars into LogDate</string>
@@ -41,7 +45,6 @@
     <string name="calendar_sync_settings_status_never">Never</string>
     <string name="calendar_sync_settings_status_created">Imported last sync: %1$d</string>
     <string name="calendar_sync_settings_status_updated">Updated last sync: %1$d</string>
-    <string name="calendar_sync_settings_status_last_error">Last error: %1$s</string>
     <string name="calendar_sync_settings_run_now">Sync now</string>
     <string name="calendar_sync_settings_run_in_progress">Syncing…</string>
     <string name="calendar_sync_settings_calendars_row_title">Calendars</string>
@@ -56,4 +59,9 @@
 
     <string name="calendar_sync_activity_title">Imported events</string>
     <string name="calendar_sync_activity_empty">Nothing imported yet. The next sync will pull events from the calendars you selected.</string>
+
+    <string name="calendar_sync_failure_unknown">Something went wrong on the last sync.</string>
+    <string name="calendar_sync_failure_permission_denied">LogDate doesn\'t have permission to read your calendars yet.</string>
+    <string name="calendar_sync_failure_calendars_unavailable">Couldn\'t reach your calendars on the last sync.</string>
+    <string name="calendar_sync_failure_persistence_failed">Couldn\'t save the imported events. They\'ll be retried on the next sync.</string>
 </resources>

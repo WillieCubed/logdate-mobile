@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.calendar.DeviceCalendarReader
 import app.logdate.client.datastore.DeviceCalendarSyncStats
 import app.logdate.client.datastore.LogdatePreferencesDataSource
+import app.logdate.client.domain.events.CalendarImportFailure
 import app.logdate.client.domain.events.CalendarImportLauncher
 import app.logdate.feature.events.ui.settings.RelativeAge
 import kotlinx.coroutines.delay
@@ -84,7 +85,7 @@ class CalendarSyncOverviewViewModel(
                 lastRunAge = recordedRunAt?.let { relativeAge(it, now) },
                 lastCreatedCount = snapshot.stats.lastCreatedCount,
                 lastUpdatedCount = snapshot.stats.lastUpdatedCount,
-                lastError = snapshot.stats.lastError,
+                lastFailure = CalendarImportFailure.fromPreference(snapshot.stats.lastErrorKind),
                 isRunInFlight = isRunInFlight,
             )
         }.stateIn(

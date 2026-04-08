@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import app.logdate.client.datastore.LogdatePreferencesDataSource
+import app.logdate.client.domain.events.EventInferenceFailure
 import app.logdate.client.domain.events.EventInferenceSensitivity
 import app.logdate.client.domain.events.InferEventsUseCase
 import io.github.aakira.napier.Napier
@@ -47,7 +48,7 @@ class EventInferenceWorker(
                 preferences.recordEventInferenceRun(
                     runAt = Clock.System.now(),
                     createdThisRun = createdCount,
-                    error = null,
+                    errorKind = null,
                 )
                 Result.success()
             },
@@ -56,7 +57,7 @@ class EventInferenceWorker(
                 preferences.recordEventInferenceRun(
                     runAt = Clock.System.now(),
                     createdThisRun = 0,
-                    error = throwable.message ?: throwable::class.simpleName ?: "unknown error",
+                    errorKind = EventInferenceFailure.Unknown.name,
                 )
                 Result.retry()
             },

@@ -17,6 +17,11 @@ data class DeviceCalendarSyncStats(
     val lastCreatedCount: Int,
     /** Events updated in place on the most recent run. */
     val lastUpdatedCount: Int,
-    /** Most recent error message, or `null` if the most recent run succeeded. */
-    val lastError: String?,
+    /**
+     * Coarse failure category from the most recent run, persisted as the
+     * `CalendarImportFailure` enum name. `null` when the most recent run succeeded. The
+     * settings screen maps the kind to a localized string instead of showing raw
+     * exception messages.
+     */
+    val lastErrorKind: String?,
 )

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.datastore.EventInferenceStats
 import app.logdate.client.datastore.LogdatePreferencesDataSource
+import app.logdate.client.domain.events.EventInferenceFailure
 import app.logdate.client.domain.events.EventInferenceLauncher
 import app.logdate.client.domain.events.EventInferenceSensitivity
 import app.logdate.client.domain.events.observeEventInferenceSensitivityValue
@@ -82,7 +83,7 @@ class EventsSettingsViewModel(
                 lastRunAge = recordedRunAt?.let { relativeAge(it, now) },
                 lastCreatedCount = stats.lastCreatedCount,
                 recentCreatedCount = stats.recentCreatedCount,
-                lastError = stats.lastError,
+                lastFailure = EventInferenceFailure.fromPreference(stats.lastErrorKind),
                 isRunInFlight = isRunInFlight,
             )
         }.stateIn(

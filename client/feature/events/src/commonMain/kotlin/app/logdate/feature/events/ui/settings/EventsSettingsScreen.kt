@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import app.logdate.client.domain.events.EventInferenceFailure
 import app.logdate.client.domain.events.EventInferenceSensitivity
 import app.logdate.ui.common.PrimaryTogglePill
 import app.logdate.ui.common.SettingsScaffold
@@ -27,6 +28,10 @@ import app.logdate.ui.common.SimpleSettingsItem
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.events.generated.resources.Res
 import logdate.client.feature.events.generated.resources.events_settings_description
+import logdate.client.feature.events.generated.resources.events_settings_failure_naming_failed
+import logdate.client.feature.events.generated.resources.events_settings_failure_persistence_failed
+import logdate.client.feature.events.generated.resources.events_settings_failure_signal_unavailable
+import logdate.client.feature.events.generated.resources.events_settings_failure_unknown
 import logdate.client.feature.events.generated.resources.events_settings_master_toggle
 import logdate.client.feature.events.generated.resources.events_settings_relative_days_ago
 import logdate.client.feature.events.generated.resources.events_settings_relative_hours_ago
@@ -46,7 +51,6 @@ import logdate.client.feature.events.generated.resources.events_settings_smart_n
 import logdate.client.feature.events.generated.resources.events_settings_smart_names_title
 import logdate.client.feature.events.generated.resources.events_settings_status_created_last_run
 import logdate.client.feature.events.generated.resources.events_settings_status_created_recently
-import logdate.client.feature.events.generated.resources.events_settings_status_last_error
 import logdate.client.feature.events.generated.resources.events_settings_status_last_run
 import logdate.client.feature.events.generated.resources.events_settings_status_never
 import logdate.client.feature.events.generated.resources.events_settings_title
@@ -119,7 +123,7 @@ fun EventsSettingsContent(
                     lastRunAge = uiState.lastRunAge,
                     lastCreatedCount = uiState.lastCreatedCount,
                     recentCreatedCount = uiState.recentCreatedCount,
-                    lastError = uiState.lastError,
+                    lastFailure = uiState.lastFailure,
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
             }
@@ -195,7 +199,7 @@ private fun StatusCard(
     lastRunAge: RelativeAge?,
     lastCreatedCount: Int,
     recentCreatedCount: Int,
-    lastError: String?,
+    lastFailure: EventInferenceFailure?,
     modifier: Modifier = Modifier,
 ) {
     val ageLabel =
@@ -222,9 +226,9 @@ private fun StatusCard(
                 text = stringResource(Res.string.events_settings_status_created_recently, recentCreatedCount),
                 style = MaterialTheme.typography.bodyMedium,
             )
-            if (lastError != null) {
+            if (lastFailure != null) {
                 Text(
-                    text = stringResource(Res.string.events_settings_status_last_error, lastError),
+                    text = stringResource(lastFailure.messageResource()),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
@@ -232,6 +236,14 @@ private fun StatusCard(
         }
     }
 }
+
+private fun EventInferenceFailure.messageResource() =
+    when (this) {
+        EventInferenceFailure.Unknown -> Res.string.events_settings_failure_unknown
+        EventInferenceFailure.SignalUnavailable -> Res.string.events_settings_failure_signal_unavailable
+        EventInferenceFailure.NamingFailed -> Res.string.events_settings_failure_naming_failed
+        EventInferenceFailure.PersistenceFailed -> Res.string.events_settings_failure_persistence_failed
+    }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

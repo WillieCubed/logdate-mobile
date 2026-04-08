@@ -63,7 +63,7 @@ class LogdatePreferencesDataSource(
         val EVENT_INFERENCE_LAST_RUN_AT = longPreferencesKey("event_inference_last_run_at")
         val EVENT_INFERENCE_LAST_CREATED_COUNT = intPreferencesKey("event_inference_last_created_count")
         val EVENT_INFERENCE_RECENT_CREATED_COUNT = intPreferencesKey("event_inference_recent_created_count")
-        val EVENT_INFERENCE_LAST_ERROR = stringPreferencesKey("event_inference_last_error")
+        val EVENT_INFERENCE_LAST_ERROR_KIND = stringPreferencesKey("event_inference_last_error_kind")
 
         // Device calendar sync preferences
         val DEVICE_CALENDAR_SYNC_ENABLED = booleanPreferencesKey("device_calendar_sync_enabled")
@@ -71,7 +71,7 @@ class LogdatePreferencesDataSource(
         val DEVICE_CALENDAR_SYNC_LAST_RUN_AT = longPreferencesKey("device_calendar_sync_last_run_at")
         val DEVICE_CALENDAR_SYNC_LAST_CREATED_COUNT = intPreferencesKey("device_calendar_sync_last_created_count")
         val DEVICE_CALENDAR_SYNC_LAST_UPDATED_COUNT = intPreferencesKey("device_calendar_sync_last_updated_count")
-        val DEVICE_CALENDAR_SYNC_LAST_ERROR = stringPreferencesKey("device_calendar_sync_last_error")
+        val DEVICE_CALENDAR_SYNC_LAST_ERROR_KIND = stringPreferencesKey("device_calendar_sync_last_error_kind")
 
         // Android AppSearch metadata
         val ANDROID_PLATFORM_SEARCH_INDEX_GENERATION = longPreferencesKey("android_platform_search_index_generation")
@@ -563,7 +563,7 @@ class LogdatePreferencesDataSource(
                     },
                 lastCreatedCount = prefs[EVENT_INFERENCE_LAST_CREATED_COUNT] ?: 0,
                 recentCreatedCount = prefs[EVENT_INFERENCE_RECENT_CREATED_COUNT] ?: 0,
-                lastError = prefs[EVENT_INFERENCE_LAST_ERROR],
+                lastErrorKind = prefs[EVENT_INFERENCE_LAST_ERROR_KIND],
             )
         }
 
@@ -571,11 +571,15 @@ class LogdatePreferencesDataSource(
      * Records the result of one event inference worker run. Atomic — the recent rolling
      * total is incremented inside the same `updateData` block as the per-run stats so two
      * concurrent worker runs (immediate + periodic) can't lose increments to a stale read.
+     *
+     * [errorKind] is the `EventInferenceFailure` enum name (or `null` on success); the
+     * settings screen translates the kind to a localized string instead of showing raw
+     * exception messages.
      */
     suspend fun recordEventInferenceRun(
         runAt: Instant,
         createdThisRun: Int,
-        error: String?,
+        errorKind: String?,
     ) {
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
@@ -583,10 +587,10 @@ class LogdatePreferencesDataSource(
                 this[EVENT_INFERENCE_LAST_CREATED_COUNT] = createdThisRun
                 val previousRecent = this[EVENT_INFERENCE_RECENT_CREATED_COUNT] ?: 0
                 this[EVENT_INFERENCE_RECENT_CREATED_COUNT] = previousRecent + createdThisRun
-                if (error != null) {
-                    this[EVENT_INFERENCE_LAST_ERROR] = error
+                if (errorKind != null) {
+                    this[EVENT_INFERENCE_LAST_ERROR_KIND] = errorKind
                 } else {
-                    this.remove(EVENT_INFERENCE_LAST_ERROR)
+                    this.remove(EVENT_INFERENCE_LAST_ERROR_KIND)
                 }
             }
         }
@@ -646,25 +650,31 @@ class LogdatePreferencesDataSource(
                     },
                 lastCreatedCount = prefs[DEVICE_CALENDAR_SYNC_LAST_CREATED_COUNT] ?: 0,
                 lastUpdatedCount = prefs[DEVICE_CALENDAR_SYNC_LAST_UPDATED_COUNT] ?: 0,
-                lastError = prefs[DEVICE_CALENDAR_SYNC_LAST_ERROR],
+                lastErrorKind = prefs[DEVICE_CALENDAR_SYNC_LAST_ERROR_KIND],
             )
         }
 
+    /**
+     * Records the result of one calendar import worker run. [errorKind] is the
+     * `CalendarImportFailure` enum name (or `null` on success); the settings screen
+     * translates the kind to a localized string instead of showing raw exception
+     * messages.
+     */
     suspend fun recordDeviceCalendarSyncRun(
         runAt: Instant,
         created: Int,
         updated: Int,
-        error: String?,
+        errorKind: String?,
     ) {
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
                 this[DEVICE_CALENDAR_SYNC_LAST_RUN_AT] = runAt.toEpochMilliseconds()
                 this[DEVICE_CALENDAR_SYNC_LAST_CREATED_COUNT] = created
                 this[DEVICE_CALENDAR_SYNC_LAST_UPDATED_COUNT] = updated
-                if (error != null) {
-                    this[DEVICE_CALENDAR_SYNC_LAST_ERROR] = error
+                if (errorKind != null) {
+                    this[DEVICE_CALENDAR_SYNC_LAST_ERROR_KIND] = errorKind
                 } else {
-                    this.remove(DEVICE_CALENDAR_SYNC_LAST_ERROR)
+                    this.remove(DEVICE_CALENDAR_SYNC_LAST_ERROR_KIND)
                 }
             }
         }

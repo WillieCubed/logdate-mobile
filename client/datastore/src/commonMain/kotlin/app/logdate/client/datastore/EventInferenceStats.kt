@@ -17,6 +17,11 @@ data class EventInferenceStats(
     val lastCreatedCount: Int,
     /** Rolling total of events created across recent runs (settings shows "in last 30 days"). */
     val recentCreatedCount: Int,
-    /** Most recent error message, or `null` if the most recent run succeeded. */
-    val lastError: String?,
+    /**
+     * Coarse failure category from the most recent run, persisted as the
+     * `EventInferenceFailure` enum name. `null` when the most recent run succeeded. The
+     * settings screen maps the kind to a localized string instead of showing raw
+     * exception messages.
+     */
+    val lastErrorKind: String?,
 )

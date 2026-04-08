@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import app.logdate.client.datastore.LogdatePreferencesDataSource
+import app.logdate.client.domain.events.CalendarImportFailure
 import app.logdate.client.domain.events.ImportDeviceCalendarEventsUseCase
 import app.logdate.client.domain.events.ImportResult
 import io.github.aakira.napier.Napier
@@ -49,7 +50,7 @@ class CalendarImportWorker(
                     runAt = Clock.System.now(),
                     created = summary.created,
                     updated = summary.updated,
-                    error = null,
+                    errorKind = null,
                 )
                 Result.success()
             }
@@ -59,7 +60,7 @@ class CalendarImportWorker(
                     runAt = Clock.System.now(),
                     created = 0,
                     updated = 0,
-                    error = "Calendar permission not granted",
+                    errorKind = CalendarImportFailure.PermissionDenied.name,
                 )
                 // Permission denial is a steady state, not a transient failure — retrying
                 // won't change anything until the user grants the permission, at which
@@ -72,7 +73,7 @@ class CalendarImportWorker(
                     runAt = Clock.System.now(),
                     created = 0,
                     updated = 0,
-                    error = "Import failed",
+                    errorKind = CalendarImportFailure.Unknown.name,
                 )
                 Result.retry()
             }

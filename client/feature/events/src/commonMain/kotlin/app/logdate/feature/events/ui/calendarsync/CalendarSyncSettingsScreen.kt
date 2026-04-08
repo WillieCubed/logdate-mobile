@@ -18,12 +18,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import app.logdate.client.domain.events.CalendarImportFailure
 import app.logdate.client.permissions.rememberCalendarPermissionState
 import app.logdate.feature.events.ui.settings.RelativeAge
 import app.logdate.ui.common.PrimaryTogglePill
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.events.generated.resources.Res
+import logdate.client.feature.events.generated.resources.calendar_sync_failure_calendars_unavailable
+import logdate.client.feature.events.generated.resources.calendar_sync_failure_permission_denied
+import logdate.client.feature.events.generated.resources.calendar_sync_failure_persistence_failed
+import logdate.client.feature.events.generated.resources.calendar_sync_failure_unknown
 import logdate.client.feature.events.generated.resources.calendar_sync_settings_activity_row_subtitle
 import logdate.client.feature.events.generated.resources.calendar_sync_settings_activity_row_title
 import logdate.client.feature.events.generated.resources.calendar_sync_settings_calendars_row_subtitle_none
@@ -37,7 +42,6 @@ import logdate.client.feature.events.generated.resources.calendar_sync_settings_
 import logdate.client.feature.events.generated.resources.calendar_sync_settings_run_in_progress
 import logdate.client.feature.events.generated.resources.calendar_sync_settings_run_now
 import logdate.client.feature.events.generated.resources.calendar_sync_settings_status_created
-import logdate.client.feature.events.generated.resources.calendar_sync_settings_status_last_error
 import logdate.client.feature.events.generated.resources.calendar_sync_settings_status_last_run
 import logdate.client.feature.events.generated.resources.calendar_sync_settings_status_never
 import logdate.client.feature.events.generated.resources.calendar_sync_settings_status_updated
@@ -266,9 +270,9 @@ private fun StatusCard(
                 text = stringResource(Res.string.calendar_sync_settings_status_updated, uiState.lastUpdatedCount),
                 style = MaterialTheme.typography.bodyMedium,
             )
-            if (uiState.lastError != null) {
+            if (uiState.lastFailure != null) {
                 Text(
-                    text = stringResource(Res.string.calendar_sync_settings_status_last_error, uiState.lastError),
+                    text = stringResource(uiState.lastFailure.messageResource()),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
@@ -276,6 +280,14 @@ private fun StatusCard(
         }
     }
 }
+
+private fun CalendarImportFailure.messageResource() =
+    when (this) {
+        CalendarImportFailure.Unknown -> Res.string.calendar_sync_failure_unknown
+        CalendarImportFailure.PermissionDenied -> Res.string.calendar_sync_failure_permission_denied
+        CalendarImportFailure.CalendarsUnavailable -> Res.string.calendar_sync_failure_calendars_unavailable
+        CalendarImportFailure.PersistenceFailed -> Res.string.calendar_sync_failure_persistence_failed
+    }
 
 private fun RelativeAge.bucketResource() =
     when (this) {
