@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -32,6 +33,10 @@ import logdate.client.feature.core.generated.resources.recommendations
 import logdate.client.feature.core.generated.resources.recommendations_privacy_note
 import logdate.client.feature.core.generated.resources.recommendations_summary_off
 import logdate.client.feature.core.generated.resources.recommendations_summary_on
+import logdate.client.feature.core.generated.resources.widget_add_to_home_screen
+import logdate.client.feature.core.generated.resources.widget_add_to_home_screen_action
+import logdate.client.feature.core.generated.resources.widget_add_to_home_screen_description
+import logdate.client.feature.core.generated.resources.widget_add_to_home_screen_unsupported
 import logdate.client.feature.core.generated.resources.widget_content_type_audio
 import logdate.client.feature.core.generated.resources.widget_content_type_audio_description
 import logdate.client.feature.core.generated.resources.widget_content_type_photos
@@ -62,6 +67,8 @@ fun MemoriesSettingsScreen(
         onToggleContextualRecommendations = viewModel::toggleContextualRecommendations,
         recallMode = uiState.settings.recallMode,
         onSetRecallMode = viewModel::setRecallMode,
+        widgetInstallUiState = uiState.widgetInstallUiState,
+        onAddWidgetToHomeScreen = viewModel::addWidgetToHomeScreen,
         widgetContentTypes = uiState.settings.widgetContentTypes,
         onToggleContentType = viewModel::toggleWidgetContentType,
         modifier = modifier,
@@ -76,6 +83,8 @@ fun MemoriesSettingsContent(
     onToggleContextualRecommendations: (Boolean) -> Unit,
     recallMode: RecallMode,
     onSetRecallMode: (RecallMode) -> Unit,
+    widgetInstallUiState: MemoriesWidgetInstallUiState,
+    onAddWidgetToHomeScreen: () -> Unit,
     widgetContentTypes: Set<WidgetContentType>,
     onToggleContentType: (WidgetContentType, Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -162,6 +171,48 @@ fun MemoriesSettingsContent(
                             selected = recallMode == RecallMode.REDISCOVER,
                             onClick = { onSetRecallMode(RecallMode.REDISCOVER) },
                         )
+                    }
+                }
+
+                if (widgetInstallUiState != MemoriesWidgetInstallUiState.Hidden) {
+                    Text(
+                        text = stringResource(Res.string.widget_add_to_home_screen),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = Spacing.sm),
+                    )
+
+                    MaterialContainer {
+                        Column(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(Spacing.md),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        ) {
+                            Text(
+                                text = stringResource(Res.string.widget_add_to_home_screen),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            Text(
+                                text =
+                                    stringResource(
+                                        if (widgetInstallUiState == MemoriesWidgetInstallUiState.Available) {
+                                            Res.string.widget_add_to_home_screen_description
+                                        } else {
+                                            Res.string.widget_add_to_home_screen_unsupported
+                                        },
+                                    ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Button(
+                                onClick = onAddWidgetToHomeScreen,
+                                enabled = widgetInstallUiState == MemoriesWidgetInstallUiState.Available,
+                            ) {
+                                Text(stringResource(Res.string.widget_add_to_home_screen_action))
+                            }
+                        }
                     }
                 }
 

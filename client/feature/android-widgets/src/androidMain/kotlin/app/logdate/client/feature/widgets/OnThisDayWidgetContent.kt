@@ -74,9 +74,10 @@ private fun WidgetContainer(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val size = LocalSize.current
-    val isCompact = size.height < 120.dp
+    val isCompact = size.height < 120.dp || size.width < 200.dp
+    val isNarrow = size.width < 190.dp
     val verticalPadding = if (isCompact) 12.dp else 16.dp
-    val horizontalPadding = if (isCompact) 16.dp else 20.dp
+    val horizontalPadding = if (isNarrow) 14.dp else if (isCompact) 16.dp else 20.dp
 
     val baseModifier =
         modifier
@@ -107,13 +108,14 @@ private fun MemoryContent(state: OnThisDayWidgetState.HasMemory) {
     val context = LocalContext.current
     val launchIntent = createWidgetLaunchIntent(dateIso = state.dateIso)
     val size = LocalSize.current
-    val isCompact = size.height < 120.dp
+    val isCompact = size.height < 120.dp || size.width < 200.dp
+    val isNarrow = size.width < 190.dp
     // Decode the thumbnail from the internal file path. Glance composition runs on a
     // background coroutine (not the main thread), so file IO here is safe. We use
     // ImageProvider(Bitmap) instead of ImageProvider(Uri) because file:// URIs cannot
     // be shared with the launcher process via RemoteViews.setImageViewUri().
     val thumbnailBitmap = state.thumbnailUri?.let { loadScaledThumbnail(it) }
-    val hasThumbnail = thumbnailBitmap != null
+    val hasThumbnail = thumbnailBitmap != null && !isNarrow
 
     WidgetContainer(onClick = launchIntent) {
         // Header
@@ -156,7 +158,7 @@ private fun MemoryContent(state: OnThisDayWidgetState.HasMemory) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Image(
-                    provider = ImageProvider(thumbnailBitmap!!),
+                    provider = ImageProvider(thumbnailBitmap),
                     contentDescription = null,
                     contentScale = androidx.glance.layout.ContentScale.Crop,
                     modifier =
@@ -300,21 +302,24 @@ private fun EmptyStateBody(
     ctaText: String,
     ctaIntent: Intent,
 ) {
+    val size = LocalSize.current
+    val isCompact = size.height < 120.dp || size.width < 200.dp
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = GlanceModifier.width(260.dp),
+        modifier = GlanceModifier.fillMaxWidth(),
     ) {
         Text(
             text = message,
             style =
                 TextStyle(
                     color = GlanceTheme.colors.onSurface,
-                    fontSize = 16.sp,
+                    fontSize = if (isCompact) 14.sp else 16.sp,
                     textAlign = TextAlign.Center,
                 ),
         )
 
-        Spacer(modifier = GlanceModifier.height(12.dp))
+        Spacer(modifier = GlanceModifier.height(if (isCompact) 8.dp else 12.dp))
 
         FilledButton(
             text = ctaText,

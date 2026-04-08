@@ -43,6 +43,7 @@ kotlin {
         commonMain.dependencies {
             implementation(projects.client.domain)
             implementation(projects.client.repository)
+            implementation(projects.shared.model)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.datetime)
             implementation(libs.napier)
@@ -55,6 +56,7 @@ kotlin {
             implementation(libs.compose.runtime)
         }
         androidMain.dependencies {
+            implementation(projects.client.feature.core)
             // Glance
             implementation(libs.androidx.glance.appwidget)
             implementation(libs.androidx.glance.material3)

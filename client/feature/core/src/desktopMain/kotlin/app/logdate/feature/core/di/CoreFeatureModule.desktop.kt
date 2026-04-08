@@ -21,6 +21,8 @@ import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
 import app.logdate.feature.core.settings.ui.DataSettingsViewModel
 import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.MemoriesSettingsViewModel
+import app.logdate.feature.core.settings.ui.HiddenMemoriesWidgetInstallController
+import app.logdate.feature.core.settings.ui.MemoriesWidgetInstallController
 import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
 import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
 import app.logdate.feature.core.settings.ui.StreakSettingsViewModel
@@ -45,6 +47,7 @@ actual val coreFeatureModule: Module =
         // TODO: Refactor to separate auth module
         single<BiometricGatekeeper> { StubBiometricGatekeeper() }
         single<AppUpdateController> { UnsupportedAppUpdateController(get()) }
+        single<MemoriesWidgetInstallController> { HiddenMemoriesWidgetInstallController() }
 
         // Export functionality for desktop
         single<ExportLauncher> { DesktopExportLauncher() }
@@ -111,7 +114,7 @@ actual val coreFeatureModule: Module =
         viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get()) }
         // TODO(desktop): Wire location settings UX and platform permissions; keep settings storage available for now.
         viewModel { LocationSettingsViewModel(get()) }
-        viewModel { MemoriesSettingsViewModel(get()) }
+        viewModel { MemoriesSettingsViewModel(get(), get()) }
         viewModel { StreakSettingsViewModel(get(), get(), get()) }
         viewModel { TimelineSettingsViewModel(get(), get(), get()) }
         viewModel { ProfileViewModel(get(), get(), get(), get(), get()) }

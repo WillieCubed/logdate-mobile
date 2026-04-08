@@ -13,6 +13,10 @@
                 android:resource="@xml/on_this_day_widget_info" />
         </receiver>
 
+        <receiver
+            android:name="app.logdate.client.feature.widgets.WidgetPinnedReceiver"
+            android:exported="false" />
+
         <activity
             android:name="app.logdate.client.feature.widgets.OnThisDayWidgetConfigActivity"
             android:exported="true"

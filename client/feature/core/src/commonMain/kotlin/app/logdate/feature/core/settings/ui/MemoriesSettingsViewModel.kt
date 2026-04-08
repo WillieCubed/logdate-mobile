@@ -19,15 +19,23 @@ import kotlinx.coroutines.launch
  */
 class MemoriesSettingsViewModel(
     private val settingsRepository: MemoriesSettingsRepository,
+    private val widgetInstallController: MemoriesWidgetInstallController,
 ) : ViewModel() {
     data class UiState(
         val settings: MemoriesSettings = MemoriesSettings(),
+        val widgetInstallUiState: MemoriesWidgetInstallUiState = MemoriesWidgetInstallUiState.Hidden,
     )
 
     val uiState: StateFlow<UiState> =
-        settingsRepository
-            .observeSettings()
-            .map { UiState(settings = it) }
+        kotlinx.coroutines.flow.combine(
+            settingsRepository.observeSettings(),
+            widgetInstallController.uiState,
+        ) { settings, widgetInstallUiState ->
+            UiState(
+                settings = settings,
+                widgetInstallUiState = widgetInstallUiState,
+            )
+        }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
@@ -155,6 +163,16 @@ class MemoriesSettingsViewModel(
                 settingsRepository.setWidgetContentTypes(updated)
             } catch (e: Exception) {
                 Napier.e("Failed to toggle widget content type", e)
+            }
+        }
+    }
+
+    fun addWidgetToHomeScreen() {
+        viewModelScope.launch {
+            try {
+                widgetInstallController.requestAddToHomeScreen()
+            } catch (e: Exception) {
+                Napier.e("Failed to request widget pinning", e)
             }
         }
     }
