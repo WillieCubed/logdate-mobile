@@ -1,118 +1,126 @@
+@file:OptIn(
+    kotlinx.cinterop.BetaInteropApi::class,
+    kotlinx.cinterop.ExperimentalForeignApi::class,
+)
+
 package app.logdate.client.media.audio.transcription
 
+import app.logdate.client.media.audio.download.ModelDownloadStatus
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.launch
-import platform.Foundation.NSLocale
-import platform.Foundation.currentLocale
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import platform.Foundation.NSURL
+import platform.Speech.SFSpeechRecognizer
+import platform.Speech.SFSpeechURLRecognitionRequest
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
- * iOS implementation of TranscriptionService using Apple's Speech Recognition API
+ * iOS implementation of [TranscriptionService] backed by Apple's on-device
+ * Speech Recognition framework. No model download is required — the system
+ * provides a high-quality on-device model for most languages out of the box.
  *
- * This is a stub implementation that would need to be completed with the actual
- * integration of Apple's Speech framework using Kotlin/Native C-interop.
+ * Live transcription requires [AVAudioEngine] buffer tapping, which conflicts
+ * with the current [AVAudioRecorder]-based capture setup. File transcription
+ * is the primary path: after a recording stops the saved file is sent through
+ * [SFSpeechURLRecognitionRequest] with on-device recognition forced so nothing
+ * leaves the device.
  *
- * TODO: Implement actual iOS speech recognition using the Speech framework
+ * Authorization: iOS shows the permission dialog on the first recognition
+ * attempt. We don't pre-request it — if the user denies, the recognition task
+ * returns an error which surfaces as a [TranscriptionResult.Error].
  */
-@OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
-class IosTranscriptionService : TranscriptionService {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+internal class IosTranscriptionService : TranscriptionService {
     private val _transcriptionFlow = MutableSharedFlow<TranscriptionResult>(replay = 1)
+
+    // SFSpeechRecognizer is stateful on the main thread; lazily created so it
+    // initialises on the correct thread when first accessed.
+    private val recognizer: SFSpeechRecognizer? by lazy { SFSpeechRecognizer() }
 
     override fun getTranscriptionFlow(): SharedFlow<TranscriptionResult> = _transcriptionFlow.asSharedFlow()
 
-    private var isRecognizing = false
-    private var currentLanguage = NSLocale.currentLocale.objectForKey("kCFLocaleLanguageCodeKey") as? String ?: "en"
-
-    /**
-     * In a real implementation, we would initialize the iOS Speech Recognition framework here
-     * and check authorization status.
-     */
-    init {
-        Napier.d("Initializing iOS transcription service")
-        // In a real implementation, we would check for speech recognition authorization here
-        // and request authorization if needed
-    }
-
     override suspend fun startLiveTranscription(): Boolean {
-        if (isRecognizing) return true
-
-        // For now, we'll simulate a successful start
-        isRecognizing = true
+        // Live buffer-based transcription requires AVAudioEngine tapping,
+        // which conflicts with AVAudioRecorder. File transcription via
+        // transcribeAudioFile() is the primary path on iOS.
         _transcriptionFlow.emit(TranscriptionResult.InProgress)
-
-        // Start a coroutine that simulates receiving transcription updates
-        scope.launch {
-            try {
-                while (isRecognizing) {
-                    delay(3000) // Simulate delay between transcription updates
-                    _transcriptionFlow.emit(TranscriptionResult.InProgress)
-                }
-            } catch (e: Exception) {
-                Napier.e("Error in iOS transcription simulation", e)
-                _transcriptionFlow.emit(TranscriptionResult.Error("Transcription error", e))
-            }
-        }
-
-        return true
+        return false
     }
 
-    override suspend fun stopLiveTranscription() {
-        if (!isRecognizing) return
-
-        isRecognizing = false
-
-        // In a real implementation, we would stop the iOS speech recognizer here
-
-        // Emit final result
-        _transcriptionFlow.emit(TranscriptionResult.Success("Transcription complete"))
-    }
+    override suspend fun stopLiveTranscription() = Unit
 
     override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult {
-        // In a real implementation, we would use iOS's speech recognition API to
-        // transcribe the audio file
+        val r = recognizer ?: return TranscriptionResult.Error("Speech recognizer unavailable")
 
-        // For now, we'll simulate a successful transcription
-        return TranscriptionResult.Success("Transcription of file $audioUri")
-    }
+        // isAvailable() is an ObjC getter exposed as a function in Kotlin/Native.
+        if (!r.isAvailable()) {
+            Napier.w("iOS SFSpeechRecognizer not available — locale may be unsupported")
+            return TranscriptionResult.Error("Speech recognizer not available for this locale")
+        }
 
-    override fun cancelTranscription() {
-        isRecognizing = false
+        val url = NSURL.fileURLWithPath(audioUri)
+        val request = SFSpeechURLRecognitionRequest(uRL = url)
+        // Force on-device recognition — no audio leaves the device.
+        request.requiresOnDeviceRecognition = true
+        // We only need the final polished transcript, not partials.
+        request.shouldReportPartialResults = false
 
-        // In a real implementation, we would cancel the iOS speech recognizer here
-
-        scope.launch {
-            _transcriptionFlow.emit(TranscriptionResult.Error("Transcription canceled"))
+        return try {
+            val text = withContext(Dispatchers.Main) { recognize(r, request) }
+            TranscriptionResult.Success(text = text, isFinal = true)
+        } catch (e: Exception) {
+            Napier.e("iOS file transcription failed for $audioUri", e)
+            TranscriptionResult.Error("Transcription failed")
         }
     }
 
-    override fun getSupportedLanguages(): List<String> {
-        // In a real implementation, we would return the list of supported locales from iOS
-        // For now, we'll return a small set of common languages
-        return listOf("en-US", "en-GB", "fr-FR", "de-DE", "es-ES", "it-IT", "ja-JP", "ko-KR", "zh-CN")
-    }
+    private suspend fun recognize(
+        recognizer: SFSpeechRecognizer,
+        request: SFSpeechURLRecognitionRequest,
+    ): String =
+        suspendCancellableCoroutine { cont ->
+            val task =
+                recognizer.recognitionTaskWithRequest(request) { result, error ->
+                    if (!cont.isActive) return@recognitionTaskWithRequest
+                    when {
+                        error != null ->
+                            cont.resumeWithException(Exception(error.localizedDescription))
+                        // isFinal() is an ObjC getter exposed as a function in Kotlin/Native.
+                        result?.isFinal() == true ->
+                            cont.resume(result.bestTranscription.formattedString)
+                    }
+                }
+            cont.invokeOnCancellation { task?.cancel() }
+        }
 
-    override fun setLanguage(languageCode: String) {
-        currentLanguage = languageCode
-    }
+    override fun cancelTranscription() = Unit
 
-    override val supportsLiveTranscription: Boolean = true
+    override fun getSupportedLanguages(): List<String> = listOf("en-US")
+
+    override fun setLanguage(languageCode: String) = Unit
+
+    // Live buffer transcription is not supported with the current AVAudioRecorder setup.
+    override val supportsLiveTranscription: Boolean = false
 
     override val supportsFileTranscription: Boolean = true
+
+    // The iOS system Speech Recognition model is always present on device —
+    // there is nothing to download.
+    override val isOfflineModelAvailable: Boolean = true
+
+    override val offlineModelDownloadStatus: StateFlow<ModelDownloadStatus> =
+        MutableStateFlow(ModelDownloadStatus.Completed).asStateFlow()
 
     override suspend fun resetTranscription() {
         _transcriptionFlow.emit(TranscriptionResult.InProgress)
     }
 
-    override fun release() {
-        isRecognizing = false
-
-        // In a real implementation, we would release resources here
-    }
+    override fun release() = Unit
 }
