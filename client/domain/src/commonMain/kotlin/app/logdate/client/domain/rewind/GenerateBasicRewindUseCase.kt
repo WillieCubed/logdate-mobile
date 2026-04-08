@@ -6,7 +6,9 @@ import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.entity.people.PeopleExtractor
 import app.logdate.client.intelligence.narrative.RewindSequencer
 import app.logdate.client.intelligence.narrative.WeekNarrativeSynthesizer
+import app.logdate.client.intelligence.weather.WeatherFetchLocation
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.location.LocationHistoryItem
 import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
@@ -195,6 +197,14 @@ class GenerateBasicRewindUseCase(
             // Generate week identifier for narrative caching
             val weekId = "${startTime.toLocalDateTime(timezone).date}"
 
+            // Compute the rewind's primary location so the synthesizer can fetch
+            // historical weather in parallel with the LLM call. Best-effort: a missing
+            // or empty location history just skips weather entirely.
+            val locationHistory =
+                runCatching { locationHistoryRepository.getLocationHistoryBetween(startTime, endTime) }
+                    .getOrElse { emptyList() }
+            val primaryLocation = computePrimaryLocation(locationHistory)
+
             // Synthesize narrative understanding of the week
             val narrativeResult =
                 narrativeSynthesizer.synthesize(
@@ -202,6 +212,9 @@ class GenerateBasicRewindUseCase(
                     textEntries = allTextEntries,
                     media = mediaItems,
                     people = people,
+                    primaryLocation = primaryLocation,
+                    periodStart = startTime,
+                    periodEnd = endTime,
                     useCached = true,
                 )
 
@@ -245,8 +258,7 @@ class GenerateBasicRewindUseCase(
                 buildMetadata(
                     narrative = narrative,
                     people = people,
-                    startTime = startTime,
-                    endTime = endTime,
+                    locationHistory = locationHistory,
                 )
 
             // Create the rewind with narrative-driven content
@@ -289,12 +301,14 @@ class GenerateBasicRewindUseCase(
 
     /**
      * Builds intelligence metadata from the data collected during generation.
+     *
+     * @param locationHistory Pre-fetched history shared with the weather lookup so we
+     *   don't hit the location DAO twice per rewind.
      */
-    private suspend fun buildMetadata(
+    private fun buildMetadata(
         narrative: WeekNarrative?,
         people: List<app.logdate.shared.model.Person>,
-        startTime: Instant,
-        endTime: Instant,
+        locationHistory: List<LocationHistoryItem>,
     ): RewindMetadata {
         // Derive activity types from narrative themes
         val activities =
@@ -309,26 +323,20 @@ class GenerateBasicRewindUseCase(
                 ?.map { it.moment }
                 ?: emptyList()
 
-        // Build location summary from location history
+        // Build location summary from the already-fetched history
         val locationSummary =
-            try {
-                val locations = locationHistoryRepository.getLocationHistoryBetween(startTime, endTime)
-                if (locations.isNotEmpty()) {
-                    LocationSummary(
-                        distinctLocations =
-                            locations
-                                .map {
-                                    "${it.location.latitude.toInt()},${it.location.longitude.toInt()}"
-                                }.distinct()
-                                .size,
-                        newPlaces = 0, // Would require historical comparison
-                        primaryLocation = null, // Would require reverse geocoding
-                    )
-                } else {
-                    null
-                }
-            } catch (e: Exception) {
-                Napier.w("Failed to build location summary for metadata", e)
+            if (locationHistory.isNotEmpty()) {
+                LocationSummary(
+                    distinctLocations =
+                        locationHistory
+                            .map {
+                                "${it.location.latitude.toInt()},${it.location.longitude.toInt()}"
+                            }.distinct()
+                            .size,
+                    newPlaces = 0, // Would require historical comparison
+                    primaryLocation = null, // Would require reverse geocoding
+                )
+            } else {
                 null
             }
 
@@ -339,7 +347,21 @@ class GenerateBasicRewindUseCase(
             peopleHighlighted = people.map { it.name },
             reflectionPrompts = narrative?.reflectionPrompts ?: emptyList(),
             highlightedQuotes = narrative?.highlightedQuotes ?: emptyList(),
+            weatherContext = narrative?.weatherContext,
         )
+    }
+
+    /**
+     * Picks one representative point from the period's location history to anchor a
+     * weather lookup against. Uses the centroid of the entries because the user might
+     * have moved around the same general area all week and a single sample would be
+     * arbitrary; an average over all samples is stable and cheap.
+     */
+    private fun computePrimaryLocation(history: List<LocationHistoryItem>): WeatherFetchLocation? {
+        if (history.isEmpty()) return null
+        val avgLat = history.sumOf { it.location.latitude } / history.size
+        val avgLon = history.sumOf { it.location.longitude } / history.size
+        return WeatherFetchLocation(latitude = avgLat, longitude = avgLon)
     }
 
     private fun deriveActivities(themes: List<String>): List<ActivityType> = deriveActivitiesFromThemes(themes)

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -31,6 +32,7 @@ import app.logdate.feature.rewind.ui.RewindPanelUiState
 import app.logdate.feature.rewind.ui.SubtitledRewindPanelUiState
 import app.logdate.feature.rewind.ui.TextNoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.TransitionRewindPanelUiState
+import app.logdate.feature.rewind.ui.WeatherChipUiState
 import app.logdate.ui.content.ImageScrimOverlay
 import coil3.compose.AsyncImage
 import logdate.client.feature.rewind.generated.resources.*
@@ -78,6 +80,7 @@ fun RewindStoryContent(
                 title = panel.title,
                 subtitle = panel.subtitle,
                 backgroundImageUri = panel.backgroundUri,
+                weatherChip = panel.weatherChip,
                 modifier = modifier,
             )
         }
@@ -248,11 +251,11 @@ private fun SubtitledPanel(
     title: String,
     subtitle: String,
     backgroundImageUri: String?,
+    weatherChip: WeatherChipUiState?,
     modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
     ) {
         // Background
         if (backgroundImageUri != null) {
@@ -278,7 +281,10 @@ private fun SubtitledPanel(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.padding(32.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.Center)
+                    .padding(32.dp),
         ) {
             Text(
                 text = title,
@@ -294,6 +300,19 @@ private fun SubtitledPanel(
                 color = Color.White.copy(alpha = 0.9f),
                 textAlign = TextAlign.Center,
                 lineHeight = MaterialTheme.typography.bodyLarge.lineHeight,
+            )
+        }
+
+        // Weather chip overlay — quietly placed in the top-end corner so it grounds
+        // the title without competing with it.
+        if (weatherChip != null) {
+            WeatherChip(
+                state = weatherChip,
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .statusBarsPadding()
+                        .padding(top = 56.dp, end = 16.dp),
             )
         }
     }

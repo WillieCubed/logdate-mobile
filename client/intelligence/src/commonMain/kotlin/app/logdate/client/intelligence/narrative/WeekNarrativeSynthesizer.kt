@@ -13,6 +13,9 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIResponseFormat
 import app.logdate.client.intelligence.structured.JsonStructuredOutputParser
 import app.logdate.client.intelligence.structured.StructuredOutputResult
 import app.logdate.client.intelligence.unavailableReason
+import app.logdate.client.intelligence.weather.HistoricalWeatherProvider
+import app.logdate.client.intelligence.weather.NoOpHistoricalWeatherProvider
+import app.logdate.client.intelligence.weather.WeatherFetchLocation
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.repository.journals.JournalNote
@@ -21,14 +24,18 @@ import app.logdate.shared.model.HighlightedQuote
 import app.logdate.shared.model.Person
 import app.logdate.shared.model.ReflectionPrompt
 import app.logdate.shared.model.StoryBeat
+import app.logdate.shared.model.WeatherContext
 import app.logdate.shared.model.WeekNarrative
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlin.time.Instant
 
 /**
  * Synthesizes a narrative understanding of a week's journal content using AI.
@@ -48,6 +55,7 @@ class WeekNarrativeSynthesizer(
     private val genAIClient: GenerativeAIChatClient,
     private val networkAvailabilityMonitor: NetworkAvailabilityMonitor,
     private val dataUsagePolicy: DataUsagePolicy,
+    private val weatherProvider: HistoricalWeatherProvider = NoOpHistoricalWeatherProvider,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     internal companion object {
@@ -323,10 +331,19 @@ Respond ONLY with valid JSON in this format. No additional text."""
     /**
      * Synthesizes a narrative from a week's worth of content.
      *
+     * When [primaryLocation] is supplied AND a [HistoricalWeatherProvider] was injected,
+     * the synthesizer kicks off a weather fetch in parallel with the narrative path
+     * (LLM call or cache hit) and attaches the result to the returned [WeekNarrative].
+     * Weather is best-effort: a failed fetch leaves `weatherContext` null and never
+     * blocks narrative generation.
+     *
      * @param weekId Unique identifier for log correlation (e.g., "2024-W42")
      * @param textEntries Journal text entries from the week
      * @param media Photos and videos from the week
      * @param people People mentioned across entries (from PeopleExtractor)
+     * @param primaryLocation Optional lat/lon for weather lookup; null skips the fetch.
+     * @param periodStart Optional period start, required for the weather lookup.
+     * @param periodEnd Optional period end, required for the weather lookup.
      * @param useCached Whether to use cached narrative if available
      * @return WeekNarrative capturing the story, or null if synthesis fails
      */
@@ -335,43 +352,82 @@ Respond ONLY with valid JSON in this format. No additional text."""
         textEntries: List<JournalNote.Text>,
         media: List<IndexedMedia>,
         people: List<Person> = emptyList(),
+        primaryLocation: WeatherFetchLocation? = null,
+        periodStart: Instant? = null,
+        periodEnd: Instant? = null,
         useCached: Boolean = true,
     ): AIResult<WeekNarrative> =
         withContext(ioDispatcher) {
-            val cacheRequest =
-                GenerativeAICacheRequest(
-                    contentType = GenerativeAICacheContentType.Narrative,
-                    inputText = buildContentSummary(textEntries, media, people),
-                    providerId = genAIClient.providerId,
-                    model = genAIClient.defaultModel,
-                    promptVersion = PROMPT_VERSION,
-                    schemaVersion = SCHEMA_VERSION,
-                    templateId = TEMPLATE_ID,
-                    policy = AICachePolicy(ttlSeconds = CACHE_TTL_SECONDS),
-                )
-            if (useCached) {
-                val cached = generativeAICache.getEntry(cacheRequest)
-                if (cached != null) {
-                    Napier.d("Using cached narrative for $weekId")
-                    val parsed = parseNarrativeResponse(cached.content)
-                    if (parsed != null) {
-                        return@withContext AIResult.Success(parsed, fromCache = true)
+            coroutineScope {
+                // Kick off the weather fetch in parallel with whichever narrative path
+                // (cache or LLM) ends up running. Weather is best-effort, so we ask for it
+                // up front and merge whatever comes back into the result.
+                val weatherDeferred =
+                    if (primaryLocation != null && periodStart != null && periodEnd != null) {
+                        async {
+                            try {
+                                weatherProvider.fetch(
+                                    latitude = primaryLocation.latitude,
+                                    longitude = primaryLocation.longitude,
+                                    startInclusive = periodStart,
+                                    endInclusive = periodEnd,
+                                )
+                            } catch (e: Exception) {
+                                Napier.w("Weather fetch failed for $weekId", e)
+                                null
+                            }
+                        }
+                    } else {
+                        null
                     }
-                    Napier.w("Cached narrative response was invalid for $weekId")
+
+                val narrativeResult = synthesizeNarrative(weekId, textEntries, media, people, useCached)
+                val weather = weatherDeferred?.await()
+                narrativeResult.attachWeather(weather)
+            }
+        }
+
+    private suspend fun synthesizeNarrative(
+        weekId: String,
+        textEntries: List<JournalNote.Text>,
+        media: List<IndexedMedia>,
+        people: List<Person>,
+        useCached: Boolean,
+    ): AIResult<WeekNarrative> {
+        val cacheRequest =
+            GenerativeAICacheRequest(
+                contentType = GenerativeAICacheContentType.Narrative,
+                inputText = buildContentSummary(textEntries, media, people),
+                providerId = genAIClient.providerId,
+                model = genAIClient.defaultModel,
+                promptVersion = PROMPT_VERSION,
+                schemaVersion = SCHEMA_VERSION,
+                templateId = TEMPLATE_ID,
+                policy = AICachePolicy(ttlSeconds = CACHE_TTL_SECONDS),
+            )
+        if (useCached) {
+            val cached = generativeAICache.getEntry(cacheRequest)
+            if (cached != null) {
+                Napier.d("Using cached narrative for $weekId")
+                val parsed = parseNarrativeResponse(cached.content)
+                if (parsed != null) {
+                    return AIResult.Success(parsed, fromCache = true)
                 }
+                Napier.w("Cached narrative response was invalid for $weekId")
             }
+        }
 
-            Napier.d("Generating narrative for $weekId with ${textEntries.size} entries, ${media.size} media items")
-            val unavailableReason = unavailableReason(networkAvailabilityMonitor, dataUsagePolicy)
-            if (unavailableReason != null) {
-                return@withContext AIResult.Unavailable(unavailableReason)
-            }
+        Napier.d("Generating narrative for $weekId with ${textEntries.size} entries, ${media.size} media items")
+        val unavailableReason = unavailableReason(networkAvailabilityMonitor, dataUsagePolicy)
+        if (unavailableReason != null) {
+            return AIResult.Unavailable(unavailableReason)
+        }
 
-            // Build content summary for AI
-            val contentSummary = cacheRequest.inputText
+        // Build content summary for AI
+        val contentSummary = cacheRequest.inputText
 
-            val prompt =
-                """
+        val prompt =
+            """
 Week's content for analysis:
 
 $contentSummary
@@ -379,42 +435,51 @@ $contentSummary
 Analyze this content and provide the narrative structure in JSON format as specified.
 """.trim()
 
-            val response =
-                genAIClient.submit(
-                    GenerativeAIRequest(
-                        messages =
-                            listOf(
-                                GenerativeAIChatMessage("system", SYSTEM_PROMPT),
-                                GenerativeAIChatMessage("user", prompt),
-                            ),
-                        model = cacheRequest.model,
-                        responseFormat =
-                            GenerativeAIResponseFormat.JsonSchema(
-                                name = "week_narrative",
-                                schema = RESPONSE_SCHEMA,
-                            ),
-                    ),
-                )
+        val response =
+            genAIClient.submit(
+                GenerativeAIRequest(
+                    messages =
+                        listOf(
+                            GenerativeAIChatMessage("system", SYSTEM_PROMPT),
+                            GenerativeAIChatMessage("user", prompt),
+                        ),
+                    model = cacheRequest.model,
+                    responseFormat =
+                        GenerativeAIResponseFormat.JsonSchema(
+                            name = "week_narrative",
+                            schema = RESPONSE_SCHEMA,
+                        ),
+                ),
+            )
 
-            return@withContext when (response) {
-                is AIResult.Success -> {
-                    val content = response.value.content
-                    Napier.d("Caching narrative for $weekId")
-                    generativeAICache.putEntry(cacheRequest, content)
-                    val parsed = parseNarrativeResponse(content)
-                    if (parsed != null) {
-                        AIResult.Success(parsed, fromCache = false)
-                    } else {
-                        AIResult.Error(AIError.InvalidResponse)
-                    }
-                }
-                is AIResult.Unavailable -> response
-                is AIResult.Error -> {
-                    Napier.e("Failed to synthesize narrative", throwable = response.throwable)
-                    response
+        return when (response) {
+            is AIResult.Success -> {
+                val content = response.value.content
+                Napier.d("Caching narrative for $weekId")
+                generativeAICache.putEntry(cacheRequest, content)
+                val parsed = parseNarrativeResponse(content)
+                if (parsed != null) {
+                    AIResult.Success(parsed, fromCache = false)
+                } else {
+                    AIResult.Error(AIError.InvalidResponse)
                 }
             }
+            is AIResult.Unavailable -> response
+            is AIResult.Error -> {
+                Napier.e("Failed to synthesize narrative", throwable = response.throwable)
+                response
+            }
         }
+    }
+
+    private fun AIResult<WeekNarrative>.attachWeather(weather: WeatherContext?): AIResult<WeekNarrative> {
+        if (weather == null) return this
+        return when (this) {
+            is AIResult.Success -> AIResult.Success(value.copy(weatherContext = weather), fromCache = fromCache)
+            is AIResult.Unavailable -> this
+            is AIResult.Error -> this
+        }
+    }
 
     /**
      * Builds a textual summary of the week's content for AI analysis.

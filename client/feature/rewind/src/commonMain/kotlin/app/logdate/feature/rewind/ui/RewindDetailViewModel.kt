@@ -23,6 +23,8 @@ import app.logdate.shared.model.ReflectionPromptKey
 import app.logdate.shared.model.ReflectionPromptResponse
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
+import app.logdate.shared.model.WeatherCategory
+import app.logdate.shared.model.WeatherContext
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -280,6 +282,7 @@ class RewindDetailViewModel(
                     )
                 }\nYour journey through time and memories",
                 backgroundUri = null,
+                weatherChip = rewind.metadata?.weatherContext?.toChipUiState(),
             ),
         )
 
@@ -625,6 +628,19 @@ class RewindDetailViewModel(
                         color = 0xFFFF9800, // Orange
                     ),
             ),
+        )
+
+    private fun WeatherContext.toChipUiState(): WeatherChipUiState =
+        WeatherChipUiState(
+            category =
+                when (category) {
+                    WeatherCategory.SUNNY -> WeatherChipCategory.SUNNY
+                    WeatherCategory.CLOUDY -> WeatherChipCategory.CLOUDY
+                    WeatherCategory.RAINY -> WeatherChipCategory.RAINY
+                    WeatherCategory.SNOWY -> WeatherChipCategory.SNOWY
+                    WeatherCategory.MIXED -> WeatherChipCategory.MIXED
+                },
+            avgTempCelsius = avgTempCelsius,
         )
 
     private companion object {

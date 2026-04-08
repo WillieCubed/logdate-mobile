@@ -79,6 +79,15 @@ data class WeekNarrative(
      * Empty when synthesis didn't surface any quotes.
      */
     val highlightedQuotes: List<HighlightedQuote> = emptyList(),
+    /**
+     * Weather summary for the week's primary location and date range.
+     *
+     * Fetched in parallel with the LLM call by the synthesizer when the caller passes
+     * a primary location. Null when no location was supplied or when the weather fetch
+     * failed — the synthesizer treats weather as best-effort context, never blocking
+     * the narrative on it.
+     */
+    val weatherContext: WeatherContext? = null,
 )
 
 /**

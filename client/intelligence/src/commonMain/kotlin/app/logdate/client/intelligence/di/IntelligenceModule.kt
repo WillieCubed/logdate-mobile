@@ -8,6 +8,8 @@ import app.logdate.client.intelligence.narrative.RewindSequencer
 import app.logdate.client.intelligence.narrative.WeekNarrativeSynthesizer
 import app.logdate.client.intelligence.rewind.RewindMessageGenerator
 import app.logdate.client.intelligence.rewind.WittyRewindMessageGenerator
+import app.logdate.client.intelligence.weather.HistoricalWeatherProvider
+import app.logdate.client.intelligence.weather.OpenMeteoHistoricalWeatherProvider
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -24,7 +26,16 @@ val intelligenceModule: Module =
         single { MomentExtractor(get(), get(), networkAvailabilityMonitor = get(), dataUsagePolicy = get()) }
         single { EventNamingExtractor(get(), get(), networkAvailabilityMonitor = get(), dataUsagePolicy = get()) }
         single { PeopleExtractor(get(), get(), networkAvailabilityMonitor = get(), dataUsagePolicy = get()) }
-        single { WeekNarrativeSynthesizer(get(), get(), networkAvailabilityMonitor = get(), dataUsagePolicy = get()) }
+        single<HistoricalWeatherProvider> { OpenMeteoHistoricalWeatherProvider(get()) }
+        single {
+            WeekNarrativeSynthesizer(
+                generativeAICache = get(),
+                genAIClient = get(),
+                networkAvailabilityMonitor = get(),
+                dataUsagePolicy = get(),
+                weatherProvider = get(),
+            )
+        }
         single { RewindSequencer() }
     }
 

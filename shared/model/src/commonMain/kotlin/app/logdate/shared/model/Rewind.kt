@@ -1,5 +1,6 @@
 package app.logdate.shared.model
 
+import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -87,7 +88,56 @@ data class RewindMetadata(
      * highlighted quote panels woven into the story.
      */
     val highlightedQuotes: List<HighlightedQuote> = emptyList(),
+    /**
+     * Atmospheric weather context for the rewind's primary location and date range.
+     *
+     * Null when the rewind period had no usable location data, or when the weather
+     * fetch failed or was skipped. The Rewind UI renders this as a small atmospheric
+     * chip on the title panel — "rainy week", "75°", and so on — so the user feels
+     * what the week was actually like outdoors before they read a single beat.
+     */
+    val weatherContext: WeatherContext? = null,
 )
+
+/**
+ * Atmospheric summary of what the weather was like for the rewind's period and place.
+ *
+ * Aggregated from a daily-resolution weather source over the rewind's date range —
+ * see `OpenMeteoHistoricalWeatherProvider` in client/intelligence. Stored on
+ * [RewindMetadata] so the title panel can render a quiet weather chip.
+ *
+ * @property category The dominant condition across the period (the day with the most
+ *   precipitation wins for rainy/snowy, otherwise the average sky cover decides).
+ * @property avgTempCelsius Average daily mean temperature across the period in Celsius.
+ *   Stored in Celsius internally; the UI converts to Fahrenheit when the locale calls
+ *   for it.
+ * @property maxTempCelsius Highest single-day max across the period.
+ * @property minTempCelsius Lowest single-day min across the period.
+ * @property precipitationMm Total precipitation across the period in millimeters.
+ *   Used to decide between "drizzle" and "downpour" framing in the chip label.
+ */
+@Serializable
+data class WeatherContext(
+    val category: WeatherCategory,
+    val avgTempCelsius: Double,
+    val maxTempCelsius: Double,
+    val minTempCelsius: Double,
+    val precipitationMm: Double,
+)
+
+/**
+ * The dominant weather condition across a rewind's period.
+ *
+ * Used by the title-panel chip to pick its icon and lead phrase.
+ */
+@Serializable
+enum class WeatherCategory {
+    SUNNY,
+    CLOUDY,
+    RAINY,
+    SNOWY,
+    MIXED,
+}
 
 /**
  * Types of activities that can be detected in a time period.

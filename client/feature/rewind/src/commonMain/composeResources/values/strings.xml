@@ -10,6 +10,14 @@
     <string name="rewind_settings_replies_label">Let me reply to noticing prompts</string>
     <string name="rewind_settings_replies_helper">Each Rewind invents a couple of quiet questions about your week. Leave this on to type your answer back at them right inside the story. Off hides the reply chrome and just shows the prompts.</string>
 
+    <!-- Weather chip on title panel -->
+    <string name="weather_chip_sunny">Sunny week</string>
+    <string name="weather_chip_cloudy">Overcast week</string>
+    <string name="weather_chip_rainy">Rainy week</string>
+    <string name="weather_chip_snowy">Snowy week</string>
+    <string name="weather_chip_mixed">Mixed week</string>
+    <string name="weather_chip_temperature">%1$d°</string>
+
     <!-- Reflection prompt replies -->
     <string name="reflection_prompt_reply">Reply</string>
     <string name="reflection_prompt_reply_edit">Edit your reply</string>

@@ -13,6 +13,7 @@ import app.logdate.shared.model.ReflectionPrompt
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
 import app.logdate.shared.model.RewindMetadata
+import app.logdate.shared.model.WeatherContext
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -394,6 +395,7 @@ class OfflineFirstRewindRepository(
         val peopleHighlighted: List<String>,
         val reflectionPrompts: List<ReflectionPrompt> = emptyList(),
         val highlightedQuotes: List<HighlightedQuote> = emptyList(),
+        val weatherContext: WeatherContext? = null,
     ) {
         fun toDomainModel(): RewindMetadata =
             RewindMetadata(
@@ -413,6 +415,7 @@ class OfflineFirstRewindRepository(
                 peopleHighlighted = peopleHighlighted,
                 reflectionPrompts = reflectionPrompts,
                 highlightedQuotes = highlightedQuotes,
+                weatherContext = weatherContext,
             )
 
         companion object {
@@ -431,6 +434,7 @@ class OfflineFirstRewindRepository(
                     peopleHighlighted = metadata.peopleHighlighted,
                     reflectionPrompts = metadata.reflectionPrompts,
                     highlightedQuotes = metadata.highlightedQuotes,
+                    weatherContext = metadata.weatherContext,
                 )
         }
     }

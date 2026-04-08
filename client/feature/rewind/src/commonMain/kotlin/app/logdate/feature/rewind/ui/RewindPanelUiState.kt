@@ -41,7 +41,39 @@ data class SubtitledRewindPanelUiState(
     val title: String,
     val subtitle: String,
     val backgroundUri: String? = null,
+    val weatherChip: WeatherChipUiState? = null,
 ) : RewindPanelUiState
+
+/**
+ * Display data for the small weather chip overlaid on a rewind's title panel.
+ *
+ * Built by [RewindDetailViewModel] from the rewind's [app.logdate.shared.model.WeatherContext].
+ * The composable side resolves the actual icon and label from these primitives so the
+ * ViewModel doesn't need to reach into compose-resources.
+ *
+ * @property category Dominant weather condition for the rewind period — picks the icon.
+ * @property avgTempCelsius Average daily mean temperature in Celsius — the composable
+ *   converts to Fahrenheit when the locale calls for it before rendering.
+ */
+data class WeatherChipUiState(
+    val category: WeatherChipCategory,
+    val avgTempCelsius: Double,
+)
+
+/**
+ * Coarse weather buckets the title chip knows how to render an icon for.
+ *
+ * Mirrors the domain `WeatherCategory` but lives in the feature module so the panel
+ * state stays decoupled from the shared model when the renderer eventually grows more
+ * categories than the data model needs.
+ */
+enum class WeatherChipCategory {
+    SUNNY,
+    CLOUDY,
+    RAINY,
+    SNOWY,
+    MIXED,
+}
 
 /**
  * UI state for a panel displaying a significant statistic.
