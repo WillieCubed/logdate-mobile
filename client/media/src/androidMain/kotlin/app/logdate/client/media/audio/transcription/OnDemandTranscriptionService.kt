@@ -5,10 +5,14 @@ import app.logdate.client.media.audio.download.ModelDownloadStatus
 import com.google.android.play.core.splitinstall.SplitInstallManagerFactory
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * [TranscriptionService] proxy that loads the Sherpa-ONNX implementation from the
@@ -16,6 +20,12 @@ import kotlinx.coroutines.flow.asStateFlow
  *
  * When the module is not yet installed, delegates to [AndroidTranscriptionService]
  * (Android's built-in SpeechRecognizer) as a fallback.
+ *
+ * Owns a stable [_transcriptionFlow] that observers subscribe to once. When
+ * [startLiveTranscription] runs, a forwarding coroutine is started that pipes
+ * the active delegate's emissions into this stable flow. Without this, a
+ * delegate switch between [getTranscriptionFlow] and [startLiveTranscription]
+ * leaves the observer watching the wrong flow and receiving nothing.
  */
 class OnDemandTranscriptionService(
     private val context: Context,
@@ -35,6 +45,11 @@ class OnDemandTranscriptionService(
     @Volatile
     private var delegate: TranscriptionService? = null
 
+    // Stable flow that external observers always collect from. Forwarded-to
+    // from whichever delegate is actually running live transcription.
+    private val _transcriptionFlow = MutableSharedFlow<TranscriptionResult>(replay = 1)
+    private var forwardingJob: Job? = null
+
     init {
         if (isModuleInstalled()) {
             loadDelegate()
@@ -43,14 +58,28 @@ class OnDemandTranscriptionService(
 
     private fun resolvedDelegate(): TranscriptionService = delegate ?: fallback
 
-    override fun getTranscriptionFlow(): SharedFlow<TranscriptionResult> = resolvedDelegate().getTranscriptionFlow()
+    override fun getTranscriptionFlow(): SharedFlow<TranscriptionResult> = _transcriptionFlow.asSharedFlow()
 
     override suspend fun startLiveTranscription(): Boolean {
-        // Try to load the dynamic module if it became available since init
         if (delegate == null && isModuleInstalled()) {
             loadDelegate()
         }
-        return resolvedDelegate().startLiveTranscription()
+        val active = resolvedDelegate()
+
+        // Replace the forwarding subscription so results from this specific
+        // delegate instance reach the stable _transcriptionFlow. The previous
+        // job is canceled — its delegate is no longer driving transcription.
+        // We intentionally start forwarding BEFORE calling startLiveTranscription
+        // so no early emissions are missed.
+        forwardingJob?.cancel()
+        forwardingJob =
+            scope.launch {
+                active.getTranscriptionFlow().collect { result ->
+                    _transcriptionFlow.emit(result)
+                }
+            }
+
+        return active.startLiveTranscription()
     }
 
     override suspend fun stopLiveTranscription() = resolvedDelegate().stopLiveTranscription()
@@ -96,6 +125,8 @@ class OnDemandTranscriptionService(
     }
 
     override fun release() {
+        forwardingJob?.cancel()
+        forwardingJob = null
         delegate?.release()
         // Don't release fallback eagerly — it's lazy-initialized
     }
