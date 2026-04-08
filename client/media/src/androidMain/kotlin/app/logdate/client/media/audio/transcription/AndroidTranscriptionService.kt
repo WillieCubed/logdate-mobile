@@ -179,25 +179,23 @@ class AndroidTranscriptionService(
         }
     }
 
-    override suspend fun startLiveTranscription(): Boolean {
-        if (speechRecognizer == null) {
-            withContext(Dispatchers.Main) { createSpeechRecognizer() }
+    override suspend fun startLiveTranscription(): Boolean =
+        withContext(Dispatchers.Main) {
+            if (speechRecognizer == null) createSpeechRecognizer()
+            if (speechRecognizer == null) {
+                _transcriptionFlow.emit(TranscriptionResult.Error("Speech recognizer not available"))
+                return@withContext false
+            }
+            isListening = true
+            startListening()
+            true
         }
 
-        if (speechRecognizer == null) {
-            _transcriptionFlow.emit(TranscriptionResult.Error("Speech recognizer not available"))
-            return false
+    override suspend fun stopLiveTranscription() =
+        withContext(Dispatchers.Main) {
+            isListening = false
+            speechRecognizer?.stopListening()
         }
-
-        isListening = true
-        startListening()
-        return true
-    }
-
-    override suspend fun stopLiveTranscription() {
-        isListening = false
-        speechRecognizer?.stopListening()
-    }
 
     override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult {
         // Android's SpeechRecognizer doesn't directly support transcribing files
@@ -208,7 +206,8 @@ class AndroidTranscriptionService(
 
     override fun cancelTranscription() {
         isListening = false
-        speechRecognizer?.cancel()
+        // Post to main thread — SpeechRecognizer requires it.
+        scope.launch { speechRecognizer?.cancel() }
     }
 
     override fun getSupportedLanguages(): List<String> =
@@ -232,10 +231,13 @@ class AndroidTranscriptionService(
         accumulatedSegments.clear()
         currentPartial = ""
         _transcriptionFlow.emit(TranscriptionResult.InProgress)
-        // If actively listening, restart recognition for a clean slate
+        // If actively listening, restart recognition for a clean slate.
+        // Both cancel() and startListening() require the main thread.
         if (isListening) {
-            speechRecognizer?.cancel()
-            startListening()
+            withContext(Dispatchers.Main) {
+                speechRecognizer?.cancel()
+                startListening()
+            }
         }
     }
 
@@ -243,8 +245,11 @@ class AndroidTranscriptionService(
         isListening = false
         accumulatedSegments.clear()
         currentPartial = ""
-        speechRecognizer?.destroy()
-        speechRecognizer = null
+        // SpeechRecognizer.destroy() also requires the main thread.
+        scope.launch {
+            speechRecognizer?.destroy()
+            speechRecognizer = null
+        }
     }
 
     private fun buildAccumulatedText(): String {
