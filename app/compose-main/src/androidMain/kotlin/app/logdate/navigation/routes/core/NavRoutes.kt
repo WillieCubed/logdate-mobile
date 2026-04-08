@@ -294,6 +294,12 @@ data object StreakSettingsRoute : NavKey
 @Serializable
 data object RewindSettingsRoute : NavKey
 
+/**
+ * Navigation route for the auto-events settings detail screen.
+ */
+@Serializable
+data object EventsSettingsRoute : NavKey
+
 @Serializable
 data object TimelineSettingsRoute : NavKey
 

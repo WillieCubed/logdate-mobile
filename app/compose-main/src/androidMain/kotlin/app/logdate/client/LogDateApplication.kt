@@ -8,6 +8,7 @@ import android.util.Log
 import app.logdate.client.ambient.AmbientPromptScheduler
 import app.logdate.client.ambient.AmbientPromptSchedulingObserver
 import app.logdate.client.domain.recommendation.AmbientPromptTriggerContext
+import app.logdate.client.events.EventInferenceScheduler
 import app.logdate.client.image.DataSaverImageInterceptor
 import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.client.networking.DataUsagePolicy
@@ -82,6 +83,11 @@ class LogdateApplication :
             rewindScheduler.enqueueImmediateCheck()
         }.onFailure { error ->
             Napier.w("Failed to initialize rewind generation scheduling", error)
+        }
+        runCatching {
+            EventInferenceScheduler(this).schedulePeriodicInference()
+        }.onFailure { error ->
+            Napier.w("Failed to initialize event inference scheduling", error)
         }
     }
 }

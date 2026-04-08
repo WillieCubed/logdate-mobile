@@ -6,6 +6,8 @@ import app.logdate.client.domain.di.accountDomainModule
 import app.logdate.client.domain.di.domainModule
 import app.logdate.client.domain.di.locationDomainModule
 import app.logdate.client.domain.di.quotaDomainModule
+import app.logdate.client.domain.events.EventInferenceLauncher
+import app.logdate.client.domain.events.NoopEventInferenceLauncher
 import app.logdate.client.media.di.audioModule
 import app.logdate.client.networking.di.networkingModule
 import org.koin.core.module.Module
@@ -33,4 +35,6 @@ actual val appModule: Module =
         includes(app.logdate.client.health.di.iosHealthModule) // iOS-specific Health Connect implementation
         includes(domainModule) // Main domain module with no circular deps
         includes(audioModule)
+
+        single<EventInferenceLauncher> { NoopEventInferenceLauncher }
     }

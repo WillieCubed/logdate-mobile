@@ -5,7 +5,8 @@ import app.logdate.client.domain.location.ObserveLocationStopsUseCase
 import app.logdate.client.domain.notes.HasNotesForTodayUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.places.PlaceResolutionCache
-import app.logdate.client.domain.places.PlaceResolutionResult
+import app.logdate.client.domain.places.toDisplayName
+import app.logdate.client.domain.places.toPlaceKey
 import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.JournalNotesRepository
 import kotlinx.coroutines.flow.first
@@ -151,23 +152,9 @@ class GenerateAmbientPromptCandidatesUseCase(
             return null
         }
 
-        val placeName: String
-        val placeKey: String
-        when (val resolved = placeResolutionCache.resolve(candidateStop.location)) {
-            is PlaceResolutionResult.UserDefinedPlace -> {
-                placeName = resolved.place.name
-                placeKey = "user:${resolved.place.uid}"
-            }
-            is PlaceResolutionResult.ExternalSuggestion -> {
-                placeName = resolved.suggestion.name
-                placeKey =
-                    resolved.suggestion.externalId?.let { externalId -> "external:$externalId" }
-                        ?: "external:${resolved.suggestion.name.lowercase()}:${resolved.suggestion.latitude}:${
-                            resolved.suggestion.longitude
-                        }"
-            }
-            else -> return null
-        }
+        val resolved = placeResolutionCache.resolve(candidateStop.location)
+        val placeKey = resolved.toPlaceKey() ?: return null
+        val placeName = resolved.toDisplayName() ?: return null
 
         val familiarity = placeFamiliarityRepository.get(placeKey)
         placeFamiliarityRepository.recordVisit(

@@ -55,6 +55,14 @@ class LogdatePreferencesDataSource(
         val REWIND_AUTO_GENERATION_ENABLED = booleanPreferencesKey("rewind_auto_generation_enabled")
         val REWIND_NOTIFICATIONS_ENABLED = booleanPreferencesKey("rewind_notifications_enabled")
 
+        // Event inference preferences
+        val EVENT_INFERENCE_SENSITIVITY = stringPreferencesKey("event_inference_sensitivity")
+        val EVENT_INFERENCE_AI_NAMING_ENABLED = booleanPreferencesKey("event_inference_ai_naming_enabled")
+        val EVENT_INFERENCE_LAST_RUN_AT = longPreferencesKey("event_inference_last_run_at")
+        val EVENT_INFERENCE_LAST_CREATED_COUNT = intPreferencesKey("event_inference_last_created_count")
+        val EVENT_INFERENCE_RECENT_CREATED_COUNT = intPreferencesKey("event_inference_recent_created_count")
+        val EVENT_INFERENCE_LAST_ERROR = stringPreferencesKey("event_inference_last_error")
+
         // Android AppSearch metadata
         val ANDROID_PLATFORM_SEARCH_INDEX_GENERATION = longPreferencesKey("android_platform_search_index_generation")
         val ANDROID_PLATFORM_SEARCH_SCHEMA_VERSION = intPreferencesKey("android_platform_search_schema_version")
@@ -120,6 +128,8 @@ class LogdatePreferencesDataSource(
         userPreferences.data.map { prefs ->
             prefs[EVENTS_ENABLED] ?: false
         }
+
+    suspend fun isEventsEnabled(): Boolean = observeEventsEnabled().first()
 
     /**
      * Sets whether the Events feature is enabled.
@@ -466,6 +476,88 @@ class LogdatePreferencesDataSource(
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
                 this[REWIND_NOTIFICATIONS_ENABLED] = enabled
+            }
+        }
+    }
+
+    /**
+     * Observes the user's auto-event inference sensitivity, defaulting to medium when unset.
+     *
+     * Persisted as the enum name (`LOW`, `MEDIUM`, `HIGH`) so we can extend the set later
+     * without renumbering existing values.
+     */
+    fun observeEventInferenceSensitivity(): Flow<String> =
+        userPreferences.data.map { prefs ->
+            prefs[EVENT_INFERENCE_SENSITIVITY] ?: "MEDIUM"
+        }
+
+    suspend fun getEventInferenceSensitivity(): String = observeEventInferenceSensitivity().first()
+
+    suspend fun setEventInferenceSensitivity(sensitivity: String) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[EVENT_INFERENCE_SENSITIVITY] = sensitivity
+            }
+        }
+    }
+
+    /**
+     * Whether the inference worker is allowed to call out to the on-device extractor for
+     * naming. Off → every event uses the heuristic fallback name, no network call.
+     */
+    fun observeEventInferenceAiNamingEnabled(): Flow<Boolean> =
+        userPreferences.data.map { prefs ->
+            prefs[EVENT_INFERENCE_AI_NAMING_ENABLED] ?: true
+        }
+
+    suspend fun isEventInferenceAiNamingEnabled(): Boolean = observeEventInferenceAiNamingEnabled().first()
+
+    suspend fun setEventInferenceAiNamingEnabled(enabled: Boolean) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[EVENT_INFERENCE_AI_NAMING_ENABLED] = enabled
+            }
+        }
+    }
+
+    /**
+     * Observes the most recent event inference worker run summary so the settings screen can
+     * show "Last run / events created / last error" without standing up a new repository.
+     */
+    fun observeEventInferenceStats(): Flow<EventInferenceStats> =
+        userPreferences.data.map { prefs ->
+            EventInferenceStats(
+                lastRunAt =
+                    prefs[EVENT_INFERENCE_LAST_RUN_AT]?.let { millis ->
+                        if (millis == 0L) null else Instant.fromEpochMilliseconds(millis)
+                    },
+                lastCreatedCount = prefs[EVENT_INFERENCE_LAST_CREATED_COUNT] ?: 0,
+                recentCreatedCount = prefs[EVENT_INFERENCE_RECENT_CREATED_COUNT] ?: 0,
+                lastError = prefs[EVENT_INFERENCE_LAST_ERROR],
+            )
+        }
+
+    /**
+     * Records the result of one event inference worker run. Atomic — the recent rolling
+     * total is incremented inside the same `updateData` block as the per-run stats so two
+     * concurrent worker runs (immediate + periodic) can't lose increments to a stale read.
+     */
+    suspend fun recordEventInferenceRun(
+        runAt: Instant,
+        createdThisRun: Int,
+        error: String?,
+    ) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[EVENT_INFERENCE_LAST_RUN_AT] = runAt.toEpochMilliseconds()
+                this[EVENT_INFERENCE_LAST_CREATED_COUNT] = createdThisRun
+                val previousRecent = this[EVENT_INFERENCE_RECENT_CREATED_COUNT] ?: 0
+                this[EVENT_INFERENCE_RECENT_CREATED_COUNT] = previousRecent + createdThisRun
+                if (error != null) {
+                    this[EVENT_INFERENCE_LAST_ERROR] = error
+                } else {
+                    this.remove(EVENT_INFERENCE_LAST_ERROR)
+                }
             }
         }
     }

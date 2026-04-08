@@ -22,6 +22,9 @@ kotlin {
             libs.versions.android.minSdk
                 .get()
                 .toInt()
+        androidResources {
+            enable = true
+        }
         withHostTestBuilder {}
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
@@ -47,6 +50,7 @@ kotlin {
             implementation(projects.client.ui)
             implementation(projects.client.domain)
             implementation(projects.client.repository)
+            implementation(projects.client.logdateDatastore)
             implementation(projects.client.util)
             // Compose
             implementation(libs.compose.runtime)

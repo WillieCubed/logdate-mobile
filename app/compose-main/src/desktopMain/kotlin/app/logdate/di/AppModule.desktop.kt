@@ -6,6 +6,8 @@ import app.logdate.client.domain.di.accountDomainModule
 import app.logdate.client.domain.di.domainModule
 import app.logdate.client.domain.di.locationDomainModule
 import app.logdate.client.domain.di.quotaDomainModule
+import app.logdate.client.domain.events.EventInferenceLauncher
+import app.logdate.client.domain.events.NoopEventInferenceLauncher
 import app.logdate.client.location.di.locationModule
 import app.logdate.client.media.di.audioModule
 import app.logdate.client.networking.di.networkingModule
@@ -37,4 +39,6 @@ actual val appModule: Module =
         includes(domainModule) // Main domain module with no circular deps
         includes(locationModule)
         includes(audioModule)
+
+        single<EventInferenceLauncher> { NoopEventInferenceLauncher }
     }

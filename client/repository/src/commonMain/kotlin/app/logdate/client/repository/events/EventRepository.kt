@@ -8,10 +8,14 @@ import kotlin.uuid.Uuid
 /**
  * Repository for the [Event] primitive.
  *
- * Events are time-bound things that media and notes attach to. They are not user-created;
- * the public API intentionally has no `createEvent` method. Events are introduced by an
- * internal pipeline (auto-generation from patterns or grounding from external calendars).
- * Users can read, edit, and delete them, and link/unlink notes to them.
+ * Events are time-bound things that media and notes attach to. They are not directly created
+ * by user actions in the UI — there is no "new event" button. Events are introduced by
+ * background pipelines: the on-device inference job that clusters location stops and media
+ * bursts into "things that happened", and the device calendar import that grounds events
+ * from the OS calendar provider. The [createEvent] method is the entry point for those
+ * pipelines.
+ *
+ * Users can read events, edit their metadata, attach or detach captures, and delete them.
  */
 interface EventRepository {
     /**
@@ -37,6 +41,20 @@ interface EventRepository {
      * Fetches a single event by id, or `null` if it does not exist.
      */
     suspend fun getEventById(eventId: Uuid): Event?
+
+    /**
+     * Persists a new event.
+     *
+     * **Not for direct use from UI code.** Events are not user-created — call sites should be
+     * the on-device inference worker, the device calendar import worker, or other background
+     * pipelines that materialize events from outside signals. The editor screen calls
+     * [updateEvent] / [deleteEvent], never this.
+     *
+     * Generates no id of its own — pass an [Event] with the id you want it stored under.
+     * Returns failure when the underlying database write fails (which should be vanishingly
+     * rare in practice but is propagated rather than swallowed for observability).
+     */
+    suspend fun createEvent(event: Event): Result<Unit>
 
     /**
      * Updates an event's mutable metadata. The event must already exist.

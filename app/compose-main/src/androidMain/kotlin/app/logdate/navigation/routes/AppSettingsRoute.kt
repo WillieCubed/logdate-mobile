@@ -45,6 +45,7 @@ import app.logdate.feature.core.settings.ui.watch.WatchSettingsScreen
 import app.logdate.feature.core.settings.ui.watch.WatchSettingsViewModel
 import app.logdate.feature.core.settings.ui.watch.WatchSyncSettingsScreen
 import app.logdate.feature.core.settings.ui.watch.WatchTroubleshootingScreen
+import app.logdate.feature.events.ui.settings.EventsSettingsScreen
 import app.logdate.feature.location.timeline.ui.LocationTimelineBottomSheet
 import app.logdate.feature.rewind.ui.settings.RewindSettingsScreen
 import app.logdate.navigation.MainAppNavigator
@@ -54,6 +55,7 @@ import app.logdate.navigation.routes.core.BirthdaySettingsRoute
 import app.logdate.navigation.routes.core.ClearDataSettingsRoute
 import app.logdate.navigation.routes.core.DayBoundarySettingsRoute
 import app.logdate.navigation.routes.core.DevicesSettingsRoute
+import app.logdate.navigation.routes.core.EventsSettingsRoute
 import app.logdate.navigation.routes.core.ExportSettingsRoute
 import app.logdate.navigation.routes.core.LibrarySettingsRoute
 import app.logdate.navigation.routes.core.LocationAdvancedRoute
@@ -204,6 +206,13 @@ fun MainAppNavigator.openRewindSettings() {
     backStack.add(RewindSettingsRoute)
 }
 
+/**
+ * Opens the auto-events settings detail screen.
+ */
+fun MainAppNavigator.openEventsSettings() {
+    backStack.add(EventsSettingsRoute)
+}
+
 fun MainAppNavigator.openTimelineSettings() {
     backStack.add(TimelineSettingsRoute)
 }
@@ -329,6 +338,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToWatchTroubleshooting: () -> Unit,
     onNavigateToStreaks: () -> Unit = {},
     onNavigateToRewindSettings: () -> Unit = {},
+    onNavigateToEventsSettings: () -> Unit = {},
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
 ) {
@@ -353,6 +363,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onNavigateToNotifications = onNavigateToNotifications,
             onNavigateToStreaks = onNavigateToStreaks,
             onNavigateToRewindSettings = onNavigateToRewindSettings,
+            onNavigateToEventsSettings = onNavigateToEventsSettings,
             onNavigateToTimeline = onNavigateToTimeline,
             onNavigateToSync = onNavigateToSync,
             onNavigateToExport = onNavigateToExport,
@@ -580,6 +591,15 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
         metadata = ListDetailSceneStrategy.detailPane(),
     ) { _ ->
         RewindSettingsScreen(
+            onBack = onBack,
+        )
+    }
+
+    // Auto-events settings detail (detail pane)
+    routeEntry<EventsSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        EventsSettingsScreen(
             onBack = onBack,
         )
     }

@@ -11,6 +11,10 @@ import app.logdate.client.domain.di.accountDomainModule
 import app.logdate.client.domain.di.domainModule
 import app.logdate.client.domain.di.locationDomainModule
 import app.logdate.client.domain.di.quotaDomainModule
+import app.logdate.client.domain.events.EventInferenceLauncher
+import app.logdate.client.events.AndroidEventInferenceLauncher
+import app.logdate.client.events.EventInferenceScheduler
+import app.logdate.client.events.EventInferenceWorker
 import app.logdate.client.feature.widgets.di.widgetModule
 import app.logdate.client.health.di.androidHealthModule
 import app.logdate.client.health.di.healthModule
@@ -85,6 +89,10 @@ actual val appModule: Module =
 
         single { RewindNotificationCoordinator(androidContext()) }
         workerOf(::RewindGenerationWorker)
+
+        single { EventInferenceScheduler(androidContext()) }
+        single<EventInferenceLauncher> { AndroidEventInferenceLauncher(get()) }
+        workerOf(::EventInferenceWorker)
 
         single { NoteDataMapper() }
         single { WearSyncNotificationHelper(androidContext()) }

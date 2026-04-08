@@ -12,6 +12,7 @@ import app.logdate.client.domain.entities.ExtractPeopleUseCase
 import app.logdate.client.domain.events.DeleteEventUseCase
 import app.logdate.client.domain.events.GetAttachableNotesForEventUseCase
 import app.logdate.client.domain.events.GetEventByIdUseCase
+import app.logdate.client.domain.events.InferEventsUseCase
 import app.logdate.client.domain.events.LinkNoteToEventUseCase
 import app.logdate.client.domain.events.ObserveEventsForDateRangeUseCase
 import app.logdate.client.domain.events.ObserveEventsForNoteUseCase
@@ -30,6 +31,7 @@ import app.logdate.client.domain.journals.GetDefaultSelectedJournalsUseCase
 import app.logdate.client.domain.journals.GetJournalByIdUseCase
 import app.logdate.client.domain.journals.SuggestJournalsUseCase
 import app.logdate.client.domain.journals.UpdateJournalUseCase
+import app.logdate.client.domain.location.ObserveLocationStopsUseCase
 import app.logdate.client.domain.media.IndexMediaForPeriodUseCase
 import app.logdate.client.domain.notes.AddNoteUseCase
 import app.logdate.client.domain.notes.FetchEntryUseCase
@@ -84,6 +86,7 @@ import app.logdate.client.domain.timeline.GetTimelineUseCase
 import app.logdate.client.domain.timeline.GroupNotesByDayBoundsUseCase
 import app.logdate.client.domain.timeline.InferMomentsUseCase
 import app.logdate.client.domain.timeline.SummarizeJournalEntriesUseCase
+import app.logdate.client.intelligence.events.EventNamingExtractor
 import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.repository.rewind.RewindGenerationManager
 import org.koin.core.module.Module
@@ -202,6 +205,20 @@ val domainModule: Module =
         factory { GetAttachableNotesForEventUseCase(get(), get()) }
         factory { ObserveUserPlacesUseCase(get()) }
         factory { ObserveUpcomingEventsUseCase(get()) }
+        factory {
+            val observeStops: ObserveLocationStopsUseCase = get()
+            val placeResolutionCache: PlaceResolutionCache = get()
+            val namingExtractor: EventNamingExtractor = get()
+            InferEventsUseCase(
+                observeLocationStops = observeStops::invoke,
+                indexedMediaRepository = get(),
+                notesRepository = get(),
+                placeFamiliarity = get(),
+                resolvePlaceForLocation = placeResolutionCache::resolve,
+                eventRepository = get(),
+                suggestEventName = { cluster -> namingExtractor.suggestName(cluster) },
+            )
+        }
 
         // Places
         factory { ResolveLocationToPlaceUseCase(get(), get(), get()) }

@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.FileDownload
@@ -120,6 +121,7 @@ fun SettingsOverviewScreen(
     onNavigateToNotifications: (() -> Unit)? = null,
     onNavigateToStreaks: () -> Unit = {},
     onNavigateToRewindSettings: () -> Unit = {},
+    onNavigateToEventsSettings: () -> Unit = {},
     onNavigateToTimeline: () -> Unit,
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
@@ -146,6 +148,7 @@ fun SettingsOverviewScreen(
         onNavigateToNotifications = onNavigateToNotifications,
         onNavigateToStreaks = onNavigateToStreaks,
         onNavigateToRewindSettings = onNavigateToRewindSettings,
+        onNavigateToEventsSettings = onNavigateToEventsSettings,
         onNavigateToTimeline = onNavigateToTimeline,
         onNavigateToSync = onNavigateToSync,
         onNavigateToExport = onNavigateToExport,
@@ -178,6 +181,7 @@ fun SettingsOverviewContent(
     onNavigateToNotifications: (() -> Unit)? = null,
     onNavigateToStreaks: () -> Unit = {},
     onNavigateToRewindSettings: () -> Unit = {},
+    onNavigateToEventsSettings: () -> Unit = {},
     onNavigateToTimeline: () -> Unit = {},
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
@@ -245,6 +249,12 @@ fun SettingsOverviewContent(
                     description = stringResource(Res.string.rewind_settings_overview_description),
                     icon = { Icon(Icons.Default.Replay, contentDescription = null) },
                     onClick = onNavigateToRewindSettings,
+                )
+                SettingsNavigationItem(
+                    title = "Auto-events",
+                    description = "Let LogDate notice events from your photos and places",
+                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                    onClick = onNavigateToEventsSettings,
                 )
                 SettingsNavigationItem(
                     title = "Your library",

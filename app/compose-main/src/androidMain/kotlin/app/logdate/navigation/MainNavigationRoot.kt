@@ -119,6 +119,7 @@ import app.logdate.navigation.routes.openClearDataSettings
 import app.logdate.navigation.routes.openDayBoundarySettings
 import app.logdate.navigation.routes.openDevicesSettings
 import app.logdate.navigation.routes.openEventDetail
+import app.logdate.navigation.routes.openEventsSettings
 import app.logdate.navigation.routes.openExportSettings
 import app.logdate.navigation.routes.openJournalDetail
 import app.logdate.navigation.routes.openJournalSettings
@@ -739,6 +740,7 @@ fun MainNavigationRoot(
                             onNavigateToNotifications = mainAppNavigator::openNotificationSettings,
                             onNavigateToStreaks = mainAppNavigator::openStreakSettings,
                             onNavigateToRewindSettings = mainAppNavigator::openRewindSettings,
+                            onNavigateToEventsSettings = mainAppNavigator::openEventsSettings,
                             onNavigateToRecommendations = mainAppNavigator::openRecommendationSettings,
                             onNavigateToTimeline = mainAppNavigator::openTimelineSettings,
                             onNavigateToDayBoundary = mainAppNavigator::openDayBoundarySettings,
