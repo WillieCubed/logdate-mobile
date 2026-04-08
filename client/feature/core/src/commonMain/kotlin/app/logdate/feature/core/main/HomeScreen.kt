@@ -28,6 +28,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.awareness.daylight.DaylightClassifier
+import app.logdate.client.domain.events.LinkNoteToEventUseCase
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.HomeRecommendation
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
@@ -236,6 +237,7 @@ class HomeViewModel(
     private val loadTimelinePage: suspend (TimelinePageRequest) -> TimelinePage,
     private val notesRepository: JournalNotesRepository,
     private val getHomeRecommendation: GetHomeRecommendationUseCase,
+    private val linkNoteToEvent: LinkNoteToEventUseCase,
 ) : ViewModel() {
     companion object {
         private const val RECENT_TIMELINE_PAGE_SIZE = 50
@@ -247,6 +249,7 @@ class HomeViewModel(
         getTimelinePageUseCase: GetTimelinePageUseCase,
         notesRepository: JournalNotesRepository,
         getHomeRecommendation: GetHomeRecommendationUseCase,
+        linkNoteToEvent: LinkNoteToEventUseCase,
     ) : this(
         recentTimelineFlow =
             getStreamingTimelineUseCase(
@@ -257,6 +260,7 @@ class HomeViewModel(
         loadTimelinePage = { request -> getTimelinePageUseCase(request) },
         notesRepository = notesRepository,
         getHomeRecommendation = getHomeRecommendation,
+        linkNoteToEvent = linkNoteToEvent,
     )
 
     private val selectedDayFlow = MutableStateFlow<LocalDate?>(null)
@@ -416,6 +420,30 @@ class HomeViewModel(
      */
     fun clearSelection() {
         selectedDayFlow.value = null
+    }
+
+    /**
+     * Attaches a note to an event from the timeline drag-and-drop gesture. The drop
+     * payload is plain text, so [noteIdString] and [eventIdString] are the parsed UUID
+     * strings — anything that doesn't parse is silently ignored (the drop came from a
+     * non-LogDate source). Errors are logged but not surfaced to the user; a failed link
+     * is recoverable on the next attempt and the gesture is best-effort.
+     */
+    fun attachNoteToEvent(
+        noteIdString: String,
+        eventIdString: String,
+    ) {
+        val noteId = runCatching { Uuid.parse(noteIdString) }.getOrNull() ?: return
+        val eventId = runCatching { Uuid.parse(eventIdString) }.getOrNull() ?: return
+        viewModelScope.launch {
+            val result = linkNoteToEvent(eventId = eventId, noteId = noteId)
+            if (result.isFailure) {
+                Napier.w(
+                    "Failed to attach note $noteId to event $eventId via drag",
+                    result.exceptionOrNull(),
+                )
+            }
+        }
     }
 
     fun loadMoreOlder() {

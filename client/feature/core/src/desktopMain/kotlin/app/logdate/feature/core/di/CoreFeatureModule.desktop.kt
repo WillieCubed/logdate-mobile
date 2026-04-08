@@ -105,6 +105,7 @@ actual val coreFeatureModule: Module =
                 getTimelinePageUseCase = get(),
                 notesRepository = get(),
                 getHomeRecommendation = get(),
+                linkNoteToEvent = get(),
             )
         }
         viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get()) }

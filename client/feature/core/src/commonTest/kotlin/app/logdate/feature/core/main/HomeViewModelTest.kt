@@ -2,6 +2,8 @@ package app.logdate.feature.core.main
 
 import app.logdate.client.domain.dayboundary.DayBoundarySettings
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
+import app.logdate.client.domain.events.LinkNoteToEventUseCase
+import app.logdate.client.domain.events.ObserveUpcomingEventsUseCase
 import app.logdate.client.domain.notes.HasNotesForTodayUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.places.PlaceResolutionCache
@@ -24,11 +26,13 @@ import app.logdate.client.health.model.TimeOfDay
 import app.logdate.client.location.places.StubExternalPlacesProvider
 import app.logdate.client.location.places.StubLocationProvider
 import app.logdate.client.location.places.StubReverseGeocodingProvider
+import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.places.UserPlacesRepository
+import app.logdate.shared.model.Event
 import app.logdate.shared.model.Place
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -164,6 +168,8 @@ class HomeViewModelTest {
                 hasNotesForToday = HasNotesForTodayUseCase(notesRepository),
                 fetchMostRecentDraft = FetchMostRecentDraftUseCase(EmptyEntryDraftRepository),
                 getMemoryRecall = GetMemoryRecallUseCase(notesRepository),
+                observeUpcomingEvents = ObserveUpcomingEventsUseCase(NoOpEventRepository),
+                eventRepository = NoOpEventRepository,
                 clientLocationProvider = StubLocationProvider,
                 placeResolutionCache =
                     PlaceResolutionCache(
@@ -181,6 +187,7 @@ class HomeViewModelTest {
             loadTimelinePage = pageUseCase::invoke,
             notesRepository = notesRepository,
             getHomeRecommendation = getHomeRecommendation,
+            linkNoteToEvent = LinkNoteToEventUseCase(NoOpEventRepository),
         )
     }
 
@@ -387,4 +394,44 @@ class HomeViewModelTest {
             return DayBounds(start = start, end = end)
         }
     }
+}
+
+/**
+ * Empty [EventRepository] used by [HomeViewModelTest] so it can wire a real
+ * [LinkNoteToEventUseCase] without standing up a junction table. The home VM tests
+ * never actually exercise the link path; this fake just satisfies the constructor.
+ */
+private object NoOpEventRepository : EventRepository {
+    override fun observeAllEvents(): Flow<List<Event>> = flowOf(emptyList())
+
+    override fun observeEvent(eventId: Uuid): Flow<Event?> = flowOf(null)
+
+    override fun observeEventsForDateRange(
+        start: Instant,
+        end: Instant,
+    ): Flow<List<Event>> = flowOf(emptyList())
+
+    override suspend fun getEventById(eventId: Uuid): Event? = null
+
+    override suspend fun findByExternalCalendarId(externalId: String): Event? = null
+
+    override suspend fun createEvent(event: Event): Result<Unit> = Result.success(Unit)
+
+    override suspend fun updateEvent(event: Event): Result<Unit> = Result.success(Unit)
+
+    override suspend fun deleteEvent(eventId: Uuid): Result<Unit> = Result.success(Unit)
+
+    override fun observeEventsForNote(noteId: Uuid): Flow<List<Event>> = flowOf(emptyList())
+
+    override fun observeNotesForEvent(eventId: Uuid): Flow<List<Uuid>> = flowOf(emptyList())
+
+    override suspend fun linkNoteToEvent(
+        eventId: Uuid,
+        noteId: Uuid,
+    ): Result<Unit> = Result.success(Unit)
+
+    override suspend fun unlinkNoteFromEvent(
+        eventId: Uuid,
+        noteId: Uuid,
+    ): Result<Unit> = Result.success(Unit)
 }

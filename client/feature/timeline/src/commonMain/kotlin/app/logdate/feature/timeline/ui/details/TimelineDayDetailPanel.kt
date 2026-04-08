@@ -44,6 +44,7 @@ fun TimelineDayDetailPanel(
     uiState: TimelineDayUiState,
     onExit: () -> Unit,
     onOpenEvent: (eventId: String) -> Unit = {},
+    onAttachNoteToEvent: (noteId: String, eventId: String) -> Unit = { _, _ -> },
     visitedLocations: List<DayLocation> = listOf(),
     onOpenLocations: (() -> Unit)? = null,
     onOpenRewind: () -> Unit = {},
@@ -136,6 +137,7 @@ fun TimelineDayDetailPanel(
                     EventsSection(
                         events = uiState.events,
                         onOpenEvent = onOpenEvent,
+                        onAttachNoteToEvent = onAttachNoteToEvent,
                     )
                 }
             }

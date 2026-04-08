@@ -33,6 +33,7 @@ import app.logdate.client.awareness.daylight.stringRes
 import app.logdate.ui.audio.AudioPlaybackDisplayInfo
 import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.audio.LocalTranscriptionState
+import app.logdate.ui.common.noteDragSource
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.util.toReadableDateTimeShort
@@ -111,6 +112,7 @@ fun AudioNoteSnippet(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .noteDragSource(uiState.noteId.toString())
                     .clickable {
                         if (isThisPlaying) {
                             audioPlaybackState.pause()

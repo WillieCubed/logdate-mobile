@@ -78,7 +78,7 @@ private fun TextNoteSnippet(uiState: TextNoteUiState) {
         Surface(
             shape = MaterialTheme.shapes.small,
             color = MaterialTheme.colorScheme.surfaceContainerLow,
-            modifier = Modifier.fillMaxWidth().noteDragSource(uiState.text),
+            modifier = Modifier.fillMaxWidth().noteDragSource(uiState.noteId.toString()),
         ) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(Spacing.xs),
@@ -110,7 +110,7 @@ private fun ImageNoteSnippet(uiState: ImageNoteUiState) {
         Surface(
             shape = MaterialTheme.shapes.small,
             color = MaterialTheme.colorScheme.surfaceContainerLow,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().noteDragSource(uiState.noteId.toString()),
         ) {
             Box {
                 AsyncImage(
@@ -159,7 +159,7 @@ private fun VideoNoteSnippet(uiState: VideoNoteUiState) {
         Surface(
             shape = MaterialTheme.shapes.small,
             color = MaterialTheme.colorScheme.surfaceContainerLow,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().noteDragSource(uiState.noteId.toString()),
         ) {
             Box {
                 AsyncImage(

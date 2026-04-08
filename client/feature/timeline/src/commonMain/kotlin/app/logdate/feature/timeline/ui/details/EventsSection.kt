@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import app.logdate.ui.common.noteDropTarget
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.DayEventUiState
 import logdate.client.feature.timeline.generated.resources.*
@@ -25,6 +26,7 @@ import org.jetbrains.compose.resources.stringResource
 internal fun EventsSection(
     events: List<DayEventUiState>,
     onOpenEvent: (eventId: String) -> Unit,
+    onAttachNoteToEvent: (noteId: String, eventId: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     if (events.isEmpty()) return
@@ -34,7 +36,11 @@ internal fun EventsSection(
     ) {
         Text(stringResource(Res.string.events), style = MaterialTheme.typography.titleSmall)
         events.forEach { event ->
-            EventItem(event = event, onOpenEvent = { onOpenEvent(event.eventId) })
+            EventItem(
+                event = event,
+                onOpenEvent = { onOpenEvent(event.eventId) },
+                onAttachNote = { noteId -> onAttachNoteToEvent(noteId, event.eventId) },
+            )
         }
     }
 }
@@ -43,6 +49,7 @@ internal fun EventsSection(
 private fun EventItem(
     event: DayEventUiState,
     onOpenEvent: () -> Unit,
+    onAttachNote: (noteId: String) -> Unit,
 ) {
     Box(
         modifier =
@@ -50,6 +57,7 @@ private fun EventItem(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Spacing.md))
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                .noteDropTarget { droppedText -> onAttachNote(droppedText) }
                 .clickable { onOpenEvent() }
                 .padding(Spacing.lg),
     ) {

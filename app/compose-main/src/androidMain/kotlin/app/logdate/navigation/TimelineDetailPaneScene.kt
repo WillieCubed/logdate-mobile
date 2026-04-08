@@ -37,6 +37,7 @@ fun TimelineDetailPaneScene(
             uiState = selectedDay,
             onExit = onClose,
             onOpenEvent = onOpenEvent,
+            onAttachNoteToEvent = viewModel::attachNoteToEvent,
             onOpenLocations = onOpenLocationTimeline,
         )
     } ?: TimelineDetailPlaceholder()
