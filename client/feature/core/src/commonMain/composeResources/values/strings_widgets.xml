@@ -2,10 +2,7 @@
 <resources>
     <!-- Widget settings (settings screen) -->
     <string name="widget_settings">Widget</string>
-    <string name="widget_add_to_home_screen">Add to home screen</string>
-    <string name="widget_add_to_home_screen_description">Pin the Memories widget from Settings instead of opening the launcher widget picker.</string>
-    <string name="widget_add_to_home_screen_action">Add widget</string>
-    <string name="widget_add_to_home_screen_unsupported">Your current Android launcher does not support adding widgets from inside the app.</string>
+    <string name="widget_add_to_home_screen">Add widget to home screen</string>
     <string name="widget_content_types">Content to show</string>
     <string name="widget_content_type_text">Text notes</string>
     <string name="widget_content_type_text_description">Written entries and journal text</string>

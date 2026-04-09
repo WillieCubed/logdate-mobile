@@ -34,9 +34,6 @@ import logdate.client.feature.core.generated.resources.recommendations_privacy_n
 import logdate.client.feature.core.generated.resources.recommendations_summary_off
 import logdate.client.feature.core.generated.resources.recommendations_summary_on
 import logdate.client.feature.core.generated.resources.widget_add_to_home_screen
-import logdate.client.feature.core.generated.resources.widget_add_to_home_screen_action
-import logdate.client.feature.core.generated.resources.widget_add_to_home_screen_description
-import logdate.client.feature.core.generated.resources.widget_add_to_home_screen_unsupported
 import logdate.client.feature.core.generated.resources.widget_content_type_audio
 import logdate.client.feature.core.generated.resources.widget_content_type_audio_description
 import logdate.client.feature.core.generated.resources.widget_content_type_photos
@@ -174,14 +171,9 @@ fun MemoriesSettingsContent(
                     }
                 }
 
-                if (widgetInstallUiState != MemoriesWidgetInstallUiState.Hidden) {
-                    Text(
-                        text = stringResource(Res.string.widget_add_to_home_screen),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = Spacing.sm),
-                    )
-
+                // Unsupported launchers get no CTA here because a dead-end button is worse
+                // than omitting the action entirely.
+                if (widgetInstallUiState == MemoriesWidgetInstallUiState.Available) {
                     MaterialContainer {
                         Column(
                             modifier =
@@ -190,27 +182,11 @@ fun MemoriesSettingsContent(
                                     .padding(Spacing.md),
                             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                         ) {
-                            Text(
-                                text = stringResource(Res.string.widget_add_to_home_screen),
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
-                            Text(
-                                text =
-                                    stringResource(
-                                        if (widgetInstallUiState == MemoriesWidgetInstallUiState.Available) {
-                                            Res.string.widget_add_to_home_screen_description
-                                        } else {
-                                            Res.string.widget_add_to_home_screen_unsupported
-                                        },
-                                    ),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                             Button(
                                 onClick = onAddWidgetToHomeScreen,
-                                enabled = widgetInstallUiState == MemoriesWidgetInstallUiState.Available,
+                                modifier = Modifier.fillMaxWidth(),
                             ) {
-                                Text(stringResource(Res.string.widget_add_to_home_screen_action))
+                                Text(stringResource(Res.string.widget_add_to_home_screen))
                             }
                         }
                     }
