@@ -110,13 +110,6 @@ class OfflineFirstTranscriptionRepository(
     ): Boolean {
         Napier.d("Updating transcription for note $noteId to status $status")
 
-        val transcription = transcriptionDao.getTranscriptionByNoteId(noteId)
-        if (transcription == null) {
-            Napier.e("Cannot update transcription: No transcription found for note $noteId")
-            return false
-        }
-
-        val now = Clock.System.now()
         val dbStatus =
             when (status) {
                 TranscriptionStatus.PENDING -> DbTranscriptionStatus.PENDING
@@ -125,15 +118,45 @@ class OfflineFirstTranscriptionRepository(
                 TranscriptionStatus.FAILED -> DbTranscriptionStatus.FAILED
             }
 
+        val transcription =
+            transcriptionDao.getTranscriptionByNoteId(noteId)
+                ?: run {
+                    // No row yet — create one if the note exists in the database.
+                    // This happens when live transcription completes before the note's
+                    // auto-save fires or before requestTranscription() is explicitly called.
+                    val noteExists =
+                        try {
+                            audioNoteDao.getNoteOneOff(noteId) != null
+                        } catch (e: Exception) {
+                            false
+                        }
+                    if (!noteExists) {
+                        Napier.w("Cannot persist transcript: note $noteId not in DB yet — will retry on next emission")
+                        return false
+                    }
+                    val now = Clock.System.now()
+                    transcriptionDao.insertTranscription(
+                        TranscriptionEntity(
+                            noteId = noteId,
+                            text = text,
+                            status = dbStatus,
+                            created = now,
+                            lastUpdated = now,
+                        ),
+                    )
+                    return true
+                }
+
+        val now = Clock.System.now()
         return try {
-            val updated =
+            transcriptionDao.updateTranscription(
                 transcription.copy(
                     text = text,
                     status = dbStatus,
                     errorMessage = errorMessage,
                     lastUpdated = now,
-                )
-            transcriptionDao.updateTranscription(updated)
+                ),
+            )
             true
         } catch (e: Exception) {
             Napier.e("Failed to update transcription", e)

@@ -203,6 +203,12 @@ class AndroidAudioRecordingManager(
     private suspend fun persistRefinedTranscript(result: TranscriptionResult.Success) {
         val noteId = sessionTargetNoteId ?: return
         if (result.text.isBlank()) return
+        // Skip intermediate live-streaming results. The audio note may not be
+        // in the database yet while recording is active (auto-save fires after
+        // the recording stops), so any updateTranscription() call here would
+        // fail. Only the Whisper refinement pass — which runs after recording
+        // has stopped and the note has been auto-saved — should be persisted.
+        if (recordingActive) return
         val status =
             if (result.isFinal && !result.isRefining) {
                 TranscriptionStatus.COMPLETED
