@@ -427,6 +427,7 @@ class MainActivity : FragmentActivity() {
             }
             PostRestoreType.CLOUD_RESTORE -> {
                 Napier.i("Cloud restore: showing contextual UI", tag = APP_LAUNCH_TAG)
+                viewModel.tryRestoreSignInAfterCloudRestore()
             }
         }
     }

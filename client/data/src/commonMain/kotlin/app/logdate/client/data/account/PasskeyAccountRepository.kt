@@ -488,7 +488,7 @@ class DefaultPasskeyAccountRepository(
             Napier.i("Restore sign-in successful for user: ${completeData.account.username}")
             Result.success(completeData.account)
         } catch (e: Exception) {
-            Napier.w("Restore sign-in failed", e)
+            Napier.i("Restore sign-in failed: ${e.message ?: "unknown error"}")
             Result.failure(e)
         }
     }

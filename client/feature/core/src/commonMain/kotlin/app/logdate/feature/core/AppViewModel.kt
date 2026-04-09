@@ -32,6 +32,7 @@ class AppViewModel(
     private val biometricState = biometricGatekeeper.authState
     private val appLockState = MutableStateFlow(AppLockState.Unlocked)
     private val securityLevelState = MutableStateFlow(AppSecurityLevel.NONE)
+    private var hasAttemptedCloudRestoreSignIn = false
 
     private val networkState: Flow<NetworkState> = networkMonitor.observeNetwork()
 
@@ -84,30 +85,34 @@ class AppViewModel(
                 }
             }
         }
-
-        viewModelScope.launch {
-            tryRestoreSignInOnStartup()
-        }
     }
 
     /**
      * Silently attempts to sign into the cloud account using a restore credential from the
-     * device's backup. This runs once on startup when the user is onboarded but has no active
-     * cloud session (e.g. after migrating to a new device and restoring from backup).
+     * device's backup after Android startup has detected a cloud restore.
      */
-    private suspend fun tryRestoreSignInOnStartup() {
+    fun tryRestoreSignInAfterCloudRestore() {
+        if (hasAttemptedCloudRestoreSignIn) return
+        hasAttemptedCloudRestoreSignIn = true
+
+        viewModelScope.launch {
+            tryRestoreSignInAfterCloudRestoreInternal()
+        }
+    }
+
+    private suspend fun tryRestoreSignInAfterCloudRestoreInternal() {
         val userData = userStateRepository.userData.first()
         if (!userData.isOnboarded) return
-        if (sessionStorage.getSession() != null) return
+        if (sessionStorage.hasValidSession()) return
 
-        Napier.i("No cloud session on onboarded device — attempting restore sign-in")
+        Napier.i("Cloud restore detected with no valid session — attempting restore sign-in")
         when (val result = tryRestoreSignInUseCase()) {
             is TryRestoreSignInUseCase.Result.Success ->
                 Napier.i("Restore sign-in succeeded for ${result.account.username}")
             is TryRestoreSignInUseCase.Result.NoCredential ->
-                Napier.d("No restore credential — user will sign in manually if needed")
+                Napier.d("No restore credential on cloud-restored device — using manual sign-in")
             is TryRestoreSignInUseCase.Result.Error ->
-                Napier.w("Restore sign-in failed: ${result.message}")
+                Napier.i("Restore sign-in fell back to manual sign-in: ${result.message}")
         }
     }
 

@@ -81,6 +81,62 @@ class AppViewModelTest {
             assertEquals(false, state.isOnline)
         }
 
+    @Test
+    fun `does not attempt restore sign-in during init`() =
+        runTest {
+            val passkeyAccountRepository = FakePasskeyAccountRepository()
+            AppViewModel(
+                userStateRepository = FakeUserStateRepository(UserData(isOnboarded = true)),
+                biometricGatekeeper = FakeBiometricGatekeeper(),
+                networkMonitor = FakeNetworkAvailabilityMonitor(isAvailable = true),
+                sessionStorage = FakeSessionStorage(),
+                tryRestoreSignInUseCase = TryRestoreSignInUseCase(passkeyAccountRepository),
+            )
+
+            advanceUntilIdle()
+
+            assertEquals(0, passkeyAccountRepository.restoreSignInAttempts)
+        }
+
+    @Test
+    fun `cloud restore sign-in skips when a valid session exists`() =
+        runTest {
+            val passkeyAccountRepository = FakePasskeyAccountRepository()
+            val viewModel =
+                AppViewModel(
+                    userStateRepository = FakeUserStateRepository(UserData(isOnboarded = true)),
+                    biometricGatekeeper = FakeBiometricGatekeeper(),
+                    networkMonitor = FakeNetworkAvailabilityMonitor(isAvailable = true),
+                    sessionStorage = FakeSessionStorage(hasValidSession = true),
+                    tryRestoreSignInUseCase = TryRestoreSignInUseCase(passkeyAccountRepository),
+                )
+
+            viewModel.tryRestoreSignInAfterCloudRestore()
+            advanceUntilIdle()
+
+            assertEquals(0, passkeyAccountRepository.restoreSignInAttempts)
+        }
+
+    @Test
+    fun `cloud restore sign-in attempts once when launched repeatedly`() =
+        runTest {
+            val passkeyAccountRepository = FakePasskeyAccountRepository()
+            val viewModel =
+                AppViewModel(
+                    userStateRepository = FakeUserStateRepository(UserData(isOnboarded = true)),
+                    biometricGatekeeper = FakeBiometricGatekeeper(),
+                    networkMonitor = FakeNetworkAvailabilityMonitor(isAvailable = true),
+                    sessionStorage = FakeSessionStorage(hasValidSession = false),
+                    tryRestoreSignInUseCase = TryRestoreSignInUseCase(passkeyAccountRepository),
+                )
+
+            viewModel.tryRestoreSignInAfterCloudRestore()
+            viewModel.tryRestoreSignInAfterCloudRestore()
+            advanceUntilIdle()
+
+            assertEquals(1, passkeyAccountRepository.restoreSignInAttempts)
+        }
+
     private class FakeUserStateRepository(
         initialValue: UserData,
     ) : UserStateRepository {
@@ -129,21 +185,28 @@ class AppViewModelTest {
         override fun observeNetwork(): SharedFlow<NetworkState> = networkState
     }
 
-    private class FakeSessionStorage : SessionStorage {
-        override fun getSession(): UserSession? = null
+    private class FakeSessionStorage(
+        private val session: UserSession? = null,
+        private val hasValidSession: Boolean = false,
+    ) : SessionStorage {
+        override fun getSession(): UserSession? = session
 
-        override fun getSessionFlow(): StateFlow<UserSession?> = MutableStateFlow(null)
+        override fun getSessionFlow(): StateFlow<UserSession?> = MutableStateFlow(session)
 
-        override suspend fun hasValidSession(): Boolean = false
+        override suspend fun hasValidSession(): Boolean = hasValidSession
 
         override fun saveSession(session: UserSession) {}
 
         override fun clearSession() {}
     }
 
-    private class FakePasskeyAccountRepository : PasskeyAccountRepository {
+    private class FakePasskeyAccountRepository(
+        private val signInWithRestoreKeyResult: Result<LogDateAccount> = Result.failure(RestoreCredentialError.NoCredential()),
+    ) : PasskeyAccountRepository {
         override val currentAccount: StateFlow<LogDateAccount?> = MutableStateFlow(null)
         override val isAuthenticated: StateFlow<Boolean> = MutableStateFlow(false)
+        var restoreSignInAttempts: Int = 0
+            private set
 
         override suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> =
             Result.failure(NotImplementedError())
@@ -164,7 +227,10 @@ class AppViewModelTest {
 
         override suspend fun createRestoreKey(): Result<Unit> = Result.success(Unit)
 
-        override suspend fun signInWithRestoreKey(): Result<LogDateAccount> = Result.failure(RestoreCredentialError.NoCredential())
+        override suspend fun signInWithRestoreKey(): Result<LogDateAccount> {
+            restoreSignInAttempts += 1
+            return signInWithRestoreKeyResult
+        }
 
         override suspend fun deleteRestoreKey(): Result<Unit> = Result.success(Unit)
     }

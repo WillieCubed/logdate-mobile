@@ -42,12 +42,12 @@ class TryRestoreSignInUseCase(
                     Napier.d("No restore credential on device")
                     Result.NoCredential
                 } else {
-                    Napier.w("Restore sign-in returned an error", cause)
+                    Napier.i("Restore sign-in returned an expected fallback: ${cause?.message ?: "unknown error"}")
                     Result.Error(cause?.message ?: "Restore sign-in failed")
                 }
             }
         } catch (e: Exception) {
-            Napier.w("Unexpected error during restore sign-in", e)
+            Napier.i("Restore sign-in fell back after unexpected error: ${e.message ?: "unknown error"}")
             Result.Error(e.message ?: "Unexpected error")
         }
 }

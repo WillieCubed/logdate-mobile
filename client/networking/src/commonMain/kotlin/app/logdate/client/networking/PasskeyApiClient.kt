@@ -412,7 +412,7 @@ class PasskeyApiClient(
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
             }
         } catch (e: Exception) {
-            Napier.w("Failed to begin restore sign-in", e)
+            Napier.i("Failed to begin restore sign-in: ${e.message ?: "unknown error"}")
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to begin restore sign-in", e))
         }
 
@@ -438,7 +438,7 @@ class PasskeyApiClient(
                 Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
             }
         } catch (e: Exception) {
-            Napier.w("Failed to complete restore sign-in", e)
+            Napier.i("Failed to complete restore sign-in: ${e.message ?: "unknown error"}")
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to complete restore sign-in", e))
         }
 }
