@@ -1,24 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Static launcher shortcut declaration.
+  Static launcher shortcut + share-target declaration.
 
-  This file used to declare three App Actions / Assistant capabilities
-  (CREATE_THING, CREATE_MEDIA_OBJECT, GET_SOCIAL_MEDIA_PROFILE) plus a "new
-  note" static shortcut, all targeting "app.logdate.mobile.MainActivity" — a
-  class that does not exist in this build (the real entry point is
-  app.logdate.client.MainActivity, applicationId co.reasonabletech.logdate).
-  None of the capabilities had matching parameter handling in MainActivity, so
-  they were entirely dead and have been removed.
+  Three things live here:
 
-  Going forward:
-   - The "new note" entry below is the always-on launcher fallback. It uses the
-     existing AMBIENT_PROMPT_TARGET extras that MainActivity.resolveNavKey
-     already understands, so the click actually opens the entry editor now.
-   - Stateful shortcuts (continue draft, today's timeline, last week's rewind)
-     are published dynamically by DynamicShortcutPublisher /
-     AndroidDynamicShortcutApplier on app startup.
-   - Assistant integration will return as App Functions (androidx.appfunctions)
-     in tier 3 of the system-surface roadmap.
+   1. The always-on "new note" launcher shortcut — fallback when no dynamic
+      shortcuts are published yet (cold install, post-restore, etc.). It uses
+      the existing AMBIENT_PROMPT_TARGET extras that MainActivity.resolveNavKey
+      already understands.
+
+   2. <share-target> entries that tell the system which dynamic shortcut
+      categories can receive which mime types from the share sheet. The runtime
+      sharing shortcuts are published per-journal by DynamicShortcutPublisher /
+      AndroidDynamicShortcutApplier and tagged with the
+      android.shortcut.conversation category — combined with these
+      <share-target> declarations, the OS surfaces them as Direct Share
+      targets in the system share sheet for any text/plain, image, or video
+      share. The mime types here must match the existing <intent-filter>s on
+      MainActivity.
+
+   3. Stateful launcher shortcuts (continue draft, today's timeline, last
+      week's rewind) are published dynamically — not declared here.
+
+  Note: Assistant App Actions / capability bindings (CREATE_THING etc.) will
+  return as App Functions (androidx.appfunctions) in a later tier — they were
+  removed from this file because the legacy bindings pointed at a class that
+  doesn't exist in this build and had no parameter handling either.
 -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
@@ -37,4 +44,11 @@
                 android:value="new_entry" />
         </intent>
     </shortcut>
+
+    <share-target android:targetClass="app.logdate.client.MainActivity">
+        <data android:mimeType="text/plain" />
+        <data android:mimeType="image/*" />
+        <data android:mimeType="video/*" />
+        <category android:name="android.shortcut.conversation" />
+    </share-target>
 </shortcuts>

@@ -60,6 +60,13 @@ class EditorActivity : FragmentActivity() {
         val initialText = intent.getStringExtra(EXTRA_INITIAL_TEXT)
         val attachmentUris = intent.getStringArrayListExtra(EXTRA_ATTACHMENTS)?.toList() ?: emptyList()
 
+        // Extract pre-selected journal ids for new entries (e.g., from a per-journal sharing shortcut).
+        val initialJournalIds =
+            intent
+                .getStringArrayListExtra(EXTRA_INITIAL_JOURNAL_IDS)
+                ?.mapNotNull { runCatching { Uuid.parse(it) }.getOrNull() }
+                ?: emptyList()
+
         // Configure window features
         enableEdgeToEdge()
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
@@ -77,6 +84,7 @@ class EditorActivity : FragmentActivity() {
                     },
                     entryId = entryId,
                     journalId = journalId,
+                    journalIds = initialJournalIds,
                     initialTextContent = initialText,
                     attachments = attachmentUris,
                     viewModel = viewModel,
@@ -143,6 +151,7 @@ class EditorActivity : FragmentActivity() {
         private const val EXTRA_JOURNAL_ID = "journal_id"
         private const val EXTRA_INITIAL_TEXT = "initial_text"
         private const val EXTRA_ATTACHMENTS = "attachments"
+        private const val EXTRA_INITIAL_JOURNAL_IDS = "initial_journal_ids"
 
         /**
          * Creates an intent to launch a new editor window.
@@ -152,6 +161,9 @@ class EditorActivity : FragmentActivity() {
          * @param journalId Optional journal ID for context when editing
          * @param initialText Optional initial text content for new entries
          * @param attachments Optional list of attachment URIs
+         * @param journalIds Optional pre-selected journal IDs for new entries (e.g. when a
+         *   sharing shortcut targets a specific journal). Distinct from [journalId] which
+         *   is used only for editing-context on existing entries.
          * @return Intent configured to launch the editor activity
          */
         fun createIntent(
@@ -160,6 +172,7 @@ class EditorActivity : FragmentActivity() {
             journalId: Uuid? = null,
             initialText: String? = null,
             attachments: List<String>? = null,
+            journalIds: List<Uuid> = emptyList(),
         ): Intent =
             Intent(context, EditorActivity::class.java).apply {
                 entryId?.let {
@@ -173,6 +186,12 @@ class EditorActivity : FragmentActivity() {
                 }
                 attachments?.let {
                     putStringArrayListExtra(EXTRA_ATTACHMENTS, ArrayList(it))
+                }
+                if (journalIds.isNotEmpty()) {
+                    putStringArrayListExtra(
+                        EXTRA_INITIAL_JOURNAL_IDS,
+                        ArrayList(journalIds.map { it.toString() }),
+                    )
                 }
 
                 // Flags to launch as a new document/task

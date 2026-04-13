@@ -38,10 +38,13 @@ class EditorManager(
      *
      * @param initialText Optional initial text content to populate the new entry with
      * @param attachments Optional list of attachment URIs (image, audio, or video) to add to the new entry
+     * @param journalIds Optional journals to pre-select for the new entry. Used when a sharing
+     *   shortcut targets a specific journal so the user doesn't have to pick one inside the editor.
      */
     fun openNewEditorWindow(
         initialText: String? = null,
         attachments: List<String>? = null,
+        journalIds: List<Uuid> = emptyList(),
     ) {
         try {
             val intent =
@@ -49,6 +52,7 @@ class EditorManager(
                     context = context,
                     initialText = initialText,
                     attachments = attachments,
+                    journalIds = journalIds,
                 )
 
             // Launch the activity as a new document

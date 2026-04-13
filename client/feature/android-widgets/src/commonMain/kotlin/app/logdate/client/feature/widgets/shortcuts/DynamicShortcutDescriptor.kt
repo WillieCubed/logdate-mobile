@@ -61,4 +61,29 @@ sealed interface DynamicShortcutDescriptor {
             const val ID: String = "logdate.shortcut.week_rewind"
         }
     }
+
+    /**
+     * Direct Share target for a specific journal.
+     *
+     * Each journal gets its own conversation shortcut so the system share sheet
+     * can offer named per-journal targets ("Share to Travel 2026") when the user
+     * shares text or media from another app. The Android applier resolves
+     * [coverImageUri] to a real bitmap when present, or falls back to the same
+     * deterministic color the in-app `JournalCover` uses.
+     *
+     * Unlike the launcher variants above, the id is per-instance (uuid-suffixed)
+     * so each journal has its own stable shortcut id — pinned share targets keep
+     * working when the journal list changes shape.
+     */
+    data class ShareToJournal(
+        val journalId: Uuid,
+        val journalTitle: String,
+        val coverImageUri: String?,
+    ) : DynamicShortcutDescriptor {
+        override val id: String = "$ID_PREFIX:$journalId"
+
+        companion object {
+            const val ID_PREFIX: String = "logdate.shortcut.share_to_journal"
+        }
+    }
 }

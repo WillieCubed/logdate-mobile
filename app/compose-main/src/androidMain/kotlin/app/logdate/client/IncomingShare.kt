@@ -7,16 +7,19 @@ import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
+import app.logdate.client.feature.widgets.shortcuts.DynamicShortcutDescriptor
 import app.logdate.client.media.MediaManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import kotlin.uuid.Uuid
 
 internal data class IncomingEditorShare(
     val initialText: String?,
     val attachments: List<String>,
+    val targetJournalIds: List<Uuid> = emptyList(),
 )
 
 internal suspend fun Context.importIncomingEditorShare(
@@ -41,13 +44,36 @@ internal suspend fun Context.importIncomingEditorShare(
                     .onFailure { Napier.e("Failed to import shared media: $uri", it) }
                     .getOrNull()
             }
+        val targetJournalIds = listOfNotNull(intent.parseShareToJournalShortcutId())
 
         if (sharedText.isNullOrBlank() && attachments.isEmpty()) {
             null
         } else {
-            IncomingEditorShare(sharedText, attachments)
+            IncomingEditorShare(sharedText, attachments, targetJournalIds)
         }
     }
+
+/**
+ * When the user picks a sharing shortcut from the system share sheet, the OS
+ * delivers the original SEND intent with [Intent.EXTRA_SHORTCUT_ID] set to the
+ * id of the chosen shortcut. For LogDate's per-journal Direct Share targets,
+ * that id encodes the journal UUID via [DynamicShortcutDescriptor.ShareToJournal.ID_PREFIX].
+ *
+ * Returns the parsed journal UUID, or null when:
+ * - No shortcut id was provided (the user shared via the generic LogDate target).
+ * - The shortcut id belongs to a launcher shortcut (Continue draft / Today / Rewind),
+ *   not a sharing shortcut.
+ * - The id format is unrecognised (defensive against future changes).
+ */
+private fun Intent.parseShareToJournalShortcutId(): Uuid? {
+    val shortcutId = getStringExtra(Intent.EXTRA_SHORTCUT_ID) ?: return null
+    val prefix = "${DynamicShortcutDescriptor.ShareToJournal.ID_PREFIX}:"
+    if (!shortcutId.startsWith(prefix)) return null
+    val rawUuid = shortcutId.removePrefix(prefix)
+    return runCatching { Uuid.parse(rawUuid) }
+        .onFailure { Napier.w("Could not parse journal id from sharing shortcut: $shortcutId", it) }
+        .getOrNull()
+}
 
 private fun Intent.extractSharedUris(): List<Uri> {
     val streamUris =

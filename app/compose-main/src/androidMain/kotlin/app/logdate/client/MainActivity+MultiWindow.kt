@@ -85,6 +85,7 @@ fun MainActivity.handleMultiWindowIntent(intent: Intent) {
                 editorManager.openNewEditorWindow(
                     initialText = sharedContent.initialText,
                     attachments = sharedContent.attachments,
+                    journalIds = sharedContent.targetJournalIds,
                 )
             }
         }

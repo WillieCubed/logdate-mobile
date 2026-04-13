@@ -3,6 +3,7 @@ package app.logdate.client.feature.widgets.shortcuts
 import app.logdate.client.domain.rewind.RewindQueryResult
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.shared.model.Journal
 import app.logdate.shared.model.Rewind
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -148,6 +149,7 @@ class DynamicShortcutPublisherTest {
                 DynamicShortcutPublisher(
                     fetchMostRecentDraft = { flowOf(null) },
                     currentWeekRewind = { flowOf() },
+                    observeJournals = { flowOf(emptyList()) },
                     clock = fixedClock(NOW),
                     timeZone = TimeZone.UTC,
                 )
@@ -211,11 +213,147 @@ class DynamicShortcutPublisherTest {
             )
         }
 
+    // -- Sharing shortcuts (per-journal Direct Share targets) ------------------
+
+    @Test
+    fun `emits no ShareToJournal descriptors when journal list is empty`() =
+        runTest {
+            val descriptors = publisher(journals = emptyList()).computeShortcuts()
+
+            assertTrue(descriptors.none { it is DynamicShortcutDescriptor.ShareToJournal })
+        }
+
+    @Test
+    fun `emits one ShareToJournal descriptor per journal`() =
+        runTest {
+            val a = journal(title = "Travel 2026", lastUpdated = NOW)
+            val b = journal(title = "Work", lastUpdated = NOW - 1.days)
+
+            val descriptors = publisher(journals = listOf(a, b)).computeShortcuts()
+
+            val shareDescriptors = descriptors.filterIsInstance<DynamicShortcutDescriptor.ShareToJournal>()
+            assertEquals(2, shareDescriptors.size)
+            assertEquals(setOf(a.id, b.id), shareDescriptors.map { it.journalId }.toSet())
+        }
+
+    @Test
+    fun `sorts ShareToJournal descriptors by lastUpdated descending`() =
+        runTest {
+            val older = journal(title = "Old", lastUpdated = NOW - 7.days)
+            val newest = journal(title = "Newest", lastUpdated = NOW)
+            val middle = journal(title = "Middle", lastUpdated = NOW - 1.days)
+
+            val descriptors = publisher(journals = listOf(older, newest, middle)).computeShortcuts()
+
+            val shareDescriptors = descriptors.filterIsInstance<DynamicShortcutDescriptor.ShareToJournal>()
+            assertEquals(
+                listOf(newest.id, middle.id, older.id),
+                shareDescriptors.map { it.journalId },
+            )
+        }
+
+    @Test
+    fun `excludes journals with blank titles`() =
+        runTest {
+            val good = journal(title = "Travel 2026")
+            val blank = journal(title = "")
+            val whitespace = journal(title = "   ")
+
+            val descriptors = publisher(journals = listOf(good, blank, whitespace)).computeShortcuts()
+
+            val shareDescriptors = descriptors.filterIsInstance<DynamicShortcutDescriptor.ShareToJournal>()
+            assertEquals(1, shareDescriptors.size)
+            assertEquals(good.id, shareDescriptors.single().journalId)
+        }
+
+    @Test
+    fun `ShareToJournal id is stable per journal id across publishes`() =
+        runTest {
+            val journalId = Uuid.random()
+            val firstSnapshot = journal(id = journalId, title = "Travel", lastUpdated = NOW - 5.days)
+            val secondSnapshot = journal(id = journalId, title = "Travel", lastUpdated = NOW)
+
+            val firstResult = publisher(journals = listOf(firstSnapshot)).computeShortcuts()
+            val secondResult = publisher(journals = listOf(secondSnapshot)).computeShortcuts()
+
+            val firstId = firstResult.filterIsInstance<DynamicShortcutDescriptor.ShareToJournal>().single().id
+            val secondId = secondResult.filterIsInstance<DynamicShortcutDescriptor.ShareToJournal>().single().id
+            assertEquals(firstId, secondId)
+        }
+
+    @Test
+    fun `ShareToJournal id differs across distinct journals`() =
+        runTest {
+            val a = journal(id = Uuid.random(), title = "Travel")
+            val b = journal(id = Uuid.random(), title = "Work")
+
+            val descriptors = publisher(journals = listOf(a, b)).computeShortcuts()
+
+            val ids = descriptors.filterIsInstance<DynamicShortcutDescriptor.ShareToJournal>().map { it.id }.toSet()
+            assertEquals(2, ids.size)
+        }
+
+    @Test
+    fun `ShareToJournal threads coverImageUri faithfully`() =
+        runTest {
+            val withCover = journal(title = "With cover", coverImageUri = "content://media/journal/42")
+            val withoutCover = journal(title = "No cover", coverImageUri = null)
+
+            val descriptors =
+                publisher(journals = listOf(withCover, withoutCover)).computeShortcuts()
+
+            val shareDescriptors =
+                descriptors
+                    .filterIsInstance<DynamicShortcutDescriptor.ShareToJournal>()
+                    .associateBy { it.journalId }
+            assertEquals("content://media/journal/42", shareDescriptors[withCover.id]?.coverImageUri)
+            assertEquals(null, shareDescriptors[withoutCover.id]?.coverImageUri)
+        }
+
+    @Test
+    fun `ShareToJournal descriptors come after all launcher descriptors`() =
+        runTest {
+            val draft = textDraft(updatedAt = NOW - 1.hours)
+            val rewindResult = RewindQueryResult.Success(rewindWith(uid = Uuid.random()))
+            val a = journal(title = "Travel 2026")
+            val b = journal(title = "Work", lastUpdated = NOW - 2.days)
+
+            val descriptors =
+                publisher(
+                    draft = draft,
+                    rewind = rewindResult,
+                    journals = listOf(a, b),
+                ).computeShortcuts()
+
+            // Find the first sharing index
+            val firstShareIndex =
+                descriptors.indexOfFirst { it is DynamicShortcutDescriptor.ShareToJournal }
+            val lastLauncherIndex =
+                descriptors.indexOfLast { it !is DynamicShortcutDescriptor.ShareToJournal }
+            assertTrue(firstShareIndex > lastLauncherIndex)
+        }
+
+    @Test
+    fun `does not cap the number of ShareToJournal descriptors`() =
+        runTest {
+            // Five journals must produce five descriptors — no arbitrary cap.
+            val journals =
+                (0 until 5).map { i ->
+                    journal(title = "Journal $i", lastUpdated = NOW - i.days)
+                }
+
+            val descriptors = publisher(journals = journals).computeShortcuts()
+
+            val shareCount = descriptors.count { it is DynamicShortcutDescriptor.ShareToJournal }
+            assertEquals(5, shareCount)
+        }
+
     // -- Helpers ----------------------------------------------------------------
 
     private fun publisher(
-        draft: EntryDraft?,
-        rewind: RewindQueryResult?,
+        draft: EntryDraft? = null,
+        rewind: RewindQueryResult? = null,
+        journals: List<Journal> = emptyList(),
         clockInstant: Instant = NOW,
         timeZone: TimeZone = TimeZone.UTC,
         maxShortcuts: Int = DynamicShortcutPublisher.DEFAULT_MAX_SHORTCUTS,
@@ -224,10 +362,28 @@ class DynamicShortcutPublisherTest {
         DynamicShortcutPublisher(
             fetchMostRecentDraft = { flowOf(draft) },
             currentWeekRewind = { if (rewind != null) flowOf(rewind) else flowOf() },
+            observeJournals = { flowOf(journals) },
             clock = fixedClock(clockInstant),
             timeZone = timeZone,
             draftFreshness = draftFreshness,
             maxShortcuts = maxShortcuts,
+        )
+
+    private fun journal(
+        id: Uuid = Uuid.random(),
+        title: String = "Travel 2026",
+        coverImageUri: String? = null,
+        lastUpdated: Instant = NOW,
+    ): Journal =
+        Journal(
+            id = id,
+            title = title,
+            description = "",
+            isFavorited = false,
+            created = lastUpdated - 1.days,
+            lastUpdated = lastUpdated,
+            syncVersion = 0,
+            coverImageUri = coverImageUri,
         )
 
     private fun textDraft(

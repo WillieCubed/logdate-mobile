@@ -31,4 +31,7 @@
     <string name="dynamic_shortcut_today_long">Open today\'s timeline</string>
     <string name="dynamic_shortcut_week_rewind_short">Last week</string>
     <string name="dynamic_shortcut_week_rewind_long">Open last week\'s rewind</string>
+
+    <!-- Sharing shortcuts (Direct Share targets per journal) -->
+    <string name="dynamic_shortcut_share_to_journal_long">Share to %1$s</string>
 </resources>

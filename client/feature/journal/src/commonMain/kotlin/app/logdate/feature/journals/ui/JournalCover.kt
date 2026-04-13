@@ -45,7 +45,6 @@ import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
 import coil3.compose.AsyncImage
-import kotlin.math.abs
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -57,17 +56,6 @@ internal val JournalShape =
         topEnd = 16.dp,
         bottomEnd = 16.dp,
     )
-
-/**
- * Derives a deterministic solid color from a journal's identity.
- *
- * Uses the journal ID's hash to pick a unique hue at a muted saturation
- * and medium lightness. Every journal gets a distinct but tasteful color.
- */
-internal fun deriveCoverColor(journalId: Uuid): Color {
-    val hue = abs(journalId.hashCode() % 360).toFloat()
-    return Color.hsl(hue, saturation = 0.50f, lightness = 0.80f)
-}
 
 /**
  * A journal cover that displays basic information about a journal.
