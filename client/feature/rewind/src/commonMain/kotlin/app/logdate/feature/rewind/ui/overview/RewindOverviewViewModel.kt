@@ -5,6 +5,7 @@ package app.logdate.feature.rewind.ui.overview
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.datastore.LogdatePreferencesDataSource
+import app.logdate.client.domain.rewind.GenerateAnnualRewindUseCase
 import app.logdate.client.domain.rewind.GenerateBasicRewindResult
 import app.logdate.client.domain.rewind.GenerateBasicRewindUseCase
 import app.logdate.client.domain.rewind.GetPastRewindsUseCase
@@ -71,6 +72,7 @@ class RewindOverviewViewModel(
     private val getPastRewindsUseCase: GetPastRewindsUseCase,
     private val rewindMessageGenerator: RewindMessageGenerator,
     private val generateBasicRewindUseCase: GenerateBasicRewindUseCase,
+    private val generateAnnualRewindUseCase: GenerateAnnualRewindUseCase,
     private val preferencesDataSource: LogdatePreferencesDataSource,
 ) : ViewModel() {
     // Tracks whether a rewind generation is in progress
@@ -239,6 +241,29 @@ class RewindOverviewViewModel(
             } finally {
                 // Mark as no longer generating
                 isGeneratingRewindState.update { false }
+            }
+        }
+    }
+
+    /**
+     * Generates a Year in Review for [year]. The annual rewind appears in pastRewinds
+     * automatically via the repository flow once generation completes.
+     */
+    fun generateAnnualRewind(year: Int) {
+        viewModelScope.launch {
+            try {
+                when (val result = generateAnnualRewindUseCase(year)) {
+                    is GenerateBasicRewindResult.Success ->
+                        Napier.i("Generated annual rewind for $year: ${result.rewind.uid}")
+                    is GenerateBasicRewindResult.NoContent ->
+                        Napier.w("Not enough weekly rewinds for annual rewind $year")
+                    is GenerateBasicRewindResult.Error ->
+                        Napier.e("Annual rewind generation failed: ${result.error}")
+                    is GenerateBasicRewindResult.AlreadyInProgress ->
+                        Napier.d("Annual rewind generation already in progress for $year")
+                }
+            } catch (e: Exception) {
+                Napier.e("Error generating annual rewind for $year", e)
             }
         }
     }

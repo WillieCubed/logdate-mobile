@@ -54,6 +54,7 @@ fun RewindOverviewScreen(
     RewindScreenContent(
         uiState,
         onOpenRewind = onOpenRewind,
+        onGenerateAnnualRewind = viewModel::generateAnnualRewind,
         modifier = modifier.fillMaxSize(),
     )
 }

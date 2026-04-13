@@ -99,6 +99,7 @@ import kotlin.uuid.Uuid
 fun RewindScreenContent(
     state: RewindOverviewScreenUiState,
     onOpenRewind: RewindOpenCallback,
+    onGenerateAnnualRewind: ((year: Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     // Combine current and past rewinds into a single list, always showing at least current week placeholder
@@ -170,6 +171,29 @@ fun RewindScreenContent(
     // Create a scroll behavior for the collapsing app bar
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
+    // Check if a completed calendar year has enough weekly rewinds to offer a Year in Review.
+    val pastRewinds =
+        when (state) {
+            is RewindOverviewScreenUiState.Ready -> state.pastRewinds
+            is RewindOverviewScreenUiState.NotReady -> state.pastRewinds
+            RewindOverviewScreenUiState.Loading -> emptyList()
+        }
+    val annualRewindYear =
+        remember(pastRewinds) {
+            if (pastRewinds.size < 4) return@remember null
+            val currentYear =
+                Clock.System
+                    .now()
+                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                    .year
+            // Offer the previous completed year if we have rewinds in it and no annual
+            // rewind already exists (annual rewinds have a label like "2025").
+            val previousYear = currentYear - 1
+            val hasWeeklyInPreviousYear = pastRewinds.any { it.startDate.year == previousYear }
+            val annualAlreadyExists = pastRewinds.any { it.label == "$previousYear" }
+            if (hasWeeklyInPreviousYear && !annualAlreadyExists) previousYear else null
+        }
+
     Scaffold(
         topBar = {
             // Use our new collapsing app bar component
@@ -186,6 +210,8 @@ fun RewindScreenContent(
             rewinds = rewindItems,
             onOpenRewind = onOpenRewind,
             scrollBehavior = scrollBehavior,
+            annualRewindYear = annualRewindYear,
+            onGenerateAnnualRewind = onGenerateAnnualRewind,
             modifier =
                 Modifier
                     .fillMaxSize()
@@ -221,6 +247,8 @@ fun FloatingRewindCardList(
     rewinds: List<RewindPreviewUiState>,
     onOpenRewind: RewindOpenCallback,
     scrollBehavior: TopAppBarScrollBehavior? = null,
+    annualRewindYear: Int? = null,
+    onGenerateAnnualRewind: ((year: Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
@@ -273,6 +301,43 @@ fun FloatingRewindCardList(
                             .padding(horizontal = 24.dp)
                             .widthIn(max = cardWidth),
                 )
+            }
+
+            // Year in Review trigger — shown when a completed year has enough data
+            if (annualRewindYear != null && onGenerateAnnualRewind != null) {
+                item {
+                    Card(
+                        onClick = { onGenerateAnnualRewind(annualRewindYear) },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp)
+                                .widthIn(max = 360.dp)
+                                .height(120.dp),
+                        colors =
+                            CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                            ),
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(Spacing.lg),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                text =
+                                    stringResource(
+                                        Res.string.annual_rewind_generate,
+                                        annualRewindYear,
+                                    ),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                }
             }
 
             // Surprise ending item
