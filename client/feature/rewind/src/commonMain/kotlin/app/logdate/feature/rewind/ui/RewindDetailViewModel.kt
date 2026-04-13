@@ -273,16 +273,26 @@ class RewindDetailViewModel(
     ): List<RewindPanelUiState> {
         val panels = mutableListOf<RewindPanelUiState>()
 
-        // 1. Add title panel
+        // 1. Add title panel with live stats from the rewind's actual content.
+        val dateRange = formatDateRange(rewind.startDate, rewind.endDate)
+        val textCount = rewind.content.count { it is RewindContent.TextNote }
+        val photoCount = rewind.content.count { it is RewindContent.Image || it is RewindContent.Video }
+        val peopleCount = rewind.metadata?.peopleHighlighted?.size ?: 0
+        val subtitleParts =
+            buildList {
+                add(dateRange)
+                val statParts =
+                    buildList {
+                        if (textCount > 0) add("$textCount entries")
+                        if (photoCount > 0) add("$photoCount photos")
+                        if (peopleCount > 0) add("$peopleCount people")
+                    }
+                if (statParts.isNotEmpty()) add(statParts.joinToString(" · "))
+            }
         panels.add(
             SubtitledRewindPanelUiState(
                 title = rewind.title,
-                subtitle = "From ${
-                    formatDateRange(
-                        rewind.startDate,
-                        rewind.endDate,
-                    )
-                }\nYour journey through time and memories",
+                subtitle = subtitleParts.joinToString("\n"),
                 backgroundUri = null,
                 weatherChip = rewind.metadata?.weatherContext?.toChipUiState(),
             ),
@@ -367,41 +377,34 @@ class RewindDetailViewModel(
 
         panels.addAll(contentPanels)
 
-        // 3. Add statistics panels if we have enough content to generate them
-        if (rewind.content.isNotEmpty()) {
-            // Count text notes
-            val textNoteCount = rewind.content.count { it is RewindContent.TextNote }
-            if (textNoteCount > 0) {
-                panels.add(
-                    BigStatisticRewindPanelUiState(
-                        title = "Journal Entries",
-                        statistic = textNoteCount.toString(),
-                        units = "entries",
-                        description = "You captured thoughts and memories $textNoteCount times this week. Each entry is a window into this moment in your life.",
-                        background =
-                            RewindPanelBackgroundSpec(
-                                color = 0xFF9C27B0, // Purple
-                            ),
-                    ),
-                )
-            }
-
-            // Count images
-            val imageCount = rewind.content.count { it is RewindContent.Image }
-            if (imageCount > 0) {
-                panels.add(
-                    BigStatisticRewindPanelUiState(
-                        title = "Images Captured",
-                        statistic = imageCount.toString(),
-                        units = "photos",
-                        description = "You preserved $imageCount visual memories this week. Each image tells a unique story from your perspective.",
-                        background =
-                            RewindPanelBackgroundSpec(
-                                color = 0xFF2196F3, // Blue
-                            ),
-                    ),
-                )
-            }
+        // 3. The stat panels reuse the counts from the title subtitle to stay consistent.
+        if (textCount > 0) {
+            panels.add(
+                BigStatisticRewindPanelUiState(
+                    title = rewind.title,
+                    statistic = textCount.toString(),
+                    units = if (textCount == 1) "entry" else "entries",
+                    description = "You wrote $textCount times this week.",
+                    background =
+                        RewindPanelBackgroundSpec(
+                            color = 0xFF9C27B0, // Purple
+                        ),
+                ),
+            )
+        }
+        if (photoCount > 0) {
+            panels.add(
+                BigStatisticRewindPanelUiState(
+                    title = rewind.title,
+                    statistic = photoCount.toString(),
+                    units = if (photoCount == 1) "photo" else "photos",
+                    description = "You captured $photoCount visual memories this week.",
+                    background =
+                        RewindPanelBackgroundSpec(
+                            color = 0xFF2196F3, // Blue
+                        ),
+                ),
+            )
         }
 
         // 4. Beats the AI invented from the period's content: verbatim quotes first, then noticing prompts.
@@ -430,10 +433,19 @@ class RewindDetailViewModel(
             }
         }
 
-        // 5. Add closing panel
+        // 5. Closing panel — use the AI-generated narrative when available so the
+        // ending reads as a distillation of THIS specific week, not a canned template.
+        val closingText =
+            rewind.metadata
+                ?.let {
+                    // The sequencer already used the opening sentence of the narrative;
+                    // the closing panel uses the last sentence(s) for a bookend effect.
+                    val sentences = (rewind.content.lastOrNull() as? RewindContent.NarrativeContext)?.contextText
+                    sentences ?: rewind.title
+                } ?: rewind.title
         panels.add(
             BasicTextRewindPanelUiState(
-                text = "This week brought new experiences, personal growth, and countless small moments that make life beautiful. Here's to next week's adventures!",
+                text = closingText,
                 background =
                     RewindPanelBackgroundSpec(
                         color = 0xFFFF9800, // Orange
