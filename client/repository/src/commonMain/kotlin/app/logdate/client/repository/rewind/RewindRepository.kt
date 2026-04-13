@@ -83,6 +83,16 @@ interface RewindRepository {
     suspend fun deleteRewind(uid: Uuid)
 
     /**
+     * Retrieves all rewinds whose entire date range falls within [start]..[end],
+     * ordered chronologically. Used by the annual rewind pipeline to collect the
+     * weekly and milestone rewinds that feed the year narrative.
+     */
+    fun getRewindsInRange(
+        start: Instant,
+        end: Instant,
+    ): Flow<List<Rewind>>
+
+    /**
      * Stamps a rewind as a milestone-detected rewind by writing [signal] into the
      * first slot of its `metadata.milestones` list.
      *
@@ -92,7 +102,7 @@ interface RewindRepository {
      *
      * @param uid Identifier of the rewind to tag.
      * @param signal Encoded `MILESTONE_KIND:summary` string — see
-     *   `app.logdate.client.intelligence.milestones.toMetadataSignal`.
+     *   [toMetadataSignal].
      */
     suspend fun tagAsMilestone(
         uid: Uuid,

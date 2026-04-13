@@ -21,6 +21,9 @@ import app.logdate.client.data.notes.OfflineFirstJournalNotesRepository
 import app.logdate.client.data.notes.drafts.AndroidLocalEntryDraftStore
 import app.logdate.client.data.notes.drafts.LocalEntryDraftStore
 import app.logdate.client.data.notes.drafts.OfflineFirstEntryDraftRepository
+import app.logdate.client.data.people.AndroidDeviceContactsReader
+import app.logdate.client.data.people.OfflineFirstPeopleGraphRepository
+import app.logdate.client.data.people.OfflineFirstPeopleRepository
 import app.logdate.client.data.places.OfflineFirstUserPlacesRepository
 import app.logdate.client.data.profile.OfflineFirstProfileRepository
 import app.logdate.client.data.quota.StubRemoteQuotaDataSource
@@ -55,6 +58,12 @@ import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.knowledge.DeviceContactsReader
+import app.logdate.client.repository.knowledge.InferredPeopleRepository
+import app.logdate.client.repository.knowledge.PeopleContactsRepository
+import app.logdate.client.repository.knowledge.PeopleProfileRepository
+import app.logdate.client.repository.knowledge.PeopleRepository
+import app.logdate.client.repository.knowledge.PersonLinkRepository
 import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.repository.places.UserPlacesRepository
@@ -159,6 +168,29 @@ actual val dataModule: Module =
         // Events
         single<EventRepository> { OfflineFirstEventRepository(get(), get()) }
 
+        // People
+        single { OfflineFirstPeopleRepository(get()) }
+        single {
+            OfflineFirstPeopleGraphRepository(
+                personDao = get(),
+                inferredPersonClusterDao = get(),
+                inferredPersonEvidenceDao = get(),
+                personLinkDao = get(),
+                personResolutionDecisionDao = get(),
+                textNoteDao = get(),
+                transcriptionDao = get(),
+                eventDao = get(),
+                journalNotesRepository = get(),
+                eventRepository = get(),
+            )
+        }
+        single<PeopleRepository> { get<OfflineFirstPeopleRepository>() }
+        single<PeopleContactsRepository> { get<OfflineFirstPeopleRepository>() }
+        single<InferredPeopleRepository> { get<OfflineFirstPeopleGraphRepository>() }
+        single<PersonLinkRepository> { get<OfflineFirstPeopleGraphRepository>() }
+        single<PeopleProfileRepository> { get<OfflineFirstPeopleGraphRepository>() }
+        single<DeviceContactsReader> { AndroidDeviceContactsReader(androidContext()) }
+
         // Profile
         single<ProfileRepository> { OfflineFirstProfileRepository(get()) }
 
@@ -195,7 +227,7 @@ actual val dataModule: Module =
         }
 
         // Search
-        single { OfflineFirstSearchRepository(get()) }
+        single { OfflineFirstSearchRepository(get(), get()) }
         single(createdAtStart = true) {
             AndroidPlatformSearchIndexManager(
                 context = androidContext(),

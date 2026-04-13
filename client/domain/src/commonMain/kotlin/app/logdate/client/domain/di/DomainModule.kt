@@ -1,5 +1,6 @@
 package app.logdate.client.domain.di
 
+import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.domain.app.GetAppInfoUseCase
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
 import app.logdate.client.domain.dayboundary.DefaultDayBoundarySettingsRepository
@@ -9,6 +10,7 @@ import app.logdate.client.domain.di.locationDomainModule
 import app.logdate.client.domain.editor.ObserveEditorDataUseCase
 import app.logdate.client.domain.editor.SaveEntryUseCase
 import app.logdate.client.domain.entities.ExtractPeopleUseCase
+import app.logdate.client.domain.entities.GetPeopleUseCase
 import app.logdate.client.domain.events.DeleteEventUseCase
 import app.logdate.client.domain.events.GetAttachableNotesForEventUseCase
 import app.logdate.client.domain.events.GetEventByIdUseCase
@@ -67,6 +69,7 @@ import app.logdate.client.domain.recommendation.PlaceFamiliarityRepository
 import app.logdate.client.domain.restore.PreviewArchiveUseCase
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.domain.rewind.DeleteRewindUseCase
+import app.logdate.client.domain.rewind.GenerateAnnualRewindUseCase
 import app.logdate.client.domain.rewind.GenerateBasicRewindUseCase
 import app.logdate.client.domain.rewind.GenerateRewindTitleUseCase
 import app.logdate.client.domain.rewind.GetPastRewindsUseCase
@@ -108,6 +111,7 @@ val domainModule: Module =
 
         // Entities
         factory { ExtractPeopleUseCase(get()) }
+        factory { GetPeopleUseCase(get()) }
 
         // App info
         factory { GetAppInfoUseCase(get()) }
@@ -154,13 +158,14 @@ val domainModule: Module =
         factory { GetPastRewindsUseCase(get()) }
         factory { GetRewindUseCase(get(), get(), get()) }
         factory {
-            val prefs: app.logdate.client.datastore.LogdatePreferencesDataSource = get()
+            val prefs: LogdatePreferencesDataSource = get()
             GetWeekRewindUseCase(get(), prefs.observeFirstDayOfWeek())
         }
         factory { GenerateRewindTitleUseCase() }
         factory { SaveReflectionPromptResponseUseCase(get()) }
         factory { ObserveReflectionPromptResponsesUseCase(get()) }
         factory { DeleteRewindUseCase(get()) }
+        factory { GenerateAnnualRewindUseCase(get(), get(), get(), get()) }
 
         // Media indexing
         factory { IndexMediaForPeriodUseCase(get(), get()) }
@@ -264,5 +269,5 @@ val domainModule: Module =
         factory { SetStreakEnabledUseCase(get()) }
 
         // Day boundaries
-        single<DayBoundarySettingsRepository> { DefaultDayBoundarySettingsRepository(get(), get()) }
+        single<DayBoundarySettingsRepository> { DefaultDayBoundarySettingsRepository(get()) }
     }

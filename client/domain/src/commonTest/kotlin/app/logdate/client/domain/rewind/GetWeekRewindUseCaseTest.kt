@@ -308,6 +308,11 @@ class GetWeekRewindUseCaseTest {
             rewindForPeriod = rewind
         }
 
+        override fun getRewindsInRange(
+            start: Instant,
+            end: Instant,
+        ): Flow<List<Rewind>> = flowOf(listOfNotNull(rewindForPeriod))
+
         override suspend fun deleteRewind(uid: Uuid) {
             if (rewindForPeriod?.uid == uid) {
                 rewindForPeriod = null

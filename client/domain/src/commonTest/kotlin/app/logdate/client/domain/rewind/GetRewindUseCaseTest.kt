@@ -326,6 +326,11 @@ class GetRewindUseCaseTest {
 
         override suspend fun saveRewind(rewind: Rewind) {}
 
+        override fun getRewindsInRange(
+            start: Instant,
+            end: Instant,
+        ): Flow<List<Rewind>> = flowOf(emptyList())
+
         override suspend fun deleteRewind(uid: Uuid) {}
 
         override suspend fun tagAsMilestone(

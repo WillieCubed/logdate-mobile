@@ -6,8 +6,10 @@ import app.logdate.client.intelligence.entity.people.PeopleExtractor
 import app.logdate.client.intelligence.events.EventNamingExtractor
 import app.logdate.client.intelligence.milestones.LocationChangeMilestoneDetector
 import app.logdate.client.intelligence.milestones.MilestoneDetector
+import app.logdate.client.intelligence.narrative.AnnualRewindSequencer
 import app.logdate.client.intelligence.narrative.RewindSequencer
 import app.logdate.client.intelligence.narrative.WeekNarrativeSynthesizer
+import app.logdate.client.intelligence.narrative.YearNarrativeSynthesizer
 import app.logdate.client.intelligence.rewind.RewindMessageGenerator
 import app.logdate.client.intelligence.rewind.WittyRewindMessageGenerator
 import app.logdate.client.intelligence.weather.HistoricalWeatherProvider
@@ -39,6 +41,10 @@ val intelligenceModule: Module =
             )
         }
         single { RewindSequencer() }
+
+        // Annual rewind
+        single { YearNarrativeSynthesizer(get(), get(), get(), get()) }
+        single { AnnualRewindSequencer() }
 
         // Milestone detection — registered as a list so the worker iterates the
         // full set without needing to know each detector individually. The list

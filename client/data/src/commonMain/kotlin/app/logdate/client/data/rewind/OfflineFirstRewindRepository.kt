@@ -6,6 +6,7 @@ import app.logdate.client.database.entities.rewind.RewindImageContentEntity
 import app.logdate.client.database.entities.rewind.RewindTextContentEntity
 import app.logdate.client.database.entities.rewind.RewindVideoContentEntity
 import app.logdate.client.repository.rewind.RewindRepository
+import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.ActivityType
 import app.logdate.shared.model.HighlightedQuote
 import app.logdate.shared.model.LocationSummary
@@ -17,8 +18,6 @@ import app.logdate.shared.model.RewindMetadata
 import app.logdate.shared.model.WeatherContext
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
@@ -40,7 +39,7 @@ import kotlin.uuid.Uuid
  */
 class OfflineFirstRewindRepository(
     private val cachedRewindDao: CachedRewindDao,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val ioDispatcher: CoroutineDispatcher = platformIODispatcher,
 ) : RewindRepository {
     private val contentJson = Json { ignoreUnknownKeys = true }
 
@@ -151,6 +150,16 @@ class OfflineFirstRewindRepository(
                 throw e
             }
         }
+
+    override fun getRewindsInRange(
+        start: Instant,
+        end: Instant,
+    ): Flow<List<Rewind>> =
+        cachedRewindDao
+            .getRewindsContainedIn(start, end)
+            .map { entities ->
+                entities.map { it.toDomainModel() }
+            }
 
     override suspend fun deleteRewind(uid: Uuid): Unit =
         withContext(ioDispatcher) {

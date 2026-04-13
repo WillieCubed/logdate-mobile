@@ -82,6 +82,25 @@ interface CachedRewindDao {
     ): Boolean
 
     /**
+     * Retrieves all rewinds whose date range falls entirely within [rangeStart]..[rangeEnd].
+     *
+     * Used by the annual rewind pipeline to collect all weekly and milestone rewinds
+     * for a given year. Results are ordered chronologically by start date.
+     */
+    @Query(
+        """
+        SELECT * FROM rewinds
+        WHERE ${RewindConstants.COLUMN_START_DATE} >= :rangeStart
+        AND ${RewindConstants.COLUMN_END_DATE} <= :rangeEnd
+        ORDER BY ${RewindConstants.COLUMN_START_DATE} ASC
+    """,
+    )
+    fun getRewindsContainedIn(
+        rangeStart: Instant,
+        rangeEnd: Instant,
+    ): Flow<List<RewindEntity>>
+
+    /**
      * Inserts a new rewind.
      *
      * @param rewind The rewind to insert
