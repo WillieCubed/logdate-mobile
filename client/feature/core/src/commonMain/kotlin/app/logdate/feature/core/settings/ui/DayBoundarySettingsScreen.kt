@@ -117,6 +117,18 @@ fun DayBoundarySettingsScreen(
         }
     }
 
+    // Auto-enable sleep-based boundaries the first time permission is granted in this session.
+    // Tracking the previous value (null = not yet observed) ensures we only react to the
+    // false→true transition, not to the initial composition when permission was already granted.
+    var previousPermissionGranted by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(permissionState.hasPermission) {
+        val justGranted = previousPermissionGranted == false && permissionState.hasPermission
+        previousPermissionGranted = permissionState.hasPermission
+        if (justGranted && !uiState.dayBoundarySettings.sleepBasedBoundariesEnabled) {
+            viewModel.toggleSleepBasedBoundaries(true)
+        }
+    }
+
     DayBoundarySettingsContent(
         sleepBasedPreferenceEnabled = uiState.dayBoundarySettings.sleepBasedBoundariesEnabled,
         fallbackStartHour = uiState.fallbackStartHour,
