@@ -190,22 +190,42 @@ Health Connect reads this to populate its list of registered apps. Without it, t
 
 This label is shown in the Health Connect permission request dialog when the user is asked to approve or deny access. The resource name `health_permissions` is required by convention — Health Connect looks for it by name.
 
-### 3. `ACTION_SHOW_PERMISSIONS_RATIONALE` activity alias
+### 3. Activity aliases — two are required
+
+Health Connect uses two different intents depending on the Android version. Both aliases target `MainActivity`, which navigates to the day boundary settings screen.
+
+**Android 13 and earlier** — shown in the HC permission dialog when the user taps the privacy policy / rationale link:
 
 ```xml
 <!-- In app/android-main/src/main/AndroidManifest.xml, inside <application> -->
 <activity-alias
     android:name=".HealthConnectPermissionsRationaleActivity"
     android:exported="true"
-    android:targetActivity="app.logdate.client.MainActivity"
-    android:permission="android.permission.START_HEALTH_CONNECT_DATA_MANAGEMENT">
+    android:targetActivity="app.logdate.client.MainActivity">
     <intent-filter>
         <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
     </intent-filter>
 </activity-alias>
 ```
 
-When a user taps **Manage** next to LogDate in Health Connect settings, the system fires `ACTION_SHOW_PERMISSIONS_RATIONALE`. This alias intercepts that intent and routes it to `MainActivity`, which navigates to the day boundary settings screen (where the Health Connect permission UI lives). The `START_HEALTH_CONNECT_DATA_MANAGEMENT` permission ensures only the Health Connect system can fire this intent.
+No permission guard is needed here — the HC permission dialog sends this intent without holding any special permission.
+
+**Android 14+** — sent by the OS / Health Connect settings to open the app's permission management screen. **This alias is what causes the app to appear in Health Connect's "App permissions" list on Android 14+.** Without it the app is invisible in HC settings regardless of all other manifest entries.
+
+```xml
+<activity-alias
+    android:name=".ViewHealthPermissionUsageActivity"
+    android:exported="true"
+    android:targetActivity="app.logdate.client.MainActivity"
+    android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+        <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+    </intent-filter>
+</activity-alias>
+```
+
+`android.permission.START_VIEW_PERMISSION_USAGE` ensures only the Android system (and the OS-integrated HC on API 34+) can fire this intent.
 
 ### Where these live in the module graph
 

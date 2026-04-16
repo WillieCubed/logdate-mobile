@@ -123,14 +123,35 @@
             </intent-filter>
         </activity>
 
-        <!-- Handles the "Manage access" entry point from Health Connect settings -->
+        <!--
+            Android 13 and earlier: Health Connect permission dialog sends this intent when the
+            user taps the privacy policy / rationale link. No permission guard — HC dialog sends
+            it without holding any special permission.
+        -->
         <activity-alias
             android:name=".HealthConnectPermissionsRationaleActivity"
             android:exported="true"
-            android:targetActivity="app.logdate.client.MainActivity"
-            android:permission="android.permission.START_HEALTH_CONNECT_DATA_MANAGEMENT">
+            android:targetActivity="app.logdate.client.MainActivity">
             <intent-filter>
                 <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity-alias>
+
+        <!--
+            Android 14+: The Android system / Health Connect settings sends VIEW_PERMISSION_USAGE
+            with the HEALTH_PERMISSIONS category to open the in-app permissions management screen.
+            This alias is what causes LogDate to appear in Health Connect's "App permissions" list
+            on Android 14+ where Health Connect is OS-integrated. Without it the app is invisible
+            in HC settings regardless of other manifest entries.
+        -->
+        <activity-alias
+            android:name=".ViewHealthPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity="app.logdate.client.MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
             </intent-filter>
         </activity-alias>
 

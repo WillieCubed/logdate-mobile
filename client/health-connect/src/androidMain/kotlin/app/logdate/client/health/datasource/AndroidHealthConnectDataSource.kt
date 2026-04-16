@@ -26,10 +26,6 @@ import kotlin.time.Instant
 class AndroidHealthConnectDataSource(
     private val context: Context,
 ) : RemoteHealthDataSource {
-    private companion object {
-        private const val HEALTH_CONNECT_PROVIDER_PACKAGE = "com.google.android.apps.healthdata"
-    }
-
     init {
         warnIfManifestRequirementsMissing()
     }
@@ -50,7 +46,7 @@ class AndroidHealthConnectDataSource(
 
     override suspend fun getAvailability(): HealthDataAvailability =
         try {
-            val availability = HealthConnectClient.getSdkStatus(context, HEALTH_CONNECT_PROVIDER_PACKAGE)
+            val availability = HealthConnectClient.getSdkStatus(context)
             Napier.i("Health Connect SDK status: ${sdkStatusLabel(availability)} ($availability)")
             when (availability) {
                 HealthConnectClient.SDK_AVAILABLE -> HealthDataAvailability.AVAILABLE
@@ -278,13 +274,28 @@ class AndroidHealthConnectDataSource(
             )
         }
 
+        // Android 13 and earlier: HC permission dialog → rationale screen
         val rationaleIntent = Intent("androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE")
             .setPackage(context.packageName)
         if (context.packageManager.resolveActivity(rationaleIntent, 0) == null) {
             Napier.e(
                 "Health Connect: No activity responds to ACTION_SHOW_PERMISSIONS_RATIONALE. " +
-                    "Tapping 'Manage' next to this app in Health Connect settings will do nothing. " +
+                    "The privacy policy link in the HC permission dialog will do nothing. " +
                     "Add an <activity-alias> in AndroidManifest.xml. " +
+                    "See docs/health-connect-refactoring.md for the required snippet.",
+            )
+        }
+
+        // Android 14+: HC settings → manage app permissions (also controls HC app-list visibility)
+        val viewUsageIntent = Intent("android.intent.action.VIEW_PERMISSION_USAGE")
+            .addCategory("android.intent.category.HEALTH_PERMISSIONS")
+            .setPackage(context.packageName)
+        if (context.packageManager.resolveActivity(viewUsageIntent, 0) == null) {
+            Napier.e(
+                "Health Connect: No activity responds to VIEW_PERMISSION_USAGE + HEALTH_PERMISSIONS. " +
+                    "LogDate will NOT appear in Health Connect's App permissions list on Android 14+. " +
+                    "Add a <activity-alias> with action VIEW_PERMISSION_USAGE and " +
+                    "category HEALTH_PERMISSIONS in AndroidManifest.xml. " +
                     "See docs/health-connect-refactoring.md for the required snippet.",
             )
         }
