@@ -181,10 +181,14 @@ Create or update reference images for the first time or after intentional change
 
 # Update baselines — Wear OS app
 ./gradlew :app:wear:updateDebugScreenshotTest
+
+# Update baselines — Desktop app
+./gradlew :app:compose-main:updateDesktopScreenshotTest
 ```
 
 Phone baselines: `app/android-main/src/screenshotTestDebug/reference/`
 Wear baselines: `app/wear/src/screenshotTestDebug/reference/`
+Desktop baselines: `app/compose-main/src/desktopTest/reference/`
 
 **In CI/CD**: Commit baseline images to version control alongside your code.
 
@@ -198,6 +202,9 @@ Check if current screenshots match baselines:
 
 # Validate — Wear OS app
 ./gradlew :app:wear:validateDebugScreenshotTest
+
+# Validate — Desktop app
+./gradlew :app:compose-main:validateDesktopScreenshotTest
 ```
 
 **In CI/CD**: This command runs automatically on pull requests.
@@ -408,10 +415,28 @@ Each preview generates two baselines (small round + large round). Wrap content i
 
 ## KMP considerations
 
-Google Compose Screenshot Testing works with Android targets only. For iOS/Desktop:
+Google Compose Screenshot Testing works with Android targets only. LogDate now wraps that limitation in a repo-level universal screenshot lane:
 
-1. **Android (Screenshot Tests)**: Use Google's screenshot plugin
-2. **iOS/Desktop**: Use separate screenshot tools or manual testing
+1. **Android and Wear**: real baseline screenshot validation via `com.android.compose.screenshot`
+2. **Desktop**: real committed baseline validation via `:app:compose-main:validateDesktopScreenshotTest`
+3. **iOS**: simulator-side `iosSimulatorArm64Test` validation for screenshot-covered UI modules
+
+Use the root tasks when you want the platform-agnostic entrypoint:
+
+```bash
+# Validate the full universal screenshot lane
+./gradlew validateAllScreenshots
+
+# Update every supported baseline lane
+./gradlew updateAllScreenshots
+
+# Per-platform entrypoints
+./gradlew validateAndroidScreenshots
+./gradlew validateDesktopScreenshots
+./gradlew validateIosScreenshots
+```
+
+Desktop now participates as a real baseline lane. `updateAllScreenshots` updates Android, Wear, and Desktop baselines. iOS remains validate-only until a committed iOS screenshot baseline renderer lands.
 
 ```kotlin
 // This only runs on Android
@@ -438,7 +463,7 @@ on:
       - 'client/feature/**'
 
 jobs:
-  screenshot-test:
+  android-wear-screenshots:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -450,10 +475,31 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v3
         with:
-          name: screenshot-diffs
+          name: android-wear-screenshot-diffs
           path: |
             app/android-main/build/outputs/screenshotTest-results/
             app/wear/build/outputs/screenshotTest-results/
+
+  desktop-screenshots:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate desktop screenshots
+        run: ./gradlew :app:compose-main:validateDesktopScreenshotTest
+      - name: Upload results
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: desktop-screenshot-diffs
+          path: |
+            app/compose-main/build/reports/desktopScreenshotTest/
+
+  ios-screenshot-validation:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate iOS screenshot lane
+        run: ./gradlew validateIosScreenshots
 ```
 
 ## Troubleshooting
@@ -469,6 +515,10 @@ git add app/android-main/src/screenshotTestDebug/reference/
 # Wear OS
 ./gradlew :app:wear:updateDebugScreenshotTest
 git add app/wear/src/screenshotTestDebug/reference/
+
+# Desktop
+./gradlew :app:compose-main:updateDesktopScreenshotTest
+git add app/compose-main/src/desktopTest/reference/
 ```
 
 ### "Images do not match"
@@ -480,6 +530,7 @@ Visual changes detected. Options:
    ```bash
    ./gradlew :app:android-main:updateDebugScreenshotTest  # phone
    ./gradlew :app:wear:updateDebugScreenshotTest           # wear
+   ./gradlew :app:compose-main:updateDesktopScreenshotTest # desktop
    ```
 
 ### Screenshot filename confusion

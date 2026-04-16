@@ -54,6 +54,23 @@ subprojects {
             configureManagedDevices(project)
         }
     }
+
+    dependencies {
+        components {
+            listOf(
+                "io.coil-kt.coil3:coil-core-jvm",
+                "io.coil-kt.coil3:coil-core-iossimulatorarm64",
+            ).forEach { moduleId ->
+                withModule(moduleId) {
+                    allVariants {
+                        withDependencies {
+                            removeAll { it.group == "org.jetbrains.skiko" }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 private val featureCoverageModules =
@@ -87,6 +104,49 @@ val atprotoModulePaths =
         ":shared:atproto-pds",
         ":shared:atproto-pds-runtime",
     )
+
+val androidScreenshotValidationTasks =
+    listOf(
+        ":app:android-main:validateDebugScreenshotTest",
+        ":app:wear:validateDebugScreenshotTest",
+    )
+
+val androidScreenshotUpdateTasks =
+    listOf(
+        ":app:android-main:updateDebugScreenshotTest",
+        ":app:wear:updateDebugScreenshotTest",
+    )
+
+val universalScreenshotHostModules =
+    listOf(
+        ":app:compose-main",
+        ":client:awareness",
+        ":client:feature:core",
+        ":client:feature:editor",
+        ":client:feature:events",
+        ":client:feature:journal",
+        ":client:feature:library",
+        ":client:feature:location-timeline",
+        ":client:feature:onboarding",
+        ":client:feature:postcards",
+        ":client:feature:rewind",
+        ":client:feature:search",
+        ":client:feature:stickers",
+        ":client:feature:timeline",
+        ":client:media",
+        ":client:permissions",
+        ":client:sharing",
+        ":client:theme",
+        ":client:ui",
+    )
+
+fun existingTaskPaths(
+    projectPaths: List<String>,
+    taskName: String,
+): List<String> =
+    projectPaths.mapNotNull { path ->
+        findProject(path)?.tasks?.findByName(taskName)?.path
+    }
 
 tasks.register("generateAtprotoDokka") {
     group = "documentation"
@@ -200,6 +260,81 @@ tasks.register("managedBenchmark") {
         "managedPhoneBenchmark",
         "managedWearBenchmark",
     )
+}
+
+tasks.register("validateAndroidScreenshots") {
+    group = "verification"
+    description = "Validate Android and Wear screenshot baselines using the Android screenshot plugin."
+    dependsOn(androidScreenshotValidationTasks)
+}
+
+tasks.register("updateAndroidScreenshots") {
+    group = "verification"
+    description = "Update Android and Wear screenshot baselines using the Android screenshot plugin."
+    dependsOn(androidScreenshotUpdateTasks)
+}
+
+val validateDesktopScreenshots =
+    tasks.register("validateDesktopScreenshots") {
+    group = "verification"
+    description = "Validate committed Desktop screenshot baselines."
+    dependsOn(":app:compose-main:validateDesktopScreenshotTest")
+}
+
+val validateIosScreenshots =
+    tasks.register("validateIosScreenshots") {
+    group = "verification"
+    description =
+        "Run the iOS simulator host-test lane for screenshot-covered UI modules. " +
+            "This is the iOS half of the universal screenshot contract until an iOS baseline renderer lands."
+}
+
+tasks.register("updateDesktopScreenshots") {
+    group = "verification"
+    description = "Update committed Desktop screenshot baselines."
+    dependsOn(":app:compose-main:updateDesktopScreenshotTest")
+}
+
+tasks.register("updateIosScreenshots") {
+    group = "verification"
+    description =
+        "Placeholder for future iOS screenshot baseline updates. " +
+            "iOS currently validates through simulator host tests only."
+    doLast {
+        logger.lifecycle(
+            "iOS baseline updates are not implemented yet. " +
+                "Use validateIosScreenshots to run the iOS visual lane.",
+        )
+    }
+}
+
+tasks.register("validateAllScreenshots") {
+    group = "verification"
+    description =
+        "Run the universal screenshot lane across Android, Wear, Desktop, and iOS. " +
+            "Android/Wear/Desktop use baseline screenshots; iOS uses a simulator validation lane."
+    dependsOn(
+        "validateAndroidScreenshots",
+        "validateDesktopScreenshots",
+        "validateIosScreenshots",
+    )
+}
+
+tasks.register("updateAllScreenshots") {
+    group = "verification"
+    description =
+        "Update every supported screenshot baseline lane. " +
+            "Today this updates Android/Wear/Desktop baselines and leaves iOS as validate-only."
+    dependsOn(
+        "updateAndroidScreenshots",
+        "updateDesktopScreenshots",
+    )
+}
+
+gradle.projectsEvaluated {
+    validateIosScreenshots.configure {
+        dependsOn(existingTaskPaths(universalScreenshotHostModules, "iosSimulatorArm64Test"))
+    }
 }
 
 tasks.register("managedAndroidPerformance") {

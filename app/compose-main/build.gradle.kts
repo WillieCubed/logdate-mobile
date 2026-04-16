@@ -1,6 +1,7 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -50,6 +51,7 @@ kotlin {
 
     sourceSets {
         val desktopMain by getting
+        val desktopTest by getting
 
         all {
             languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
@@ -142,6 +144,12 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
         }
+        desktopTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.kotlin.test.junit)
+            implementation(libs.junit)
+            implementation(compose.desktop.currentOs)
+        }
     }
 }
 
@@ -209,4 +217,37 @@ buildConfig {
     // TODO: add per-variant overrides once a staging/debug web environment exists.
     buildConfigField("LOGDATE_ORIGIN", providers.gradleProperty("logdate.origin").get())
     buildConfigField("LOGDATE_API_BASE_URL", providers.gradleProperty("logdate.apiBaseUrl").get())
+}
+
+val desktopScreenshotReferenceDir = layout.projectDirectory.dir("src/desktopTest/reference")
+val desktopScreenshotActualDir = layout.buildDirectory.dir("reports/desktopScreenshotTest/actual")
+val desktopScreenshotDiffDir = layout.buildDirectory.dir("reports/desktopScreenshotTest/diff")
+
+tasks.named<Test>("desktopTest") {
+    systemProperty("skiko.renderApi", "SOFTWARE_COMPAT")
+    systemProperty("logdate.desktopScreenshots.referenceDir", desktopScreenshotReferenceDir.asFile.absolutePath)
+    systemProperty("logdate.desktopScreenshots.actualDir", desktopScreenshotActualDir.get().asFile.absolutePath)
+    systemProperty("logdate.desktopScreenshots.diffDir", desktopScreenshotDiffDir.get().asFile.absolutePath)
+}
+
+tasks.register("validateDesktopScreenshotTest") {
+    group = "verification"
+    description = "Validate committed Desktop screenshot baselines for app/compose-main."
+    dependsOn("desktopTest")
+}
+
+tasks.register<Test>("updateDesktopScreenshotTest") {
+    group = "verification"
+    description = "Update committed Desktop screenshot baselines for app/compose-main."
+
+    val desktopTest = tasks.named<Test>("desktopTest").get()
+    testClassesDirs = desktopTest.testClassesDirs
+    classpath = desktopTest.classpath
+    workingDir = desktopTest.workingDir
+    systemProperty("skiko.renderApi", "SOFTWARE_COMPAT")
+    systemProperty("logdate.desktopScreenshots.referenceDir", desktopScreenshotReferenceDir.asFile.absolutePath)
+    systemProperty("logdate.desktopScreenshots.actualDir", desktopScreenshotActualDir.get().asFile.absolutePath)
+    systemProperty("logdate.desktopScreenshots.diffDir", desktopScreenshotDiffDir.get().asFile.absolutePath)
+    systemProperty("logdate.desktopScreenshots.update", "true")
+    outputs.upToDateWhen { false }
 }
