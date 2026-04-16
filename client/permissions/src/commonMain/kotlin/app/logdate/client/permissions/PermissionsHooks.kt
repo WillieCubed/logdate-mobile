@@ -16,6 +16,9 @@ expect fun rememberMediaLibraryPermissionState(): MediaLibraryPermissionState
 @Composable
 expect fun rememberCalendarPermissionState(): CalendarPermissionState
 
+@Composable
+expect fun rememberContactsPermissionState(): ContactsPermissionState
+
 /**
  * Represents the state of notification permission.
  */
@@ -30,8 +33,11 @@ data class NotificationPermissionState(
  * Represents the state of the Health Connect sleep permission request flow.
  */
 data class HealthConnectPermissionState(
-    val completedRequestCount: Int,
+    val hasPermission: Boolean,
+    val permissionRequested: Boolean,
+    val isRequestInFlight: Boolean,
     val requestPermission: () -> Unit,
+    val refreshPermissionState: () -> Unit,
 )
 
 /**
@@ -50,6 +56,16 @@ data class MediaLibraryPermissionState(
  * settings" branch and to drive the runtime permission request.
  */
 data class CalendarPermissionState(
+    val hasPermission: Boolean,
+    val shouldShowRationale: Boolean,
+    val permissionRequested: Boolean,
+    val requestPermission: () -> Unit,
+)
+
+/**
+ * Represents the state of read-only access to the user's device contacts.
+ */
+data class ContactsPermissionState(
     val hasPermission: Boolean,
     val shouldShowRationale: Boolean,
     val permissionRequested: Boolean,

@@ -14,8 +14,11 @@ actual fun rememberNotificationPermissionState(): NotificationPermissionState =
 @Composable
 actual fun rememberHealthConnectPermissionState(): HealthConnectPermissionState =
     HealthConnectPermissionState(
-        completedRequestCount = 0,
+        hasPermission = false,
+        permissionRequested = false,
+        isRequestInFlight = false,
         requestPermission = {},
+        refreshPermissionState = {},
     )
 
 @Composable
@@ -30,6 +33,15 @@ actual fun rememberMediaLibraryPermissionState(): MediaLibraryPermissionState =
 @Composable
 actual fun rememberCalendarPermissionState(): CalendarPermissionState =
     CalendarPermissionState(
+        hasPermission = false,
+        shouldShowRationale = false,
+        permissionRequested = false,
+        requestPermission = {},
+    )
+
+@Composable
+actual fun rememberContactsPermissionState(): ContactsPermissionState =
+    ContactsPermissionState(
         hasPermission = false,
         shouldShowRationale = false,
         permissionRequested = false,

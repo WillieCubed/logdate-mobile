@@ -1,5 +1,6 @@
 package app.logdate.navigation.routes
 
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -7,9 +8,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import app.logdate.client.domain.dayboundary.HealthConnectStatus
+import app.logdate.client.launchHealthConnectSetup
 import app.logdate.feature.onboarding.flow.OnboardingEntryMode
 import app.logdate.feature.onboarding.flow.OnboardingProgressSnapshot
 import app.logdate.feature.onboarding.flow.OnboardingStep
@@ -44,6 +50,7 @@ import app.logdate.navigation.routes.core.OnboardingRecommendationsRoute
 import app.logdate.navigation.routes.core.OnboardingStart
 import app.logdate.navigation.routes.core.OnboardingWelcomeBackRoute
 import app.logdate.navigation.routes.core.PersonalIntroRoute
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -263,12 +270,34 @@ fun EntryProviderScope<NavKey>.onboarding(
         )
     }
     routeEntry<OnboardingDayBoundariesRoute> {
+        val context = LocalContext.current
+        val lifecycleOwner = LocalLifecycleOwner.current
         val viewModel = koinViewModel<OnboardingViewModel>()
         val progressSnapshot by viewModel.progressSnapshot.collectAsState()
         val entryMode by viewModel.activeEntryMode.collectAsState()
+        var awaitingHealthConnectSetupResult by rememberSaveable { mutableStateOf(false) }
+
+        DisposableEffect(lifecycleOwner, viewModel) {
+            val observer =
+                LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME && awaitingHealthConnectSetupResult) {
+                        awaitingHealthConnectSetupResult = false
+                        Napier.i("Refreshing onboarding Health Connect status after setup return")
+                        viewModel.refreshHealthStatus()
+                    }
+                }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+            }
+        }
 
         OnboardingDayBoundariesScreen(
             onBack = onBack,
+            onSetUpHealthConnect = {
+                awaitingHealthConnectSetupResult = true
+                launchHealthConnectSetup(context)
+            },
             onNext = { dayBoundariesEnabled ->
                 onNavigate(
                     routeForNextStep(

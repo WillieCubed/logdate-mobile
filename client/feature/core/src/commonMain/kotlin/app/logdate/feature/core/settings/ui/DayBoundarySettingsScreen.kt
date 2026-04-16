@@ -5,37 +5,40 @@ package app.logdate.feature.core.settings.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.HealthAndSafety
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import app.logdate.client.domain.dayboundary.HealthConnectGateKind
+import app.logdate.client.domain.dayboundary.HealthConnectGateState
+import app.logdate.client.domain.dayboundary.HealthConnectMissingRequirement
 import app.logdate.client.domain.dayboundary.HealthConnectStatus
+import app.logdate.client.domain.dayboundary.reduceHealthConnectGateState
+import app.logdate.client.permissions.rememberHealthConnectPermissionState
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.PrimaryTogglePill
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.asTime
+import io.github.aakira.napier.Napier
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
@@ -49,14 +52,25 @@ import logdate.client.feature.core.generated.resources.day_schedule_enabled_expl
 import logdate.client.feature.core.generated.resources.day_schedule_fallback_time
 import logdate.client.feature.core.generated.resources.day_schedule_fallback_time_description
 import logdate.client.feature.core.generated.resources.day_schedule_health_checking
-import logdate.client.feature.core.generated.resources.day_schedule_health_connected
+import logdate.client.feature.core.generated.resources.day_schedule_health_checking_detail
 import logdate.client.feature.core.generated.resources.day_schedule_health_grant_access
 import logdate.client.feature.core.generated.resources.day_schedule_health_not_available
 import logdate.client.feature.core.generated.resources.day_schedule_health_not_available_detail
+import logdate.client.feature.core.generated.resources.day_schedule_health_permission_denied_detail
 import logdate.client.feature.core.generated.resources.day_schedule_health_permissions_needed
+import logdate.client.feature.core.generated.resources.day_schedule_health_permissions_needed_detail
+import logdate.client.feature.core.generated.resources.day_schedule_health_recovery_permissions_detail
+import logdate.client.feature.core.generated.resources.day_schedule_health_recovery_setup_detail
+import logdate.client.feature.core.generated.resources.day_schedule_health_recovery_title
+import logdate.client.feature.core.generated.resources.day_schedule_health_recovery_unavailable_detail
+import logdate.client.feature.core.generated.resources.day_schedule_health_set_up
+import logdate.client.feature.core.generated.resources.day_schedule_health_setup_required
+import logdate.client.feature.core.generated.resources.day_schedule_health_setup_required_detail
+import logdate.client.feature.core.generated.resources.day_schedule_health_turn_off
 import logdate.client.feature.core.generated.resources.use_sleep_schedule
 import logdate.client.ui.generated.resources.common_cancel
 import logdate.client.ui.generated.resources.common_confirm
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Clock
@@ -65,28 +79,52 @@ import logdate.client.ui.generated.resources.Res as UiRes
 @Composable
 fun DayBoundarySettingsScreen(
     onBack: () -> Unit,
-    onRequestHealthPermissions: () -> Unit = {},
-    onEnableSleepBasedWithPermissions: () -> Unit = onRequestHealthPermissions,
+    onSetUpHealthConnect: () -> Unit = {},
     modifier: Modifier = Modifier,
-    viewModel: TimelineSettingsViewModel = koinViewModel(),
+    viewModel: DayBoundarySettingsViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val permissionState = rememberHealthConnectPermissionState()
+    var previousResolvedGateState by remember { mutableStateOf<HealthConnectGateState?>(null) }
+    val gateState =
+        reduceHealthConnectGateState(
+            sleepBasedPreferenceEnabled = uiState.dayBoundarySettings.sleepBasedBoundariesEnabled,
+            healthConnectStatus = uiState.healthConnectStatus,
+            hasPermission = permissionState.hasPermission,
+            permissionRequested = permissionState.permissionRequested,
+            previousResolvedGateState = previousResolvedGateState,
+        )
+
+    LaunchedEffect(gateState) {
+        if (gateState.kind != HealthConnectGateKind.CHECKING) {
+            previousResolvedGateState = gateState
+        }
+        Napier.i(
+            "Day boundary settings gate state: kind=${gateState.kind} requirement=${gateState.missingRequirement}",
+        )
+    }
+
+    LaunchedEffect(uiState.healthConnectStatus) {
+        permissionState.refreshPermissionState()
+    }
+
+    LaunchedEffect(permissionState.hasPermission, uiState.healthConnectStatus) {
+        val backendThinksConnected = uiState.healthConnectStatus == HealthConnectStatus.CONNECTED
+        if (permissionState.hasPermission != backendThinksConnected) {
+            viewModel.refreshHealthStatus()
+        }
+    }
 
     DayBoundarySettingsContent(
-        sleepBasedEnabled = uiState.dayBoundarySettings.sleepBasedBoundariesEnabled,
+        sleepBasedPreferenceEnabled = uiState.dayBoundarySettings.sleepBasedBoundariesEnabled,
         fallbackStartHour = uiState.fallbackStartHour,
-        healthConnectStatus = uiState.healthConnectStatus,
+        gateState = gateState,
+        isRequestInFlight = permissionState.isRequestInFlight,
         onBack = onBack,
-        onToggleSleepBased = { enabled ->
-            when (resolveDayBoundaryToggleAction(enabled, uiState.healthConnectStatus)) {
-                DayBoundaryToggleAction.DISABLE -> viewModel.toggleSleepBasedBoundaries(false)
-                DayBoundaryToggleAction.ENABLE_DIRECTLY -> viewModel.toggleSleepBasedBoundaries(true)
-                DayBoundaryToggleAction.REQUEST_PERMISSIONS -> onEnableSleepBasedWithPermissions()
-                DayBoundaryToggleAction.NO_OP -> Unit
-            }
-        },
+        onToggleSleepBased = viewModel::toggleSleepBasedBoundaries,
         onSetFallbackHour = viewModel::setFallbackStartHour,
-        onRequestPermissions = onRequestHealthPermissions,
+        onRequestPermissions = permissionState.requestPermission,
+        onSetUpHealthConnect = onSetUpHealthConnect,
         modifier = modifier,
     )
 }
@@ -94,23 +132,25 @@ fun DayBoundarySettingsScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DayBoundarySettingsContent(
-    sleepBasedEnabled: Boolean,
+    sleepBasedPreferenceEnabled: Boolean,
     fallbackStartHour: Int,
-    healthConnectStatus: HealthConnectStatus,
+    gateState: HealthConnectGateState,
+    isRequestInFlight: Boolean,
     onBack: () -> Unit,
     onToggleSleepBased: (Boolean) -> Unit,
     onSetFallbackHour: (Int) -> Unit,
     onRequestPermissions: () -> Unit,
+    onSetUpHealthConnect: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showTimePicker by remember { mutableStateOf(false) }
+    val showSleepBasedToggle = shouldShowSleepBasedToggle(gateState)
 
     SettingsScaffold(
         title = stringResource(Res.string.day_schedule),
         onBack = onBack,
         modifier = modifier,
     ) {
-        // Description
         item {
             Text(
                 text = stringResource(Res.string.day_schedule_detail_description),
@@ -120,38 +160,36 @@ fun DayBoundarySettingsContent(
             )
         }
 
-        // Primary toggle
-        item {
-            PrimaryTogglePill(
-                label = stringResource(Res.string.use_sleep_schedule),
-                checked = sleepBasedEnabled,
-                onCheckedChange = onToggleSleepBased,
-                enabled = healthConnectStatus != HealthConnectStatus.NOT_AVAILABLE,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
+        if (showSleepBasedToggle) {
+            item {
+                PrimaryTogglePill(
+                    label = stringResource(Res.string.use_sleep_schedule),
+                    checked = sleepBasedPreferenceEnabled,
+                    onCheckedChange = onToggleSleepBased,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+            }
         }
 
-        // Options section
         item {
             Column(
                 modifier = Modifier.padding(horizontal = Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                // Health Connect status
-                if (sleepBasedEnabled || healthConnectStatus == HealthConnectStatus.NOT_AVAILABLE) {
-                    MaterialContainer {
-                        HealthConnectStatusRow(
-                            status = healthConnectStatus,
-                            onRequestPermissions = onRequestPermissions,
-                        )
-                    }
+                if (!showSleepBasedToggle) {
+                    HealthConnectGateCard(
+                        gateState = gateState,
+                        isRequestInFlight = isRequestInFlight,
+                        onRequestPermissions = onRequestPermissions,
+                        onSetUpHealthConnect = onSetUpHealthConnect,
+                        onDisableSleepBased = { onToggleSleepBased(false) },
+                    )
                 }
 
-                // Explanation text
                 Text(
                     text =
                         stringResource(
-                            if (sleepBasedEnabled) {
+                            if (showSleepBasedToggle && sleepBasedPreferenceEnabled) {
                                 Res.string.day_schedule_enabled_explanation
                             } else {
                                 Res.string.day_schedule_disabled_explanation
@@ -163,7 +201,6 @@ fun DayBoundarySettingsContent(
 
                 Spacer(modifier = Modifier.height(Spacing.sm))
 
-                // Fallback time
                 MaterialContainer {
                     ListItem(
                         headlineContent = {
@@ -198,87 +235,112 @@ fun DayBoundarySettingsContent(
     }
 }
 
+internal fun shouldShowSleepBasedToggle(gateState: HealthConnectGateState): Boolean = gateState.kind == HealthConnectGateKind.READY
+
 @Composable
-private fun HealthConnectStatusRow(
-    status: HealthConnectStatus,
+private fun HealthConnectGateCard(
+    gateState: HealthConnectGateState,
+    isRequestInFlight: Boolean,
     onRequestPermissions: () -> Unit,
+    onSetUpHealthConnect: () -> Unit,
+    onDisableSleepBased: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    when (status) {
-        HealthConnectStatus.CONNECTED -> {
-            ListItem(
-                modifier = modifier,
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp),
-                    )
-                },
-                headlineContent = {
-                    Text(stringResource(Res.string.day_schedule_health_connected))
-                },
-            )
+    val titleRes =
+        when (gateState.kind) {
+            HealthConnectGateKind.CHECKING -> Res.string.day_schedule_health_checking
+            HealthConnectGateKind.NEEDS_SETUP -> Res.string.day_schedule_health_setup_required
+            HealthConnectGateKind.NEEDS_PERMISSION,
+            HealthConnectGateKind.PERMISSION_DENIED,
+            -> Res.string.day_schedule_health_permissions_needed
+            HealthConnectGateKind.UNAVAILABLE -> Res.string.day_schedule_health_not_available
+            HealthConnectGateKind.RECOVERY_REQUIRED -> Res.string.day_schedule_health_recovery_title
+            HealthConnectGateKind.READY -> Res.string.day_schedule_health_checking
         }
+    val descriptionRes = resolveDayBoundaryGateDescription(gateState)
+    val primaryActionLabelRes = resolveDayBoundaryPrimaryActionLabel(gateState)
+    val showDisableAction = gateState.kind == HealthConnectGateKind.RECOVERY_REQUIRED
 
-        HealthConnectStatus.PERMISSIONS_NEEDED -> {
-            Column(modifier = modifier) {
-                ListItem(
-                    leadingContent = {
-                        Icon(
-                            imageVector = Icons.Default.HealthAndSafety,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(24.dp),
-                        )
-                    },
-                    headlineContent = {
-                        Text(stringResource(Res.string.day_schedule_health_permissions_needed))
-                    },
-                )
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RoundedCornerShape(Spacing.md),
+    ) {
+        Column(
+            modifier = Modifier.padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text(
+                text = stringResource(titleRes),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = stringResource(descriptionRes),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            primaryActionLabelRes?.let { labelRes ->
                 FilledTonalButton(
-                    onClick = onRequestPermissions,
-                    modifier = Modifier.padding(start = Spacing.lg, bottom = Spacing.md),
+                    onClick = {
+                        when (gateState.missingRequirement) {
+                            HealthConnectMissingRequirement.PERMISSION -> onRequestPermissions()
+                            HealthConnectMissingRequirement.SETUP -> onSetUpHealthConnect()
+                            HealthConnectMissingRequirement.UNAVAILABLE,
+                            null,
+                            -> Unit
+                        }
+                    },
+                    enabled = !isRequestInFlight,
                 ) {
-                    Text(stringResource(Res.string.day_schedule_health_grant_access))
+                    Text(stringResource(labelRes))
+                }
+            }
+            if (showDisableAction) {
+                TextButton(onClick = onDisableSleepBased) {
+                    Text(stringResource(Res.string.day_schedule_health_turn_off))
                 }
             }
         }
-
-        HealthConnectStatus.NOT_AVAILABLE -> {
-            ListItem(
-                modifier = modifier,
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Default.Error,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(24.dp),
-                    )
-                },
-                headlineContent = {
-                    Text(stringResource(Res.string.day_schedule_health_not_available))
-                },
-                supportingContent = {
-                    Text(stringResource(Res.string.day_schedule_health_not_available_detail))
-                },
-            )
-        }
-
-        HealthConnectStatus.CHECKING -> {
-            ListItem(
-                modifier = modifier,
-                headlineContent = {
-                    Text(
-                        text = stringResource(Res.string.day_schedule_health_checking),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                },
-            )
-        }
     }
 }
+
+private fun resolveDayBoundaryGateDescription(gateState: HealthConnectGateState): StringResource =
+    when (gateState.kind) {
+        HealthConnectGateKind.CHECKING -> Res.string.day_schedule_health_checking_detail
+        HealthConnectGateKind.NEEDS_SETUP -> Res.string.day_schedule_health_setup_required_detail
+        HealthConnectGateKind.NEEDS_PERMISSION -> Res.string.day_schedule_health_permissions_needed_detail
+        HealthConnectGateKind.PERMISSION_DENIED -> Res.string.day_schedule_health_permission_denied_detail
+        HealthConnectGateKind.UNAVAILABLE -> Res.string.day_schedule_health_not_available_detail
+        HealthConnectGateKind.READY -> Res.string.day_schedule_health_checking_detail
+        HealthConnectGateKind.RECOVERY_REQUIRED ->
+            when (gateState.missingRequirement) {
+                HealthConnectMissingRequirement.PERMISSION -> Res.string.day_schedule_health_recovery_permissions_detail
+                HealthConnectMissingRequirement.SETUP -> Res.string.day_schedule_health_recovery_setup_detail
+                HealthConnectMissingRequirement.UNAVAILABLE,
+                null,
+                -> Res.string.day_schedule_health_recovery_unavailable_detail
+            }
+    }
+
+private fun resolveDayBoundaryPrimaryActionLabel(gateState: HealthConnectGateState): StringResource? =
+    when (gateState.kind) {
+        HealthConnectGateKind.NEEDS_PERMISSION,
+        HealthConnectGateKind.PERMISSION_DENIED,
+        -> Res.string.day_schedule_health_grant_access
+        HealthConnectGateKind.NEEDS_SETUP -> Res.string.day_schedule_health_set_up
+        HealthConnectGateKind.RECOVERY_REQUIRED ->
+            when (gateState.missingRequirement) {
+                HealthConnectMissingRequirement.PERMISSION -> Res.string.day_schedule_health_grant_access
+                HealthConnectMissingRequirement.SETUP -> Res.string.day_schedule_health_set_up
+                HealthConnectMissingRequirement.UNAVAILABLE,
+                null,
+                -> null
+            }
+        HealthConnectGateKind.CHECKING,
+        HealthConnectGateKind.UNAVAILABLE,
+        HealthConnectGateKind.READY,
+        -> null
+    }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -316,23 +378,3 @@ private fun formatHour(hour: Int): String {
     val today = Clock.System.todayIn(tz)
     return LocalDateTime(today, LocalTime(hour, 0)).toInstant(tz).asTime
 }
-
-internal enum class DayBoundaryToggleAction {
-    DISABLE,
-    ENABLE_DIRECTLY,
-    REQUEST_PERMISSIONS,
-    NO_OP,
-}
-
-internal fun resolveDayBoundaryToggleAction(
-    enabled: Boolean,
-    healthConnectStatus: HealthConnectStatus,
-): DayBoundaryToggleAction =
-    when {
-        !enabled -> DayBoundaryToggleAction.DISABLE
-        healthConnectStatus == HealthConnectStatus.CONNECTED -> DayBoundaryToggleAction.ENABLE_DIRECTLY
-        healthConnectStatus == HealthConnectStatus.PERMISSIONS_NEEDED -> DayBoundaryToggleAction.REQUEST_PERMISSIONS
-        healthConnectStatus == HealthConnectStatus.CHECKING -> DayBoundaryToggleAction.REQUEST_PERMISSIONS
-        healthConnectStatus == HealthConnectStatus.NOT_AVAILABLE -> DayBoundaryToggleAction.NO_OP
-        else -> DayBoundaryToggleAction.NO_OP
-    }

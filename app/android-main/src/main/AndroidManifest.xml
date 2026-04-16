@@ -31,6 +31,9 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="@string/google_api_key" />
+        <meta-data
+            android:name="health_connect.privacy_policy_url"
+            android:value="https://logdate.app/privacy" />
 
         <activity
             android:name="app.logdate.client.MainActivity"
@@ -119,6 +122,17 @@
                 <action android:name="android.intent.action.MAIN" />
             </intent-filter>
         </activity>
+
+        <!-- Handles the "Manage access" entry point from Health Connect settings -->
+        <activity-alias
+            android:name=".HealthConnectPermissionsRationaleActivity"
+            android:exported="true"
+            android:targetActivity="app.logdate.client.MainActivity"
+            android:permission="android.permission.START_HEALTH_CONNECT_DATA_MANAGEMENT">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity-alias>
 
         <receiver
             android:name="app.logdate.client.ambient.AmbientPromptAlarmReceiver"

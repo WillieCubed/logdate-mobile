@@ -1,5 +1,6 @@
 package app.logdate.client.health.datasource
 
+import app.logdate.client.health.HealthDataAvailability
 import app.logdate.client.health.model.SleepSession
 import app.logdate.client.health.model.TimeOfDay
 import io.github.aakira.napier.Napier
@@ -13,6 +14,11 @@ import kotlin.time.Instant
  * This implementation returns empty or false results for all methods.
  */
 class StubRemoteHealthDataSource : RemoteHealthDataSource {
+    override suspend fun getAvailability(): HealthDataAvailability {
+        Napier.d("StubRemoteHealthDataSource.getAvailability() called")
+        return HealthDataAvailability.NOT_AVAILABLE
+    }
+
     override suspend fun isAvailable(): Boolean {
         Napier.d("StubRemoteHealthDataSource.isAvailable() called")
         return false

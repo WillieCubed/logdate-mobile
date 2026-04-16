@@ -32,6 +32,11 @@ class DefaultLocalFirstHealthRepository(
     private val preferencesDataSource: LogdatePreferencesDataSource,
     private val ioDispatcher: CoroutineDispatcher,
 ) : LocalFirstHealthRepository {
+    override suspend fun getHealthDataAvailability(): HealthDataAvailability =
+        withContext(ioDispatcher) {
+            remoteDataSource.getAvailability()
+        }
+
     // Implementation of HealthDataRepository methods
     override suspend fun getAvailableDataTypes(): List<String> =
         withContext(ioDispatcher) {
@@ -51,7 +56,7 @@ class DefaultLocalFirstHealthRepository(
 
     override suspend fun isHealthDataAvailable(): Boolean =
         withContext(ioDispatcher) {
-            remoteDataSource.isAvailable()
+            remoteDataSource.getAvailability() == HealthDataAvailability.AVAILABLE
         }
 
     override suspend fun hasSleepPermissions(): Boolean =

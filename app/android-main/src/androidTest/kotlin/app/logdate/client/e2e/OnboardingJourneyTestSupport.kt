@@ -10,9 +10,10 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
-import app.logdate.client.domain.recommendation.AmbientPromptTime
 import app.logdate.client.domain.dayboundary.DayBoundarySettings
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
+import app.logdate.client.domain.recommendation.AmbientPromptTime
+import app.logdate.client.health.HealthDataAvailability
 import app.logdate.client.health.LocalFirstHealthRepository
 import app.logdate.client.health.model.DayBounds
 import app.logdate.client.health.model.SleepSession
@@ -34,9 +35,14 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.streak.StreakSettingsRepository
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.client.domain.recommendation.RecallMode
+import app.logdate.client.domain.recommendation.WidgetContentType
 import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.di.appModule
+import app.logdate.feature.onboarding.flow.OnboardingDeviceState
+import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
+import app.logdate.feature.onboarding.flow.OnboardingEntryMode
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.shared.model.user.AppSecurityLevel
@@ -51,6 +57,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
 import org.junit.rules.TestRule
 import org.junit.runner.Description
 import org.junit.runners.model.Statement
@@ -91,7 +98,7 @@ internal class OnboardingJourneyEnvironment {
             single<MemoriesSettingsRepository> { memoriesSettingsRepository }
             single<LocationTrackingSettingsRepository> { locationSettingsRepository }
             single<DayBoundarySettingsRepository> { dayBoundarySettingsRepository }
-            single<app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository> { onboardingDeviceStateRepository }
+            single<OnboardingDeviceStateRepository> { onboardingDeviceStateRepository }
             single<MediaManager> { mediaManager }
             single<GenerativeAIChatClient> { aiClient }
             single<NetworkAvailabilityMonitor> { networkMonitor }
@@ -371,11 +378,11 @@ internal class OnboardingFakeMemoriesSettingsRepository : MemoriesSettingsReposi
         state.value = state.value.copy(aiRecallEnabled = enabled)
     }
 
-    override suspend fun setRecallMode(mode: app.logdate.client.domain.recommendation.RecallMode) {
+    override suspend fun setRecallMode(mode: RecallMode) {
         state.value = state.value.copy(recallMode = mode)
     }
 
-    override suspend fun setWidgetContentTypes(types: Set<app.logdate.client.domain.recommendation.WidgetContentType>) {
+    override suspend fun setWidgetContentTypes(types: Set<WidgetContentType>) {
         state.value = state.value.copy(widgetContentTypes = types)
     }
 }
@@ -416,12 +423,12 @@ internal class OnboardingFakeDayBoundarySettingsRepository : DayBoundarySettings
     }
 }
 
-internal class OnboardingFakeOnboardingDeviceStateRepository : app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository {
-    private val state = MutableStateFlow(app.logdate.feature.onboarding.flow.OnboardingDeviceState())
-    override val deviceState: StateFlow<app.logdate.feature.onboarding.flow.OnboardingDeviceState> = state.asStateFlow()
+internal class OnboardingFakeOnboardingDeviceStateRepository : OnboardingDeviceStateRepository {
+    private val state = MutableStateFlow(OnboardingDeviceState())
+    override val deviceState: StateFlow<OnboardingDeviceState> = state.asStateFlow()
 
     fun reset() {
-        state.value = app.logdate.feature.onboarding.flow.OnboardingDeviceState()
+        state.value = OnboardingDeviceState()
     }
 
     override suspend fun markRecommendationsHandled() {
@@ -440,7 +447,7 @@ internal class OnboardingFakeOnboardingDeviceStateRepository : app.logdate.featu
         state.value = state.value.copy(notificationsHandledOnThisDevice = true)
     }
 
-    override suspend fun setActiveEntryMode(entryMode: app.logdate.feature.onboarding.flow.OnboardingEntryMode) {
+    override suspend fun setActiveEntryMode(entryMode: OnboardingEntryMode) {
         state.value = state.value.copy(activeEntryMode = entryMode)
     }
 
@@ -543,6 +550,13 @@ internal class OnboardingFakeHealthRepository : LocalFirstHealthRepository {
         sleepPermissionsGranted = false
     }
 
+    override suspend fun getHealthDataAvailability(): HealthDataAvailability =
+        if (available) {
+            HealthDataAvailability.AVAILABLE
+        } else {
+            HealthDataAvailability.NOT_AVAILABLE
+        }
+
     override suspend fun isHealthDataAvailable(): Boolean = available
 
     override suspend fun getAvailableDataTypes(): List<String> = emptyList()
@@ -560,18 +574,18 @@ internal class OnboardingFakeHealthRepository : LocalFirstHealthRepository {
     ): List<SleepSession> = emptyList()
 
     override suspend fun getAverageWakeUpTime(
-        timeZone: kotlinx.datetime.TimeZone,
+        timeZone: TimeZone,
         days: Int,
     ): TimeOfDay? = null
 
     override suspend fun getAverageSleepTime(
-        timeZone: kotlinx.datetime.TimeZone,
+        timeZone: TimeZone,
         days: Int,
     ): TimeOfDay? = null
 
     override suspend fun getDayBoundsForDate(
         date: LocalDate,
-        timeZone: kotlinx.datetime.TimeZone,
+        timeZone: TimeZone,
         sleepBasedBoundariesEnabled: Boolean,
     ): DayBounds = DayBounds(start = Clock.System.now(), end = Clock.System.now())
 }

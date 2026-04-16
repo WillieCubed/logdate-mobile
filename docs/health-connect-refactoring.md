@@ -166,6 +166,53 @@ val androidHealthModule = module {
 }
 ```
 
+## Android Manifest Requirements
+
+Health Connect has three mandatory manifest declarations that are separate from the runtime permission API. Missing any of these prevents the app from appearing in Health Connect's **App permissions** settings screen.
+
+### 1. Privacy policy URL
+
+```xml
+<!-- In app/android-main/src/main/AndroidManifest.xml, inside <application> -->
+<meta-data
+    android:name="health_connect.privacy_policy_url"
+    android:value="https://logdate.app/privacy" />
+```
+
+Health Connect reads this to populate its list of registered apps. Without it, the app is invisible in Health Connect settings regardless of which permissions have been granted at runtime.
+
+### 2. `health_permissions` string resource
+
+```xml
+<!-- In app/android-main/src/main/res/values/strings.xml -->
+<string name="health_permissions">LogDate</string>
+```
+
+This label is shown in the Health Connect permission request dialog when the user is asked to approve or deny access. The resource name `health_permissions` is required by convention — Health Connect looks for it by name.
+
+### 3. `ACTION_SHOW_PERMISSIONS_RATIONALE` activity alias
+
+```xml
+<!-- In app/android-main/src/main/AndroidManifest.xml, inside <application> -->
+<activity-alias
+    android:name=".HealthConnectPermissionsRationaleActivity"
+    android:exported="true"
+    android:targetActivity="app.logdate.client.MainActivity"
+    android:permission="android.permission.START_HEALTH_CONNECT_DATA_MANAGEMENT">
+    <intent-filter>
+        <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+    </intent-filter>
+</activity-alias>
+```
+
+When a user taps **Manage** next to LogDate in Health Connect settings, the system fires `ACTION_SHOW_PERMISSIONS_RATIONALE`. This alias intercepts that intent and routes it to `MainActivity`, which navigates to the day boundary settings screen (where the Health Connect permission UI lives). The `START_HEALTH_CONNECT_DATA_MANAGEMENT` permission ensures only the Health Connect system can fire this intent.
+
+### Where these live in the module graph
+
+The `android.permission.health.READ_SLEEP` permission and the `<queries>` block for the Health Connect provider package are declared in `client/domain/src/androidMain/AndroidManifest.xml` and merge into the final app manifest via Gradle manifest merging. The three entries above must live in the **app-level** manifest because they reference app-level resources and activities.
+
+---
+
 ## Benefits of the New Architecture
 
 1. **Simplified API**: Single repository interface with clear methods

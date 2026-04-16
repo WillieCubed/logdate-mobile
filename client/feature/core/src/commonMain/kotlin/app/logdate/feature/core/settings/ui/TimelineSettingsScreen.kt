@@ -3,19 +3,25 @@
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bedtime
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import app.logdate.ui.common.LinkedToggleSettingsItem
+import app.logdate.client.domain.dayboundary.HealthConnectStatus
 import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.SettingsNavigationItem
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.day_schedule
 import logdate.client.feature.core.generated.resources.day_schedule_summary_off
 import logdate.client.feature.core.generated.resources.day_schedule_summary_on
+import logdate.client.feature.core.generated.resources.day_schedule_summary_paused
 import logdate.client.feature.core.generated.resources.timeline_settings
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -37,7 +43,7 @@ fun TimelineSettingsScreen(
         onBack = onBack,
         onNavigateToDayBoundary = onNavigateToDayBoundary,
         sleepBasedBoundariesEnabled = uiState.dayBoundarySettings.sleepBasedBoundariesEnabled,
-        onToggleSleepBasedBoundaries = viewModel::toggleSleepBasedBoundaries,
+        healthConnectStatus = uiState.healthConnectStatus,
         modifier = modifier,
     )
 }
@@ -47,7 +53,7 @@ fun TimelineSettingsContent(
     onBack: () -> Unit,
     onNavigateToDayBoundary: () -> Unit,
     sleepBasedBoundariesEnabled: Boolean,
-    onToggleSleepBasedBoundaries: (Boolean) -> Unit,
+    healthConnectStatus: HealthConnectStatus,
     modifier: Modifier = Modifier,
 ) {
     SettingsScaffold(
@@ -59,21 +65,31 @@ fun TimelineSettingsContent(
             MaterialContainer(
                 modifier = Modifier.padding(horizontal = Spacing.lg),
             ) {
-                LinkedToggleSettingsItem(
+                SettingsNavigationItem(
                     title = stringResource(Res.string.day_schedule),
                     description =
                         stringResource(
-                            if (sleepBasedBoundariesEnabled) {
-                                Res.string.day_schedule_summary_on
-                            } else {
-                                Res.string.day_schedule_summary_off
-                            },
+                            resolveDayBoundarySummaryText(
+                                sleepBasedBoundariesEnabled = sleepBasedBoundariesEnabled,
+                                healthConnectStatus = healthConnectStatus,
+                            ),
                         ),
-                    checked = sleepBasedBoundariesEnabled,
-                    onCheckedChange = onToggleSleepBasedBoundaries,
-                    onNavigate = onNavigateToDayBoundary,
+                    icon = { Icon(Icons.Rounded.Bedtime, contentDescription = null) },
+                    onClick = onNavigateToDayBoundary,
                 )
             }
         }
     }
 }
+
+internal fun resolveDayBoundarySummaryText(
+    sleepBasedBoundariesEnabled: Boolean,
+    healthConnectStatus: HealthConnectStatus,
+): StringResource =
+    when {
+        !sleepBasedBoundariesEnabled -> Res.string.day_schedule_summary_off
+        healthConnectStatus == HealthConnectStatus.CONNECTED ||
+            healthConnectStatus == HealthConnectStatus.CHECKING
+        -> Res.string.day_schedule_summary_on
+        else -> Res.string.day_schedule_summary_paused
+    }

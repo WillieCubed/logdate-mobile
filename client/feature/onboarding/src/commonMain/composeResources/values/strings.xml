@@ -109,12 +109,15 @@
     <string name="onboarding_day_boundaries_status_connected_description">LogDate can use Health Connect to place late-night entries on the day you were still living.</string>
     <string name="onboarding_day_boundaries_status_permissions_title">Use sleep data for better journaling boundaries</string>
     <string name="onboarding_day_boundaries_status_permissions_description">Grant access to sleep sessions so LogDate can tell when one journaling day actually ends and the next begins.</string>
+    <string name="onboarding_day_boundaries_status_setup_required_title">Install or update Health Connect first</string>
+    <string name="onboarding_day_boundaries_status_setup_required_description">This device can use sleep-based day boundaries, but Health Connect needs to finish installing or updating before LogDate can request sleep access.</string>
     <string name="onboarding_day_boundaries_status_checking_title">Checking Health Connect</string>
     <string name="onboarding_day_boundaries_status_checking_description">We&apos;re seeing whether sleep-based day boundaries are available on this device.</string>
     <string name="onboarding_day_boundaries_privacy_title">Private by default</string>
     <string name="onboarding_day_boundaries_privacy">Sleep data is only used to place your entries on the right day. LogDate isn&apos;t trying to track or coach your sleep.</string>
     <string name="onboarding_day_boundaries_enable">Use sleep for day boundaries</string>
     <string name="onboarding_day_boundaries_grant_access">Grant sleep access</string>
+    <string name="onboarding_day_boundaries_set_up_health_connect">Install or update Health Connect</string>
     <string name="onboarding_day_boundaries_not_now">Not now</string>
 
     <!-- Location screen -->
@@ -126,10 +129,37 @@
     <string name="onboarding_location_not_now">Not now</string>
     <string name="onboarding_location_privacy">Your location data is stored locally on your device and is never shared without your explicit consent.</string>
 
+    <!-- Start screen -->
+    <string name="onboarding_start_tagline">Imagine if you had a journal that grew with you and the people you cared about.</string>
+    <string name="onboarding_start_tagline_subheading">No need to imagine anymore.</string>
+    <string name="onboarding_start_welcome_title">Welcome to LogDate.</string>
+    <string name="onboarding_start_welcome_subtitle">A new home for your memories.</string>
+
+    <!-- Overview screen -->
+    <string name="onboarding_overview_title">Here&apos;s how this works.</string>
+    <string name="onboarding_overview_card_log_title">Add things to your Log</string>
+    <string name="onboarding_overview_card_log_description">Your Log is your personal timeline. Write things and add photos or even voice memos. Everything is private to you by default.</string>
+    <string name="onboarding_overview_card_journals_title">Make journals for your memories</string>
+    <string name="onboarding_overview_card_journals_description">Create a journal for the people you care about — whether your climbing buddies, your crochet club, or your family. Even if they don&apos;t use LogDate, they can still join in and add stuff.</string>
+    <string name="onboarding_overview_card_recaps_title">Get weekly recaps</string>
+    <string name="onboarding_overview_card_recaps_description">Every week, we&apos;ll give you a Wrapped for your everyday life. We&apos;ll even give you a year in review if you keep it up!</string>
+
+    <!-- Completion screen -->
+    <string name="onboarding_completion_streak_begins">Your streak begins today.</string>
+    <string name="onboarding_completion_streak_encouragement">Write, photograph, or record something every day to keep it up.</string>
+    <string name="onboarding_completion_happy_logging">Happy logging!</string>
+
+    <!-- Error messages -->
+    <string name="onboarding_error_save_birthday">We couldn&apos;t save your birthday right now.</string>
+    <string name="onboarding_error_save_location">We couldn&apos;t save your location preference right now.</string>
+    <string name="onboarding_error_save_notifications">We couldn&apos;t save your notification setup right now.</string>
+    <string name="onboarding_error_save_recommendations">We couldn&apos;t save your recommendations setting right now.</string>
+    <string name="onboarding_error_save_day_boundaries">We couldn&apos;t save your day boundary preference right now.</string>
+
     <!-- Notifications screen -->
-    <string name="onboarding_notifications_title">Stay in the loop</string>
-    <string name="onboarding_notifications_body_with_recommendations">Get a gentle nudge when it&apos;s the perfect time to capture a memory, plus progress updates when exporting or restoring your data.</string>
+    <string name="onboarding_notifications_title">Journal notifications</string>
+    <string name="onboarding_notifications_body_with_recommendations">Get daily journal prompts with LogDate. Every day, you&apos;ll get a reminder to log something in your journal.</string>
     <string name="onboarding_notifications_body_without_recommendations">Get progress updates when exporting or restoring your data, so you always know when your memories are ready.</string>
-    <string name="onboarding_notifications_enable">Enable notifications</string>
-    <string name="onboarding_notifications_not_now">Not now</string>
+    <string name="onboarding_notifications_enable">Enable</string>
+    <string name="onboarding_notifications_not_now">Continue without notifications</string>
 </resources>

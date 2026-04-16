@@ -1,5 +1,6 @@
 package app.logdate.client.health.datasource
 
+import app.logdate.client.health.HealthDataAvailability
 import app.logdate.client.health.model.SleepSession
 import app.logdate.client.health.model.TimeOfDay
 import io.github.aakira.napier.Napier
@@ -14,19 +15,24 @@ import kotlin.time.Instant
  * to provide simulated data for testing or development.
  */
 class JvmStubRemoteHealthDataSource : RemoteHealthDataSource {
+    override suspend fun getAvailability(): HealthDataAvailability {
+        Napier.d("JvmStubRemoteHealthDataSource health provider is not available")
+        return HealthDataAvailability.NOT_AVAILABLE
+    }
+
     override suspend fun isAvailable(): Boolean {
-        Napier.d("JvmStubRemoteHealthDataSource is always available")
-        return true
+        Napier.d("JvmStubRemoteHealthDataSource is not available")
+        return false
     }
 
     override suspend fun hasSleepPermissions(): Boolean {
-        Napier.d("JvmStubRemoteHealthDataSource always has permissions")
-        return true
+        Napier.d("JvmStubRemoteHealthDataSource has no health permissions")
+        return false
     }
 
     override suspend fun requestSleepPermissions(): Boolean {
-        Napier.d("JvmStubRemoteHealthDataSource permissions request always succeeds")
-        return true
+        Napier.d("JvmStubRemoteHealthDataSource cannot request health permissions")
+        return false
     }
 
     override suspend fun getSleepSessions(

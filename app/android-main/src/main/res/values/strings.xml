@@ -1,6 +1,13 @@
 <resources>
     <!-- App identity -->
     <string name="app_name">LogDate</string>
+    <!--
+        Required by Health Connect to register LogDate in the "App permissions" list.
+        Health Connect displays this label when the user manages which apps can access
+        their health data. Without this resource the app does not appear in Health Connect
+        settings at all, regardless of whether permissions have been granted.
+    -->
+    <string name="health_permissions">LogDate</string>
     <string name="feature_remote_display_module_title">Present on TV</string>
     <string name="feature_speech_recognition_module_title">Speech Recognition</string>
 

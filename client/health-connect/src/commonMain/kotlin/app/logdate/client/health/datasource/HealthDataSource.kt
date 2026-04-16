@@ -1,5 +1,6 @@
 package app.logdate.client.health.datasource
 
+import app.logdate.client.health.HealthDataAvailability
 import app.logdate.client.health.model.SleepSession
 import app.logdate.client.health.model.TimeOfDay
 import kotlinx.datetime.TimeZone
@@ -91,6 +92,11 @@ interface LocalHealthDataSource : HealthDataSource {
  * This includes Android's Health Connect, iOS HealthKit, etc.
  */
 interface RemoteHealthDataSource : HealthDataSource {
+    /**
+     * Returns the provider availability state, including setup-required cases.
+     */
+    suspend fun getAvailability(): HealthDataAvailability
+
     /**
      * Checks if the app has permissions to access sleep data.
      *

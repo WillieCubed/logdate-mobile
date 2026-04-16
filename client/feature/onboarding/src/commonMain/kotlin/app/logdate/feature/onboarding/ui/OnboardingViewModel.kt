@@ -13,6 +13,7 @@ import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.feature.onboarding.flow.OnboardingDeviceState
 import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
 import app.logdate.feature.onboarding.flow.OnboardingEntryMode
 import app.logdate.feature.onboarding.flow.OnboardingProgressSnapshot
@@ -238,9 +239,6 @@ class OnboardingViewModel(
             viewModelScope.launch {
                 observeHealthConnectStatus().collect { status ->
                     _healthConnectStatus.value = status
-                    if (status == HealthConnectStatus.NOT_AVAILABLE) {
-                        dayBoundarySettingsRepository.setSleepBasedBoundariesEnabled(false)
-                    }
                 }
             }
     }
@@ -308,7 +306,7 @@ class OnboardingViewModel(
     }
 
     private data class OnboardingProgressInputs(
-        val deviceState: app.logdate.feature.onboarding.flow.OnboardingDeviceState,
+        val deviceState: OnboardingDeviceState,
         val healthStatus: HealthConnectStatus,
         val recommendationsEnabled: Boolean,
         val locationTrackingEnabled: Boolean,
@@ -316,7 +314,7 @@ class OnboardingViewModel(
     )
 
     private data class PartialOnboardingProgressInputs(
-        val deviceState: app.logdate.feature.onboarding.flow.OnboardingDeviceState,
+        val deviceState: OnboardingDeviceState,
         val healthStatus: HealthConnectStatus,
         val recommendationsEnabled: Boolean,
         val locationTrackingEnabled: Boolean,

@@ -108,9 +108,6 @@ fun NavGraphBuilder.settingsGraph(navController: NavController) {
     composable<DayBoundarySettingsRoute> {
         DayBoundarySettingsScreen(
             onBack = { navController.popBackStack() },
-            // Health Connect not available on desktop
-            onRequestHealthPermissions = {},
-            onEnableSleepBasedWithPermissions = {},
         )
     }
     composable<SyncSettingsRoute> {

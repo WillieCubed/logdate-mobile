@@ -13,6 +13,11 @@ import kotlin.time.Instant
  */
 interface LocalFirstHealthRepository : HealthDataRepository {
     /**
+     * Returns the current availability state of the platform health provider.
+     */
+    suspend fun getHealthDataAvailability(): HealthDataAvailability
+
+    /**
      * Checks if the app has permissions to access sleep data.
      *
      * @return true if sleep permissions are granted, false otherwise

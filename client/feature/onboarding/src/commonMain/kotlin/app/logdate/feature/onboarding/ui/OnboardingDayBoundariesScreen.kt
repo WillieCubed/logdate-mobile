@@ -6,33 +6,31 @@
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.calculateEndPadding
-import androidx.compose.foundation.layout.calculateStartPadding
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -44,20 +42,24 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import app.logdate.client.domain.dayboundary.HealthConnectGateKind
+import app.logdate.client.domain.dayboundary.HealthConnectGateState
+import app.logdate.client.domain.dayboundary.HealthConnectMissingRequirement
 import app.logdate.client.domain.dayboundary.HealthConnectStatus
+import app.logdate.client.domain.dayboundary.reduceHealthConnectGateState
 import app.logdate.client.permissions.rememberHealthConnectPermissionState
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.ui.generated.resources.common_back
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import logdate.client.ui.generated.resources.Res as UiRes
@@ -70,81 +72,98 @@ const val ONBOARDING_DAY_BOUNDARIES_SKIP_TAG = "onboarding_day_boundaries_skip"
 fun OnboardingDayBoundariesScreen(
     onBack: () -> Unit,
     onNext: (Boolean) -> Unit,
+    onSetUpHealthConnect: () -> Unit = {},
     viewModel: OnboardingViewModel = koinViewModel(),
 ) {
-    val healthConnectStatus by viewModel.healthConnectStatus.collectAsState()
+    val progressSnapshot by viewModel.progressSnapshot.collectAsState()
+    val healthConnectStatus = progressSnapshot.healthConnectStatus
     val permissionState = rememberHealthConnectPermissionState()
     val coroutineScope = rememberCoroutineScope()
     var isSaving by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var enableAfterPermission by rememberSaveable { mutableStateOf(false) }
+    var pendingEnableAfterPermission by rememberSaveable { mutableStateOf(false) }
+    var previousResolvedGateState by remember { mutableStateOf<HealthConnectGateState?>(null) }
+    val gateState =
+        reduceHealthConnectGateState(
+            sleepBasedPreferenceEnabled = progressSnapshot.sleepBasedDayBoundariesEnabled,
+            healthConnectStatus = healthConnectStatus,
+            hasPermission = permissionState.hasPermission,
+            permissionRequested = permissionState.permissionRequested,
+            previousResolvedGateState = previousResolvedGateState,
+        )
 
-    LaunchedEffect(permissionState.completedRequestCount) {
-        if (permissionState.completedRequestCount > 0) {
+    fun persistAndContinue(enabled: Boolean) {
+        coroutineScope.launch {
+            isSaving = true
+            errorMessage = null
+            viewModel
+                .persistSleepBasedDayBoundariesEnabled(enabled = enabled)
+                .onSuccess {
+                    viewModel
+                        .markDayBoundariesHandled()
+                        .onSuccess {
+                            isSaving = false
+                            onNext(enabled)
+                        }.onFailure {
+                            errorMessage = getString(Res.string.onboarding_error_save_day_boundaries)
+                            isSaving = false
+                        }
+                }.onFailure {
+                    errorMessage = getString(Res.string.onboarding_error_save_day_boundaries)
+                    isSaving = false
+                }
+        }
+    }
+
+    LaunchedEffect(gateState) {
+        if (gateState.kind != HealthConnectGateKind.CHECKING) {
+            previousResolvedGateState = gateState
+        }
+        Napier.i(
+            "Onboarding day boundaries gate state: kind=${gateState.kind} requirement=${gateState.missingRequirement}",
+        )
+    }
+
+    LaunchedEffect(healthConnectStatus) {
+        permissionState.refreshPermissionState()
+    }
+
+    LaunchedEffect(permissionState.hasPermission, healthConnectStatus) {
+        val backendThinksConnected = healthConnectStatus == HealthConnectStatus.CONNECTED
+        if (permissionState.hasPermission != backendThinksConnected) {
             viewModel.refreshHealthStatus()
         }
     }
 
-    // Defensive: screen should not be reached when HC is unavailable, but navigate away if it is
     LaunchedEffect(healthConnectStatus) {
         if (healthConnectStatus == HealthConnectStatus.NOT_AVAILABLE) {
-            coroutineScope.launch {
-                isSaving = true
-                errorMessage = null
-                viewModel
-                    .persistSleepBasedDayBoundariesEnabled(enabled = false)
-                    .onSuccess {
-                        viewModel
-                            .markDayBoundariesHandled()
-                            .onSuccess {
-                                isSaving = false
-                                onNext(false)
-                            }.onFailure {
-                                errorMessage = "We couldn't save your day boundary preference right now."
-                                isSaving = false
-                            }
-                    }.onFailure {
-                        errorMessage = "We couldn't save your day boundary preference right now."
-                        isSaving = false
-                    }
-            }
+            persistAndContinue(enabled = false)
         }
     }
 
-    LaunchedEffect(enableAfterPermission, permissionState.completedRequestCount, healthConnectStatus) {
+    LaunchedEffect(
+        pendingEnableAfterPermission,
+        permissionState.hasPermission,
+        permissionState.permissionRequested,
+        permissionState.isRequestInFlight,
+        gateState,
+    ) {
         when (
             resolveDayBoundariesPostPermissionAction(
-                enableAfterPermission = enableAfterPermission,
-                completedRequestCount = permissionState.completedRequestCount,
-                healthConnectStatus = healthConnectStatus,
+                pendingEnableAfterPermission = pendingEnableAfterPermission,
+                hasPermission = permissionState.hasPermission,
+                permissionRequested = permissionState.permissionRequested,
+                isRequestInFlight = permissionState.isRequestInFlight,
+                gateState = gateState,
             )
         ) {
             DayBoundariesPostPermissionAction.ENABLE_AND_CONTINUE -> {
-                enableAfterPermission = false
-                coroutineScope.launch {
-                    isSaving = true
-                    errorMessage = null
-                    viewModel
-                        .persistSleepBasedDayBoundariesEnabled(enabled = true)
-                        .onSuccess {
-                            viewModel
-                                .markDayBoundariesHandled()
-                                .onSuccess {
-                                    isSaving = false
-                                    onNext(true)
-                                }.onFailure {
-                                    errorMessage = "We couldn't save your day boundary preference right now."
-                                    isSaving = false
-                                }
-                        }.onFailure {
-                            errorMessage = "We couldn't save your day boundary preference right now."
-                            isSaving = false
-                        }
-                }
+                pendingEnableAfterPermission = false
+                persistAndContinue(enabled = true)
             }
 
             DayBoundariesPostPermissionAction.RESET_REQUEST_STATE -> {
-                enableAfterPermission = false
+                pendingEnableAfterPermission = false
             }
 
             DayBoundariesPostPermissionAction.NONE -> Unit
@@ -152,64 +171,29 @@ fun OnboardingDayBoundariesScreen(
     }
 
     OnboardingDayBoundariesContent(
-        healthConnectStatus = healthConnectStatus,
+        gateState = gateState,
         onBack = onBack,
         onEnable = {
-            when (healthConnectStatus) {
-                HealthConnectStatus.CONNECTED -> {
-                    coroutineScope.launch {
-                        isSaving = true
-                        errorMessage = null
-                        viewModel
-                            .persistSleepBasedDayBoundariesEnabled(enabled = true)
-                            .onSuccess {
-                                viewModel
-                                    .markDayBoundariesHandled()
-                                    .onSuccess {
-                                        isSaving = false
-                                        onNext(true)
-                                    }.onFailure {
-                                        errorMessage = "We couldn't save your day boundary preference right now."
-                                        isSaving = false
-                                    }
-                            }.onFailure {
-                                errorMessage = "We couldn't save your day boundary preference right now."
-                                isSaving = false
-                            }
-                    }
+            when {
+                gateState.kind == HealthConnectGateKind.READY -> {
+                    persistAndContinue(enabled = true)
                 }
-                HealthConnectStatus.PERMISSIONS_NEEDED -> {
-                    enableAfterPermission = true
+                gateState.missingRequirement == HealthConnectMissingRequirement.PERMISSION -> {
+                    pendingEnableAfterPermission = true
                     permissionState.requestPermission()
                 }
-                HealthConnectStatus.CHECKING,
-                HealthConnectStatus.NOT_AVAILABLE,
-                -> Unit
+                gateState.missingRequirement == HealthConnectMissingRequirement.SETUP -> {
+                    onSetUpHealthConnect()
+                }
+                else -> Unit
             }
         },
         onSkip = {
-            coroutineScope.launch {
-                isSaving = true
-                errorMessage = null
-                viewModel
-                    .persistSleepBasedDayBoundariesEnabled(enabled = false)
-                    .onSuccess {
-                        viewModel
-                            .markDayBoundariesHandled()
-                            .onSuccess {
-                                isSaving = false
-                                onNext(false)
-                            }.onFailure {
-                                errorMessage = "We couldn't save your day boundary preference right now."
-                                isSaving = false
-                            }
-                    }.onFailure {
-                        errorMessage = "We couldn't save your day boundary preference right now."
-                        isSaving = false
-                    }
-            }
+            pendingEnableAfterPermission = false
+            persistAndContinue(enabled = false)
         },
         isSaving = isSaving,
+        isRequestInFlight = permissionState.isRequestInFlight,
         errorMessage = errorMessage,
     )
 }
@@ -221,169 +205,101 @@ internal enum class DayBoundariesPostPermissionAction {
 }
 
 internal fun resolveDayBoundariesPostPermissionAction(
-    enableAfterPermission: Boolean,
-    completedRequestCount: Int,
-    healthConnectStatus: HealthConnectStatus,
+    pendingEnableAfterPermission: Boolean,
+    hasPermission: Boolean,
+    permissionRequested: Boolean,
+    isRequestInFlight: Boolean,
+    gateState: HealthConnectGateState,
 ): DayBoundariesPostPermissionAction {
-    if (!enableAfterPermission || completedRequestCount == 0) {
+    if (!pendingEnableAfterPermission) {
         return DayBoundariesPostPermissionAction.NONE
     }
 
-    return when (healthConnectStatus) {
-        HealthConnectStatus.CONNECTED -> DayBoundariesPostPermissionAction.ENABLE_AND_CONTINUE
-        HealthConnectStatus.PERMISSIONS_NEEDED,
-        HealthConnectStatus.NOT_AVAILABLE,
-        -> DayBoundariesPostPermissionAction.RESET_REQUEST_STATE
-        HealthConnectStatus.CHECKING -> DayBoundariesPostPermissionAction.NONE
+    return when {
+        hasPermission && gateState.kind == HealthConnectGateKind.READY -> {
+            DayBoundariesPostPermissionAction.ENABLE_AND_CONTINUE
+        }
+        permissionRequested && !hasPermission && !isRequestInFlight -> {
+            DayBoundariesPostPermissionAction.RESET_REQUEST_STATE
+        }
+        else -> DayBoundariesPostPermissionAction.NONE
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingDayBoundariesContent(
-    healthConnectStatus: HealthConnectStatus,
+    gateState: HealthConnectGateState,
     onBack: () -> Unit,
     onEnable: () -> Unit,
     onSkip: () -> Unit,
     isSaving: Boolean = false,
+    isRequestInFlight: Boolean = false,
     errorMessage: String? = null,
 ) {
-    val scrollState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(scrollState)
     val primaryActionLabel =
-        when (healthConnectStatus) {
-            HealthConnectStatus.CONNECTED -> stringResource(Res.string.onboarding_day_boundaries_enable)
-            HealthConnectStatus.PERMISSIONS_NEEDED -> stringResource(Res.string.onboarding_day_boundaries_grant_access)
-            HealthConnectStatus.CHECKING,
-            HealthConnectStatus.NOT_AVAILABLE,
-            -> stringResource(Res.string.onboarding_day_boundaries_status_checking_title)
+        when {
+            gateState.kind == HealthConnectGateKind.READY -> {
+                stringResource(Res.string.onboarding_day_boundaries_enable)
+            }
+            gateState.missingRequirement == HealthConnectMissingRequirement.PERMISSION -> {
+                stringResource(Res.string.onboarding_day_boundaries_grant_access)
+            }
+            gateState.missingRequirement == HealthConnectMissingRequirement.SETUP -> {
+                stringResource(Res.string.onboarding_day_boundaries_set_up_health_connect)
+            }
+            else -> stringResource(Res.string.onboarding_day_boundaries_status_checking_title)
         }
     val statusTitle =
-        when (healthConnectStatus) {
-            HealthConnectStatus.CONNECTED -> stringResource(Res.string.onboarding_day_boundaries_status_connected_title)
-            HealthConnectStatus.PERMISSIONS_NEEDED -> stringResource(Res.string.onboarding_day_boundaries_status_permissions_title)
-            HealthConnectStatus.CHECKING,
-            HealthConnectStatus.NOT_AVAILABLE,
-            -> stringResource(Res.string.onboarding_day_boundaries_status_checking_title)
+        when {
+            gateState.kind == HealthConnectGateKind.READY -> {
+                stringResource(Res.string.onboarding_day_boundaries_status_connected_title)
+            }
+            gateState.missingRequirement == HealthConnectMissingRequirement.PERMISSION -> {
+                stringResource(Res.string.onboarding_day_boundaries_status_permissions_title)
+            }
+            gateState.missingRequirement == HealthConnectMissingRequirement.SETUP -> {
+                stringResource(Res.string.onboarding_day_boundaries_status_setup_required_title)
+            }
+            else -> stringResource(Res.string.onboarding_day_boundaries_status_checking_title)
         }
     val statusDescription =
-        when (healthConnectStatus) {
-            HealthConnectStatus.CONNECTED -> stringResource(Res.string.onboarding_day_boundaries_status_connected_description)
-            HealthConnectStatus.PERMISSIONS_NEEDED -> stringResource(Res.string.onboarding_day_boundaries_status_permissions_description)
-            HealthConnectStatus.CHECKING,
-            HealthConnectStatus.NOT_AVAILABLE,
-            -> stringResource(Res.string.onboarding_day_boundaries_status_checking_description)
+        when {
+            gateState.kind == HealthConnectGateKind.READY -> {
+                stringResource(Res.string.onboarding_day_boundaries_status_connected_description)
+            }
+            gateState.missingRequirement == HealthConnectMissingRequirement.PERMISSION -> {
+                stringResource(Res.string.onboarding_day_boundaries_status_permissions_description)
+            }
+            gateState.missingRequirement == HealthConnectMissingRequirement.SETUP -> {
+                stringResource(Res.string.onboarding_day_boundaries_status_setup_required_description)
+            }
+            else -> stringResource(Res.string.onboarding_day_boundaries_status_checking_description)
         }
 
     Scaffold(
-        topBar = {
-            LargeTopAppBar(
-                title = {
-                    Text(stringResource(Res.string.onboarding_day_boundaries_title))
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
-        },
-    ) { contentPadding ->
-        LazyColumn(
-            modifier =
-                Modifier
-                    .testTag(ONBOARDING_DAY_BOUNDARIES_ROOT_TAG)
-                    .fillMaxHeight()
-                    .widthIn(max = 444.dp)
-                    .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding =
-                PaddingValues(
-                    top = contentPadding.calculateTopPadding() + Spacing.lg,
-                    bottom = contentPadding.calculateBottomPadding() + Spacing.lg,
-                    start = contentPadding.calculateStartPadding(LayoutDirection.Ltr) + Spacing.lg,
-                    end = contentPadding.calculateEndPadding(LayoutDirection.Ltr) + Spacing.lg,
-                ),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            item {
-                Text(
-                    stringResource(Res.string.onboarding_day_boundaries_body),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
-            item {
-                OverviewItem(
-                    title = stringResource(Res.string.onboarding_day_boundaries_card_title),
-                    description = stringResource(Res.string.onboarding_day_boundaries_card_description),
-                    icon = {
-                        Icon(Icons.Rounded.Bedtime, contentDescription = null)
-                    },
-                )
-            }
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                ) {
-                    Column(modifier = Modifier.padding(Spacing.lg)) {
-                        Text(
-                            text = statusTitle,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(modifier = Modifier.height(Spacing.sm))
-                        Text(
-                            text = statusDescription,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                ) {
-                    Column(modifier = Modifier.padding(Spacing.lg)) {
-                        Text(
-                            text = stringResource(Res.string.onboarding_day_boundaries_privacy_title),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(modifier = Modifier.height(Spacing.sm))
-                        Text(
-                            text = stringResource(Res.string.onboarding_day_boundaries_privacy),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            item {
+        bottomBar = {
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+                contentAlignment = Alignment.Center,
+            ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(top = Spacing.md),
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Button(
                         onClick = onEnable,
                         modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_DAY_BOUNDARIES_ENABLE_TAG),
-                        enabled = !isSaving && healthConnectStatus != HealthConnectStatus.CHECKING,
+                        enabled = !isSaving && !isRequestInFlight && gateState.kind != HealthConnectGateKind.CHECKING,
                     ) {
-                        Text(primaryActionLabel)
+                        if (isSaving || isRequestInFlight) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Text(primaryActionLabel)
+                        }
                     }
                     TextButton(
                         onClick = onSkip,
@@ -401,6 +317,96 @@ fun OnboardingDayBoundariesContent(
                     }
                 }
             }
+        },
+    ) { contentPadding ->
+        Box(
+            modifier = Modifier.fillMaxSize().padding(contentPadding),
+        ) {
+            Column(
+                modifier =
+                    Modifier
+                        .testTag(ONBOARDING_DAY_BOUNDARIES_ROOT_TAG)
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = Spacing.lg),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
+                    horizontalArrangement = Arrangement.Start,
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
+                    }
+                }
+                Column(
+                    modifier = Modifier.widthIn(max = 444.dp),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Text(
+                        stringResource(Res.string.onboarding_day_boundaries_title),
+                        style = MaterialTheme.typography.headlineLarge,
+                        modifier = Modifier.padding(bottom = Spacing.md),
+                    )
+                    Text(
+                        stringResource(Res.string.onboarding_day_boundaries_body),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    OverviewItem(
+                        title = stringResource(Res.string.onboarding_day_boundaries_card_title),
+                        description = stringResource(Res.string.onboarding_day_boundaries_card_description),
+                        icon = {
+                            Icon(Icons.Rounded.Bedtime, contentDescription = null)
+                        },
+                    )
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors =
+                            CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    ) {
+                        Column(modifier = Modifier.padding(Spacing.lg)) {
+                            Text(
+                                text = statusTitle,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(modifier = Modifier.height(Spacing.sm))
+                            Text(
+                                text = statusDescription,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors =
+                            CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    ) {
+                        Column(modifier = Modifier.padding(Spacing.lg)) {
+                            Text(
+                                text = stringResource(Res.string.onboarding_day_boundaries_privacy_title),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(modifier = Modifier.height(Spacing.sm))
+                            Text(
+                                text = stringResource(Res.string.onboarding_day_boundaries_privacy),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -410,7 +416,11 @@ fun OnboardingDayBoundariesContent(
 private fun OnboardingDayBoundariesScreenPreview_PermissionsNeeded() {
     LogDateTheme {
         OnboardingDayBoundariesContent(
-            healthConnectStatus = HealthConnectStatus.PERMISSIONS_NEEDED,
+            gateState =
+                HealthConnectGateState(
+                    kind = HealthConnectGateKind.NEEDS_PERMISSION,
+                    missingRequirement = HealthConnectMissingRequirement.PERMISSION,
+                ),
             onBack = {},
             onEnable = {},
             onSkip = {},
@@ -423,7 +433,10 @@ private fun OnboardingDayBoundariesScreenPreview_PermissionsNeeded() {
 private fun OnboardingDayBoundariesScreenPreview_Connected() {
     LogDateTheme {
         OnboardingDayBoundariesContent(
-            healthConnectStatus = HealthConnectStatus.CONNECTED,
+            gateState =
+                HealthConnectGateState(
+                    kind = HealthConnectGateKind.READY,
+                ),
             onBack = {},
             onEnable = {},
             onSkip = {},

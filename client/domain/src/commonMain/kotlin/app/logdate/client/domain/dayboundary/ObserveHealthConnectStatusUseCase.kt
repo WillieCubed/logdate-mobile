@@ -1,5 +1,6 @@
 package app.logdate.client.domain.dayboundary
 
+import app.logdate.client.health.HealthDataAvailability
 import app.logdate.client.health.LocalFirstHealthRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -13,6 +14,9 @@ enum class HealthConnectStatus {
 
     /** Health Connect is available but sleep permissions have not been granted. */
     PERMISSIONS_NEEDED,
+
+    /** Health Connect can work here, but the provider app must be installed or updated first. */
+    PROVIDER_UPDATE_REQUIRED,
 
     /** Health Connect is not available on this device. */
     NOT_AVAILABLE,
@@ -31,10 +35,16 @@ class ObserveHealthConnectStatusUseCase(
         flow {
             emit(HealthConnectStatus.CHECKING)
 
-            val available = healthRepository.isHealthDataAvailable()
-            if (!available) {
-                emit(HealthConnectStatus.NOT_AVAILABLE)
-                return@flow
+            when (healthRepository.getHealthDataAvailability()) {
+                HealthDataAvailability.NOT_AVAILABLE -> {
+                    emit(HealthConnectStatus.NOT_AVAILABLE)
+                    return@flow
+                }
+                HealthDataAvailability.PROVIDER_UPDATE_REQUIRED -> {
+                    emit(HealthConnectStatus.PROVIDER_UPDATE_REQUIRED)
+                    return@flow
+                }
+                HealthDataAvailability.AVAILABLE -> Unit
             }
 
             val hasPermissions = healthRepository.hasSleepPermissions()

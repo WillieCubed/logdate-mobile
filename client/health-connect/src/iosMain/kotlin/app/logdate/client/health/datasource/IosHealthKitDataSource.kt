@@ -1,5 +1,6 @@
 package app.logdate.client.health.datasource
 
+import app.logdate.client.health.HealthDataAvailability
 import app.logdate.client.health.model.SleepSession
 import app.logdate.client.health.model.TimeOfDay
 import io.github.aakira.napier.Napier
@@ -13,6 +14,11 @@ import kotlin.time.Instant
  * an actual HealthKit implementation in a real application.
  */
 class IosHealthKitDataSource : RemoteHealthDataSource {
+    override suspend fun getAvailability(): HealthDataAvailability {
+        Napier.d("HealthKit availability check - currently unavailable")
+        return HealthDataAvailability.NOT_AVAILABLE
+    }
+
     override suspend fun isAvailable(): Boolean {
         Napier.d("HealthKit availability check - currently a stub")
         return false

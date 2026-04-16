@@ -13,6 +13,7 @@ import app.logdate.client.domain.recommendation.RecallMode
 import app.logdate.client.domain.recommendation.WidgetContentType
 import app.logdate.client.domain.streak.CalculateStreakUseCase
 import app.logdate.client.domain.streak.RefreshStreakUseCase
+import app.logdate.client.health.HealthDataAvailability
 import app.logdate.client.health.LocalFirstHealthRepository
 import app.logdate.client.health.model.DayBounds
 import app.logdate.client.health.model.SleepSession
@@ -173,7 +174,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun refreshHealthStatus_whenUnavailable_disablesSleepBasedDayBoundaries() =
+    fun refreshHealthStatus_whenUnavailable_preservesSleepBasedDayBoundariesPreference() =
         runTest {
             fakeHealthRepository.isAvailable = false
             fakeDayBoundarySettingsRepository.setSleepBasedBoundariesEnabled(true)
@@ -182,7 +183,7 @@ class OnboardingViewModelTest {
             advanceUntilIdle()
 
             assertEquals(HealthConnectStatus.NOT_AVAILABLE, viewModel.healthConnectStatus.value)
-            assertEquals(false, fakeDayBoundarySettingsRepository.sleepBasedBoundariesEnabled)
+            assertEquals(true, fakeDayBoundarySettingsRepository.sleepBasedBoundariesEnabled)
         }
 
     @Test
@@ -535,6 +536,13 @@ private class FakeDayBoundarySettingsRepository : DayBoundarySettingsRepository 
 private class FakeLocalFirstHealthRepository : LocalFirstHealthRepository {
     var isAvailable: Boolean = true
     var hasPermissions: Boolean = true
+
+    override suspend fun getHealthDataAvailability(): HealthDataAvailability =
+        if (isAvailable) {
+            HealthDataAvailability.AVAILABLE
+        } else {
+            HealthDataAvailability.NOT_AVAILABLE
+        }
 
     override suspend fun isHealthDataAvailable(): Boolean = isAvailable
 

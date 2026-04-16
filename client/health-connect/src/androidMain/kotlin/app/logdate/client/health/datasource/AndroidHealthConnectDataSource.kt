@@ -1,11 +1,14 @@
 package app.logdate.client.health.datasource
 
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import app.logdate.client.health.HealthDataAvailability
 import app.logdate.client.health.SleepSessionConstants
 import app.logdate.client.health.model.SleepSession
 import app.logdate.client.health.model.SleepStage
@@ -23,6 +26,14 @@ import kotlin.time.Instant
 class AndroidHealthConnectDataSource(
     private val context: Context,
 ) : RemoteHealthDataSource {
+    private companion object {
+        private const val HEALTH_CONNECT_PROVIDER_PACKAGE = "com.google.android.apps.healthdata"
+    }
+
+    init {
+        warnIfManifestRequirementsMissing()
+    }
+
     private val healthConnectClient by lazy {
         try {
             HealthConnectClient.getOrCreate(context)
@@ -37,14 +48,23 @@ class AndroidHealthConnectDataSource(
             HealthPermission.getReadPermission(SleepSessionRecord::class),
         )
 
-    override suspend fun isAvailable(): Boolean =
+    override suspend fun getAvailability(): HealthDataAvailability =
         try {
-            val availability = HealthConnectClient.getSdkStatus(context)
-            availability == HealthConnectClient.SDK_AVAILABLE
+            val availability = HealthConnectClient.getSdkStatus(context, HEALTH_CONNECT_PROVIDER_PACKAGE)
+            Napier.i("Health Connect SDK status: ${sdkStatusLabel(availability)} ($availability)")
+            when (availability) {
+                HealthConnectClient.SDK_AVAILABLE -> HealthDataAvailability.AVAILABLE
+                HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> {
+                    HealthDataAvailability.PROVIDER_UPDATE_REQUIRED
+                }
+                else -> HealthDataAvailability.NOT_AVAILABLE
+            }
         } catch (e: Exception) {
             Napier.e("Error checking Health Connect availability", e)
-            false
+            HealthDataAvailability.NOT_AVAILABLE
         }
+
+    override suspend fun isAvailable(): Boolean = getAvailability() == HealthDataAvailability.AVAILABLE
 
     override suspend fun hasSleepPermissions(): Boolean {
         val client = healthConnectClient ?: return false
@@ -215,6 +235,61 @@ class AndroidHealthConnectDataSource(
         }
     }
 
+    /**
+     * Logs errors for each Health Connect manifest requirement that is missing.
+     *
+     * Health Connect will not list the app in its "App permissions" settings screen unless all
+     * three entries are present. Missing any one of them silently breaks the integration — the
+     * runtime permission API still works, but users can never find or manage the app from within
+     * Health Connect. This check fires once at startup so the problem is immediately visible in
+     * logs rather than discovered via a user report.
+     *
+     * See docs/health-connect-refactoring.md § "Android Manifest Requirements" for the XML
+     * snippets that resolve each error.
+     */
+    private fun warnIfManifestRequirementsMissing() {
+        val appInfo = try {
+            context.packageManager.getApplicationInfo(
+                context.packageName,
+                PackageManager.GET_META_DATA,
+            )
+        } catch (e: PackageManager.NameNotFoundException) {
+            Napier.e("Health Connect: could not read ApplicationInfo to verify manifest requirements", e)
+            return
+        }
+
+        if (appInfo.metaData?.getString("health_connect.privacy_policy_url") == null) {
+            Napier.e(
+                "Health Connect: <meta-data android:name=\"health_connect.privacy_policy_url\"> " +
+                    "is missing from AndroidManifest.xml. The app will NOT appear in Health Connect's " +
+                    "App permissions settings screen. " +
+                    "See docs/health-connect-refactoring.md for the required snippet.",
+            )
+        }
+
+        val stringId = context.resources.getIdentifier(
+            "health_permissions", "string", context.packageName,
+        )
+        if (stringId == 0) {
+            Napier.e(
+                "Health Connect: <string name=\"health_permissions\"> is missing from strings.xml. " +
+                    "The permission request dialog will show a blank label. " +
+                    "See docs/health-connect-refactoring.md for details.",
+            )
+        }
+
+        val rationaleIntent = Intent("androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE")
+            .setPackage(context.packageName)
+        if (context.packageManager.resolveActivity(rationaleIntent, 0) == null) {
+            Napier.e(
+                "Health Connect: No activity responds to ACTION_SHOW_PERMISSIONS_RATIONALE. " +
+                    "Tapping 'Manage' next to this app in Health Connect settings will do nothing. " +
+                    "Add an <activity-alias> in AndroidManifest.xml. " +
+                    "See docs/health-connect-refactoring.md for the required snippet.",
+            )
+        }
+    }
+
     private fun mapSleepStageType(stage: String): SleepStageType =
         when (stage) {
             "${SleepSessionConstants.STAGE_TYPE_AWAKE}" -> SleepStageType.AWAKE
@@ -228,3 +303,13 @@ class AndroidHealthConnectDataSource(
 private fun Instant.toJavaTimeInstant(): java.time.Instant = java.time.Instant.ofEpochSecond(epochSeconds, nanosecondsOfSecond.toLong())
 
 private fun java.time.Instant.toKotlinxInstant(): Instant = Instant.fromEpochSeconds(epochSecond, nano.toLong())
+
+private fun sdkStatusLabel(status: Int): String =
+    when (status) {
+        HealthConnectClient.SDK_AVAILABLE -> "SDK_AVAILABLE"
+        HealthConnectClient.SDK_UNAVAILABLE -> "SDK_UNAVAILABLE"
+        HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> {
+            "SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED"
+        }
+        else -> "UNKNOWN"
+    }

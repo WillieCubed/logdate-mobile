@@ -1,6 +1,7 @@
 package app.logdate.feature.onboarding.ui
 
-import app.logdate.client.domain.dayboundary.HealthConnectStatus
+import app.logdate.client.domain.dayboundary.HealthConnectGateKind
+import app.logdate.client.domain.dayboundary.HealthConnectGateState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -10,45 +11,82 @@ class OnboardingDayBoundariesScreenStateTest {
         assertEquals(
             DayBoundariesPostPermissionAction.NONE,
             resolveDayBoundariesPostPermissionAction(
-                enableAfterPermission = false,
-                completedRequestCount = 1,
-                healthConnectStatus = HealthConnectStatus.CONNECTED,
+                pendingEnableAfterPermission = false,
+                hasPermission = true,
+                permissionRequested = true,
+                isRequestInFlight = false,
+                gateState =
+                    HealthConnectGateState(
+                        kind = HealthConnectGateKind.READY,
+                    ),
             ),
         )
     }
 
     @Test
-    fun `post-permission action enables and continues once health connect is connected`() {
+    fun `post-permission action enables and continues once gate is ready`() {
         assertEquals(
             DayBoundariesPostPermissionAction.ENABLE_AND_CONTINUE,
             resolveDayBoundariesPostPermissionAction(
-                enableAfterPermission = true,
-                completedRequestCount = 1,
-                healthConnectStatus = HealthConnectStatus.CONNECTED,
+                pendingEnableAfterPermission = true,
+                hasPermission = true,
+                permissionRequested = true,
+                isRequestInFlight = false,
+                gateState =
+                    HealthConnectGateState(
+                        kind = HealthConnectGateKind.READY,
+                    ),
             ),
         )
     }
 
     @Test
-    fun `post-permission action resets request state when permissions are still needed`() {
+    fun `post-permission action resets after a rejected permission request`() {
         assertEquals(
             DayBoundariesPostPermissionAction.RESET_REQUEST_STATE,
             resolveDayBoundariesPostPermissionAction(
-                enableAfterPermission = true,
-                completedRequestCount = 1,
-                healthConnectStatus = HealthConnectStatus.PERMISSIONS_NEEDED,
+                pendingEnableAfterPermission = true,
+                hasPermission = false,
+                permissionRequested = true,
+                isRequestInFlight = false,
+                gateState =
+                    HealthConnectGateState(
+                        kind = HealthConnectGateKind.PERMISSION_DENIED,
+                    ),
             ),
         )
     }
 
     @Test
-    fun `post-permission action waits while health connect status is still checking`() {
+    fun `post-permission action waits while a request is still in flight`() {
         assertEquals(
             DayBoundariesPostPermissionAction.NONE,
             resolveDayBoundariesPostPermissionAction(
-                enableAfterPermission = true,
-                completedRequestCount = 1,
-                healthConnectStatus = HealthConnectStatus.CHECKING,
+                pendingEnableAfterPermission = true,
+                hasPermission = false,
+                permissionRequested = true,
+                isRequestInFlight = true,
+                gateState =
+                    HealthConnectGateState(
+                        kind = HealthConnectGateKind.NEEDS_PERMISSION,
+                    ),
+            ),
+        )
+    }
+
+    @Test
+    fun `post-permission action waits while the gate is still checking`() {
+        assertEquals(
+            DayBoundariesPostPermissionAction.NONE,
+            resolveDayBoundariesPostPermissionAction(
+                pendingEnableAfterPermission = true,
+                hasPermission = false,
+                permissionRequested = false,
+                isRequestInFlight = false,
+                gateState =
+                    HealthConnectGateState(
+                        kind = HealthConnectGateKind.CHECKING,
+                    ),
             ),
         )
     }
