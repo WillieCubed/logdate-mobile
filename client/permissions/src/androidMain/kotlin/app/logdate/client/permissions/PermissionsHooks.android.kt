@@ -86,7 +86,11 @@ actual fun rememberHealthConnectPermissionState(): HealthConnectPermissionState 
 
     val permissionLauncher =
         rememberLauncherForActivityResult(
-            contract = PermissionController.createRequestPermissionResultContract(HEALTH_CONNECT_PROVIDER_PACKAGE),
+            // No provider package: the SDK auto-selects the correct target (OS-integrated on
+            // Android 14+, standalone com.google.android.apps.healthdata on Android 13).
+            // Passing the standalone package name on Android 14+ routes to a non-existent
+            // activity and the contract returns immediately with an empty grant set.
+            contract = PermissionController.createRequestPermissionResultContract(),
         ) { granted ->
             val hasAllPermissions = granted.containsAll(sleepPermissions)
             Napier.i(

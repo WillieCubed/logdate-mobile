@@ -54,6 +54,7 @@ import logdate.client.feature.core.generated.resources.day_schedule_fallback_tim
 import logdate.client.feature.core.generated.resources.day_schedule_health_checking
 import logdate.client.feature.core.generated.resources.day_schedule_health_checking_detail
 import logdate.client.feature.core.generated.resources.day_schedule_health_grant_access
+import logdate.client.feature.core.generated.resources.day_schedule_health_open_settings
 import logdate.client.feature.core.generated.resources.day_schedule_health_not_available
 import logdate.client.feature.core.generated.resources.day_schedule_health_not_available_detail
 import logdate.client.feature.core.generated.resources.day_schedule_health_permission_denied_detail
@@ -80,6 +81,7 @@ import logdate.client.ui.generated.resources.Res as UiRes
 fun DayBoundarySettingsScreen(
     onBack: () -> Unit,
     onSetUpHealthConnect: () -> Unit = {},
+    onOpenHealthConnectPermissions: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: DayBoundarySettingsViewModel = koinViewModel(),
 ) {
@@ -125,6 +127,7 @@ fun DayBoundarySettingsScreen(
         onSetFallbackHour = viewModel::setFallbackStartHour,
         onRequestPermissions = permissionState.requestPermission,
         onSetUpHealthConnect = onSetUpHealthConnect,
+        onOpenHealthConnectPermissions = onOpenHealthConnectPermissions,
         modifier = modifier,
     )
 }
@@ -141,6 +144,7 @@ fun DayBoundarySettingsContent(
     onSetFallbackHour: (Int) -> Unit,
     onRequestPermissions: () -> Unit,
     onSetUpHealthConnect: () -> Unit,
+    onOpenHealthConnectPermissions: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showTimePicker by remember { mutableStateOf(false) }
@@ -182,6 +186,7 @@ fun DayBoundarySettingsContent(
                         isRequestInFlight = isRequestInFlight,
                         onRequestPermissions = onRequestPermissions,
                         onSetUpHealthConnect = onSetUpHealthConnect,
+                        onOpenHealthConnectPermissions = onOpenHealthConnectPermissions,
                         onDisableSleepBased = { onToggleSleepBased(false) },
                     )
                 }
@@ -243,6 +248,7 @@ private fun HealthConnectGateCard(
     isRequestInFlight: Boolean,
     onRequestPermissions: () -> Unit,
     onSetUpHealthConnect: () -> Unit,
+    onOpenHealthConnectPermissions: () -> Unit,
     onDisableSleepBased: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -282,11 +288,22 @@ private fun HealthConnectGateCard(
             primaryActionLabelRes?.let { labelRes ->
                 FilledTonalButton(
                     onClick = {
-                        when (gateState.missingRequirement) {
-                            HealthConnectMissingRequirement.PERMISSION -> onRequestPermissions()
-                            HealthConnectMissingRequirement.SETUP -> onSetUpHealthConnect()
-                            HealthConnectMissingRequirement.UNAVAILABLE,
-                            null,
+                        when (gateState.kind) {
+                            // First-time ask: show the system permission dialog.
+                            HealthConnectGateKind.NEEDS_PERMISSION -> onRequestPermissions()
+                            // Already denied or revoked: re-requesting the dialog is pointless.
+                            // Send the user to Health Connect settings to grant manually.
+                            HealthConnectGateKind.PERMISSION_DENIED,
+                            HealthConnectGateKind.RECOVERY_REQUIRED,
+                            -> when (gateState.missingRequirement) {
+                                HealthConnectMissingRequirement.PERMISSION -> onOpenHealthConnectPermissions()
+                                HealthConnectMissingRequirement.SETUP -> onSetUpHealthConnect()
+                                HealthConnectMissingRequirement.UNAVAILABLE, null -> Unit
+                            }
+                            HealthConnectGateKind.NEEDS_SETUP -> onSetUpHealthConnect()
+                            HealthConnectGateKind.CHECKING,
+                            HealthConnectGateKind.UNAVAILABLE,
+                            HealthConnectGateKind.READY,
                             -> Unit
                         }
                     },
@@ -324,13 +341,14 @@ private fun resolveDayBoundaryGateDescription(gateState: HealthConnectGateState)
 
 private fun resolveDayBoundaryPrimaryActionLabel(gateState: HealthConnectGateState): StringResource? =
     when (gateState.kind) {
-        HealthConnectGateKind.NEEDS_PERMISSION,
-        HealthConnectGateKind.PERMISSION_DENIED,
-        -> Res.string.day_schedule_health_grant_access
+        // First-time ask: the system dialog will show.
+        HealthConnectGateKind.NEEDS_PERMISSION -> Res.string.day_schedule_health_grant_access
+        // Already denied: open Health Connect settings so the user can grant manually.
+        HealthConnectGateKind.PERMISSION_DENIED -> Res.string.day_schedule_health_open_settings
         HealthConnectGateKind.NEEDS_SETUP -> Res.string.day_schedule_health_set_up
         HealthConnectGateKind.RECOVERY_REQUIRED ->
             when (gateState.missingRequirement) {
-                HealthConnectMissingRequirement.PERMISSION -> Res.string.day_schedule_health_grant_access
+                HealthConnectMissingRequirement.PERMISSION -> Res.string.day_schedule_health_open_settings
                 HealthConnectMissingRequirement.SETUP -> Res.string.day_schedule_health_set_up
                 HealthConnectMissingRequirement.UNAVAILABLE,
                 null,

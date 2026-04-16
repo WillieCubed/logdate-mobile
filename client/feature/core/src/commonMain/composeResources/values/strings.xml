@@ -76,8 +76,9 @@
     <string name="day_schedule_health_connected">Health Connect is providing sleep data</string>
     <string name="day_schedule_health_permissions_needed">LogDate needs permission to read your sleep data</string>
     <string name="day_schedule_health_permissions_needed_detail">Grant access to sleep sessions so LogDate can tell when one journaling day ends and the next begins.</string>
-    <string name="day_schedule_health_permission_denied_detail">Health Connect did not grant sleep access. Try again to finish turning this on.</string>
+    <string name="day_schedule_health_permission_denied_detail">Health Connect did not grant sleep access. Open Health Connect to grant it from there.</string>
     <string name="day_schedule_health_grant_access">Grant sleep access</string>
+    <string name="day_schedule_health_open_settings">Open Health Connect settings</string>
     <string name="day_schedule_health_setup_required">Health Connect needs to be installed or updated first</string>
     <string name="day_schedule_health_setup_required_detail">Install or update Health Connect before LogDate can request sleep access.</string>
     <string name="day_schedule_health_set_up">Install or update Health Connect</string>

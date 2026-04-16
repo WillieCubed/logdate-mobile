@@ -3,25 +3,37 @@
 package app.logdate.navigation.routes
 
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
-import app.logdate.client.permissions.rememberHealthConnectPermissionState
+import app.logdate.client.launchHealthConnectPermissions
+import app.logdate.client.launchHealthConnectSetup
+import app.logdate.client.people.SelectedContactsPickerContract
+import app.logdate.client.permissions.rememberContactsPermissionState
 import app.logdate.client.settings.NotificationSettingsScreen
+import app.logdate.feature.core.people.ui.PeopleDirectoryScreen
+import app.logdate.feature.core.people.ui.PeopleInboxScreen
+import app.logdate.feature.core.people.ui.PeopleSettingsScreen
+import app.logdate.feature.core.people.ui.PeopleSettingsViewModel
+import app.logdate.feature.core.people.ui.PersonDetailScreen
 import app.logdate.feature.core.profile.ui.ProfileScreen
 import app.logdate.feature.core.settings.ui.AccountSettingsScreen
 import app.logdate.feature.core.settings.ui.AdvancedSettingsScreen
 import app.logdate.feature.core.settings.ui.BirthdaySettingsScreen
 import app.logdate.feature.core.settings.ui.ClearDataSettingsScreen
 import app.logdate.feature.core.settings.ui.DayBoundarySettingsScreen
+import app.logdate.feature.core.settings.ui.DayBoundarySettingsViewModel
 import app.logdate.feature.core.settings.ui.ExportSettingsScreen
 import app.logdate.feature.core.settings.ui.LibrarySettingsScreen
 import app.logdate.feature.core.settings.ui.LocationAdvancedScreen
@@ -37,7 +49,6 @@ import app.logdate.feature.core.settings.ui.SettingsOverviewScreen
 import app.logdate.feature.core.settings.ui.StreakSettingsScreen
 import app.logdate.feature.core.settings.ui.SyncSettingsScreen
 import app.logdate.feature.core.settings.ui.TimelineSettingsScreen
-import app.logdate.feature.core.settings.ui.TimelineSettingsViewModel
 import app.logdate.feature.core.settings.ui.VoiceNotesSettingsScreen
 import app.logdate.feature.core.settings.ui.devices.DevicesScreen
 import app.logdate.feature.core.settings.ui.watch.WatchNotificationSettingsScreen
@@ -73,6 +84,10 @@ import app.logdate.navigation.routes.core.LocationTrackingOptionsRoute
 import app.logdate.navigation.routes.core.MemoriesSettingsRoute
 import app.logdate.navigation.routes.core.NotificationsSettingsRoute
 import app.logdate.navigation.routes.core.OnboardingStart
+import app.logdate.navigation.routes.core.PeopleDirectoryRoute
+import app.logdate.navigation.routes.core.PeopleInboxRoute
+import app.logdate.navigation.routes.core.PeopleSettingsRoute
+import app.logdate.navigation.routes.core.PersonDetailRoute
 import app.logdate.navigation.routes.core.PrivacySettingsRoute
 import app.logdate.navigation.routes.core.RecommendationSettingsRoute
 import app.logdate.navigation.routes.core.ResetAppSettingsRoute
@@ -220,6 +235,22 @@ fun MainAppNavigator.openRewindSettings() {
  */
 fun MainAppNavigator.openEventsSettings() {
     backStack.add(EventsSettingsRoute)
+}
+
+fun MainAppNavigator.openPeopleSettings() {
+    backStack.add(PeopleSettingsRoute)
+}
+
+fun MainAppNavigator.openPeopleDirectory() {
+    backStack.add(PeopleDirectoryRoute)
+}
+
+fun MainAppNavigator.openPeopleInbox() {
+    backStack.add(PeopleInboxRoute)
+}
+
+fun MainAppNavigator.openPersonDetail(personId: Uuid) {
+    backStack.add(PersonDetailRoute(personId))
 }
 
 /**
@@ -376,6 +407,10 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     onNavigateToStreaks: () -> Unit = {},
     onNavigateToRewindSettings: () -> Unit = {},
     onNavigateToEventsSettings: () -> Unit = {},
+    onNavigateToPeopleSettings: () -> Unit = {},
+    onNavigateToPeopleDirectory: () -> Unit = {},
+    onNavigateToPeopleInbox: () -> Unit = {},
+    onNavigateToPersonDetail: (Uuid) -> Unit = {},
     onNavigateToEventsCalendar: () -> Unit = {},
     onNavigateToCalendarSyncSettings: () -> Unit = {},
     onNavigateToCalendarSyncCalendars: () -> Unit = {},
@@ -406,6 +441,7 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
             onNavigateToStreaks = onNavigateToStreaks,
             onNavigateToRewindSettings = onNavigateToRewindSettings,
             onNavigateToEventsSettings = onNavigateToEventsSettings,
+            onNavigateToPeopleSettings = onNavigateToPeopleSettings,
             onNavigateToTimeline = onNavigateToTimeline,
             onNavigateToSync = onNavigateToSync,
             onNavigateToExport = onNavigateToExport,
@@ -649,6 +685,58 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
         )
     }
 
+    routeEntry<PeopleSettingsRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        val contactsPermissionState = rememberContactsPermissionState()
+        val viewModel: PeopleSettingsViewModel = koinViewModel()
+        val selectedContactsLauncher =
+            rememberLauncherForActivityResult(
+                contract = SelectedContactsPickerContract(),
+            ) { sessionUri ->
+                if (!sessionUri.isNullOrBlank()) {
+                    viewModel.importSelectedContacts(sessionUri)
+                }
+            }
+
+        PeopleSettingsScreen(
+            onBack = onBack,
+            onBrowsePeople = onNavigateToPeopleDirectory,
+            onOpenReviewInbox = onNavigateToPeopleInbox,
+            contactsPermissionState = contactsPermissionState,
+            onImportSelectedContacts = {
+                selectedContactsLauncher.launch(Unit)
+            },
+            viewModel = viewModel,
+        )
+    }
+
+    routeEntry<PeopleDirectoryRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        PeopleDirectoryScreen(
+            onBack = onBack,
+            onOpenPerson = onNavigateToPersonDetail,
+        )
+    }
+
+    routeEntry<PeopleInboxRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { _ ->
+        PeopleInboxScreen(
+            onBack = onBack,
+        )
+    }
+
+    routeEntry<PersonDetailRoute>(
+        metadata = ListDetailSceneStrategy.detailPane(),
+    ) { route ->
+        PersonDetailScreen(
+            personId = route.personId,
+            onBack = onBack,
+        )
+    }
+
     // Calendar sync overview (detail pane)
     routeEntry<CalendarSyncSettingsRoute>(
         metadata = ListDetailSceneStrategy.detailPane(),
@@ -710,45 +798,36 @@ fun EntryProviderScope<NavKey>.appSettingsRoutes(
     routeEntry<DayBoundarySettingsRoute>(
         metadata = ListDetailSceneStrategy.detailPane(),
     ) { _ ->
-        val viewModel: TimelineSettingsViewModel = koinViewModel()
-        val uiState by viewModel.uiState.collectAsState()
-        val healthConnectPermissionState = rememberHealthConnectPermissionState()
-        var enableAfterPermission by rememberSaveable { mutableStateOf(false) }
+        val context = LocalContext.current
+        val lifecycleOwner = LocalLifecycleOwner.current
+        val viewModel: DayBoundarySettingsViewModel = koinViewModel()
+        var awaitingHealthConnectSetupResult by rememberSaveable { mutableStateOf(false) }
 
-        LaunchedEffect(healthConnectPermissionState.completedRequestCount) {
-            if (healthConnectPermissionState.completedRequestCount > 0) {
-                viewModel.refreshHealthStatus()
-            }
-        }
-
-        LaunchedEffect(enableAfterPermission, healthConnectPermissionState.completedRequestCount, uiState.healthConnectStatus) {
-            if (!enableAfterPermission || healthConnectPermissionState.completedRequestCount == 0) {
-                return@LaunchedEffect
-            }
-
-            when (uiState.healthConnectStatus) {
-                app.logdate.client.domain.dayboundary.HealthConnectStatus.CONNECTED -> {
-                    viewModel.toggleSleepBasedBoundaries(true)
-                    enableAfterPermission = false
+        DisposableEffect(lifecycleOwner, viewModel) {
+            val observer =
+                LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME && awaitingHealthConnectSetupResult) {
+                        awaitingHealthConnectSetupResult = false
+                        Napier.i("Refreshing Health Connect day-boundary status after setup return")
+                        viewModel.refreshHealthStatus()
+                    }
                 }
-
-                app.logdate.client.domain.dayboundary.HealthConnectStatus.PERMISSIONS_NEEDED,
-                app.logdate.client.domain.dayboundary.HealthConnectStatus.NOT_AVAILABLE,
-                -> {
-                    enableAfterPermission = false
-                }
-
-                app.logdate.client.domain.dayboundary.HealthConnectStatus.CHECKING -> Unit
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
             }
         }
 
         DayBoundarySettingsScreen(
             onBack = onBack,
             viewModel = viewModel,
-            onRequestHealthPermissions = healthConnectPermissionState.requestPermission,
-            onEnableSleepBasedWithPermissions = {
-                enableAfterPermission = true
-                healthConnectPermissionState.requestPermission()
+            onSetUpHealthConnect = {
+                awaitingHealthConnectSetupResult = true
+                launchHealthConnectSetup(context)
+            },
+            onOpenHealthConnectPermissions = {
+                awaitingHealthConnectSetupResult = true
+                launchHealthConnectPermissions(context)
             },
         )
     }
