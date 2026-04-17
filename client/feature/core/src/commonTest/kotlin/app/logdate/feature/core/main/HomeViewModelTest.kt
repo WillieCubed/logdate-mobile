@@ -19,6 +19,7 @@ import app.logdate.client.domain.timeline.GetTimelinePageUseCase
 import app.logdate.client.domain.timeline.GroupNotesByDayBoundsUseCase
 import app.logdate.client.domain.timeline.Timeline
 import app.logdate.client.domain.timeline.TimelinePageRequest
+import app.logdate.client.health.HealthDataAvailability
 import app.logdate.client.health.LocalFirstHealthRepository
 import app.logdate.client.health.model.DayBounds
 import app.logdate.client.health.model.SleepSession
@@ -47,6 +48,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
@@ -361,6 +363,8 @@ class HomeViewModelTest {
     }
 
     private class FakeHealthRepository : LocalFirstHealthRepository {
+        override suspend fun getHealthDataAvailability(): HealthDataAvailability = HealthDataAvailability.AVAILABLE
+
         override suspend fun hasSleepPermissions(): Boolean = true
 
         override suspend fun requestSleepPermissions(): Boolean = true
@@ -390,7 +394,7 @@ class HomeViewModelTest {
             sleepBasedBoundariesEnabled: Boolean,
         ): DayBounds {
             val start = LocalDateTime(date, LocalTime(4, 0)).toInstant(timeZone)
-            val end = LocalDateTime(date.plus(1, kotlinx.datetime.DateTimeUnit.DAY), LocalTime(4, 0)).toInstant(timeZone)
+            val end = LocalDateTime(date.plus(1, DateTimeUnit.DAY), LocalTime(4, 0)).toInstant(timeZone)
             return DayBounds(start = start, end = end)
         }
     }

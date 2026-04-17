@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalUuidApi::class)
 
 package app.logdate.benchmark.micro
 
@@ -10,6 +10,7 @@ import app.logdate.client.domain.timeline.GetDayBoundsUseCase
 import app.logdate.client.domain.timeline.GetTimelinePageUseCase
 import app.logdate.client.domain.timeline.GroupNotesByDayBoundsUseCase
 import app.logdate.client.domain.timeline.TimelinePageRequest
+import app.logdate.client.health.HealthDataAvailability
 import app.logdate.client.health.LocalFirstHealthRepository
 import app.logdate.client.health.model.DayBounds
 import app.logdate.client.health.model.SleepSession
@@ -35,6 +36,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.time.Instant
+import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @RunWith(AndroidJUnit4::class)
@@ -111,6 +113,8 @@ private class FakeDayBoundarySettingsRepository : DayBoundarySettingsRepository 
 }
 
 private class FakeHealthRepository : LocalFirstHealthRepository {
+    override suspend fun getHealthDataAvailability(): HealthDataAvailability = HealthDataAvailability.NOT_AVAILABLE
+
     override suspend fun hasSleepPermissions(): Boolean = false
 
     override suspend fun requestSleepPermissions(): Boolean = false

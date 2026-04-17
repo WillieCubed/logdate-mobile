@@ -2,6 +2,7 @@ package app.logdate.client.domain.timeline
 
 import app.logdate.client.domain.dayboundary.DayBoundarySettings
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
+import app.logdate.client.health.HealthDataAvailability
 import app.logdate.client.health.LocalFirstHealthRepository
 import app.logdate.client.health.model.DayBounds
 import app.logdate.client.health.model.SleepSession
@@ -40,6 +41,9 @@ class FakeHealthRepository : LocalFirstHealthRepository {
     var bounds: DayBounds? = null
     var boundsByDate: Map<LocalDate, DayBounds> = emptyMap()
     var throwable: Throwable? = null
+    var availability: HealthDataAvailability = HealthDataAvailability.AVAILABLE
+
+    override suspend fun getHealthDataAvailability(): HealthDataAvailability = availability
 
     override suspend fun getDayBoundsForDate(
         date: LocalDate,
@@ -55,7 +59,7 @@ class FakeHealthRepository : LocalFirstHealthRepository {
         return DayBounds(start, end)
     }
 
-    override suspend fun isHealthDataAvailable() = true
+    override suspend fun isHealthDataAvailable() = availability == HealthDataAvailability.AVAILABLE
 
     override suspend fun getAvailableDataTypes() = emptyList<String>()
 

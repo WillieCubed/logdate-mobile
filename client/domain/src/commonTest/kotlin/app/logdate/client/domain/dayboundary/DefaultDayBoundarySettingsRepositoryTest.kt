@@ -3,16 +3,10 @@
 package app.logdate.client.domain.dayboundary
 
 import app.logdate.client.datastore.KeyValueStorage
-import app.logdate.client.health.LocalFirstHealthRepository
-import app.logdate.client.health.model.DayBounds
-import app.logdate.client.health.model.SleepSession
-import app.logdate.client.health.model.TimeOfDay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -20,7 +14,7 @@ class DefaultDayBoundarySettingsRepositoryTest {
     @Test
     fun `default settings have sleep boundaries disabled`() =
         runTest {
-            val repo = DefaultDayBoundarySettingsRepository(InMemoryKeyValueStorage(), FakeHealthRepository())
+            val repo = DefaultDayBoundarySettingsRepository(InMemoryKeyValueStorage())
             val settings = repo.getSettings()
             assertEquals(false, settings.sleepBasedBoundariesEnabled)
         }
@@ -28,7 +22,7 @@ class DefaultDayBoundarySettingsRepositoryTest {
     @Test
     fun `toggle disables sleep boundaries`() =
         runTest {
-            val repo = DefaultDayBoundarySettingsRepository(InMemoryKeyValueStorage(), FakeHealthRepository())
+            val repo = DefaultDayBoundarySettingsRepository(InMemoryKeyValueStorage())
             repo.setSleepBasedBoundariesEnabled(false)
             val settings = repo.getSettings()
             assertEquals(false, settings.sleepBasedBoundariesEnabled)
@@ -37,48 +31,34 @@ class DefaultDayBoundarySettingsRepositoryTest {
     @Test
     fun `observe reflects changes`() =
         runTest {
-            val repo = DefaultDayBoundarySettingsRepository(InMemoryKeyValueStorage(), FakeHealthRepository())
+            val repo = DefaultDayBoundarySettingsRepository(InMemoryKeyValueStorage())
             repo.setSleepBasedBoundariesEnabled(false)
             val observed = repo.observeSettings().first()
             assertEquals(false, observed.sleepBasedBoundariesEnabled)
         }
 
     @Test
-    fun `enable request is rejected when sleep permissions are missing`() =
+    fun `enable request persists even when health connect is not ready`() =
         runTest {
-            val repo =
-                DefaultDayBoundarySettingsRepository(
-                    InMemoryKeyValueStorage(),
-                    FakeHealthRepository(
-                        isHealthAvailable = true,
-                        hasSleepPermissions = false,
-                    ),
-                )
+            val repo = DefaultDayBoundarySettingsRepository(InMemoryKeyValueStorage())
 
             repo.setSleepBasedBoundariesEnabled(true)
 
             val settings = repo.getSettings()
-            assertEquals(false, settings.sleepBasedBoundariesEnabled)
+            assertEquals(true, settings.sleepBasedBoundariesEnabled)
         }
 
     @Test
-    fun `stored enabled value is sanitized when health data is unavailable`() =
+    fun `stored enabled value is preserved when health data is unavailable`() =
         runTest {
             val storage = InMemoryKeyValueStorage()
             storage.putBoolean("day_boundary_sleep_based_enabled", true)
-            val repo =
-                DefaultDayBoundarySettingsRepository(
-                    storage,
-                    FakeHealthRepository(
-                        isHealthAvailable = false,
-                        hasSleepPermissions = false,
-                    ),
-                )
+            val repo = DefaultDayBoundarySettingsRepository(storage)
 
             val settings = repo.getSettings()
 
-            assertEquals(false, settings.sleepBasedBoundariesEnabled)
-            assertEquals(false, storage.getBoolean("day_boundary_sleep_based_enabled", true))
+            assertEquals(true, settings.sleepBasedBoundariesEnabled)
+            assertEquals(true, storage.getBoolean("day_boundary_sleep_based_enabled", false))
         }
 }
 
@@ -187,38 +167,4 @@ private class InMemoryKeyValueStorage : KeyValueStorage {
         longs.clear()
         floats.clear()
     }
-}
-
-private class FakeHealthRepository(
-    private val isHealthAvailable: Boolean = true,
-    private val hasSleepPermissions: Boolean = true,
-) : LocalFirstHealthRepository {
-    override suspend fun isHealthDataAvailable(): Boolean = isHealthAvailable
-
-    override suspend fun getAvailableDataTypes(): List<String> = emptyList()
-
-    override suspend fun hasSleepPermissions(): Boolean = hasSleepPermissions
-
-    override suspend fun requestSleepPermissions(): Boolean = hasSleepPermissions
-
-    override suspend fun getSleepSessions(
-        start: kotlin.time.Instant,
-        end: kotlin.time.Instant,
-    ): List<SleepSession> = emptyList()
-
-    override suspend fun getAverageWakeUpTime(
-        timeZone: TimeZone,
-        days: Int,
-    ): TimeOfDay? = null
-
-    override suspend fun getAverageSleepTime(
-        timeZone: TimeZone,
-        days: Int,
-    ): TimeOfDay? = null
-
-    override suspend fun getDayBoundsForDate(
-        date: LocalDate,
-        timeZone: TimeZone,
-        sleepBasedBoundariesEnabled: Boolean,
-    ): DayBounds = error("Not used in settings repository tests")
 }
