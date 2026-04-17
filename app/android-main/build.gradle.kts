@@ -16,6 +16,54 @@ val baselineProfileRequested =
 val androidTestClassOverride = providers.gradleProperty("logdate.androidTestClass").orNull
 val androidTestPackageOverride = providers.gradleProperty("logdate.androidTestPackage").orNull
 
+/**
+ * Production release versionCode comes from CI. Priority order:
+ *
+ *  1. `LOGDATE_VERSION_CODE` env var (CI sets this per-build — typically a bumpable counter).
+ *  2. `logdate.versionCode` Gradle property (for ad-hoc local release builds).
+ *  3. Fallback `1` — the historical hard-coded value, kept so `assembleDebug` still works
+ *     without extra configuration.
+ *
+ * Play Store requires monotonically-increasing versionCodes per upload, so keeping this in CI
+ * rather than hard-coding prevents collisions.
+ */
+val resolvedVersionCode: Int =
+    (
+        System.getenv("LOGDATE_VERSION_CODE")
+            ?: providers.gradleProperty("logdate.versionCode").orNull
+    )?.toIntOrNull() ?: 1
+
+val resolvedVersionName: String =
+    System.getenv("LOGDATE_VERSION_NAME")
+        ?: providers.gradleProperty("logdate.versionName").orNull
+        ?: "0.1.0"
+
+/**
+ * Release signing material. Set these via env (CI/secrets) or `~/.gradle/gradle.properties`:
+ *
+ *  - `LOGDATE_RELEASE_STORE_FILE` (absolute or project-relative path to the .jks)
+ *  - `LOGDATE_RELEASE_STORE_PASSWORD`
+ *  - `LOGDATE_RELEASE_KEY_ALIAS`
+ *  - `LOGDATE_RELEASE_KEY_PASSWORD`
+ *
+ * When any of these are missing, the release build falls back to the debug signing config so
+ * local assembles don't fail on developer machines. CI *must* set all four to produce a
+ * Play-publishable APK/AAB.
+ */
+fun resolveRelease(prop: String): String? =
+    System.getenv("LOGDATE_RELEASE_${prop.uppercase()}")
+        ?: providers.gradleProperty("logdate.release.$prop").orNull
+
+val releaseStoreFile: String? = resolveRelease("storeFile")
+val releaseStorePassword: String? = resolveRelease("storePassword")
+val releaseKeyAlias: String? = resolveRelease("keyAlias")
+val releaseKeyPassword: String? = resolveRelease("keyPassword")
+val hasReleaseSigningConfig: Boolean =
+    !releaseStoreFile.isNullOrBlank() &&
+        !releaseStorePassword.isNullOrBlank() &&
+        !releaseKeyAlias.isNullOrBlank() &&
+        !releaseKeyPassword.isNullOrBlank()
+
 if (baselineProfileRequested) {
     apply(
         plugin =
@@ -47,14 +95,28 @@ extensions.configure<ApplicationExtension> {
             libs.versions.android.targetSdk
                 .get()
                 .toInt()
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = resolvedVersionCode
+        versionName = resolvedVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         if (androidTestClassOverride != null) {
             testInstrumentationRunnerArguments["class"] = androidTestClassOverride
         }
         if (androidTestPackageOverride != null) {
             testInstrumentationRunnerArguments["package"] = androidTestPackageOverride
+        }
+    }
+
+    if (hasReleaseSigningConfig) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+                // enable both V1 and V2 signatures so Play accepts the upload
+                enableV1Signing = true
+                enableV2Signing = true
+            }
         }
     }
 
@@ -66,8 +128,13 @@ extensions.configure<ApplicationExtension> {
         getByName("release") {
             isMinifyEnabled = true
             isDebuggable = false
+            signingConfig =
+                if (baselineProfileRequested || !hasReleaseSigningConfig) {
+                    signingConfigs.getByName("debug")
+                } else {
+                    signingConfigs.getByName("release")
+                }
             if (baselineProfileRequested) {
-                signingConfig = signingConfigs.getByName("debug")
                 isProfileable = true
             }
         }
