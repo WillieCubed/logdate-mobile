@@ -16,6 +16,7 @@ import app.logdate.server.config.ProductionConfigValidator
 import app.logdate.server.config.RuntimeProfile
 import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
+import app.logdate.server.entitlements.entitlementsModule
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.logdate.CompositeLogDateMediaBlobRepository
@@ -126,7 +127,10 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
 
     install(Koin) {
         slf4jLogger()
-        modules(serverModule(isDatabaseAvailable))
+        modules(
+            serverModule(isDatabaseAvailable),
+            entitlementsModule(databaseAvailable = isDatabaseAvailable),
+        )
     }
 
     val syncRepository: SyncRepository by inject()
