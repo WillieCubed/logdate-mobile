@@ -65,24 +65,7 @@ fun <T> rememberAutoSaveHandler(
 
     // Calculate a hash/representation of the current content for comparison
     val currentContentHash by remember(content) {
-        derivedStateOf {
-            when (content) {
-                // Special handling for EditorState
-                is EditorState -> {
-                    content.blocks.joinToString(separator = "|") { block ->
-                        when (block) {
-                            is TextBlockUiState -> "text:${block.content}"
-                            is ImageBlockUiState -> "image:${block.uri ?: ""}"
-                            is VideoBlockUiState -> "video:${block.uri ?: ""}"
-                            is AudioBlockUiState -> "audio:${block.uri ?: ""}"
-                            is CameraBlockUiState -> "camera:${block.uri ?: ""}"
-                        }
-                    }
-                }
-                // Allow any other content type by using its string representation
-                else -> content.toString()
-            }
-        }
+        derivedStateOf { getContentHash(content) }
     }
 
     // Debounced auto-save logic
@@ -207,7 +190,7 @@ fun rememberEditorAutoSave(
             // Check if the content has meaningful changes that need to be saved
             val hasContent = state.hasContent()
             val isDirty = state.isDirty
-            val isNewOrChanged = lastHash.isEmpty() || lastHash != getBlocksHash(state.blocks)
+            val isNewOrChanged = lastHash.isEmpty() || lastHash != getContentHash(state)
 
             Napier.i("AutoSave check: hasContent=$hasContent, isDirty=$isDirty, isNewOrChanged=$isNewOrChanged")
 
@@ -232,4 +215,11 @@ private fun getBlocksHash(blocks: List<EntryBlockUiState>): String =
             is AudioBlockUiState -> "audio:${block.id}:${block.uri ?: ""}"
             is CameraBlockUiState -> "camera:${block.id}:${block.uri ?: ""}"
         }
+    }
+
+private fun getContentHash(content: Any?): String =
+    when (content) {
+        is EditorState -> getBlocksHash(content.blocks)
+        null -> ""
+        else -> content.toString()
     }

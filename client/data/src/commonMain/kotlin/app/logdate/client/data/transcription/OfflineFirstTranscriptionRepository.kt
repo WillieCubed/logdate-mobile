@@ -126,7 +126,8 @@ class OfflineFirstTranscriptionRepository(
                     // auto-save fires or before requestTranscription() is explicitly called.
                     val noteExists =
                         try {
-                            audioNoteDao.getNoteOneOff(noteId) != null
+                            audioNoteDao.getNoteOneOff(noteId)
+                            true
                         } catch (e: Exception) {
                             false
                         }

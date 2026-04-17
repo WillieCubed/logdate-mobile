@@ -190,8 +190,67 @@ class DraftManagementTest {
             advanceUntilIdle()
 
             // Draft should be deleted from the repository
-            val remainingDrafts = viewModel.editorState.value.availableDrafts
+            val finalState = viewModel.editorState.value
+            val remainingDrafts = finalState.availableDrafts
             assertTrue(remainingDrafts.isEmpty(), "Draft should be deleted after save")
+            assertEquals(DraftState.None, finalState.draftState, "Draft state should reset after save")
+            assertFalse(finalState.isModified, "Editor should no longer be marked modified after save")
+        }
+
+    @Test
+    fun testSaveEntryDeletesDraftWhenCallerStateMissesLatestAutosave() =
+        testScope.runTest {
+            val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
+            advanceUntilIdle()
+
+            viewModel.updateBlock(block.copy(content = "Content with stale caller state"))
+            advanceUntilIdle()
+
+            val stalePreAutosaveState = viewModel.editorState.value
+            assertEquals(DraftState.None, stalePreAutosaveState.draftState)
+
+            viewModel.autoSaveEntry(viewModel.editorState.value)
+            advanceUntilIdle()
+
+            assertTrue(
+                viewModel.editorState.value.draftState is DraftState.Active,
+                "draftState should be Active after autosave",
+            )
+
+            viewModel.saveEntry(stalePreAutosaveState)
+            advanceUntilIdle()
+
+            val finalState = viewModel.editorState.value
+            assertTrue(finalState.availableDrafts.isEmpty(), "Draft should be deleted even with stale caller state")
+            assertEquals(DraftState.None, finalState.draftState, "Draft state should reset after save")
+            assertTrue(finalState.shouldExit, "Successful save should mark the editor for exit")
+        }
+
+    @Test
+    fun testDelayedAutoSaveAfterSuccessfulSaveDoesNotRecreateDraft() =
+        testScope.runTest {
+            val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
+            advanceUntilIdle()
+
+            viewModel.updateBlock(block.copy(content = "Content to publish"))
+            advanceUntilIdle()
+
+            viewModel.autoSaveEntry(viewModel.editorState.value)
+            advanceUntilIdle()
+
+            val staleAutoSaveState = viewModel.editorState.value
+            assertTrue(staleAutoSaveState.draftState is DraftState.Active)
+
+            viewModel.saveEntry(staleAutoSaveState)
+            advanceUntilIdle()
+
+            viewModel.autoSaveEntry(staleAutoSaveState)
+            advanceUntilIdle()
+
+            val finalState = viewModel.editorState.value
+            assertTrue(finalState.availableDrafts.isEmpty(), "A stale autosave callback must not recreate drafts")
+            assertEquals(DraftState.None, finalState.draftState, "Draft state should remain cleared after save")
+            assertTrue(finalState.shouldExit, "Editor should still be in exit state after save")
         }
 
     @Test
@@ -251,6 +310,10 @@ class DraftManagementTest {
             assertFalse(
                 viewModel.editorState.value.isSaving,
                 "isSaving should be false after save completes",
+            )
+            assertTrue(
+                viewModel.editorState.value.shouldExit,
+                "Successful save should mark the editor for exit",
             )
         }
 

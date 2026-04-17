@@ -234,7 +234,8 @@ class EntryEditorViewModel(
      * Autosaves the current entry state as a draft.
      */
     fun autoSaveEntry(state: EditorState) {
-        if (state.isSaving) return
+        val currentState = mutableEditorState.value
+        if (state.isSaving || state.shouldExit || currentState.isSaving || currentState.shouldExit) return
 
         autoSaveJob =
             viewModelScope.launch {
@@ -267,9 +268,10 @@ class EntryEditorViewModel(
         mutableEditorState.update { it.copy(isSaving = true) }
 
         viewModelScope.launch {
+            val latestState = editorState.value
             val notes =
-                state.blocks.mapNotNull { block ->
-                    if (state.isReadOnly(block.id)) return@mapNotNull null
+                latestState.blocks.mapNotNull { block ->
+                    if (latestState.isReadOnly(block.id)) return@mapNotNull null
                     block.toJournalNote()
                 }
 
@@ -279,9 +281,17 @@ class EntryEditorViewModel(
             }
 
             try {
-                val activeDraftId = (state.draftState as? DraftState.Active)?.id
-                saveEntryUseCase(notes, state.selectedJournalIds, activeDraftId)
-                mutableEditorState.update { it.copy(shouldExit = true, isSaving = false) }
+                val activeDraftId = (latestState.draftState as? DraftState.Active)?.id
+                saveEntryUseCase(notes, latestState.selectedJournalIds, activeDraftId)
+                mutableEditorState.update {
+                    it.copy(
+                        draftState = DraftState.None,
+                        isModified = false,
+                        errorMessage = null,
+                        shouldExit = true,
+                        isSaving = false,
+                    )
+                }
             } catch (e: Exception) {
                 Napier.e("Failed to save entry: ${e.message}", e)
                 mutableEditorState.update {

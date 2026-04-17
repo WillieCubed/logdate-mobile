@@ -164,4 +164,42 @@ class AutoSaveHandlerTest {
         // No saves should have occurred
         assertEquals(0, saveCount)
     }
+
+    @Test
+    fun testSameContentIsNotReportedAsChangedAfterSave() {
+        var saveCount = 0
+
+        composeTestRule.setContent {
+            val editorState =
+                remember {
+                    mutableStateOf(
+                        EditorState(
+                            blocks = listOf(TextBlockUiState(content = "Stable content")),
+                            isModified = true,
+                        ),
+                    )
+                }
+
+            rememberEditorAutoSave(
+                editorState = editorState.value,
+                onAutoSave = { saveCount++ },
+                debounceMs = 100,
+                backupIntervalMs = 10_000,
+            )
+
+            LaunchedEffect(saveCount) {
+                if (saveCount == 1) {
+                    editorState.value =
+                        editorState.value.copy(
+                            isModified = true,
+                            errorMessage = "recompose without content changes",
+                        )
+                }
+            }
+        }
+
+        composeTestRule.mainClock.advanceTimeBy(500)
+
+        assertEquals(1, saveCount)
+    }
 }

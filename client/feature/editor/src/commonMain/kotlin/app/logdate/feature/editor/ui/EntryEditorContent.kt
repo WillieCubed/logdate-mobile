@@ -132,6 +132,7 @@ fun EntryEditorContent(
         rememberEditorAutoSave(
             editorState = editorState,
             onAutoSave = { state -> viewModel.autoSaveEntry(state) },
+            enabled = !editorState.isSaving && !editorState.shouldExit,
         )
 
     LaunchedEffect(editorState.errorMessage) {
