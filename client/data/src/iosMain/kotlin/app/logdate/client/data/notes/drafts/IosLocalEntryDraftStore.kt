@@ -55,7 +55,6 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
                 is JournalNote.Audio -> this.mediaRef
                 is JournalNote.Image -> this.mediaRef
                 is JournalNote.Video -> this.mediaRef
-                else -> ""
             }
 
         return SerializableJournalNote(

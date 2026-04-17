@@ -598,7 +598,11 @@ class OfflineFirstJournalNotesRepositoryTest {
 
         override suspend fun isIndexed(uri: String): Boolean = media.any { it.uri == uri }
 
-        override suspend fun remove(uid: Uuid): Boolean = media.removeIf { it.uid == uid }
+        override suspend fun remove(uid: Uuid): Boolean {
+            val originalSize = media.size
+            media.removeAll { it.uid == uid }
+            return media.size != originalSize
+        }
 
         override suspend fun updateCaption(
             uid: Uuid,

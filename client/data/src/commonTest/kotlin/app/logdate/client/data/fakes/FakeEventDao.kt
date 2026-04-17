@@ -48,6 +48,8 @@ class FakeEventDao : EventDao {
 
     override fun observeAll(): Flow<List<EventEntity>> = eventsFlow.map { list -> list.sortedByDescending { it.startTime } }
 
+    override suspend fun getAll(): List<EventEntity> = events.values.filter { it.deletedAt == null }.sortedByDescending { it.startTime }
+
     override fun observeForDateRange(
         start: Instant,
         end: Instant,

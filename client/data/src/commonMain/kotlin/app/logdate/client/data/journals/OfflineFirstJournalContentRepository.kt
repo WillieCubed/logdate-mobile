@@ -11,10 +11,9 @@ import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -31,7 +30,7 @@ class OfflineFirstJournalContentRepository(
     private val journalRepository: JournalRepository,
     private val journalNotesRepository: JournalNotesRepository,
     private val syncMetadataService: SyncMetadataService,
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val dispatcher: CoroutineDispatcher = platformIODispatcher,
 ) : JournalContentRepository,
     SyncableJournalContentRepository {
     override fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>> {

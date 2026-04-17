@@ -9,13 +9,12 @@ import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -37,7 +36,7 @@ class OfflineFirstJournalRepository(
     private val draftRepository: DraftRepository,
     private val syncManagerProvider: () -> SyncManager = { NoOpSyncManager },
     private val syncMetadataService: SyncMetadataService,
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val dispatcher: CoroutineDispatcher = platformIODispatcher,
     private val externalScope: CoroutineScope = CoroutineScope(dispatcher),
 ) : JournalRepository,
     SyncableJournalRepository {
