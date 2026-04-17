@@ -46,6 +46,8 @@ import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncRepository
 import app.logdate.util.UuidSerializer
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.install
@@ -53,6 +55,8 @@ import io.ktor.server.application.log
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.plugins.httpsredirect.HttpsRedirect
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
@@ -117,6 +121,8 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
         org.koin.core.context
             .stopKoin()
     }
+
+    installNetworkEdge()
 
     install(Koin) {
         slf4jLogger()
@@ -311,6 +317,83 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
             )
         }
     }
+}
+
+/**
+ * Installs the CORS and HTTPS-redirect plugins based on environment configuration.
+ *
+ * Both are off by default so local development (and the test harness, which loads this module via
+ * `Application.module()`) stay simple. Operators opt in by setting:
+ *
+ *  - `ALLOWED_ORIGINS` — a comma-separated list of scheme://host[:port] strings to trust for CORS.
+ *    Unset or blank disables the CORS plugin entirely (same-origin only).
+ *  - `REQUIRE_HTTPS` — when `true`, installs HttpsRedirect. Leave unset if the server sits behind a
+ *    TLS-terminating load balancer that already enforces HTTPS.
+ */
+internal fun Application.installNetworkEdge(readEnv: (String) -> String? = System::getenv) {
+    val allowedOrigins = parseAllowedOrigins(readEnv("ALLOWED_ORIGINS"))
+    if (allowedOrigins.isNotEmpty()) {
+        install(CORS) {
+            allowedOrigins.forEach { origin ->
+                val scheme = origin.scheme
+                val hostWithPort =
+                    if (origin.port != null) "${origin.host}:${origin.port}" else origin.host
+                allowHost(hostWithPort, schemes = listOf(scheme))
+            }
+            allowMethod(HttpMethod.Get)
+            allowMethod(HttpMethod.Post)
+            allowMethod(HttpMethod.Put)
+            allowMethod(HttpMethod.Patch)
+            allowMethod(HttpMethod.Delete)
+            allowMethod(HttpMethod.Options)
+            allowHeader(HttpHeaders.Authorization)
+            allowHeader(HttpHeaders.ContentType)
+            allowHeader(HttpHeaders.Accept)
+            allowCredentials = true
+            maxAgeInSeconds = 3600
+        }
+        log.info("CORS enabled for ${allowedOrigins.size} origin(s): ${allowedOrigins.joinToString { it.raw }}")
+    } else {
+        log.info("CORS disabled (ALLOWED_ORIGINS not set)")
+    }
+
+    if (readBoolFlag(readEnv("REQUIRE_HTTPS"))) {
+        install(HttpsRedirect)
+        log.info("HttpsRedirect enabled (REQUIRE_HTTPS=true)")
+    }
+}
+
+internal data class AllowedOrigin(
+    val raw: String,
+    val scheme: String,
+    val host: String,
+    val port: Int?,
+)
+
+internal fun parseAllowedOrigins(raw: String?): List<AllowedOrigin> {
+    if (raw.isNullOrBlank()) return emptyList()
+    return raw.split(',')
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .mapNotNull { entry ->
+            runCatching {
+                val uri = java.net.URI(entry)
+                val scheme = uri.scheme?.lowercase()
+                val host = uri.host
+                if (scheme.isNullOrBlank() || host.isNullOrBlank()) return@runCatching null
+                AllowedOrigin(
+                    raw = entry,
+                    scheme = scheme,
+                    host = host,
+                    port = if (uri.port == -1) null else uri.port,
+                )
+            }.getOrNull()
+        }
+}
+
+private fun readBoolFlag(raw: String?): Boolean {
+    val trimmed = raw?.trim()?.lowercase().orEmpty()
+    return trimmed == "true" || trimmed == "1" || trimmed == "yes"
 }
 
 private const val SYNC_PURGE_METRIC_NAME = "sync.maintenance.purge"

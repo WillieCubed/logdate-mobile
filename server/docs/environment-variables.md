@@ -32,6 +32,27 @@
 
 ---
 
+## Network Edge
+
+### `ALLOWED_ORIGINS`
+- **Description**: Comma-separated list of origins trusted by CORS (e.g. a web UI that calls the API).
+- **Type**: String (CSV of `scheme://host[:port]`)
+- **Default**: None (CORS plugin not installed → browsers enforce same-origin only)
+- **Example**: `ALLOWED_ORIGINS=https://app.logdate.com,https://admin.logdate.com`
+- **Required**: Only if a browser client on a different origin needs to talk to the API.
+- **Notes**:
+  - Each entry must include a scheme. Malformed entries are ignored.
+  - The plugin reflects the request's origin back in `Access-Control-Allow-Origin` only for entries on the allowlist.
+
+### `REQUIRE_HTTPS`
+- **Description**: When `true`, installs Ktor's `HttpsRedirect` plugin so HTTP requests are 301'd to HTTPS.
+- **Type**: Boolean (`true` / `1` / `yes`)
+- **Default**: `false` (plugin not installed)
+- **Example**: `REQUIRE_HTTPS=true`
+- **Required**: No. Leave unset when the server sits behind a TLS-terminating load balancer that already enforces HTTPS (common on Cloud Run).
+
+---
+
 ## Server Configuration
 
 ### `PORT`

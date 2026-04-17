@@ -1,0 +1,95 @@
+package app.logdate.server
+
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.options
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
+import io.ktor.server.routing.routing
+import io.ktor.server.testing.testApplication
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+
+class ApplicationEdgeTest {
+    @Test
+    fun `parseAllowedOrigins returns empty list for null or blank`() {
+        assertEquals(emptyList(), parseAllowedOrigins(null))
+        assertEquals(emptyList(), parseAllowedOrigins(""))
+        assertEquals(emptyList(), parseAllowedOrigins("   "))
+    }
+
+    @Test
+    fun `parseAllowedOrigins splits and parses a comma-separated list`() {
+        val parsed = parseAllowedOrigins("https://app.logdate.com,http://localhost:3000")
+        assertEquals(2, parsed.size)
+
+        assertEquals("https", parsed[0].scheme)
+        assertEquals("app.logdate.com", parsed[0].host)
+        assertNull(parsed[0].port)
+
+        assertEquals("http", parsed[1].scheme)
+        assertEquals("localhost", parsed[1].host)
+        assertEquals(3000, parsed[1].port)
+    }
+
+    @Test
+    fun `parseAllowedOrigins skips malformed entries`() {
+        val parsed = parseAllowedOrigins("not-a-url, https://valid.example.com, also-bad")
+        assertEquals(1, parsed.size)
+        assertEquals("valid.example.com", parsed.single().host)
+    }
+
+    @Test
+    fun `CORS is installed when ALLOWED_ORIGINS is set and reflects the origin back`() =
+        testApplication {
+            application { edgeModule(env = mapOf("ALLOWED_ORIGINS" to "https://app.logdate.com")) }
+
+            val response =
+                client.options("/test") {
+                    header(HttpHeaders.Origin, "https://app.logdate.com")
+                    header(HttpHeaders.AccessControlRequestMethod, "GET")
+                }
+            assertEquals(
+                "https://app.logdate.com",
+                response.headers[HttpHeaders.AccessControlAllowOrigin],
+            )
+        }
+
+    @Test
+    fun `CORS rejects origins not on the allowlist`() =
+        testApplication {
+            application { edgeModule(env = mapOf("ALLOWED_ORIGINS" to "https://app.logdate.com")) }
+
+            val response =
+                client.get("/test") {
+                    header(HttpHeaders.Origin, "https://evil.example.com")
+                }
+            assertNull(response.headers[HttpHeaders.AccessControlAllowOrigin])
+        }
+
+    @Test
+    fun `CORS is off by default when ALLOWED_ORIGINS is unset`() =
+        testApplication {
+            application { edgeModule(env = emptyMap()) }
+
+            val response =
+                client.get("/test") {
+                    header(HttpHeaders.Origin, "https://app.logdate.com")
+                }
+            assertEquals(HttpStatusCode.OK, response.status)
+            // No CORS plugin → no Access-Control-Allow-Origin header on the response.
+            assertNull(response.headers[HttpHeaders.AccessControlAllowOrigin])
+        }
+
+    private fun Application.edgeModule(env: Map<String, String>) {
+        installNetworkEdge(readEnv = env::get)
+        routing {
+            get("/test") { call.respondText("ok") }
+        }
+    }
+}
