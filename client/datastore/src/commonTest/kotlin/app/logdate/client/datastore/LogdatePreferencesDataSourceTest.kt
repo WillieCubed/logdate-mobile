@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,6 +18,12 @@ class LogdatePreferencesDataSourceTest {
     fun systemSearchVisibility_defaultsToEnabled() =
         runTest {
             assertTrue(dataSource.getSystemSearchVisibilityEnabled())
+        }
+
+    @Test
+    fun peopleFeature_defaultsToEnabled() =
+        runTest {
+            assertEquals(true, dataSource.observePeopleEnabled().first())
         }
 
     @Test

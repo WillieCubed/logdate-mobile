@@ -17,6 +17,8 @@ import kotlinx.datetime.DayOfWeek
 import kotlin.time.Clock
 import kotlin.time.Instant
 
+private const val DEFAULT_PEOPLE_CONTACTS_ACCESS_MODE = "NONE"
+
 /**
  * A local data source for user preferences.
  */
@@ -37,6 +39,8 @@ class LogdatePreferencesDataSource(
         // Feature flags
         val LIBRARY_ENABLED = booleanPreferencesKey("library_enabled")
         val EVENTS_ENABLED = booleanPreferencesKey("events_enabled")
+        val PEOPLE_ENABLED = booleanPreferencesKey("people_enabled")
+        val PEOPLE_CONTACTS_ACCESS_MODE = stringPreferencesKey("people_contacts_access_mode")
 
         // Journal UI keys
         val JOURNAL_LAYOUT_MODE = stringPreferencesKey("journal_layout_mode")
@@ -151,6 +155,38 @@ class LogdatePreferencesDataSource(
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
                 this[EVENTS_ENABLED] = enabled
+            }
+        }
+    }
+
+    /**
+     * Observes whether the People slice is enabled for this installation.
+     *
+     * This now defaults to on because the Android-first People experience is intended to ship as
+     * a headline capability rather than a hidden lab feature.
+     */
+    fun observePeopleEnabled(): Flow<Boolean> =
+        userPreferences.data.map { prefs ->
+            prefs[PEOPLE_ENABLED] ?: true
+        }
+
+    suspend fun setPeopleEnabled(enabled: Boolean) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[PEOPLE_ENABLED] = enabled
+            }
+        }
+    }
+
+    fun observePeopleContactsAccessMode(): Flow<String> =
+        userPreferences.data.map { prefs ->
+            prefs[PEOPLE_CONTACTS_ACCESS_MODE] ?: DEFAULT_PEOPLE_CONTACTS_ACCESS_MODE
+        }
+
+    suspend fun setPeopleContactsAccessMode(modeName: String) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[PEOPLE_CONTACTS_ACCESS_MODE] = modeName
             }
         }
     }
