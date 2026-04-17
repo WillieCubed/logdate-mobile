@@ -67,6 +67,8 @@ import logdate.client.feature.core.generated.resources.memories
 import logdate.client.feature.core.generated.resources.memories_description
 import logdate.client.feature.core.generated.resources.notifications_settings
 import logdate.client.feature.core.generated.resources.notifications_settings_description
+import logdate.client.feature.core.generated.resources.people_overview_description
+import logdate.client.feature.core.generated.resources.people_title
 import logdate.client.feature.core.generated.resources.privacy_and_security
 import logdate.client.feature.core.generated.resources.privacy_security_description
 import logdate.client.feature.core.generated.resources.profile
@@ -120,6 +122,7 @@ fun SettingsOverviewScreen(
     onNavigateToStreaks: () -> Unit = {},
     onNavigateToRewindSettings: () -> Unit = {},
     onNavigateToEventsSettings: () -> Unit = {},
+    onNavigateToPeopleSettings: () -> Unit = {},
     onNavigateToTimeline: () -> Unit,
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
@@ -147,6 +150,7 @@ fun SettingsOverviewScreen(
         onNavigateToStreaks = onNavigateToStreaks,
         onNavigateToRewindSettings = onNavigateToRewindSettings,
         onNavigateToEventsSettings = onNavigateToEventsSettings,
+        onNavigateToPeopleSettings = onNavigateToPeopleSettings,
         onNavigateToTimeline = onNavigateToTimeline,
         onNavigateToSync = onNavigateToSync,
         onNavigateToExport = onNavigateToExport,
@@ -180,6 +184,7 @@ fun SettingsOverviewContent(
     onNavigateToStreaks: () -> Unit = {},
     onNavigateToRewindSettings: () -> Unit = {},
     onNavigateToEventsSettings: () -> Unit = {},
+    onNavigateToPeopleSettings: () -> Unit = {},
     onNavigateToTimeline: () -> Unit = {},
     onNavigateToSync: () -> Unit,
     onNavigateToExport: () -> Unit,
@@ -253,6 +258,12 @@ fun SettingsOverviewContent(
                     description = "The moments worth remembering, gathered for you",
                     icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
                     onClick = onNavigateToEventsSettings,
+                )
+                SettingsNavigationItem(
+                    title = stringResource(Res.string.people_title),
+                    description = stringResource(Res.string.people_overview_description),
+                    icon = { Icon(Icons.Default.Person, contentDescription = null) },
+                    onClick = onNavigateToPeopleSettings,
                 )
                 SettingsNavigationItem(
                     title = "Your library",

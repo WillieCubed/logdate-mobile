@@ -22,4 +22,5 @@ fun Person.toUiState(): PersonUiState =
     PersonUiState(
         uid = this.uid,
         name = this.name,
+        photoUri = this.photoUri,
     )

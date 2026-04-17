@@ -84,6 +84,7 @@ enum class SearchContentType(
     STICKER("sticker"),
     POSTCARD("postcard"),
     AMBIENT_SOUND("ambient_sound"),
+    PERSON("person"),
     ;
 
     companion object {

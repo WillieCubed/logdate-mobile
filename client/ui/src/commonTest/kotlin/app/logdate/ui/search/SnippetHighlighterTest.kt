@@ -1,6 +1,5 @@
 package app.logdate.ui.search
 
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,7 +28,7 @@ class SnippetHighlighterTest {
         val span = result.spanStyles[0]
         assertEquals(6, span.start) // "Found " = 6 chars
         assertEquals(11, span.end) // "match" = 5 chars
-        assertEquals(FontWeight.Bold, (span.item as SpanStyle).fontWeight)
+        assertEquals(FontWeight.Bold, span.item.fontWeight)
     }
 
     @Test

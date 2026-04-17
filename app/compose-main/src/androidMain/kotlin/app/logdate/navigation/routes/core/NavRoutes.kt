@@ -301,6 +301,33 @@ data object RewindSettingsRoute : NavKey
 data object EventsSettingsRoute : NavKey
 
 /**
+ * Navigation route for the People settings hub.
+ */
+@Serializable
+data object PeopleSettingsRoute : NavKey
+
+/**
+ * Navigation route for the canonical People directory.
+ */
+@Serializable
+data object PeopleDirectoryRoute : NavKey
+
+/**
+ * Navigation route for the inferred People review inbox.
+ */
+@Serializable
+data object PeopleInboxRoute : NavKey
+
+/**
+ * Navigation route for a specific person detail screen.
+ */
+@Serializable
+data class PersonDetailRoute(
+    @Serializable(with = UuidSerializer::class)
+    val personId: Uuid,
+) : NavKey
+
+/**
  * Navigation route for the device calendar sync overview screen.
  */
 @Serializable

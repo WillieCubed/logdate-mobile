@@ -15,11 +15,10 @@ import app.logdate.client.intelligence.structured.StructuredOutputResult
 import app.logdate.client.intelligence.unavailableReason
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
+import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.Person
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -34,7 +33,7 @@ class PeopleExtractor(
     private val generativeAIChatClient: GenerativeAIChatClient,
     private val networkAvailabilityMonitor: NetworkAvailabilityMonitor,
     private val dataUsagePolicy: DataUsagePolicy,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val ioDispatcher: CoroutineDispatcher = platformIODispatcher,
 ) {
     companion object {
         // TODO: Use additional logic to extract text fragments that could be resolved to people

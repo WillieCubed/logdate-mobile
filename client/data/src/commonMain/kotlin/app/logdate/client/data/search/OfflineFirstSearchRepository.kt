@@ -2,6 +2,7 @@ package app.logdate.client.data.search
 
 import app.logdate.client.database.dao.SearchDao
 import app.logdate.client.database.dao.SearchResultEntity
+import app.logdate.client.database.dao.people.PersonDao
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchRepository
 import app.logdate.client.repository.search.SearchResult
@@ -9,6 +10,7 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.mapLatest
@@ -27,6 +29,7 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalCoroutinesApi::class)
 class OfflineFirstSearchRepository(
     private val searchDao: SearchDao,
+    private val personDao: PersonDao,
 ) : SearchRepository {
     private val correctionCache = mutableMapOf<String, String?>()
     private val correctionCacheMutex = Mutex()
@@ -103,15 +106,20 @@ class OfflineFirstSearchRepository(
     ): Flow<List<SearchResult>> {
         val prepared = prepareFtsQuery(query) ?: return flowOf(emptyList())
 
-        return searchDao
-            .observeGeneration()
-            .distinctUntilChanged()
-            .mapLatest {
-                executePreparedQuery(prepared, block)
-            }.catch { error ->
-                Napier.e("Search query failed for \"$query\": ${error.message}", error)
-                emit(emptyList())
-            }
+        val ftsResults =
+            searchDao
+                .observeGeneration()
+                .distinctUntilChanged()
+                .mapLatest {
+                    executePreparedQuery(prepared, block)
+                }.catch { error ->
+                    Napier.e("Search query failed for \"$query\": ${error.message}", error)
+                    emit(emptyList())
+                }
+
+        return combine(ftsResults, observePeopleResults(query)) { fts, people ->
+            mergeSearchResults(fts = fts, people = people)
+        }
     }
 
     private suspend fun executePreparedQuery(
@@ -188,10 +196,52 @@ class OfflineFirstSearchRepository(
                 },
         )
 
+    private fun observePeopleResults(query: String): Flow<List<SearchResult>> {
+        val tokens =
+            query
+                .trim()
+                .lowercase()
+                .split(Regex("\\s+"))
+                .filter(String::isNotBlank)
+        if (tokens.isEmpty()) {
+            return flowOf(emptyList())
+        }
+
+        return personDao.observeAll().mapLatest { people ->
+            people
+                .asSequence()
+                .filter { person ->
+                    val searchHaystack =
+                        buildString {
+                            append(person.name.lowercase())
+                            if (person.aliases.isNotEmpty()) {
+                                append(' ')
+                                append(person.aliases.joinToString(" ").lowercase())
+                            }
+                        }
+                    tokens.all(searchHaystack::contains)
+                }.map { person ->
+                    SearchResult(
+                        uid = person.id,
+                        content = person.name,
+                        created = person.lastUpdated,
+                        contentType = SearchContentType.PERSON,
+                        rank = PERSON_SEARCH_RANK,
+                    )
+                }.toList()
+        }
+    }
+
+    private fun mergeSearchResults(
+        fts: List<SearchResult>,
+        people: List<SearchResult>,
+    ): List<SearchResult> = (people + fts).distinctBy { "${it.contentType.ftsValue}_${it.uid}" }
+
     private companion object {
         const val LONG_FUZZY_TOKEN_LENGTH = 7
         const val MAX_FUZZY_CANDIDATES = 64
         const val MIN_FUZZY_TOKEN_LENGTH = 4
+        const val PERSON_SEARCH_RANK = -1.0
         const val SHORT_QUERY_RESULT_LIMIT = 20
         const val TWO_CHARACTER_PREFIX_MIN_LENGTH = 5
     }

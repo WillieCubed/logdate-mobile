@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.mapLatest
+import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AndroidPlatformSearchRepository(
@@ -56,7 +57,7 @@ class AndroidPlatformSearchRepository(
 
     override fun searchInJournal(
         query: String,
-        journalId: kotlin.uuid.Uuid,
+        journalId: Uuid,
         limit: Int,
     ): Flow<List<SearchResult>> = roomSearchRepository.searchInJournal(query, journalId, limit)
 
@@ -85,10 +86,11 @@ class AndroidPlatformSearchRepository(
                         return@mapLatest fallback().first()
                     }
 
+                val roomResults = fallback().first()
                 if (results.isNotEmpty()) {
-                    results
+                    (results + roomResults).distinctBy { "${it.contentType.ftsValue}_${it.uid}" }
                 } else {
-                    fallback().first()
+                    roomResults
                 }
             }.catch { error ->
                 Napier.w("Android AppSearch flow failed; falling back to Room search", error)

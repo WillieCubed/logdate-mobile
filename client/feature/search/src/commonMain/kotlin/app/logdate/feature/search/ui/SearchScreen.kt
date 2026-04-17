@@ -72,6 +72,7 @@ const val SEARCH_SCREEN_INPUT_ACCESSIBILITY_TAG = "search_screen_input"
 fun SearchScreen(
     onNavigateToDay: (LocalDate) -> Unit,
     onNavigateToJournal: (Uuid) -> Unit = {},
+    onNavigateToPerson: (Uuid) -> Unit = {},
     onGoBack: () -> Unit,
     initialQuery: String = "",
     modifier: Modifier = Modifier,
@@ -94,6 +95,7 @@ fun SearchScreen(
         onCommitSearch = viewModel::commitSearch,
         onNavigateToDay = onNavigateToDay,
         onNavigateToJournal = onNavigateToJournal,
+        onNavigateToPerson = onNavigateToPerson,
         onGoBack = onGoBack,
         modifier = modifier,
     )
@@ -113,6 +115,7 @@ fun SearchScreenContent(
     onCommitSearch: () -> Unit,
     onNavigateToDay: (LocalDate) -> Unit,
     onNavigateToJournal: (Uuid) -> Unit,
+    onNavigateToPerson: (Uuid) -> Unit,
     onGoBack: () -> Unit,
     initialQuery: String = "",
     queryText: String = initialQuery,
@@ -254,6 +257,7 @@ fun SearchScreenContent(
                                         result = resultRow.result,
                                         onNavigateToDay = onNavigateToDay,
                                         onNavigateToJournal = onNavigateToJournal,
+                                        onNavigateToPerson = onNavigateToPerson,
                                     )
                                 },
                             )
@@ -305,9 +309,11 @@ private fun navigateToResult(
     result: SearchResult,
     onNavigateToDay: (LocalDate) -> Unit,
     onNavigateToJournal: (Uuid) -> Unit,
+    onNavigateToPerson: (Uuid) -> Unit,
 ) {
     when (result.contentType) {
         SearchContentType.JOURNAL -> onNavigateToJournal(result.uid)
+        SearchContentType.PERSON -> onNavigateToPerson(result.uid)
         else -> {
             val date =
                 result.created

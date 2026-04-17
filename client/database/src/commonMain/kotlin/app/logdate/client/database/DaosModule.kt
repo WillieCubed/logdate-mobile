@@ -37,4 +37,9 @@ val daosModule: Module =
         single { get<LogDateDatabase>().eventNoteLinkDao() }
         single { get<LogDateDatabase>().audioTagDao() }
         single { get<LogDateDatabase>().reflectionPromptResponseDao() }
+        single { get<LogDateDatabase>().personDao() }
+        single { get<LogDateDatabase>().inferredPersonClusterDao() }
+        single { get<LogDateDatabase>().inferredPersonEvidenceDao() }
+        single { get<LogDateDatabase>().personLinkDao() }
+        single { get<LogDateDatabase>().personResolutionDecisionDao() }
     }

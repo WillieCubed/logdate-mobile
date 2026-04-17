@@ -1,6 +1,24 @@
 package app.logdate.client.database
 
+import app.logdate.client.database.converters.StringListConverter
+import app.logdate.client.database.converters.TimestampConverter
+import app.logdate.client.database.converters.UuidConverter
+import app.logdate.client.database.entities.ImageNoteEntity
+import app.logdate.client.database.entities.JournalEntity
+import app.logdate.client.database.entities.JournalNoteCrossRef
+import app.logdate.client.database.entities.LocationLogEntity
+import app.logdate.client.database.entities.TextNoteEntity
+import app.logdate.client.database.entities.UserDeviceEntity
+import app.logdate.client.database.entities.journals.JournalContentEntityLink
+import app.logdate.client.database.entities.media.MediaImageEntity
+import app.logdate.client.database.entities.people.InferredPersonClusterEntity
+import app.logdate.client.database.entities.people.InferredPersonEvidenceEntity
+import app.logdate.client.database.entities.people.PersonEntity
+import app.logdate.client.database.entities.people.PersonLinkEntity
+import app.logdate.client.database.entities.people.PersonResolutionDecisionEntity
 import app.logdate.client.database.migrations.MIGRATION_1_2
+import app.logdate.client.database.migrations.MIGRATION_39_40
+import app.logdate.client.database.migrations.MIGRATION_40_41
 import app.logdate.client.database.migrations.MIGRATION_2_3
 import app.logdate.client.database.migrations.MIGRATION_3_4
 import app.logdate.client.database.migrations.MIGRATION_4_5
@@ -25,9 +43,8 @@ class DatabaseConfigurationTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun migrations_haveCorrectVersionNumbers() =
+    fun migrationEndpoints_haveCorrectVersionNumbers() =
         runTest {
-            // Test that all migrations have sequential version numbers
             val migrations =
                 listOf(
                     MIGRATION_1_2,
@@ -39,13 +56,13 @@ class DatabaseConfigurationTest : BaseDatabaseTest() {
                     MIGRATION_7_8,
                     MIGRATION_8_9,
                     MIGRATION_9_10,
+                    MIGRATION_39_40,
+                    MIGRATION_40_41,
                 )
 
-            // Verify all migrations exist
             assertTrue(migrations.isNotEmpty())
-            assertEquals(9, migrations.size)
+            assertEquals(11, migrations.size)
 
-            // Verify version numbers are sequential
             assertEquals(1, MIGRATION_1_2.startVersion)
             assertEquals(2, MIGRATION_1_2.endVersion)
 
@@ -72,6 +89,12 @@ class DatabaseConfigurationTest : BaseDatabaseTest() {
 
             assertEquals(9, MIGRATION_9_10.startVersion)
             assertEquals(10, MIGRATION_9_10.endVersion)
+
+            assertEquals(39, MIGRATION_39_40.startVersion)
+            assertEquals(40, MIGRATION_39_40.endVersion)
+
+            assertEquals(40, MIGRATION_40_41.startVersion)
+            assertEquals(41, MIGRATION_40_41.endVersion)
         }
 
     @Test
@@ -99,51 +122,41 @@ class DatabaseConfigurationTest : BaseDatabaseTest() {
     @Test
     fun databaseVersion_isCorrect() =
         runTest {
-            // The database version should be 10 based on the latest migration
-            // This is defined in the @Database annotation
-
-            // We can verify this indirectly by checking the last migration
-            assertEquals(10, MIGRATION_9_10.endVersion)
+            assertEquals(41, MIGRATION_40_41.endVersion)
         }
 
     @Test
     fun typeConverters_areConfigured() =
         runTest {
-            // Test that the database has type converters configured
-            // The @TypeConverters annotation should include:
-            // - TimestampConverter
-            // - UuidConverter
-
-            // This is verified at compile time by the Room processor
-            // We can check that the converter classes exist
-            assertNotNull(app.logdate.client.database.converters.TimestampConverter::class)
-            assertNotNull(app.logdate.client.database.converters.UuidConverter::class)
+            assertNotNull(TimestampConverter::class)
+            assertNotNull(UuidConverter::class)
+            assertNotNull(StringListConverter::class)
         }
 
     @Test
     fun entities_areProperlyConfigured() =
         runTest {
-            // Test that all expected entities are configured in the database
-            // This includes verifying the entity classes exist and are properly annotated
-
             val entityClasses =
                 listOf(
-                    app.logdate.client.database.entities.TextNoteEntity::class,
-                    app.logdate.client.database.entities.ImageNoteEntity::class,
-                    app.logdate.client.database.entities.JournalEntity::class,
-                    app.logdate.client.database.entities.JournalNoteCrossRef::class,
-                    app.logdate.client.database.entities.LocationLogEntity::class,
-                    app.logdate.client.database.entities.UserDeviceEntity::class,
-                    app.logdate.client.database.entities.media.MediaImageEntity::class,
-                    app.logdate.client.database.entities.journals.JournalContentEntityLink::class,
-                    // Rewind entity has been removed or renamed
+                    TextNoteEntity::class,
+                    ImageNoteEntity::class,
+                    JournalEntity::class,
+                    JournalNoteCrossRef::class,
+                    LocationLogEntity::class,
+                    UserDeviceEntity::class,
+                    MediaImageEntity::class,
+                    JournalContentEntityLink::class,
+                    PersonEntity::class,
+                    InferredPersonClusterEntity::class,
+                    InferredPersonEvidenceEntity::class,
+                    PersonLinkEntity::class,
+                    PersonResolutionDecisionEntity::class,
                 )
 
-            // Verify all entity classes exist
             entityClasses.forEach { entityClass ->
                 assertNotNull(entityClass)
             }
 
-            assertEquals(8, entityClasses.size)
+            assertEquals(13, entityClasses.size)
         }
 }

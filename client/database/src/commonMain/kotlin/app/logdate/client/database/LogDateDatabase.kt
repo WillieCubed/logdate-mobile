@@ -11,6 +11,7 @@ import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import app.logdate.client.database.converters.DurationConverter
 import app.logdate.client.database.converters.LocationDataConverter
 import app.logdate.client.database.converters.MediaDimensionsConverter
+import app.logdate.client.database.converters.StringListConverter
 import app.logdate.client.database.converters.TimestampConverter
 import app.logdate.client.database.converters.UuidConverter
 import app.logdate.client.database.dao.AudioNoteDao
@@ -38,6 +39,11 @@ import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.dao.maintenance.IntegrityDao
 import app.logdate.client.database.dao.media.IndexedMediaDao
 import app.logdate.client.database.dao.media.MediaExifDao
+import app.logdate.client.database.dao.people.InferredPersonClusterDao
+import app.logdate.client.database.dao.people.InferredPersonEvidenceDao
+import app.logdate.client.database.dao.people.PersonDao
+import app.logdate.client.database.dao.people.PersonLinkDao
+import app.logdate.client.database.dao.people.PersonResolutionDecisionDao
 import app.logdate.client.database.dao.rewind.CachedRewindDao
 import app.logdate.client.database.dao.rewind.ReflectionPromptResponseDao
 import app.logdate.client.database.dao.rewind.RewindGenerationRequestDao
@@ -67,6 +73,11 @@ import app.logdate.client.database.entities.media.IndexedImageEntity
 import app.logdate.client.database.entities.media.IndexedVideoEntity
 import app.logdate.client.database.entities.media.MediaExifMetadataEntity
 import app.logdate.client.database.entities.media.MediaImageEntity
+import app.logdate.client.database.entities.people.InferredPersonClusterEntity
+import app.logdate.client.database.entities.people.InferredPersonEvidenceEntity
+import app.logdate.client.database.entities.people.PersonEntity
+import app.logdate.client.database.entities.people.PersonLinkEntity
+import app.logdate.client.database.entities.people.PersonResolutionDecisionEntity
 import app.logdate.client.database.entities.rewind.ReflectionPromptResponseEntity
 import app.logdate.client.database.entities.rewind.RewindEntity
 import app.logdate.client.database.entities.rewind.RewindGenerationRequestEntity
@@ -106,7 +117,9 @@ import app.logdate.client.database.migrations.MIGRATION_35_36
 import app.logdate.client.database.migrations.MIGRATION_36_37
 import app.logdate.client.database.migrations.MIGRATION_37_38
 import app.logdate.client.database.migrations.MIGRATION_38_39
+import app.logdate.client.database.migrations.MIGRATION_39_40
 import app.logdate.client.database.migrations.MIGRATION_3_4
+import app.logdate.client.database.migrations.MIGRATION_40_41
 import app.logdate.client.database.migrations.MIGRATION_4_5
 import app.logdate.client.database.migrations.MIGRATION_5_6
 import app.logdate.client.database.migrations.MIGRATION_6_7
@@ -114,8 +127,6 @@ import app.logdate.client.database.migrations.MIGRATION_7_8
 import app.logdate.client.database.migrations.MIGRATION_8_9
 import app.logdate.client.database.migrations.MIGRATION_9_10
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 
 /**
  * The main on-device database for a LogDate client.
@@ -169,8 +180,14 @@ import kotlinx.coroutines.IO
         AudioTagEntity::class,
         // Typed replies to rewind noticing prompts
         ReflectionPromptResponseEntity::class,
+        // People
+        PersonEntity::class,
+        InferredPersonClusterEntity::class,
+        InferredPersonEvidenceEntity::class,
+        PersonLinkEntity::class,
+        PersonResolutionDecisionEntity::class,
     ],
-    version = 39,
+    version = 41,
     exportSchema = true,
 )
 @TypeConverters(
@@ -179,6 +196,7 @@ import kotlinx.coroutines.IO
     DurationConverter::class,
     MediaDimensionsConverter::class,
     LocationDataConverter::class,
+    StringListConverter::class,
 )
 @ConstructedBy(LogDateDatabaseConstructor::class)
 abstract class LogDateDatabase : RoomDatabase() {
@@ -239,12 +257,24 @@ abstract class LogDateDatabase : RoomDatabase() {
     abstract fun audioTagDao(): AudioTagDao
 
     abstract fun reflectionPromptResponseDao(): ReflectionPromptResponseDao
+
+    abstract fun personDao(): PersonDao
+
+    abstract fun inferredPersonClusterDao(): InferredPersonClusterDao
+
+    abstract fun inferredPersonEvidenceDao(): InferredPersonEvidenceDao
+
+    abstract fun personLinkDao(): PersonLinkDao
+
+    abstract fun personResolutionDecisionDao(): PersonResolutionDecisionDao
 }
 
 /**
  * The name of the [LogDateDatabase] file.
  */
 internal const val DATABASE_NAME = "logdate"
+
+internal expect val roomDatabaseDispatcher: CoroutineDispatcher
 
 /**
  * Creates a new [LogDateDatabase].
@@ -255,11 +285,11 @@ internal const val DATABASE_NAME = "logdate"
  * applying all necessary configurations to the database, including database migrations.
  *
  * This creates a SQLite database that uses the bundled SQLite driver and runs all queries on the
- * IO dispatcher.
+ * platform database dispatcher.
  *
  * @param builder The [RoomDatabase.Builder] to use to create the database.
  * @param driver The SQLite driver to use for the database. Defaults to [BundledSQLiteDriver].
- * @param dispatcher The dispatcher to use for all database queries. Defaults to [Dispatchers.IO].
+ * @param dispatcher The dispatcher to use for all database queries. Defaults to [roomDatabaseDispatcher].
  * @param destroyTablesOnDowngrade Whether to destructively recreate database tables if the
  * database version is downgraded. False by default — Room will throw instead of silently wiping data.
  *
@@ -268,7 +298,7 @@ internal const val DATABASE_NAME = "logdate"
 fun getRoomDatabase(
     builder: RoomDatabase.Builder<LogDateDatabase>,
     driver: SQLiteDriver? = BundledSQLiteDriver(),
-    dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    dispatcher: CoroutineDispatcher = roomDatabaseDispatcher,
     destroyTablesOnUpgrade: Boolean = false,
     destroyTablesOnDowngrade: Boolean = false,
 ): LogDateDatabase {
@@ -313,6 +343,8 @@ fun getRoomDatabase(
                 MIGRATION_36_37,
                 MIGRATION_37_38,
                 MIGRATION_38_39,
+                MIGRATION_39_40,
+                MIGRATION_40_41,
             ).addCallback(FtsTableCallback)
             .fallbackToDestructiveMigration(destroyTablesOnUpgrade)
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)

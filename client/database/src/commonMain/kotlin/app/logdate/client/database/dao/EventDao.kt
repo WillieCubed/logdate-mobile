@@ -30,6 +30,9 @@ interface EventDao {
     @Query("SELECT * FROM events WHERE deleted_at IS NULL ORDER BY start_time DESC")
     fun observeAll(): Flow<List<EventEntity>>
 
+    @Query("SELECT * FROM events WHERE deleted_at IS NULL ORDER BY start_time DESC")
+    suspend fun getAll(): List<EventEntity>
+
     /**
      * Observe events that overlap the given time window. An event overlaps if its [start_time]
      * is before [end] and its [end_time] (or [start_time], for point-in-time events) is at or

@@ -136,6 +136,10 @@ import app.logdate.navigation.routes.openLocationTrackingOptions
 import app.logdate.navigation.routes.openMediaDetail
 import app.logdate.navigation.routes.openMemoriesSettings
 import app.logdate.navigation.routes.openNotificationSettings
+import app.logdate.navigation.routes.openPeopleDirectory
+import app.logdate.navigation.routes.openPeopleInbox
+import app.logdate.navigation.routes.openPeopleSettings
+import app.logdate.navigation.routes.openPersonDetail
 import app.logdate.navigation.routes.openPrivacySettings
 import app.logdate.navigation.routes.openProfile
 import app.logdate.navigation.routes.openRecommendationSettings
@@ -699,6 +703,7 @@ fun MainNavigationRoot(
                         searchRoutes(
                             onBack = mainAppNavigator::goBack,
                             onNavigateToDay = mainAppNavigator::openTimelineDetail,
+                            onNavigateToPerson = mainAppNavigator::openPersonDetail,
                         )
                         rewindRoutes(
                             onBack = mainAppNavigator::goBack,
@@ -745,6 +750,10 @@ fun MainNavigationRoot(
                             onNavigateToStreaks = mainAppNavigator::openStreakSettings,
                             onNavigateToRewindSettings = mainAppNavigator::openRewindSettings,
                             onNavigateToEventsSettings = mainAppNavigator::openEventsSettings,
+                            onNavigateToPeopleSettings = mainAppNavigator::openPeopleSettings,
+                            onNavigateToPeopleDirectory = mainAppNavigator::openPeopleDirectory,
+                            onNavigateToPeopleInbox = mainAppNavigator::openPeopleInbox,
+                            onNavigateToPersonDetail = mainAppNavigator::openPersonDetail,
                             onNavigateToEventsCalendar = mainAppNavigator::openEventsCalendar,
                             onNavigateToCalendarSyncSettings = mainAppNavigator::openCalendarSyncSettings,
                             onNavigateToCalendarSyncCalendars = mainAppNavigator::openCalendarSyncCalendars,

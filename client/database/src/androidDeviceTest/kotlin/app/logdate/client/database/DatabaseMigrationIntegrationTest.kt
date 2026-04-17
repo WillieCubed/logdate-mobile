@@ -2,6 +2,7 @@ package app.logdate.client.database
 
 import androidx.room.Room
 import androidx.room.testing.MigrationTestHelper
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -9,6 +10,8 @@ import app.logdate.client.database.entities.JournalEntity
 import app.logdate.client.database.entities.TextNoteEntity
 import app.logdate.client.database.migrations.MIGRATION_25_26
 import app.logdate.client.database.migrations.MIGRATION_26_27
+import app.logdate.client.database.migrations.MIGRATION_39_40
+import app.logdate.client.database.migrations.MIGRATION_40_41
 import app.logdate.client.database.migrations.MIGRATION_5_6
 import app.logdate.client.database.migrations.MIGRATION_6_7
 import app.logdate.client.database.migrations.MIGRATION_7_8
@@ -194,7 +197,215 @@ class DatabaseMigrationIntegrationTest {
         cursor.close()
     }
 
-    private fun androidx.sqlite.db.SupportSQLiteDatabase.insertLegacyIntegerJournal(
+    @Test
+    fun testMigrationFrom39To40CreatesPeopleTable() {
+        val databaseName = "$testDatabaseName-39-40"
+
+        helper.createDatabase(databaseName, 39).use { db ->
+            assertFalse(db.hasTable("people"))
+        }
+
+        val db = helper.runMigrationsAndValidate(databaseName, 40, true, MIGRATION_39_40)
+
+        assertTrue(db.hasTable("people"))
+        assertEquals(
+            listOf("contact_lookup_key", "name", "origin"),
+            db.indexNamesFor("people"),
+        )
+
+        db.execSQL(
+            """
+            INSERT INTO people (
+                id,
+                name,
+                photo_uri,
+                aliases,
+                relationship_label,
+                notes,
+                origin,
+                contact_lookup_key,
+                created,
+                last_updated,
+                deleted_at
+            ) VALUES (
+                'person-1',
+                'Ava',
+                NULL,
+                'Av|A',
+                'Friend',
+                'Met through work',
+                'CONTACT_SELECTED',
+                'lookup-ava',
+                1710000000000,
+                1710000000000,
+                NULL
+            )
+            """.trimIndent(),
+        )
+
+        val cursor =
+            db.query(
+                """
+                SELECT name, aliases, relationship_label, origin, contact_lookup_key
+                FROM people
+                WHERE id = 'person-1'
+                """.trimIndent(),
+            )
+        assertTrue(cursor.moveToFirst())
+        assertEquals("Ava", cursor.getString(cursor.getColumnIndexOrThrow("name")))
+        assertEquals("Av|A", cursor.getString(cursor.getColumnIndexOrThrow("aliases")))
+        assertEquals("Friend", cursor.getString(cursor.getColumnIndexOrThrow("relationship_label")))
+        assertEquals("CONTACT_SELECTED", cursor.getString(cursor.getColumnIndexOrThrow("origin")))
+        assertEquals("lookup-ava", cursor.getString(cursor.getColumnIndexOrThrow("contact_lookup_key")))
+        cursor.close()
+    }
+
+    @Test
+    fun testMigrationFrom40To41CreatesPeopleGraphTables() {
+        val databaseName = "$testDatabaseName-40-41"
+
+        helper.createDatabase(databaseName, 40).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO people (
+                    id,
+                    name,
+                    photo_uri,
+                    aliases,
+                    relationship_label,
+                    notes,
+                    origin,
+                    contact_lookup_key,
+                    created,
+                    last_updated,
+                    deleted_at
+                ) VALUES (
+                    'person-1',
+                    'Ava',
+                    NULL,
+                    'Av|A',
+                    NULL,
+                    NULL,
+                    'CONTACT_SELECTED',
+                    'lookup-ava',
+                    1710000000000,
+                    1710000000000,
+                    NULL
+                )
+                """.trimIndent(),
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(databaseName, 41, true, MIGRATION_40_41)
+
+        assertTrue(db.hasTable("inferred_person_clusters"))
+        assertTrue(db.hasTable("inferred_person_evidence"))
+        assertTrue(db.hasTable("person_links"))
+        assertTrue(db.hasTable("person_resolution_decisions"))
+
+        db.execSQL(
+            """
+            INSERT INTO inferred_person_clusters (
+                id,
+                display_name_hint,
+                normalized_name,
+                status,
+                linked_person_id,
+                created,
+                last_updated
+            ) VALUES (
+                'cluster-1',
+                'Sam',
+                'sam',
+                'OPEN',
+                NULL,
+                1710000000000,
+                1710000000000
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            INSERT INTO inferred_person_evidence (
+                id,
+                cluster_id,
+                source_type,
+                source_id,
+                label,
+                confidence,
+                created
+            ) VALUES (
+                'evidence-1',
+                'cluster-1',
+                'ENTRY_TEXT',
+                'note-1',
+                'Sam came over for dinner',
+                0.8,
+                1710000000000
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            INSERT INTO person_links (
+                id,
+                person_id,
+                target_type,
+                target_id,
+                provenance,
+                confidence,
+                status,
+                created,
+                last_updated
+            ) VALUES (
+                'link-1',
+                'person-1',
+                'ENTRY',
+                'note-1',
+                'INFERRED',
+                0.9,
+                'ACTIVE',
+                1710000000000,
+                1710000000000
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            INSERT INTO person_resolution_decisions (
+                id,
+                normalized_name,
+                action,
+                person_id,
+                created,
+                last_updated
+            ) VALUES (
+                'decision-1',
+                'sam',
+                'SUPPRESS',
+                NULL,
+                1710000000000,
+                1710000000000
+            )
+            """.trimIndent(),
+        )
+
+        val linkCursor =
+            db.query(
+                """
+                SELECT person_id, target_type, provenance
+                FROM person_links
+                WHERE id = 'link-1'
+                """.trimIndent(),
+            )
+        assertTrue(linkCursor.moveToFirst())
+        assertEquals("person-1", linkCursor.getString(linkCursor.getColumnIndexOrThrow("person_id")))
+        assertEquals("ENTRY", linkCursor.getString(linkCursor.getColumnIndexOrThrow("target_type")))
+        assertEquals("INFERRED", linkCursor.getString(linkCursor.getColumnIndexOrThrow("provenance")))
+        linkCursor.close()
+    }
+
+    private fun SupportSQLiteDatabase.insertLegacyIntegerJournal(
         id: Int,
         title: String,
         description: String,
@@ -209,7 +420,32 @@ class DatabaseMigrationIntegrationTest {
         )
     }
 
-    private fun androidx.sqlite.db.SupportSQLiteDatabase.insertLegacyTextJournal(
+    private fun SupportSQLiteDatabase.hasTable(tableName: String): Boolean {
+        val cursor =
+            query(
+                """
+                SELECT name
+                FROM sqlite_master
+                WHERE type = 'table' AND name = ?
+                """.trimIndent(),
+                arrayOf(tableName),
+            )
+        return cursor.use { it.moveToFirst() }
+    }
+
+    private fun SupportSQLiteDatabase.indexNamesFor(tableName: String): List<String> {
+        val cursor = query("PRAGMA index_list(`$tableName`)")
+        return cursor.use {
+            buildList {
+                while (it.moveToNext()) {
+                    val indexName = it.getString(it.getColumnIndexOrThrow("name"))
+                    add(indexName.removePrefix("index_${tableName}_"))
+                }
+            }.sorted()
+        }
+    }
+
+    private fun SupportSQLiteDatabase.insertLegacyTextJournal(
         id: String,
         title: String,
         description: String,
@@ -224,7 +460,7 @@ class DatabaseMigrationIntegrationTest {
         )
     }
 
-    private fun androidx.sqlite.db.SupportSQLiteDatabase.insertLegacyTextNote(
+    private fun SupportSQLiteDatabase.insertLegacyTextNote(
         uid: String,
         content: String,
         created: Long = 1640995200000,

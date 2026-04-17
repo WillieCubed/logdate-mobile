@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
@@ -75,11 +76,17 @@ fun SearchResult.toUniversalSearchResultUiState(): UniversalSearchResultUiState 
     return UniversalSearchResultUiState(
         id = "${contentType.ftsValue}_$uid",
         contentText = parseSnippetMarkers(content),
-        supportingText = "${created.toReadableDateTimeShort()} · $typeLabel",
+        supportingText = searchSupportingText(typeLabel),
         typeLabel = typeLabel,
         typeIcon = icon,
     )
 }
+
+private fun SearchResult.searchSupportingText(typeLabel: String): String =
+    when (contentType) {
+        SearchContentType.PERSON -> typeLabel
+        else -> "${created.toReadableDateTimeShort()} · $typeLabel"
+    }
 
 private fun SearchContentType.visualInfo(): Pair<ImageVector, String> =
     when (this) {
@@ -92,4 +99,5 @@ private fun SearchContentType.visualInfo(): Pair<ImageVector, String> =
         SearchContentType.STICKER -> Icons.Default.Star to "Sticker"
         SearchContentType.POSTCARD -> Icons.Default.Mail to "Postcard"
         SearchContentType.AMBIENT_SOUND -> Icons.Default.GraphicEq to "Soundscape"
+        SearchContentType.PERSON -> Icons.Default.Person to "Person"
     }

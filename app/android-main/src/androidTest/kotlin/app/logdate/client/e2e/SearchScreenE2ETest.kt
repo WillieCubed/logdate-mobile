@@ -117,7 +117,11 @@ class SearchScreenE2ETest {
                         externalScope = searchScope,
                         databaseName = "search_screen_e2e_${System.nanoTime()}",
                     ),
-                roomSearchRepository = OfflineFirstSearchRepository(database.searchDao()),
+                roomSearchRepository =
+                    OfflineFirstSearchRepository(
+                        searchDao = database.searchDao(),
+                        personDao = database.personDao(),
+                    ),
             )
         val recentSearchesRepository = InMemoryRecentSearchesRepository()
         viewModel =
@@ -142,6 +146,7 @@ class SearchScreenE2ETest {
                 onCommitSearch = {},
                 onNavigateToDay = {},
                 onNavigateToJournal = {},
+                onNavigateToPerson = {},
                 onGoBack = {},
             )
         }
@@ -159,6 +164,7 @@ class SearchScreenE2ETest {
                 onCommitSearch = {},
                 onNavigateToDay = {},
                 onNavigateToJournal = {},
+                onNavigateToPerson = {},
                 onGoBack = {},
             )
         }
@@ -176,6 +182,7 @@ class SearchScreenE2ETest {
                 onCommitSearch = {},
                 onNavigateToDay = {},
                 onNavigateToJournal = {},
+                onNavigateToPerson = {},
                 onGoBack = {},
             )
         }
@@ -195,6 +202,7 @@ class SearchScreenE2ETest {
                 onCommitSearch = {},
                 onNavigateToDay = {},
                 onNavigateToJournal = {},
+                onNavigateToPerson = {},
                 onGoBack = {},
             )
         }
@@ -210,6 +218,7 @@ class SearchScreenE2ETest {
                 SearchScreen(
                     onNavigateToDay = {},
                     onNavigateToJournal = {},
+                    onNavigateToPerson = {},
                     onGoBack = {},
                     viewModel = viewModel,
                 )
@@ -243,6 +252,7 @@ class SearchScreenE2ETest {
                 SearchScreen(
                     onNavigateToDay = {},
                     onNavigateToJournal = {},
+                    onNavigateToPerson = {},
                     onGoBack = {},
                     viewModel = viewModel,
                 )
