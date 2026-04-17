@@ -7,6 +7,7 @@ import app.logdate.shared.model.PasskeyInfo
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyRegistrationResponse
 import app.logdate.shared.model.PasskeyUser
+import app.logdate.server.config.profileAwareBoolEnv
 import com.webauthn4j.WebAuthnManager
 import com.webauthn4j.authenticator.AuthenticatorImpl
 import com.webauthn4j.converter.AttestedCredentialDataConverter
@@ -33,8 +34,9 @@ import kotlin.uuid.Uuid
 /**
  * WebAuthn passkey service with optional strict cryptographic verification.
  *
- * Strict mode (`WEBAUTHN_STRICT_VERIFICATION=true`) uses WebAuthn4J verification.
- * Non-strict mode keeps a lightweight fallback for local/dev tests.
+ * Strict mode uses WebAuthn4J verification. Production profiles default to strict; development and
+ * test profiles default to the lightweight fallback so fixture challenges don't require real
+ * attestations. Set `WEBAUTHN_STRICT_VERIFICATION` explicitly to override the profile default.
  */
 @OptIn(ExperimentalUuidApi::class)
 class WebAuthnPasskeyService(
@@ -42,7 +44,12 @@ class WebAuthnPasskeyService(
     val relyingPartyId: String = "logdate.app",
     private val relyingPartyName: String = "LogDate",
     private val origin: String = "https://app.logdate.com",
-    private val strictVerificationEnabled: Boolean = readBooleanEnv("WEBAUTHN_STRICT_VERIFICATION", false),
+    private val strictVerificationEnabled: Boolean =
+        profileAwareBoolEnv(
+            name = "WEBAUTHN_STRICT_VERIFICATION",
+            productionDefault = true,
+            devDefault = false,
+        ),
 ) {
     private val secureRandom = SecureRandom()
     private val challenges = ConcurrentHashMap<String, PasskeyChallenge>()
@@ -456,13 +463,3 @@ class WebAuthnPasskeyService(
     private fun normalizeCredentialId(value: String): String? = decodeBase64Url(value)?.let { encodeBase64Url(it) }
 }
 
-private fun readBooleanEnv(
-    name: String,
-    defaultValue: Boolean,
-    readEnv: (String) -> String? = System::getenv,
-): Boolean {
-    val raw = readEnv(name) ?: return defaultValue
-    return raw.equals("true", ignoreCase = true) ||
-        raw.equals("yes", ignoreCase = true) ||
-        raw == "1"
-}

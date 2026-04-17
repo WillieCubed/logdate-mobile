@@ -181,14 +181,14 @@ These can be used instead of `DATABASE_URL`:
   - If unset, the server derives the value from the configured public server origin when available
 
 ### `WEBAUTHN_STRICT_VERIFICATION`
-- **Description**: Enables strict WebAuthn4J cryptographic verification for passkeys
+- **Description**: Enables strict WebAuthn4J cryptographic verification for passkeys and restore credentials.
 - **Type**: Boolean
-- **Default**: `false`
+- **Default**: **`true` when `LOGDATE_ENV=production`**, `false` otherwise. Set explicitly to override either way.
 - **Example**: `WEBAUTHN_STRICT_VERIFICATION=true`
-- **Required**: **Yes for production**
+- **Required**: No (profile default is correct for most deployments)
 - **Notes**:
-  - Strict mode requires valid Base64URL WebAuthn payloads from clients
-  - Keep disabled only for local/test environments
+  - Strict mode requires valid Base64URL WebAuthn payloads from clients — the default in production.
+  - Self-hosters running a non-standard client can set this to `false` explicitly, even in production.
 
 ---
 

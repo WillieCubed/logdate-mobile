@@ -6,6 +6,7 @@ import app.logdate.shared.model.PasskeyChallenge
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyRegistrationResponse
 import app.logdate.shared.model.PasskeyUser
+import app.logdate.server.config.profileAwareBoolEnv
 import com.webauthn4j.WebAuthnManager
 import com.webauthn4j.authenticator.AuthenticatorImpl
 import com.webauthn4j.converter.AttestedCredentialDataConverter
@@ -33,15 +34,6 @@ import kotlin.uuid.Uuid
 private const val CHALLENGE_TYPE_REGISTRATION = "restore-registration"
 private const val CHALLENGE_TYPE_AUTHENTICATION = "restore-authentication"
 
-private fun readBooleanEnv(
-    name: String,
-    defaultValue: Boolean,
-    readEnv: (String) -> String? = System::getenv,
-): Boolean {
-    val raw = readEnv(name) ?: return defaultValue
-    return raw.equals("true", ignoreCase = true) || raw.equals("yes", ignoreCase = true) || raw == "1"
-}
-
 /**
  * Standalone WebAuthn service for the restore credential flow.
  *
@@ -55,7 +47,12 @@ class RestoreCredentialService(
     val relyingPartyId: String = "logdate.app",
     private val relyingPartyName: String = "LogDate",
     private val origin: String = "https://app.logdate.com",
-    private val strictVerificationEnabled: Boolean = readBooleanEnv("WEBAUTHN_STRICT_VERIFICATION", false),
+    private val strictVerificationEnabled: Boolean =
+        profileAwareBoolEnv(
+            name = "WEBAUTHN_STRICT_VERIFICATION",
+            productionDefault = true,
+            devDefault = false,
+        ),
 ) {
     private val secureRandom = SecureRandom()
     private val challenges = ConcurrentHashMap<String, PasskeyChallenge>()

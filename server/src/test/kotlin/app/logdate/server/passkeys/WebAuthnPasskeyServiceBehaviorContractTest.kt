@@ -762,54 +762,6 @@ class WebAuthnPasskeyServiceBehaviorContractTest {
             isActive = true,
         )
 
-    @Test
-    fun `readBooleanEnv helper supports true yes one and fallback`() {
-        val method =
-            Class
-                .forName("app.logdate.server.passkeys.WebAuthnPasskeyServiceKt")
-                .getDeclaredMethod(
-                    "readBooleanEnv",
-                    String::class.java,
-                    Boolean::class.javaPrimitiveType,
-                    Function1::class.java,
-                )
-        method.isAccessible = true
-
-        val fallback =
-            method.invoke(
-                null,
-                "FLAG",
-                true,
-                { _: String -> null } as Function1<String, String?>,
-            ) as Boolean
-        val fromTrue =
-            method.invoke(
-                null,
-                "FLAG",
-                false,
-                { _: String -> "true" } as Function1<String, String?>,
-            ) as Boolean
-        val fromYes =
-            method.invoke(
-                null,
-                "FLAG",
-                false,
-                { _: String -> "YES" } as Function1<String, String?>,
-            ) as Boolean
-        val fromOne =
-            method.invoke(
-                null,
-                "FLAG",
-                false,
-                { _: String -> "1" } as Function1<String, String?>,
-            ) as Boolean
-
-        assertTrue(fallback)
-        assertTrue(fromTrue)
-        assertTrue(fromYes)
-        assertTrue(fromOne)
-    }
-
     private fun setPrivateField(
         target: Any,
         fieldName: String,
