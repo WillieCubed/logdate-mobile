@@ -14,6 +14,7 @@ import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.config.ProductionConfigValidator
 import app.logdate.server.config.RuntimeProfile
+import app.logdate.server.config.profileAwareBoolEnv
 import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
 import app.logdate.server.entitlements.EntitlementEnforcer
@@ -364,7 +365,7 @@ internal fun Application.installNetworkEdge(readEnv: (String) -> String? = Syste
         log.info("CORS disabled (ALLOWED_ORIGINS not set)")
     }
 
-    if (readBoolFlag(readEnv("REQUIRE_HTTPS"))) {
+    if (profileAwareBoolEnv("REQUIRE_HTTPS", productionDefault = false, devDefault = false, readEnv = readEnv)) {
         install(HttpsRedirect)
         log.info("HttpsRedirect enabled (REQUIRE_HTTPS=true)")
     }
@@ -396,11 +397,6 @@ internal fun parseAllowedOrigins(raw: String?): List<AllowedOrigin> {
                 )
             }.getOrNull()
         }
-}
-
-private fun readBoolFlag(raw: String?): Boolean {
-    val trimmed = raw?.trim()?.lowercase().orEmpty()
-    return trimmed == "true" || trimmed == "1" || trimmed == "yes"
 }
 
 private const val SYNC_PURGE_METRIC_NAME = "sync.maintenance.purge"

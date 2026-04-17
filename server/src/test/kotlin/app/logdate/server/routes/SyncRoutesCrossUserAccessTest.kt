@@ -1,13 +1,12 @@
 package app.logdate.server.routes
 
 import app.logdate.server.auth.JwtTokenService
-import app.logdate.server.logdate.LogDateBlobStorage
-import app.logdate.server.logdate.LogDateBlobWriteRequest
 import app.logdate.server.logdate.asLogDateBackupRepository
 import app.logdate.server.logdate.asLogDateCollectionsRepository
 import app.logdate.server.logdate.asLogDateMediaBlobRepository
 import app.logdate.server.logdate.asLogDateMediaRepository
 import app.logdate.server.routes.support.backupUploadMultipartContent
+import app.logdate.server.routes.support.createPermissiveBlobStorage
 import app.logdate.server.routes.support.mediaUploadMultipartContent
 import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.SyncMetricsRegistry
@@ -27,11 +26,8 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
-import io.mockk.every
-import io.mockk.mockk
 import kotlinx.serialization.json.Json
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
@@ -226,7 +222,7 @@ class SyncRoutesCrossUserAccessTest {
 
     private fun ApplicationTestBuilder.configureSync() {
         val repository = InMemorySyncRepository()
-        val storage = createPermissiveStorage()
+        val storage = createPermissiveBlobStorage()
         application {
             install(ServerContentNegotiation) {
                 json(json)
@@ -246,27 +242,4 @@ class SyncRoutesCrossUserAccessTest {
         }
     }
 
-    /**
-     * In-memory fake that accepts any namespace (BACKUP or MEDIA). The canonical
-     * [app.logdate.server.routes.support.createBackupStorageMock] refuses non-BACKUP writes, which
-     * makes it unsuitable for tests that exercise both media and backup paths.
-     */
-    private fun createPermissiveStorage(): LogDateBlobStorage {
-        val blobs = ConcurrentHashMap<String, ByteArray>()
-        val storage = mockk<LogDateBlobStorage>()
-        every { storage.putBlob(any()) } answers {
-            val req = firstArg<LogDateBlobWriteRequest>()
-            val path = "ns/${req.namespace.name.lowercase()}/${req.ownerId}/${req.blobId}"
-            blobs[path] = req.bytes
-            path
-        }
-        every { storage.getBlob(any()) } answers {
-            blobs[firstArg<String>()]
-        }
-        every { storage.deleteBlob(any()) } answers {
-            blobs.remove(firstArg<String>()) != null
-        }
-        every { storage.getSignedDownloadUrl(any(), any()) } returns "https://signed-url.example.com"
-        return storage
-    }
 }

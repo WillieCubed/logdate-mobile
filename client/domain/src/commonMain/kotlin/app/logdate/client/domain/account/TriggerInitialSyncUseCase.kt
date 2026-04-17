@@ -70,6 +70,9 @@ class TriggerInitialSyncUseCase(
         }
 
     companion object {
-        val DEFAULT_TIMEOUT: Duration = 20.seconds
+        // Keep this short enough that a slow network never turns the "Signing in…" screen into a
+        // frozen-app perception, but long enough that a one-round-trip sync over a normal mobile
+        // connection finishes before the deadline. Tuning this up is a UX regression.
+        val DEFAULT_TIMEOUT: Duration = 10.seconds
     }
 }

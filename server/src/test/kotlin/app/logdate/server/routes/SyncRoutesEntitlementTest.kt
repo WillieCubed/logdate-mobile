@@ -8,13 +8,12 @@ import app.logdate.server.entitlements.EntitlementService
 import app.logdate.server.entitlements.EntitlementStatus
 import app.logdate.server.entitlements.EntitlementTier
 import app.logdate.server.entitlements.UsageCalculator
-import app.logdate.server.logdate.LogDateBlobStorage
-import app.logdate.server.logdate.LogDateBlobWriteRequest
 import app.logdate.server.logdate.asLogDateBackupRepository
 import app.logdate.server.logdate.asLogDateCollectionsRepository
 import app.logdate.server.logdate.asLogDateMediaBlobRepository
 import app.logdate.server.logdate.asLogDateMediaRepository
 import app.logdate.server.routes.support.backupUploadMultipartContent
+import app.logdate.server.routes.support.createPermissiveBlobStorage
 import app.logdate.server.routes.support.mediaUploadMultipartContent
 import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.SyncMetricsRegistry
@@ -30,11 +29,8 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
-import io.mockk.every
-import io.mockk.mockk
 import kotlinx.serialization.json.Json
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -164,7 +160,7 @@ class SyncRoutesEntitlementTest {
                         override suspend fun backupCount(accountId: UUID): Int = currentBackups
                     },
             )
-        val storage = permissiveStorage()
+        val storage = createPermissiveBlobStorage()
         application {
             install(ServerContentNegotiation) { json(json) }
             routing {
@@ -183,18 +179,4 @@ class SyncRoutesEntitlementTest {
         }
     }
 
-    private fun permissiveStorage(): LogDateBlobStorage {
-        val blobs = ConcurrentHashMap<String, ByteArray>()
-        val storage = mockk<LogDateBlobStorage>()
-        every { storage.putBlob(any()) } answers {
-            val req = firstArg<LogDateBlobWriteRequest>()
-            val path = "ns/${req.namespace.name.lowercase()}/${req.ownerId}/${req.blobId}"
-            blobs[path] = req.bytes
-            path
-        }
-        every { storage.getBlob(any()) } answers { blobs[firstArg<String>()] }
-        every { storage.deleteBlob(any()) } answers { blobs.remove(firstArg<String>()) != null }
-        every { storage.getSignedDownloadUrl(any(), any()) } returns "https://signed-url.example.com"
-        return storage
-    }
 }

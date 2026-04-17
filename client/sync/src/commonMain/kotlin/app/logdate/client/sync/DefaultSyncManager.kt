@@ -100,9 +100,7 @@ class DefaultSyncManager(
     override val syncStatusFlow: StateFlow<SyncStatus> = _syncStatusFlow.asStateFlow()
 
     init {
-        // Mirror the internal sync state + last error flows into the public [syncStatusFlow] so
-        // observers (e.g. the in-app sync-status banner) see a live view of the pipeline without
-        // polling. Each transition in either flow recomputes pending-uploads and republishes.
+        // Republish status on each internal state/error transition so observers don't have to poll.
         syncScope.launch {
             combine(syncStateFlow, lastErrorFlow) { state, error -> state to error }
                 .collect { publishStatus() }
