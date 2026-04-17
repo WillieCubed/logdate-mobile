@@ -1,5 +1,6 @@
 package app.logdate.client.sync
 
+import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Instant
 
 /**
@@ -8,6 +9,16 @@ import kotlin.time.Instant
  * Implementations of this interface should be platform-specific.
  */
 interface SyncManager {
+    /**
+     * Live snapshot of the sync pipeline state.
+     *
+     * Emits updates when sync starts, completes, or errors. The UI observes this to render a
+     * persistent status banner: the value reflects whatever was true at the last sync settle
+     * (plus live `isSyncing` while a run is in flight). Implementations that do not track sync
+     * reactively return a flow that is updated on [getSyncStatus] or on each explicit sync call.
+     */
+    val syncStatusFlow: StateFlow<SyncStatus>
+
     /**
      * Begin syncing the client with the user's remote data.
      *

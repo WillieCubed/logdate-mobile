@@ -229,6 +229,19 @@ fun MainActivityUiRoot(
                                         hostState = appUpdateSnackbarHostState,
                                         modifier = Modifier.align(Alignment.BottomCenter),
                                     )
+
+                                    SyncStatusBanner(
+                                        modifier =
+                                            Modifier
+                                                .align(Alignment.TopCenter)
+                                                .padding(top = 0.dp),
+                                        onSignInRequested = {
+                                            if (!mainAppNavigator.backStack.contains(SettingsOverviewRoute)) {
+                                                mainAppNavigator.openSettings()
+                                            }
+                                        },
+                                        onRetryRequested = { /* Relies on periodic worker; expose manual trigger later. */ },
+                                    )
                                 }
                             }
                         }

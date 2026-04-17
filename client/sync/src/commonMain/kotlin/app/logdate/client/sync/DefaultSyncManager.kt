@@ -40,6 +40,9 @@ import app.logdate.shared.model.Journal
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -83,6 +86,47 @@ class DefaultSyncManager(
     private val syncMutex = Mutex()
 
     private var isEnabled = true
+
+    private val _syncStatusFlow =
+        MutableStateFlow(
+            SyncStatus(
+                isEnabled = true,
+                lastSyncTime = null,
+                pendingUploads = 0,
+                isSyncing = false,
+                hasErrors = false,
+            ),
+        )
+    override val syncStatusFlow: StateFlow<SyncStatus> = _syncStatusFlow.asStateFlow()
+
+    init {
+        // Mirror the internal sync state + last error flows into the public [syncStatusFlow] so
+        // observers (e.g. the in-app sync-status banner) see a live view of the pipeline without
+        // polling. Each transition in either flow recomputes pending-uploads and republishes.
+        syncScope.launch {
+            combine(syncStateFlow, lastErrorFlow) { state, error -> state to error }
+                .collect { publishStatus() }
+        }
+    }
+
+    /**
+     * Snapshot the combined state into [syncStatusFlow]. Reads pending-uploads from metadata
+     * on every publish; falls back to zero if metadata is unavailable (shouldn't happen in
+     * practice, but we'd rather show an over-optimistic banner than crash the collector).
+     */
+    private suspend fun publishStatus() {
+        val pendingCount =
+            runCatching { syncMetadataService.getPendingCount() }.getOrDefault(0)
+        _syncStatusFlow.value =
+            SyncStatus(
+                isEnabled = isEnabled,
+                lastSyncTime = latestSyncTime(),
+                pendingUploads = pendingCount,
+                isSyncing = syncStateFlow.value is SyncState.Syncing,
+                hasErrors = lastErrorFlow.value != null,
+                lastError = lastErrorFlow.value,
+            )
+    }
 
     /**
      * Represents the current state of the sync operation.

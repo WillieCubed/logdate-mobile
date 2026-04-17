@@ -1,5 +1,9 @@
 package app.logdate.client.sync
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
 /**
  * No-op sync manager for environments where sync is unavailable.
  */
@@ -14,6 +18,8 @@ object NoOpSyncManager : SyncManager {
             hasErrors = false,
             lastError = null,
         )
+    private val _syncStatusFlow = MutableStateFlow(noOpStatus)
+    override val syncStatusFlow: StateFlow<SyncStatus> = _syncStatusFlow.asStateFlow()
 
     override fun sync(startNow: Boolean) {
         // No-op.

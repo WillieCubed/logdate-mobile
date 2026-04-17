@@ -345,5 +345,7 @@ class AndroidSyncManager(
 
     override suspend fun fullSync(): SyncResult = defaultSyncManager.fullSync()
 
+    override val syncStatusFlow = defaultSyncManager.syncStatusFlow
+
     override suspend fun getSyncStatus(): SyncStatus = defaultSyncManager.getSyncStatus()
 }

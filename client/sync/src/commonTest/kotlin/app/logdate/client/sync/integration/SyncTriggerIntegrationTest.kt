@@ -196,6 +196,17 @@ private class MockSyncManager : SyncManager {
             isSyncing = false,
             hasErrors = false,
         )
+
+    override val syncStatusFlow: kotlinx.coroutines.flow.StateFlow<SyncStatus> =
+        kotlinx.coroutines.flow.MutableStateFlow(
+            SyncStatus(
+                isEnabled = true,
+                lastSyncTime = null,
+                pendingUploads = 0,
+                isSyncing = false,
+                hasErrors = false,
+            ),
+        )
 }
 
 /**

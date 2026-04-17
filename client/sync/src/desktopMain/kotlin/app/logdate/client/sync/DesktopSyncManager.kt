@@ -28,4 +28,6 @@ class DesktopSyncManager(
     override suspend fun fullSync(): SyncResult = defaultSyncManager.fullSync()
 
     override suspend fun getSyncStatus(): SyncStatus = defaultSyncManager.getSyncStatus()
+
+    override val syncStatusFlow = defaultSyncManager.syncStatusFlow
 }

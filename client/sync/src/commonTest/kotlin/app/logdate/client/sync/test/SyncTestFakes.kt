@@ -902,6 +902,9 @@ class TrackingSyncManager : SyncManager {
             hasErrors = false,
         )
 
+    private val _syncStatusFlow = kotlinx.coroutines.flow.MutableStateFlow(syncStatus)
+    override val syncStatusFlow: kotlinx.coroutines.flow.StateFlow<SyncStatus> = _syncStatusFlow
+
     override fun sync(startNow: Boolean) {
         syncCalls++
     }

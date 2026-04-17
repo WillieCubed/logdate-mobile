@@ -91,6 +91,8 @@ class ForegroundSyncManager(
 
     override suspend fun getSyncStatus(): SyncStatus = defaultSyncManager.getSyncStatus()
 
+    override val syncStatusFlow = defaultSyncManager.syncStatusFlow
+
     private fun startPeriodicSync() {
         if (periodicJob?.isActive == true) {
             return
