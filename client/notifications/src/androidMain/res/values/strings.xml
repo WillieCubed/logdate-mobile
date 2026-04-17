@@ -24,6 +24,7 @@
     <string name="notification_rewind_ready_title">Your weekly Rewind is ready</string>
     <string name="notification_rewind_ready_body">%1$s is waiting for you. Tap to watch the story.</string>
     <string name="notification_rewind_ready_body_generic">A new weekly Rewind is waiting for you. Tap to watch the story.</string>
+    <string name="notification_rewind_ready_action_watch">Watch</string>
     <string name="notification_channel_watch_sync_name">Watch sync</string>
     <string name="notification_channel_watch_sync_description">Alerts when entries arrive from your watch.</string>
     <string name="notification_channel_data_export_name">Data export</string>

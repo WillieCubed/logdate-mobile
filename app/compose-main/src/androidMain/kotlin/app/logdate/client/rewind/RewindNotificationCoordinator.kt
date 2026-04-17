@@ -32,16 +32,24 @@ class RewindNotificationCoordinator(
                     context.getString(NotificationResources.string.notification_rewind_ready_body_generic)
                 }
 
+            val watchLabel = context.getString(NotificationResources.string.notification_rewind_ready_action_watch)
+            val pendingIntent = buildPendingIntent(rewind)
+
             val notification =
                 NotificationCompat
                     .Builder(context, channel.id)
-                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setSmallIcon(NotificationResources.drawable.ic_notification_rewind)
                     .setContentTitle(title)
                     .setContentText(body)
                     .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                     .setAutoCancel(true)
-                    .setContentIntent(buildPendingIntent(rewind))
-                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    .setContentIntent(pendingIntent)
+                    .addAction(
+                        NotificationResources.drawable.ic_notification_rewind,
+                        watchLabel,
+                        pendingIntent,
+                    ).setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setVibrate(longArrayOf(0, 200, 100, 200))
                     .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
                     .build()
 
