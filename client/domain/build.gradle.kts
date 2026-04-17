@@ -57,6 +57,7 @@ kotlin {
             implementation(projects.client.util)
             implementation(projects.client.permissions)
             implementation(projects.client.repository)
+            implementation(projects.client.sync)
             implementation(projects.client.media)
             implementation(projects.client.location)
             implementation(projects.client.intelligence)

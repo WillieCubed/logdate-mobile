@@ -116,7 +116,7 @@ actual val coreFeatureModule: Module =
                 linkNoteToEvent = get(),
             )
         }
-        viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get()) }
+        viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get(), get()) }
         // TODO(desktop): Wire location settings UX and platform permissions; keep settings storage available for now.
         viewModel { LocationSettingsViewModel(get()) }
         viewModel { MemoriesSettingsViewModel(get(), get()) }

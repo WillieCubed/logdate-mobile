@@ -129,7 +129,7 @@ actual val coreFeatureModule: Module =
                 linkNoteToEvent = get(),
             )
         }
-        viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get()) }
+        viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get(), get()) }
         viewModel { LocationSettingsViewModel(get()) }
         viewModel { MemoriesSettingsViewModel(get(), get<MemoriesWidgetInstallController>()) }
         viewModel { VoiceNotesSettingsViewModel(get(), get()) }

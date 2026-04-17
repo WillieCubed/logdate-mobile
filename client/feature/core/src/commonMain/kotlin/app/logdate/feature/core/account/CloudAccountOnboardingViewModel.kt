@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.account.AuthenticateWithPasskeyUseCase
 import app.logdate.client.domain.account.CheckUsernameAvailabilityUseCase
 import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
+import app.logdate.client.domain.account.TriggerInitialSyncUseCase
 import app.logdate.client.permissions.PasskeyManager
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
@@ -25,6 +26,7 @@ class CloudAccountOnboardingViewModel(
     private val createPasskeyAccountUseCase: CreatePasskeyAccountUseCase,
     private val checkUsernameAvailabilityUseCase: CheckUsernameAvailabilityUseCase,
     private val authenticateWithPasskeyUseCase: AuthenticateWithPasskeyUseCase,
+    private val triggerInitialSyncUseCase: TriggerInitialSyncUseCase,
     private val passkeyManager: PasskeyManager,
     private val profileRepository: ProfileRepository,
     private val serverConfigurationCoordinator: ServerConfigurationCoordinator,
@@ -161,12 +163,14 @@ class CloudAccountOnboardingViewModel(
                 is CreatePasskeyAccountUseCase.Result.Success -> {
                     syncDisplayNameToLocalProfile(result.account.displayName)
                     _uiState.value =
-                        currentState.copy(
+                        _uiState.value.copy(
                             isCreatingAccount = false,
-                            isAccountCreated = true,
                             createdAccount = result.account,
                             currentStep = OnboardingStep.Complete,
+                            isInitialSyncing = true,
+                            initialSyncStatus = InitialSyncStatus.Running,
                         )
+                    performInitialSync(markCompletedBy = SyncCompletion.ACCOUNT_CREATED)
                 }
                 is CreatePasskeyAccountUseCase.Result.Error -> {
                     _uiState.value =
@@ -177,6 +181,46 @@ class CloudAccountOnboardingViewModel(
                 }
             }
         }
+    }
+
+    /**
+     * Runs the blocking portion of the first sync and transitions to [OnboardingStep.Complete]
+     * when it settles (success, partial, timeout, or error). The onboarding flow does not fail
+     * because sync had issues — we still let the user into the app — but the UI reflects the
+     * outcome so the global sync-status banner can prompt retries downstream.
+     *
+     * [markCompletedBy] determines which terminal flag flips at the end. This is what drives the
+     * screen's completion LaunchedEffect, so it must only flip once sync is done — otherwise the
+     * host navigates away mid-sync and the user never sees the sync progress state.
+     */
+    private suspend fun performInitialSync(markCompletedBy: SyncCompletion) {
+        val syncResult = triggerInitialSyncUseCase()
+        val status =
+            when (syncResult) {
+                is TriggerInitialSyncUseCase.Result.Success -> InitialSyncStatus.Success
+                is TriggerInitialSyncUseCase.Result.Partial -> {
+                    Napier.w(
+                        "Initial sync partial: uploads=${syncResult.uploadedItems}, " +
+                            "downloads=${syncResult.downloadedItems}, errors=${syncResult.errorMessages}",
+                    )
+                    InitialSyncStatus.Partial
+                }
+                is TriggerInitialSyncUseCase.Result.TimedOut -> InitialSyncStatus.TimedOut
+                is TriggerInitialSyncUseCase.Result.Error -> InitialSyncStatus.Failed
+            }
+        _uiState.value =
+            _uiState.value.copy(
+                isInitialSyncing = false,
+                initialSyncStatus = status,
+                currentStep = OnboardingStep.Complete,
+                isAccountCreated = _uiState.value.isAccountCreated || markCompletedBy == SyncCompletion.ACCOUNT_CREATED,
+                isSignedIn = _uiState.value.isSignedIn || markCompletedBy == SyncCompletion.SIGNED_IN,
+            )
+    }
+
+    private enum class SyncCompletion {
+        ACCOUNT_CREATED,
+        SIGNED_IN,
     }
 
     fun clearError() {
@@ -204,10 +248,12 @@ class CloudAccountOnboardingViewModel(
                     _uiState.value =
                         _uiState.value.copy(
                             isSigningIn = false,
-                            isSignedIn = true,
                             createdAccount = result.account,
                             currentStep = OnboardingStep.Complete,
+                            isInitialSyncing = true,
+                            initialSyncStatus = InitialSyncStatus.Running,
                         )
+                    performInitialSync(markCompletedBy = SyncCompletion.SIGNED_IN)
                 }
                 is AuthenticateWithPasskeyUseCase.Result.Error -> {
                     _uiState.value =
@@ -485,6 +531,8 @@ data class CloudAccountOnboardingUiState(
     val isAccountCreated: Boolean = false,
     val isSigningIn: Boolean = false,
     val isSignedIn: Boolean = false,
+    val isInitialSyncing: Boolean = false,
+    val initialSyncStatus: InitialSyncStatus = InitialSyncStatus.NotStarted,
     val isSkipped: Boolean = false,
     /**
      * True when the user pressed back from the entry step set via
@@ -519,4 +567,25 @@ enum class OnboardingStep {
     Username,
     PasskeyCreation,
     Complete,
+}
+
+/**
+ * Outcome of the blocking first sync that follows a successful account creation or sign-in.
+ *
+ *  - [NotStarted]: no sync has been attempted yet.
+ *  - [Running]: sync is in flight; the UI shows "Syncing your library…" instead of "Ready".
+ *  - [Success]: first round-trip completed cleanly; the user has seen the server state.
+ *  - [Partial]: the call finished but reported errors (e.g. some uploads failed). The user gets
+ *    into the app and the global sync banner can prompt retries.
+ *  - [TimedOut]: network was too slow to finish within the onboarding budget; the periodic worker
+ *    will retry in the background.
+ *  - [Failed]: an unexpected error escaped; surface in the banner for retry.
+ */
+enum class InitialSyncStatus {
+    NotStarted,
+    Running,
+    Success,
+    Partial,
+    TimedOut,
+    Failed,
 }

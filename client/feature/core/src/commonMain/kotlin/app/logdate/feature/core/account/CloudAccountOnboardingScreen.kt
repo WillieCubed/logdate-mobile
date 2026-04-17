@@ -2,7 +2,14 @@
 
 package app.logdate.feature.core.account
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -10,8 +17,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.feature.core.settings.ui.CustomServerInfoBottomSheet
 import app.logdate.feature.core.settings.ui.ServerPreset
@@ -168,8 +177,42 @@ fun CloudAccountOnboardingScreen(
         }
 
         OnboardingStep.Complete -> {
-            // This should be handled by LaunchedEffect above
+            // Stay here until the first sync finishes so the user sees we're actually doing
+            // something; the completion LaunchedEffect above navigates away once isAccountCreated
+            // / isSignedIn flips, which [CloudAccountOnboardingViewModel.performInitialSync] only
+            // sets after sync settles.
+            InitialSyncProgressScreen(
+                status = uiState.initialSyncStatus,
+                modifier = modifier,
+            )
         }
+    }
+}
+
+@Composable
+private fun InitialSyncProgressScreen(
+    status: InitialSyncStatus,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        CircularProgressIndicator(modifier = Modifier.size(48.dp))
+        Text(
+            text =
+                when (status) {
+                    InitialSyncStatus.Running -> "Syncing your library\u2026"
+                    InitialSyncStatus.Success -> "All caught up"
+                    InitialSyncStatus.Partial -> "Signed in. Some items are still uploading."
+                    InitialSyncStatus.TimedOut -> "Signed in. Continuing to sync in the background."
+                    InitialSyncStatus.Failed -> "Signed in. We'll retry sync shortly."
+                    InitialSyncStatus.NotStarted -> ""
+                },
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 24.dp),
+        )
     }
 }
 
