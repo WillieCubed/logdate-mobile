@@ -5,6 +5,8 @@ package app.logdate.feature.rewind.ui.detail
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -46,11 +48,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindPanelUiState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import logdate.client.feature.rewind.generated.resources.*
 import logdate.client.feature.rewind.generated.resources.Res
@@ -81,8 +87,30 @@ import kotlin.math.abs
  * - **Auto-advance**: Automatically moves to next panel after delay
  *
  * @param panels List of story panels to display
- * @param onExit Callback invoked when user exits the story view
+ * @param onExit Callback invoked when the user exits the story view (e.g., close
+ *   button, or completion when [onComplete] is not provided)
+ * @param modifier Modifier for customizing layout
+ * @param isFirstView True when the user has never opened this rewind before. Enables
+ *   a scale-up spring entrance and a single haptic pulse on mount.
+ * @param onFirstViewConsumed Invoked after the entrance animation finishes so the
+ *   host can clear its one-shot first-view flag. Without this, rotating the device
+ *   mid-story would replay the celebration.
+ * @param restartKey Bumping this value rewinds the story back to the first panel —
+ *   used by the "Watch again" action in the post-viewing sheet.
+ * @param externalPause Pauses auto-advance and the progress animation. Used while the
+ *   reply sheet, delete dialog, or post-viewing sheet is visible.
  * @param autoAdvanceDelayMs Time in milliseconds before auto-advancing to next panel
+ * @param accentColor Foreground tint applied to story chrome (progress bars, icons)
+ * @param onComplete Invoked when the last panel finishes instead of [onExit]. When
+ *   null, completion falls back to [onExit]. The host uses this to show a post-viewing
+ *   sheet without popping the screen.
+ * @param onSharePanel Callback invoked when the user taps share for the current panel
+ * @param onShareRewindStats Callback invoked when the user taps share for the overall
+ *   rewind summary card
+ * @param onReplyToPrompt Callback invoked when the user taps reply on a reflection
+ *   prompt panel
+ * @param onDeleteRewind Callback invoked when the user requests deletion from the
+ *   story chrome
  * @param content Composable content renderer for each panel
  */
 @Composable
@@ -90,13 +118,17 @@ fun RewindStoryView(
     panels: List<RewindPanelUiState>,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
+    isFirstView: Boolean = false,
+    onFirstViewConsumed: (() -> Unit)? = null,
+    restartKey: Int = 0,
+    externalPause: Boolean = false,
+    autoAdvanceDelayMs: Long = 5000L,
+    accentColor: Color = Color.White,
+    onComplete: (() -> Unit)? = null,
     onSharePanel: ((panel: RewindPanelUiState) -> Unit)? = null,
     onShareRewindStats: (() -> Unit)? = null,
     onReplyToPrompt: ((panel: ReflectionPromptRewindPanelUiState) -> Unit)? = null,
     onDeleteRewind: (() -> Unit)? = null,
-    externalPause: Boolean = false,
-    accentColor: Color = Color.White,
-    autoAdvanceDelayMs: Long = 5000L,
     content: @Composable (panel: RewindPanelUiState) -> Unit,
 ) {
     if (panels.isEmpty()) {
@@ -113,9 +145,40 @@ fun RewindStoryView(
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
 
+    // First-view entrance animation: scale up from 0.92 with a spring, then settle.
+    // Only plays once when the story first mounts, and only for unviewed rewinds.
+    val entranceScale = remember { Animatable(if (isFirstView) 0.92f else 1f) }
+    val hapticFeedback = LocalHapticFeedback.current
+
+    LaunchedEffect(isFirstView) {
+        if (isFirstView) {
+            // Brief pause so the user registers the screen before the spring fires
+            delay(150)
+            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+            entranceScale.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow,
+                ),
+            )
+            onFirstViewConsumed?.invoke()
+        }
+    }
+
     // Auto-advance progress for current panel
     var autoAdvanceProgress by remember { mutableFloatStateOf(0f) }
     val progressAnimatable = remember { Animatable(0f) }
+
+    // Watch-again: reset to the first panel when the host bumps restartKey.
+    // Skip the initial composition so we don't fight the entrance animation.
+    LaunchedEffect(restartKey) {
+        if (restartKey > 0) {
+            currentPanelIndex = 0
+            navigatingForward = true
+            progressAnimatable.snapTo(0f)
+        }
+    }
 
     // Auto-advance logic that respects pause state
     LaunchedEffect(currentPanelIndex) {
@@ -132,6 +195,11 @@ fun RewindStoryView(
         if (effectivelyPaused) {
             progressAnimatable.stop()
             return@LaunchedEffect
+        }
+
+        // Give the entrance animation time to play on the first panel of a first view
+        if (isFirstView && currentPanelIndex == 0) {
+            delay(500)
         }
 
         // Resume or start from current progress
@@ -152,6 +220,8 @@ fun RewindStoryView(
         if (currentPanelIndex < panels.size - 1) {
             navigatingForward = true
             currentPanelIndex++
+        } else if (onComplete != null) {
+            onComplete()
         } else {
             onExit()
         }
@@ -165,6 +235,7 @@ fun RewindStoryView(
     Box(
         modifier =
             modifier
+                .graphicsLayer { scaleX = entranceScale.value; scaleY = entranceScale.value }
                 .background(Color.Black)
                 .statusBarsPadding()
                 // Swipe gesture with accumulated drag distance
@@ -201,7 +272,7 @@ fun RewindStoryView(
                                         navigatingForward = true
                                         currentPanelIndex++
                                     } else if (accumulatedDrag < 0 && currentPanelIndex == panels.size - 1) {
-                                        onExit()
+                                        if (onComplete != null) onComplete() else onExit()
                                     }
                                 }
                             }
@@ -365,7 +436,7 @@ fun RewindStoryView(
                                             navigatingForward = true
                                             currentPanelIndex++
                                         } else {
-                                            onExit()
+                                            if (onComplete != null) onComplete() else onExit()
                                         }
                                     }
                                 }

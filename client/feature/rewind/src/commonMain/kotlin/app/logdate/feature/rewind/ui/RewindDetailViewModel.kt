@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.domain.rewind.DeleteRewindUseCase
+import app.logdate.client.domain.rewind.MarkRewindViewedUseCase
 import app.logdate.client.domain.rewind.GetRewindUseCase
 import app.logdate.client.domain.rewind.ObserveReflectionPromptResponsesUseCase
 import app.logdate.client.domain.rewind.SaveReflectionPromptResponseUseCase
@@ -34,12 +35,14 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.Month
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -63,6 +66,16 @@ import kotlin.uuid.Uuid
  * it into UI-ready panels for the story-like interface.
  *
  * @param getRewindUseCase Use case for retrieving rewind data
+ * @param sharingLauncher Platform sharing entry point for panel and stats shares
+ * @param quoteCardRenderer Renders quote panels to a bitmap for sharing
+ * @param statsSummaryRenderer Renders the overall stats summary card for sharing
+ * @param observeReflectionPromptResponses Observes the user's saved replies keyed by
+ *   prompt so the story can rebuild with the latest reply state
+ * @param saveReflectionPromptResponse Persists a reply typed into the story
+ * @param deleteRewindUseCase Deletes a rewind and all of its attached content
+ * @param markRewindViewed Records that the user has opened this rewind; bumps the
+ *   view count and stamps the first-viewed timestamp on the first call
+ * @param preferences User preferences data source, read for the replies-enabled toggle
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RewindDetailViewModel(
@@ -73,6 +86,7 @@ class RewindDetailViewModel(
     private val observeReflectionPromptResponses: ObserveReflectionPromptResponsesUseCase,
     private val saveReflectionPromptResponse: SaveReflectionPromptResponseUseCase,
     private val deleteRewindUseCase: DeleteRewindUseCase,
+    private val markRewindViewed: MarkRewindViewedUseCase,
     private val preferences: LogdatePreferencesDataSource,
 //    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -95,6 +109,16 @@ class RewindDetailViewModel(
      * view reads it to stay paused while the user is composing a reply.
      */
     val replySheetState: StateFlow<ReflectionReplySheetState> = replySheetStateFlow.asStateFlow()
+
+    private val isFirstViewFlow = MutableStateFlow(false)
+
+    /**
+     * Whether this is the first time the user is opening this rewind.
+     *
+     * Captured at [loadRewind] time before the viewed flag is written to the database,
+     * so it reflects the pre-navigation state rather than racing with the DB write.
+     */
+    val isFirstView: StateFlow<Boolean> = isFirstViewFlow.asStateFlow()
 
     private val deletePromptVisibleFlow = MutableStateFlow(false)
 
@@ -146,12 +170,35 @@ class RewindDetailViewModel(
             )
 
     /**
-     * Loads rewind data for the specified ID.
+     * Loads rewind data for the specified ID and records that the user opened it.
+     *
+     * Also captures a one-shot [isFirstView] flag from the pre-write viewed state, so
+     * the detail screen's first-view celebration doesn't race against the DB write.
      *
      * @param rewindId The unique identifier of the rewind to load
      */
     fun loadRewind(rewindId: Uuid) {
+        // Reset the one-shot first-view flag synchronously so navigating to a new
+        // rewind can't briefly display the stale value from the previous rewind.
+        isFirstViewFlow.value = false
         rewindIdState.value = rewindId
+        viewModelScope.launch {
+            // Snapshot the viewed state before the DB write so the UI can show
+            // the first-view celebration without racing against the Flow emission.
+            // A short timeout guards against Room flows that don't emit promptly.
+            val rewind = withTimeoutOrNull(1_500) { getRewindUseCase(rewindId).firstOrNull() }
+            isFirstViewFlow.value = rewind?.isViewed == false
+            markRewindViewed(rewindId)
+        }
+    }
+
+    /**
+     * Called by the story view after it has consumed the first-view signal (played
+     * the entrance animation + haptic). Clears the flag so rotating or navigating
+     * back into the same story doesn't replay the celebration.
+     */
+    fun onFirstViewConsumed() {
+        isFirstViewFlow.value = false
     }
 
     /**

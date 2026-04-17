@@ -221,6 +221,8 @@ class GetPastRewindsUseCaseTest {
 
         override suspend fun deleteRewind(uid: Uuid) {}
 
+        override suspend fun markAsViewed(uid: Uuid) {}
+
         override suspend fun tagAsMilestone(
             uid: Uuid,
             signal: String,

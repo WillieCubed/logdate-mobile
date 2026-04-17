@@ -7,6 +7,7 @@ import app.logdate.shared.model.StoryBeat
 import app.logdate.shared.model.WeekNarrative
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -34,9 +35,8 @@ class RewindSequencerTest {
             )
 
         assertTrue(result.isNotEmpty())
-        val firstPanel = result.first()
-        assertTrue(firstPanel is RewindContent.NarrativeContext)
-        assertEquals("You explored the coast.", (firstPanel as RewindContent.NarrativeContext).contextText)
+        val firstPanel = assertIs<RewindContent.NarrativeContext>(result.first())
+        assertEquals("You explored the coast.", firstPanel.contextText)
     }
 
     @Test
@@ -58,9 +58,8 @@ class RewindSequencerTest {
             )
 
         assertTrue(result.isNotEmpty())
-        val lastPanel = result.last()
-        assertTrue(lastPanel is RewindContent.NarrativeContext)
-        assertEquals("It was wonderful.", (lastPanel as RewindContent.NarrativeContext).contextText)
+        val lastPanel = assertIs<RewindContent.NarrativeContext>(result.last())
+        assertEquals("It was wonderful.", lastPanel.contextText)
     }
 
     @Test
@@ -101,9 +100,8 @@ class RewindSequencerTest {
         assertTrue(result.size >= 3)
 
         // Find the text note panel
-        val textPanel = result.find { it is RewindContent.TextNote }
-        assertTrue(textPanel is RewindContent.TextNote)
-        assertEquals(textEntry.content, (textPanel as RewindContent.TextNote).content)
+        val textPanel = assertIs<RewindContent.TextNote>(result.find { it is RewindContent.TextNote })
+        assertEquals(textEntry.content, textPanel.content)
     }
 
     @Test
@@ -154,14 +152,11 @@ class RewindSequencerTest {
             )
 
         // Find image and video panels
-        val imagePanel = result.find { it is RewindContent.Image }
-        val videoPanel = result.find { it is RewindContent.Video }
+        val imagePanel = assertIs<RewindContent.Image>(result.find { it is RewindContent.Image })
+        val videoPanel = assertIs<RewindContent.Video>(result.find { it is RewindContent.Video })
 
-        assertTrue(imagePanel is RewindContent.Image)
-        assertTrue(videoPanel is RewindContent.Video)
-
-        assertEquals(imageMedia.uri, (imagePanel as RewindContent.Image).uri)
-        assertEquals(videoMedia.uri, (videoPanel as RewindContent.Video).uri)
+        assertEquals(imageMedia.uri, imagePanel.uri)
+        assertEquals(videoMedia.uri, videoPanel.uri)
     }
 
     @Test

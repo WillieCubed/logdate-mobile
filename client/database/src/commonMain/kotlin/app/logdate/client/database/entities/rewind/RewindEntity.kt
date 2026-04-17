@@ -63,4 +63,19 @@ data class RewindEntity(
      */
     @ColumnInfo(name = "metadata", defaultValue = "NULL")
     val metadata: String? = null,
+    /**
+     * Whether this rewind has been opened and viewed at least once.
+     */
+    @ColumnInfo(name = RewindConstants.COLUMN_IS_VIEWED, defaultValue = "0")
+    val isViewed: Boolean = false,
+    /**
+     * Epoch millis when the user first opened this rewind, or null if never viewed.
+     */
+    @ColumnInfo(name = RewindConstants.COLUMN_FIRST_VIEWED_AT, defaultValue = "NULL")
+    val firstViewedAt: Instant? = null,
+    /**
+     * How many times the user has opened this rewind.
+     */
+    @ColumnInfo(name = RewindConstants.COLUMN_VIEW_COUNT, defaultValue = "0")
+    val viewCount: Int = 0,
 )

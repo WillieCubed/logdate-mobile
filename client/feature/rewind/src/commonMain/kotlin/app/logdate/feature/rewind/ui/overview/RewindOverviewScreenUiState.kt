@@ -163,6 +163,16 @@ data class RewindPreviewUiState(
     val activities: List<ActivityUiState> = listOf(),
     /** Whether this week's rewind is ready to be viewed. */
     val rewindAvailable: Boolean = false,
+    /** Whether this rewind has been viewed at least once. */
+    val isViewed: Boolean = true,
+    /** Number of text entries in this rewind. */
+    val entryCount: Int = 0,
+    /** Number of photos in this rewind. */
+    val photoCount: Int = 0,
+    /** Number of people mentioned in this rewind. */
+    val peopleCount: Int = 0,
+    /** Primary location name, if available. */
+    val primaryLocation: String? = null,
 )
 
 /**

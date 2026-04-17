@@ -18,6 +18,22 @@ data class RewindHistoryUiState(
     val label: String,
     val startDate: LocalDate,
     val endDate: LocalDate,
+    /**
+     * A contextual message describing this rewind, generated from its metadata.
+     */
+    val message: String,
+    /**
+     * Whether this rewind has been viewed at least once.
+     */
+    val isViewed: Boolean = true,
+    /** Number of text entries in this rewind. */
+    val entryCount: Int = 0,
+    /** Number of photos in this rewind. */
+    val photoCount: Int = 0,
+    /** Number of people mentioned in this rewind. */
+    val peopleCount: Int = 0,
+    /** Primary location name, if available. */
+    val primaryLocation: String? = null,
     val milestone: MilestoneSummaryUiState? = null,
 )
 

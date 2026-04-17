@@ -2,6 +2,10 @@
 
 package app.logdate.feature.rewind.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
@@ -33,9 +37,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -56,6 +64,7 @@ import app.logdate.feature.rewind.ui.overview.RewindPreviewUiState
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.getLocaleFirstDayOfWeek
+import kotlinx.coroutines.delay
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -107,18 +116,7 @@ fun RewindScreenContent(
         remember(state) {
             when (state) {
                 is RewindOverviewScreenUiState.Ready -> {
-                    listOf(state.mostRecentRewind) +
-                        state.pastRewinds.map { history ->
-                            RewindPreviewUiState(
-                                message = "A week to remember",
-                                rewindId = history.uid,
-                                label = history.label,
-                                title = history.title,
-                                start = history.startDate,
-                                end = history.endDate,
-                                rewindAvailable = true,
-                            )
-                        }
+                    listOf(state.mostRecentRewind) + state.pastRewinds.map { it.toPreview() }
                 }
                 is RewindOverviewScreenUiState.NotReady -> {
                     val (weekStart, weekEnd) = lastWeekBounds()
@@ -126,30 +124,19 @@ fun RewindScreenContent(
                         RewindPreviewUiState(
                             message =
                                 if (state.isGeneratingRewind) {
-                                    "Generating this week's rewind..."
+                                    "Putting your week together..."
                                 } else {
-                                    "Still working on this week's rewind..."
+                                    "Weaving this week's story..."
                                 },
                             rewindId = Uuid.random(),
                             label = "This Week",
-                            title = "Coming Soon",
+                            title = "This week's story",
                             start = weekStart,
                             end = weekEnd,
                             rewindAvailable = false,
                         )
 
-                    listOf(currentWeekPlaceholder) +
-                        state.pastRewinds.map { history ->
-                            RewindPreviewUiState(
-                                message = "A week to remember",
-                                rewindId = history.uid,
-                                label = history.label,
-                                title = history.title,
-                                start = history.startDate,
-                                end = history.endDate,
-                                rewindAvailable = true,
-                            )
-                        }
+                    listOf(currentWeekPlaceholder) + state.pastRewinds.map { it.toPreview() }
                 }
                 RewindOverviewScreenUiState.Loading -> {
                     val (weekStart, weekEnd) = lastWeekBounds()
@@ -158,7 +145,7 @@ fun RewindScreenContent(
                             message = "Loading your rewinds...",
                             rewindId = Uuid.random(),
                             label = "This Week",
-                            title = "Loading...",
+                            title = "Your stories",
                             start = weekStart,
                             end = weekEnd,
                             rewindAvailable = false,
@@ -276,6 +263,12 @@ fun FloatingRewindCardList(
                     ),
         )
 
+        // Track which card indices have already played their entrance animation,
+        // so scrolling away and back doesn't replay it. This intentionally does
+        // not survive configuration changes — replaying on rotate is fine since
+        // the list's identity changes.
+        val animatedIndices = remember { mutableStateSetOf<Int>() }
+
         LazyColumn(
             state = listState,
             flingBehavior = snapFlingBehavior,
@@ -289,18 +282,37 @@ fun FloatingRewindCardList(
             modifier = Modifier.fillMaxSize(),
         ) {
             itemsIndexed(rewinds) { index, rewind ->
-                FloatingRewindCard(
-                    rewind = rewind,
-                    onOpenRewind = onOpenRewind,
-                    listState = listState,
-                    index = index,
-                    cardHeight = cardHeight,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp)
-                            .widthIn(max = cardWidth),
-                )
+                val alreadyAnimated = index in animatedIndices
+                var visible by remember { mutableStateOf(alreadyAnimated) }
+                LaunchedEffect(Unit) {
+                    if (!alreadyAnimated) {
+                        delay(index * 80L)
+                        visible = true
+                        animatedIndices += index
+                    }
+                }
+                AnimatedVisibility(
+                    visible = visible,
+                    enter =
+                        fadeIn(animationSpec = tween(300)) +
+                            slideInVertically(
+                                initialOffsetY = { it / 4 },
+                                animationSpec = tween(300),
+                            ),
+                ) {
+                    FloatingRewindCard(
+                        rewind = rewind,
+                        onOpenRewind = onOpenRewind,
+                        listState = listState,
+                        index = index,
+                        cardHeight = cardHeight,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp)
+                                .widthIn(max = cardWidth),
+                    )
+                }
             }
 
             // Year in Review trigger — shown when a completed year has enough data
@@ -680,21 +692,37 @@ private fun RewindScreenPreview() {
                 pastRewinds =
                     listOf(
                         RewindHistoryUiState(
-                            Uuid.random(),
-                            "Adventures in Barcelona",
-                            "Week 42",
-                            LocalDate(2024, 10, 14),
-                            LocalDate(2024, 10, 20),
+                            uid = Uuid.random(),
+                            title = "Caught up on sleep",
+                            label = "Week 42",
+                            startDate = LocalDate(2024, 10, 14),
+                            endDate = LocalDate(2024, 10, 20),
+                            message = "A quiet week, but yours nonetheless",
                         ),
-                        RewindHistoryUiState(Uuid.random(), "A Week in Tokyo", "Week 41", LocalDate(2024, 10, 7), LocalDate(2024, 10, 13)),
                         RewindHistoryUiState(
-                            Uuid.random(),
-                            "Mountain Hiking Week",
-                            "Week 40",
-                            LocalDate(2024, 9, 30),
-                            LocalDate(2024, 10, 6),
+                            uid = Uuid.random(),
+                            title = "New coffee spot on 5th",
+                            label = "Week 41",
+                            startDate = LocalDate(2024, 10, 7),
+                            endDate = LocalDate(2024, 10, 13),
+                            message = "Moments worth remembering",
                         ),
-                        RewindHistoryUiState(lastId, "City Life Chronicles", "Week 39", LocalDate(2024, 9, 23), LocalDate(2024, 9, 29)),
+                        RewindHistoryUiState(
+                            uid = Uuid.random(),
+                            title = "The one with the deadline",
+                            label = "Week 40",
+                            startDate = LocalDate(2024, 9, 30),
+                            endDate = LocalDate(2024, 10, 6),
+                            message = "Your mind's been busy",
+                        ),
+                        RewindHistoryUiState(
+                            uid = lastId,
+                            title = "Errands and leftovers",
+                            label = "Week 39",
+                            startDate = LocalDate(2024, 9, 23),
+                            endDate = LocalDate(2024, 9, 29),
+                            message = "Quality over quantity",
+                        ),
                     ),
             ),
         onOpenRewind = {},
@@ -709,37 +737,38 @@ private fun FloatingCardListPreview() {
     val rewinds =
         listOf(
             RewindPreviewUiState(
-                message = "Still working on this week's rewind...",
+                message = "Weaving this week's story...",
                 rewindId = Uuid.random(),
                 label = "This Week",
-                title = "Coming Soon",
+                title = "This week's story",
                 start = LocalDate(2024, 11, 18),
                 end = LocalDate(2024, 11, 24),
                 rewindAvailable = false,
             ),
             RewindPreviewUiState(
-                message = "Quite the adventurer, aren't you?",
+                message = "Your week, captured",
                 rewindId = Uuid.random(),
-                label = "Week of November 1-7",
-                title = "Five Cities in a Week",
+                label = "2024#44",
+                title = "Rainy days and good reads",
                 start = LocalDate(2024, 11, 1),
                 end = LocalDate(2024, 11, 7),
                 rewindAvailable = true,
+                isViewed = false,
             ),
             RewindPreviewUiState(
-                message = "A journey through time and space",
+                message = "A quiet week, but yours nonetheless",
                 rewindId = Uuid.random(),
-                label = "Week of October 25-31",
-                title = "Adventures in Barcelona",
+                label = "2024#43",
+                title = "Just another week",
                 start = LocalDate(2024, 10, 25),
                 end = LocalDate(2024, 10, 31),
                 rewindAvailable = true,
             ),
             RewindPreviewUiState(
-                message = "Memories that last forever",
+                message = "Connections that matter",
                 rewindId = Uuid.random(),
-                label = "Week of October 18-24",
-                title = "A Week in Tokyo",
+                label = "2024#42",
+                title = "Dinner with the crew",
                 start = LocalDate(2024, 10, 18),
                 end = LocalDate(2024, 10, 24),
                 rewindAvailable = true,
@@ -753,3 +782,25 @@ private fun FloatingCardListPreview() {
         modifier = Modifier.fillMaxSize(),
     )
 }
+
+/**
+ * Flattens a [RewindHistoryUiState] into the [RewindPreviewUiState] form that
+ * [FloatingRewindCard] renders. Historical rewinds are always available to view
+ * (they wouldn't be in the list otherwise), so [RewindPreviewUiState.rewindAvailable]
+ * is hardcoded to `true`.
+ */
+private fun RewindHistoryUiState.toPreview(): RewindPreviewUiState =
+    RewindPreviewUiState(
+        message = message,
+        rewindId = uid,
+        label = label,
+        title = title,
+        start = startDate,
+        end = endDate,
+        rewindAvailable = true,
+        isViewed = isViewed,
+        entryCount = entryCount,
+        photoCount = photoCount,
+        peopleCount = peopleCount,
+        primaryLocation = primaryLocation,
+    )

@@ -49,6 +49,18 @@ data class Rewind(
      * milestones, and highlighted people from the time period.
      */
     val metadata: RewindMetadata? = null,
+    /**
+     * Whether this rewind has been opened and viewed at least once.
+     */
+    val isViewed: Boolean = false,
+    /**
+     * When the user first opened this rewind, or null if never viewed.
+     */
+    val firstViewedAt: Instant? = null,
+    /**
+     * How many times the user has opened this rewind.
+     */
+    val viewCount: Int = 0,
 )
 
 /**

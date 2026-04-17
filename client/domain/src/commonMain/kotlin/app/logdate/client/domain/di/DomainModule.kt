@@ -4,7 +4,6 @@ import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.domain.app.GetAppInfoUseCase
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
 import app.logdate.client.domain.dayboundary.DefaultDayBoundarySettingsRepository
-import app.logdate.client.domain.di.StubIndexedMediaRepository
 import app.logdate.client.domain.di.healthDomainModule
 import app.logdate.client.domain.di.locationDomainModule
 import app.logdate.client.domain.editor.ObserveEditorDataUseCase
@@ -69,6 +68,7 @@ import app.logdate.client.domain.recommendation.PlaceFamiliarityRepository
 import app.logdate.client.domain.restore.PreviewArchiveUseCase
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.domain.rewind.DeleteRewindUseCase
+import app.logdate.client.domain.rewind.MarkRewindViewedUseCase
 import app.logdate.client.domain.rewind.GenerateAnnualRewindUseCase
 import app.logdate.client.domain.rewind.GenerateBasicRewindUseCase
 import app.logdate.client.domain.rewind.GenerateRewindTitleUseCase
@@ -165,15 +165,11 @@ val domainModule: Module =
         factory { SaveReflectionPromptResponseUseCase(get()) }
         factory { ObserveReflectionPromptResponsesUseCase(get()) }
         factory { DeleteRewindUseCase(get()) }
+        factory { MarkRewindViewedUseCase(get()) }
         factory { GenerateAnnualRewindUseCase(get(), get(), get(), get()) }
 
         // Media indexing
         factory { IndexMediaForPeriodUseCase(get(), get()) }
-
-        // Note: The actual implementations for these repositories are provided by the platform-specific
-        // data modules. These stub implementations are provided as fallbacks for testing.
-        single<IndexedMediaRepository> { StubIndexedMediaRepository() }
-        single<RewindGenerationManager> { StubRewindGenerationManager() }
 
         // Create the GenerateBasicRewindUseCase with all its dependencies
         factory { GenerateBasicRewindUseCase(get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }

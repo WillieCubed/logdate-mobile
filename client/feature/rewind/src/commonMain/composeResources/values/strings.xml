@@ -44,9 +44,9 @@
     <string name="youve_reviewed_all_your_weekly_rewinds">You&apos;ve reviewed all your weekly rewinds</string>
 
     <!-- State messages -->
-    <string name="congrats_youve_reached_the_end">Congrats, you&apos;ve reached the end!</string>
-    <string name="go_live_a_little_will_ya">Go live a little, will ya?</string>
-    <string name="rewind_empty_description">Still working on the Rewind. Go touch some grass in the meantime.</string>
+    <string name="congrats_youve_reached_the_end">That&apos;s your story so far</string>
+    <string name="go_live_a_little_will_ya">Your story starts with your first entry</string>
+    <string name="rewind_empty_description">Your entries are being woven into a story. Check back soon.</string>
     <string name="unsupported_panel_type">Unsupported panel type</string>
 
     <!-- Actions -->
@@ -67,6 +67,15 @@
     <string name="share_rewind_stats_label_people">people</string>
     <string name="share_rewind_stats_heading_theme">theme</string>
     <string name="share_rewind_stats_heading_location">where</string>
+
+    <!-- New rewind indicator -->
+    <string name="badge_new">NEW</string>
+
+    <!-- Post-viewing prompt -->
+    <string name="post_viewing_title">That&apos;s your week</string>
+    <string name="post_viewing_share">Share this Rewind</string>
+    <string name="post_viewing_watch_again">Watch again</string>
+    <string name="post_viewing_done">Done</string>
 
     <!-- Icon labels -->
     <string name="text">↓</string>

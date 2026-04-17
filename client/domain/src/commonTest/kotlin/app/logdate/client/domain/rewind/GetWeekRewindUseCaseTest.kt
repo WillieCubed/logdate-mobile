@@ -319,6 +319,10 @@ class GetWeekRewindUseCaseTest {
             }
         }
 
+        override suspend fun markAsViewed(uid: Uuid) {
+            // No-op stub for tests that don't exercise view tracking.
+        }
+
         override suspend fun tagAsMilestone(
             uid: Uuid,
             signal: String,

@@ -26,6 +26,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -161,6 +162,17 @@ class OfflineFirstRewindRepository(
                 entities.map { it.toDomainModel() }
             }
 
+    override suspend fun markAsViewed(uid: Uuid): Unit =
+        withContext(ioDispatcher) {
+            val now = Clock.System.now()
+            // First view: sets is_viewed=1 and view_count=1. No-ops if already viewed.
+            val firstViewApplied = cachedRewindDao.markAsFirstViewed(uid, now)
+            // Subsequent views: only bump the count if the first-view path didn't fire.
+            if (firstViewApplied == 0) {
+                cachedRewindDao.incrementViewCount(uid)
+            }
+        }
+
     override suspend fun deleteRewind(uid: Uuid): Unit =
         withContext(ioDispatcher) {
             cachedRewindDao.deleteRewind(uid)
@@ -230,6 +242,9 @@ class OfflineFirstRewindRepository(
             title = title,
             content = sortedContent,
             metadata = rewindMetadata,
+            isViewed = isViewed,
+            firstViewedAt = firstViewedAt,
+            viewCount = viewCount,
         )
     }
 

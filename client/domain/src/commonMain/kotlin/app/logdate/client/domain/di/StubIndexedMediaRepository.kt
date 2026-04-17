@@ -4,7 +4,6 @@ import app.logdate.client.repository.media.ExifMetadata
 import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -46,7 +45,7 @@ class StubIndexedMediaRepository : IndexedMediaRepository {
     override fun getForPeriod(
         startTime: Instant,
         endTime: Instant,
-    ): Flow<List<IndexedMedia>> = emptyFlow()
+    ): Flow<List<IndexedMedia>> = flowOf(emptyList())
 
     override suspend fun isIndexed(uri: String): Boolean = false
 

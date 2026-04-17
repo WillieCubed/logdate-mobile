@@ -126,10 +126,10 @@ class WittyRewindMessageGenerator : RewindMessageGenerator {
          */
         private val UNAVAILABLE_MESSAGES =
             listOf(
-                "Still working on the Rewind. Go touch some grass in the meantime.",
-                "Patience, young grasshopper. Your rewind is cooking.",
-                "Good things take time. Like this rewind.",
-                "Brewing your memories... be right back ☕",
+                "Your entries are being woven into a story. Check back soon.",
+                "Putting the pieces together. Almost there.",
+                "Your week is taking shape behind the scenes.",
+                "Brewing your memories... be right back.",
             )
 
         /**

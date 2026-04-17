@@ -24,7 +24,6 @@ import app.logdate.shared.model.RewindMetadata
 import app.logdate.shared.model.WeekNarrative
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
@@ -32,6 +31,7 @@ import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -153,17 +153,23 @@ class GenerateBasicRewindUseCase(
             // Convert the date range to local dates for day-by-day processing
             val timezone = TimeZone.currentSystemDefault()
             var currentDate = startTime.toLocalDateTime(timezone).date
-            val endDate = endTime.toLocalDateTime(timezone).date
+            if (startTime < endTime) {
+                val lastIncludedDate =
+                    endTime
+                        .minus(1.nanoseconds)
+                        .toLocalDateTime(timezone)
+                        .date
 
-            // Collect notes for each day in the period
-            while (currentDate <= endDate) {
-                val notesForDay = fetchNotesForDay(currentDate).firstOrNull() ?: emptyList()
-                allTextEntries.addAll(notesForDay.filterIsInstance<JournalNote.Text>())
-                currentDate = currentDate.plus(1, DateTimeUnit.DAY)
+                // Collect notes for each day in the period
+                while (currentDate <= lastIncludedDate) {
+                    val notesForDay = fetchNotesForDay(currentDate).firstOrNull() ?: emptyList()
+                    allTextEntries.addAll(notesForDay.filterIsInstance<JournalNote.Text>())
+                    currentDate = currentDate.plus(1, DateTimeUnit.DAY)
+                }
             }
 
             // Collect indexed media for the period
-            val mediaItems = indexedMediaRepository.getForPeriod(startTime, endTime).first()
+            val mediaItems = indexedMediaRepository.getForPeriod(startTime, endTime).firstOrNull() ?: emptyList()
 
             // Check if we have any content
             if (allTextEntries.isEmpty() && mediaItems.isEmpty()) {

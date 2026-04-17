@@ -147,6 +147,16 @@ private class FakeCachedRewindDao : CachedRewindDao {
         end: Instant,
     ): Flow<RewindEntity?> = rewinds.map { list -> list.firstOrNull { it.startDate == start && it.endDate == end } }
 
+    override fun getRewindsContainedIn(
+        rangeStart: Instant,
+        rangeEnd: Instant,
+    ): Flow<List<RewindEntity>> =
+        rewinds.map { list ->
+            list
+                .filter { it.startDate >= rangeStart && it.endDate <= rangeEnd }
+                .sortedBy { it.startDate }
+        }
+
     override suspend fun rewindExistsForPeriod(
         start: Instant,
         end: Instant,
@@ -175,6 +185,38 @@ private class FakeCachedRewindDao : CachedRewindDao {
 
     override suspend fun insertVideoContent(content: List<RewindVideoContentEntity>) {
         videoContent.addAll(content)
+    }
+
+    override suspend fun markAsFirstViewed(
+        uid: Uuid,
+        now: Instant,
+    ): Int {
+        val existing = rewinds.value.firstOrNull { it.uid == uid } ?: return 0
+        if (existing.isViewed) return 0
+        rewinds.value =
+            rewinds.value.map { rewind ->
+                if (rewind.uid == uid) {
+                    rewind.copy(
+                        isViewed = true,
+                        firstViewedAt = now,
+                        viewCount = 1,
+                    )
+                } else {
+                    rewind
+                }
+            }
+        return 1
+    }
+
+    override suspend fun incrementViewCount(uid: Uuid) {
+        rewinds.value =
+            rewinds.value.map { rewind ->
+                if (rewind.uid == uid && rewind.isViewed) {
+                    rewind.copy(viewCount = rewind.viewCount + 1)
+                } else {
+                    rewind
+                }
+            }
     }
 
     override suspend fun deleteRewind(uid: Uuid) {

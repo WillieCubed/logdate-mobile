@@ -160,6 +160,40 @@ interface CachedRewindDao {
     suspend fun insertVideoContent(content: List<RewindVideoContentEntity>)
 
     /**
+     * Marks a rewind as viewed for the first time: sets the viewed flag, records the
+     * timestamp, and sets the view count to 1. No-ops if already viewed.
+     *
+     * @return The number of rows affected (1 on first view, 0 if already viewed).
+     */
+    @Query(
+        """
+        UPDATE rewinds
+        SET ${RewindConstants.COLUMN_IS_VIEWED} = 1,
+            ${RewindConstants.COLUMN_FIRST_VIEWED_AT} = :now,
+            ${RewindConstants.COLUMN_VIEW_COUNT} = 1
+        WHERE ${RewindConstants.COLUMN_UID} = :uid
+        AND ${RewindConstants.COLUMN_IS_VIEWED} = 0
+    """,
+    )
+    suspend fun markAsFirstViewed(
+        uid: Uuid,
+        now: Instant,
+    ): Int
+
+    /**
+     * Increments the view count for a rewind that has already been viewed at least once.
+     */
+    @Query(
+        """
+        UPDATE rewinds
+        SET ${RewindConstants.COLUMN_VIEW_COUNT} = ${RewindConstants.COLUMN_VIEW_COUNT} + 1
+        WHERE ${RewindConstants.COLUMN_UID} = :uid
+        AND ${RewindConstants.COLUMN_IS_VIEWED} = 1
+    """,
+    )
+    suspend fun incrementViewCount(uid: Uuid)
+
+    /**
      * Deletes a rewind and all its content.
      * Due to foreign key constraints with CASCADE delete,
      * this will automatically delete all associated content.

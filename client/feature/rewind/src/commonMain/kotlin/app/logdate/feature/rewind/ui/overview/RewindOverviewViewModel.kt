@@ -83,12 +83,30 @@ class RewindOverviewViewModel(
             .map { pastRewinds ->
                 pastRewinds.map { rewind ->
                     val milestoneSignal = parseMilestoneSignal(rewind.metadata?.milestones?.firstOrNull())
+                    val photoCount = rewind.content.count { it is RewindContent.Image }
+                    val textCount = rewind.content.count { it is RewindContent.TextNote }
+                    val peopleCount = rewind.metadata?.peopleHighlighted?.size ?: 0
+                    val primaryLocation = rewind.metadata?.locationSummary?.primaryLocation
+                    val themes = rewind.metadata?.detectedActivities?.map { it.name }.orEmpty()
                     RewindHistoryUiState(
                         uid = rewind.uid,
                         title = rewind.title,
                         label = rewind.label,
                         startDate = rewind.startDate.toLocalDateTime(TimeZone.currentSystemDefault()).date,
                         endDate = rewind.endDate.toLocalDateTime(TimeZone.currentSystemDefault()).date,
+                        message =
+                            rewindMessageGenerator.generateContextualMessage(
+                                rewindAvailable = true,
+                                photoCount = photoCount,
+                                textCount = textCount,
+                                peopleCount = peopleCount,
+                                themes = themes,
+                            ),
+                        isViewed = rewind.isViewed,
+                        entryCount = textCount,
+                        photoCount = photoCount,
+                        peopleCount = peopleCount,
+                        primaryLocation = primaryLocation,
                         milestone =
                             milestoneSignal?.let {
                                 MilestoneSummaryUiState(
@@ -118,6 +136,9 @@ class RewindOverviewViewModel(
                     val rewind = rewindResult.rewind
                     val photoCount = rewind.content.count { it is RewindContent.Image }
                     val textCount = rewind.content.count { it is RewindContent.TextNote }
+                    val peopleCount = rewind.metadata?.peopleHighlighted?.size ?: 0
+                    val primaryLocation = rewind.metadata?.locationSummary?.primaryLocation
+                    val themes = rewind.metadata?.detectedActivities?.map { it.name }.orEmpty()
                     RewindOverviewScreenUiState.Ready(
                         pastRewinds = pastRewinds,
                         mostRecentRewind =
@@ -128,6 +149,8 @@ class RewindOverviewViewModel(
                                         rewindAvailable = true,
                                         photoCount = photoCount,
                                         textCount = textCount,
+                                        peopleCount = peopleCount,
+                                        themes = themes,
                                     ),
                                 label = rewind.label,
                                 title = rewind.title,
@@ -140,7 +163,11 @@ class RewindOverviewViewModel(
                                         .toLocalDateTime(TimeZone.currentSystemDefault())
                                         .date,
                                 rewindAvailable = rewind.content.isNotEmpty(),
-                                // TODO: Add activity states based on rewind content
+                                isViewed = rewind.isViewed,
+                                entryCount = textCount,
+                                photoCount = photoCount,
+                                peopleCount = peopleCount,
+                                primaryLocation = primaryLocation,
                             ),
                     )
                 }

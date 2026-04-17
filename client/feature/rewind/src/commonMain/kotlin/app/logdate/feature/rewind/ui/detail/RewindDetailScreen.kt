@@ -18,7 +18,11 @@ import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -96,6 +100,7 @@ fun RewindDetailScreen(
     val currentRewind by viewModel.currentRewind.collectAsStateWithLifecycle()
     val replySheetState by viewModel.replySheetState.collectAsStateWithLifecycle()
     val deletePromptVisible by viewModel.deletePromptVisible.collectAsStateWithLifecycle()
+    val isFirstView by viewModel.isFirstView.collectAsStateWithLifecycle()
 
     val onSharePanel: (RewindPanelUiState) -> Unit = { panel ->
         val shareContent = panel.toShareContent()
@@ -142,13 +147,15 @@ fun RewindDetailScreen(
     RewindDetailScreenContent(
         uiState = uiState,
         onExitRewind = onExitRewind,
+        modifier = modifier,
+        isFirstView = isFirstView,
+        onFirstViewConsumed = viewModel::onFirstViewConsumed,
+        externalPause = replySheetState is ReflectionReplySheetState.Open || deletePromptVisible,
+        accentColor = currentRewind?.accentColor() ?: Color.White,
         onSharePanel = onSharePanel,
         onShareRewindStats = onShareRewindStats,
         onReplyToPrompt = viewModel::onReplyRequested,
         onDeleteRewind = viewModel::onDeleteRequested,
-        externalPause = replySheetState is ReflectionReplySheetState.Open || deletePromptVisible,
-        accentColor = currentRewind?.accentColor() ?: Color.White,
-        modifier = modifier,
     )
 
     val openSheet = replySheetState as? ReflectionReplySheetState.Open
@@ -181,20 +188,48 @@ fun RewindDetailScreen(
     }
 }
 
+/**
+ * Stateless body of the detail screen. Dispatches between loading, success, and
+ * error presentations, and owns the post-viewing sheet that appears after the
+ * user finishes a story.
+ *
+ * @param uiState The current state of the detail screen
+ * @param onExitRewind Invoked when the user closes the rewind (via chrome, dismiss
+ *   of the post-viewing sheet, or an error state's back button)
+ * @param modifier Root modifier
+ * @param isFirstView True when this rewind has never been opened. Captured from the
+ *   ViewModel's snapshot so it reflects the pre-navigation state, not a live DB read.
+ * @param onFirstViewConsumed Invoked after the story has played the first-view
+ *   entrance so the ViewModel can clear the one-shot flag; preventing replays on
+ *   configuration change or re-composition.
+ * @param externalPause Pauses the story when chrome outside this composable (reply
+ *   sheet, delete dialog) is visible
+ * @param accentColor Foreground tint applied to the story chrome
+ * @param onSharePanel Invoked when the user shares an individual panel; null hides
+ *   the share affordance
+ * @param onShareRewindStats Invoked when the user shares the overall rewind summary
+ * @param onReplyToPrompt Invoked when the user replies to a reflection prompt panel
+ * @param onDeleteRewind Invoked when the user confirms deletion from the chrome
+ */
 @Composable
 fun RewindDetailScreenContent(
     uiState: RewindDetailUiState,
     onExitRewind: () -> Unit,
     modifier: Modifier = Modifier,
+    isFirstView: Boolean = false,
+    onFirstViewConsumed: (() -> Unit)? = null,
+    externalPause: Boolean = false,
+    accentColor: Color = Color.White,
     onSharePanel: ((panel: RewindPanelUiState) -> Unit)? = null,
     onShareRewindStats: (() -> Unit)? = null,
     onReplyToPrompt: ((panel: ReflectionPromptRewindPanelUiState) -> Unit)? = null,
     onDeleteRewind: (() -> Unit)? = null,
-    externalPause: Boolean = false,
-    accentColor: Color = Color.White,
 ) {
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
     val isWideScreen = windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND)
+
+    var showPostViewingSheet by rememberSaveable { mutableStateOf(false) }
+    var restartKey by rememberSaveable { mutableStateOf(0) }
 
     when (val currentState = uiState) {
         is RewindDetailUiState.Loading -> {
@@ -211,34 +246,42 @@ fun RewindDetailScreenContent(
                     RewindStoryView(
                         panels = currentState.panels,
                         onExit = onExitRewind,
-                        onSharePanel = onSharePanel,
-                        onShareRewindStats = onShareRewindStats,
-                        onReplyToPrompt = onReplyToPrompt,
-                        onDeleteRewind = onDeleteRewind,
-                        externalPause = externalPause,
-                        accentColor = accentColor,
-                        content = { panel ->
-                            RewindStoryContent(panel = panel)
-                        },
                         modifier =
                             Modifier
                                 .fillMaxHeight(0.9f)
                                 .aspectRatio(AspectRatios.RATIO_9_16)
                                 .clip(RoundedCornerShape(16.dp)),
+                        isFirstView = isFirstView,
+                        onFirstViewConsumed = onFirstViewConsumed,
+                        restartKey = restartKey,
+                        externalPause = externalPause || showPostViewingSheet,
+                        accentColor = accentColor,
+                        onComplete = { showPostViewingSheet = true },
+                        onSharePanel = onSharePanel,
+                        onShareRewindStats = onShareRewindStats,
+                        onReplyToPrompt = onReplyToPrompt,
+                        onDeleteRewind = onDeleteRewind,
+                        content = { panel ->
+                            RewindStoryContent(panel = panel)
+                        },
                     )
                 }
             } else {
                 RewindStoryView(
                     panels = currentState.panels,
                     onExit = onExitRewind,
+                    modifier = modifier.fillMaxSize(),
+                    isFirstView = isFirstView,
+                    onFirstViewConsumed = onFirstViewConsumed,
+                    restartKey = restartKey,
+                    externalPause = externalPause || showPostViewingSheet,
+                    onComplete = { showPostViewingSheet = true },
                     onSharePanel = onSharePanel,
                     onShareRewindStats = onShareRewindStats,
                     onReplyToPrompt = onReplyToPrompt,
-                    externalPause = externalPause,
                     content = { panel ->
                         RewindStoryContent(panel = panel)
                     },
-                    modifier = modifier.fillMaxSize(),
                 )
             }
         }
@@ -250,6 +293,23 @@ fun RewindDetailScreenContent(
                 modifier = modifier.fillMaxSize(),
             )
         }
+    }
+
+    if (showPostViewingSheet) {
+        RewindPostViewingSheet(
+            onShare = {
+                showPostViewingSheet = false
+                onShareRewindStats?.invoke()
+            },
+            onWatchAgain = {
+                showPostViewingSheet = false
+                restartKey++
+            },
+            onDismiss = {
+                showPostViewingSheet = false
+                onExitRewind()
+            },
+        )
     }
 }
 

@@ -93,6 +93,13 @@ interface RewindRepository {
     ): Flow<List<Rewind>>
 
     /**
+     * Records that the user has opened this rewind. On the first call for a given
+     * rewind, sets the viewed flag and records the timestamp. On subsequent calls,
+     * increments the view count.
+     */
+    suspend fun markAsViewed(uid: Uuid)
+
+    /**
      * Stamps a rewind as a milestone-detected rewind by writing [signal] into the
      * first slot of its `metadata.milestones` list.
      *

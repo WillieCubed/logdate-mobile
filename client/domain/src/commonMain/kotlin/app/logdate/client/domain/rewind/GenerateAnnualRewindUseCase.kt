@@ -14,7 +14,7 @@ import app.logdate.shared.model.RewindGenerationRequest
 import app.logdate.shared.model.RewindMetadata
 import app.logdate.shared.model.YearNarrative
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
@@ -54,7 +54,7 @@ class GenerateAnnualRewindUseCase(
         Napier.d("Generating annual rewind for $year ($startTime to $endTime)")
 
         // Dedup: skip if an annual rewind already exists for this year.
-        val existing = rewindRepository.getRewindBetween(startTime, endTime).first()
+        val existing = rewindRepository.getRewindBetween(startTime, endTime).firstOrNull()
         if (existing != null) {
             Napier.d("Annual rewind already exists for $year")
             return GenerateBasicRewindResult.Success(existing)
@@ -74,7 +74,7 @@ class GenerateAnnualRewindUseCase(
 
         try {
             // Collect all weekly/milestone rewinds for the year.
-            val allRewinds = rewindRepository.getRewindsInRange(startTime, endTime).first()
+            val allRewinds = rewindRepository.getRewindsInRange(startTime, endTime).firstOrNull() ?: emptyList()
             // Filter out any existing annual rewinds (short-circuit: span > 30 days).
             val weeklyRewinds =
                 allRewinds.filter { rewind ->

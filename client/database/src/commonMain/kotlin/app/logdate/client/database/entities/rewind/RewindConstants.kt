@@ -24,4 +24,11 @@ object RewindConstants {
      */
     const val COLUMN_START_DATE = "startDate"
     const val COLUMN_END_DATE = "endDate"
+
+    /**
+     * View tracking columns
+     */
+    const val COLUMN_IS_VIEWED = "is_viewed"
+    const val COLUMN_FIRST_VIEWED_AT = "first_viewed_at"
+    const val COLUMN_VIEW_COUNT = "view_count"
 }
