@@ -24,6 +24,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -109,9 +110,9 @@ class DevicesViewModelTest {
             assertNull(state.error, "Should have no error")
 
             // Verify current device is properly marked
-            val currentDevice = state.devices.find { it.id == currentDeviceId }
-            assertTrue(currentDevice?.isCurrentDevice ?: false, "Current device should be marked as current")
-            assertEquals("Current Device", currentDevice?.name, "Current device should have correct name")
+            val currentDevice = assertNotNull(state.devices.find { it.id == currentDeviceId })
+            assertTrue(currentDevice.isCurrentDevice, "Current device should be marked as current")
+            assertEquals("Current Device", currentDevice.name, "Current device should have correct name")
 
             // Verify other devices are not marked as current
             state.devices

@@ -15,6 +15,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.launch
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -46,6 +47,7 @@ class MemoriesSettingsViewModelTest {
                     settingsRepository = FakeMemoriesSettingsRepository(),
                     widgetInstallController = widgetInstallController,
                 )
+            backgroundScope.launch { viewModel.uiState.collect { } }
 
             advanceUntilIdle()
 

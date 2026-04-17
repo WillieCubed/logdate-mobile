@@ -10,7 +10,7 @@ import app.logdate.client.domain.recommendation.WidgetContentType
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -27,7 +27,7 @@ class MemoriesSettingsViewModel(
     )
 
     val uiState: StateFlow<UiState> =
-        kotlinx.coroutines.flow.combine(
+        combine(
             settingsRepository.observeSettings(),
             widgetInstallController.uiState,
         ) { settings, widgetInstallUiState ->
@@ -35,12 +35,11 @@ class MemoriesSettingsViewModel(
                 settings = settings,
                 widgetInstallUiState = widgetInstallUiState,
             )
-        }
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5_000),
-                initialValue = UiState(),
-            )
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = UiState(),
+        )
 
     fun toggleContextualRecommendations(enabled: Boolean) {
         viewModelScope.launch {
