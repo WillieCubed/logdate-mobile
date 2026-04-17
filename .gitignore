@@ -25,6 +25,13 @@ captures
 !infra/terraform/*.tfvars
 
 **/.claude/settings.local.json
+**/.claude/worktrees/
+
+# Local Claude Code MCP server config (per-developer, points at local services)
+.mcp.json
+
+# Local debug dumps and scratch state
+tmp/
 
 # Firebase local config
 **/google-services.json
