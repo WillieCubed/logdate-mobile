@@ -1,9 +1,8 @@
 package app.logdate.client.intelligence.cache
 
+import app.logdate.client.util.platformIODispatcher
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -21,7 +20,7 @@ class OfflineGenerativeAICache(
             maxEntries = config.memoryMaxEntries,
             maxBytes = config.memoryMaxBytes,
         ),
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val ioDispatcher: CoroutineDispatcher = platformIODispatcher,
 ) : GenerativeAICache {
     override suspend fun getEntry(request: GenerativeAICacheRequest): GenerativeAICacheEntry? {
         return withContext(ioDispatcher) {

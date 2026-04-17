@@ -6,6 +6,8 @@ import app.logdate.client.intelligence.cache.AICachePolicy
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.cache.GenerativeAICacheContentType
 import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
+import app.logdate.client.intelligence.entity.moments.MomentExtractor
+import app.logdate.client.intelligence.events.EventNamingExtractor
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
 import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
@@ -13,18 +15,16 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIResponseFormat
 import app.logdate.client.intelligence.unavailableReason
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
+import app.logdate.client.util.platformIODispatcher
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 
 /**
  * Shared cache → unavailability check → submit → parse → cache write skeleton for the
  * project's structured-output AI extractors.
  *
- * Both [app.logdate.client.intelligence.entity.moments.MomentExtractor] and
- * [app.logdate.client.intelligence.events.EventNamingExtractor] used to copy the same
+ * Both [MomentExtractor] and [EventNamingExtractor] used to copy the same
  * sixty-line dance: build a cache request, try the cache, gate on network/data-usage,
  * call the chat client with a JSON-schema response format, parse the JSON, write the
  * cache, return. Only the input serialization, the system prompt, and the parser
@@ -44,7 +44,7 @@ abstract class StructuredAIExtractor<Input, Output>(
     protected val generativeAIChatClient: GenerativeAIChatClient,
     protected val networkAvailabilityMonitor: NetworkAvailabilityMonitor,
     protected val dataUsagePolicy: DataUsagePolicy,
-    protected val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    protected val ioDispatcher: CoroutineDispatcher = platformIODispatcher,
 ) {
     protected abstract val systemPrompt: String
 

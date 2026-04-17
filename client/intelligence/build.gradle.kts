@@ -45,6 +45,7 @@ kotlin {
             implementation(projects.shared.model)
             implementation(projects.client.networking)
             implementation(projects.client.repository)
+            implementation(projects.client.util)
             // External dependencies
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.kotlinx.serialization.json)

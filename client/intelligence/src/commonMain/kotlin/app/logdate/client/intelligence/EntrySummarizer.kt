@@ -9,10 +9,9 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
 import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
+import app.logdate.client.util.platformIODispatcher
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 
 /**
@@ -27,7 +26,7 @@ class EntrySummarizer(
     private val genAIClient: GenerativeAIChatClient,
     private val networkAvailabilityMonitor: NetworkAvailabilityMonitor,
     private val dataUsagePolicy: DataUsagePolicy,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val ioDispatcher: CoroutineDispatcher = platformIODispatcher,
 ) {
     private companion object {
         private const val SYSTEM_PROMPT =

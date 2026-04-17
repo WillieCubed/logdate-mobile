@@ -9,9 +9,8 @@ import app.logdate.client.intelligence.structured.StructuredAIExtractor
 import app.logdate.client.intelligence.structured.StructuredOutputResult
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
+import app.logdate.client.util.platformIODispatcher
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -32,7 +31,7 @@ class EventNamingExtractor(
     generativeAIChatClient: GenerativeAIChatClient,
     networkAvailabilityMonitor: NetworkAvailabilityMonitor,
     dataUsagePolicy: DataUsagePolicy,
-    ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    ioDispatcher: CoroutineDispatcher = platformIODispatcher,
 ) : StructuredAIExtractor<EventCluster, EventName>(
         generativeAICache = generativeAICache,
         generativeAIChatClient = generativeAIChatClient,

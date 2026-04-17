@@ -20,6 +20,7 @@ import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.media.IndexedMedia
+import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.HighlightedQuote
 import app.logdate.shared.model.Person
 import app.logdate.shared.model.ReflectionPrompt
@@ -28,8 +29,6 @@ import app.logdate.shared.model.WeatherContext
 import app.logdate.shared.model.WeekNarrative
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
@@ -56,7 +55,7 @@ class WeekNarrativeSynthesizer(
     private val networkAvailabilityMonitor: NetworkAvailabilityMonitor,
     private val dataUsagePolicy: DataUsagePolicy,
     private val weatherProvider: HistoricalWeatherProvider = NoOpHistoricalWeatherProvider,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val ioDispatcher: CoroutineDispatcher = platformIODispatcher,
 ) {
     internal companion object {
         private const val SYSTEM_PROMPT = """
