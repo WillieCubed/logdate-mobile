@@ -45,7 +45,7 @@ class DynamicShortcutScheduler(
         val request = OneTimeWorkRequestBuilder<DynamicShortcutRefreshWorker>().build()
         workManager.enqueueUniqueWork(
             IMMEDIATE_WORK_NAME,
-            ExistingWorkPolicy.KEEP,
+            ExistingWorkPolicy.REPLACE,
             request,
         )
         Napier.d("Enqueued immediate dynamic shortcut refresh")

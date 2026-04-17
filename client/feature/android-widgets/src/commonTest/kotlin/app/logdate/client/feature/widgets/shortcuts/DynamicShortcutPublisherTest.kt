@@ -253,6 +253,18 @@ class DynamicShortcutPublisherTest {
         }
 
     @Test
+    fun `sorts favorited journals ahead of more recently updated non-favorites`() =
+        runTest {
+            val favorite = journal(title = "Favorite", isFavorited = true, lastUpdated = NOW - 7.days)
+            val recent = journal(title = "Recent", isFavorited = false, lastUpdated = NOW)
+
+            val descriptors = publisher(journals = listOf(recent, favorite)).computeShortcuts()
+
+            val shareDescriptors = descriptors.filterIsInstance<DynamicShortcutDescriptor.ShareToJournal>()
+            assertEquals(listOf(favorite.id, recent.id), shareDescriptors.map { it.journalId })
+        }
+
+    @Test
     fun `excludes journals with blank titles`() =
         runTest {
             val good = journal(title = "Travel 2026")
@@ -372,6 +384,7 @@ class DynamicShortcutPublisherTest {
     private fun journal(
         id: Uuid = Uuid.random(),
         title: String = "Travel 2026",
+        isFavorited: Boolean = false,
         coverImageUri: String? = null,
         lastUpdated: Instant = NOW,
     ): Journal =
@@ -379,7 +392,7 @@ class DynamicShortcutPublisherTest {
             id = id,
             title = title,
             description = "",
-            isFavorited = false,
+            isFavorited = isFavorited,
             created = lastUpdated - 1.days,
             lastUpdated = lastUpdated,
             syncVersion = 0,

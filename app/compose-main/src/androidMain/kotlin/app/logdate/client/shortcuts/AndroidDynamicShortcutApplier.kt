@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -89,7 +90,11 @@ class AndroidDynamicShortcutApplier(
                     }.awaitAll()
             }
 
-        ShortcutManagerCompat.setDynamicShortcuts(context, launcherShortcuts + sharingShortcuts)
+        val publishSucceeded =
+            ShortcutManagerCompat.setDynamicShortcuts(context, launcherShortcuts + sharingShortcuts)
+        if (!publishSucceeded) {
+            Napier.w("Dynamic shortcut publish was rate-limited by ShortcutManagerCompat")
+        }
     }
 
     private fun buildLauncherShortcut(
@@ -111,7 +116,7 @@ class AndroidDynamicShortcutApplier(
         val intent =
             Intent(context, MainActivity::class.java).apply {
                 action = Intent.ACTION_VIEW
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 putExtra(EXTRA_AMBIENT_PROMPT_TARGET, AMBIENT_PROMPT_TARGET_DRAFT)
                 putExtra(EXTRA_AMBIENT_PROMPT_DRAFT_ID, descriptor.draftId.toString())
             }
@@ -132,7 +137,7 @@ class AndroidDynamicShortcutApplier(
         val intent =
             Intent(context, MainActivity::class.java).apply {
                 action = Intent.ACTION_VIEW
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 putExtra(EXTRA_AMBIENT_PROMPT_TARGET, AMBIENT_PROMPT_TARGET_MEMORY_RECALL)
                 putExtra(EXTRA_AMBIENT_PROMPT_RECALL_DATE, descriptor.date.toString())
             }
@@ -153,7 +158,7 @@ class AndroidDynamicShortcutApplier(
         val intent =
             Intent(context, MainActivity::class.java).apply {
                 action = Intent.ACTION_VIEW
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 putExtra(EXTRA_REWIND_NOTIFICATION_TARGET, REWIND_NOTIFICATION_TARGET_DETAIL)
                 putExtra(EXTRA_REWIND_NOTIFICATION_ID, descriptor.rewindId.toString())
             }
@@ -174,7 +179,7 @@ class AndroidDynamicShortcutApplier(
         val intent =
             Intent(context, MainActivity::class.java).apply {
                 action = Intent.ACTION_VIEW
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 putExtra(EXTRA_SHORTCUT_TARGET_JOURNAL_ID, descriptor.journalId.toString())
             }
         val icon = loadJournalIcon(descriptor)
@@ -219,21 +224,42 @@ class AndroidDynamicShortcutApplier(
                 }.getOrNull()
             }
 
-        val bitmap = coverBitmap ?: renderColorCircleBitmap(descriptor.journalId)
+        val bitmap = coverBitmap ?: renderJournalMonogramBitmap(descriptor.journalId, descriptor.journalTitle)
         return IconCompat.createWithAdaptiveBitmap(bitmap)
     }
 
-    private fun renderColorCircleBitmap(journalId: Uuid): Bitmap {
+    private fun renderJournalMonogramBitmap(
+        journalId: Uuid,
+        journalTitle: String,
+    ): Bitmap {
         val bitmap = Bitmap.createBitmap(SHORTCUT_ICON_PX, SHORTCUT_ICON_PX, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        val paint =
+        val backgroundPaint =
             Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = deriveCoverColor(journalId).toArgb()
             }
-        // Full-bleed solid color: the launcher's adaptive-icon mask handles cropping to its
-        // shape (circle on Pixel, squircle elsewhere). Drawing a circle inside the bitmap
-        // would slice off the safe-zone padding.
-        canvas.drawRect(0f, 0f, SHORTCUT_ICON_PX.toFloat(), SHORTCUT_ICON_PX.toFloat(), paint)
+        canvas.drawRect(0f, 0f, SHORTCUT_ICON_PX.toFloat(), SHORTCUT_ICON_PX.toFloat(), backgroundPaint)
+
+        val monogram =
+            journalTitle
+                .trim()
+                .firstOrNull()
+                ?.uppercaseChar()
+                ?.toString()
+                .orEmpty()
+        if (monogram.isNotEmpty()) {
+            val textPaint =
+                Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0xFFFFFFFF.toInt()
+                    textAlign = Paint.Align.CENTER
+                    textSize = SHORTCUT_MONOGRAM_TEXT_PX
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                }
+            val centerX = SHORTCUT_ICON_PX / 2f
+            val centerY = (SHORTCUT_ICON_PX / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
+            canvas.drawText(monogram, centerX, centerY, textPaint)
+        }
+
         return bitmap
     }
 
@@ -243,6 +269,7 @@ class AndroidDynamicShortcutApplier(
          * is the recommended adaptive-icon canvas size.
          */
         const val SHORTCUT_ICON_PX = 324
+        const val SHORTCUT_MONOGRAM_TEXT_PX = 140f
 
         /**
          * Rank offset that pushes sharing shortcuts past launcher shortcuts in long-press

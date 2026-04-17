@@ -6,6 +6,7 @@ import app.logdate.client.intelligence.milestones.MilestoneCandidate
 import app.logdate.client.intelligence.milestones.MilestoneDetector
 import app.logdate.client.intelligence.milestones.toMetadataSignal
 import app.logdate.client.repository.rewind.RewindRepository
+import app.logdate.client.shortcuts.DynamicShortcutScheduler
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.firstOrNull
 import kotlin.time.Instant
@@ -25,6 +26,7 @@ class MilestoneRewindCoordinator(
     private val detectors: List<MilestoneDetector>,
     private val rewindRepository: RewindRepository,
     private val generateRewind: GenerateBasicRewindUseCase,
+    private val shortcutScheduler: DynamicShortcutScheduler,
 ) {
     /**
      * Walks the detector list and acts on the first candidate that produces a fresh
@@ -61,6 +63,8 @@ class MilestoneRewindCoordinator(
             is GenerateBasicRewindResult.Success -> {
                 runCatching {
                     rewindRepository.tagAsMilestone(result.rewind.uid, candidate.toMetadataSignal())
+                }.onSuccess {
+                    shortcutScheduler.enqueueImmediateRefresh()
                 }.onFailure { Napier.w("MilestoneRewindCoordinator: failed to tag milestone rewind", it) }
             }
             is GenerateBasicRewindResult.AlreadyInProgress -> {

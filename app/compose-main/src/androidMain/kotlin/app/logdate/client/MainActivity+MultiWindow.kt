@@ -7,6 +7,7 @@ import android.view.Menu
 import android.view.MenuItem
 import androidx.lifecycle.lifecycleScope
 import app.logdate.client.media.MediaManager
+import app.logdate.client.shortcuts.parseLauncherShortcutTargetJournalId
 import app.logdate.navigation.EditorManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
@@ -67,12 +68,12 @@ fun MainActivity.handleMultiWindowMenuSelection(item: MenuItem): Boolean {
  *
  * @param intent The new intent received
  */
-fun MainActivity.handleMultiWindowIntent(intent: Intent) {
+fun MainActivity.handleMultiWindowIntent(intent: Intent): Boolean {
     val editorManager: EditorManager by inject()
     val mediaManager: MediaManager by inject()
 
     // Check for actions that should launch a new editor
-    when (intent.action) {
+    return when (intent.action) {
         Intent.ACTION_SEND,
         Intent.ACTION_SEND_MULTIPLE,
         -> {
@@ -87,7 +88,20 @@ fun MainActivity.handleMultiWindowIntent(intent: Intent) {
                     attachments = sharedContent.attachments,
                     journalIds = sharedContent.targetJournalIds,
                 )
+                finish()
             }
+            true
+        }
+
+        Intent.ACTION_VIEW -> {
+            val targetJournalId = intent.parseLauncherShortcutTargetJournalId() ?: return false
+            editorManager.openNewEditorWindow(journalIds = listOf(targetJournalId))
+            finish()
+            true
+        }
+
+        else -> {
+            false
         }
     }
 }

@@ -36,7 +36,9 @@ import app.logdate.client.rewind.RewindGenerationWorker
 import app.logdate.client.rewind.RewindNotificationCoordinator
 import app.logdate.client.sensor.di.sensorModule
 import app.logdate.client.shortcuts.AndroidDynamicShortcutApplier
+import app.logdate.client.shortcuts.DynamicShortcutRefreshObserver
 import app.logdate.client.shortcuts.DynamicShortcutRefreshWorker
+import app.logdate.client.shortcuts.DynamicShortcutScheduler
 import app.logdate.client.sync.AndroidPhoneAudioStreamOpener
 import app.logdate.client.sync.DefaultPhoneWearSyncBridge
 import app.logdate.client.sync.GooglePhoneWearTransport
@@ -102,7 +104,14 @@ actual val appModule: Module =
         workerOf(::AmbientPromptWorker)
 
         single { RewindNotificationCoordinator(androidContext()) }
-        single { MilestoneRewindCoordinator(detectors = get(), rewindRepository = get(), generateRewind = get()) }
+        single {
+            MilestoneRewindCoordinator(
+                detectors = get(),
+                rewindRepository = get(),
+                generateRewind = get(),
+                shortcutScheduler = get(),
+            )
+        }
         workerOf(::RewindGenerationWorker)
 
         single { EventInferenceScheduler(androidContext()) }
@@ -126,6 +135,16 @@ actual val appModule: Module =
             AndroidDynamicShortcutApplier(
                 context = androidContext(),
                 imageLoader = SingletonImageLoader.get(androidContext()),
+            )
+        }
+        single { DynamicShortcutScheduler(androidContext()) }
+        single {
+            DynamicShortcutRefreshObserver(
+                fetchMostRecentDraft = get(),
+                currentWeekRewind = get(),
+                observeJournals = get(),
+                shortcutScheduler = get(),
+                applicationScope = get(),
             )
         }
         workerOf(::DynamicShortcutRefreshWorker)

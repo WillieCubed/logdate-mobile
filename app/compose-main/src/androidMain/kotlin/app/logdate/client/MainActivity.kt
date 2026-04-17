@@ -317,7 +317,9 @@ class MainActivity : FragmentActivity() {
         Napier.i("MainActivity onCreate: Compose content attached", tag = APP_LAUNCH_TAG)
 
         // Handle the intent if this activity was launched with one
-        intent?.let { handleMultiWindowIntent(it) }
+        if (intent?.let { handleMultiWindowIntent(it) } == true) {
+            return
+        }
     }
 
     private fun applyOnboardingTestFixtureFromLaunchIntent() {
@@ -339,7 +341,9 @@ class MainActivity : FragmentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handleMultiWindowIntent(intent)
+        if (handleMultiWindowIntent(intent)) {
+            return
+        }
         resolveNavKey(intent)?.let { pendingNavKey = it }
     }
 

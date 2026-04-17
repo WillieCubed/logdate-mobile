@@ -15,6 +15,7 @@ import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.client.rewind.RewindGenerationScheduler
+import app.logdate.client.shortcuts.DynamicShortcutRefreshObserver
 import app.logdate.client.shortcuts.DynamicShortcutScheduler
 import app.logdate.di.initializeKoin
 import coil3.ImageLoader
@@ -97,9 +98,10 @@ class LogdateApplication :
             Napier.w("Failed to initialize calendar import scheduling", error)
         }
         runCatching {
-            val shortcutScheduler = DynamicShortcutScheduler(this)
+            val shortcutScheduler = get<DynamicShortcutScheduler>()
             shortcutScheduler.schedulePeriodicRefresh()
             shortcutScheduler.enqueueImmediateRefresh()
+            get<DynamicShortcutRefreshObserver>().start()
         }.onFailure { error ->
             Napier.w("Failed to initialize dynamic shortcut scheduling", error)
         }

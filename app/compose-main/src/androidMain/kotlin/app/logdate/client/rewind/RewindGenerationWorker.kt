@@ -7,6 +7,7 @@ import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.domain.rewind.GenerateBasicRewindResult
 import app.logdate.client.domain.rewind.GenerateBasicRewindUseCase
 import app.logdate.client.repository.rewind.RewindRepository
+import app.logdate.client.shortcuts.DynamicShortcutScheduler
 import app.logdate.util.getLocaleFirstDayOfWeek
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.firstOrNull
@@ -37,6 +38,7 @@ class RewindGenerationWorker(
     private val preferences: LogdatePreferencesDataSource by inject()
     private val notificationCoordinator: RewindNotificationCoordinator by inject()
     private val milestoneCoordinator: MilestoneRewindCoordinator by inject()
+    private val shortcutScheduler: DynamicShortcutScheduler by inject()
 
     override suspend fun doWork(): Result {
         Napier.d("RewindGenerationWorker: checking if weekly rewind needs generation")
@@ -59,6 +61,7 @@ class RewindGenerationWorker(
             when (weeklyResult) {
                 is GenerateBasicRewindResult.Success -> {
                     Napier.d("RewindGenerationWorker: generated weekly rewind ${weeklyResult.rewind.uid}")
+                    shortcutScheduler.enqueueImmediateRefresh()
                     if (preferences.isRewindNotificationsEnabled()) {
                         notificationCoordinator.postRewindReady(weeklyResult.rewind)
                     } else {

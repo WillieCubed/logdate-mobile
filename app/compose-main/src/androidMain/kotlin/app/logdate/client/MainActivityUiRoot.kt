@@ -12,6 +12,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -163,7 +164,9 @@ fun MainActivityUiRoot(
         hasRequestedUnlock = false
         if (pendingNavKey != null) {
             if (!mainAppNavigator.backStack.contains(pendingNavKey)) {
-                mainAppNavigator.navigateHomeFromLaunch()
+                if (shouldBootstrapNavigation(currentRoute)) {
+                    mainAppNavigator.navigateHomeFromLaunch()
+                }
                 // Guard: navigateHomeFromLaunch may have already added the key (e.g. TimelineListRoute)
                 if (!mainAppNavigator.backStack.contains(pendingNavKey)) {
                     mainAppNavigator.backStack.add(pendingNavKey)
@@ -172,8 +175,10 @@ fun MainActivityUiRoot(
             onDeepLinkHandled()
             hasHandledInitialNavigation = true
         } else {
-            if (!hasHandledInitialNavigation) {
+            if (!hasHandledInitialNavigation && shouldBootstrapNavigation(currentRoute)) {
                 mainAppNavigator.navigateHomeFromLaunch()
+            }
+            if (!hasHandledInitialNavigation && currentRoute != null) {
                 hasHandledInitialNavigation = true
             }
         }
@@ -318,11 +323,13 @@ fun MainActivityUiRoot(
                 duration = SnackbarDuration.Indefinite,
             )
 
-        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+        if (result == SnackbarResult.ActionPerformed) {
             onCompleteAppUpdate()
         }
     }
 }
+
+internal fun shouldBootstrapNavigation(currentRoute: NavKey?): Boolean = currentRoute == null || currentRoute == NavigationStart
 
 private fun NavKey?.isOnboardingRoute(): Boolean =
     when (this) {

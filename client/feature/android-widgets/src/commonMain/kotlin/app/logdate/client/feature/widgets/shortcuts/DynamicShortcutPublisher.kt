@@ -1,5 +1,8 @@
 package app.logdate.client.feature.widgets.shortcuts
 
+import app.logdate.client.domain.journals.GetCurrentUserJournalsUseCase
+import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
+import app.logdate.client.domain.rewind.GetWeekRewindUseCase
 import app.logdate.client.domain.rewind.RewindQueryResult
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.shared.model.Journal
@@ -39,14 +42,14 @@ import kotlin.time.Duration.Companion.days
  *
  * @param fetchMostRecentDraft Factory returning a cold flow of the most
  *   recently updated draft (or null when there are none). Uses
- *   [app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase] in
+ *   [FetchMostRecentDraftUseCase] in
  *   production.
  * @param currentWeekRewind Factory returning a cold flow of the most recent
  *   weekly rewind result. Uses
- *   [app.logdate.client.domain.rewind.GetWeekRewindUseCase] in production.
+ *   [GetWeekRewindUseCase] in production.
  * @param observeJournals Factory returning a cold flow of all of the user's
  *   journals. Uses
- *   [app.logdate.client.domain.journals.GetCurrentUserJournalsUseCase] in
+ *   [GetCurrentUserJournalsUseCase] in
  *   production.
  *   Function references rather than the concrete use cases keep the publisher
  *   trivially fakeable in commonTest without depending on use-case internals.
@@ -90,7 +93,10 @@ class DynamicShortcutPublisher(
         val sharingDescriptors =
             journals
                 .filter { it.title.isNotBlank() }
-                .sortedByDescending { it.lastUpdated }
+                .sortedWith(
+                    compareByDescending<Journal> { it.isFavorited }
+                        .thenByDescending { it.lastUpdated },
+                )
                 .map { journal ->
                     DynamicShortcutDescriptor.ShareToJournal(
                         journalId = journal.id,
