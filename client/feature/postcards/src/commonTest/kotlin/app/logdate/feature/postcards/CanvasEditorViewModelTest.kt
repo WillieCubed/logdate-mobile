@@ -36,7 +36,6 @@ class CanvasEditorViewModelTest {
         assertEquals(50f, updated.transform.x)
         assertEquals(100f, updated.transform.y)
         assertEquals(45f, updated.transform.rotation)
-        assertTrue(updated is CanvasElement.Photo)
         assertEquals(photo.mediaUri, updated.mediaUri)
     }
 

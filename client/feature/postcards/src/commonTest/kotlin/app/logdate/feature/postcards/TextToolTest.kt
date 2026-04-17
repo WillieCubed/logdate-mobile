@@ -109,7 +109,7 @@ class TextToolTest {
 
         val updatedElements =
             elements.map { el ->
-                if (el.id == targetId && el is CanvasElement.Text) {
+                if (el.id == targetId) {
                     el.copy(content = "Changed", fontFamily = "dancing-script")
                 } else {
                     el
