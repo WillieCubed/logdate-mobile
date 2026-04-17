@@ -34,12 +34,11 @@ import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
+import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.Journal
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -76,7 +75,7 @@ class DefaultSyncManager(
     private val syncMetadataService: SyncMetadataService,
     private val transactionManager: SyncTransactionManager,
     private val dataUsagePolicy: DataUsagePolicy,
-    private val syncScope: CoroutineScope = CoroutineScope(Dispatchers.IO),
+    private val syncScope: CoroutineScope = CoroutineScope(platformIODispatcher),
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     private val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)

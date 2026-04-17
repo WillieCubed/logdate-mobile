@@ -2,19 +2,22 @@ package app.logdate.client.sync.cloud.account
 
 import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.sync.cloud.CloudApiClient
+import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.AccountCredentials
 import app.logdate.shared.model.AuthenticationResult
+import app.logdate.shared.model.BeginAccountCreationRequest
 import app.logdate.shared.model.BeginAccountCreationResult
 import app.logdate.shared.model.CloudAccount
 import app.logdate.shared.model.CloudAccountRepository
+import app.logdate.shared.model.CompleteAccountCreationRequest
 import app.logdate.shared.model.DeviceInfo
+import app.logdate.shared.model.PasskeyAuthenticatorResponse
 import app.logdate.shared.model.PasskeyCredential
+import app.logdate.shared.model.PasskeyCredentialResponse
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,7 +39,7 @@ class DefaultCloudAccountRepository(
     private val apiClient: CloudApiClient,
     private val secureStorage: KeyValueStorage,
     private val configRepository: LogDateConfigRepository = DefaultLogDateConfigRepository(),
-    private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO),
+    private val coroutineScope: CoroutineScope = CoroutineScope(platformIODispatcher),
 ) : CloudAccountRepository {
     private val accountFlow = MutableStateFlow<CloudAccount?>(null)
 
@@ -168,7 +171,7 @@ class DefaultCloudAccountRepository(
             // Device metadata is currently not part of the auth v1 begin-signup contract.
             // Keep the parameter for domain interface compatibility until the API adds support.
             val request =
-                app.logdate.shared.model.BeginAccountCreationRequest(
+                BeginAccountCreationRequest(
                     username = username,
                     displayName = displayName,
                     bio = null, // Optional bio not supported in domain model yet
@@ -211,14 +214,14 @@ class DefaultCloudAccountRepository(
     ): Result<AuthenticationResult> =
         try {
             val request =
-                app.logdate.shared.model.CompleteAccountCreationRequest(
+                CompleteAccountCreationRequest(
                     sessionToken = sessionToken,
                     credential =
-                        app.logdate.shared.model.PasskeyCredentialResponse(
+                        PasskeyCredentialResponse(
                             id = credentialId,
                             rawId = credentialId, // In a real implementation, these would be different
                             response =
-                                app.logdate.shared.model.PasskeyAuthenticatorResponse(
+                                PasskeyAuthenticatorResponse(
                                     clientDataJSON = clientDataJSON,
                                     attestationObject = attestationObject,
                                 ),
