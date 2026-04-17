@@ -116,6 +116,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            implementation(projects.client.screenshotScenes)
         }
         androidMain.dependencies {
             implementation(libs.compose.ui.tooling.preview)
@@ -149,6 +150,7 @@ kotlin {
             implementation(libs.kotlin.test.junit)
             implementation(libs.junit)
             implementation(compose.desktop.currentOs)
+            implementation(projects.client.screenshotScenes)
         }
     }
 }
@@ -222,12 +224,17 @@ buildConfig {
 val desktopScreenshotReferenceDir = layout.projectDirectory.dir("src/desktopTest/reference")
 val desktopScreenshotActualDir = layout.buildDirectory.dir("reports/desktopScreenshotTest/actual")
 val desktopScreenshotDiffDir = layout.buildDirectory.dir("reports/desktopScreenshotTest/diff")
+val desktopScreenshotSceneFilter = providers.systemProperty("logdate.desktopScreenshots.sceneFilter").orNull
 
 tasks.named<Test>("desktopTest") {
     systemProperty("skiko.renderApi", "SOFTWARE_COMPAT")
+    systemProperty("apple.awt.UIElement", "true")
     systemProperty("logdate.desktopScreenshots.referenceDir", desktopScreenshotReferenceDir.asFile.absolutePath)
     systemProperty("logdate.desktopScreenshots.actualDir", desktopScreenshotActualDir.get().asFile.absolutePath)
     systemProperty("logdate.desktopScreenshots.diffDir", desktopScreenshotDiffDir.get().asFile.absolutePath)
+    desktopScreenshotSceneFilter?.let {
+        systemProperty("logdate.desktopScreenshots.sceneFilter", it)
+    }
 }
 
 tasks.register("validateDesktopScreenshotTest") {
@@ -245,9 +252,13 @@ tasks.register<Test>("updateDesktopScreenshotTest") {
     classpath = desktopTest.classpath
     workingDir = desktopTest.workingDir
     systemProperty("skiko.renderApi", "SOFTWARE_COMPAT")
+    systemProperty("apple.awt.UIElement", "true")
     systemProperty("logdate.desktopScreenshots.referenceDir", desktopScreenshotReferenceDir.asFile.absolutePath)
     systemProperty("logdate.desktopScreenshots.actualDir", desktopScreenshotActualDir.get().asFile.absolutePath)
     systemProperty("logdate.desktopScreenshots.diffDir", desktopScreenshotDiffDir.get().asFile.absolutePath)
     systemProperty("logdate.desktopScreenshots.update", "true")
+    desktopScreenshotSceneFilter?.let {
+        systemProperty("logdate.desktopScreenshots.sceneFilter", it)
+    }
     outputs.upToDateWhen { false }
 }

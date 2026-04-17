@@ -134,8 +134,8 @@ private val timelineNoPeopleState =
 private val rewindId = Uuid.parse("00000000-0000-0000-0000-000000000051")
 private val pastRewinds =
     listOf(
-        RewindHistoryUiState(uid = rewindId, title = "Week of Feb 17", label = "Week 8", startDate = LocalDate(2025, 2, 17), endDate = LocalDate(2025, 2, 23)),
-        RewindHistoryUiState(uid = Uuid.parse("00000000-0000-0000-0000-000000000052"), title = "Week of Feb 10", label = "Week 7", startDate = LocalDate(2025, 2, 10), endDate = LocalDate(2025, 2, 16)),
+        RewindHistoryUiState(uid = rewindId, title = "Week of Feb 17", label = "Week 8", startDate = LocalDate(2025, 2, 17), endDate = LocalDate(2025, 2, 23), message = "Your week, captured"),
+        RewindHistoryUiState(uid = Uuid.parse("00000000-0000-0000-0000-000000000052"), title = "Week of Feb 10", label = "Week 7", startDate = LocalDate(2025, 2, 10), endDate = LocalDate(2025, 2, 16), message = "Moments worth remembering"),
     )
 
 private val mostRecentRewind =

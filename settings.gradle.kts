@@ -75,6 +75,7 @@ include(":client:notifications")
 include(":client:sync")
 include(":client:health-connect")
 include(":client:calendar-sync")
+include(":client:screenshot-scenes")
 // Client Features
 include(":client:feature:core")
 include(":client:feature:editor")

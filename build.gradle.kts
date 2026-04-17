@@ -135,6 +135,7 @@ val universalScreenshotHostModules =
         ":client:feature:timeline",
         ":client:media",
         ":client:permissions",
+        ":client:screenshot-scenes",
         ":client:sharing",
         ":client:theme",
         ":client:ui",

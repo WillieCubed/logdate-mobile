@@ -562,3 +562,69 @@ app/logdate/screenshots/EditorScreenshotsKt/EditorEmpty_dark.png
 - [Compose Screenshot Testing](https://developer.android.com/studio/preview/compose-screenshot-testing)
 - [Google Issue #402137754](https://issuetracker.google.com/issues/402137754) - KMP compatibility
 - [Visual Regression Testing Best Practices](https://www.smashingmagazine.com/2021/06/visual-regression-testing/)
+## Desktop Screenshot Operations
+
+Desktop screenshot validation for `app/compose-main` runs through the normal desktop unit test task and does not require any Android device, emulator, `adb`, or connected-device task.
+
+Core tasks:
+
+```bash
+# Validate committed desktop baselines
+./gradlew :app:compose-main:desktopTest \
+  --tests 'app.logdate.screenshots.DesktopScreenshotTest.shared_catalog_matches_baselines'
+
+# Convenience alias for the same validation lane
+./gradlew :app:compose-main:validateDesktopScreenshotTest
+
+# Refresh committed desktop baselines
+./gradlew :app:compose-main:updateDesktopScreenshotTest
+```
+
+Default behavior:
+
+- Desktop screenshot tests now run in hidden mode by default.
+- The harness creates a displayable off-screen surface without forcing a visible foreground window.
+- Hidden mode avoids stealing focus from the current desktop window.
+- Hidden mode also avoids hover and focus contamination from the mouse pointer during screenshot capture.
+
+Visible mode:
+
+Use visible mode only when you explicitly want to watch screenshots render live on the desktop.
+
+```bash
+./gradlew -Dlogdate.desktopScreenshots.visible=true \
+  :app:compose-main:desktopTest \
+  --tests 'app.logdate.screenshots.DesktopScreenshotTest.shared_catalog_matches_baselines'
+```
+
+Scene filtering:
+
+Use `logdate.desktopScreenshots.sceneFilter` to run only a subset of the shared screenshot catalog. The filter matches `SharedScreenshotSceneId.value` substrings.
+
+```bash
+# Run only onboarding-start scenes
+./gradlew -Dlogdate.desktopScreenshots.sceneFilter=onboarding-start \
+  :app:compose-main:desktopTest \
+  --tests 'app.logdate.screenshots.DesktopScreenshotTest.shared_catalog_matches_baselines'
+
+# Run only settings scenes and show them live
+./gradlew \
+  -Dlogdate.desktopScreenshots.visible=true \
+  -Dlogdate.desktopScreenshots.sceneFilter=settings \
+  :app:compose-main:desktopTest \
+  --tests 'app.logdate.screenshots.DesktopScreenshotTest.shared_catalog_matches_baselines'
+```
+
+Desktop baseline locations:
+
+- References: `app/compose-main/src/desktopTest/reference`
+- Actual renders: `app/compose-main/build/reports/desktopScreenshotTest/actual`
+- Pixel diffs: `app/compose-main/build/reports/desktopScreenshotTest/diff`
+
+Recommended workflow for desktop screenshot changes:
+
+1. Narrow the scope with `logdate.desktopScreenshots.sceneFilter` while iterating on a scene.
+2. Run hidden mode by default to avoid desktop interference.
+3. Use visible mode only when you need to inspect transitions or layout behavior live.
+4. Refresh baselines with `:app:compose-main:updateDesktopScreenshotTest` after the render path is deterministic.
+5. Re-run `:app:compose-main:desktopTest --tests 'app.logdate.screenshots.DesktopScreenshotTest.shared_catalog_matches_baselines'` before committing.
