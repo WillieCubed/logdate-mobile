@@ -2,6 +2,9 @@ package app.logdate.server.routes
 
 import app.logdate.server.auth.TokenService
 import app.logdate.server.crypto.EncryptionService
+import app.logdate.server.entitlements.EntitlementEnforcer
+import app.logdate.server.entitlements.QuotaCheck
+import app.logdate.server.entitlements.QuotaReason
 import app.logdate.server.logdate.LogDateAssociation
 import app.logdate.server.logdate.LogDateAssociationRef
 import app.logdate.server.logdate.LogDateBackup
@@ -390,6 +393,7 @@ fun Route.syncRoutes(
     collectionsRepository: LogDateCollectionsRepository,
     mediaBlobRepository: LogDateMediaBlobRepository,
     backupRepository: LogDateBackupRepository,
+    entitlementEnforcer: EntitlementEnforcer? = null,
 ) {
     route("") {
         // High-level status (used by smoke tests)
@@ -960,6 +964,13 @@ fun Route.syncRoutes(
                     val req = call.receiveMediaMultipartUpload() ?: return@post
                     bytes = req.sizeBytes
                     Napier.d("Media upload for user $userId: ${req.fileName}")
+
+                    if (entitlementEnforcer != null) {
+                        val quota = entitlementEnforcer.checkMediaUpload(userId, req.sizeBytes)
+                        if (quota is QuotaCheck.Denied) {
+                            return@post respondQuotaExceeded(call, quota)
+                        }
+                    }
                     val mediaId = UUID.randomUUID().toString()
 
                     val encryptedPayload =
@@ -1170,6 +1181,13 @@ fun Route.syncRoutes(
                     val userId = extractUserId(call, tokenService) ?: return@post
                     val req = call.receiveBackupMultipartUpload() ?: return@post
                     bytes = req.data.size.toLong()
+
+                    if (entitlementEnforcer != null) {
+                        val quota = entitlementEnforcer.checkBackupUpload(userId, bytes)
+                        if (quota is QuotaCheck.Denied) {
+                            return@post respondQuotaExceeded(call, quota)
+                        }
+                    }
 
                     val storage =
                         mediaStorage ?: return@post call.respond(
@@ -1492,3 +1510,35 @@ private fun app.logdate.server.sync.SyncMetricsSnapshot.toPrometheus(): String {
 }
 
 private fun escapeLabelValue(value: String): String = value.replace("\\", "\\\\").replace("\"", "\\\"")
+
+/**
+ * Translates a quota violation into the wire-level 402 Payment Required response. We structure the
+ * `details` map so a client can render a specific message without parsing the free-form body:
+ * `reason` is one of the [QuotaReason] enum values, `limit`/`current` give the user-facing numbers,
+ * and the code `QUOTA_EXCEEDED` groups both reasons for easy client-side switching.
+ */
+private suspend fun respondQuotaExceeded(
+    call: io.ktor.server.application.ApplicationCall,
+    denied: QuotaCheck.Denied,
+) {
+    val reasonMessage =
+        when (denied.reason) {
+            QuotaReason.STORAGE_BYTES ->
+                "Storage quota exceeded: ${denied.current} of ${denied.limit} bytes in use."
+            QuotaReason.BACKUP_COUNT ->
+                "Backup quota exceeded: ${denied.current} of ${denied.limit} backups stored."
+        }
+    call.respond(
+        HttpStatusCode.PaymentRequired,
+        error(
+            code = "QUOTA_EXCEEDED",
+            message = reasonMessage,
+            details =
+                mapOf(
+                    "reason" to denied.reason.name,
+                    "limit" to denied.limit.toString(),
+                    "current" to denied.current.toString(),
+                ),
+        ),
+    )
+}

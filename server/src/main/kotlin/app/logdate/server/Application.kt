@@ -16,6 +16,7 @@ import app.logdate.server.config.ProductionConfigValidator
 import app.logdate.server.config.RuntimeProfile
 import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
+import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.entitlements.entitlementsModule
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.SigningKeyService
@@ -160,6 +161,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val logDateCollectionsMetadataStore: LogDateCollectionsMetadataStore by inject()
     val logDateMediaRepository: LogDateMediaRepository by inject()
     val logDateBackupRepository: LogDateBackupRepository by inject()
+    val entitlementEnforcer: EntitlementEnforcer by inject()
     val logDateAtprotoBlobRepository: LogDateAtprotoBlobRepository by inject()
     val logDateMediaBlobRepository =
         CompositeLogDateMediaBlobRepository(
@@ -318,6 +320,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
                 collectionsRepository = logDateCollectionsRepository,
                 mediaBlobRepository = logDateMediaBlobRepository,
                 backupRepository = logDateBackupRepository,
+                entitlementEnforcer = entitlementEnforcer,
             )
         }
     }
