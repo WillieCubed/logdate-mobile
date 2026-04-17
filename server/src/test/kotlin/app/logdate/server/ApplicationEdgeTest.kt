@@ -3,6 +3,7 @@ package app.logdate.server
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.options
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
@@ -84,6 +85,50 @@ class ApplicationEdgeTest {
             assertEquals(HttpStatusCode.OK, response.status)
             // No CORS plugin → no Access-Control-Allow-Origin header on the response.
             assertNull(response.headers[HttpHeaders.AccessControlAllowOrigin])
+        }
+
+    @Test
+    fun `production profile redirects HTTP to HTTPS by default`() =
+        testApplication {
+            application { edgeModule(env = mapOf("LOGDATE_ENV" to "production")) }
+            val noRedirectClient = createClient { followRedirects = false }
+
+            // Explicitly send X-Forwarded-Proto=http to override the test harness's default scheme
+            // so we're unambiguously simulating an LB forwarding a plain-HTTP client request.
+            val response =
+                noRedirectClient.get("/test") {
+                    header("X-Forwarded-Proto", "http")
+                }
+            assertEquals(
+                true,
+                response.status.value in 300..399,
+                "expected redirect, got ${response.status}",
+            )
+        }
+
+    @Test
+    fun `production profile lets forwarded-https requests through without redirect`() =
+        testApplication {
+            application { edgeModule(env = mapOf("LOGDATE_ENV" to "production")) }
+
+            val response =
+                client.get("/test") {
+                    header("X-Forwarded-Proto", "https")
+                    header("X-Forwarded-For", "203.0.113.42")
+                }
+            // XForwardedHeaders makes the request look like HTTPS to the HttpsRedirect plugin,
+            // so the request reaches the handler instead of getting redirected.
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("ok", response.bodyAsText())
+        }
+
+    @Test
+    fun `development profile does not install HttpsRedirect`() =
+        testApplication {
+            application { edgeModule(env = emptyMap()) }
+
+            val response = client.get("/test")
+            assertEquals(HttpStatusCode.OK, response.status)
         }
 
     private fun Application.edgeModule(env: Map<String, String>) {

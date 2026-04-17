@@ -59,6 +59,7 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.plugins.forwardedheaders.XForwardedHeaders
 import io.ktor.server.plugins.httpsredirect.HttpsRedirect
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
@@ -328,15 +329,23 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
 }
 
 /**
- * Installs the CORS and HTTPS-redirect plugins based on environment configuration.
+ * Installs the CORS, forwarded-headers, and HTTPS-redirect plugins based on environment
+ * configuration.
  *
- * Both are off by default so local development (and the test harness, which loads this module via
- * `Application.module()`) stay simple. Operators opt in by setting:
- *
- *  - `ALLOWED_ORIGINS` — a comma-separated list of scheme://host[:port] strings to trust for CORS.
- *    Unset or blank disables the CORS plugin entirely (same-origin only).
- *  - `REQUIRE_HTTPS` — when `true`, installs HttpsRedirect. Leave unset if the server sits behind a
- *    TLS-terminating load balancer that already enforces HTTPS.
+ * Knobs:
+ *  - `ALLOWED_ORIGINS` — comma-separated `scheme://host[:port]` entries trusted for CORS. Unset or
+ *    blank disables the CORS plugin entirely (same-origin only). No default in any profile.
+ *  - `TRUST_FORWARDED_HEADERS` — when `true`, installs [XForwardedHeaders] so the request's
+ *    `scheme` / `remoteHost` reflect what the load balancer saw from the client rather than what
+ *    the LB's backend socket looks like. **Defaults to `true` in production** (the typical deploy
+ *    is behind Cloud Run / an ALB / GKE Ingress / Cloudflare, all of which forward plain HTTP to
+ *    the container). Set `false` when the app is directly internet-facing — otherwise a malicious
+ *    client could lie about their scheme with `X-Forwarded-Proto: https`.
+ *  - `REQUIRE_HTTPS` — when `true`, installs [HttpsRedirect]. **Defaults to `true` in production.**
+ *    Combined with [XForwardedHeaders] above, a request the LB received over HTTPS will pass
+ *    through (scheme reads as `https`) while a request the LB received over HTTP gets 301'd. With
+ *    `TRUST_FORWARDED_HEADERS=false` the redirect looks at the raw socket scheme — correct for
+ *    direct-facing deployments, wrong for LB-fronted ones.
  */
 internal fun Application.installNetworkEdge(readEnv: (String) -> String? = System::getenv) {
     val allowedOrigins = parseAllowedOrigins(readEnv("ALLOWED_ORIGINS"))
@@ -365,9 +374,28 @@ internal fun Application.installNetworkEdge(readEnv: (String) -> String? = Syste
         log.info("CORS disabled (ALLOWED_ORIGINS not set)")
     }
 
-    if (profileAwareBoolEnv("REQUIRE_HTTPS", productionDefault = false, devDefault = false, readEnv = readEnv)) {
+    val trustForwarded =
+        profileAwareBoolEnv(
+            "TRUST_FORWARDED_HEADERS",
+            productionDefault = true,
+            devDefault = false,
+            readEnv = readEnv,
+        )
+    if (trustForwarded) {
+        install(XForwardedHeaders)
+        log.info("XForwardedHeaders installed; request scheme/host will follow forwarded headers")
+    }
+
+    val requireHttps =
+        profileAwareBoolEnv(
+            "REQUIRE_HTTPS",
+            productionDefault = true,
+            devDefault = false,
+            readEnv = readEnv,
+        )
+    if (requireHttps) {
         install(HttpsRedirect)
-        log.info("HttpsRedirect enabled (REQUIRE_HTTPS=true)")
+        log.info("HttpsRedirect enabled (production default, or REQUIRE_HTTPS=true)")
     }
 }
 

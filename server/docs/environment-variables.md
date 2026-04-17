@@ -46,10 +46,23 @@
 
 ### `REQUIRE_HTTPS`
 - **Description**: When `true`, installs Ktor's `HttpsRedirect` plugin so HTTP requests are 301'd to HTTPS.
-- **Type**: Boolean (`true` / `1` / `yes`)
-- **Default**: `false` (plugin not installed)
-- **Example**: `REQUIRE_HTTPS=true`
-- **Required**: No. Leave unset when the server sits behind a TLS-terminating load balancer that already enforces HTTPS (common on Cloud Run).
+- **Type**: Boolean
+- **Default**: **`true` when `LOGDATE_ENV=production`**, `false` otherwise.
+- **Example**: `REQUIRE_HTTPS=false`
+- **Required**: No (profile default is correct for most deployments).
+- **Notes**:
+  - Combined with `TRUST_FORWARDED_HEADERS=true`, the redirect reads the scheme the load balancer saw from the client, so requests that arrived over HTTPS at the edge pass through unchanged.
+  - Set to `false` only when you're deliberately serving HTTP (rare — usually a local dev proxy or a dev container).
+
+### `TRUST_FORWARDED_HEADERS`
+- **Description**: Installs Ktor's `XForwardedHeaders` so `request.scheme` / `remoteHost` reflect the `X-Forwarded-Proto` / `X-Forwarded-For` headers the load balancer sets, instead of the LB's backend socket.
+- **Type**: Boolean
+- **Default**: **`true` when `LOGDATE_ENV=production`**, `false` otherwise.
+- **Example**: `TRUST_FORWARDED_HEADERS=false`
+- **Required**: No.
+- **Notes**:
+  - Set to `false` when the server is directly internet-facing (no LB/reverse proxy). Trusting forwarded headers without a trusted proxy in front lets any client spoof their scheme and IP.
+  - Needed in production so `REQUIRE_HTTPS` doesn't redirect-loop requests the LB already accepted over HTTPS but forwards internally as HTTP.
 
 ---
 
