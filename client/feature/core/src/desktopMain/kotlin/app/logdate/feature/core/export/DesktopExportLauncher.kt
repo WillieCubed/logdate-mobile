@@ -1,6 +1,9 @@
 package app.logdate.feature.core.export
 
 import app.logdate.client.domain.export.ExportFileStructure
+import app.logdate.client.domain.export.ExportIssue
+import app.logdate.client.domain.export.ExportIssueCode
+import app.logdate.client.domain.export.ExportMediaFile
 import app.logdate.client.domain.export.ExportProgress
 import app.logdate.client.domain.export.ExportResult
 import app.logdate.client.domain.export.ExportUserDataUseCase
@@ -30,6 +33,11 @@ import java.util.zip.ZipOutputStream
 class DesktopExportLauncher :
     ExportLauncher,
     KoinComponent {
+    private data class MediaEntryOutcome(
+        val written: Boolean,
+        val issue: ExportIssue? = null,
+    )
+
     private val exportUserDataUseCase: ExportUserDataUseCase by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var currentExportJob: Job? = null
@@ -85,7 +93,7 @@ class DesktopExportLauncher :
                             dateRangeCutoff = dateRangeCutoff,
                         ).catch { exception ->
                             Napier.e("Desktop: Export failed", exception)
-                            showExportErrorDialog("Export failed: ${exception.message}")
+                            showExportErrorDialog("Export could not be completed.")
                             completionCallback?.invoke(null)
                         }.collect { progress ->
                             when (progress) {
@@ -123,7 +131,7 @@ class DesktopExportLauncher :
                                         completionCallback?.invoke(zipPath)
                                     } catch (e: Exception) {
                                         Napier.e("Desktop: Failed to save file", e)
-                                        showExportErrorDialog("Failed to save file: ${e.message}")
+                                        showExportErrorDialog("Could not write the export archive.")
                                         completionCallback?.invoke(null)
                                     }
                                 }
@@ -138,7 +146,7 @@ class DesktopExportLauncher :
                         }
                 } catch (e: Exception) {
                     Napier.e("Desktop: Export process failed", e)
-                    showExportErrorDialog("Export process failed: ${e.message}")
+                    showExportErrorDialog("Export could not be completed.")
                     completionCallback?.invoke(null)
                 }
             }
@@ -182,13 +190,20 @@ class DesktopExportLauncher :
             exportResult.serializePlaces()?.let { addZipEntry(zipOutputStream, ExportFileStructure.PLACES_FILE, it) }
             exportResult.serializeLocationHistory()?.let { addZipEntry(zipOutputStream, ExportFileStructure.LOCATION_HISTORY_FILE, it) }
 
-            exportResult.serializeMediaManifest()?.let { manifest ->
-                addZipEntry(zipOutputStream, ExportFileStructure.MEDIA_MANIFEST_FILE, manifest)
+            val exportedMediaFiles = mutableListOf<ExportMediaFile>()
+            val archiveIssues = mutableListOf<ExportIssue>()
+            exportResult.mediaFiles.forEach { mediaFile ->
+                val outcome = addMediaEntry(zipOutputStream, mediaFile)
+                if (outcome.written) {
+                    exportedMediaFiles += mediaFile
+                }
+                outcome.issue?.let(archiveIssues::add)
             }
 
-            exportResult.mediaFiles.forEach { mediaFile ->
-                addMediaEntry(zipOutputStream, mediaFile)
+            exportResult.serializeMediaManifest(exportedMediaFiles)?.let { manifest ->
+                addZipEntry(zipOutputStream, ExportFileStructure.MEDIA_MANIFEST_FILE, manifest)
             }
+            exportResult.renderIssuesText(archiveIssues)?.let { addZipEntry(zipOutputStream, ExportFileStructure.EXPORT_ISSUES_FILE, it) }
         }
     }
 
@@ -205,32 +220,80 @@ class DesktopExportLauncher :
 
     private fun addMediaEntry(
         zipOutputStream: ZipOutputStream,
-        mediaFile: app.logdate.client.domain.export.ExportMediaFile,
-    ) {
-        zipOutputStream.putNextEntry(ZipEntry(mediaFile.exportPath))
+        mediaFile: ExportMediaFile,
+    ): MediaEntryOutcome {
+        var entryOpened = false
         try {
             val sourceUri = mediaFile.sourceUri
             when {
                 sourceUri.startsWith("/") || sourceUri.startsWith("file://") -> {
-                    val file =
+                    val requestedFile =
                         if (sourceUri.startsWith("file://")) {
                             File(URI(sourceUri))
                         } else {
                             File(sourceUri)
                         }
-                    require(file.exists()) { "Media file missing at ${file.absolutePath}" }
+                    val file = normalizeDuplicateExtension(requestedFile)
+                    if (!file.exists()) {
+                        Napier.w("Desktop: Media file missing during export, skipping: ${requestedFile.absolutePath}")
+                        return MediaEntryOutcome(
+                            written = false,
+                            issue =
+                                ExportIssue(
+                                    code = ExportIssueCode.MEDIA_BYTES_MISSING,
+                                    source = sourceUri,
+                                ),
+                        )
+                    }
+                    zipOutputStream.putNextEntry(ZipEntry(mediaFile.exportPath))
+                    entryOpened = true
                     file.inputStream().use { it.copyTo(zipOutputStream) }
+                    zipOutputStream.closeEntry()
+                    entryOpened = false
+                    return MediaEntryOutcome(
+                        written = true,
+                        issue =
+                            if (file.absolutePath != requestedFile.absolutePath) {
+                                ExportIssue(
+                                    code = ExportIssueCode.MEDIA_RECOVERED_NORMALIZED_PATH,
+                                    source = sourceUri,
+                                )
+                            } else {
+                                null
+                            },
+                    )
                 }
                 else -> {
+                    zipOutputStream.putNextEntry(ZipEntry(mediaFile.exportPath))
+                    entryOpened = true
                     URI(sourceUri).toURL().openStream().use { it.copyTo(zipOutputStream) }
+                    zipOutputStream.closeEntry()
+                    entryOpened = false
+                    return MediaEntryOutcome(written = true)
                 }
             }
         } catch (e: Exception) {
-            Napier.e("Desktop: Failed to add media file to ZIP: ${mediaFile.sourceUri}", e)
-            throw IllegalStateException("Failed to include media file: ${mediaFile.sourceUri}", e)
-        } finally {
-            zipOutputStream.closeEntry()
+            if (entryOpened) {
+                runCatching { zipOutputStream.closeEntry() }
+            }
+            Napier.w("Desktop: Failed to add media file to ZIP, skipping: ${mediaFile.sourceUri}", e)
+            return MediaEntryOutcome(
+                written = false,
+                issue =
+                    ExportIssue(
+                        code = ExportIssueCode.MEDIA_BYTES_MISSING,
+                        source = mediaFile.sourceUri,
+                    ),
+            )
         }
+    }
+
+    private fun normalizeDuplicateExtension(file: File): File {
+        val normalizedName =
+            file.name.replace(Regex("(\\.[A-Za-z0-9]+)\\1$")) { match ->
+                match.groupValues[1]
+            }
+        return if (normalizedName == file.name) file else File(file.parentFile, normalizedName)
     }
 
     private fun showExportSuccessDialog(filePath: String) {

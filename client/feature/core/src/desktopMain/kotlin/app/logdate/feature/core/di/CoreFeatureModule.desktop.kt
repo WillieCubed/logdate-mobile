@@ -11,6 +11,10 @@ import app.logdate.feature.core.export.DesktopExportLauncher
 import app.logdate.feature.core.export.ExportLauncher
 import app.logdate.feature.core.export.UserDataExportViewModel
 import app.logdate.feature.core.main.HomeViewModel
+import app.logdate.feature.core.people.ui.PeopleDirectoryViewModel
+import app.logdate.feature.core.people.ui.PeopleInboxViewModel
+import app.logdate.feature.core.people.ui.PeopleSettingsViewModel
+import app.logdate.feature.core.people.ui.PersonDetailViewModel
 import app.logdate.feature.core.profile.ui.ProfileViewModel
 import app.logdate.feature.core.restore.DesktopRestoreLauncher
 import app.logdate.feature.core.restore.RestoreLauncher
@@ -19,9 +23,10 @@ import app.logdate.feature.core.settings.ui.AccountSettingsViewModel
 import app.logdate.feature.core.settings.ui.AdvancedSettingsViewModel
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
 import app.logdate.feature.core.settings.ui.DataSettingsViewModel
+import app.logdate.feature.core.settings.ui.DayBoundarySettingsViewModel
+import app.logdate.feature.core.settings.ui.HiddenMemoriesWidgetInstallController
 import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.MemoriesSettingsViewModel
-import app.logdate.feature.core.settings.ui.HiddenMemoriesWidgetInstallController
 import app.logdate.feature.core.settings.ui.MemoriesWidgetInstallController
 import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
 import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
@@ -117,5 +122,10 @@ actual val coreFeatureModule: Module =
         viewModel { MemoriesSettingsViewModel(get(), get()) }
         viewModel { StreakSettingsViewModel(get(), get(), get()) }
         viewModel { TimelineSettingsViewModel(get(), get(), get()) }
+        viewModel { DayBoundarySettingsViewModel(get(), get(), get()) }
         viewModel { ProfileViewModel(get(), get(), get(), get(), get()) }
+        viewModel { PeopleSettingsViewModel(get(), get(), get(), get(), get()) }
+        viewModel { PeopleDirectoryViewModel(get(), get()) }
+        viewModel { PeopleInboxViewModel(get()) }
+        viewModel { PersonDetailViewModel(get(), get()) }
     }

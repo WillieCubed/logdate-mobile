@@ -31,6 +31,7 @@ import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.shared.model.user.UserData
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
@@ -38,6 +39,7 @@ import kotlinx.serialization.json.Json
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -194,13 +196,38 @@ class ExportUserDataUseCaseTest {
         }
 
     @Test
-    fun `exportUserData handles dependency failures`() =
+    fun `exportUserData falls back when dependencies fail`() =
         runTest {
             appInfoProvider.shouldThrow = true
 
             val progressUpdates = useCase.exportUserData().toList()
+            val completed = progressUpdates.last() as ExportProgress.Completed
+            val issuesText = completed.result.renderIssuesText()
 
-            assertTrue(progressUpdates.last() is ExportProgress.Failed, "Final emission should be Failed")
+            assertTrue(issuesText != null, "Expected internal export issues to be recorded")
+            assertTrue(issuesText.contains("App version metadata could not be read"))
+            assertFalse(issuesText.contains("App info unavailable"), "Raw exception text should not be exported")
+        }
+
+    @Test
+    fun `exportUserData completes with empty notes when notes loading fails`() =
+        runTest {
+            mockNotesRepository.notesFailure = RuntimeException("notes backend exploded")
+
+            val progressUpdates = useCase.exportUserData().toList()
+            val completed = progressUpdates.last() as ExportProgress.Completed
+            val result = completed.result
+
+            val json = Json { ignoreUnknownKeys = true }
+            val notesPayload = json.decodeFromString<Map<String, List<ExportNote>>>(result.serializeNotes())
+            val metadata = json.decodeFromString<ExportMetadata>(result.serializeMetadata())
+            val issuesText = result.renderIssuesText()
+
+            assertTrue(notesPayload.getValue("notes").isEmpty(), "Notes should fall back to an empty export section")
+            assertEquals(0, metadata.stats.noteCount)
+            assertTrue(issuesText != null, "Expected issues text for failed notes load")
+            assertTrue(issuesText.contains("Notes could not be loaded"))
+            assertFalse(issuesText.contains("notes backend exploded"), "Raw exception text should not be exported")
         }
 
     @Test
@@ -1119,13 +1146,13 @@ class ExportUserDataUseCaseTest {
 
         override fun observeJournalById(id: Uuid): Flow<Journal> = flowOf(testJournals.firstOrNull() ?: Journal(id = id))
 
-        override suspend fun saveDraft(draft: app.logdate.shared.model.EditorDraft) {}
+        override suspend fun saveDraft(draft: EditorDraft) {}
 
-        override suspend fun getLatestDraft(): app.logdate.shared.model.EditorDraft? = null
+        override suspend fun getLatestDraft(): EditorDraft? = null
 
-        override suspend fun getAllDrafts(): List<app.logdate.shared.model.EditorDraft> = testDrafts
+        override suspend fun getAllDrafts(): List<EditorDraft> = testDrafts
 
-        override suspend fun getDraft(id: Uuid): app.logdate.shared.model.EditorDraft? = null
+        override suspend fun getDraft(id: Uuid): EditorDraft? = null
 
         override suspend fun deleteDraft(id: Uuid) {}
     }
@@ -1138,8 +1165,14 @@ class ExportUserDataUseCaseTest {
                 notesFlow.value = value
             }
         var notesByJournal: Map<Uuid, List<JournalNote>> = emptyMap()
+        var notesFailure: Throwable? = null
+        var linksFailure: Throwable? = null
 
-        override val allNotesObserved: Flow<List<JournalNote>> = notesFlow
+        override val allNotesObserved: Flow<List<JournalNote>>
+            get() =
+                notesFailure?.let { failure ->
+                    flow { throw failure }
+                } ?: notesFlow
 
         override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> = flowOf(notesByJournal[journalId] ?: emptyList())
 
@@ -1176,8 +1209,9 @@ class ExportUserDataUseCaseTest {
         override suspend fun getNoteById(noteId: Uuid): JournalNote? = null
 
         override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> =
-            notesByJournal.flatMap { (journalId, notes) ->
-                notes.map { note -> journalId to note.uid }
-            }
+            linksFailure?.let { throw it }
+                ?: notesByJournal.flatMap { (journalId, notes) ->
+                    notes.map { note -> journalId to note.uid }
+                }
     }
 }

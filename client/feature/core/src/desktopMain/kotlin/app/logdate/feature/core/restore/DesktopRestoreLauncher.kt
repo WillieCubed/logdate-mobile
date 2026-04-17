@@ -240,11 +240,7 @@ class DesktopRestoreLauncher :
                     data = data,
                 )
             val savedPath = mediaManager.saveMedia(payload)
-            if (savedPath != null) {
-                Napier.d("Desktop: Successfully imported media from archive: $exportPath")
-            } else {
-                Napier.w("Desktop: Failed to save media during restore: $fileName")
-            }
+            Napier.d("Desktop: Successfully imported media from archive: $exportPath")
             savedPath
         }.onFailure { Napier.e("Desktop: Exception importing media from archive at path: $exportPath", it) }
             .getOrNull()

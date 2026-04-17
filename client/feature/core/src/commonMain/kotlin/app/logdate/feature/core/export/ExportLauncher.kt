@@ -70,7 +70,7 @@ internal val ExportStage.defaultMessage: String
 internal val ExportError.defaultMessage: String
     get() =
         when (this) {
-            ExportError.UNKNOWN -> "Unknown error occurred"
+            ExportError.UNKNOWN -> "Export could not be completed."
         }
 
 /**

@@ -227,24 +227,39 @@ class RestoreWorker(
                     input.copyTo(output)
                 }
             }
+            val fromExtension = resolveMimeType(fileName)
+            // Always read magic bytes once and reuse — avoids double file I/O when both
+            // the extension path and the verification path would otherwise call detectMimeTypeFromBytes.
+            val fromBytes = detectMimeTypeFromBytes(tempFile)
             val mimeType =
-                resolveMimeType(fileName).let { byExtension ->
-                    if (byExtension == "application/octet-stream") {
-                        detectMimeTypeFromBytes(tempFile).also { detected ->
-                            if (detected != "application/octet-stream") {
-                                Napier.d("Detected MIME type from magic bytes for $fileName: $detected")
-                            }
+                when {
+                    fromExtension == "application/octet-stream" -> {
+                        if (fromBytes != "application/octet-stream") {
+                            Napier.d("Detected MIME type from magic bytes for $fileName: $fromBytes")
                         }
-                    } else {
-                        byExtension
+                        fromBytes
                     }
+                    fromBytes != "application/octet-stream" && fromBytes != fromExtension -> {
+                        // Extension may be inferred (e.g. .jpg for a HEIC file from a bare
+                        // MediaStore content URI). Magic bytes win when they disagree.
+                        Napier.w(
+                            "MIME mismatch for $fileName: extension says $fromExtension " +
+                                "but magic bytes say $fromBytes — using $fromBytes",
+                        )
+                        fromBytes
+                    }
+                    else -> fromExtension
                 }
             val savedPath =
-                mediaManager.saveMediaFromFile(
-                    sourceFilePath = tempFile.absolutePath,
-                    fileName = fileName,
-                    mimeType = mimeType,
-                )
+                if (mimeType.startsWith("audio/")) {
+                    saveAudioToInternalStorage(tempFile, fileName)
+                } else {
+                    mediaManager.saveMediaFromFile(
+                        sourceFilePath = tempFile.absolutePath,
+                        fileName = fileName,
+                        mimeType = mimeType,
+                    )
+                }
             Napier.d("Successfully imported media from archive: $exportPath")
             return savedPath
         } catch (e: Exception) {
@@ -264,6 +279,16 @@ class RestoreWorker(
                 null
             }
         return mimeType ?: "application/octet-stream"
+    }
+
+    private fun saveAudioToInternalStorage(
+        sourceFile: File,
+        fileName: String,
+    ): String {
+        val audioDir = File(context.filesDir, "audio_notes").apply { mkdirs() }
+        val destFile = File(audioDir, fileName)
+        sourceFile.copyTo(destFile, overwrite = true)
+        return Uri.fromFile(destFile).toString()
     }
 
     private fun detectMimeTypeFromBytes(file: File): String =

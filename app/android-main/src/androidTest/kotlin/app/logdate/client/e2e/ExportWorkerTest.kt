@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.work.Data
 import androidx.work.ListenableWorker
 import androidx.work.testing.TestListenableWorkerBuilder
 import app.logdate.client.domain.export.ExportError
@@ -70,6 +71,7 @@ class ExportWorkerTest {
                     every { serializePlaces() } returns null
                     every { serializeLocationHistory() } returns null
                     every { serializeMediaManifest() } returns null
+                    every { renderIssuesText(any()) } returns null
                     every { mediaFiles } returns emptyList()
                     every { stats } returns ExportStats(0, 0, 0, 0)
                 }
@@ -89,7 +91,7 @@ class ExportWorkerTest {
                 val worker =
                     TestListenableWorkerBuilder<ExportWorker>(context)
                         .setInputData(
-                            androidx.work.Data
+                            Data
                                 .Builder()
                                 .putString(ExportWorker.DESTINATION_URI_KEY, Uri.fromFile(destFile).toString())
                                 .build(),

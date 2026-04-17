@@ -175,6 +175,7 @@ object ExportFileStructure {
     const val NOTES_FILE: String = "notes.json"
     const val JOURNAL_NOTES_FILE: String = "journal_notes.json"
     const val DRAFTS_FILE: String = "drafts.json"
+    const val EXPORT_ISSUES_FILE: String = "export_issues.txt"
     const val PROFILE_FILE: String = "profile.json"
     const val PLACES_FILE: String = "places.json"
     const val LOCATION_HISTORY_FILE: String = "location_history.json"

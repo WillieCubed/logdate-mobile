@@ -1,8 +1,10 @@
-@file:OptIn(kotlinx.cinterop.BetaInteropApi::class)
+@file:OptIn(BetaInteropApi::class)
 
 package app.logdate.feature.core.export
 
 import app.logdate.client.domain.export.ExportFileStructure
+import app.logdate.client.domain.export.ExportIssue
+import app.logdate.client.domain.export.ExportIssueCode
 import app.logdate.client.domain.export.ExportMediaFile
 import app.logdate.client.domain.export.ExportProgress
 import app.logdate.client.domain.export.ExportResult
@@ -10,6 +12,7 @@ import app.logdate.client.domain.export.ExportUserDataUseCase
 import app.logdate.client.domain.export.ZipArchiveEntry
 import app.logdate.client.domain.export.ZipArchiveWriter
 import io.github.aakira.napier.Napier
+import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +44,11 @@ class IosExportLauncher(
     private val rootViewController: () -> UIViewController,
 ) : ExportLauncher,
     KoinComponent {
+    private data class MediaArchiveEntry(
+        val entry: ZipArchiveEntry.File? = null,
+        val issue: ExportIssue? = null,
+    )
+
     private val exportUserDataUseCase: ExportUserDataUseCase by inject()
     private val zipArchiveWriter = ZipArchiveWriter(FileSystem.SYSTEM)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -83,7 +91,7 @@ class IosExportLauncher(
                             Napier.e("iOS: Export failed", exception)
                             showAlert(
                                 title = "Export Failed",
-                                message = exception.message ?: "Unknown error occurred",
+                                message = "Export could not be completed.",
                             )
                             completionCallback?.invoke(null)
                         }.collect { progress ->
@@ -118,7 +126,7 @@ class IosExportLauncher(
                                         Napier.e("iOS: Failed to save or share export", e)
                                         showAlert(
                                             title = "Export Failed",
-                                            message = "Could not save or share the export files: ${e.message}",
+                                            message = "Could not write the export archive.",
                                         )
                                         completionCallback?.invoke(null)
                                     }
@@ -139,7 +147,7 @@ class IosExportLauncher(
                     Napier.e("iOS: Export process failed", e)
                     showAlert(
                         title = "Export Failed",
-                        message = "Export process failed: ${e.message}",
+                        message = "Export could not be completed.",
                     )
                     completionCallback?.invoke(null)
                 }
@@ -172,10 +180,18 @@ class IosExportLauncher(
                 result.serializeProfile()?.let { addJsonEntry(ExportFileStructure.PROFILE_FILE, it) }
                 result.serializePlaces()?.let { addJsonEntry(ExportFileStructure.PLACES_FILE, it) }
                 result.serializeLocationHistory()?.let { addJsonEntry(ExportFileStructure.LOCATION_HISTORY_FILE, it) }
-                result.serializeMediaManifest()?.let { addJsonEntry(ExportFileStructure.MEDIA_MANIFEST_FILE, it) }
+                val exportedMediaFiles = mutableListOf<ExportMediaFile>()
+                val archiveIssues = mutableListOf<ExportIssue>()
                 result.mediaFiles.forEach { mediaFile ->
-                    add(buildMediaEntry(mediaFile))
+                    val mediaEntry = buildMediaEntry(mediaFile)
+                    mediaEntry.entry?.let {
+                        exportedMediaFiles += mediaFile
+                        add(it)
+                    }
+                    mediaEntry.issue?.let(archiveIssues::add)
                 }
+                result.serializeMediaManifest(exportedMediaFiles)?.let { addJsonEntry(ExportFileStructure.MEDIA_MANIFEST_FILE, it) }
+                result.renderIssuesText(archiveIssues)?.let { addJsonEntry(ExportFileStructure.EXPORT_ISSUES_FILE, it) }
             }
 
         zipArchiveWriter.write(exportFilePath.toPath(), entries)
@@ -193,28 +209,62 @@ class IosExportLauncher(
         )
     }
 
-    private fun buildMediaEntry(mediaFile: ExportMediaFile): ZipArchiveEntry.File {
+    private fun buildMediaEntry(mediaFile: ExportMediaFile): MediaArchiveEntry {
         val sourceUri = mediaFile.sourceUri
         val sourcePath =
             when {
                 sourceUri.startsWith("file://") -> sourceUri.removePrefix("file://")
                 sourceUri.startsWith("/") -> sourceUri
-                else -> throw IllegalStateException("Unsupported media URI for iOS export: $sourceUri")
+                else -> {
+                    Napier.w("iOS: Unsupported media URI for export, skipping: $sourceUri")
+                    return MediaArchiveEntry(
+                        issue =
+                            ExportIssue(
+                                code = ExportIssueCode.MEDIA_BYTES_MISSING,
+                                source = sourceUri,
+                            ),
+                    )
+                }
             }
 
         require(sourcePath.isNotBlank()) {
             "Media source path is empty for export entry ${mediaFile.exportPath}"
         }
 
-        if (!NSFileManager.defaultManager.fileExistsAtPath(sourcePath)) {
-            throw IllegalStateException("Media file missing at $sourcePath")
+        val normalizedSourcePath = normalizeDuplicateExtensionPath(sourcePath)
+        if (!NSFileManager.defaultManager.fileExistsAtPath(normalizedSourcePath)) {
+            Napier.w("iOS: Media file missing during export, skipping: $sourcePath")
+            return MediaArchiveEntry(
+                issue =
+                    ExportIssue(
+                        code = ExportIssueCode.MEDIA_BYTES_MISSING,
+                        source = sourceUri,
+                    ),
+            )
         }
 
-        return ZipArchiveEntry.File(
-            path = mediaFile.exportPath,
-            sourcePath = sourcePath.toPath(),
+        return MediaArchiveEntry(
+            entry =
+                ZipArchiveEntry.File(
+                    path = mediaFile.exportPath,
+                    sourcePath = normalizedSourcePath.toPath(),
+                ),
+            issue =
+                if (normalizedSourcePath != sourcePath) {
+                    ExportIssue(
+                        code = ExportIssueCode.MEDIA_RECOVERED_NORMALIZED_PATH,
+                        source = sourceUri,
+                    )
+                } else {
+                    null
+                },
         )
     }
+
+    private fun normalizeDuplicateExtensionPath(path: String): String =
+        path.replace(Regex("(\\.[A-Za-z0-9]+)\\1$")) { match ->
+            match.groupValues[1]
+        }
 
     /**
      * Presents the iOS share sheet with the exported ZIP archive.
