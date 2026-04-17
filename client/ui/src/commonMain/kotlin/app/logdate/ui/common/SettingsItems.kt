@@ -232,6 +232,7 @@ fun SettingsNavigationItem(
     description: String,
     icon: @Composable () -> Unit,
     onClick: () -> Unit,
+    enabled: Boolean = true,
 ) {
     ListItem(
         headlineContent = { Text(text = title) },
@@ -250,6 +251,9 @@ fun SettingsNavigationItem(
                 contentDescription = null,
             )
         },
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier =
+            Modifier
+                .alpha(if (enabled) 1f else 0.6f)
+                .clickable(enabled = enabled, onClick = onClick),
     )
 }
