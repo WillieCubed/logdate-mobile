@@ -4,6 +4,9 @@ package app.logdate.feature.onboarding.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -54,7 +57,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
 import logdate.client.feature.onboarding.generated.resources.*
@@ -134,6 +139,8 @@ fun PersonalIntroContent(
     onProcessWithLlm: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    autoFocusInputs: Boolean = true,
+    animateStepTransitions: Boolean = true,
 ) {
     Box(
         modifier = modifier,
@@ -146,7 +153,7 @@ fun PersonalIntroContent(
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.lg)
                     .verticalScroll(rememberScrollState())
-                    .widthIn(max = 500.dp)
+                    .widthIn(max = 444.dp)
                     .semantics {
                         contentDescription = PERSONAL_INTRO_ROOT_TAG
                     },
@@ -190,7 +197,13 @@ fun PersonalIntroContent(
 
             AnimatedContent(
                 targetState = uiState.currentStep,
-                transitionSpec = { onboardingSlideTransition() },
+                transitionSpec = {
+                    if (animateStepTransitions) {
+                        onboardingSlideTransition()
+                    } else {
+                        ContentTransform(EnterTransition.None, ExitTransition.None)
+                    }
+                },
                 label = "Step Content",
             ) { step ->
                 when (step) {
@@ -202,6 +215,7 @@ fun PersonalIntroContent(
                             onNameChanged = onNameChanged,
                             onContinue = onProceedToBio,
                             onBack = onBack,
+                            autoFocus = autoFocusInputs,
                         )
 
                     PersonalIntroStep.Bio ->
@@ -212,6 +226,7 @@ fun PersonalIntroContent(
                             onBioChanged = onBioChanged,
                             onContinue = onProcessWithLlm,
                             onBack = onGoBackToName,
+                            autoFocus = autoFocusInputs,
                         )
 
                     PersonalIntroStep.LlmResponse ->
@@ -235,11 +250,16 @@ private fun NameStep(
     onNameChanged: (String) -> Unit,
     onContinue: () -> Unit,
     onBack: () -> Unit,
+    autoFocus: Boolean = true,
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(autoFocus) {
+        if (!autoFocus) {
+            return@LaunchedEffect
+        }
+
         delay(300) // Small delay for smooth animation
         focusRequester.requestFocus()
     }
@@ -348,10 +368,15 @@ private fun BioStep(
     onBioChanged: (String) -> Unit,
     onContinue: () -> Unit,
     onBack: () -> Unit,
+    autoFocus: Boolean = true,
 ) {
     val focusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(autoFocus) {
+        if (!autoFocus) {
+            return@LaunchedEffect
+        }
+
         delay(300) // Small delay for smooth animation
         focusRequester.requestFocus()
     }
@@ -569,5 +594,65 @@ private fun LlmResponseStep(
                 }
             }
         }
+    }
+}
+
+@Preview
+@Composable
+private fun PersonalIntroContentPreview_Name() {
+    LogDateTheme {
+        PersonalIntroContent(
+            uiState = PersonalIntroUiState(currentStep = PersonalIntroStep.Name),
+            onNameChanged = {},
+            onBioChanged = {},
+            onProceedToBio = {},
+            onGoBackToName = {},
+            onProcessWithLlm = {},
+            onBack = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun PersonalIntroContentPreview_Bio() {
+    LogDateTheme {
+        PersonalIntroContent(
+            uiState =
+                PersonalIntroUiState(
+                    currentStep = PersonalIntroStep.Bio,
+                    name = "Willie",
+                ),
+            onNameChanged = {},
+            onBioChanged = {},
+            onProceedToBio = {},
+            onGoBackToName = {},
+            onProcessWithLlm = {},
+            onBack = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun PersonalIntroContentPreview_LlmResponse() {
+    LogDateTheme {
+        PersonalIntroContent(
+            uiState =
+                PersonalIntroUiState(
+                    currentStep = PersonalIntroStep.LlmResponse,
+                    name = "Willie",
+                    bio = "I love coffee, hiking, and terrible movies.",
+                    llmResponse =
+                        "Nice to meet you! Your journey through coffee, trails, and " +
+                            "cinematic disasters sounds like a story worth capturing.",
+                ),
+            onNameChanged = {},
+            onBioChanged = {},
+            onProceedToBio = {},
+            onGoBackToName = {},
+            onProcessWithLlm = {},
+            onBack = {},
+        )
     }
 }

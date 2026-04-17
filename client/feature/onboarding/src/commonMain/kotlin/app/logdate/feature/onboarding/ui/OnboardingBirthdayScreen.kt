@@ -9,16 +9,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.calculateEndPadding
-import androidx.compose.foundation.layout.calculateStartPadding
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Cake
@@ -31,14 +30,11 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,10 +47,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
@@ -62,6 +56,7 @@ import kotlinx.coroutines.launch
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.ui.generated.resources.common_back
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Instant
@@ -99,7 +94,7 @@ fun OnboardingBirthdayScreen(
                         isSaving = false
                         onNext()
                     }.onFailure {
-                        errorMessage = "We couldn't save your birthday right now."
+                        errorMessage = getString(Res.string.onboarding_error_save_birthday)
                     }
             }
         },
@@ -116,124 +111,119 @@ fun OnboardingBirthdayContent(
     isSaving: Boolean = false,
     errorMessage: String? = null,
 ) {
-    val scrollState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(scrollState)
     var showDatePicker by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            LargeTopAppBar(
-                title = {
-                    Text(
-                        if (scrollState.collapsedFraction > 0.6f) {
-                            stringResource(Res.string.onboarding_birthday_set_label)
-                        } else {
-                            stringResource(Res.string.onboarding_birthday_title)
-                        },
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
-        },
-    ) { contentPadding ->
-        LazyColumn(
+    Scaffold { contentPadding ->
+        Box(
             modifier =
                 Modifier
-                    .testTag(ONBOARDING_BIRTHDAY_ROOT_TAG)
-                    .fillMaxHeight()
-                    .widthIn(max = 444.dp)
-                    .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding =
-                PaddingValues(
-                    top = contentPadding.calculateTopPadding() + Spacing.lg,
-                    bottom = contentPadding.calculateBottomPadding() + Spacing.lg,
-                    start = contentPadding.calculateStartPadding(LayoutDirection.Ltr) + Spacing.lg,
-                    end = contentPadding.calculateEndPadding(LayoutDirection.Ltr) + Spacing.lg,
-                ),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                    .fillMaxSize()
+                    .padding(contentPadding),
         ) {
-            item {
-                // Hero icon
-                Box(
-                    modifier =
-                        Modifier
-                            .padding(vertical = Spacing.md)
-                            .size(80.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.tertiary,
-                                    ),
-                                ),
-                            ),
-                    contentAlignment = Alignment.Center,
+            Column(
+                modifier =
+                    Modifier
+                        .testTag(ONBOARDING_BIRTHDAY_ROOT_TAG)
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = Spacing.lg),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                // Back arrow row
+                Row(
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
+                    horizontalArrangement = Arrangement.Start,
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Cake,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(40.dp),
-                    )
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Default.ArrowBack,
+                            contentDescription = stringResource(UiRes.string.common_back),
+                        )
+                    }
                 }
-            }
-            item {
-                Text(
-                    stringResource(Res.string.onboarding_birthday_body),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
-            item {
-                OverviewItem(
-                    title = stringResource(Res.string.onboarding_birthday_card_rewind_title),
-                    description = stringResource(Res.string.onboarding_birthday_card_rewind_description),
-                    icon = {
-                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
-                    },
-                )
-            }
-            item {
-                OverviewItem(
-                    title = stringResource(Res.string.onboarding_birthday_card_origin_title),
-                    description = stringResource(Res.string.onboarding_birthday_card_origin_description),
-                    icon = {
-                        Icon(Icons.Rounded.Timeline, contentDescription = null)
-                    },
-                )
-            }
-            item {
+
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(top = Spacing.md),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.widthIn(max = 444.dp),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
-                    Button(
-                        onClick = { showDatePicker = true },
-                        modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_BIRTHDAY_SET_TAG),
-                        enabled = !isSaving,
+                    // Inline headline
+                    Text(
+                        stringResource(Res.string.onboarding_birthday_title),
+                        style = MaterialTheme.typography.headlineLarge,
+                        modifier = Modifier.padding(bottom = Spacing.md),
+                    )
+
+                    // Hero icon
+                    Box(
+                        modifier =
+                            Modifier
+                                .padding(vertical = Spacing.md)
+                                .size(80.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(
+                                            MaterialTheme.colorScheme.primary,
+                                            MaterialTheme.colorScheme.tertiary,
+                                        ),
+                                    ),
+                                ).align(Alignment.CenterHorizontally),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        if (isSaving) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Text(stringResource(Res.string.onboarding_birthday_set))
-                        }
-                    }
-                    errorMessage?.let { message ->
-                        Text(
-                            text = message,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium,
+                        Icon(
+                            imageVector = Icons.Default.Cake,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(40.dp),
                         )
+                    }
+
+                    Text(
+                        stringResource(Res.string.onboarding_birthday_body),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    OverviewItem(
+                        title = stringResource(Res.string.onboarding_birthday_card_rewind_title),
+                        description = stringResource(Res.string.onboarding_birthday_card_rewind_description),
+                        icon = {
+                            Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
+                        },
+                    )
+                    OverviewItem(
+                        title = stringResource(Res.string.onboarding_birthday_card_origin_title),
+                        description = stringResource(Res.string.onboarding_birthday_card_origin_description),
+                        icon = {
+                            Icon(Icons.Rounded.Timeline, contentDescription = null)
+                        },
+                    )
+
+                    // Button at end of scroll content so user sees all info first
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        Button(
+                            onClick = { showDatePicker = true },
+                            modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_BIRTHDAY_SET_TAG),
+                            enabled = !isSaving,
+                        ) {
+                            if (isSaving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Text(stringResource(Res.string.onboarding_birthday_set))
+                            }
+                        }
+                        errorMessage?.let { message ->
+                            Text(
+                                text = message,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
                     }
                 }
             }

@@ -92,6 +92,21 @@ import app.logdate.navigation.routes.cloudAccountSetupFlow
 import app.logdate.navigation.routes.core.NavigationStart
 import app.logdate.navigation.routes.core.NewJournalRoute
 import app.logdate.navigation.routes.core.NoteViewerRoute
+import app.logdate.navigation.routes.core.OnboardingAccountCreationRoute
+import app.logdate.navigation.routes.core.OnboardingAppOverviewRoute
+import app.logdate.navigation.routes.core.OnboardingBirthdayRoute
+import app.logdate.navigation.routes.core.OnboardingCompleteRoute
+import app.logdate.navigation.routes.core.OnboardingDayBoundariesRoute
+import app.logdate.navigation.routes.core.OnboardingEntryRoute
+import app.logdate.navigation.routes.core.OnboardingImportRoute
+import app.logdate.navigation.routes.core.OnboardingLocationTimelineRoute
+import app.logdate.navigation.routes.core.OnboardingMemorySelectionRoute
+import app.logdate.navigation.routes.core.OnboardingNotificationsRoute
+import app.logdate.navigation.routes.core.OnboardingRecommendationsRoute
+import app.logdate.navigation.routes.core.OnboardingSignIn
+import app.logdate.navigation.routes.core.OnboardingStart
+import app.logdate.navigation.routes.core.OnboardingWelcomeBackRoute
+import app.logdate.navigation.routes.core.PersonalIntroRoute
 import app.logdate.navigation.routes.core.RewindDetailRoute
 import app.logdate.navigation.routes.core.SettingsOverviewRoute
 import app.logdate.navigation.routes.core.TimelineDetail
@@ -204,6 +219,27 @@ private val cloudAccountRouteClasses: Set<KClass<out NavKey>> =
 
 private fun isCloudAccountRoute(routeClass: KClass<out NavKey>?): Boolean = routeClass in cloudAccountRouteClasses
 
+private val onboardingRouteClasses: Set<KClass<out NavKey>> =
+    setOf(
+        OnboardingStart::class,
+        PersonalIntroRoute::class,
+        OnboardingSignIn::class,
+        OnboardingEntryRoute::class,
+        OnboardingImportRoute::class,
+        OnboardingAppOverviewRoute::class,
+        OnboardingMemorySelectionRoute::class,
+        OnboardingAccountCreationRoute::class,
+        OnboardingBirthdayRoute::class,
+        OnboardingRecommendationsRoute::class,
+        OnboardingDayBoundariesRoute::class,
+        OnboardingLocationTimelineRoute::class,
+        OnboardingNotificationsRoute::class,
+        OnboardingCompleteRoute::class,
+        OnboardingWelcomeBackRoute::class,
+    )
+
+private fun isOnboardingRoute(routeClass: KClass<out NavKey>?): Boolean = routeClass in onboardingRouteClasses
+
 /**
  * Creates the forward navigation transition specification that implements Material Design 3
  * transition guidelines with context-aware animation selection.
@@ -273,6 +309,11 @@ private fun createForwardTransitionSpec(): AnimatedContentTransitionScope<Scene<
             isCloudAccountRoute(toRoute) && !isCloudAccountRoute(fromRoute) -> {
                 slideInVertically(initialOffsetY = { it }) + fadeIn() togetherWith
                     fadeOut()
+            }
+            // Onboarding step-to-step: subtle 1/6-width slide + fade for connected flow feel
+            isOnboardingRoute(fromRoute) && isOnboardingRoute(toRoute) -> {
+                slideInHorizontally(initialOffsetX = { it / 6 }) + fadeIn() togetherWith
+                    slideOutHorizontally(targetOffsetX = { -it / 6 }) + fadeOut()
             }
             // All other navigation: hierarchical slide transitions
             else -> {
@@ -345,6 +386,11 @@ private fun createBackTransitionSpec(): AnimatedContentTransitionScope<Scene<Nav
                 fadeIn() togetherWith
                     slideOutVertically(targetOffsetY = { it }) + fadeOut()
             }
+            // Onboarding step-to-step back: subtle 1/6-width slide + fade, reverse of forward
+            isOnboardingRoute(fromRoute) && isOnboardingRoute(toRoute) -> {
+                slideInHorizontally(initialOffsetX = { -it / 6 }) + fadeIn() togetherWith
+                    slideOutHorizontally(targetOffsetX = { it / 6 }) + fadeOut()
+            }
             // Hierarchical back navigation: slide in from left (reverse of forward)
             else -> {
                 slideInHorizontally(initialOffsetX = { -it }) togetherWith
@@ -392,6 +438,11 @@ private fun createPredictiveBackTransitionSpec(): AnimatedContentTransitionScope
             isCloudAccountRoute(fromRoute) && !isCloudAccountRoute(toRoute) -> {
                 fadeIn() togetherWith
                     slideOutVertically(targetOffsetY = { it }) + fadeOut()
+            }
+            // Onboarding step-to-step back: subtle 1/6-width slide + fade (matches popTransitionSpec)
+            isOnboardingRoute(fromRoute) && isOnboardingRoute(toRoute) -> {
+                slideInHorizontally(initialOffsetX = { -it / 6 }) + fadeIn() togetherWith
+                    slideOutHorizontally(targetOffsetX = { it / 6 }) + fadeOut()
             }
             // Hierarchical back navigation: slide in from left (matches popTransitionSpec)
             else -> {

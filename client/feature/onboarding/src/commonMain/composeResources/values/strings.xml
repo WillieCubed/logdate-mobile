@@ -156,6 +156,14 @@
     <string name="onboarding_error_save_recommendations">We couldn&apos;t save your recommendations setting right now.</string>
     <string name="onboarding_error_save_day_boundaries">We couldn&apos;t save your day boundary preference right now.</string>
 
+    <!-- Backup plan options (per Figma) -->
+    <string name="onboarding_plan_basic_title">Basic</string>
+    <string name="onboarding_plan_basic_description">Max 10 GB of text, photos, videos, and voice notes. Photos and videos will be compressed in high quality (1080p).</string>
+    <string name="onboarding_plan_basic_price">Free</string>
+    <string name="onboarding_plan_standard_title">Standard</string>
+    <string name="onboarding_plan_standard_description">Includes up to 1 TB of storage for text, photo, video, and voice notes. Photos and videos will be stored in original quality.</string>
+    <string name="onboarding_plan_standard_price">$5/month</string>
+
     <!-- Notifications screen -->
     <string name="onboarding_notifications_title">Journal notifications</string>
     <string name="onboarding_notifications_body_with_recommendations">Get daily journal prompts with LogDate. Every day, you&apos;ll get a reminder to log something in your journal.</string>

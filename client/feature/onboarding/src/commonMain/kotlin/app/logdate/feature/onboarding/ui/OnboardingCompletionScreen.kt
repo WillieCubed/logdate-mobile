@@ -6,6 +6,10 @@
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,6 +38,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.onboarding.flow.OnboardingStep
+import app.logdate.ui.theme.LogDateTheme
+import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import logdate.client.feature.onboarding.generated.resources.*
@@ -88,9 +94,15 @@ fun OnboardingCompletionContent(
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var finalContentVisible by remember { mutableStateOf(true) }
+
     LaunchedEffect(shouldShowFinish) {
         if (shouldShowFinish) {
-            delay(2_000)
+            // Hold the final message, then fade out before leaving onboarding so the
+            // next screen doesn't snap in on top of "Happy logging!"
+            delay(1_600)
+            finalContentVisible = false
+            delay(ONBOARDING_COMPLETION_EXIT_FADE_MILLIS.toLong())
             onFinish()
         }
     }
@@ -102,12 +114,20 @@ fun OnboardingCompletionContent(
         label = "Show Finish Screen",
     ) { isShowingFinish ->
         if (isShowingFinish) {
-            CompletionFinalContent()
+            AnimatedVisibility(
+                visible = finalContentVisible,
+                enter = fadeIn(tween(ONBOARDING_COMPLETION_EXIT_FADE_MILLIS)),
+                exit = fadeOut(tween(ONBOARDING_COMPLETION_EXIT_FADE_MILLIS)),
+            ) {
+                CompletionFinalContent()
+            }
         } else {
             CompletionStreakContent(onContinue = onContinue)
         }
     }
 }
+
+private const val ONBOARDING_COMPLETION_EXIT_FADE_MILLIS = 400
 
 @Composable
 private fun CompletionStreakContent(onContinue: () -> Unit) {
@@ -125,23 +145,23 @@ private fun CompletionStreakContent(onContinue: () -> Unit) {
             Column(
                 modifier =
                     Modifier
-                        .padding(app.logdate.ui.theme.Spacing.lg)
-                        .widthIn(max = 320.dp),
+                        .padding(Spacing.lg)
+                        .widthIn(max = 444.dp),
                 verticalArrangement = Arrangement.spacedBy(48.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(stringResource(Res.string.one_more_thing), style = MaterialTheme.typography.headlineMedium)
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(app.logdate.ui.theme.Spacing.xl),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xl),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        "Your streak begins today.",
+                        stringResource(Res.string.onboarding_completion_streak_begins),
                         style = MaterialTheme.typography.headlineMedium,
                     )
                     StreakCounterBox()
                     Text(
-                        "Write, photograph, or record something every day to keep it up.",
+                        stringResource(Res.string.onboarding_completion_streak_encouragement),
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center,
                     )
@@ -152,7 +172,7 @@ private fun CompletionStreakContent(onContinue: () -> Unit) {
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(app.logdate.ui.theme.Spacing.lg)
+                        .padding(Spacing.lg)
                         .fillMaxWidth()
                         .testTag(ONBOARDING_COMPLETION_CONTINUE_TAG),
             ) {
@@ -192,7 +212,7 @@ private fun CompletionFinalContent() {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                "Happy logging!",
+                stringResource(Res.string.onboarding_completion_happy_logging),
                 style = MaterialTheme.typography.headlineMedium,
             )
         }
@@ -204,7 +224,7 @@ private fun CompletionFinalContent() {
 )
 @Composable
 private fun PreviewCompletionStreakContent() {
-    app.logdate.ui.theme.LogDateTheme {
+    LogDateTheme {
         CompletionStreakContent(onContinue = {})
     }
 }
@@ -214,7 +234,7 @@ private fun PreviewCompletionStreakContent() {
 )
 @Composable
 private fun PreviewCompletionFinalContent() {
-    app.logdate.ui.theme.LogDateTheme {
+    LogDateTheme {
         CompletionFinalContent()
     }
 }

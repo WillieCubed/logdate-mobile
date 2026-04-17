@@ -80,6 +80,7 @@ fun OnboardingStartScreenContent(
     onStartFromBackup: () -> Unit,
     modifier: Modifier = Modifier,
     useLargerTextSizes: Boolean = false,
+    animateContent: Boolean = true,
 ) {
     Box(
         modifier =
@@ -97,20 +98,30 @@ fun OnboardingStartScreenContent(
                     .widthIn(max = 520.dp),
             contentAlignment = Alignment.Center,
         ) {
-            AnimatedContent(
-                showLanding,
-                transitionSpec = { onboardingFadeTransition() },
-                label = "Main Content",
-            ) { target ->
-                if (target) {
-                    OnboardingLandingContent(
-                        onGetStarted = onGetStarted,
-                        onStartFromBackup = onStartFromBackup,
-                        useLargerTextSizes = useLargerTextSizes,
-                    )
-                } else {
-                    OnboardingSplashContent()
+            if (animateContent) {
+                AnimatedContent(
+                    showLanding,
+                    transitionSpec = { onboardingFadeTransition() },
+                    label = "Main Content",
+                ) { target ->
+                    if (target) {
+                        OnboardingLandingContent(
+                            onGetStarted = onGetStarted,
+                            onStartFromBackup = onStartFromBackup,
+                            useLargerTextSizes = useLargerTextSizes,
+                        )
+                    } else {
+                        OnboardingSplashContent()
+                    }
                 }
+            } else if (showLanding) {
+                OnboardingLandingContent(
+                    onGetStarted = onGetStarted,
+                    onStartFromBackup = onStartFromBackup,
+                    useLargerTextSizes = useLargerTextSizes,
+                )
+            } else {
+                OnboardingSplashContent()
             }
         }
     }
@@ -131,7 +142,7 @@ private fun OnboardingSplashContent() {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            "Imagine if you had a journal that grew with you and the people you cared about.",
+            stringResource(Res.string.onboarding_start_tagline),
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onPrimary,
             textAlign = TextAlign.Center,
@@ -143,7 +154,7 @@ private fun OnboardingSplashContent() {
         ) { target ->
             if (target) {
                 Text(
-                    "No need to imagine anymore.",
+                    stringResource(Res.string.onboarding_start_tagline_subheading),
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onPrimary,
                     textAlign = TextAlign.Center,
@@ -178,7 +189,7 @@ private fun OnboardingLandingContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    "Welcome to LogDate.",
+                    stringResource(Res.string.onboarding_start_welcome_title),
                     style =
                         if (useLargerTextSizes) {
                             MaterialTheme.typography.displaySmall
@@ -189,7 +200,7 @@ private fun OnboardingLandingContent(
                     textAlign = TextAlign.Center,
                 )
                 Text(
-                    "A new home for your memories.",
+                    stringResource(Res.string.onboarding_start_welcome_subtitle),
                     style =
                         if (useLargerTextSizes) {
                             MaterialTheme.typography.headlineSmall

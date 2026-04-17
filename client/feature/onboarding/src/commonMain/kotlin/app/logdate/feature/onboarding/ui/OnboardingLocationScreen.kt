@@ -6,18 +6,18 @@
 package app.logdate.feature.onboarding.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.calculateEndPadding
-import androidx.compose.foundation.layout.calculateStartPadding
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.rounded.LocationOn
@@ -25,16 +25,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,11 +40,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import app.logdate.client.permissions.rememberLocationPermissionState
 import app.logdate.ui.theme.LogDateTheme
@@ -57,6 +51,7 @@ import kotlinx.coroutines.launch
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.ui.generated.resources.common_back
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import logdate.client.ui.generated.resources.Res as UiRes
@@ -91,11 +86,11 @@ fun OnboardingLocationScreen(
                                 isSaving = false
                                 onNext(true)
                             }.onFailure {
-                                errorMessage = "We couldn't save your location preference right now."
+                                errorMessage = getString(Res.string.onboarding_error_save_location)
                                 isSaving = false
                             }
                     }.onFailure {
-                        errorMessage = "We couldn't save your location preference right now."
+                        errorMessage = getString(Res.string.onboarding_error_save_location)
                         isSaving = false
                     }
             }
@@ -115,7 +110,7 @@ fun OnboardingLocationScreen(
                         isSaving = false
                         onNext(false)
                     }.onFailure {
-                        errorMessage = "We couldn't save your location preference right now."
+                        errorMessage = getString(Res.string.onboarding_error_save_location)
                         isSaving = false
                     }
             }
@@ -125,7 +120,6 @@ fun OnboardingLocationScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingLocationContent(
     onBack: () -> Unit,
@@ -134,87 +128,14 @@ fun OnboardingLocationContent(
     isSaving: Boolean = false,
     errorMessage: String? = null,
 ) {
-    val scrollState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(scrollState)
-
     Scaffold(
-        topBar = {
-            LargeTopAppBar(
-                title = {
-                    Text(stringResource(Res.string.onboarding_location_title))
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
-        },
-    ) { contentPadding ->
-        LazyColumn(
-            modifier =
-                Modifier
-                    .testTag(ONBOARDING_LOCATION_ROOT_TAG)
-                    .fillMaxHeight()
-                    .widthIn(max = 444.dp)
-                    .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding =
-                PaddingValues(
-                    top = contentPadding.calculateTopPadding() + Spacing.lg,
-                    bottom = contentPadding.calculateBottomPadding() + Spacing.lg,
-                    start = contentPadding.calculateStartPadding(LayoutDirection.Ltr) + Spacing.lg,
-                    end = contentPadding.calculateEndPadding(LayoutDirection.Ltr) + Spacing.lg,
-                ),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            item {
-                Text(
-                    stringResource(Res.string.onboarding_location_body),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
-            item {
-                OverviewItem(
-                    title = stringResource(Res.string.onboarding_location_card_title),
-                    description = stringResource(Res.string.onboarding_location_card_description),
-                    icon = {
-                        Icon(Icons.Rounded.LocationOn, contentDescription = null)
-                    },
-                )
-            }
-            item {
-                // Privacy card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(Spacing.lg),
-                    ) {
-                        Text(
-                            text = "Privacy first",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(modifier = Modifier.height(Spacing.sm))
-                        Text(
-                            stringResource(Res.string.onboarding_location_privacy),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            item {
+        bottomBar = {
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+                contentAlignment = Alignment.Center,
+            ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(top = Spacing.md),
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
@@ -241,6 +162,76 @@ fun OnboardingLocationContent(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.error,
                         )
+                    }
+                }
+            }
+        },
+    ) { contentPadding ->
+        Box(
+            modifier = Modifier.fillMaxSize().padding(contentPadding),
+        ) {
+            Column(
+                modifier =
+                    Modifier
+                        .testTag(ONBOARDING_LOCATION_ROOT_TAG)
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = Spacing.lg),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
+                    horizontalArrangement = Arrangement.Start,
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
+                    }
+                }
+                Column(
+                    modifier = Modifier.widthIn(max = 444.dp),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Text(
+                        stringResource(Res.string.onboarding_location_title),
+                        style = MaterialTheme.typography.headlineLarge,
+                        modifier = Modifier.padding(bottom = Spacing.md),
+                    )
+                    Text(
+                        stringResource(Res.string.onboarding_location_body),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    OverviewItem(
+                        title = stringResource(Res.string.onboarding_location_card_title),
+                        description = stringResource(Res.string.onboarding_location_card_description),
+                        icon = {
+                            Icon(Icons.Rounded.LocationOn, contentDescription = null)
+                        },
+                    )
+                    // Privacy card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors =
+                            CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(Spacing.lg),
+                        ) {
+                            Text(
+                                text = "Privacy first",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(modifier = Modifier.height(Spacing.sm))
+                            Text(
+                                stringResource(Res.string.onboarding_location_privacy),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }

@@ -6,42 +6,34 @@
 
 package app.logdate.feature.onboarding.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.calculateEndPadding
-import androidx.compose.foundation.layout.calculateStartPadding
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.AdaptiveLayout
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.onboarding.generated.resources.*
@@ -55,89 +47,70 @@ import logdate.client.ui.generated.resources.Res as coreRes
 const val ONBOARDING_OVERVIEW_ROOT_TAG = "onboarding_overview_root"
 const val ONBOARDING_OVERVIEW_CONTINUE_TAG = "onboarding_overview_continue"
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingOverviewScreen(
     onBack: () -> Unit,
     onNext: () -> Unit,
-    useSplitScreen: Boolean = false,
+    useSplitScreen: Boolean? = null,
 ) {
-    val scrollState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(scrollState)
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val resolvedUseSplitScreen = useSplitScreen ?: (maxWidth >= 700.dp)
 
-    Scaffold(
-        topBar = {
-            LargeTopAppBar(
-                title = {
-                    Text(
-                        if (scrollState.collapsedFraction > 0.6f) {
-                            "Overview"
-                        } else {
-                            "Here's how this works."
-                        }, // TODO: Localize this
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(coreRes.string.common_back))
-                    }
-                },
-                modifier = Modifier.then(if (useSplitScreen) Modifier.fillMaxHeight() else Modifier),
-                scrollBehavior = scrollBehavior,
-            )
-        },
-    ) { contentPadding ->
-        if (!useSplitScreen) {
-            LazyColumn(
+        if (resolvedUseSplitScreen) {
+            OverviewSplitLayout(onBack = onBack, onNext = onNext)
+        } else {
+            OverviewCompactLayout(onBack = onBack, onNext = onNext)
+        }
+    }
+}
+
+@Composable
+private fun OverviewCompactLayout(
+    onBack: () -> Unit,
+    onNext: () -> Unit,
+) {
+    Scaffold { contentPadding ->
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(contentPadding),
+        ) {
+            Column(
                 modifier =
                     Modifier
                         .testTag(ONBOARDING_OVERVIEW_ROOT_TAG)
-                        .fillMaxHeight()
-                        .widthIn(max = 444.dp)
-                        .nestedScroll(scrollBehavior.nestedScrollConnection),
-                contentPadding =
-                    PaddingValues(
-                        top = contentPadding.calculateTopPadding() + Spacing.lg,
-                        bottom = contentPadding.calculateBottomPadding() + Spacing.lg,
-                        start = contentPadding.calculateStartPadding(LayoutDirection.Ltr) + Spacing.lg,
-                        end = contentPadding.calculateEndPadding(LayoutDirection.Ltr) + Spacing.lg,
-                    ),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = Spacing.lg),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                item {
-                    OverviewItem(
-                        title = "Add things to your Log",
-                        description = "Your Log is your personal timeline. Write things and add photos or even voice memos. Everything is private to you by default.",
-                        icon = {
-                            Icon(Icons.Rounded.Edit, contentDescription = null)
-                        },
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
+                    horizontalArrangement = Arrangement.Start,
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Default.ArrowBack,
+                            contentDescription = stringResource(coreRes.string.common_back),
+                        )
+                    }
                 }
-                item {
-                    OverviewItem(
-                        title = "Make journals for your memories",
-                        description = "Create a journal for the people you care about - whether your climbing buddies, your crochet club, or your family. Even if they don’t use LogDate, they can still join in and add stuff.",
-                        icon = {
-                            Icon(
-                                painterResource(coreRes.drawable.book_open),
-                                contentDescription = null,
-                            )
-                        },
+
+                Column(
+                    modifier = Modifier.widthIn(max = 444.dp),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Text(
+                        stringResource(Res.string.onboarding_overview_title),
+                        style = MaterialTheme.typography.headlineLarge,
+                        modifier = Modifier.padding(bottom = Spacing.lg),
                     )
-                }
-                item {
-                    OverviewItem(
-                        title = "Get weekly recaps",
-                        description = "Every week, we’ll give you a Wrapped for your everyday life. We’ll even give you a year in review if you keep it up!",
-                        icon = {
-                            Icon(Icons.Rounded.History, contentDescription = null)
-                        },
-                    )
-                }
-                item {
+
+                    OverviewCards()
+
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg),
                         horizontalArrangement = Arrangement.End,
                     ) {
                         Button(
@@ -149,52 +122,98 @@ fun OnboardingOverviewScreen(
                     }
                 }
             }
-        } else {
-            // Keep blank
         }
     }
 }
 
 @Composable
-internal fun OverviewItem(
-    title: String,
-    description: String,
-    icon: @Composable () -> Unit = {},
+private fun OverviewSplitLayout(
+    onBack: () -> Unit,
+    onNext: () -> Unit,
 ) {
-    Row(
-        modifier =
-            Modifier
-                .clip(MaterialTheme.shapes.medium)
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .padding(Spacing.lg),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.lg, Alignment.Start),
-    ) {
-        InfoIcon {
-            icon()
-        }
-        Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.md, Alignment.Top),
-            horizontalAlignment = Alignment.Start,
-        ) {
-            Text(title, style = MaterialTheme.typography.titleLarge)
-            Text(description, style = MaterialTheme.typography.bodyMedium)
-        }
-    }
+    AdaptiveLayout(
+        useCompactLayout = false,
+        modifier = Modifier.fillMaxSize().testTag(ONBOARDING_OVERVIEW_ROOT_TAG),
+        supplementalContent = {
+            // Left pane: title + subtitle with back arrow
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.AutoMirrored.Default.ArrowBack,
+                        contentDescription = stringResource(coreRes.string.common_back),
+                    )
+                }
+                Text(
+                    stringResource(Res.string.onboarding_overview_title),
+                    style = MaterialTheme.typography.headlineLarge,
+                )
+                Text(
+                    stringResource(Res.string.onboarding_overview_card_log_description),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        mainContent = {
+            // Right pane: cards + Continue button
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                OverviewCards()
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    Button(
+                        onClick = onNext,
+                        modifier = Modifier.testTag(ONBOARDING_OVERVIEW_CONTINUE_TAG),
+                    ) {
+                        Text(text = stringResource(coreRes.string.common_continue))
+                    }
+                }
+            }
+        },
+    )
 }
 
 @Composable
-fun InfoIcon(icon: @Composable () -> Unit) {
-    Row(
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-        modifier =
-            Modifier
-                .size(40.dp)
-                .clip(MaterialTheme.shapes.extraLarge)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-    ) {
-        icon()
-    }
+private fun OverviewCards() {
+    OverviewItem(
+        title = stringResource(Res.string.onboarding_overview_card_log_title),
+        description = stringResource(Res.string.onboarding_overview_card_log_description),
+        icon = {
+            Icon(Icons.Rounded.Edit, contentDescription = null)
+        },
+    )
+    OverviewItem(
+        title = stringResource(Res.string.onboarding_overview_card_journals_title),
+        description = stringResource(Res.string.onboarding_overview_card_journals_description),
+        icon = {
+            Icon(
+                painterResource(coreRes.drawable.book_open),
+                contentDescription = null,
+            )
+        },
+    )
+    OverviewItem(
+        title = stringResource(Res.string.onboarding_overview_card_recaps_title),
+        description = stringResource(Res.string.onboarding_overview_card_recaps_description),
+        icon = {
+            Icon(Icons.Rounded.History, contentDescription = null)
+        },
+    )
 }
 
 @Preview
@@ -205,8 +224,7 @@ private fun OnboardingOverviewScreenPreview() {
     }
 }
 
-@Preview
-// @Preview(device = "spec:parent=pixel_5,orientation=landscape")
+@Preview(device = "spec:parent=pixel_5,orientation=landscape")
 @Composable
 private fun OnboardingOverviewScreenPreview_Compact_Landscape() {
     LogDateTheme {
@@ -214,8 +232,7 @@ private fun OnboardingOverviewScreenPreview_Compact_Landscape() {
     }
 }
 
-@Preview
-// @Preview(device = "spec:width=1280dp,height=800dp,dpi=240")
+@Preview(device = "spec:width=1280dp,height=800dp,dpi=240")
 @Composable
 private fun OnboardingOverviewScreenPreview_Medium_Landscape() {
     LogDateTheme {
