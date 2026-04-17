@@ -12,6 +12,8 @@ import app.logdate.server.auth.AuthMetricsRegistry
 import app.logdate.server.auth.GoogleIdTokenVerifier
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.SessionManager
+import app.logdate.server.config.ProductionConfigValidator
+import app.logdate.server.config.RuntimeProfile
 import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
 import app.logdate.server.identity.AtprotoIdentityService
@@ -79,6 +81,8 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 fun main() {
+    ProductionConfigValidator.validate(RuntimeProfile.fromEnvironment())
+
     val isDatabaseAvailable = initializeDatabase()
 
     val port = System.getProperty("PORT")?.toIntOrNull() ?: System.getenv("PORT")?.toIntOrNull() ?: SERVER_PORT

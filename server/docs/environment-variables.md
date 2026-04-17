@@ -18,6 +18,20 @@
 
 ---
 
+## Runtime Profile
+
+### `LOGDATE_ENV`
+- **Description**: Deployment profile. Selects whether the server enforces production-grade secret validation at startup.
+- **Type**: String: `production` | `development` | `test`
+- **Default**: `development`
+- **Example**: `LOGDATE_ENV=production`
+- **Required**: No (but must be `production` for real deployments)
+- **Notes**:
+  - When set to `production`, the server refuses to start if `JWT_SECRET` or `DATABASE_PASSWORD` are missing, too short, or set to known placeholder values.
+  - Development and test profiles skip this validation so local runs and the test suite work without extra setup.
+
+---
+
 ## Server Configuration
 
 ### `PORT`
@@ -57,12 +71,12 @@ The server supports two sets of database environment variables for flexibility:
 - **Required**: Yes (if `DATABASE_URL` is set)
 
 ### `DATABASE_PASSWORD`
-- **Description**: PostgreSQL password
+- **Description**: PostgreSQL password.
 - **Type**: String
-- **Default**: None
+- **Default**: None — previous releases fell back to the literal string `logdate`; that fallback has been removed.
 - **Example**: `DATABASE_PASSWORD=secure_password_here`
-- **Required**: Yes (if `DATABASE_URL` is set)
-- **Security**: Store securely, never commit to version control
+- **Required**: **Yes**, unless the password is already embedded in `DATABASE_URL` (e.g. `postgres://user:pass@host/db`). `LOGDATE_ENV=production` additionally rejects known-default passwords.
+- **Security**: Store in a secret manager; never commit.
 
 ### `CLOUD_SQL_INSTANCE_CONNECTION_NAME`
 - **Description**: Cloud SQL instance connection name for Google-managed PostgreSQL connectivity
@@ -119,15 +133,16 @@ These can be used instead of `DATABASE_URL`:
 ## Authentication & Security
 
 ### `JWT_SECRET`
-- **Description**: Secret key for JWT token signing
-- **Type**: String (minimum 32 characters recommended)
-- **Default**: None
-- **Example**: `JWT_SECRET=your-super-secret-jwt-signing-key-here-min-32-chars`
-- **Required**: Yes (for production)
-- **Security**: 
-  - Must be at least 32 characters for security
-  - Store securely, never commit to version control
-  - Rotate periodically in production
+- **Description**: Secret key for JWT token signing.
+- **Type**: String (minimum 32 characters required in production)
+- **Default**: None (when unset in development, the server generates a random per-process secret; tokens invalidate on restart)
+- **Example**: `JWT_SECRET=$(openssl rand -base64 32)`
+- **Required**: **Yes, in production.** `LOGDATE_ENV=production` refuses to start without it.
+- **Security**:
+  - Must be at least 32 characters.
+  - Known placeholder values (e.g. `your-secret-key-change-in-production`) are rejected at startup.
+  - Store in a secret manager; never commit.
+  - Rotate periodically.
 
 ### `GOOGLE_OIDC_CLIENT_IDS`
 - **Description**: Comma-separated Google OAuth client IDs accepted for ID token verification

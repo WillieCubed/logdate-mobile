@@ -86,9 +86,9 @@ class DatabaseConfigTest {
 
     @Test
     fun `createDataSource and createTestDataSource create hikari data sources`() {
-        val createDefaultFromEnv = runCatching { DatabaseConfig.createDataSource() }
-        assertTrue(createDefaultFromEnv.isSuccess)
-        (createDefaultFromEnv.getOrNull() as? HikariDataSource)?.close()
+        // No env-only invocation is exercised here: DATABASE_USER/DATABASE_PASSWORD are now required
+        // and the no-arg overload would depend on the test runner's ambient environment. Each
+        // explicit-arg case below covers one branch of credential resolution.
 
         val createDefault =
             runCatching {
@@ -145,6 +145,36 @@ class DatabaseConfigTest {
         val createTest = runCatching { DatabaseConfig.createTestDataSource() }
         assertTrue(createTest.isSuccess)
         (createTest.getOrNull() as? HikariDataSource)?.close()
+    }
+
+    @Test
+    fun `createDataSource fails fast when no credentials are available`() {
+        val failure =
+            assertFailsWith<IllegalStateException> {
+                DatabaseConfig.createDataSource(
+                    host = "db.example.com",
+                    port = 5432,
+                    database = "logdate",
+                    username = null,
+                    password = null,
+                    databaseUrl = null,
+                    instanceConnectionName = null,
+                )
+            }
+        assertTrue(failure.message!!.contains("DATABASE_USER"))
+    }
+
+    @Test
+    fun `createDataSource picks credentials out of DATABASE_URL when not passed explicitly`() {
+        val source =
+            DatabaseConfig.createDataSource(
+                username = null,
+                password = null,
+                databaseUrl = "postgres://embedded:fromurl@localhost:5432/logdate",
+            ) as HikariDataSource
+        assertEquals("embedded", source.username)
+        assertEquals("fromurl", source.password)
+        source.close()
     }
 
     @Test

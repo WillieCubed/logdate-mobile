@@ -30,12 +30,12 @@ object DatabaseConfig {
             if (urlFromEnv != null) {
                 val parsedUrl = parseDatabaseUrl(urlFromEnv)
                 val jdbcUrl = parsedUrl?.jdbcUrl ?: normalizeJdbcUrl(urlFromEnv)
-                val resolvedUsername = username ?: parsedUrl?.username ?: "logdate"
-                val resolvedPassword = password ?: parsedUrl?.password ?: "logdate"
+                val resolvedUsername = resolveCredential("DATABASE_USER", username, parsedUrl?.username)
+                val resolvedPassword = resolveCredential("DATABASE_PASSWORD", password, parsedUrl?.password)
                 buildConfig(jdbcUrl, resolvedUsername, resolvedPassword)
             } else if (instanceConnection != null) {
-                val resolvedUsername = username ?: "logdate"
-                val resolvedPassword = password ?: "logdate"
+                val resolvedUsername = resolveCredential("DATABASE_USER", username, null)
+                val resolvedPassword = resolveCredential("DATABASE_PASSWORD", password, null)
                 buildConfig("jdbc:postgresql://google/$database", resolvedUsername, resolvedPassword).apply {
                     addDataSourceProperty("socketFactory", "com.google.cloud.sql.postgres.SocketFactory")
                     addDataSourceProperty("cloudSqlInstance", instanceConnection)
@@ -43,13 +43,31 @@ object DatabaseConfig {
                 }
             } else {
                 val jdbcUrl = "jdbc:postgresql://$host:$port/$database"
-                val resolvedUsername = username ?: "logdate"
-                val resolvedPassword = password ?: "logdate"
+                val resolvedUsername = resolveCredential("DATABASE_USER", username, null)
+                val resolvedPassword = resolveCredential("DATABASE_PASSWORD", password, null)
                 buildConfig(jdbcUrl, resolvedUsername, resolvedPassword)
             }
 
         return HikariDataSource(dataSourceConfig)
     }
+
+    /**
+     * Pick the first non-blank credential from (explicit argument, parsed-from-URL) and fail with a
+     * clear message otherwise. The previous behavior silently fell back to `"logdate"`, which meant
+     * a misconfigured deploy could try to connect with a known-default password rather than crashing
+     * with an actionable error.
+     */
+    private fun resolveCredential(
+        envVarName: String,
+        explicit: String?,
+        fromUrl: String?,
+    ): String =
+        listOfNotNull(explicit, fromUrl)
+            .firstOrNull { it.isNotBlank() }
+            ?: error(
+                "Database credential missing: set $envVarName (or embed credentials in DATABASE_URL). " +
+                    "If you're running locally, export $envVarName=<your-local-password>.",
+            )
 
     fun initializeDatabase(
         dataSource: DataSource,
