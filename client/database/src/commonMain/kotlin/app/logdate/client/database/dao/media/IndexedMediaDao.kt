@@ -91,7 +91,7 @@ interface IndexedMediaDao {
      * @param end The end of the time period (exclusive)
      * @return Flow emitting a list of indexed image entities
      */
-    @Query("SELECT * FROM indexed_media_images WHERE timestamp BETWEEN :start AND :end ORDER BY timestamp ASC")
+    @Query("SELECT * FROM indexed_media_images WHERE timestamp >= :start AND timestamp < :end ORDER BY timestamp ASC")
     fun getImagesForPeriod(
         start: Instant,
         end: Instant,
@@ -104,7 +104,7 @@ interface IndexedMediaDao {
      * @param end The end of the time period (exclusive)
      * @return Flow emitting a list of indexed video entities
      */
-    @Query("SELECT * FROM indexed_media_videos WHERE timestamp BETWEEN :start AND :end ORDER BY timestamp ASC")
+    @Query("SELECT * FROM indexed_media_videos WHERE timestamp >= :start AND timestamp < :end ORDER BY timestamp ASC")
     fun getVideosForPeriod(
         start: Instant,
         end: Instant,

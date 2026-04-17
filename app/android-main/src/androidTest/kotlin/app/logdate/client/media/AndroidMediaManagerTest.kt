@@ -34,6 +34,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -102,9 +103,14 @@ class AndroidMediaManagerTest {
             assertEquals(imageFile.name, image.name)
             assertEquals(imageFile.length().toInt(), image.size)
 
-            assertFailsWith<IllegalStateException> {
-                mediaManager.getMedia(Uri.fromFile(videoFile).toString())
-            }
+            // Corrupt video file: MediaMetadataRetriever can't parse 4 bytes of garbage,
+            // but the user must still see the file in the gallery rather than have it
+            // disappear. Duration falls back to ZERO so the row stays visible.
+            val unreadableVideo = mediaManager.getMedia(Uri.fromFile(videoFile).toString())
+            assertTrue(unreadableVideo is MediaObject.Video)
+            assertEquals(videoFile.name, unreadableVideo.name)
+            assertEquals(videoFile.length().toInt(), unreadableVideo.size)
+            assertEquals(Duration.ZERO, unreadableVideo.duration)
 
             val environment = createMockEnvironment()
             val fallbackUri = Uri.parse("content://example.media/items/fallback.png")
@@ -631,7 +637,11 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun getMedia_returnsFallbackObjectsWhenCursorHasNoRows() = runTest {
+    fun getMedia_throwsWhenCursorHasNoRows() = runTest {
+        // Empty cursor means the URI itself doesn't resolve to any MediaStore row,
+        // which is genuinely unrecoverable: there's nothing to materialize. Throwing
+        // here is correct — distinct from the "row exists but metadata is incomplete"
+        // case, which the fallback chain handles by surfacing the row anyway.
         val environment = createMockEnvironment()
         val imageUri = Uri.parse("content://example.media/images/empty")
         val videoUri = Uri.parse("content://example.media/videos/empty")
@@ -812,7 +822,11 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun queryMediaByDate_throwsWhenRowMetadataIsMissing() = runTest {
+    fun queryMediaByDate_recoversRowsWithMissingTimestampMetadata() = runTest {
+        // The user must never see media disappear from the gallery just because
+        // MediaStore left a row's metadata blank. A row with both DATE_TAKEN and
+        // DATE_ADDED set to zero must still surface, with the timestamp falling
+        // back to "now" so the row stays visible.
         val environment = createMockEnvironment()
         val start = Instant.fromEpochMilliseconds(0)
         val end = Instant.fromEpochMilliseconds(20_000L)
@@ -853,9 +867,13 @@ class AndroidMediaManagerTest {
                 MediaStore.MediaColumns.DATE_ADDED,
             )
 
-            assertFailsWith<IllegalStateException> {
-                environment.mediaManager.queryMediaByDate(start, end).first()
-            }
+            val result = environment.mediaManager.queryMediaByDate(start, end).first()
+
+            assertEquals(1, result.size)
+            val recovered = result.single()
+            assertTrue(recovered is MediaObject.Image)
+            assertEquals("image.png", recovered.name)
+            assertEquals(321, recovered.size)
         } finally {
             environment.filesDir.deleteRecursively()
             clearAllMocks()
@@ -863,7 +881,10 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun getRecentMedia_throwsWhenRowMetadataIsMissing() = runTest {
+    fun getRecentMedia_recoversRowsWithMissingTimestampMetadata() = runTest {
+        // Same contract as the date-range query: the user must never see a row
+        // disappear from the recent media gallery just because MediaStore left
+        // its DATE_TAKEN and DATE_ADDED columns blank.
         val environment = createMockEnvironment()
         val imageCollection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
         val videoCollection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
@@ -902,9 +923,13 @@ class AndroidMediaManagerTest {
                 MediaStore.MediaColumns.DATE_ADDED,
             )
 
-            assertFailsWith<IllegalStateException> {
-                environment.mediaManager.getRecentMedia().first()
-            }
+            val result = environment.mediaManager.getRecentMedia().first()
+
+            assertEquals(1, result.size)
+            val recovered = result.single()
+            assertTrue(recovered is MediaObject.Image)
+            assertEquals("image.png", recovered.name)
+            assertEquals(321, recovered.size)
         } finally {
             environment.filesDir.deleteRecursively()
             clearAllMocks()
@@ -912,7 +937,71 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun getMedia_throwsWhenTimestampMetadataIsMissing() = runTest {
+    fun getRecentMedia_recoversVideosWithNullDurationMetadata() = runTest {
+        // The originally reported bug: a video row whose DURATION column is null
+        // (e.g. MediaStore failed to index it properly) used to throw and abort the
+        // entire query, hiding every other video in the gallery. The user would
+        // see videos disappear. The fallback chain must keep the video visible.
+        val environment = createMockEnvironment()
+        val imageCollection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        val videoCollection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+
+        try {
+            every {
+                environment.contentResolver.query(
+                    imageCollection,
+                    any(),
+                    null,
+                    null,
+                    any(),
+                )
+            } returns emptyCursor(
+                MediaStore.Images.Media._ID,
+                MediaStore.MediaColumns.DISPLAY_NAME,
+                MediaStore.MediaColumns.SIZE,
+                MediaStore.MediaColumns.DATE_TAKEN,
+                MediaStore.MediaColumns.DATE_ADDED,
+            )
+
+            every {
+                environment.contentResolver.query(
+                    videoCollection,
+                    any(),
+                    null,
+                    null,
+                    any(),
+                )
+            } returns singleRowCursor(
+                MediaStore.Video.Media._ID to 1_000_025_185L,
+                MediaStore.MediaColumns.DISPLAY_NAME to "broken.mp4",
+                MediaStore.MediaColumns.SIZE to 654,
+                MediaStore.Video.Media.DURATION to null,
+                MediaStore.MediaColumns.DATE_TAKEN to 5_000L,
+                MediaStore.MediaColumns.DATE_ADDED to 4L,
+            )
+
+            val result = environment.mediaManager.getRecentMedia().first()
+
+            assertEquals(1, result.size)
+            val recovered = result.single()
+            assertTrue(recovered is MediaObject.Video)
+            assertEquals("broken.mp4", recovered.name)
+            assertEquals(654, recovered.size)
+            assertEquals(5_000L, recovered.timestamp.toEpochMilliseconds())
+            // Duration falls all the way through to ZERO so the row stays visible.
+            assertEquals(Duration.ZERO, recovered.duration)
+        } finally {
+            environment.filesDir.deleteRecursively()
+            clearAllMocks()
+        }
+    }
+
+    @Test
+    fun getMedia_recoversMediaWithMissingTimestampMetadata() = runTest {
+        // Direct lookups by URI must follow the same "never lose user data"
+        // contract as the bulk queries: a row with both DATE_TAKEN and DATE_ADDED
+        // set to zero must still materialize, with the timestamp falling back to
+        // "now" so the user keeps seeing their photo or video.
         val environment = createMockEnvironment()
         val imageUri = Uri.parse("content://example.media/images/missing-timestamp")
         val videoUri = Uri.parse("content://example.media/videos/missing-timestamp")
@@ -951,12 +1040,16 @@ class AndroidMediaManagerTest {
                 MediaStore.MediaColumns.DATE_ADDED to 0L,
             )
 
-            assertFailsWith<IllegalStateException> {
-                environment.mediaManager.getMedia(imageUri.toString())
-            }
-            assertFailsWith<IllegalStateException> {
-                environment.mediaManager.getMedia(videoUri.toString())
-            }
+            val image = environment.mediaManager.getMedia(imageUri.toString())
+            assertTrue(image is MediaObject.Image)
+            assertEquals("image.png", image.name)
+            assertEquals(321, image.size)
+
+            val video = environment.mediaManager.getMedia(videoUri.toString())
+            assertTrue(video is MediaObject.Video)
+            assertEquals("video.mp4", video.name)
+            assertEquals(654, video.size)
+            assertEquals(4_500L, video.duration.inWholeMilliseconds)
         } finally {
             environment.filesDir.deleteRecursively()
             clearAllMocks()

@@ -32,6 +32,8 @@ class AndroidMediaManager(
 ) : MediaManager {
     private val filesDir = context.filesDir
     private val legacyBackfillMutex = Mutex()
+    private val recoveryGateway: MediaRecoveryGateway =
+        ContentResolverMediaRecoveryGateway(contentResolver, context)
 
     private enum class MediaKind {
         IMAGE,
@@ -86,12 +88,15 @@ class AndroidMediaManager(
             val dateTakenIndex = it.getColumnIndex(MediaStore.Images.Media.DATE_TAKEN)
             val dateIndex = it.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
 
-            MediaObject.Image(
-                uri = uri.toString(),
-                name = it.resolveDisplayName(nameIndex, MediaStore.Images.Media.DISPLAY_NAME, uri),
-                size = it.resolveSize(sizeIndex, MediaStore.Images.Media.SIZE, uri),
-                timestamp = resolveTimestampWithFallback(dateTakenIndex, dateIndex, it, uri, "image"),
-            )
+            it
+                .toMediaCursorRow(
+                    uri = uri.toString(),
+                    nameColumn = nameIndex,
+                    sizeColumn = sizeIndex,
+                    durationColumn = -1,
+                    dateTakenColumn = dateTakenIndex,
+                    dateAddedColumn = dateIndex,
+                ).toImage(recoveryGateway)
         } ?: throw IllegalStateException("Unable to query image metadata for URI: $uri")
     }
 
@@ -125,13 +130,15 @@ class AndroidMediaManager(
             val dateTakenIndex = it.getColumnIndex(MediaStore.Video.Media.DATE_TAKEN)
             val dateIndex = it.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
 
-            MediaObject.Video(
-                uri = uri.toString(),
-                name = it.resolveDisplayName(nameIndex, MediaStore.Video.Media.DISPLAY_NAME, uri),
-                size = it.resolveSize(sizeIndex, MediaStore.Video.Media.SIZE, uri),
-                duration = resolveVideoDuration(it, durationIndex, uri),
-                timestamp = resolveTimestampWithFallback(dateTakenIndex, dateIndex, it, uri, "video"),
-            )
+            it
+                .toMediaCursorRow(
+                    uri = uri.toString(),
+                    nameColumn = nameIndex,
+                    sizeColumn = sizeIndex,
+                    durationColumn = durationIndex,
+                    dateTakenColumn = dateTakenIndex,
+                    dateAddedColumn = dateIndex,
+                ).toVideo(recoveryGateway)
         } ?: throw IllegalStateException("Unable to query video metadata for URI: $uri")
     }
 
@@ -881,29 +888,9 @@ class AndroidMediaManager(
     }
 
     /**
-     * Resolves a timestamp from MediaStore. Falls back to the current time so
-     * a media row never disappears from the gallery just because both DATE_TAKEN
-     * and DATE_ADDED are missing. This loses precise chronology for the affected
-     * row but preserves the data — and the user keeps seeing their photo or video.
-     */
-    private fun resolveTimestampWithFallback(
-        dateTakenColumn: Int,
-        dateAddedColumn: Int,
-        cursor: Cursor,
-        uri: Uri,
-        mediaLabel: String,
-    ): Instant {
-        val resolved = resolveTimestampOrNull(dateTakenColumn, dateAddedColumn, cursor)
-        if (resolved != null) return resolved
-
-        Napier.w("Missing $mediaLabel timestamp metadata for URI: $uri — defaulting to now to keep the row visible")
-        return Clock.System.now()
-    }
-
-    /**
-     * Resolves a video's duration when the source is a file:// URI. Falls back to
-     * [Duration.ZERO] on any failure so the user never loses access to the video
-     * just because we can't read its duration metadata.
+     * Resolves a video's duration when the source is a file:// URI. Falls back
+     * to [Duration.ZERO] on any failure so the user never loses access to the
+     * video just because we can't read its duration metadata.
      */
     private fun resolveFileVideoDuration(uri: Uri): Duration {
         val retriever = MediaMetadataRetriever()
@@ -921,31 +908,6 @@ class AndroidMediaManager(
         } catch (error: RuntimeException) {
             Napier.w("Unable to resolve video duration for file URI: $uri — defaulting to zero so the video stays visible", error)
             return Duration.ZERO
-        } finally {
-            try {
-                retriever.release()
-            } catch (error: RuntimeException) {
-                Napier.e("Failed to release MediaMetadataRetriever", error)
-            }
-        }
-    }
-
-    /**
-     * Resolves a video's duration by opening the underlying content URI through
-     * [MediaMetadataRetriever]. Returns null on any failure since this is itself
-     * a fallback path for rows whose MediaStore DURATION column is null.
-     */
-    private fun extractContentVideoDurationOrNull(uri: Uri): Duration? {
-        val retriever = MediaMetadataRetriever()
-        return try {
-            retriever.setDataSource(context, uri)
-            retriever
-                .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                ?.toLongOrNull()
-                ?.milliseconds
-        } catch (error: RuntimeException) {
-            Napier.w("Unable to read video duration directly from URI: $uri", error)
-            null
         } finally {
             try {
                 retriever.release()
@@ -981,12 +943,16 @@ class AndroidMediaManager(
         dateAddedColumn: Int,
     ): MediaObject.Image {
         val uri = Uri.withAppendedPath(collectionUri, cursor.getLong(idColumn).toString())
-        return MediaObject.Image(
-            uri = uri.toString(),
-            name = cursor.resolveDisplayName(nameColumn, MediaStore.Images.Media.DISPLAY_NAME, uri),
-            size = cursor.resolveSize(sizeColumn, MediaStore.Images.Media.SIZE, uri),
-            timestamp = resolveTimestampWithFallback(dateTakenColumn, dateAddedColumn, cursor, uri, "image"),
-        )
+        val row =
+            cursor.toMediaCursorRow(
+                uri = uri.toString(),
+                nameColumn = nameColumn,
+                sizeColumn = sizeColumn,
+                durationColumn = -1,
+                dateTakenColumn = dateTakenColumn,
+                dateAddedColumn = dateAddedColumn,
+            )
+        return row.toImage(recoveryGateway)
     }
 
     private fun videoFromCursor(
@@ -1000,85 +966,49 @@ class AndroidMediaManager(
         dateAddedColumn: Int,
     ): MediaObject.Video {
         val uri = Uri.withAppendedPath(collectionUri, cursor.getLong(idColumn).toString())
-        return MediaObject.Video(
-            uri = uri.toString(),
-            name = cursor.resolveDisplayName(nameColumn, MediaStore.Video.Media.DISPLAY_NAME, uri),
-            size = cursor.resolveSize(sizeColumn, MediaStore.Video.Media.SIZE, uri),
-            duration = resolveVideoDuration(cursor, durationColumn, uri),
-            timestamp = resolveTimestampWithFallback(dateTakenColumn, dateAddedColumn, cursor, uri, "video"),
-        )
+        val row =
+            cursor.toMediaCursorRow(
+                uri = uri.toString(),
+                nameColumn = nameColumn,
+                sizeColumn = sizeColumn,
+                durationColumn = durationColumn,
+                dateTakenColumn = dateTakenColumn,
+                dateAddedColumn = dateAddedColumn,
+            )
+        return row.toVideo(recoveryGateway)
     }
 
     /**
-     * Reads a display name from MediaStore. Falls back to the URI's last path
-     * segment and finally to a generic placeholder so a media row never disappears
-     * from the gallery just because its DISPLAY_NAME column is null or blank.
+     * Extracts a [MediaCursorRow] snapshot from the cursor's current row,
+     * keeping every metadata field nullable so the fallback logic in
+     * [MediaCursorRow.toImage]/[MediaCursorRow.toVideo] can recover gracefully
+     * from missing values. Pass [durationColumn] as -1 for image rows.
      */
-    private fun Cursor.resolveDisplayName(
-        index: Int,
-        columnName: String,
-        uri: Uri,
-    ): String {
-        val cursorName =
-            if (!isNull(index)) {
-                getString(index)?.takeIf { it.isNotBlank() }
-            } else {
-                null
-            }
-        if (cursorName != null) return cursorName
-
-        Napier.w("Missing $columnName for URI: $uri — falling back to URI segment")
-        return uri.lastPathSegment?.takeIf { it.isNotBlank() } ?: "Untitled"
-    }
-
-    /**
-     * Reads a size in bytes from MediaStore. Falls back to a stat against the
-     * file descriptor and finally to 0 so a media row never disappears from the
-     * gallery just because its SIZE column is null. Size is purely informational
-     * in the picker, so a zero fallback is harmless.
-     */
-    private fun Cursor.resolveSize(
-        index: Int,
-        columnName: String,
-        uri: Uri,
-    ): Int {
-        if (!isNull(index)) {
-            return getInt(index)
-        }
-
-        Napier.w("Missing $columnName for URI: $uri — falling back to file descriptor stat")
-        val fromStat =
-            try {
-                contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize.toInt() }
-            } catch (error: Exception) {
-                Napier.w("Unable to stat file descriptor for URI: $uri", error)
-                null
-            }
-        return fromStat ?: 0
-    }
-
-    /**
-     * Resolves a video's duration from a MediaStore cursor. Falls back to reading
-     * the underlying file directly with [MediaMetadataRetriever] and finally to
-     * [Duration.ZERO], so the user never sees a video disappear from the gallery
-     * just because its cached duration metadata is missing or stale.
-     */
-    private fun resolveVideoDuration(
-        cursor: Cursor,
+    private fun Cursor.toMediaCursorRow(
+        uri: String,
+        nameColumn: Int,
+        sizeColumn: Int,
         durationColumn: Int,
-        uri: Uri,
-    ): Duration {
-        if (!cursor.isNull(durationColumn)) {
-            return cursor.getLong(durationColumn).milliseconds
-        }
-
-        Napier.w("Missing duration metadata for URI: $uri — reading directly from the file")
-        val fromRetriever = extractContentVideoDurationOrNull(uri)
-        if (fromRetriever != null) return fromRetriever
-
-        // Both MediaStore and MediaMetadataRetriever returned null. The file is inaccessible
-        // or corrupt. Throw so the call site logs this at error level — showing Duration.ZERO
-        // would display an incorrect 0-second duration to the user.
-        throw IllegalStateException("Unable to resolve duration for URI: $uri")
+        dateTakenColumn: Int,
+        dateAddedColumn: Int,
+    ): MediaCursorRow {
+        val displayName =
+            if (nameColumn >= 0 && !isNull(nameColumn)) getString(nameColumn) else null
+        val sizeBytes =
+            if (sizeColumn >= 0 && !isNull(sizeColumn)) getInt(sizeColumn) else null
+        val durationMillis =
+            if (durationColumn >= 0 && !isNull(durationColumn)) getLong(durationColumn) else null
+        val dateTakenMillis =
+            if (dateTakenColumn >= 0 && !isNull(dateTakenColumn)) getLong(dateTakenColumn) else null
+        val dateAddedSeconds =
+            if (dateAddedColumn >= 0 && !isNull(dateAddedColumn)) getLong(dateAddedColumn) else null
+        return MediaCursorRow(
+            uri = uri,
+            displayName = displayName,
+            sizeBytes = sizeBytes,
+            durationMillis = durationMillis,
+            dateTakenMillis = dateTakenMillis,
+            dateAddedSeconds = dateAddedSeconds,
+        )
     }
 }

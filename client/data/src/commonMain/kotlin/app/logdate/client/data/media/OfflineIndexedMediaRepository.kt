@@ -12,7 +12,6 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.flow.map
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -149,14 +148,13 @@ class OfflineIndexedMediaRepository(
         startTime: Instant,
         endTime: Instant,
     ): Flow<List<IndexedMedia>> =
-        indexedMediaDao.getImagesForPeriod(startTime, endTime).map { images ->
-            val videos = indexedMediaDao.getVideosForPeriod(startTime, endTime).firstOrNull() ?: emptyList()
-
-            // Combine and sort by timestamp
+        combine(
+            indexedMediaDao.getImagesForPeriod(startTime, endTime),
+            indexedMediaDao.getVideosForPeriod(startTime, endTime),
+        ) { images, videos ->
             val result = mutableListOf<IndexedMedia>()
             result.addAll(images.map { mapToIndexedImage(it) })
             result.addAll(videos.map { mapToIndexedVideo(it) })
-
             result.sortedBy { it.timestamp }
         }
 
