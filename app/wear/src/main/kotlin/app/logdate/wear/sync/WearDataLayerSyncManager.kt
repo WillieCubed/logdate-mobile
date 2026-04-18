@@ -22,6 +22,9 @@ import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -55,9 +58,20 @@ class WearDataLayerSyncManager(
     private val healthSnapshotDataMapper: HealthSnapshotDataMapper,
     private val clock: Clock = Clock.System,
 ) : SyncManager {
-
     @Volatile
     private var isSyncing = false
+
+    private val _syncStatusFlow =
+        MutableStateFlow(
+            SyncStatus(
+                isEnabled = false,
+                lastSyncTime = null,
+                pendingUploads = 0,
+                isSyncing = false,
+                hasErrors = false,
+            ),
+        )
+    override val syncStatusFlow: StateFlow<SyncStatus> = _syncStatusFlow.asStateFlow()
 
     override fun sync(startNow: Boolean) {
         Napier.d("Wear sync requested (startNow=$startNow)")
@@ -82,10 +96,11 @@ class WearDataLayerSyncManager(
                 Napier.d("Skipping note ${pending.entityId} — backoff not elapsed")
                 continue
             }
-            val outcome = when (pending.operation) {
-                PendingOperation.DELETE -> uploadNoteDelete(pending)
-                PendingOperation.CREATE, PendingOperation.UPDATE -> uploadNote(pending)
-            }
+            val outcome =
+                when (pending.operation) {
+                    PendingOperation.DELETE -> uploadNoteDelete(pending)
+                    PendingOperation.CREATE, PendingOperation.UPDATE -> uploadNote(pending)
+                }
             handleOutcome(outcome, pending, EntityType.NOTE, errors) { uploaded++ }
         }
 
@@ -131,10 +146,11 @@ class WearDataLayerSyncManager(
                 Napier.d("Skipping journal ${pending.entityId} — backoff not elapsed")
                 continue
             }
-            val outcome = when (pending.operation) {
-                PendingOperation.DELETE -> uploadJournalDelete(pending)
-                PendingOperation.CREATE, PendingOperation.UPDATE -> uploadJournal(pending)
-            }
+            val outcome =
+                when (pending.operation) {
+                    PendingOperation.DELETE -> uploadJournalDelete(pending)
+                    PendingOperation.CREATE, PendingOperation.UPDATE -> uploadJournal(pending)
+                }
             handleOutcome(outcome, pending, EntityType.JOURNAL, errors) { uploaded++ }
         }
 
@@ -166,10 +182,11 @@ class WearDataLayerSyncManager(
                 Napier.d("Skipping association ${pending.entityId} — backoff not elapsed")
                 continue
             }
-            val outcome = when (pending.operation) {
-                PendingOperation.DELETE -> uploadAssociationDelete(pending)
-                PendingOperation.CREATE, PendingOperation.UPDATE -> uploadAssociation(pending)
-            }
+            val outcome =
+                when (pending.operation) {
+                    PendingOperation.DELETE -> uploadAssociationDelete(pending)
+                    PendingOperation.CREATE, PendingOperation.UPDATE -> uploadAssociation(pending)
+                }
             handleOutcome(outcome, pending, EntityType.ASSOCIATION, errors) { uploaded++ }
         }
 
@@ -204,10 +221,12 @@ class WearDataLayerSyncManager(
             // Phase 4: Health snapshots last (reference notes)
             val healthResult = syncHealthSnapshots()
 
-            val totalUploaded = journalsResult.uploadedItems + notesResult.uploadedItems +
-                associationsResult.uploadedItems + healthResult.uploadedItems
-            val allErrors = journalsResult.errors + notesResult.errors +
-                associationsResult.errors + healthResult.errors
+            val totalUploaded =
+                journalsResult.uploadedItems + notesResult.uploadedItems +
+                    associationsResult.uploadedItems + healthResult.uploadedItems
+            val allErrors =
+                journalsResult.errors + notesResult.errors +
+                    associationsResult.errors + healthResult.errors
 
             return SyncResult(
                 success = allErrors.isEmpty(),
@@ -257,17 +276,18 @@ class WearDataLayerSyncManager(
         val errors = mutableListOf<SyncError>()
 
         for (entity in recentSnapshots) {
-            val syncData = HealthSnapshotSyncData(
-                id = entity.id,
-                noteId = entity.noteId,
-                heartRateBpm = entity.heartRateBpm,
-                heartRateVariabilityMs = entity.heartRateVariabilityMs,
-                stepCount = entity.stepCount,
-                stressLevel = entity.stressLevel,
-                cumulativeCalories = entity.cumulativeCalories,
-                timestamp = entity.timestamp,
-                source = entity.source,
-            )
+            val syncData =
+                HealthSnapshotSyncData(
+                    id = entity.id,
+                    noteId = entity.noteId,
+                    heartRateBpm = entity.heartRateBpm,
+                    heartRateVariabilityMs = entity.heartRateVariabilityMs,
+                    stepCount = entity.stepCount,
+                    stressLevel = entity.stressLevel,
+                    cumulativeCalories = entity.cumulativeCalories,
+                    timestamp = entity.timestamp,
+                    source = entity.source,
+                )
             val dataMap = healthSnapshotDataMapper.toDataMap(syncData)
             val path = HealthSnapshotDataMapper.healthPath(entity.id)
 
@@ -319,7 +339,7 @@ class WearDataLayerSyncManager(
 
         // For audio notes, also send the audio file via channel
         if (note is JournalNote.Audio) {
-            val channelPath = "${path}/audio"
+            val channelPath = "$path/audio"
             val fileSuccess = dataLayerClient.sendFile(channelPath, note.mediaRef)
             if (!fileSuccess) {
                 Napier.w("Audio file transfer failed for note $noteId, metadata was sent")
@@ -336,10 +356,11 @@ class WearDataLayerSyncManager(
         val noteId = parseUuid(pending.entityId) ?: return UploadOutcome.SKIPPED
 
         val path = NoteDataMapper.noteDeletePath(noteId)
-        val deleteData = mapOf(
-            NoteDataMapper.KEY_UID to noteId.toString(),
-            NoteDataMapper.KEY_NOTE_TYPE to "DELETE",
-        )
+        val deleteData =
+            mapOf(
+                NoteDataMapper.KEY_UID to noteId.toString(),
+                NoteDataMapper.KEY_NOTE_TYPE to "DELETE",
+            )
         return if (dataLayerClient.putDataItem(path, deleteData)) {
             UploadOutcome.SUCCESS
         } else {
@@ -503,16 +524,18 @@ class WearDataLayerSyncManager(
     // Shared helpers
     // -----------------------------------------------------------------------
 
-    private fun notConnectedResult(): SyncResult = SyncResult(
-        success = false,
-        errors = listOf(
-            SyncError(
-                type = SyncErrorType.NETWORK_ERROR,
-                message = "Phone not connected",
-                retryable = true,
-            ),
-        ),
-    )
+    private fun notConnectedResult(): SyncResult =
+        SyncResult(
+            success = false,
+            errors =
+                listOf(
+                    SyncError(
+                        type = SyncErrorType.NETWORK_ERROR,
+                        message = "Phone not connected",
+                        retryable = true,
+                    ),
+                ),
+        )
 
     private suspend fun handleOutcome(
         outcome: UploadOutcome,

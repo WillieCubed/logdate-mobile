@@ -3,11 +3,27 @@ package app.logdate.client.data.fakes
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncResult
 import app.logdate.client.sync.SyncStatus
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Fake implementation of [SyncManager] for testing.
  */
 class FakeSyncManager : SyncManager {
+    private val _syncStatusFlow =
+        MutableStateFlow(
+            SyncStatus(
+                isEnabled = true,
+                lastSyncTime = null,
+                pendingUploads = 0,
+                isSyncing = false,
+                hasErrors = false,
+                lastError = null,
+            ),
+        )
+    override val syncStatusFlow: StateFlow<SyncStatus> = _syncStatusFlow.asStateFlow()
+
     private var syncRequested = false
     private var immediateSync = false
     private var syncCount = 0
