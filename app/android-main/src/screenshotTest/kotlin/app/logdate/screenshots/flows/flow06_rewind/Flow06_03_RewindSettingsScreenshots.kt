@@ -14,8 +14,10 @@ fun S01_RewindSettingsBothEnabled() {
         RewindSettingsContent(
             autoGenerationEnabled = true,
             notificationsEnabled = true,
+            reflectionRepliesEnabled = true,
             onAutoGenerationToggled = {},
             onNotificationsToggled = {},
+            onReflectionRepliesToggled = {},
             onBack = {},
         )
     }
@@ -29,8 +31,10 @@ fun S02_RewindSettingsAutoGenerationOff() {
         RewindSettingsContent(
             autoGenerationEnabled = false,
             notificationsEnabled = true,
+            reflectionRepliesEnabled = true,
             onAutoGenerationToggled = {},
             onNotificationsToggled = {},
+            onReflectionRepliesToggled = {},
             onBack = {},
         )
     }
@@ -44,8 +48,10 @@ fun S03_RewindSettingsNotificationsOff() {
         RewindSettingsContent(
             autoGenerationEnabled = true,
             notificationsEnabled = false,
+            reflectionRepliesEnabled = true,
             onAutoGenerationToggled = {},
             onNotificationsToggled = {},
+            onReflectionRepliesToggled = {},
             onBack = {},
         )
     }
