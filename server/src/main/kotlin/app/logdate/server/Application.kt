@@ -22,8 +22,10 @@ import app.logdate.server.entitlements.entitlementsModule
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.logdate.CompositeLogDateMediaBlobRepository
+import app.logdate.server.logdate.FilesystemLogDateBlobStorage
 import app.logdate.server.logdate.LogDateAtprotoBlobRepository
 import app.logdate.server.logdate.LogDateBackupRepository
+import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateCollectionsMetadataStore
 import app.logdate.server.logdate.LogDateMediaRepository
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
@@ -170,7 +172,15 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
             mediaRepository = logDateMediaRepository,
             atprotoBlobRepository = logDateAtprotoBlobRepository,
         )
-    val blobStorage = GcsMediaStorage.fromEnvironment()
+    val blobStorage: LogDateBlobStorage? =
+        GcsMediaStorage.fromEnvironment()
+            ?: FilesystemLogDateBlobStorage.fromEnvironment()
+    if (blobStorage == null) {
+        log.warn(
+            "No blob storage configured: media and backup endpoints will reject uploads. " +
+                "Set GCS_* for Google Cloud Storage or LOGDATE_BLOB_STORAGE_DIR for an on-disk store.",
+        )
+    }
     val logDateCollectionsRepository =
         RepoBackedLogDateCollectionsRepository(
             accountRepository = accountRepository,

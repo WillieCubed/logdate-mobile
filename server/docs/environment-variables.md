@@ -226,6 +226,22 @@ These can be used instead of `DATABASE_URL`:
 
 ---
 
+## Blob Storage
+
+### `LOGDATE_BLOB_STORAGE_DIR`
+- **Description**: Absolute or relative path to a directory that the server uses as on-disk blob storage for media and backups when GCS is not configured.
+- **Type**: String (filesystem path)
+- **Default**: None. When both this and `GCS_*` are unset, media and backup uploads are rejected with `503 Service Unavailable`.
+- **Example**: `LOGDATE_BLOB_STORAGE_DIR=/var/lib/logdate/blobs`
+- **Required**: No — needed only for self-host deployments without Google Cloud Storage.
+- **Notes**:
+  - The server creates the directory if it doesn't exist.
+  - Layout is `<namespace>/<ownerId>/<blobId>`, matching the GCS object naming.
+  - GCS takes precedence when both are set (GCS is checked first).
+  - Back this with durable storage. A crashed container loses anything written to an ephemeral volume.
+
+---
+
 ## Encryption
 
 ### `SERVER_ENCRYPTION_KEY`
