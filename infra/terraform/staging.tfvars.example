@@ -9,7 +9,7 @@ enable_github_oidc = true
 github_repo        = "your-org/logdate"
 
 enable_domain_mapping = false
-domain                = "staging.logdate.app"
+domains               = ["staging.logdate.app"]
 
 create_gcs_bucket = true
 gcs_bucket_name   = "logdate-media-staging"

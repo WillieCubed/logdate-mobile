@@ -42,3 +42,18 @@ output "media_bucket_name" {
   description = "Media bucket name."
   value       = var.create_gcs_bucket ? google_storage_bucket.media[0].name : null
 }
+
+output "domain_mappings" {
+  description = "Map of custom domain to the verifying DNS resource records Cloud Run wants published."
+  value = {
+    for domain, mapping in google_cloud_run_domain_mapping.default :
+    domain => [
+      for record in mapping.status[0].resource_records :
+      {
+        name   = record.name
+        rrdata = record.rrdata
+        type   = record.type
+      }
+    ]
+  }
+}

@@ -9,7 +9,7 @@ enable_github_oidc = true
 github_repo        = "your-org/logdate"
 
 enable_domain_mapping = true
-domain                = "cloud.logdate.app"
+domains               = ["cloud.logdate.app", "logdate.hypertext.studio"]
 
 create_gcs_bucket = true
 gcs_bucket_name   = "logdate-media-production"

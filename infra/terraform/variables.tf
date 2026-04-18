@@ -211,13 +211,19 @@ variable "github_deploy_service_account_name" {
 
 variable "enable_domain_mapping" {
   type        = bool
-  description = "Whether to create Cloud Run domain mapping."
+  description = "Whether to create Cloud Run domain mappings for every entry in `domains`."
   default     = false
+}
+
+variable "domains" {
+  type        = list(string)
+  description = "Custom domains for Cloud Run (e.g., [\"cloud.logdate.app\", \"logdate.hypertext.studio\"]). Every entry becomes its own `google_cloud_run_domain_mapping` pointing at the same service."
+  default     = []
 }
 
 variable "domain" {
   type        = string
-  description = "Custom domain for Cloud Run (e.g., cloud.logdate.app)."
+  description = "Legacy single-domain shim for deploy scripts that read `var.domain` via `terraform console`. Prefer `domains`; when both are set, the value of `domain` is merged into the effective domains list."
   default     = ""
 }
 

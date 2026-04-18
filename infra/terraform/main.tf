@@ -49,6 +49,11 @@ locals {
   secret_ids_to_create = var.create_secrets ? local.secret_ids : toset([])
 
   github_oidc_enabled = var.enable_github_oidc && var.github_repo != ""
+
+  effective_domains = toset(concat(
+    var.domains,
+    var.domain != "" ? [var.domain] : [],
+  ))
 }
 
 resource "google_project_service" "required" {
@@ -98,15 +103,15 @@ resource "google_iam_workload_identity_pool" "github" {
 }
 
 resource "google_iam_workload_identity_pool_provider" "github" {
-  count                               = local.github_oidc_enabled ? 1 : 0
-  workload_identity_pool_id           = google_iam_workload_identity_pool.github[0].workload_identity_pool_id
-  workload_identity_pool_provider_id  = "github-provider"
-  display_name                        = "GitHub Actions Provider"
+  count                              = local.github_oidc_enabled ? 1 : 0
+  workload_identity_pool_id          = google_iam_workload_identity_pool.github[0].workload_identity_pool_id
+  workload_identity_pool_provider_id = "github-provider"
+  display_name                       = "GitHub Actions Provider"
 
   attribute_mapping = {
-    "google.subject"           = "assertion.sub"
-    "attribute.actor"          = "assertion.actor"
-    "attribute.repository"     = "assertion.repository"
+    "google.subject"             = "assertion.sub"
+    "attribute.actor"            = "assertion.actor"
+    "attribute.repository"       = "assertion.repository"
     "attribute.repository_owner" = "assertion.repository_owner"
   }
 
@@ -305,10 +310,10 @@ resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
 }
 
 resource "google_cloud_run_domain_mapping" "default" {
-  count    = var.enable_domain_mapping && var.enable_cloud_run_service ? 1 : 0
+  for_each = var.enable_domain_mapping && var.enable_cloud_run_service ? local.effective_domains : toset([])
   provider = google-beta
   location = var.region
-  name     = var.domain
+  name     = each.key
 
   metadata {
     namespace = var.project_id

@@ -118,8 +118,10 @@ Use a remote state backend for staging/production. Copy `backend.tf.example` to
 `backend.tf`, set a GCS bucket, and re-run `terraform init` with migration.
 
 ## Domain mapping
-Set `enable_domain_mapping = true` and `domain = "cloud.logdate.app"` after verifying
-ownership in Google Search Console. Domain mappings can take time to provision SSL.
+Set `enable_domain_mapping = true` and `domains = ["cloud.logdate.app", "logdate.hypertext.studio"]`
+after verifying ownership of each entry in Google Search Console. One
+`google_cloud_run_domain_mapping` is created per list entry, all pointing at the same
+Cloud Run service. SSL provisioning per domain can take 15–30 minutes.
 
 ## Fallback (manual) deploy
 Use `scripts/deploy-cloud-run.sh` for emergency deploys with gcloud + Docker. This keeps
