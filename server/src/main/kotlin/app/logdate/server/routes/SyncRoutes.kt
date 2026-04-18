@@ -1,5 +1,7 @@
 package app.logdate.server.routes
 
+import app.logdate.server.audit.AuditCategory
+import app.logdate.server.audit.AuditLogger
 import app.logdate.server.auth.TokenService
 import app.logdate.server.crypto.EncryptionService
 import app.logdate.server.entitlements.EntitlementEnforcer
@@ -1592,6 +1594,15 @@ private suspend fun respondRateLimited(
     policy: RateLimitPolicy,
 ) {
     val retryAfter = rateLimiter.retryAfterSeconds(key, policy)
+    AuditLogger.emit(
+        AuditCategory.SYNC_RATE_LIMITED,
+        mapOf(
+            "key" to key,
+            "retryAfterSeconds" to retryAfter.toString(),
+            "maxRequests" to policy.maxRequests.toString(),
+            "windowSeconds" to policy.windowSeconds.toString(),
+        ),
+    )
     call.response.headers.append(HttpHeaders.RetryAfter, retryAfter.toString())
     call.respond(
         HttpStatusCode.TooManyRequests,
@@ -1620,6 +1631,14 @@ private suspend fun respondQuotaExceeded(
             QuotaReason.BACKUP_COUNT ->
                 "Backup quota exceeded: ${denied.current} of ${denied.limit} backups stored."
         }
+    AuditLogger.emit(
+        AuditCategory.SYNC_QUOTA_EXCEEDED,
+        mapOf(
+            "reason" to denied.reason.name,
+            "limit" to denied.limit.toString(),
+            "current" to denied.current.toString(),
+        ),
+    )
     call.respond(
         HttpStatusCode.PaymentRequired,
         error(

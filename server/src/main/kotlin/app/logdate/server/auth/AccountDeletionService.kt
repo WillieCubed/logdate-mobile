@@ -1,5 +1,8 @@
 package app.logdate.server.auth
 
+import app.logdate.server.audit.AuditCategory
+import app.logdate.server.audit.AuditKey
+import app.logdate.server.audit.AuditLogger
 import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateMediaBlobRepository
@@ -48,6 +51,15 @@ class AccountDeletionService(
             "Account deletion complete: account=$accountId, " +
                 "mediaBlobsDeleted=$mediaBlobsDeleted, backupBlobsDeleted=$backupBlobsDeleted, " +
                 "accountRowDeleted=$accountDeleted",
+        )
+        AuditLogger.emit(
+            AuditCategory.ACCOUNT_DELETED,
+            mapOf(
+                AuditKey.ACCOUNT_ID to accountId.toString(),
+                "mediaBlobsDeleted" to mediaBlobsDeleted.toString(),
+                "backupBlobsDeleted" to backupBlobsDeleted.toString(),
+                "accountRowDeleted" to accountDeleted.toString(),
+            ),
         )
         return Summary(
             mediaBlobsDeleted = mediaBlobsDeleted,

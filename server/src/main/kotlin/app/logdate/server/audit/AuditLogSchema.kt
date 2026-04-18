@@ -9,6 +9,10 @@ object AuditCategory {
     const val AUTH_SIGNIN_PASSKEY_SUCCESS = "auth.signin.passkey.success"
     const val AUTH_SIGNIN_GOOGLE_SUCCESS = "auth.signin.google.success"
     const val AUTH_LINK_GOOGLE_IMPLICIT = "auth.link.google.implicit"
+
+    const val ACCOUNT_DELETED = "account.deleted"
+    const val SYNC_QUOTA_EXCEEDED = "sync.quota.exceeded"
+    const val SYNC_RATE_LIMITED = "sync.rate.limited"
 }
 
 /**
