@@ -57,6 +57,17 @@ internal const val METRIC_MEDIA_DOWNLOAD = "sync.media.download"
 internal const val METRIC_MEDIA_DELETE = "sync.media.delete"
 internal const val METRIC_SYNC_PURGE = "sync.maintenance.purge"
 
+// --- Passive configuration for sync sub-routes --------------------------------------------------
+
+/**
+ * Environment-derived policy knobs the sync surface reads. Intentionally *only* passive values —
+ * collaborator objects (services, repositories, metrics, rate limiters) are passed as individual
+ * function parameters so the dependency graph of each sub-route stays visible at the call site.
+ */
+internal data class SyncRouteConfig(
+    val mediaAccessPolicy: MediaAccessPolicy,
+)
+
 // --- Per-user write-path rate-limit policies ----------------------------------------------------
 
 /**
@@ -344,7 +355,10 @@ internal fun buildBackupDownloadUrl(
     backupId: String,
 ): String = buildBinaryDownloadUrl(call, "/api/v1/backups/$backupId/binary")
 
-private fun buildBinaryDownloadUrl(call: ApplicationCall, path: String): String {
+private fun buildBinaryDownloadUrl(
+    call: ApplicationCall,
+    path: String,
+): String {
     val origin = call.request.local
     val defaultPort =
         (origin.scheme == "http" && origin.localPort == 80) ||

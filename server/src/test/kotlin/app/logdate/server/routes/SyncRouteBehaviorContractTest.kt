@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class SyncRouteBehaviorContractTest {
     @Test
     fun `private sync snapshots expose expected getters`() {
-        val statusClass = Class.forName("app.logdate.server.routes.SyncStatusSnapshot")
+        val statusClass = Class.forName("app.logdate.server.routes.sync.SyncStatusSnapshot")
         val status =
             statusClass
                 .getDeclaredConstructor(Int::class.java, Int::class.java, Int::class.java, Long::class.java)
@@ -18,7 +18,7 @@ class SyncRouteBehaviorContractTest {
         assertEquals(3, statusClass.getMethod("getAssociationCount").invoke(status))
         assertEquals(4L, statusClass.getMethod("getLastTimestamp").invoke(status))
 
-        val purgeClass = Class.forName("app.logdate.server.routes.SyncPurgeResponse")
+        val purgeClass = Class.forName("app.logdate.server.routes.sync.SyncPurgeResponse")
         val purge =
             purgeClass
                 .getDeclaredConstructor(
@@ -61,7 +61,7 @@ class SyncRouteBehaviorContractTest {
 
     @Test
     fun `association link request constructors are invocable`() {
-        val requestClass = Class.forName("app.logdate.server.routes.AssociationLinkUpsertRequest")
+        val requestClass = Class.forName("app.logdate.server.routes.sync.AssociationLinkUpsertRequest")
         val primaryCtor =
             requestClass.getDeclaredConstructor(
                 Long::class.javaPrimitiveType,
