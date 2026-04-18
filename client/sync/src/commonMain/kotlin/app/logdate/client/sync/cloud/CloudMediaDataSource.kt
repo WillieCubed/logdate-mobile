@@ -75,6 +75,11 @@ data class MediaUploadResult(
 
 /**
  * Default implementation of CloudMediaDataSource using the CloudApiClient.
+ *
+ * **Encryption:** [mediaPayloadCrypto] defaults to [NoOpMediaPayloadCrypto] only so tests can
+ * construct this class without wiring a key source. Production builds receive
+ * [StoredMediaPayloadCrypto] via DI (`CloudModule.kt`) and bytes on the wire are always
+ * AES-GCM–encrypted client-side before they reach the server.
  */
 class DefaultCloudMediaDataSource(
     private val cloudApiClient: CloudApiClient,
