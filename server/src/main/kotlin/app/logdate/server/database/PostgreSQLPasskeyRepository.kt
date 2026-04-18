@@ -2,18 +2,16 @@ package app.logdate.server.database
 
 import app.logdate.server.passkeys.PasskeyRepository
 import app.logdate.server.passkeys.StoredPasskeyData
-import app.logdate.server.util.toKotlinInstant
-import app.logdate.server.util.toKotlinxInstant
 import app.logdate.shared.model.PasskeyInfo
-import org.jetbrains.exposed.sql.ResultRow
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.ResultRow
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
+import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.update
 import java.util.Base64
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
@@ -38,8 +36,8 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
                     it[PasskeysTable.signCount] = signCount
                     it[nickname] = info.nickname
                     it[deviceType] = info.deviceType
-                    it[createdAt] = info.createdAt.toKotlinxInstant()
-                    it[lastUsedAt] = info.lastUsedAt?.toKotlinxInstant()
+                    it[createdAt] = info.createdAt
+                    it[lastUsedAt] = info.lastUsedAt
                     it[isActive] = info.isActive
                     it[webauthnData] = "{}"
                 }
@@ -86,7 +84,7 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
             val updatedRows =
                 PasskeysTable.update({ PasskeysTable.credentialId eq credentialId }) {
                     it[signCount] = newSignCount
-                    it[lastUsedAt] = Clock.System.now().toKotlinxInstant()
+                    it[lastUsedAt] = Clock.System.now()
                 }
             updatedRows > 0
         }
@@ -167,7 +165,7 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
         transaction {
             val updatedRows =
                 PasskeysTable.update({ PasskeysTable.credentialId eq credentialId }) {
-                    it[lastUsedAt] = Clock.System.now().toKotlinxInstant()
+                    it[lastUsedAt] = Clock.System.now()
                 }
             updatedRows > 0
         }
@@ -200,8 +198,8 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
                 it[this.signCount] = signCount
                 it[nickname] = passkey.nickname
                 it[deviceType] = passkey.deviceType
-                it[createdAt] = passkey.createdAt.toKotlinxInstant()
-                it[lastUsedAt] = passkey.lastUsedAt?.toKotlinxInstant()
+                it[createdAt] = passkey.createdAt
+                it[lastUsedAt] = passkey.lastUsedAt
                 it[isActive] = passkey.isActive
                 it[this.webauthnData] = webauthnData
             }
@@ -232,8 +230,8 @@ class PostgreSQLPasskeyRepository : PasskeyRepository {
             credentialId = this[PasskeysTable.credentialId],
             nickname = this[PasskeysTable.nickname],
             deviceType = this[PasskeysTable.deviceType],
-            createdAt = this[PasskeysTable.createdAt].toKotlinInstant(),
-            lastUsedAt = this[PasskeysTable.lastUsedAt]?.toKotlinInstant(),
+            createdAt = this[PasskeysTable.createdAt],
+            lastUsedAt = this[PasskeysTable.lastUsedAt],
             isActive = this[PasskeysTable.isActive],
         )
 

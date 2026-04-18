@@ -2,11 +2,13 @@ package app.logdate.server.entitlements
 
 import app.logdate.server.database.LogDateBackupsTable
 import app.logdate.server.database.LogDateMediaRecordsTable
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.sum
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.sum
+import org.jetbrains.exposed.v1.jdbc.Database
+import org.jetbrains.exposed.v1.jdbc.select
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.util.UUID
 
 /**
@@ -29,8 +31,7 @@ class DatabaseUsageCalculator(
                     .where {
                         (LogDateMediaRecordsTable.userId eq accountId) and
                             (LogDateMediaRecordsTable.deleted eq false)
-                    }
-                    .singleOrNull()
+                    }.singleOrNull()
                     ?.get(LogDateMediaRecordsTable.sizeBytes.sum()) ?: 0L
             val backups =
                 LogDateBackupsTable

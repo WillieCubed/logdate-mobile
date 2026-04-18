@@ -98,8 +98,8 @@ import app.logdate.server.sync.SyncRepository
 import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
-import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.SchemaUtils
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.koin.dsl.module
 import studio.hypertext.atproto.plc.KtorPlcDirectoryClient
 import studio.hypertext.atproto.repo.InMemoryRepoBlockStore

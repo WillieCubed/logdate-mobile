@@ -4,15 +4,13 @@ import app.logdate.server.oauth.OAuthRuntimeStateRepository
 import app.logdate.server.oauth.StoredAuthorizationCode
 import app.logdate.server.oauth.StoredAuthorizationRequest
 import app.logdate.server.oauth.StoredRefreshToken
-import app.logdate.server.util.toKotlinInstant
-import app.logdate.server.util.toKotlinxInstant
-import org.jetbrains.exposed.sql.ResultRow
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.ResultRow
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
+import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.update
 
 internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateRepository {
     override suspend fun saveAuthorizationRequest(request: StoredAuthorizationRequest): StoredAuthorizationRequest =
@@ -36,7 +34,7 @@ internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateReposito
                     it[dpopKeyThumbprint] = request.dpopKeyThumbprint
                     it[clientAuthKeyId] = request.clientAuthKeyId
                     it[clientAuthKeyThumbprint] = request.clientAuthKeyThumbprint
-                    it[expiresAt] = request.expiresAt.toKotlinxInstant()
+                    it[expiresAt] = request.expiresAt
                 }
             } else {
                 OAuthAuthorizationRequestsTable.update({ OAuthAuthorizationRequestsTable.requestUri eq request.requestUri }) {
@@ -50,7 +48,7 @@ internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateReposito
                     it[dpopKeyThumbprint] = request.dpopKeyThumbprint
                     it[clientAuthKeyId] = request.clientAuthKeyId
                     it[clientAuthKeyThumbprint] = request.clientAuthKeyThumbprint
-                    it[expiresAt] = request.expiresAt.toKotlinxInstant()
+                    it[expiresAt] = request.expiresAt
                 }
             }
             request
@@ -90,7 +88,7 @@ internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateReposito
                     it[dpopKeyThumbprint] = code.dpopKeyThumbprint
                     it[clientAuthKeyId] = code.clientAuthKeyId
                     it[clientAuthKeyThumbprint] = code.clientAuthKeyThumbprint
-                    it[expiresAt] = code.expiresAt.toKotlinxInstant()
+                    it[expiresAt] = code.expiresAt
                 }
             } else {
                 OAuthAuthorizationCodesTable.update({ OAuthAuthorizationCodesTable.code eq code.code }) {
@@ -103,7 +101,7 @@ internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateReposito
                     it[dpopKeyThumbprint] = code.dpopKeyThumbprint
                     it[clientAuthKeyId] = code.clientAuthKeyId
                     it[clientAuthKeyThumbprint] = code.clientAuthKeyThumbprint
-                    it[expiresAt] = code.expiresAt.toKotlinxInstant()
+                    it[expiresAt] = code.expiresAt
                 }
             }
             code
@@ -140,8 +138,8 @@ internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateReposito
                     it[dpopKeyThumbprint] = token.dpopKeyThumbprint
                     it[clientAuthKeyId] = token.clientAuthKeyId
                     it[clientAuthKeyThumbprint] = token.clientAuthKeyThumbprint
-                    it[expiresAt] = token.expiresAt.toKotlinxInstant()
-                    it[revokedAt] = token.revokedAt?.toKotlinxInstant()
+                    it[expiresAt] = token.expiresAt
+                    it[revokedAt] = token.revokedAt
                 }
             } else {
                 OAuthRefreshTokensTable.update({ OAuthRefreshTokensTable.token eq token.token }) {
@@ -151,8 +149,8 @@ internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateReposito
                     it[dpopKeyThumbprint] = token.dpopKeyThumbprint
                     it[clientAuthKeyId] = token.clientAuthKeyId
                     it[clientAuthKeyThumbprint] = token.clientAuthKeyThumbprint
-                    it[expiresAt] = token.expiresAt.toKotlinxInstant()
-                    it[revokedAt] = token.revokedAt?.toKotlinxInstant()
+                    it[expiresAt] = token.expiresAt
+                    it[revokedAt] = token.revokedAt
                 }
             }
             token
@@ -173,7 +171,7 @@ internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateReposito
     ): Boolean =
         transaction {
             OAuthRefreshTokensTable.update({ OAuthRefreshTokensTable.token eq token }) {
-                it[OAuthRefreshTokensTable.revokedAt] = revokedAt.toKotlinxInstant()
+                it[OAuthRefreshTokensTable.revokedAt] = revokedAt
             } > 0
         }
 
@@ -196,7 +194,7 @@ private fun ResultRow.toAuthorizationRequestState(): StoredAuthorizationRequest 
         dpopKeyThumbprint = this[OAuthAuthorizationRequestsTable.dpopKeyThumbprint],
         clientAuthKeyId = this[OAuthAuthorizationRequestsTable.clientAuthKeyId],
         clientAuthKeyThumbprint = this[OAuthAuthorizationRequestsTable.clientAuthKeyThumbprint],
-        expiresAt = this[OAuthAuthorizationRequestsTable.expiresAt].toKotlinInstant(),
+        expiresAt = this[OAuthAuthorizationRequestsTable.expiresAt],
     )
 
 private fun ResultRow.toAuthorizationCodeState(): StoredAuthorizationCode =
@@ -211,7 +209,7 @@ private fun ResultRow.toAuthorizationCodeState(): StoredAuthorizationCode =
         dpopKeyThumbprint = this[OAuthAuthorizationCodesTable.dpopKeyThumbprint],
         clientAuthKeyId = this[OAuthAuthorizationCodesTable.clientAuthKeyId],
         clientAuthKeyThumbprint = this[OAuthAuthorizationCodesTable.clientAuthKeyThumbprint],
-        expiresAt = this[OAuthAuthorizationCodesTable.expiresAt].toKotlinInstant(),
+        expiresAt = this[OAuthAuthorizationCodesTable.expiresAt],
     )
 
 private fun ResultRow.toRefreshTokenState(): StoredRefreshToken =
@@ -223,6 +221,6 @@ private fun ResultRow.toRefreshTokenState(): StoredRefreshToken =
         dpopKeyThumbprint = this[OAuthRefreshTokensTable.dpopKeyThumbprint],
         clientAuthKeyId = this[OAuthRefreshTokensTable.clientAuthKeyId],
         clientAuthKeyThumbprint = this[OAuthRefreshTokensTable.clientAuthKeyThumbprint],
-        expiresAt = this[OAuthRefreshTokensTable.expiresAt].toKotlinInstant(),
-        revokedAt = this[OAuthRefreshTokensTable.revokedAt]?.toKotlinInstant(),
+        expiresAt = this[OAuthRefreshTokensTable.expiresAt],
+        revokedAt = this[OAuthRefreshTokensTable.revokedAt],
     )

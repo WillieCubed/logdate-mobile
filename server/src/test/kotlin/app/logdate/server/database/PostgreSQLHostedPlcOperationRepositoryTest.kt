@@ -2,9 +2,8 @@ package app.logdate.server.database
 
 import app.logdate.server.database.support.withH2Database
 import app.logdate.server.identity.StoredHostedPlcOperation
-import app.logdate.server.util.toKotlinxInstant
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Clock
@@ -26,7 +25,7 @@ class PostgreSQLHostedPlcOperationRepositoryTest {
                         it[id] = accountId.toJavaUUID()
                         it[username] = "plc-history"
                         it[displayName] = "PLC History"
-                        it[createdAt] = Clock.System.now().toKotlinxInstant()
+                        it[createdAt] = Clock.System.now()
                         it[isActive] = true
                         it[preferences] = "{}"
                     }

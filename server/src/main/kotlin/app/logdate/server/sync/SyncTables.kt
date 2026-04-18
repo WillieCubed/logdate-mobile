@@ -1,14 +1,18 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package app.logdate.server.sync
 
-import org.jetbrains.exposed.sql.Table
-import org.jetbrains.exposed.sql.Table.PrimaryKey
+import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.core.Table.PrimaryKey
+import org.jetbrains.exposed.v1.core.java.javaUUID
+import kotlin.uuid.ExperimentalUuidApi
 
 /**
  * Stores synced content metadata. Body remains nullable for cases where blobs are external.
  */
 object ContentSyncTable : Table("sync_content") {
     val id = varchar("id", 128)
-    val userId = uuid("user_id")
+    val userId = javaUUID("user_id")
     val type = varchar("type", 32)
     val content = text("content").nullable()
     val mediaUri = text("media_uri").nullable()
@@ -33,7 +37,7 @@ object ContentSyncTable : Table("sync_content") {
  */
 object JournalSyncTable : Table("sync_journals") {
     val id = varchar("id", 128)
-    val userId = uuid("user_id")
+    val userId = javaUUID("user_id")
     val title = text("title")
     val description = text("description")
     val createdAt = long("created_at")
@@ -57,7 +61,7 @@ object JournalSyncTable : Table("sync_journals") {
 object AssociationSyncTable : Table("sync_associations") {
     val journalId = varchar("journal_id", 128)
     val contentId = varchar("content_id", 128)
-    val userId = uuid("user_id")
+    val userId = javaUUID("user_id")
     val createdAt = long("created_at")
     val serverVersion = long("server_version")
     val deviceId = varchar("device_id", 128)
@@ -78,7 +82,7 @@ object AssociationSyncTable : Table("sync_associations") {
 object MediaSyncTable : Table("sync_media") {
     val mediaId = varchar("media_id", 128)
     val contentId = varchar("content_id", 128)
-    val userId = uuid("user_id")
+    val userId = javaUUID("user_id")
     val fileName = varchar("file_name", 256)
     val mimeType = varchar("mime_type", 128)
     val sizeBytes = long("size_bytes")
@@ -105,8 +109,8 @@ object MediaSyncTable : Table("sync_media") {
  * Registry for sovereign encrypted backups stored by the user.
  */
 object BackupSyncTable : Table("sync_backups") {
-    val id = uuid("id")
-    val userId = uuid("user_id")
+    val id = javaUUID("id")
+    val userId = javaUUID("user_id")
     val deviceId = varchar("device_id", 128)
     val manifest = text("manifest")
     val storagePath = text("storage_path")

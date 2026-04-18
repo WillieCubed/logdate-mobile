@@ -9,11 +9,10 @@ import app.logdate.server.auth.SessionType
 import app.logdate.server.auth.TemporarySession
 import app.logdate.server.database.support.withH2Database
 import app.logdate.server.identity.StoredSigningKey
-import app.logdate.server.util.toKotlinxInstant
 import app.logdate.shared.model.PasskeyInfo
 import kotlinx.coroutines.runBlocking
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -348,8 +347,8 @@ class PostgreSqlRepositoriesTest {
                     it[bio] = null
                     it[deviceInfo] = null
                     val now = Clock.System.now()
-                    it[createdAt] = now.toKotlinxInstant()
-                    it[expiresAt] = (now + 5.minutes).toKotlinxInstant()
+                    it[createdAt] = now
+                    it[expiresAt] = now + 5.minutes
                     it[isUsed] = false
                 }
             }

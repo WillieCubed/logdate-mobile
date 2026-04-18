@@ -2,13 +2,12 @@ package app.logdate.server.database
 
 import app.logdate.server.passkeys.RestoreCredentialRepository
 import app.logdate.server.passkeys.StoredRestoreCredentialData
-import app.logdate.server.util.toKotlinxInstant
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.update
 import java.util.Base64
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
@@ -30,7 +29,7 @@ class PostgreSQLRestoreCredentialRepository : RestoreCredentialRepository {
                     it[RestoreCredentialsTable.publicKey] = encodePublicKey(publicKey)
                     it[RestoreCredentialsTable.signCount] = signCount
                     it[isActive] = true
-                    it[createdAt] = Clock.System.now().toKotlinxInstant()
+                    it[createdAt] = Clock.System.now()
                     it[lastUsedAt] = null
                 }
             }
@@ -74,7 +73,7 @@ class PostgreSQLRestoreCredentialRepository : RestoreCredentialRepository {
         transaction {
             RestoreCredentialsTable.update({ RestoreCredentialsTable.credentialId eq credentialId }) {
                 it[signCount] = newSignCount
-                it[lastUsedAt] = Clock.System.now().toKotlinxInstant()
+                it[lastUsedAt] = Clock.System.now()
             } > 0
         }
 
@@ -82,7 +81,7 @@ class PostgreSQLRestoreCredentialRepository : RestoreCredentialRepository {
         transaction {
             RestoreCredentialsTable.update({ RestoreCredentialsTable.credentialId eq credentialId }) {
                 it[isActive] = false
-                it[lastUsedAt] = Clock.System.now().toKotlinxInstant()
+                it[lastUsedAt] = Clock.System.now()
             } > 0
         }
 

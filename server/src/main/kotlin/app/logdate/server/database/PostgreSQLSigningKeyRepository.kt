@@ -2,16 +2,14 @@ package app.logdate.server.database
 
 import app.logdate.server.identity.SigningKeyRepository
 import app.logdate.server.identity.StoredSigningKey
-import app.logdate.server.util.toKotlinInstant
-import app.logdate.server.util.toKotlinxInstant
-import org.jetbrains.exposed.sql.ResultRow
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.ResultRow
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.update
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -26,8 +24,8 @@ class PostgreSQLSigningKeyRepository : SigningKeyRepository {
                 it[algorithm] = signingKey.algorithm
                 it[publicKeyMultibase] = signingKey.publicKeyMultibase
                 it[privateKeyEncrypted] = signingKey.privateKeyEncrypted
-                it[createdAt] = signingKey.createdAt.toKotlinxInstant()
-                it[revokedAt] = signingKey.revokedAt?.toKotlinxInstant()
+                it[createdAt] = signingKey.createdAt
+                it[revokedAt] = signingKey.revokedAt
             }
             signingKey
         }
@@ -53,7 +51,6 @@ class PostgreSQLSigningKeyRepository : SigningKeyRepository {
                 it[revokedAt] =
                     kotlin.time.Clock.System
                         .now()
-                        .toKotlinxInstant()
             }
         }
 
@@ -65,7 +62,7 @@ class PostgreSQLSigningKeyRepository : SigningKeyRepository {
             algorithm = this[SigningKeysTable.algorithm],
             publicKeyMultibase = this[SigningKeysTable.publicKeyMultibase],
             privateKeyEncrypted = this[SigningKeysTable.privateKeyEncrypted],
-            createdAt = this[SigningKeysTable.createdAt].toKotlinInstant(),
-            revokedAt = this[SigningKeysTable.revokedAt]?.toKotlinInstant(),
+            createdAt = this[SigningKeysTable.createdAt],
+            revokedAt = this[SigningKeysTable.revokedAt],
         )
 }

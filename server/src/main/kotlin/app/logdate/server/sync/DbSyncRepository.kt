@@ -1,25 +1,23 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package app.logdate.server.sync
 
-import app.logdate.server.sync.AssociationSyncTable
-import app.logdate.server.sync.BackupSyncTable
-import app.logdate.server.sync.ContentSyncTable
-import app.logdate.server.sync.JournalSyncTable
-import app.logdate.server.sync.MediaSyncTable
 import app.logdate.shared.model.sync.DeviceId
-import org.jetbrains.exposed.sql.ResultRow
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.ResultRow
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.greater
+import org.jetbrains.exposed.v1.core.less
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
+import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.update
 import java.util.UUID
 import kotlin.math.absoluteValue
 import kotlin.random.Random
+import kotlin.uuid.ExperimentalUuidApi
 
 /**
  * Exposed-based implementation of SyncRepository with user isolation.
@@ -171,9 +169,11 @@ class DbSyncRepository : SyncRepository {
                         row[ContentSyncTable.deletedAt] ?: row[ContentSyncTable.lastUpdated],
                     )
                 }
-            val deletionVersionMax = deletionRows.take(limit).maxOfOrNull { it[ContentSyncTable.serverVersion] }
+            val deletionVersionMax =
+                deletionRows.take(limit).maxOfOrNull { it[ContentSyncTable.serverVersion] }
 
-            val lastTimestamp = listOfNotNull(changeVersionMax, deletionVersionMax).maxOrNull() ?: since
+            val lastTimestamp =
+                listOfNotNull(changeVersionMax, deletionVersionMax).maxOrNull() ?: since
 
             ChangeSet(changes, deletions, lastTimestamp, hasMoreChanges || hasMoreDeletions)
         }
@@ -293,9 +293,11 @@ class DbSyncRepository : SyncRepository {
                         row[JournalSyncTable.deletedAt] ?: row[JournalSyncTable.lastUpdated],
                     )
                 }
-            val deletionVersionMax = deletionRows.take(limit).maxOfOrNull { it[JournalSyncTable.serverVersion] }
+            val deletionVersionMax =
+                deletionRows.take(limit).maxOfOrNull { it[JournalSyncTable.serverVersion] }
 
-            val lastTimestamp = listOfNotNull(changeVersionMax, deletionVersionMax).maxOrNull() ?: since
+            val lastTimestamp =
+                listOfNotNull(changeVersionMax, deletionVersionMax).maxOrNull() ?: since
 
             ChangeSet(changes, deletions, lastTimestamp, hasMoreChanges || hasMoreDeletions)
         }
@@ -409,13 +411,18 @@ class DbSyncRepository : SyncRepository {
             val deletions =
                 deletionRows.take(limit).map { row ->
                     AssociationDeletionMarker(
-                        AssociationKey(row[AssociationSyncTable.journalId], row[AssociationSyncTable.contentId]),
+                        AssociationKey(
+                            row[AssociationSyncTable.journalId],
+                            row[AssociationSyncTable.contentId],
+                        ),
                         row[AssociationSyncTable.deletedAt] ?: row[AssociationSyncTable.createdAt],
                     )
                 }
-            val deletionVersionMax = deletionRows.take(limit).maxOfOrNull { it[AssociationSyncTable.serverVersion] }
+            val deletionVersionMax =
+                deletionRows.take(limit).maxOfOrNull { it[AssociationSyncTable.serverVersion] }
 
-            val lastTimestamp = listOfNotNull(changeVersionMax, deletionVersionMax).maxOrNull() ?: since
+            val lastTimestamp =
+                listOfNotNull(changeVersionMax, deletionVersionMax).maxOrNull() ?: since
 
             ChangeSet(changes, deletions, lastTimestamp, hasMoreChanges || hasMoreDeletions)
         }
@@ -426,7 +433,8 @@ class DbSyncRepository : SyncRepository {
         record: MediaRecord,
     ): MediaRecord =
         transaction {
-            val id = if (record.mediaId.isBlank()) "media-${Random.nextLong().absoluteValue}" else record.mediaId
+            val id =
+                if (record.mediaId.isBlank()) "media-${Random.nextLong().absoluteValue}" else record.mediaId
             val existing =
                 MediaSyncTable
                     .selectAll()
@@ -566,8 +574,8 @@ class DbSyncRepository : SyncRepository {
             val contentPurged =
                 ContentSyncTable.deleteWhere {
                     (ContentSyncTable.userId eq userId) and
-                        (ContentSyncTable.deleted eq true) and
-                        (ContentSyncTable.deletedAt less olderThan)
+                        (deleted eq true) and
+                        (deletedAt less olderThan)
                 }
             val journalPurged =
                 JournalSyncTable.deleteWhere {
@@ -601,23 +609,23 @@ class DbSyncRepository : SyncRepository {
         transaction {
             val contentPurged =
                 ContentSyncTable.deleteWhere {
-                    (ContentSyncTable.deleted eq true) and
-                        (ContentSyncTable.deletedAt less olderThan)
+                    (deleted eq true) and
+                        (deletedAt less olderThan)
                 }
             val journalPurged =
                 JournalSyncTable.deleteWhere {
-                    (JournalSyncTable.deleted eq true) and
-                        (JournalSyncTable.deletedAt less olderThan)
+                    (deleted eq true) and
+                        (deletedAt less olderThan)
                 }
             val associationPurged =
                 AssociationSyncTable.deleteWhere {
-                    (AssociationSyncTable.deleted eq true) and
-                        (AssociationSyncTable.deletedAt less olderThan)
+                    (deleted eq true) and
+                        (deletedAt less olderThan)
                 }
             val mediaPurged =
                 MediaSyncTable.deleteWhere {
-                    (MediaSyncTable.deleted eq true) and
-                        (MediaSyncTable.deletedAt less olderThan)
+                    (deleted eq true) and
+                        (deletedAt less olderThan)
                 }
 
             SyncPurgeResult(

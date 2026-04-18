@@ -82,13 +82,13 @@ dependencies {
     implementation(libs.exposed.dao)
     implementation(libs.exposed.kotlin.datetime)
     implementation(libs.postgresql)
-    implementation("com.google.cloud.sql:postgres-socket-factory:1.15.0")
+    implementation("com.google.cloud.sql:postgres-socket-factory:1.28.2")
     implementation(libs.hikariCP)
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.postgresql)
 
     // Google Cloud Storage
-    implementation("com.google.cloud:google-cloud-storage:2.64.0")
+    implementation("com.google.cloud:google-cloud-storage:2.67.0")
 
     // Koin DI
     implementation(platform(libs.koin.bom))
@@ -100,7 +100,7 @@ dependencies {
     testImplementation(libs.ktor.client.mock)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation("com.h2database:h2:2.3.232")
+    testImplementation("com.h2database:h2:2.4.240")
 
     // E2E Testing
     testImplementation(libs.testcontainers.testcontainers)

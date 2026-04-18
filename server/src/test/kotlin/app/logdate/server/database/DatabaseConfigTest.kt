@@ -10,6 +10,7 @@ import io.mockk.unmockkAll
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.configuration.FluentConfiguration
 import org.flywaydb.core.api.output.MigrateResult
+import org.jetbrains.exposed.v1.jdbc.Database
 import java.sql.Connection
 import java.sql.SQLException
 import java.util.logging.Logger
@@ -235,7 +236,7 @@ class DatabaseConfigTest {
     @Test
     fun `initializeDatabase and runMigrations cover success and failure branches`() {
         val dataSource = mockk<DataSource>(relaxed = true)
-        val database = mockk<org.jetbrains.exposed.sql.Database>()
+        val database = mockk<Database>()
 
         var migrated = false
         val initialized =

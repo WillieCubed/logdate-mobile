@@ -2,18 +2,16 @@ package app.logdate.server.database
 
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
-import app.logdate.server.util.toKotlinInstant
-import app.logdate.server.util.toKotlinxInstant
-import org.jetbrains.exposed.sql.ResultRow
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.ResultRow
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.greater
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
+import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.update
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
@@ -41,7 +39,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[email] = account.email
                     it[emailVerified] = account.emailVerified
                     it[bio] = account.bio
-                    it[lastSignInAt] = account.lastSignInAt?.toKotlinxInstant()
+                    it[lastSignInAt] = account.lastSignInAt
                     it[isActive] = account.isActive
                     it[preferences] = account.preferences?.toString() ?: "{}"
                 }
@@ -59,8 +57,8 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[email] = account.email
                     it[emailVerified] = account.emailVerified
                     it[bio] = account.bio
-                    it[createdAt] = account.createdAt.toKotlinxInstant()
-                    it[lastSignInAt] = account.lastSignInAt?.toKotlinxInstant()
+                    it[createdAt] = account.createdAt
+                    it[lastSignInAt] = account.lastSignInAt
                     it[isActive] = account.isActive
                     it[preferences] = account.preferences?.toString() ?: "{}"
                 }
@@ -143,7 +141,7 @@ class PostgreSQLAccountRepository : AccountRepository {
         transaction {
             val updatedRows =
                 AccountsTable.update({ AccountsTable.id eq accountId.toJavaUUID() }) {
-                    it[lastSignInAt] = Clock.System.now().toKotlinxInstant()
+                    it[lastSignInAt] = Clock.System.now()
                 }
             updatedRows > 0
         }
@@ -171,7 +169,7 @@ class PostgreSQLAccountRepository : AccountRepository {
             AccountsTable
                 .selectAll()
                 .where {
-                    (AccountsTable.createdAt greater timestamp.toKotlinxInstant()) and
+                    (AccountsTable.createdAt greater timestamp) and
                         (AccountsTable.isActive eq true)
                 }.orderBy(AccountsTable.createdAt, SortOrder.DESC)
                 .map { it.toAccount() }
@@ -195,8 +193,8 @@ class PostgreSQLAccountRepository : AccountRepository {
             email = this[AccountsTable.email],
             emailVerified = this[AccountsTable.emailVerified],
             bio = this[AccountsTable.bio],
-            createdAt = this[AccountsTable.createdAt].toKotlinInstant(),
-            lastSignInAt = this[AccountsTable.lastSignInAt]?.toKotlinInstant(),
+            createdAt = this[AccountsTable.createdAt],
+            lastSignInAt = this[AccountsTable.lastSignInAt],
             isActive = this[AccountsTable.isActive],
             preferences = this[AccountsTable.preferences],
         )

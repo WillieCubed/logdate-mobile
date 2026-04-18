@@ -24,7 +24,11 @@ interface UsageCalculator {
 sealed class QuotaCheck {
     data object Allowed : QuotaCheck()
 
-    data class Denied(val reason: QuotaReason, val limit: Long, val current: Long) : QuotaCheck()
+    data class Denied(
+        val reason: QuotaReason,
+        val limit: Long,
+        val current: Long,
+    ) : QuotaCheck()
 }
 
 enum class QuotaReason { STORAGE_BYTES, BACKUP_COUNT }
@@ -37,7 +41,10 @@ class EntitlementEnforcer(
     private val entitlementService: EntitlementService,
     private val usageCalculator: UsageCalculator,
 ) {
-    suspend fun checkMediaUpload(accountId: UUID, pendingBytes: Long): QuotaCheck {
+    suspend fun checkMediaUpload(
+        accountId: UUID,
+        pendingBytes: Long,
+    ): QuotaCheck {
         val entitlement = entitlementService.resolve(accountId)
         val limit = entitlement.limits.storageBytes ?: return QuotaCheck.Allowed
         val current = usageCalculator.storageBytes(accountId)
@@ -49,7 +56,10 @@ class EntitlementEnforcer(
         }
     }
 
-    suspend fun checkBackupUpload(accountId: UUID, pendingBytes: Long): QuotaCheck {
+    suspend fun checkBackupUpload(
+        accountId: UUID,
+        pendingBytes: Long,
+    ): QuotaCheck {
         val entitlement = entitlementService.resolve(accountId)
         val storageLimit = entitlement.limits.storageBytes
         if (storageLimit != null) {

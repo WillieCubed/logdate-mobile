@@ -1,8 +1,8 @@
 package app.logdate.server.entitlements
 
 import app.logdate.server.billing.BillingProvider
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.transactions.TransactionManager
+import org.jetbrains.exposed.v1.jdbc.Database
+import org.jetbrains.exposed.v1.jdbc.transactions.TransactionManager
 import org.koin.core.module.Module
 import org.koin.dsl.module
 

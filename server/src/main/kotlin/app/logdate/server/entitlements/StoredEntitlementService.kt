@@ -1,15 +1,17 @@
 package app.logdate.server.entitlements
 
 import io.github.aakira.napier.Napier
-import kotlinx.datetime.Instant
-import org.jetbrains.exposed.sql.Column
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.Table
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.core.Column
+import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.java.javaUUID
+import org.jetbrains.exposed.v1.datetime.timestamp
+import org.jetbrains.exposed.v1.jdbc.Database
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.util.UUID
+import kotlin.time.Instant
 
 /**
  * Reads the `account_entitlements` + `plans` tables populated by webhook handlers.
@@ -101,8 +103,9 @@ internal object PlansTable : Table("plans") {
 }
 
 internal object AccountEntitlementsTable : Table("account_entitlements") {
-    val accountId: Column<UUID> = uuid("account_id")
+    val accountId: Column<UUID> = javaUUID("account_id")
     val planId: Column<String> = text("plan_id")
+
     // `entitlementSource` rather than `source` because Exposed's [Table] already exposes a `source`
     // member; shadowing it changes subquery-building semantics in subtle ways.
     val entitlementSource: Column<String> = text("source")

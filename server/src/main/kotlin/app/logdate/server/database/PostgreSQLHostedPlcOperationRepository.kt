@@ -2,14 +2,12 @@ package app.logdate.server.database
 
 import app.logdate.server.identity.HostedPlcOperationRepository
 import app.logdate.server.identity.StoredHostedPlcOperation
-import app.logdate.server.util.toKotlinInstant
-import app.logdate.server.util.toKotlinxInstant
-import org.jetbrains.exposed.sql.ResultRow
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.core.ResultRow
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -25,7 +23,7 @@ class PostgreSQLHostedPlcOperationRepository : HostedPlcOperationRepository {
                 it[prevCid] = operation.prevCid
                 it[operationType] = operation.operationType
                 it[operationJson] = operation.operationJson
-                it[createdAt] = operation.createdAt.toKotlinxInstant()
+                it[createdAt] = operation.createdAt
             }
             operation
         }
@@ -57,6 +55,6 @@ class PostgreSQLHostedPlcOperationRepository : HostedPlcOperationRepository {
             prevCid = this[HostedPlcOperationsTable.prevCid],
             operationType = this[HostedPlcOperationsTable.operationType],
             operationJson = this[HostedPlcOperationsTable.operationJson],
-            createdAt = this[HostedPlcOperationsTable.createdAt].toKotlinInstant(),
+            createdAt = this[HostedPlcOperationsTable.createdAt],
         )
 }

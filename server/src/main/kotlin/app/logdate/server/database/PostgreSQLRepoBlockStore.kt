@@ -1,15 +1,14 @@
 package app.logdate.server.database
 
-import app.logdate.server.util.toKotlinxInstant
-import org.jetbrains.exposed.sql.ResultRow
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.ResultRow
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
+import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.update
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.repo.Cid
 import studio.hypertext.atproto.repo.RepoBlock
@@ -53,14 +52,14 @@ class PostgreSQLRepoBlockStore : RepoBlockStore {
                         it[rootCid] = head.root.toString()
                         it[commitCid] = head.commitCid.toString()
                         it[revision] = head.revision
-                        it[updatedAt] = Clock.System.now().toKotlinxInstant()
+                        it[updatedAt] = Clock.System.now()
                     }
                 } else {
                     AtprotoRepoHeadsTable.update({ AtprotoRepoHeadsTable.repoDid eq repoDid }) {
                         it[rootCid] = head.root.toString()
                         it[commitCid] = head.commitCid.toString()
                         it[revision] = head.revision
-                        it[updatedAt] = Clock.System.now().toKotlinxInstant()
+                        it[updatedAt] = Clock.System.now()
                     }
                 }
             }
