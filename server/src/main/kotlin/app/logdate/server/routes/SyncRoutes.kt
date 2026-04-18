@@ -5,6 +5,8 @@ import app.logdate.server.crypto.EncryptionService
 import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.entitlements.QuotaCheck
 import app.logdate.server.entitlements.QuotaReason
+import app.logdate.server.ratelimit.RateLimitPolicy
+import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.logdate.LogDateAssociation
 import app.logdate.server.logdate.LogDateAssociationRef
 import app.logdate.server.logdate.LogDateBackup
@@ -394,6 +396,7 @@ fun Route.syncRoutes(
     mediaBlobRepository: LogDateMediaBlobRepository,
     backupRepository: LogDateBackupRepository,
     entitlementEnforcer: EntitlementEnforcer? = null,
+    rateLimiter: SlidingWindowRateLimiter? = SlidingWindowRateLimiter(),
 ) {
     route("") {
         // High-level status (used by smoke tests)
@@ -961,6 +964,11 @@ fun Route.syncRoutes(
                 var bytes = 0L
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@post
+
+                    if (rateLimiter != null && !rateLimiter.allow("media-upload:$userId", MEDIA_UPLOAD_RATE_LIMIT)) {
+                        return@post respondRateLimited(call, rateLimiter, "media-upload:$userId", MEDIA_UPLOAD_RATE_LIMIT)
+                    }
+
                     val req = call.receiveMediaMultipartUpload() ?: return@post
                     bytes = req.sizeBytes
                     Napier.d("Media upload for user $userId: ${req.fileName}")
@@ -1179,6 +1187,11 @@ fun Route.syncRoutes(
                 var bytes = 0L
                 try {
                     val userId = extractUserId(call, tokenService) ?: return@post
+
+                    if (rateLimiter != null && !rateLimiter.allow("backup-upload:$userId", BACKUP_UPLOAD_RATE_LIMIT)) {
+                        return@post respondRateLimited(call, rateLimiter, "backup-upload:$userId", BACKUP_UPLOAD_RATE_LIMIT)
+                    }
+
                     val req = call.receiveBackupMultipartUpload() ?: return@post
                     bytes = req.data.size.toLong()
 
@@ -1510,6 +1523,32 @@ private fun app.logdate.server.sync.SyncMetricsSnapshot.toPrometheus(): String {
 }
 
 private fun escapeLabelValue(value: String): String = value.replace("\\", "\\\\").replace("\"", "\\\"")
+
+/**
+ * Per-user ceilings on the write paths. Tuned to let an actively-syncing device churn through its
+ * pending upload queue (which typically runs a dozen or two items in a burst) without bothering a
+ * well-behaved client, while still throttling a runaway loop or a compromised token.
+ */
+private val MEDIA_UPLOAD_RATE_LIMIT = RateLimitPolicy(maxRequests = 120, windowSeconds = 60)
+private val BACKUP_UPLOAD_RATE_LIMIT = RateLimitPolicy(maxRequests = 6, windowSeconds = 60 * 60)
+
+private suspend fun respondRateLimited(
+    call: io.ktor.server.application.ApplicationCall,
+    rateLimiter: SlidingWindowRateLimiter,
+    key: String,
+    policy: RateLimitPolicy,
+) {
+    val retryAfter = rateLimiter.retryAfterSeconds(key, policy)
+    call.response.headers.append(HttpHeaders.RetryAfter, retryAfter.toString())
+    call.respond(
+        HttpStatusCode.TooManyRequests,
+        error(
+            code = "RATE_LIMIT_EXCEEDED",
+            message = "Too many uploads. Try again in $retryAfter seconds.",
+            details = mapOf("retryAfterSeconds" to retryAfter.toString()),
+        ),
+    )
+}
 
 /**
  * Translates a quota violation into the wire-level 402 Payment Required response. We structure the

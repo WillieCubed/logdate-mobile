@@ -19,6 +19,7 @@ import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
 import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.entitlements.entitlementsModule
+import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.logdate.CompositeLogDateMediaBlobRepository
@@ -166,6 +167,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val logDateMediaRepository: LogDateMediaRepository by inject()
     val logDateBackupRepository: LogDateBackupRepository by inject()
     val entitlementEnforcer: EntitlementEnforcer by inject()
+    val syncRateLimiter = SlidingWindowRateLimiter()
     val logDateAtprotoBlobRepository: LogDateAtprotoBlobRepository by inject()
     val logDateMediaBlobRepository =
         CompositeLogDateMediaBlobRepository(
@@ -333,6 +335,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
                 mediaBlobRepository = logDateMediaBlobRepository,
                 backupRepository = logDateBackupRepository,
                 entitlementEnforcer = entitlementEnforcer,
+                rateLimiter = syncRateLimiter,
             )
         }
     }
