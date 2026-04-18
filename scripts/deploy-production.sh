@@ -241,25 +241,87 @@ detect_dns_provider() {
 }
 
 # ----------------------------------------------------------------------------
-# Phase 0 — Prereq validation
+# gcloud identity confirmation — runs before any mutating action so the user
+# can catch a wrong-account mistake before resources are touched.
 # ----------------------------------------------------------------------------
-phase_0_prereqs() {
-    log_phase "Phase 0 — Prereq validation"
+confirm_gcloud_identity() {
+    log_phase "Confirming gcloud identity"
 
     local required=(gcloud terraform docker jq openssl curl)
     for cmd in "${required[@]}"; do
         command -v "$cmd" >/dev/null 2>&1 || die "Missing required command: $cmd"
     done
-    log_info "CLI tools present: ${required[*]}"
 
-    if ! gcloud auth list --filter=status:ACTIVE --format='value(account)' | grep -q '@'; then
+    local accounts
+    accounts=$(gcloud auth list --format='value(account)' 2>/dev/null || true)
+    if [[ -z "$accounts" ]]; then
         if [[ "$NON_INTERACTIVE" == "true" ]]; then
-            die "No active gcloud credential — rerun without --non-interactive or run 'gcloud auth login' first"
+            die "No gcloud accounts configured — run 'gcloud auth login' first"
         fi
-        log_warn "No active gcloud credential — launching browser login"
+        log_warn "No gcloud accounts configured — launching browser login"
         gcloud auth login
+        accounts=$(gcloud auth list --format='value(account)' 2>/dev/null || true)
     fi
-    log_info "gcloud account: $(gcloud config get-value account 2>/dev/null)"
+
+    local active
+    active=$(gcloud config get-value account 2>/dev/null || true)
+    if [[ -z "$active" || "$active" == "(unset)" ]]; then
+        die "gcloud has accounts configured but none is active. Run: gcloud config set account <email>"
+    fi
+
+    local current_project
+    current_project=$(gcloud config get-value project 2>/dev/null || true)
+    [[ "$current_project" == "(unset)" ]] && current_project=""
+
+    echo
+    printf '  %bAccount:%b %s\n' "$BOLD" "$NC" "$active"
+    printf '  %bProject:%b %s\n' "$BOLD" "$NC" "${current_project:-<none>}"
+    echo
+
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then
+        log_info "Proceeding with $active (non-interactive)"
+        return
+    fi
+
+    local confirm
+    read -rp "Is this the account you want to deploy with? [Y/n] " confirm
+    if [[ ! "$confirm" =~ ^[nN]$ ]]; then
+        return
+    fi
+
+    echo "Available accounts:"
+    local -a ids=()
+    local i=1
+    while IFS= read -r acct; do
+        [[ -z "$acct" ]] && continue
+        printf '  %d) %s\n' "$i" "$acct"
+        ids+=("$acct")
+        ((i++))
+    done <<<"$accounts"
+    printf '  %d) Log in as a different account\n' "$i"
+
+    local choice
+    read -rp "Select [1]: " choice
+    choice="${choice:-1}"
+    [[ "$choice" =~ ^[0-9]+$ ]] || die "Invalid selection: $choice"
+
+    if (( choice == i )); then
+        gcloud auth login
+        active=$(gcloud config get-value account 2>/dev/null || true)
+    elif (( choice >= 1 && choice < i )); then
+        active="${ids[$((choice - 1))]}"
+        gcloud config set account "$active"
+    else
+        die "Selection out of range"
+    fi
+    log_info "Now using gcloud account: $active"
+}
+
+# ----------------------------------------------------------------------------
+# Phase 0 — Prereq validation
+# ----------------------------------------------------------------------------
+phase_0_prereqs() {
+    log_phase "Phase 0 — Prereq validation"
 
     gcloud config set project "$PROJECT_ID" >/dev/null
     log_info "Active project: $PROJECT_ID"
@@ -745,6 +807,7 @@ phase_7_verify() {
 main() {
     parse_args "$@"
 
+    confirm_gcloud_identity
     detect_project_id
     detect_dns_provider
 
