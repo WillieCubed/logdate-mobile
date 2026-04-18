@@ -374,44 +374,71 @@ phase_1_domain_check() {
         return
     fi
 
-    log_warn "The following domains are not yet verified:"
+    log_warn "The following domains are not verified for $(gcloud config get-value account 2>/dev/null):"
     for domain in "${unverified[@]}"; do
         printf '  • %s\n' "$domain"
+        printf '    verify:  gcloud domains verify %s\n' "$domain"
+        printf '    view:    https://search.google.com/search-console?resource_id=sc-domain:%s\n' "$domain"
     done
 
     cat <<'EOF'
 
-Domain ownership is verified through Google Site Verification (the system
-Search Console uses). The easiest path is `gcloud domains verify`, which
-opens the correct browser flow for each domain:
-
-  gcloud domains verify <domain>
-
-Publish the TXT record Google shows, click "Verify", then return here.
-(If your DNS provider is Cloudflare and you've set CLOUDFLARE_API_TOKEN,
-you can paste the TXT value in the Cloudflare dashboard; publishing
-verification records via the Cloudflare API isn't wired up yet.)
+Notes:
+  • `gcloud domains verify` launches the Google Site Verification browser
+    flow — this is the authoritative path. Publish the TXT record Google
+    shows at your DNS provider (paste it into the Cloudflare dashboard if
+    that's where the zone lives), click "Verify", then come back here.
+  • The "view" URL drops you into the Search Console property if it already
+    exists — useful when Site Verification and Search Console have drifted.
+  • `gcloud domains list-user-verified` occasionally lags verifications done
+    directly in Search Console. If you're confident the domain is verified,
+    answer "skip" below to proceed anyway — Cloud Run will reject the
+    domain mapping at terraform-apply time if it really isn't verified.
 EOF
 
     if [[ "$NON_INTERACTIVE" == "true" ]]; then
         die "Halting until domains are verified"
     fi
 
-    local do_verify
-    read -rp "Launch 'gcloud domains verify' for each unverified domain now? [Y/n] " do_verify
-    if [[ ! "$do_verify" =~ ^[nN]$ ]]; then
-        for domain in "${unverified[@]}"; do
-            log_info "Opening verification flow for $domain"
-            gcloud domains verify "$domain" || log_warn "gcloud domains verify $domain exited non-zero; verify manually"
-        done
-    fi
+    echo
+    echo "Next action:"
+    echo "  1) Run 'gcloud domains verify' for each unverified domain now (recommended)"
+    echo "  2) I've already verified them; re-check 'gcloud domains list-user-verified'"
+    echo "  3) Skip the check; trust the domains are verified and let Cloud Run gate it"
+    echo "  4) Abort"
 
-    read -rp "Press Enter once every domain above shows as verified (or Ctrl-C to abort) " _
+    local choice
+    read -rp "Select [1]: " choice
+    case "${choice:-1}" in
+        1)
+            for domain in "${unverified[@]}"; do
+                log_info "Opening verification flow for $domain"
+                gcloud domains verify "$domain" || log_warn "gcloud domains verify $domain exited non-zero; verify manually"
+            done
+            read -rp "Press Enter once every domain above shows as verified " _
+            ;;
+        2) ;;
+        3)
+            log_warn "Skipping verification check — Cloud Run will validate at apply time."
+            return
+            ;;
+        4) die "Aborted by user" ;;
+        *) die "Invalid selection: $choice" ;;
+    esac
+
     verified=$(gcloud domains list-user-verified --format='value(id)' 2>/dev/null || true)
+    local still_missing=()
     for domain in "${unverified[@]}"; do
-        grep -qx "$domain" <<<"$verified" || die "$domain still not verified — rerun once it is"
+        grep -qx "$domain" <<<"$verified" || still_missing+=("$domain")
     done
-    log_info "All target domains verified"
+    if [[ ${#still_missing[@]} -eq 0 ]]; then
+        log_info "All target domains verified"
+        return
+    fi
+    log_warn "'gcloud domains list-user-verified' still doesn't show: ${still_missing[*]}"
+    log_warn "This can be a cache/scope drift — check the Search Console URLs above."
+    read -rp "Proceed anyway and let Cloud Run decide at apply time? [y/N] " fallback
+    [[ "$fallback" =~ ^[yY]$ ]] || die "Aborting; rerun once verification is reflected."
 }
 
 # ----------------------------------------------------------------------------
