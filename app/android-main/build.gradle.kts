@@ -294,7 +294,7 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.rules)
-    androidTestImplementation("io.mockk:mockk-android:${libs.versions.mockk.get()}")
+    androidTestImplementation("io.mockk:mockk-android:1.14.9")
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestUtil(libs.androidx.test.orchestrator)
     androidTestImplementation(libs.androidx.ui.test.junit4)

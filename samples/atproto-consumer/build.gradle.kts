@@ -21,10 +21,10 @@ repositories {
 dependencies {
     implementation(kotlin("stdlib"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-    implementation("io.ktor:ktor-client-core:3.4.0")
-    implementation("io.ktor:ktor-client-content-negotiation:3.4.0")
-    implementation("io.ktor:ktor-client-mock:3.4.0")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.4.0")
+    implementation("io.ktor:ktor-client-core:3.4.2")
+    implementation("io.ktor:ktor-client-content-negotiation:3.4.2")
+    implementation("io.ktor:ktor-client-mock:3.4.2")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.4.2")
     runtimeOnly("org.slf4j:slf4j-nop:2.0.17")
 
     implementation("studio.hypertext.atproto:atproto-syntax:${atprotoVersion.get()}")
