@@ -322,14 +322,14 @@ These can be used instead of `DATABASE_URL`:
 - **Notes**: Disable for debugging or to manually control purge operations
 
 ### `AUTO_MIGRATE`
-- **Description**: Controls whether startup applies Flyway migrations and schema reconciliation
+- **Description**: Controls whether startup applies Flyway migrations and schema reconciliation.
 - **Type**: Boolean
-- **Default**: `true`
-- **Example**: `AUTO_MIGRATE=false`
-- **Required**: No
+- **Default**: **`false` when `LOGDATE_ENV=production`**, `true` otherwise. Set explicitly to override.
+- **Example**: `AUTO_MIGRATE=true`
+- **Required**: No (profile default is correct for most deployments).
 - **Notes**:
-  - Set to `false` when the deployment pipeline manages schema changes separately
-  - When `false`, startup still connects to the database but skips schema mutation
+  - Production should run migrations as a dedicated CI step before the new container goes live; automatic migration on every container start means a rolling deploy can race two versions of the app against the same Flyway lock.
+  - When `false`, startup still connects to the database but skips schema mutation.
 
 ### `SYNC_TOMBSTONE_RETENTION_DAYS`
 - **Description**: How many days to keep deletion markers before purging

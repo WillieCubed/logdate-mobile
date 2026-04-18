@@ -1,5 +1,6 @@
 package app.logdate.server.database
 
+import app.logdate.server.config.RuntimeProfile
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import io.mockk.every
@@ -178,13 +179,26 @@ class DatabaseConfigTest {
     }
 
     @Test
-    fun `shouldRunMigrations defaults to true and respects explicit false values`() {
-        assertTrue(DatabaseConfig.shouldRunMigrations(null))
-        assertTrue(DatabaseConfig.shouldRunMigrations(""))
-        assertTrue(DatabaseConfig.shouldRunMigrations("true"))
-        assertTrue(DatabaseConfig.shouldRunMigrations("yes"))
-        assertTrue(!DatabaseConfig.shouldRunMigrations("false"))
-        assertTrue(!DatabaseConfig.shouldRunMigrations("0"))
+    fun `shouldRunMigrations defaults to true in development`() {
+        assertTrue(DatabaseConfig.shouldRunMigrations(null, RuntimeProfile.DEVELOPMENT))
+        assertTrue(DatabaseConfig.shouldRunMigrations("", RuntimeProfile.DEVELOPMENT))
+        assertTrue(DatabaseConfig.shouldRunMigrations(null, RuntimeProfile.TEST))
+    }
+
+    @Test
+    fun `shouldRunMigrations defaults to false in production so CI owns migrations`() {
+        assertTrue(!DatabaseConfig.shouldRunMigrations(null, RuntimeProfile.PRODUCTION))
+        assertTrue(!DatabaseConfig.shouldRunMigrations("", RuntimeProfile.PRODUCTION))
+    }
+
+    @Test
+    fun `shouldRunMigrations respects explicit values in any profile`() {
+        assertTrue(DatabaseConfig.shouldRunMigrations("true", RuntimeProfile.PRODUCTION))
+        assertTrue(DatabaseConfig.shouldRunMigrations("yes", RuntimeProfile.PRODUCTION))
+        assertTrue(DatabaseConfig.shouldRunMigrations("1", RuntimeProfile.PRODUCTION))
+        assertTrue(!DatabaseConfig.shouldRunMigrations("false", RuntimeProfile.DEVELOPMENT))
+        assertTrue(!DatabaseConfig.shouldRunMigrations("0", RuntimeProfile.DEVELOPMENT))
+        assertTrue(!DatabaseConfig.shouldRunMigrations("no", RuntimeProfile.DEVELOPMENT))
     }
 
     @Test

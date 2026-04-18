@@ -1,5 +1,6 @@
 package app.logdate.server.database
 
+import app.logdate.server.config.RuntimeProfile
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import io.github.aakira.napier.Napier
@@ -8,11 +9,26 @@ import org.jetbrains.exposed.sql.Database
 import javax.sql.DataSource
 
 object DatabaseConfig {
-    fun shouldRunMigrations(autoMigrate: String? = System.getenv("AUTO_MIGRATE")): Boolean =
+    /**
+     * Whether the server should run Flyway migrations on boot.
+     *
+     * Profile-aware: development and test boot with migrations enabled so a local iteration cycle
+     * picks up schema changes without extra wiring. Production defaults to **off** because in a
+     * real deployment migrations should run as a distinct CI step before the new container goes
+     * live — conflating them with boot means every container restart could mutate the schema,
+     * and during a rolling deploy two versions of the app fight over the migration lock.
+     *
+     * Override explicitly with `AUTO_MIGRATE=true|false` in either direction.
+     */
+    fun shouldRunMigrations(
+        autoMigrate: String? = System.getenv("AUTO_MIGRATE"),
+        profile: RuntimeProfile = RuntimeProfile.fromEnvironment(),
+    ): Boolean =
         when (autoMigrate?.trim()?.lowercase()) {
-            null, "" -> true
             "false", "0", "no" -> false
-            else -> true
+            "true", "1", "yes" -> true
+            null, "" -> !profile.isProduction
+            else -> !profile.isProduction
         }
 
     fun createDataSource(
