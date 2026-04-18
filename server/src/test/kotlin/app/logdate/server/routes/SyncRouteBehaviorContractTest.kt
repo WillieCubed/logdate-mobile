@@ -43,7 +43,7 @@ class SyncRouteBehaviorContractTest {
         registry.recordOperation("""sync."media"\test""", durationMs = 10, success = true, bytes = 5)
         val snapshot = registry.snapshot()
 
-        val ktClass = Class.forName("app.logdate.server.routes.SyncRoutesKt")
+        val ktClass = Class.forName("app.logdate.server.routes.sync.SyncHelpersKt")
         val toPrometheus =
             ktClass.getDeclaredMethod(
                 "toPrometheus",

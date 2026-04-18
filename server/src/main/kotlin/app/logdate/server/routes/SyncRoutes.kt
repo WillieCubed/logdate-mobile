@@ -1,15 +1,10 @@
 package app.logdate.server.routes
 
-import app.logdate.server.audit.AuditCategory
-import app.logdate.server.audit.AuditLogger
 import app.logdate.server.auth.TokenService
 import app.logdate.server.crypto.EncryptionService
 import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.entitlements.QuotaCheck
-import app.logdate.server.entitlements.QuotaReason
 import app.logdate.server.logdate.BackupRetentionPolicy
-import app.logdate.server.ratelimit.RateLimitPolicy
-import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.logdate.LogDateAssociation
 import app.logdate.server.logdate.LogDateAssociationRef
 import app.logdate.server.logdate.LogDateBackup
@@ -23,11 +18,47 @@ import app.logdate.server.logdate.LogDateEntry
 import app.logdate.server.logdate.LogDateJournal
 import app.logdate.server.logdate.LogDateMedia
 import app.logdate.server.logdate.LogDateMediaBlobRepository
+import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.responses.error
 import app.logdate.server.responses.simpleSuccess
+import app.logdate.server.routes.sync.BACKUP_UPLOAD_RATE_LIMIT
+import app.logdate.server.routes.sync.DEFAULT_SYNC_PAGE_SIZE
+import app.logdate.server.routes.sync.MAX_SYNC_PAGE_SIZE
+import app.logdate.server.routes.sync.MEDIA_UPLOAD_RATE_LIMIT
+import app.logdate.server.routes.sync.METRIC_ASSOCIATION_CHANGES
+import app.logdate.server.routes.sync.METRIC_ASSOCIATION_DELETE
+import app.logdate.server.routes.sync.METRIC_ASSOCIATION_UPLOAD
+import app.logdate.server.routes.sync.METRIC_CONTENT_CHANGES
+import app.logdate.server.routes.sync.METRIC_CONTENT_DELETE
+import app.logdate.server.routes.sync.METRIC_CONTENT_UPDATE
+import app.logdate.server.routes.sync.METRIC_CONTENT_UPLOAD
+import app.logdate.server.routes.sync.METRIC_JOURNAL_CHANGES
+import app.logdate.server.routes.sync.METRIC_JOURNAL_DELETE
+import app.logdate.server.routes.sync.METRIC_JOURNAL_UPDATE
+import app.logdate.server.routes.sync.METRIC_JOURNAL_UPLOAD
+import app.logdate.server.routes.sync.METRIC_MEDIA_DELETE
+import app.logdate.server.routes.sync.METRIC_MEDIA_DOWNLOAD
+import app.logdate.server.routes.sync.METRIC_MEDIA_UPLOAD
+import app.logdate.server.routes.sync.METRIC_SYNC_METRICS
+import app.logdate.server.routes.sync.METRIC_SYNC_METRICS_PROM
+import app.logdate.server.routes.sync.METRIC_SYNC_PURGE
+import app.logdate.server.routes.sync.METRIC_SYNC_STATUS
+import app.logdate.server.routes.sync.MILLIS_PER_DAY
+import app.logdate.server.routes.sync.buildMediaDownloadUrl
+import app.logdate.server.routes.sync.extractUserId
+import app.logdate.server.routes.sync.receiveBackupMultipartUpload
+import app.logdate.server.routes.sync.receiveMediaMultipartUpload
+import app.logdate.server.routes.sync.requiredPathParam
+import app.logdate.server.routes.sync.resolveBackupDownloadUrl
+import app.logdate.server.routes.sync.resolveMediaDownloadUrl
+import app.logdate.server.routes.sync.respondQuotaExceeded
+import app.logdate.server.routes.sync.respondRateLimited
+import app.logdate.server.routes.sync.toAssociationChange
+import app.logdate.server.routes.sync.toContentChange
+import app.logdate.server.routes.sync.toJournalChange
+import app.logdate.server.routes.sync.toPrometheus
 import app.logdate.server.sync.MediaAccessPolicy
 import app.logdate.server.sync.SyncMetricsRegistry
-import app.logdate.shared.model.sync.AssociationChange
 import app.logdate.shared.model.sync.AssociationChangesResponse
 import app.logdate.shared.model.sync.AssociationDeleteRequest
 import app.logdate.shared.model.sync.AssociationDeletion
@@ -36,7 +67,6 @@ import app.logdate.shared.model.sync.AssociationUploadResponse
 import app.logdate.shared.model.sync.BackupInfoResponse
 import app.logdate.shared.model.sync.BackupListResponse
 import app.logdate.shared.model.sync.BackupUploadResponse
-import app.logdate.shared.model.sync.ContentChange
 import app.logdate.shared.model.sync.ContentChangesResponse
 import app.logdate.shared.model.sync.ContentDeletion
 import app.logdate.shared.model.sync.ContentUpdateRequest
@@ -44,7 +74,6 @@ import app.logdate.shared.model.sync.ContentUpdateResponse
 import app.logdate.shared.model.sync.ContentUploadRequest
 import app.logdate.shared.model.sync.ContentUploadResponse
 import app.logdate.shared.model.sync.DeviceId
-import app.logdate.shared.model.sync.JournalChange
 import app.logdate.shared.model.sync.JournalChangesResponse
 import app.logdate.shared.model.sync.JournalDeletion
 import app.logdate.shared.model.sync.JournalUpdateRequest
@@ -58,13 +87,9 @@ import io.github.aakira.napier.Napier
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.content.PartData
-import io.ktor.http.content.forEachPart
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
-import io.ktor.server.request.header
 import io.ktor.server.request.receive
-import io.ktor.server.request.receiveMultipart
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondText
@@ -75,8 +100,6 @@ import io.ktor.server.routing.patch
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.route
-import io.ktor.utils.io.readRemaining
-import kotlinx.io.readByteArray
 import kotlinx.serialization.Serializable
 import java.util.UUID
 
@@ -98,292 +121,14 @@ private data class SyncPurgeResponse(
     val retentionDaysApplied: Long,
 )
 
-private data class ParsedMediaMultipartUpload(
-    val contentId: String,
-    val fileName: String,
-    val mimeType: String,
-    val sizeBytes: Long,
-    val data: ByteArray,
-    val deviceId: String,
-)
-
-private data class ParsedBackupMultipartUpload(
-    val deviceId: String,
-    val manifest: String,
-    val data: ByteArray,
-)
-
 @Serializable
 private data class AssociationLinkUpsertRequest(
     val createdAt: Long,
     val deviceId: DeviceId = DeviceId.UNKNOWN,
 )
 
-private const val DEFAULT_SYNC_PAGE_SIZE = 200
-private const val MAX_SYNC_PAGE_SIZE = 500
-private const val METRIC_SYNC_STATUS = "sync.status"
-private const val METRIC_SYNC_METRICS = "sync.metrics"
-private const val METRIC_SYNC_METRICS_PROM = "sync.metrics.prometheus"
-private const val METRIC_CONTENT_UPLOAD = "sync.content.upload"
-private const val METRIC_CONTENT_CHANGES = "sync.content.changes"
-private const val METRIC_CONTENT_UPDATE = "sync.content.update"
-private const val METRIC_CONTENT_DELETE = "sync.content.delete"
-private const val METRIC_JOURNAL_UPLOAD = "sync.journal.upload"
-private const val METRIC_JOURNAL_CHANGES = "sync.journal.changes"
-private const val METRIC_JOURNAL_UPDATE = "sync.journal.update"
-private const val METRIC_JOURNAL_DELETE = "sync.journal.delete"
-private const val METRIC_ASSOCIATION_UPLOAD = "sync.association.upload"
-private const val METRIC_ASSOCIATION_CHANGES = "sync.association.changes"
-private const val METRIC_ASSOCIATION_DELETE = "sync.association.delete"
-private const val METRIC_MEDIA_UPLOAD = "sync.media.upload"
-private const val METRIC_MEDIA_DOWNLOAD = "sync.media.download"
-private const val METRIC_MEDIA_DELETE = "sync.media.delete"
-private const val METRIC_SYNC_PURGE = "sync.maintenance.purge"
-private const val MILLIS_PER_DAY = 86_400_000L
-
-private suspend fun ApplicationCall.respondMissingMultipartField(field: String) {
-    respond(
-        HttpStatusCode.BadRequest,
-        error("VALIDATION_ERROR", "Missing required multipart field: $field"),
-    )
-}
-
-private fun LogDateEntry.toContentChange(): ContentChange =
-    ContentChange(
-        id = id,
-        type = type,
-        content = content,
-        mediaUri = mediaUri,
-        durationMs = durationMs ?: 0L,
-        createdAt = createdAt,
-        lastUpdated = lastUpdated,
-        serverVersion = version,
-        isDeleted = false,
-    )
-
-private fun LogDateJournal.toJournalChange(): JournalChange =
-    JournalChange(
-        id = id,
-        title = title,
-        description = description,
-        createdAt = createdAt,
-        lastUpdated = lastUpdated,
-        serverVersion = version,
-        isDeleted = false,
-    )
-
-private fun LogDateAssociation.toAssociationChange(): AssociationChange =
-    AssociationChange(
-        journalId = journalId,
-        contentId = entryId,
-        createdAt = createdAt,
-        serverVersion = version,
-        isDeleted = false,
-    )
-
-private suspend fun ApplicationCall.receiveMediaMultipartUpload(): ParsedMediaMultipartUpload? {
-    val multipart =
-        runCatching { receiveMultipart() }.getOrElse {
-            respond(
-                HttpStatusCode.BadRequest,
-                error("VALIDATION_ERROR", "Expected multipart/form-data body"),
-            )
-            return null
-        }
-
-    var contentId: String? = null
-    var fileName: String? = null
-    var mimeType: String? = null
-    var sizeBytes: Long? = null
-    var deviceId: String? = null
-    var data: ByteArray? = null
-
-    multipart.forEachPart { part ->
-        when (part) {
-            is PartData.FormItem -> {
-                when (part.name) {
-                    "contentId" -> contentId = part.value.trim()
-                    "fileName" -> fileName = part.value.trim()
-                    "mimeType" -> mimeType = part.value.trim()
-                    "sizeBytes" -> sizeBytes = part.value.trim().toLongOrNull()
-                    "deviceId" -> deviceId = part.value.trim()
-                }
-            }
-
-            is PartData.FileItem -> {
-                if (part.name == "data") {
-                    data = part.provider().readRemaining().readByteArray()
-                }
-            }
-
-            else -> Unit
-        }
-        part.dispose()
-    }
-
-    val requiredContentId =
-        contentId?.takeIf { it.isNotBlank() } ?: run {
-            respondMissingMultipartField("contentId")
-            return null
-        }
-    val requiredFileName =
-        fileName?.takeIf { it.isNotBlank() } ?: run {
-            respondMissingMultipartField("fileName")
-            return null
-        }
-    val requiredMimeType =
-        mimeType?.takeIf { it.isNotBlank() } ?: run {
-            respondMissingMultipartField("mimeType")
-            return null
-        }
-    val requiredSizeBytes =
-        sizeBytes ?: run {
-            respondMissingMultipartField("sizeBytes")
-            return null
-        }
-    val requiredDeviceId =
-        deviceId?.takeIf { it.isNotBlank() } ?: run {
-            respondMissingMultipartField("deviceId")
-            return null
-        }
-    val requiredData =
-        data ?: run {
-            respondMissingMultipartField("data")
-            return null
-        }
-
-    if (requiredSizeBytes <= 0) {
-        respond(HttpStatusCode.BadRequest, error("VALIDATION_ERROR", "sizeBytes must be greater than 0"))
-        return null
-    }
-    if (requiredSizeBytes != requiredData.size.toLong()) {
-        respond(
-            HttpStatusCode.BadRequest,
-            error("VALIDATION_ERROR", "sizeBytes does not match uploaded binary payload size"),
-        )
-        return null
-    }
-
-    return ParsedMediaMultipartUpload(
-        contentId = requiredContentId,
-        fileName = requiredFileName,
-        mimeType = requiredMimeType,
-        sizeBytes = requiredSizeBytes,
-        data = requiredData,
-        deviceId = requiredDeviceId,
-    )
-}
-
-private suspend fun ApplicationCall.receiveBackupMultipartUpload(): ParsedBackupMultipartUpload? {
-    val multipart =
-        runCatching { receiveMultipart() }.getOrElse {
-            respond(
-                HttpStatusCode.BadRequest,
-                error("VALIDATION_ERROR", "Expected multipart/form-data body"),
-            )
-            return null
-        }
-
-    var deviceId: String? = null
-    var manifest: String? = null
-    var data: ByteArray? = null
-
-    multipart.forEachPart { part ->
-        when (part) {
-            is PartData.FormItem -> {
-                when (part.name) {
-                    "deviceId" -> deviceId = part.value.trim()
-                    "manifest" -> manifest = part.value
-                }
-            }
-
-            is PartData.FileItem -> {
-                if (part.name == "data") {
-                    data = part.provider().readRemaining().readByteArray()
-                }
-            }
-
-            else -> Unit
-        }
-        part.dispose()
-    }
-
-    val requiredDeviceId =
-        deviceId?.takeIf { it.isNotBlank() } ?: run {
-            respondMissingMultipartField("deviceId")
-            return null
-        }
-    val requiredManifest =
-        manifest?.takeIf { it.isNotBlank() } ?: run {
-            respondMissingMultipartField("manifest")
-            return null
-        }
-    val requiredData =
-        data ?: run {
-            respondMissingMultipartField("data")
-            return null
-        }
-    if (requiredData.isEmpty()) {
-        respond(HttpStatusCode.BadRequest, error("VALIDATION_ERROR", "Backup payload must not be empty"))
-        return null
-    }
-
-    return ParsedBackupMultipartUpload(
-        deviceId = requiredDeviceId,
-        manifest = requiredManifest,
-        data = requiredData,
-    )
-}
-
-/**
- * Extracts and validates the user ID from the Authorization header.
- * Returns null and responds with 401 if authentication fails.
- */
-private suspend fun extractUserId(
-    call: ApplicationCall,
-    tokenService: TokenService?,
-): UUID? {
-    if (tokenService == null) {
-        call.respond(
-            HttpStatusCode.InternalServerError,
-            error("SERVER_MISCONFIGURED", "Token service is not configured"),
-        )
-        return null
-    }
-
-    val authHeader = call.request.header(HttpHeaders.Authorization)
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-        call.respond(
-            HttpStatusCode.Unauthorized,
-            error("UNAUTHORIZED", "Missing or invalid Authorization header"),
-        )
-        return null
-    }
-
-    val token = authHeader.removePrefix("Bearer ").trim()
-    val accountId = tokenService.validateAccessToken(token)
-    if (accountId == null) {
-        call.respond(
-            HttpStatusCode.Unauthorized,
-            error("UNAUTHORIZED", "Invalid or expired token"),
-        )
-        return null
-    }
-
-    return try {
-        UUID.fromString(accountId)
-    } catch (e: IllegalArgumentException) {
-        Napier.e("Invalid account ID format in token: $accountId", e)
-        call.respond(
-            HttpStatusCode.Unauthorized,
-            error("UNAUTHORIZED", "Invalid token payload"),
-        )
-        null
-    }
-}
-
-private fun ApplicationCall.requiredPathParam(name: String): String =
-    requireNotNull(parameters[name]) { "Missing required route parameter: $name" }
+// Multipart parsers, auth helpers, and wire-shape mappers live in
+// [app.logdate.server.routes.sync.SyncHelpers] and are imported at the top of this file.
 
 /**
  * Sync routes with JWT authentication.
@@ -1494,162 +1239,5 @@ data class BackupPurgeResponse(
     val maxAgeDaysApplied: Long,
 )
 
-private fun buildMediaDownloadUrl(
-    call: ApplicationCall,
-    mediaId: String,
-): String {
-    val origin = call.request.local
-    val defaultPort =
-        (origin.scheme == "http" && origin.localPort == 80) ||
-            (origin.scheme == "https" && origin.localPort == 443)
-    val portPart = if (defaultPort) "" else ":${origin.localPort}"
-    return "${origin.scheme}://${origin.localHost}$portPart/api/v1/media/$mediaId/binary"
-}
-
-private fun resolveMediaDownloadUrl(
-    call: ApplicationCall,
-    record: LogDateMedia,
-    mediaStorage: LogDateBlobStorage?,
-    accessPolicy: MediaAccessPolicy,
-): String {
-    if (accessPolicy.useSignedUrls && mediaStorage != null && record.storagePath != null) {
-        return runCatching {
-            mediaStorage.getSignedDownloadUrl(record.storagePath, accessPolicy.signedUrlTtlHours)
-        }.getOrElse { error ->
-            Napier.e("Failed to generate signed URL for ${record.mediaId}", error)
-            buildMediaDownloadUrl(call, record.mediaId)
-        }
-    }
-    return buildMediaDownloadUrl(call, record.mediaId)
-}
-
-private fun resolveBackupDownloadUrl(
-    call: ApplicationCall,
-    record: LogDateBackup,
-    mediaStorage: LogDateBlobStorage?,
-    accessPolicy: MediaAccessPolicy,
-): String {
-    if (accessPolicy.useSignedUrls && mediaStorage != null) {
-        return runCatching {
-            mediaStorage.getSignedDownloadUrl(record.storagePath, accessPolicy.signedUrlTtlHours)
-        }.getOrElse { error ->
-            Napier.e("Failed to generate signed URL for backup ${record.id}", error)
-            buildBackupDownloadUrl(call, record.id.toString())
-        }
-    }
-    return buildBackupDownloadUrl(call, record.id.toString())
-}
-
-private fun buildBackupDownloadUrl(
-    call: ApplicationCall,
-    backupId: String,
-): String {
-    val origin = call.request.local
-    val defaultPort =
-        (origin.scheme == "http" && origin.localPort == 80) ||
-            (origin.scheme == "https" && origin.localPort == 443)
-    val portPart = if (defaultPort) "" else ":${origin.localPort}"
-    return "${origin.scheme}://${origin.localHost}$portPart/api/v1/backups/$backupId/binary"
-}
-
-private fun app.logdate.server.sync.SyncMetricsSnapshot.toPrometheus(): String {
-    val builder = StringBuilder()
-    builder.appendLine("# HELP logdate_sync_conflicts_total Total sync conflicts detected.")
-    builder.appendLine("# TYPE logdate_sync_conflicts_total counter")
-    builder.appendLine("logdate_sync_conflicts_total $conflictCount")
-    builder.appendLine("# HELP logdate_sync_operation_success_total Successful sync operations by type.")
-    builder.appendLine("# TYPE logdate_sync_operation_success_total counter")
-    builder.appendLine("# HELP logdate_sync_operation_error_total Failed sync operations by type.")
-    builder.appendLine("# TYPE logdate_sync_operation_error_total counter")
-    builder.appendLine("# HELP logdate_sync_operation_duration_ms_total Total sync operation duration by type.")
-    builder.appendLine("# TYPE logdate_sync_operation_duration_ms_total counter")
-    builder.appendLine("# HELP logdate_sync_operation_bytes_total Total bytes processed by operation type.")
-    builder.appendLine("# TYPE logdate_sync_operation_bytes_total counter")
-
-    operations.forEach { operation ->
-        val label = escapeLabelValue(operation.name)
-        builder.appendLine("logdate_sync_operation_success_total{operation=\"$label\"} ${operation.successCount}")
-        builder.appendLine("logdate_sync_operation_error_total{operation=\"$label\"} ${operation.errorCount}")
-        builder.appendLine("logdate_sync_operation_duration_ms_total{operation=\"$label\"} ${operation.totalDurationMs}")
-        builder.appendLine("logdate_sync_operation_bytes_total{operation=\"$label\"} ${operation.totalBytes}")
-    }
-
-    return builder.toString()
-}
-
-private fun escapeLabelValue(value: String): String = value.replace("\\", "\\\\").replace("\"", "\\\"")
-
-/**
- * Per-user ceilings on the write paths. Tuned to let an actively-syncing device churn through its
- * pending upload queue (which typically runs a dozen or two items in a burst) without bothering a
- * well-behaved client, while still throttling a runaway loop or a compromised token.
- */
-private val MEDIA_UPLOAD_RATE_LIMIT = RateLimitPolicy(maxRequests = 120, windowSeconds = 60)
-private val BACKUP_UPLOAD_RATE_LIMIT = RateLimitPolicy(maxRequests = 6, windowSeconds = 60 * 60)
-
-private suspend fun respondRateLimited(
-    call: ApplicationCall,
-    rateLimiter: SlidingWindowRateLimiter,
-    key: String,
-    policy: RateLimitPolicy,
-) {
-    val retryAfter = rateLimiter.retryAfterSeconds(key, policy)
-    AuditLogger.emit(
-        AuditCategory.SYNC_RATE_LIMITED,
-        mapOf(
-            "key" to key,
-            "retryAfterSeconds" to retryAfter.toString(),
-            "maxRequests" to policy.maxRequests.toString(),
-            "windowSeconds" to policy.windowSeconds.toString(),
-        ),
-    )
-    call.response.headers.append(HttpHeaders.RetryAfter, retryAfter.toString())
-    call.respond(
-        HttpStatusCode.TooManyRequests,
-        error(
-            code = "RATE_LIMIT_EXCEEDED",
-            message = "Too many uploads. Try again in $retryAfter seconds.",
-            details = mapOf("retryAfterSeconds" to retryAfter.toString()),
-        ),
-    )
-}
-
-/**
- * Translates a quota violation into the wire-level 402 Payment Required response. We structure the
- * `details` map so a client can render a specific message without parsing the free-form body:
- * `reason` is one of the [QuotaReason] enum values, `limit`/`current` give the user-facing numbers,
- * and the code `QUOTA_EXCEEDED` groups both reasons for easy client-side switching.
- */
-private suspend fun respondQuotaExceeded(
-    call: ApplicationCall,
-    denied: QuotaCheck.Denied,
-) {
-    val reasonMessage =
-        when (denied.reason) {
-            QuotaReason.STORAGE_BYTES ->
-                "Storage quota exceeded: ${denied.current} of ${denied.limit} bytes in use."
-            QuotaReason.BACKUP_COUNT ->
-                "Backup quota exceeded: ${denied.current} of ${denied.limit} backups stored."
-        }
-    AuditLogger.emit(
-        AuditCategory.SYNC_QUOTA_EXCEEDED,
-        mapOf(
-            "reason" to denied.reason.name,
-            "limit" to denied.limit.toString(),
-            "current" to denied.current.toString(),
-        ),
-    )
-    call.respond(
-        HttpStatusCode.PaymentRequired,
-        error(
-            code = "QUOTA_EXCEEDED",
-            message = reasonMessage,
-            details =
-                mapOf(
-                    "reason" to denied.reason.name,
-                    "limit" to denied.limit.toString(),
-                    "current" to denied.current.toString(),
-                ),
-        ),
-    )
-}
+// URL-resolution, Prometheus export, rate-limit policies, and quota/rate-limit responders live
+// in [app.logdate.server.routes.sync.SyncHelpers].
