@@ -1,13 +1,12 @@
 package app.logdate.client.data.media
 
+import app.logdate.client.database.dao.media.IndexedMediaContent
 import app.logdate.client.database.dao.media.IndexedMediaDao
 import app.logdate.client.database.dao.media.MediaExifDao
-import app.logdate.client.database.dao.media.IndexedMediaContent
 import app.logdate.client.database.entities.media.IndexedImageEntity
 import app.logdate.client.database.entities.media.IndexedVideoEntity
 import app.logdate.client.database.entities.media.MediaDimensions
 import app.logdate.client.database.entities.media.MediaExifMetadataEntity
-import app.logdate.client.repository.media.IndexedMedia
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
