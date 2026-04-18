@@ -40,8 +40,8 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkAll
-import org.jetbrains.exposed.v1.core.Transaction
 import org.jetbrains.exposed.v1.jdbc.Database
+import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.SchemaUtils
 import org.koin.core.context.stopKoin
 import org.koin.core.logger.EmptyLogger
@@ -127,9 +127,9 @@ class ServerModuleTest {
         val method =
             Class
                 .forName("app.logdate.server.di.ServerModuleKt")
-                .getDeclaredMethod("initializeDatabase\$lambda\$0", Transaction::class.java)
+                .getDeclaredMethod("initializeDatabase\$lambda\$0", JdbcTransaction::class.java)
         method.isAccessible = true
-        method.invoke(null, mockk<Transaction>(relaxed = true))
+        method.invoke(null, mockk<JdbcTransaction>(relaxed = true))
     }
 
     @Test

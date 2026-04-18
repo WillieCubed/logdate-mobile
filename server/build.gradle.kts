@@ -27,15 +27,6 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
-configurations.configureEach {
-    resolutionStrategy.eachDependency {
-        if (requested.group == "org.jetbrains.kotlinx" && requested.name.startsWith("kotlinx-datetime")) {
-            useVersion("0.6.2")
-            because("Exposed kotlin-datetime integration requires kotlinx.datetime.Instant runtime class")
-        }
-    }
-}
-
 dependencies {
     // Shared project dependencies
     implementation(projects.shared.model)
