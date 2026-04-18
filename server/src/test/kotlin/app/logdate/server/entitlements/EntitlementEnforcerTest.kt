@@ -86,6 +86,50 @@ class EntitlementEnforcerTest {
             assertTrue(result.limits.backupCount == null)
         }
 
+    @Test
+    fun `PAST_DUE status keeps the plan's quota so grace period is transparent`() =
+        runTest {
+            val enforcer =
+                EntitlementEnforcer(
+                    entitlementService =
+                        FakeService(
+                            entitlement =
+                                Entitlement(
+                                    planId = "standard",
+                                    tier = EntitlementTier.STANDARD,
+                                    status = EntitlementStatus.PAST_DUE,
+                                    limits = EntitlementLimits(storageBytes = 1_000_000L, backupCount = 10),
+                                ),
+                        ),
+                    usageCalculator = StaticUsage(bytes = 900_000L),
+                )
+            // A user in grace can still upload under their existing quota — they shouldn't see
+            // 402s before they see a billing-UI nudge.
+            assertIs<QuotaCheck.Allowed>(enforcer.checkMediaUpload(accountId, pendingBytes = 50_000L))
+        }
+
+    @Test
+    fun `CANCELLED status still honors whatever limits the current plan row carries`() =
+        runTest {
+            // Until a webhook moves the row to the free plan, a just-cancelled account keeps its
+            // paid quota. The enforcer doesn't do a cliff-edge downgrade on the status change.
+            val enforcer =
+                EntitlementEnforcer(
+                    entitlementService =
+                        FakeService(
+                            entitlement =
+                                Entitlement(
+                                    planId = "standard",
+                                    tier = EntitlementTier.STANDARD,
+                                    status = EntitlementStatus.CANCELLED,
+                                    limits = EntitlementLimits(storageBytes = 1_000_000L, backupCount = 10),
+                                ),
+                        ),
+                    usageCalculator = StaticUsage(bytes = 100_000L),
+                )
+            assertIs<QuotaCheck.Allowed>(enforcer.checkMediaUpload(accountId, pendingBytes = 50_000L))
+        }
+
     private fun unlimited(): Entitlement =
         Entitlement(
             planId = "unlimited",

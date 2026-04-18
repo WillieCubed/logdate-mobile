@@ -36,6 +36,20 @@ enum class QuotaReason { STORAGE_BYTES, BACKUP_COUNT }
 /**
  * Quota gate used by write endpoints. Computes `current + incremental vs. limit` for the
  * dimension in question and emits [QuotaCheck.Denied] when the write would push past.
+ *
+ * **Status handling — payment lifecycle edge cases.** The enforcer deliberately reads only the
+ * plan's *limits*, not the account's [EntitlementStatus]:
+ *
+ *  - `ACTIVE` and `PAST_DUE` and `GRACE` all yield the same quota. This is by design: a user in
+ *    grace shouldn't get surprised with 402s, they should get a separate "your payment failed"
+ *    nudge from the billing UI. Uploads keep working until the provider actually cancels.
+ *  - `CANCELLED` keeps whatever plan row the account still points at — typically the plan they
+ *    had before cancelling, until a later webhook overwrites the row to the `free` plan. That
+ *    means downgrades coast through the end of the billing period rather than going cliff-edge
+ *    the moment Stripe/Play notifies us, which matches standard SaaS expectations.
+ *  - Provider swaps (a user who had Stripe buys on Play, or vice versa) are "last webhook write
+ *    wins" because both providers' webhook handlers overwrite the single
+ *    `account_entitlements` row keyed on account_id. Nothing extra to do here.
  */
 class EntitlementEnforcer(
     private val entitlementService: EntitlementService,
