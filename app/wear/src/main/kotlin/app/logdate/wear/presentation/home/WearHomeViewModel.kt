@@ -25,31 +25,47 @@ class WearHomeViewModel(
     private val syncManager: SyncManager,
     private val dataLayerClient: WearDataLayerClient,
 ) : ViewModel() {
-
     companion object {
         private const val SYNC_POLL_INTERVAL_MS = 30_000L
     }
 
     private val today: LocalDate
-        get() = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+        get() =
+            Clock.System
+                .now()
+                .toLocalDateTime(TimeZone.currentSystemDefault())
+                .date
 
     private val _syncBadge = MutableStateFlow(SyncBadge.NONE)
     private var pollingJob: Job? = null
 
-    val uiState = combine(
-        notesRepository.observeNotesForDay(today).map { it.size },
-        _syncBadge,
-    ) { entryCount, syncBadge ->
-        WearHomeUiState(
-            timeOfDay = currentTimeOfDay(),
-            entryCount = entryCount,
-            syncBadge = syncBadge,
+    val uiState =
+        combine(
+            notesRepository.observeNotesForDay(today).map { it.size },
+            _syncBadge,
+        ) { entryCount, syncBadge ->
+            val timeOfDay = currentTimeOfDay()
+            WearHomeUiState(
+                greeting =
+                    when (timeOfDay) {
+                        TimeOfDay.MORNING -> "Good morning"
+                        TimeOfDay.AFTERNOON -> "Good afternoon"
+                        TimeOfDay.EVENING -> "Good evening"
+                    },
+                entryCount = entryCount,
+                entryCountLabel =
+                    when (entryCount) {
+                        0 -> "No entries yet"
+                        1 -> "1 entry today"
+                        else -> "$entryCount entries today"
+                    },
+                syncBadge = syncBadge,
+            )
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            WearHomeUiState(),
         )
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5_000),
-        WearHomeUiState(timeOfDay = currentTimeOfDay()),
-    )
 
     init {
         startSyncPolling()
@@ -57,12 +73,13 @@ class WearHomeViewModel(
 
     fun startSyncPolling() {
         if (pollingJob?.isActive == true) return
-        pollingJob = viewModelScope.launch {
-            while (isActive) {
-                refreshSyncBadge()
-                delay(SYNC_POLL_INTERVAL_MS)
+        pollingJob =
+            viewModelScope.launch {
+                while (isActive) {
+                    refreshSyncBadge()
+                    delay(SYNC_POLL_INTERVAL_MS)
+                }
             }
-        }
     }
 
     fun stopSyncPolling() {
@@ -75,20 +92,23 @@ class WearHomeViewModel(
             val connected = dataLayerClient.isPhoneConnected()
             val status = syncManager.getSyncStatus()
 
-            _syncBadge.value = when {
-                status.hasErrors -> SyncBadge.ERROR
-                connected && status.pendingUploads > 0 -> SyncBadge.SYNCING
-                else -> SyncBadge.NONE
-            }
+            _syncBadge.value =
+                when {
+                    status.hasErrors -> SyncBadge.ERROR
+                    connected && status.pendingUploads > 0 -> SyncBadge.SYNCING
+                    else -> SyncBadge.NONE
+                }
         } catch (e: Exception) {
             Napier.w("Failed to refresh sync badge", e)
         }
     }
 
     private fun currentTimeOfDay(): TimeOfDay {
-        val hour = Clock.System.now()
-            .toLocalDateTime(TimeZone.currentSystemDefault())
-            .hour
+        val hour =
+            Clock.System
+                .now()
+                .toLocalDateTime(TimeZone.currentSystemDefault())
+                .hour
         return when {
             hour < 12 -> TimeOfDay.MORNING
             hour < 17 -> TimeOfDay.AFTERNOON
@@ -110,7 +130,8 @@ enum class SyncBadge {
 }
 
 data class WearHomeUiState(
-    val timeOfDay: TimeOfDay = TimeOfDay.MORNING,
+    val greeting: String = "",
     val entryCount: Int = 0,
+    val entryCountLabel: String = "",
     val syncBadge: SyncBadge = SyncBadge.NONE,
 )

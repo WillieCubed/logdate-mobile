@@ -28,7 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
@@ -44,6 +43,7 @@ import androidx.wear.compose.material3.TimeText
 import app.logdate.wear.R
 import app.logdate.wear.presentation.common.SaveFeedback
 import app.logdate.wear.presentation.recording.RecordingPhase
+import app.logdate.wear.presentation.recording.RecordingUiState
 import app.logdate.wear.presentation.recording.WearRecordingViewModel
 import app.logdate.wear.presentation.recording.formatDuration
 import kotlinx.coroutines.flow.collectLatest
@@ -75,11 +75,35 @@ fun WearHomeScreen(
         }
     }
 
-    val isRecording = recordingState.phase == RecordingPhase.RECORDING
+    WearHomeContent(
+        homeState = homeState,
+        recordingState = recordingState,
+        onNavigateToMoodCheckIn = onNavigateToMoodCheckIn,
+        onNavigateToQuickText = onNavigateToQuickText,
+        onNavigateToTimeline = onNavigateToTimeline,
+        onNavigateToSettings = onNavigateToSettings,
+        onTouchDown = recordingViewModel::onTouchDown,
+        onTouchUp = recordingViewModel::onTouchUp,
+    )
+}
+
+@Composable
+fun WearHomeContent(
+    homeState: WearHomeUiState,
+    modifier: Modifier = Modifier,
+    onNavigateToMoodCheckIn: () -> Unit = {},
+    onNavigateToQuickText: () -> Unit = {},
+    onNavigateToTimeline: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
+    onTouchDown: () -> Unit = {},
+    onTouchUp: () -> Unit = {},
+    recordingState: RecordingUiState = RecordingUiState(),
+) {
     val isIdle = recordingState.phase == RecordingPhase.READY
 
     ScreenScaffold(
         timeText = { TimeText() },
+        modifier = modifier,
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -93,25 +117,23 @@ fun WearHomeScreen(
                 // Top text — greeting or recording status
                 when (recordingState.phase) {
                     RecordingPhase.READY -> {
-                        val greetingText = when (homeState.timeOfDay) {
-                            TimeOfDay.MORNING -> stringResource(R.string.wear_home_greeting_morning)
-                            TimeOfDay.AFTERNOON -> stringResource(R.string.wear_home_greeting_afternoon)
-                            TimeOfDay.EVENING -> stringResource(R.string.wear_home_greeting_evening)
-                        }
                         Text(
-                            text = greetingText,
+                            text = homeState.greeting,
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                         )
                         if (homeState.syncBadge != SyncBadge.NONE) {
-                            val (badgeText, badgeColor) = when (homeState.syncBadge) {
-                                SyncBadge.SYNCING -> stringResource(R.string.wear_home_syncing) to
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                SyncBadge.ERROR -> stringResource(R.string.wear_home_sync_issue) to
-                                    MaterialTheme.colorScheme.error
-                                SyncBadge.NONE -> "" to MaterialTheme.colorScheme.onSurfaceVariant
-                            }
+                            val (badgeText, badgeColor) =
+                                when (homeState.syncBadge) {
+                                    SyncBadge.SYNCING ->
+                                        stringResource(R.string.wear_home_syncing) to
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                    SyncBadge.ERROR ->
+                                        stringResource(R.string.wear_home_sync_issue) to
+                                            MaterialTheme.colorScheme.error
+                                    SyncBadge.NONE -> "" to MaterialTheme.colorScheme.onSurfaceVariant
+                                }
                             Text(
                                 text = badgeText,
                                 style = MaterialTheme.typography.labelSmall,
@@ -119,6 +141,7 @@ fun WearHomeScreen(
                             )
                         }
                     }
+
                     RecordingPhase.RECORDING -> {
                         Text(
                             text = formatDuration(recordingState.recordingDurationMs),
@@ -127,6 +150,7 @@ fun WearHomeScreen(
                             textAlign = TextAlign.Center,
                         )
                     }
+
                     RecordingPhase.SAVING, RecordingPhase.PAUSED -> {
                         Text(
                             text = stringResource(R.string.wear_recording_saving),
@@ -135,12 +159,14 @@ fun WearHomeScreen(
                             textAlign = TextAlign.Center,
                         )
                     }
+
                     RecordingPhase.SAVED -> {
-                        val feedbackText = when (recordingState.saveFeedback) {
-                            SaveFeedback.SYNCING_TO_PHONE -> stringResource(R.string.wear_saved_syncing_to_phone)
-                            SaveFeedback.SAVED_LOCALLY -> stringResource(R.string.wear_saved_on_watch)
-                            null -> stringResource(R.string.wear_recording_saved)
-                        }
+                        val feedbackText =
+                            when (recordingState.saveFeedback) {
+                                SaveFeedback.SYNCING_TO_PHONE -> stringResource(R.string.wear_saved_syncing_to_phone)
+                                SaveFeedback.SAVED_LOCALLY -> stringResource(R.string.wear_saved_on_watch)
+                                null -> stringResource(R.string.wear_recording_saved)
+                            }
                         Text(
                             text = feedbackText,
                             style = MaterialTheme.typography.labelMedium,
@@ -148,6 +174,7 @@ fun WearHomeScreen(
                             textAlign = TextAlign.Center,
                         )
                     }
+
                     RecordingPhase.TOO_SHORT -> {
                         Text(
                             text = stringResource(R.string.wear_recording_hold_longer),
@@ -156,10 +183,12 @@ fun WearHomeScreen(
                             textAlign = TextAlign.Center,
                         )
                     }
+
                     RecordingPhase.ERROR -> {
                         Text(
-                            text = recordingState.errorMessage
-                                ?: stringResource(R.string.wear_recording_error),
+                            text =
+                                recordingState.errorMessage
+                                    ?: stringResource(R.string.wear_recording_error),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error,
                             textAlign = TextAlign.Center,
@@ -170,8 +199,8 @@ fun WearHomeScreen(
                 // Center surface — the recorder
                 RecordSurface(
                     phase = recordingState.phase,
-                    onTouchDown = recordingViewModel::onTouchDown,
-                    onTouchUp = recordingViewModel::onTouchUp,
+                    onTouchDown = onTouchDown,
+                    onTouchUp = onTouchUp,
                     modifier = Modifier.padding(vertical = 8.dp),
                 )
             }
@@ -184,18 +213,20 @@ fun WearHomeScreen(
             )
             if (bottomAlpha > 0f) {
                 Row(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 16.dp)
-                        .alpha(bottomAlpha),
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 16.dp)
+                            .alpha(bottomAlpha),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     IconButton(
                         onClick = onNavigateToMoodCheckIn,
                         modifier = Modifier.size(36.dp),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        ),
+                        colors =
+                            IconButtonDefaults.iconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            ),
                     ) {
                         Icon(
                             imageVector = Icons.Default.Mood,
@@ -206,9 +237,10 @@ fun WearHomeScreen(
                     IconButton(
                         onClick = onNavigateToQuickText,
                         modifier = Modifier.size(36.dp),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        ),
+                        colors =
+                            IconButtonDefaults.iconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            ),
                     ) {
                         Icon(
                             imageVector = Icons.Default.TextFields,
@@ -219,9 +251,10 @@ fun WearHomeScreen(
                     IconButton(
                         onClick = onNavigateToTimeline,
                         modifier = Modifier.size(36.dp),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        ),
+                        colors =
+                            IconButtonDefaults.iconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            ),
                     ) {
                         Icon(
                             imageVector = Icons.Default.ViewTimeline,
@@ -232,9 +265,10 @@ fun WearHomeScreen(
                     IconButton(
                         onClick = onNavigateToSettings,
                         modifier = Modifier.size(36.dp),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        ),
+                        colors =
+                            IconButtonDefaults.iconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            ),
                     ) {
                         Icon(
                             imageVector = Icons.Default.Settings,
@@ -248,89 +282,74 @@ fun WearHomeScreen(
     }
 }
 
-/**
- * Circular surface that IS the recorder.
- *
- * Resting state: mic icon on a surface. Press and hold: expands, turns red,
- * becomes the active recording target. Release: auto-saves.
- */
 @Composable
-private fun RecordSurface(
+fun RecordSurface(
     phase: RecordingPhase,
     onTouchDown: () -> Unit,
     onTouchUp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val isRecording = phase == RecordingPhase.RECORDING
-    val isSaved = phase == RecordingPhase.SAVED
-
     val scale by animateFloatAsState(
-        targetValue = when {
-            isRecording -> 1.4f
-            isSaved -> 1.1f
-            else -> 1f
-        },
-        animationSpec = tween(durationMillis = 150),
+        targetValue = if (isRecording) 1.15f else 1f,
+        animationSpec = tween(200),
         label = "recordScale",
     )
-
-    val bgColor by animateColorAsState(
-        targetValue = when {
-            isRecording -> Color(0xFF8B1A1A)
-            isSaved -> MaterialTheme.colorScheme.primaryContainer
-            else -> MaterialTheme.colorScheme.surfaceContainerHigh
-        },
-        animationSpec = tween(durationMillis = 150),
-        label = "recordBg",
+    val color by animateColorAsState(
+        targetValue =
+            when (phase) {
+                RecordingPhase.RECORDING -> MaterialTheme.colorScheme.primary
+                RecordingPhase.SAVED -> MaterialTheme.colorScheme.primaryContainer
+                RecordingPhase.ERROR -> MaterialTheme.colorScheme.errorContainer
+                else -> MaterialTheme.colorScheme.surfaceContainer
+            },
+        animationSpec = tween(200),
+        label = "recordColor",
     )
-
-    val iconTint by animateColorAsState(
-        targetValue = when {
-            isRecording -> Color.White
-            isSaved -> MaterialTheme.colorScheme.onPrimaryContainer
-            else -> MaterialTheme.colorScheme.onSurface
-        },
-        animationSpec = tween(durationMillis = 150),
-        label = "iconTint",
-    )
-
-    val icon = when {
-        isSaved -> Icons.Default.Check
-        else -> Icons.Default.Mic
-    }
-
-    val touchActive = phase == RecordingPhase.READY || phase == RecordingPhase.RECORDING
 
     Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .size(80.dp)
-            .scale(scale)
-            .clip(CircleShape)
-            .background(color = bgColor, shape = CircleShape)
-            .then(
-                if (touchActive) {
-                    Modifier.pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                when (event.type) {
-                                    PointerEventType.Press -> onTouchDown()
-                                    PointerEventType.Release -> onTouchUp()
-                                }
+        modifier =
+            modifier
+                .size(80.dp)
+                .scale(scale)
+                .clip(CircleShape)
+                .background(color)
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            when (event.type) {
+                                PointerEventType.Press -> onTouchDown()
+                                PointerEventType.Release -> onTouchUp()
                             }
                         }
                     }
-                } else {
-                    Modifier
                 },
-            ),
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = stringResource(R.string.wear_home_record_audio),
-            tint = iconTint,
-            modifier = Modifier.size(32.dp),
-        )
+        when (phase) {
+            RecordingPhase.SAVED -> {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+
+            else -> {
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = stringResource(R.string.wear_home_record_audio),
+                    modifier = Modifier.size(32.dp),
+                    tint =
+                        if (isRecording) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                )
+            }
+        }
     }
 }

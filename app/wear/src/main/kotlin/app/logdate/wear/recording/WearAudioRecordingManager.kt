@@ -21,10 +21,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.uuid.Uuid
 
 /**
  * Wear OS implementation of the AudioRecordingManager interface.
- * 
+ *
  * Manages audio recording on Wear OS devices with optimizations for:
  * - Small form factor
  * - Limited battery capacity
@@ -35,12 +36,11 @@ class WearAudioRecordingManager(
     private val storageChecker: StorageSpaceChecker,
     private val audioStorage: AudioStorage,
 ) : AudioRecordingManager {
-
     companion object {
         // Estimate size of 1-minute audio recording (AAC format, 128kbps)
         // 128 kilobits per second * 60 seconds / 8 bits per byte = 960 kilobytes
         private const val ONE_MINUTE_RECORDING_SIZE_BYTES = 960 * 1024L
-        
+
         // Buffer space to leave free (0.5 MB)
         private const val BUFFER_SPACE_BYTES = 512 * 1024L
     }
@@ -50,54 +50,57 @@ class WearAudioRecordingManager(
     private val durationFlow = MutableStateFlow(Duration.ZERO)
     private val transcriptionFlow = MutableStateFlow<String?>(null)
     private var transcriptionService: TranscriptionService? = null
-    
+
     // Recording state
     private var recordingActive = false
     private var serviceBound = false
     private var recordingService: WearAudioRecordingService? = null
     private var recordedAudioPath: String? = null
     private var recordingTarget: AudioRecordingTarget? = null
-    
-    
-    // Service connection
-    private val serviceConnection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            val binder = service as WearAudioRecordingService.AudioServiceBinder
-            recordingService = binder.getService()
-            serviceBound = true
-            
-            // Observe service state
-            scope.launch {
-                recordingService?.recordingState?.collect { serviceState ->
-                    // Process updates only while recording is active
-                    if (recordingActive) {
-                        // Update audio level
-                        audioLevelFlow.value = serviceState.audioLevel
 
-                        // Update duration
-                        val durationMs = serviceState.durationSeconds * 1000L
-                        durationFlow.value = durationMs.milliseconds
-                        
-                        // Check if recording stopped on service side
-                        if (!serviceState.isRecording) {
-                            recordingActive = false
-                            recordedAudioPath = serviceState.recordedFilePath
-                            unbindFromService()
+    // Service connection
+    private val serviceConnection =
+        object : ServiceConnection {
+            override fun onServiceConnected(
+                name: ComponentName?,
+                service: IBinder?,
+            ) {
+                val binder = service as WearAudioRecordingService.AudioServiceBinder
+                recordingService = binder.getService()
+                serviceBound = true
+
+                // Observe service state
+                scope.launch {
+                    recordingService?.recordingState?.collect { serviceState ->
+                        // Process updates only while recording is active
+                        if (recordingActive) {
+                            // Update audio level
+                            audioLevelFlow.value = serviceState.audioLevel
+
+                            // Update duration
+                            val durationMs = serviceState.durationSeconds * 1000L
+                            durationFlow.value = durationMs.milliseconds
+
+                            // Check if recording stopped on service side
+                            if (!serviceState.isRecording) {
+                                recordingActive = false
+                                recordedAudioPath = serviceState.recordedFilePath
+                                unbindFromService()
+                            }
                         }
                     }
                 }
+
+                Napier.d("Connected to Wear OS audio recording service")
             }
-            
-            Napier.d("Connected to Wear OS audio recording service")
+
+            override fun onServiceDisconnected(name: ComponentName?) {
+                recordingService = null
+                serviceBound = false
+                Napier.d("Disconnected from Wear OS audio recording service")
+            }
         }
-        
-        override fun onServiceDisconnected(name: ComponentName?) {
-            recordingService = null
-            serviceBound = false
-            Napier.d("Disconnected from Wear OS audio recording service")
-        }
-    }
-    
+
     init {
         Napier.d("WearAudioRecordingManager initialized")
     }
@@ -114,7 +117,7 @@ class WearAudioRecordingManager(
     override fun setTranscriptionService(service: TranscriptionService) {
         transcriptionService = service
     }
-    
+
     private fun bindToService() {
         try {
             val intent = Intent(context, WearAudioRecordingService::class.java)
@@ -126,7 +129,7 @@ class WearAudioRecordingManager(
             serviceBound = false
         }
     }
-    
+
     private fun unbindFromService() {
         if (serviceBound) {
             try {
@@ -138,20 +141,20 @@ class WearAudioRecordingManager(
             }
         }
     }
-    
+
     /**
      * Check if there's enough storage space for a 1-minute recording
      */
     private suspend fun checkStorageSpace(): Boolean {
         val requiredSpace = ONE_MINUTE_RECORDING_SIZE_BYTES + BUFFER_SPACE_BYTES
         val availableSpace = storageChecker.getAvailableStorageSpace()
-        
+
         Napier.d("Available storage: ${availableSpace / 1024}KB, Required: ${requiredSpace / 1024}KB")
-        
+
         return availableSpace >= requiredSpace
     }
-    
-    override suspend fun startRecording(): Boolean {
+
+    override suspend fun startRecording(targetNoteId: Uuid?): Boolean {
         if (recordingActive) {
             return false
         }
@@ -186,22 +189,22 @@ class WearAudioRecordingManager(
             false
         }
     }
-    
+
     override suspend fun stopRecording(): String? {
         return try {
             Napier.d("Stopping Wear OS recording")
-            
+
             if (!recordingActive) {
                 Napier.w("Attempted to stop Wear OS recording when not active")
                 return null
             }
-            
+
             // Get file path before stopping
             val filePath = recordingService?.getRecordedFilePath() ?: recordingTarget?.path
-            
+
             // Stop service
             context.stopWearAudioRecordingService()
-            
+
             // Give service time to stop properly
             scope.launch {
                 withContext(Dispatchers.IO) {
@@ -209,7 +212,7 @@ class WearAudioRecordingManager(
                     unbindFromService()
                 }
             }
-            
+
             // Return audio path
             recordingActive = false
             recordingTarget = null
@@ -222,61 +225,63 @@ class WearAudioRecordingManager(
             null
         }
     }
-    
+
     override suspend fun pauseRecording(): Boolean {
         if (!recordingActive || recordingService == null) {
             return false
         }
-        
+
         try {
             // Send pause action to service
-            val intent = Intent(context, WearAudioRecordingService::class.java).apply {
-                action = WearAudioRecordingService.ACTION_PAUSE
-            }
+            val intent =
+                Intent(context, WearAudioRecordingService::class.java).apply {
+                    action = WearAudioRecordingService.ACTION_PAUSE
+                }
             context.startService(intent)
-            
+
             delay(200) // Small delay
-            
+
             return recordingService?.isRecordingPaused() == true
         } catch (e: Exception) {
             Napier.e("Error pausing Wear OS recording", e)
             return false
         }
     }
-    
+
     override suspend fun resumeRecording(): Boolean {
         if (!recordingActive || recordingService == null) {
             return false
         }
-        
+
         try {
             // Send resume action to service
-            val intent = Intent(context, WearAudioRecordingService::class.java).apply {
-                action = WearAudioRecordingService.ACTION_RESUME
-            }
+            val intent =
+                Intent(context, WearAudioRecordingService::class.java).apply {
+                    action = WearAudioRecordingService.ACTION_RESUME
+                }
             context.startService(intent)
-            
+
             delay(200) // Small delay
-            
+
             return recordingService?.isRecordingPaused() == false
         } catch (e: Exception) {
             Napier.e("Error resuming Wear OS recording", e)
             return false
         }
     }
-    
+
     override fun release() {
         try {
             Napier.d("Clearing Wear OS recording resources")
-            
+
             if (recordingActive) {
                 context.stopWearAudioRecordingService()
                 recordingActive = false
             }
-            
+
             unbindFromService()
             recordingTarget = null
-            
+
             Napier.d("Wear OS recording resources cleared")
         } catch (e: Exception) {
             Napier.e("Error clearing Wear OS recording resources", e)
