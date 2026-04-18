@@ -21,7 +21,9 @@ class StripeSignatureVerifier(
     sealed class Verification {
         data object Ok : Verification()
 
-        data class Rejected(val reason: String) : Verification()
+        data class Rejected(
+            val reason: String,
+        ) : Verification()
     }
 
     fun verify(
@@ -47,14 +49,22 @@ class StripeSignatureVerifier(
     }
 
     private fun parseHeader(raw: String): Map<String, String> =
-        raw.split(',')
+        raw
+            .split(',')
             .mapNotNull { pair ->
                 val eq = pair.indexOf('=')
-                if (eq <= 0 || eq == pair.length - 1) null
-                else pair.substring(0, eq).trim() to pair.substring(eq + 1).trim()
+                if (eq <= 0 || eq == pair.length - 1) {
+                    null
+                } else {
+                    pair.substring(0, eq).trim() to pair.substring(eq + 1).trim()
+                }
             }.toMap()
 
-    private fun computeSignature(secret: String, timestamp: Long, rawBody: String): String {
+    private fun computeSignature(
+        secret: String,
+        timestamp: Long,
+        rawBody: String,
+    ): String {
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256"))
         val payload = "$timestamp.$rawBody"
@@ -63,7 +73,10 @@ class StripeSignatureVerifier(
     }
 
     /** Constant-time string compare — signature equality comparisons must not leak timing. */
-    private fun constantTimeEquals(a: String, b: String): Boolean {
+    private fun constantTimeEquals(
+        a: String,
+        b: String,
+    ): Boolean {
         if (a.length != b.length) return false
         var diff = 0
         for (i in a.indices) {

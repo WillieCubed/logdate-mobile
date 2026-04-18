@@ -21,7 +21,6 @@ import app.logdate.server.di.serverModule
 import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.entitlements.EntitlementService
 import app.logdate.server.entitlements.entitlementsModule
-import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.logdate.CompositeLogDateMediaBlobRepository
@@ -41,6 +40,7 @@ import app.logdate.server.oauth.OAuthNonceService
 import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnConfig
 import app.logdate.server.passkeys.WebAuthnPasskeyService
+import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.routes.authV1Routes
 import app.logdate.server.routes.identityApiRoutes
 import app.logdate.server.routes.identityRoutes

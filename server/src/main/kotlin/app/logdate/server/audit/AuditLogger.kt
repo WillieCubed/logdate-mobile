@@ -20,19 +20,31 @@ import kotlin.time.Clock
 object AuditLogger {
     private val logger = LoggerFactory.getLogger("app.logdate.audit")
 
-    fun emit(category: String, fields: Map<String, String?> = emptyMap()) {
+    fun emit(
+        category: String,
+        fields: Map<String, String?> = emptyMap(),
+    ) {
         if (!logger.isInfoEnabled) return
         logger.info(renderJson(category, fields))
     }
 
-    internal fun renderJson(category: String, fields: Map<String, String?>): String {
+    internal fun renderJson(
+        category: String,
+        fields: Map<String, String?>,
+    ): String {
         val now = Clock.System.now()
         val builder = StringBuilder("{")
         builder.append("\"ts\":\"").append(now).append('"')
         builder.append(",\"category\":\"").append(escape(category)).append('"')
         for ((key, value) in fields.toSortedMap()) {
             if (value == null) continue
-            builder.append(',').append('"').append(escape(key)).append("\":\"").append(escape(value)).append('"')
+            builder
+                .append(',')
+                .append('"')
+                .append(escape(key))
+                .append("\":\"")
+                .append(escape(value))
+                .append('"')
         }
         builder.append('}')
         return builder.toString()
@@ -48,8 +60,11 @@ object AuditLogger {
                     '\r' -> append("\\r")
                     '\t' -> append("\\t")
                     else ->
-                        if (ch.code < 0x20) append("\\u%04x".format(ch.code))
-                        else append(ch)
+                        if (ch.code < 0x20) {
+                            append("\\u%04x".format(ch.code))
+                        } else {
+                            append(ch)
+                        }
                 }
             }
         }

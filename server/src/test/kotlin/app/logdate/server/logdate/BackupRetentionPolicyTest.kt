@@ -64,7 +64,10 @@ class BackupRetentionPolicyTest {
         assertEquals(90L * 24 * 60 * 60 * 1000, BackupRetentionPolicy.DEFAULT.maxAgeMillis)
     }
 
-    private fun backup(deviceId: String, createdAt: Long): LogDateBackup =
+    private fun backup(
+        deviceId: String,
+        createdAt: Long,
+    ): LogDateBackup =
         LogDateBackup(
             id = UUID.randomUUID(),
             userId = ACCOUNT,

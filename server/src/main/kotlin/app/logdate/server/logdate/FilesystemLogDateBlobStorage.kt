@@ -56,7 +56,10 @@ class FilesystemLogDateBlobStorage(
             false
         }
 
-    override fun getSignedDownloadUrl(storagePath: String, expirationHours: Long): String = storagePath
+    override fun getSignedDownloadUrl(
+        storagePath: String,
+        expirationHours: Long,
+    ): String = storagePath
 
     companion object {
         const val ENV_VAR: String = "LOGDATE_BLOB_STORAGE_DIR"
@@ -81,5 +84,8 @@ class FilesystemLogDateBlobStorage(
 }
 
 /** Canonical layout: `<namespace-lower>/<ownerId>/<blobId>`, matching the GCS object naming. */
-private fun relativePath(namespace: LogDateBlobNamespace, ownerId: String, blobId: String): String =
-    "${namespace.name.lowercase()}/$ownerId/$blobId"
+private fun relativePath(
+    namespace: LogDateBlobNamespace,
+    ownerId: String,
+    blobId: String,
+): String = "${namespace.name.lowercase()}/$ownerId/$blobId"

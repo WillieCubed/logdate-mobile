@@ -1,10 +1,10 @@
 package app.logdate.server.billing
 
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-import javax.crypto.Mac
-import javax.crypto.spec.SecretKeySpec
 
 class StripeSignatureVerifierTest {
     private val secret = "whsec_test_abc_123"
@@ -65,7 +65,10 @@ class StripeSignatureVerifierTest {
         assertIs<StripeSignatureVerifier.Verification.Ok>(result)
     }
 
-    private fun hmacHex(secret: String, payload: String): String {
+    private fun hmacHex(
+        secret: String,
+        payload: String,
+    ): String {
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(secret.toByteArray(), "HmacSHA256"))
         return mac.doFinal(payload.toByteArray()).joinToString("") { "%02x".format(it) }
