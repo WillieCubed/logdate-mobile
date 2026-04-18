@@ -38,6 +38,9 @@ internal class SyncBackedLogDateMediaRepository(
     ) {
         syncRepository.deleteMedia(userId, mediaId, deletedAt)
     }
+
+    override fun listAllForUser(userId: java.util.UUID): List<LogDateMedia> =
+        syncRepository.listAllMediaForUser(userId).map(MediaRecord::toLogDateMedia)
 }
 
 internal class SyncBackedLogDateBackupRepository(

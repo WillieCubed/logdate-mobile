@@ -115,6 +115,14 @@ internal class PostgreSQLLogDateMediaRepository : LogDateMediaRepository {
         }
     }
 
+    override fun listAllForUser(userId: UUID): List<LogDateMedia> =
+        transaction {
+            LogDateMediaRecordsTable
+                .selectAll()
+                .where { LogDateMediaRecordsTable.userId eq userId }
+                .map { it.toLogDateMedia() }
+        }
+
     private fun ResultRow.toLogDateMedia(): LogDateMedia =
         LogDateMedia(
             mediaId = this[LogDateMediaRecordsTable.mediaId],

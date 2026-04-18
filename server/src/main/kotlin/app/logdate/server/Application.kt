@@ -6,6 +6,7 @@ import app.logdate.server.atproto.AtprotoPdsSessionService
 import app.logdate.server.atproto.AtprotoSessionTokenService
 import app.logdate.server.atproto.LogDatePdsBlobStore
 import app.logdate.server.atproto.LogDateRepoStore
+import app.logdate.server.auth.AccountDeletionService
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.AuthMetricsRegistry
@@ -168,6 +169,8 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val logDateBackupRepository: LogDateBackupRepository by inject()
     val entitlementEnforcer: EntitlementEnforcer by inject()
     val syncRateLimiter = SlidingWindowRateLimiter()
+    // Deferred construction: blobStorage isn't resolvable from Koin yet, so we build the service
+    // after the repositories are wired a few lines below.
     val logDateAtprotoBlobRepository: LogDateAtprotoBlobRepository by inject()
     val logDateMediaBlobRepository =
         CompositeLogDateMediaBlobRepository(
@@ -183,6 +186,13 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
                 "Set GCS_* for Google Cloud Storage or LOGDATE_BLOB_STORAGE_DIR for an on-disk store.",
         )
     }
+    val accountDeletionService =
+        AccountDeletionService(
+            accountRepository = accountRepository,
+            mediaBlobRepository = logDateMediaBlobRepository,
+            backupRepository = logDateBackupRepository,
+            blobStorage = blobStorage,
+        )
     val logDateCollectionsRepository =
         RepoBackedLogDateCollectionsRepository(
             accountRepository = accountRepository,
@@ -320,6 +330,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
                 tokenService = tokenService,
                 googleIdTokenVerifier = googleIdTokenVerifier,
                 metrics = authMetrics,
+                accountDeletionService = accountDeletionService,
             )
             identityApiRoutes(
                 accountRepository = accountRepository,

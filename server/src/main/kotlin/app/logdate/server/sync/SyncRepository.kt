@@ -159,6 +159,12 @@ interface SyncRepository {
         deletedAt: Long,
     )
 
+    /**
+     * Returns every media record owned by [userId], including soft-deleted ones, so
+     * account-deletion can purge blobs the user had soft-deleted but whose bytes are still live.
+     */
+    fun listAllMediaForUser(userId: UUID): List<MediaRecord>
+
     // Backups
     fun createBackupRecord(
         userId: UUID,

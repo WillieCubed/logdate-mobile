@@ -25,6 +25,9 @@ interface LogDateMediaBlobRepository {
         deletedAt: Long,
     )
 
+    /** All media for [userId], including soft-deleted rows. Used by account deletion cascade. */
+    fun listMedia(userId: UUID): List<LogDateMedia>
+
     fun upsertAtprotoBlob(
         userId: UUID,
         blob: LogDateAtprotoBlob,
@@ -61,6 +64,8 @@ class CompositeLogDateMediaBlobRepository(
         mediaRepository.deleteMedia(userId, mediaId, deletedAt)
     }
 
+    override fun listMedia(userId: UUID): List<LogDateMedia> = mediaRepository.listAllForUser(userId)
+
     override fun upsertAtprotoBlob(
         userId: UUID,
         blob: LogDateAtprotoBlob,
@@ -95,6 +100,8 @@ class MediaOnlyLogDateMediaBlobRepository(
     ) {
         mediaRepository.deleteMedia(userId, mediaId, deletedAt)
     }
+
+    override fun listMedia(userId: UUID): List<LogDateMedia> = mediaRepository.listAllForUser(userId)
 
     override fun upsertAtprotoBlob(
         userId: UUID,

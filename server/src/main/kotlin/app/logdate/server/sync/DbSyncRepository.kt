@@ -516,6 +516,14 @@ class DbSyncRepository : SyncRepository {
         }
     }
 
+    override fun listAllMediaForUser(userId: UUID): List<MediaRecord> =
+        transaction {
+            MediaSyncTable
+                .selectAll()
+                .where { MediaSyncTable.userId eq userId }
+                .map { it.toMediaRecord() }
+        }
+
     override fun createBackupRecord(
         userId: UUID,
         record: BackupRecord,

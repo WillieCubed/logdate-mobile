@@ -49,6 +49,13 @@ interface LogDateMediaRepository {
         mediaId: String,
         deletedAt: Long,
     )
+
+    /**
+     * Lists every media record owned by [userId], including soft-deleted ones, so account-deletion
+     * can clean up blobs the user may have deleted but whose storage paths still point to bytes
+     * we need to remove.
+     */
+    fun listAllForUser(userId: UUID): List<LogDateMedia>
 }
 
 /**
@@ -94,6 +101,9 @@ class InMemoryLogDateMediaRepository : LogDateMediaRepository {
                 deletedAt = deletedAt,
             )
     }
+
+    override fun listAllForUser(userId: UUID): List<LogDateMedia> =
+        rowsForUser(userId).values.map(StoredLogDateMedia::media)
 
     private fun rowsForUser(userId: UUID): ConcurrentHashMap<String, StoredLogDateMedia> = rows.getOrPut(userId) { ConcurrentHashMap() }
 

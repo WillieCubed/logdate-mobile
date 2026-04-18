@@ -4,6 +4,7 @@ import app.logdate.server.audit.AuditCategory
 import app.logdate.server.audit.AuditKey
 import app.logdate.server.audit.formatAuditLog
 import app.logdate.server.auth.Account
+import app.logdate.server.auth.AccountDeletionService
 import app.logdate.server.auth.AccountIdentity
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountLinkEvent
@@ -246,6 +247,7 @@ fun Route.authV1Routes(
     tokenService: TokenService,
     googleIdTokenVerifier: GoogleIdTokenVerifier,
     metrics: AuthMetricsRegistry,
+    accountDeletionService: AccountDeletionService? = null,
 ) {
     val rateLimiter = InMemoryAuthRateLimiter()
 
@@ -1100,6 +1102,39 @@ fun Route.authV1Routes(
             } catch (e: Exception) {
                 Napier.e("Failed to delete passkey", e)
                 call.respondForRequestException(e, "Failed to delete passkey", metrics)
+            }
+        }
+
+        delete("/me") {
+            try {
+                val account =
+                    resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
+                        ?: return@delete
+                val deletionService =
+                    accountDeletionService ?: return@delete call.respondApiError(
+                        HttpStatusCode.ServiceUnavailable,
+                        "DELETION_UNAVAILABLE",
+                        "Account deletion is not configured on this server",
+                        metrics,
+                    )
+
+                val summary = deletionService.deleteAccount(account.id)
+                if (!summary.accountRowDeleted) {
+                    return@delete call.respondApiError(
+                        HttpStatusCode.InternalServerError,
+                        "DELETION_FAILED",
+                        "Account could not be deleted",
+                        metrics,
+                    )
+                }
+                Napier.i(
+                    "Account ${account.id} deleted: media=${summary.mediaBlobsDeleted}, " +
+                        "backup=${summary.backupBlobsDeleted}",
+                )
+                call.respond(HttpStatusCode.NoContent)
+            } catch (e: Exception) {
+                Napier.e("Failed to delete account", e)
+                call.respondForRequestException(e, "Failed to delete account", metrics)
             }
         }
 

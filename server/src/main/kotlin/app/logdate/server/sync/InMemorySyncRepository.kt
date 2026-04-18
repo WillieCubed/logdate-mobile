@@ -237,6 +237,9 @@ class InMemorySyncRepository : SyncRepository {
         lastTimestamp.set(deletedAt)
     }
 
+    override fun listAllMediaForUser(userId: UUID): List<MediaRecord> =
+        media.forUser(userId).values.toList()
+
     // Backups
     override fun createBackupRecord(
         userId: UUID,
