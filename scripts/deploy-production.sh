@@ -374,34 +374,36 @@ phase_1_domain_check() {
         return
     fi
 
-    log_warn "The following domains are not yet verified in Search Console:"
+    log_warn "The following domains are not yet verified:"
     for domain in "${unverified[@]}"; do
         printf '  • %s\n' "$domain"
-        printf '    → https://search.google.com/search-console/welcome?resource_id=%s\n' "$domain"
     done
 
     cat <<'EOF'
 
-Domain verification is a one-time browser flow. Steps:
-  1. Open each URL above, choose "DNS record" verification.
-  2. Publish the TXT record Google gives you at your DNS provider
-     (if Cloudflare is configured here, publish via the Cloudflare dashboard
-     or its API — this script only manages Cloud Run mapping records, not
-     the Search Console TXT).
-  3. Click "Verify" in Search Console; it usually takes under a minute.
+Domain ownership is verified through Google Site Verification (the system
+Search Console uses). The easiest path is `gcloud domains verify`, which
+opens the correct browser flow for each domain:
+
+  gcloud domains verify <domain>
+
+Publish the TXT record Google shows, click "Verify", then return here.
+(If your DNS provider is Cloudflare and you've set CLOUDFLARE_API_TOKEN,
+you can paste the TXT value in the Cloudflare dashboard; publishing
+verification records via the Cloudflare API isn't wired up yet.)
 EOF
 
     if [[ "$NON_INTERACTIVE" == "true" ]]; then
         die "Halting until domains are verified"
     fi
 
-    if command -v open >/dev/null 2>&1; then
-        read -rp "Open the verification URLs in your browser now? [Y/n] " do_open
-        if [[ ! "$do_open" =~ ^[nN]$ ]]; then
-            for domain in "${unverified[@]}"; do
-                open "https://search.google.com/search-console/welcome?resource_id=$domain" || true
-            done
-        fi
+    local do_verify
+    read -rp "Launch 'gcloud domains verify' for each unverified domain now? [Y/n] " do_verify
+    if [[ ! "$do_verify" =~ ^[nN]$ ]]; then
+        for domain in "${unverified[@]}"; do
+            log_info "Opening verification flow for $domain"
+            gcloud domains verify "$domain" || log_warn "gcloud domains verify $domain exited non-zero; verify manually"
+        done
     fi
 
     read -rp "Press Enter once every domain above shows as verified (or Ctrl-C to abort) " _
