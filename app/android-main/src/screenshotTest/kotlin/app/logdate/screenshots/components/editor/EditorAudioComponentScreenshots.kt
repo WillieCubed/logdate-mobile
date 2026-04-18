@@ -2,6 +2,7 @@ package app.logdate.screenshots.components.editor
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import app.logdate.client.media.audio.transcription.TranscriptionFailure
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.feature.editor.ui.audio.AudioTranscriptionUi
@@ -209,7 +210,7 @@ fun Editor_Transcription_Error() {
     ScreenshotTheme {
         AudioTranscriptionUi(
             transcriptionState = AudioUiState.TranscriptionState.Error(
-                message = "Failed to transcribe audio",
+                reason = TranscriptionFailure.Unknown,
             ),
             onRequestTranscription = {},
         )
