@@ -5,6 +5,7 @@ import app.logdate.server.crypto.EncryptionService
 import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.entitlements.QuotaCheck
 import app.logdate.server.entitlements.QuotaReason
+import app.logdate.server.logdate.BackupRetentionPolicy
 import app.logdate.server.ratelimit.RateLimitPolicy
 import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.logdate.LogDateAssociation
@@ -1436,8 +1437,60 @@ fun Route.syncRoutes(
                 }
             }
         }
+
+        route("/ops/backups") {
+            post(":purge") {
+                val start = System.currentTimeMillis()
+                var success = false
+                try {
+                    val userId = extractUserId(call, tokenService) ?: return@post
+                    val keepPerDevice =
+                        call.request.queryParameters["keepPerDevice"]?.toIntOrNull()
+                            ?: BackupRetentionPolicy.DEFAULT.keepPerDevice
+                    val maxAgeDays =
+                        call.request.queryParameters["maxAgeDays"]?.toLongOrNull()
+                            ?: (BackupRetentionPolicy.DEFAULT.maxAgeMillis / MILLIS_PER_DAY)
+                    if (keepPerDevice < 0 || maxAgeDays <= 0) {
+                        return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            error("INVALID_PARAMETER", "keepPerDevice must be >= 0 and maxAgeDays must be > 0"),
+                        )
+                    }
+                    val policy =
+                        BackupRetentionPolicy(
+                            keepPerDevice = keepPerDevice,
+                            maxAgeMillis = maxAgeDays.coerceAtMost(3650L) * MILLIS_PER_DAY,
+                        )
+                    val backups = backupRepository.listBackups(userId)
+                    val toPurge = policy.backupsToPurge(backups, System.currentTimeMillis())
+                    toPurge.forEach { backup ->
+                        runCatching { mediaStorage?.deleteBlob(backup.storagePath) }
+                        backupRepository.deleteBackup(userId, backup.id)
+                    }
+                    call.respond(
+                        BackupPurgeResponse(
+                            deleted = toPurge.size,
+                            remaining = backups.size - toPurge.size,
+                            keepPerDevice = keepPerDevice,
+                            maxAgeDaysApplied = maxAgeDays,
+                        ),
+                    )
+                    success = true
+                } finally {
+                    metrics.recordOperation("sync.backups.purge", System.currentTimeMillis() - start, success)
+                }
+            }
+        }
     }
 }
+
+@kotlinx.serialization.Serializable
+data class BackupPurgeResponse(
+    val deleted: Int,
+    val remaining: Int,
+    val keepPerDevice: Int,
+    val maxAgeDaysApplied: Long,
+)
 
 private fun buildMediaDownloadUrl(
     call: ApplicationCall,
