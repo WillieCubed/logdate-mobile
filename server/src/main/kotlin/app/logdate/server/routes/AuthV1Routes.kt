@@ -7,6 +7,12 @@ import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountDeletionService
 import app.logdate.server.auth.AccountIdentity
 import app.logdate.server.auth.AccountIdentityRepository
+import app.logdate.server.entitlements.EntitlementService
+import app.logdate.server.entitlements.EntitlementStatus
+import app.logdate.server.entitlements.EntitlementTier
+import app.logdate.shared.model.EntitlementResponse
+import app.logdate.shared.model.EntitlementStatusWire
+import app.logdate.shared.model.EntitlementTierWire
 import app.logdate.server.auth.AccountLinkEvent
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.AuthMetricsRegistry
@@ -248,6 +254,7 @@ fun Route.authV1Routes(
     googleIdTokenVerifier: GoogleIdTokenVerifier,
     metrics: AuthMetricsRegistry,
     accountDeletionService: AccountDeletionService? = null,
+    entitlementService: EntitlementService? = null,
 ) {
     val rateLimiter = InMemoryAuthRateLimiter()
 
@@ -1138,6 +1145,41 @@ fun Route.authV1Routes(
             }
         }
 
+        get("/me/entitlement") {
+            try {
+                val account =
+                    resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
+                        ?: return@get
+                val service = entitlementService ?: return@get call.respond(
+                    HttpStatusCode.OK,
+                    // When billing isn't wired we expose the unlimited-self-host shape directly
+                    // rather than 404-ing — the UI needs a value to render.
+                    EntitlementResponse(
+                        planId = "self_host_unlimited",
+                        tier = EntitlementTierWire.UNLIMITED,
+                        status = EntitlementStatusWire.SELF_HOST,
+                        storageBytesLimit = null,
+                        backupCountLimit = null,
+                    ),
+                )
+                val resolved =
+                    service.resolve(java.util.UUID.fromString(account.id.toString()))
+                call.respond(
+                    HttpStatusCode.OK,
+                    EntitlementResponse(
+                        planId = resolved.planId,
+                        tier = resolved.tier.toWire(),
+                        status = resolved.status.toWire(),
+                        storageBytesLimit = resolved.limits.storageBytes,
+                        backupCountLimit = resolved.limits.backupCount,
+                    ),
+                )
+            } catch (e: Exception) {
+                Napier.e("Failed to resolve entitlement", e)
+                call.respondForRequestException(e, "Failed to resolve entitlement", metrics)
+            }
+        }
+
         get("/me/identities") {
             try {
                 val account =
@@ -1412,6 +1454,23 @@ private fun validateDisplayName(displayName: String): String? {
 
     return null
 }
+
+private fun EntitlementTier.toWire(): EntitlementTierWire =
+    when (this) {
+        EntitlementTier.FREE -> EntitlementTierWire.FREE
+        EntitlementTier.STANDARD -> EntitlementTierWire.STANDARD
+        EntitlementTier.PRO -> EntitlementTierWire.PRO
+        EntitlementTier.UNLIMITED -> EntitlementTierWire.UNLIMITED
+    }
+
+private fun EntitlementStatus.toWire(): EntitlementStatusWire =
+    when (this) {
+        EntitlementStatus.ACTIVE -> EntitlementStatusWire.ACTIVE
+        EntitlementStatus.PAST_DUE -> EntitlementStatusWire.PAST_DUE
+        EntitlementStatus.GRACE -> EntitlementStatusWire.GRACE
+        EntitlementStatus.CANCELLED -> EntitlementStatusWire.CANCELLED
+        EntitlementStatus.SELF_HOST -> EntitlementStatusWire.SELF_HOST
+    }
 
 private data class AuthRateLimitPolicy(
     val maxRequests: Int,

@@ -19,6 +19,7 @@ import app.logdate.server.config.profileAwareBoolEnv
 import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
 import app.logdate.server.entitlements.EntitlementEnforcer
+import app.logdate.server.entitlements.EntitlementService
 import app.logdate.server.entitlements.entitlementsModule
 import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.identity.AtprotoIdentityService
@@ -168,6 +169,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val logDateMediaRepository: LogDateMediaRepository by inject()
     val logDateBackupRepository: LogDateBackupRepository by inject()
     val entitlementEnforcer: EntitlementEnforcer by inject()
+    val entitlementService: EntitlementService by inject()
     val syncRateLimiter = SlidingWindowRateLimiter()
     // Deferred construction: blobStorage isn't resolvable from Koin yet, so we build the service
     // after the repositories are wired a few lines below.
@@ -331,6 +333,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
                 googleIdTokenVerifier = googleIdTokenVerifier,
                 metrics = authMetrics,
                 accountDeletionService = accountDeletionService,
+                entitlementService = entitlementService,
             )
             identityApiRoutes(
                 accountRepository = accountRepository,

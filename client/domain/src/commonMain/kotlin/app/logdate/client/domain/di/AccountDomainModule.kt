@@ -9,6 +9,7 @@ import app.logdate.client.domain.account.DeletePasskeyUseCase
 import app.logdate.client.domain.account.GetAccountSetupDataUseCase
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
 import app.logdate.client.domain.account.HasLogDateCloudAccountUseCase
+import app.logdate.client.domain.account.GetCurrentEntitlementUseCase
 import app.logdate.client.domain.account.TriggerInitialSyncUseCase
 import app.logdate.client.domain.account.TryRestoreSignInUseCase
 import app.logdate.client.domain.user.GetUserIdUseCase
@@ -33,6 +34,7 @@ val accountDomainModule: Module =
         factory { AuthenticateWithPasskeyUseCase(get()) }
         factory { TryRestoreSignInUseCase(get()) }
         factory { TriggerInitialSyncUseCase(syncManager = get()) }
+        factory { GetCurrentEntitlementUseCase(sessionStorage = get(), apiClient = get()) }
 
         // User ID - depends on account
         factory { GetUserIdUseCase(get(), get()) }

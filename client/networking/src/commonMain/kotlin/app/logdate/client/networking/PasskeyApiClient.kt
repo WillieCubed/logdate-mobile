@@ -12,6 +12,7 @@ import app.logdate.shared.model.CompleteAccountCreationData
 import app.logdate.shared.model.CompleteAccountCreationRequest
 import app.logdate.shared.model.CompleteAuthenticationData
 import app.logdate.shared.model.CompleteAuthenticationRequest
+import app.logdate.shared.model.EntitlementResponse
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyAllowCredential
 import app.logdate.shared.model.PasskeyRegistrationOptions
@@ -53,6 +54,9 @@ interface PasskeyApiClientContract {
     suspend fun completeAuthentication(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData>
 
     suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount>
+
+    /** Fetch the caller's current cloud entitlement (plan + quota + status). */
+    suspend fun getEntitlement(accessToken: String): Result<EntitlementResponse>
 
     suspend fun updateAccountProfile(
         accessToken: String,
@@ -269,6 +273,24 @@ class PasskeyApiClient(
         } catch (e: Exception) {
             Napier.w("Failed to get account info", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to get account info", e))
+        }
+
+    override suspend fun getEntitlement(accessToken: String): Result<EntitlementResponse> =
+        try {
+            val baseUrl = getBaseUrl()
+            val response =
+                httpClient.get("$baseUrl$AUTH_PATH/me/entitlement") {
+                    header("Authorization", "Bearer $accessToken")
+                }
+            if (response.status.value in 200..299) {
+                Result.success(json.decodeFromString<EntitlementResponse>(response.bodyAsText()))
+            } else {
+                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+            }
+        } catch (e: Exception) {
+            Napier.w("Failed to get entitlement", e)
+            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to get entitlement", e))
         }
 
     override suspend fun updateAccountProfile(
