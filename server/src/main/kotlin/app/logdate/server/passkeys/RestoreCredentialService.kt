@@ -1,12 +1,12 @@
 package app.logdate.server.passkeys
 
+import app.logdate.server.config.profileAwareBoolEnv
 import app.logdate.shared.model.PasskeyAuthenticationOptions
 import app.logdate.shared.model.PasskeyAuthenticationResponse
 import app.logdate.shared.model.PasskeyChallenge
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyRegistrationResponse
 import app.logdate.shared.model.PasskeyUser
-import app.logdate.server.config.profileAwareBoolEnv
 import com.webauthn4j.WebAuthnManager
 import com.webauthn4j.authenticator.AuthenticatorImpl
 import com.webauthn4j.converter.AttestedCredentialDataConverter

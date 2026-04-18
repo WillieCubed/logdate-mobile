@@ -94,7 +94,10 @@ class EntitlementEnforcerTest {
             limits = EntitlementLimits(storageBytes = null, backupCount = null),
         )
 
-    private fun tier(storage: Long?, backups: Int? = null): Entitlement =
+    private fun tier(
+        storage: Long?,
+        backups: Int? = null,
+    ): Entitlement =
         Entitlement(
             planId = "standard",
             tier = EntitlementTier.STANDARD,
@@ -102,11 +105,16 @@ class EntitlementEnforcerTest {
             limits = EntitlementLimits(storageBytes = storage, backupCount = backups),
         )
 
-    private class FakeService(val entitlement: Entitlement) : EntitlementService {
+    private class FakeService(
+        val entitlement: Entitlement,
+    ) : EntitlementService {
         override suspend fun resolve(accountId: UUID): Entitlement = entitlement
     }
 
-    private class StaticUsage(val bytes: Long = 0L, val backups: Int = 0) : UsageCalculator {
+    private class StaticUsage(
+        val bytes: Long = 0L,
+        val backups: Int = 0,
+    ) : UsageCalculator {
         override suspend fun storageBytes(accountId: UUID): Long = bytes
 
         override suspend fun backupCount(accountId: UUID): Int = backups

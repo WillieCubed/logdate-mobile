@@ -133,7 +133,10 @@ class SyncRoutesEntitlementTest {
             assertEquals(HttpStatusCode.Created, response.status, response.bodyAsText())
         }
 
-    private fun tiered(storage: Long?, backups: Int?): Entitlement =
+    private fun tiered(
+        storage: Long?,
+        backups: Int?,
+    ): Entitlement =
         Entitlement(
             planId = "standard",
             tier = EntitlementTier.STANDARD,
@@ -178,5 +181,4 @@ class SyncRoutesEntitlementTest {
             }
         }
     }
-
 }

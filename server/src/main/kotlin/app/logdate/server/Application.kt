@@ -48,9 +48,9 @@ import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncRepository
 import app.logdate.util.UuidSerializer
-import io.ktor.serialization.kotlinx.json.json
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
+import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.install
@@ -408,7 +408,8 @@ internal data class AllowedOrigin(
 
 internal fun parseAllowedOrigins(raw: String?): List<AllowedOrigin> {
     if (raw.isNullOrBlank()) return emptyList()
-    return raw.split(',')
+    return raw
+        .split(',')
         .map(String::trim)
         .filter(String::isNotEmpty)
         .mapNotNull { entry ->

@@ -25,7 +25,6 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import java.util.Base64
-import kotlin.jvm.functions.Function1
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals

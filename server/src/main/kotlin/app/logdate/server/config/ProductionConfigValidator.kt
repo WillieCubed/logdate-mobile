@@ -27,7 +27,9 @@ object ProductionConfigValidator {
             "changeme",
         )
 
-    class InsecureProductionConfigException(message: String) : IllegalStateException(message)
+    class InsecureProductionConfigException(
+        message: String,
+    ) : IllegalStateException(message)
 
     fun validate(
         profile: RuntimeProfile = RuntimeProfile.fromEnvironment(),
