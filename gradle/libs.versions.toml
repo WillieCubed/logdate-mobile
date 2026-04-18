@@ -13,7 +13,7 @@ buildConfigPlugin = "6.0.9"
 kover = "0.9.8"
 screenshot = "0.0.1-alpha14"
 benManesVersions = "0.53.0"
-ktlint = "14.2.0"
+ktlint = "13.1.0"
 
 # Android Build Versions
 android-compileSdk = "37"
