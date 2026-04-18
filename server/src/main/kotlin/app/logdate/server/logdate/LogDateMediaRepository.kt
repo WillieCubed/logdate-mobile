@@ -28,7 +28,49 @@ data class LogDateMedia(
     val encryptionVersion: Int? = null,
     val encryptionKeyId: String? = null,
     val encryptionMode: String? = null,
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as LogDateMedia
+
+        if (sizeBytes != other.sizeBytes) return false
+        if (createdAt != other.createdAt) return false
+        if (version != other.version) return false
+        if (encryptionVersion != other.encryptionVersion) return false
+        if (mediaId != other.mediaId) return false
+        if (contentId != other.contentId) return false
+        if (userId != other.userId) return false
+        if (fileName != other.fileName) return false
+        if (mimeType != other.mimeType) return false
+        if (!data.contentEquals(other.data)) return false
+        if (storagePath != other.storagePath) return false
+        if (deviceId != other.deviceId) return false
+        if (encryptionKeyId != other.encryptionKeyId) return false
+        if (encryptionMode != other.encryptionMode) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = sizeBytes.hashCode()
+        result = 31 * result + createdAt.hashCode()
+        result = 31 * result + version.hashCode()
+        result = 31 * result + (encryptionVersion ?: 0)
+        result = 31 * result + mediaId.hashCode()
+        result = 31 * result + contentId.hashCode()
+        result = 31 * result + userId.hashCode()
+        result = 31 * result + fileName.hashCode()
+        result = 31 * result + mimeType.hashCode()
+        result = 31 * result + data.contentHashCode()
+        result = 31 * result + (storagePath?.hashCode() ?: 0)
+        result = 31 * result + deviceId.hashCode()
+        result = 31 * result + (encryptionKeyId?.hashCode() ?: 0)
+        result = 31 * result + (encryptionMode?.hashCode() ?: 0)
+        return result
+    }
+}
 
 /**
  * Internal boundary for media metadata operations.
@@ -102,8 +144,7 @@ class InMemoryLogDateMediaRepository : LogDateMediaRepository {
             )
     }
 
-    override fun listAllForUser(userId: UUID): List<LogDateMedia> =
-        rowsForUser(userId).values.map(StoredLogDateMedia::media)
+    override fun listAllForUser(userId: UUID): List<LogDateMedia> = rowsForUser(userId).values.map(StoredLogDateMedia::media)
 
     private fun rowsForUser(userId: UUID): ConcurrentHashMap<String, StoredLogDateMedia> = rows.getOrPut(userId) { ConcurrentHashMap() }
 
