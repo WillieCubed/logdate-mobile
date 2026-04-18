@@ -7,6 +7,10 @@ import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateMediaBlobRepository
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import java.util.UUID
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -68,34 +72,45 @@ class AccountDeletionService(
         )
     }
 
-    private fun deleteMediaBlobs(userId: UUID): Int {
+    private suspend fun deleteMediaBlobs(userId: UUID): Int {
         val storage = blobStorage ?: return 0
-        val records = runCatching { mediaBlobRepository.listMedia(userId) }
-            .onFailure { Napier.w("Failed to list media for account $userId during delete", it) }
-            .getOrElse { return 0 }
-        var deleted = 0
-        records.forEach { record ->
-            val path = record.storagePath ?: return@forEach
-            val removed = runCatching { storage.deleteBlob(path) }
-                .onFailure { Napier.w("Failed to delete media blob $path for $userId", it) }
-                .getOrDefault(false)
-            if (removed) deleted++
-        }
-        return deleted
+        val paths =
+            runCatching { mediaBlobRepository.listMedia(userId) }
+                .onFailure { Napier.w("Failed to list media for account $userId during delete", it) }
+                .getOrElse { return 0 }
+                .mapNotNull { it.storagePath }
+        return deleteInParallel(storage, paths, userId)
     }
 
-    private fun deleteBackupBlobs(userId: UUID): Int {
+    private suspend fun deleteBackupBlobs(userId: UUID): Int {
         val storage = blobStorage ?: return 0
-        val backups = runCatching { backupRepository.listBackups(userId) }
-            .onFailure { Napier.w("Failed to list backups for account $userId during delete", it) }
-            .getOrElse { return 0 }
-        var deleted = 0
-        backups.forEach { backup ->
-            val removed = runCatching { storage.deleteBlob(backup.storagePath) }
-                .onFailure { Napier.w("Failed to delete backup blob ${backup.storagePath} for $userId", it) }
-                .getOrDefault(false)
-            if (removed) deleted++
-        }
-        return deleted
+        val paths =
+            runCatching { backupRepository.listBackups(userId) }
+                .onFailure { Napier.w("Failed to list backups for account $userId during delete", it) }
+                .getOrElse { return 0 }
+                .map { it.storagePath }
+        return deleteInParallel(storage, paths, userId)
     }
+
+    /**
+     * Fan out [paths] deletes across the IO dispatcher so a user with hundreds of blobs doesn't
+     * block the delete on serial round-trips against GCS. Each failure is logged but non-fatal —
+     * orphaned bytes are a smaller problem than refusing the delete.
+     */
+    private suspend fun deleteInParallel(
+        storage: LogDateBlobStorage,
+        paths: List<String>,
+        userId: UUID,
+    ): Int =
+        coroutineScope {
+            paths
+                .map { path ->
+                    async(Dispatchers.IO) {
+                        runCatching { storage.deleteBlob(path) }
+                            .onFailure { Napier.w("Failed to delete blob $path for $userId", it) }
+                            .getOrDefault(false)
+                    }
+                }.awaitAll()
+                .count { it }
+        }
 }

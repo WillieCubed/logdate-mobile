@@ -1588,7 +1588,7 @@ private val MEDIA_UPLOAD_RATE_LIMIT = RateLimitPolicy(maxRequests = 120, windowS
 private val BACKUP_UPLOAD_RATE_LIMIT = RateLimitPolicy(maxRequests = 6, windowSeconds = 60 * 60)
 
 private suspend fun respondRateLimited(
-    call: io.ktor.server.application.ApplicationCall,
+    call: ApplicationCall,
     rateLimiter: SlidingWindowRateLimiter,
     key: String,
     policy: RateLimitPolicy,
@@ -1621,7 +1621,7 @@ private suspend fun respondRateLimited(
  * and the code `QUOTA_EXCEEDED` groups both reasons for easy client-side switching.
  */
 private suspend fun respondQuotaExceeded(
-    call: io.ktor.server.application.ApplicationCall,
+    call: ApplicationCall,
     denied: QuotaCheck.Denied,
 ) {
     val reasonMessage =

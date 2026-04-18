@@ -2,10 +2,10 @@ package app.logdate.server.logdate
 
 import io.github.aakira.napier.Napier
 import java.nio.file.Files
+import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteIfExists
-import kotlin.io.path.exists
 import kotlin.io.path.readBytes
 
 /**
@@ -38,16 +38,15 @@ class FilesystemLogDateBlobStorage(
         return relative
     }
 
-    override fun getBlob(storagePath: String): ByteArray? {
-        val resolved = rootPath.resolve(storagePath)
-        if (!resolved.exists()) return null
-        return try {
-            resolved.readBytes()
+    override fun getBlob(storagePath: String): ByteArray? =
+        try {
+            rootPath.resolve(storagePath).readBytes()
+        } catch (_: NoSuchFileException) {
+            null
         } catch (e: Exception) {
             Napier.w("Filesystem blob read failed at $storagePath", e)
             null
         }
-    }
 
     override fun deleteBlob(storagePath: String): Boolean =
         try {
