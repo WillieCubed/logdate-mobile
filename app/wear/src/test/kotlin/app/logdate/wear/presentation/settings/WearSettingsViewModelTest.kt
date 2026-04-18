@@ -25,7 +25,6 @@ import kotlin.time.Clock
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WearSettingsViewModelTest {
-
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var syncManager: SyncManager
     private lateinit var dataLayerClient: WearDataLayerClient
@@ -35,13 +34,14 @@ class WearSettingsViewModelTest {
         Dispatchers.setMain(testDispatcher)
         syncManager = mockk(relaxed = true)
         dataLayerClient = mockk(relaxed = true)
-        coEvery { syncManager.getSyncStatus() } returns SyncStatus(
-            isEnabled = false,
-            lastSyncTime = null,
-            pendingUploads = 0,
-            isSyncing = false,
-            hasErrors = false,
-        )
+        coEvery { syncManager.getSyncStatus() } returns
+            SyncStatus(
+                isEnabled = false,
+                lastSyncTime = null,
+                pendingUploads = 0,
+                isSyncing = false,
+                hasErrors = false,
+            )
         coEvery { dataLayerClient.getConnectedPhoneName() } returns null
     }
 
@@ -50,103 +50,110 @@ class WearSettingsViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel(): WearSettingsViewModel {
-        return WearSettingsViewModel(syncManager, dataLayerClient)
-    }
+    private fun createViewModel(): WearSettingsViewModel = WearSettingsViewModel(syncManager, dataLayerClient)
 
     @Test
-    fun `initial state is disconnected with no sync info`() = runTest {
-        val viewModel = createViewModel()
-        viewModel.uiState.test {
-            val state = awaitItem()
-            assertFalse(state.isPhoneConnected)
-            assertNull(state.phoneName)
-            assertNull(state.lastSyncTime)
-            assertEquals(0, state.pendingCount)
-            assertFalse(state.hasErrors)
-            assertFalse(state.isSyncingNow)
+    fun `initial state is disconnected with no sync info`() =
+        runTest {
+            val viewModel = createViewModel()
+            viewModel.uiState.test {
+                val state = awaitItem()
+                assertFalse(state.isPhoneConnected)
+                assertNull(state.phoneName)
+                assertNull(state.lastSyncTime)
+                assertEquals(0, state.pendingCount)
+                assertFalse(state.hasErrors)
+                assertFalse(state.isSyncingNow)
+                viewModel.stopPolling()
+            }
+        }
+
+    @Test
+    fun `shows connected phone name when phone is reachable`() =
+        runTest {
+            coEvery { dataLayerClient.getConnectedPhoneName() } returns "Pixel 9"
+            coEvery { syncManager.getSyncStatus() } returns
+                SyncStatus(
+                    isEnabled = true,
+                    lastSyncTime = Clock.System.now(),
+                    pendingUploads = 0,
+                    isSyncing = false,
+                    hasErrors = false,
+                )
+
+            val viewModel = createViewModel()
+            viewModel.uiState.test {
+                val state = expectMostRecentItem()
+                assertTrue(state.isPhoneConnected)
+                assertEquals("Pixel 9", state.phoneName)
+                viewModel.stopPolling()
+            }
+        }
+
+    @Test
+    fun `shows pending count from sync status`() =
+        runTest {
+            coEvery { dataLayerClient.getConnectedPhoneName() } returns "Phone"
+            coEvery { syncManager.getSyncStatus() } returns
+                SyncStatus(
+                    isEnabled = true,
+                    lastSyncTime = null,
+                    pendingUploads = 3,
+                    isSyncing = false,
+                    hasErrors = false,
+                )
+
+            val viewModel = createViewModel()
+            viewModel.uiState.test {
+                val state = expectMostRecentItem()
+                assertEquals(3, state.pendingCount)
+                viewModel.stopPolling()
+            }
+        }
+
+    @Test
+    fun `shows error state when sync has errors`() =
+        runTest {
+            coEvery { syncManager.getSyncStatus() } returns
+                SyncStatus(
+                    isEnabled = true,
+                    lastSyncTime = null,
+                    pendingUploads = 0,
+                    isSyncing = false,
+                    hasErrors = true,
+                )
+
+            val viewModel = createViewModel()
+            viewModel.uiState.test {
+                val state = expectMostRecentItem()
+                assertTrue(state.hasErrors)
+                viewModel.stopPolling()
+            }
+        }
+
+    @Test
+    fun `syncNow calls fullSync on SyncManager`() =
+        runTest {
+            coEvery { syncManager.fullSync() } returns SyncResult(success = true)
+
+            val viewModel = createViewModel()
+            viewModel.syncNow()
+
+            coVerify { syncManager.fullSync() }
             viewModel.stopPolling()
         }
-    }
 
     @Test
-    fun `shows connected phone name when phone is reachable`() = runTest {
-        coEvery { dataLayerClient.getConnectedPhoneName() } returns "Pixel 9"
-        coEvery { syncManager.getSyncStatus() } returns SyncStatus(
-            isEnabled = true,
-            lastSyncTime = Clock.System.now(),
-            pendingUploads = 0,
-            isSyncing = false,
-            hasErrors = false,
-        )
+    fun `disconnected state when phone name is null`() =
+        runTest {
+            coEvery { dataLayerClient.getConnectedPhoneName() } returns null
 
-        val viewModel = createViewModel()
-        viewModel.uiState.test {
-            val state = expectMostRecentItem()
-            assertTrue(state.isPhoneConnected)
-            assertEquals("Pixel 9", state.phoneName)
-            viewModel.stopPolling()
+            val viewModel = createViewModel()
+            viewModel.uiState.test {
+                val state = expectMostRecentItem()
+                assertFalse(state.isPhoneConnected)
+                assertNull(state.phoneName)
+                viewModel.stopPolling()
+            }
         }
-    }
-
-    @Test
-    fun `shows pending count from sync status`() = runTest {
-        coEvery { dataLayerClient.getConnectedPhoneName() } returns "Phone"
-        coEvery { syncManager.getSyncStatus() } returns SyncStatus(
-            isEnabled = true,
-            lastSyncTime = null,
-            pendingUploads = 3,
-            isSyncing = false,
-            hasErrors = false,
-        )
-
-        val viewModel = createViewModel()
-        viewModel.uiState.test {
-            val state = expectMostRecentItem()
-            assertEquals(3, state.pendingCount)
-            viewModel.stopPolling()
-        }
-    }
-
-    @Test
-    fun `shows error state when sync has errors`() = runTest {
-        coEvery { syncManager.getSyncStatus() } returns SyncStatus(
-            isEnabled = true,
-            lastSyncTime = null,
-            pendingUploads = 0,
-            isSyncing = false,
-            hasErrors = true,
-        )
-
-        val viewModel = createViewModel()
-        viewModel.uiState.test {
-            val state = expectMostRecentItem()
-            assertTrue(state.hasErrors)
-            viewModel.stopPolling()
-        }
-    }
-
-    @Test
-    fun `syncNow calls fullSync on SyncManager`() = runTest {
-        coEvery { syncManager.fullSync() } returns SyncResult(success = true)
-
-        val viewModel = createViewModel()
-        viewModel.syncNow()
-
-        coVerify { syncManager.fullSync() }
-        viewModel.stopPolling()
-    }
-
-    @Test
-    fun `disconnected state when phone name is null`() = runTest {
-        coEvery { dataLayerClient.getConnectedPhoneName() } returns null
-
-        val viewModel = createViewModel()
-        viewModel.uiState.test {
-            val state = expectMostRecentItem()
-            assertFalse(state.isPhoneConnected)
-            assertNull(state.phoneName)
-            viewModel.stopPolling()
-        }
-    }
 }

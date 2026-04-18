@@ -23,7 +23,6 @@ import kotlin.time.Clock
  * Displays the mood as a short emoji. Tapping opens the mood check-in screen.
  */
 class MoodComplicationService : SuspendingComplicationDataSourceService() {
-
     override fun getPreviewData(type: ComplicationType): ComplicationData? {
         if (type != ComplicationType.SHORT_TEXT) return null
         return createComplicationData(
@@ -35,11 +34,12 @@ class MoodComplicationService : SuspendingComplicationDataSourceService() {
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData {
         val mood = fetchTodayMood()
         val emoji = moodToEmoji(mood)
-        val description = if (mood != null) {
-            getString(R.string.wear_complication_mood_current, mood)
-        } else {
-            getString(R.string.wear_complication_mood_none)
-        }
+        val description =
+            if (mood != null) {
+                getString(R.string.wear_complication_mood_current, mood)
+            } else {
+                getString(R.string.wear_complication_mood_none)
+            }
         return createComplicationData(
             moodEmoji = emoji,
             contentDescription = description,
@@ -47,16 +47,20 @@ class MoodComplicationService : SuspendingComplicationDataSourceService() {
         )
     }
 
-    private suspend fun fetchTodayMood(): String? {
-        return try {
-            val repository = org.koin.java.KoinJavaComponent
-                .getKoin()
-                .get<JournalNotesRepository>()
-            val today = Clock.System.now()
-                .toLocalDateTime(TimeZone.currentSystemDefault())
-                .date
+    private suspend fun fetchTodayMood(): String? =
+        try {
+            val repository =
+                org.koin.java.KoinJavaComponent
+                    .getKoin()
+                    .get<JournalNotesRepository>()
+            val today =
+                Clock.System
+                    .now()
+                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                    .date
             val notes = repository.observeNotesForDay(today).first()
-            notes.filterIsInstance<JournalNote.Text>()
+            notes
+                .filterIsInstance<JournalNote.Text>()
                 .filter { it.content.startsWith("#mood:") }
                 .maxByOrNull { it.creationTimestamp }
                 ?.content
@@ -65,13 +69,13 @@ class MoodComplicationService : SuspendingComplicationDataSourceService() {
         } catch (e: Exception) {
             null
         }
-    }
 
     private fun createMoodCheckInIntent(): PendingIntent {
-        val intent = Intent(Intent.ACTION_MAIN).apply {
-            component = ComponentName(packageName, "app.logdate.wear.presentation.MainActivity")
-            putExtra("tile_route", "mood")
-        }
+        val intent =
+            Intent(Intent.ACTION_MAIN).apply {
+                component = ComponentName(packageName, "app.logdate.wear.presentation.MainActivity")
+                putExtra("tile_route", "mood")
+            }
         return PendingIntent.getActivity(
             this,
             MOOD_REQUEST_CODE,
@@ -85,10 +89,11 @@ class MoodComplicationService : SuspendingComplicationDataSourceService() {
         contentDescription: String,
         tapIntent: PendingIntent? = null,
     ): ShortTextComplicationData {
-        val builder = ShortTextComplicationData.Builder(
-            text = PlainComplicationText.Builder(moodEmoji).build(),
-            contentDescription = PlainComplicationText.Builder(contentDescription).build(),
-        )
+        val builder =
+            ShortTextComplicationData.Builder(
+                text = PlainComplicationText.Builder(moodEmoji).build(),
+                contentDescription = PlainComplicationText.Builder(contentDescription).build(),
+            )
         if (tapIntent != null) {
             builder.setTapAction(tapIntent)
         }
@@ -105,13 +110,14 @@ class MoodComplicationService : SuspendingComplicationDataSourceService() {
         private const val MOOD_EMOJI_ROUGH = "\uD83D\uDE23"
         private const val MOOD_EMOJI_NONE = "\u2014" // em dash
 
-        fun moodToEmoji(mood: String?): String = when (mood) {
-            "great" -> MOOD_EMOJI_GREAT
-            "good" -> MOOD_EMOJI_GOOD
-            "ok" -> MOOD_EMOJI_OK
-            "sad" -> MOOD_EMOJI_SAD
-            "rough" -> MOOD_EMOJI_ROUGH
-            else -> MOOD_EMOJI_NONE
-        }
+        fun moodToEmoji(mood: String?): String =
+            when (mood) {
+                "great" -> MOOD_EMOJI_GREAT
+                "good" -> MOOD_EMOJI_GOOD
+                "ok" -> MOOD_EMOJI_OK
+                "sad" -> MOOD_EMOJI_SAD
+                "rough" -> MOOD_EMOJI_ROUGH
+                else -> MOOD_EMOJI_NONE
+            }
     }
 }

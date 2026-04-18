@@ -28,7 +28,6 @@ data class RemoteCameraUiState(
 class WearRemoteCameraViewModel(
     private val dataLayerClient: WearDataLayerClient,
 ) : ViewModel() {
-
     companion object {
         const val PATH_CAMERA_OPEN = "/logdate/camera/open"
         const val PATH_CAMERA_CAPTURE = "/logdate/camera/capture"
@@ -121,8 +120,9 @@ class WearRemoteCameraViewModel(
 
     fun dismiss() {
         viewModelScope.launch {
-            val wasActive = _uiState.value.phase != RemoteCameraPhase.IDLE &&
-                _uiState.value.phase != RemoteCameraPhase.ERROR
+            val wasActive =
+                _uiState.value.phase != RemoteCameraPhase.IDLE &&
+                    _uiState.value.phase != RemoteCameraPhase.ERROR
             if (wasActive) {
                 dataLayerClient.sendMessage(PATH_CAMERA_CLOSE)
             }

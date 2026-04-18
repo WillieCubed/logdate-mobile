@@ -17,14 +17,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import app.logdate.shared.model.RewindContent
-import app.logdate.wear.R
 
 @Composable
 fun WearRewindPlaybackScreen(
@@ -58,24 +56,27 @@ internal fun WearRewindPlaybackContent(
     onExit: () -> Unit = {},
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
     ) {
         // Progress bar at top
         ProgressSegments(
             current = state.currentIndex,
             total = state.totalPanels,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 24.dp, start = 16.dp, end = 16.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 24.dp, start = 16.dp, end = 16.dp),
         )
 
         // Panel content
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 40.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 40.dp),
             contentAlignment = Alignment.Center,
         ) {
             val panel = state.currentPanel
@@ -87,18 +88,20 @@ internal fun WearRewindPlaybackContent(
         // Touch zones: left half = previous, right half = advance
         Row(modifier = Modifier.fillMaxSize()) {
             Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxSize()
-                    .clickable { onPrevious() },
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                        .clickable { onPrevious() },
             )
             Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxSize()
-                    .clickable {
-                        if (state.isLastPanel) onExit() else onAdvance()
-                    },
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                        .clickable {
+                            if (state.isLastPanel) onExit() else onAdvance()
+                        },
             )
         }
     }
@@ -115,17 +118,19 @@ private fun ProgressSegments(
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         repeat(total) { index ->
-            val color = if (index <= current) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.surfaceContainer
-            }
+            val color =
+                if (index <= current) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainer
+                }
             Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(2.dp)
-                    .clip(RoundedCornerShape(1.dp))
-                    .background(color),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .height(2.dp)
+                        .clip(RoundedCornerShape(1.dp))
+                        .background(color),
             )
         }
     }

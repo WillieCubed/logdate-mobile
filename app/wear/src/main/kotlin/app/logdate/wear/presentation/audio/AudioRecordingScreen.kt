@@ -3,15 +3,16 @@
 package app.logdate.wear.presentation.audio
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material.SwipeToDismissBox
 import androidx.wear.compose.material.SwipeToDismissValue
 import androidx.wear.compose.material.rememberSwipeToDismissBoxState
@@ -22,7 +23,6 @@ import app.logdate.wear.presentation.audio.components.RecordButton
 import app.logdate.wear.presentation.audio.components.RecordingTimer
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
-import androidx.compose.ui.res.stringResource
 
 /**
  * Main screen for audio recording on Wear OS.
@@ -31,11 +31,11 @@ import androidx.compose.ui.res.stringResource
 @Composable
 fun AudioRecordingScreen(
     viewModel: AudioRecordingViewModel = koinViewModel(),
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val swipeToDismissBoxState = rememberSwipeToDismissBoxState()
-    
+
     // Handle swipe to dismiss
     LaunchedEffect(swipeToDismissBoxState.currentValue) {
         if (swipeToDismissBoxState.currentValue == SwipeToDismissValue.Dismissed) {
@@ -45,7 +45,7 @@ fun AudioRecordingScreen(
             onNavigateBack()
         }
     }
-    
+
     // Detect successful recording completion
     LaunchedEffect(uiState.navigateBack) {
         if (uiState.navigateBack) {
@@ -53,25 +53,27 @@ fun AudioRecordingScreen(
             onNavigateBack()
         }
     }
-    
+
     SwipeToDismissBox(
         state = swipeToDismissBoxState,
         backgroundKey = uiState,
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
     ) {
         ScreenScaffold(
-            timeText = { TimeText() }
+            timeText = { TimeText() },
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp), // Reduced padding for small screens
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp),
+                    // Reduced padding for small screens
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.Center,
                 ) {
                     // Error message
                     if (uiState.errorMessage != null) {
@@ -80,30 +82,31 @@ fun AudioRecordingScreen(
                             style = MaterialTheme.typography.labelSmall, // Smaller text for Wear OS
                             color = MaterialTheme.colorScheme.error,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(bottom = 4.dp)
+                            modifier = Modifier.padding(bottom = 4.dp),
                         )
                     }
-                    
+
                     // Audio waveform visualization
                     if (uiState.isRecording) {
                         AudioWaveform(
                             audioLevels = uiState.audioLevels,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(24.dp) // Reduced height for small screens
-                                .padding(bottom = 4.dp)
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(24.dp) // Reduced height for small screens
+                                    .padding(bottom = 4.dp),
                         )
                     }
-                    
+
                     // Recording timer
                     if (uiState.isRecording) {
                         RecordingTimer(
                             durationMs = uiState.durationMs,
                             isRecording = uiState.isRecording,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            modifier = Modifier.padding(bottom = 8.dp),
                         )
                     }
-                    
+
                     // Record/Stop button - large touch target
                     RecordButton(
                         isRecording = uiState.isRecording,
@@ -114,16 +117,17 @@ fun AudioRecordingScreen(
                                 viewModel.startRecording()
                             }
                         },
-                        modifier = Modifier.size(64.dp)
+                        modifier = Modifier.size(64.dp),
                     )
-                    
+
                     // Secondary controls
                     if (uiState.isRecording) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
                         ) {
                             // Pause/Resume button
                             Button(
@@ -134,50 +138,56 @@ fun AudioRecordingScreen(
                                         viewModel.pauseRecording()
                                     }
                                 },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                                ),
-                                modifier = Modifier.size(48.dp)
+                                colors =
+                                    ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    ),
+                                modifier = Modifier.size(48.dp),
                             ) {
                                 Icon(
-                                    imageVector = if (uiState.isPaused) 
-                                        Icons.Filled.PlayArrow 
-                                    else 
-                                        Icons.Filled.Pause,
-                                    contentDescription = stringResource(
-                                        if (uiState.isPaused) R.string.wear_recording_resume else R.string.wear_recording_pause,
-                                    )
+                                    imageVector =
+                                        if (uiState.isPaused) {
+                                            Icons.Filled.PlayArrow
+                                        } else {
+                                            Icons.Filled.Pause
+                                        },
+                                    contentDescription =
+                                        stringResource(
+                                            if (uiState.isPaused) R.string.wear_recording_resume else R.string.wear_recording_pause,
+                                        ),
                                 )
                             }
-                            
+
                             // Cancel button
                             Button(
                                 onClick = {
                                     viewModel.stopRecording()
                                     onNavigateBack()
                                 },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer
-                                ),
-                                modifier = Modifier.size(48.dp)
+                                colors =
+                                    ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    ),
+                                modifier = Modifier.size(48.dp),
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.Close,
-                                    contentDescription = stringResource(R.string.cancel)
+                                    contentDescription = stringResource(R.string.cancel),
                                 )
                             }
                         }
                     }
                 }
-                
+
                 // Loading indicator (for storage check or initialization)
                 if (uiState.isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.align(Alignment.Center),
-                        colors = ProgressIndicatorDefaults.colors(
-                            indicatorColor = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.surfaceContainer
-                        )
+                        colors =
+                            ProgressIndicatorDefaults.colors(
+                                indicatorColor = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.surfaceContainer,
+                            ),
                     )
                 }
             }

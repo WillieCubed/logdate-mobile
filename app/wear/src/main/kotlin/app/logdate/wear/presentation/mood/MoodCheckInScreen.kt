@@ -50,24 +50,25 @@ fun MoodCheckInScreen(
     }
 
     when (uiState.step) {
-        MoodCheckInStep.SELECT_MOOD -> SelectMoodContent(
-            onMoodSelected = viewModel::selectMood,
-        )
-        MoodCheckInStep.VOICE_PROMPT -> VoicePromptContent(
-            selectedMood = uiState.selectedMood,
-            onAttachVoice = viewModel::attachVoice,
-            onSkip = viewModel::skipVoiceAttachment,
-        )
-        MoodCheckInStep.SAVED -> MoodSavedContent(
-            saveFeedback = uiState.saveFeedback,
-        )
+        MoodCheckInStep.SELECT_MOOD ->
+            SelectMoodContent(
+                onMoodSelected = viewModel::selectMood,
+            )
+        MoodCheckInStep.VOICE_PROMPT ->
+            VoicePromptContent(
+                selectedMood = uiState.selectedMood,
+                onAttachVoice = viewModel::attachVoice,
+                onSkip = viewModel::skipVoiceAttachment,
+            )
+        MoodCheckInStep.SAVED ->
+            MoodSavedContent(
+                saveFeedback = uiState.saveFeedback,
+            )
     }
 }
 
 @Composable
-internal fun SelectMoodContent(
-    onMoodSelected: (MoodOption) -> Unit,
-) {
+internal fun SelectMoodContent(onMoodSelected: (MoodOption) -> Unit) {
     ScreenScaffold {
         ScalingLazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -100,9 +101,10 @@ internal fun VoicePromptContent(
     onSkip: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -125,9 +127,10 @@ internal fun VoicePromptContent(
         }
         OutlinedButton(
             onClick = onSkip,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
         ) {
             Text(text = stringResource(R.string.wear_mood_skip))
         }
@@ -135,9 +138,7 @@ internal fun VoicePromptContent(
 }
 
 @Composable
-internal fun MoodSavedContent(
-    saveFeedback: SaveFeedback? = null,
-) {
+internal fun MoodSavedContent(saveFeedback: SaveFeedback? = null) {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -149,11 +150,12 @@ internal fun MoodSavedContent(
             tint = Color(0xFF4CAF50),
             modifier = Modifier.size(48.dp),
         )
-        val feedbackText = when (saveFeedback) {
-            SaveFeedback.SYNCING_TO_PHONE -> stringResource(R.string.wear_saved_syncing_to_phone)
-            SaveFeedback.SAVED_LOCALLY -> stringResource(R.string.wear_saved_on_watch)
-            null -> stringResource(R.string.wear_mood_saved)
-        }
+        val feedbackText =
+            when (saveFeedback) {
+                SaveFeedback.SYNCING_TO_PHONE -> stringResource(R.string.wear_saved_syncing_to_phone)
+                SaveFeedback.SAVED_LOCALLY -> stringResource(R.string.wear_saved_on_watch)
+                null -> stringResource(R.string.wear_mood_saved)
+            }
         Text(
             text = feedbackText,
             style = MaterialTheme.typography.titleSmall,

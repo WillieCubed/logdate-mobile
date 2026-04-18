@@ -3,7 +3,6 @@ package app.logdate.wear.presentation.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.sync.SyncManager
-import app.logdate.client.sync.SyncStatus
 import app.logdate.wear.sync.WearDataLayerClient
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
@@ -26,7 +25,6 @@ class WearSettingsViewModel(
     private val syncManager: SyncManager,
     private val dataLayerClient: WearDataLayerClient,
 ) : ViewModel() {
-
     companion object {
         private const val POLL_INTERVAL_MS = 5_000L
     }
@@ -42,12 +40,13 @@ class WearSettingsViewModel(
 
     fun startPolling() {
         if (pollingJob?.isActive == true) return
-        pollingJob = viewModelScope.launch {
-            while (isActive) {
-                refreshStatus()
-                delay(POLL_INTERVAL_MS)
+        pollingJob =
+            viewModelScope.launch {
+                while (isActive) {
+                    refreshStatus()
+                    delay(POLL_INTERVAL_MS)
+                }
             }
-        }
     }
 
     fun stopPolling() {

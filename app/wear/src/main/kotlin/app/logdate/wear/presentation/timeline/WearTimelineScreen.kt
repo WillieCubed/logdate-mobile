@@ -19,13 +19,13 @@ import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
 import app.logdate.wear.R
-import kotlin.time.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.time.Clock
 
 @Composable
 fun WearTimelineScreen(
@@ -60,9 +60,10 @@ internal fun WearTimelineContent(
                     text = stringResource(R.string.wear_timeline_title),
                     style = MaterialTheme.typography.titleSmall,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 4.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 4.dp),
                 )
             }
 
@@ -73,9 +74,10 @@ internal fun WearTimelineContent(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 16.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(top = 16.dp),
                     )
                 }
             } else {
@@ -98,11 +100,12 @@ private fun TimelineDayCard(
     day: WearTimelineDayUiState,
     onClick: () -> Unit,
 ) {
-    val entryCountText = if (day.entryCount == 1) {
-        stringResource(R.string.wear_timeline_entry_count_one, day.entryCount)
-    } else {
-        stringResource(R.string.wear_timeline_entry_count_other, day.entryCount)
-    }
+    val entryCountText =
+        if (day.entryCount == 1) {
+            stringResource(R.string.wear_timeline_entry_count_one, day.entryCount)
+        } else {
+            stringResource(R.string.wear_timeline_entry_count_other, day.entryCount)
+        }
 
     Card(
         onClick = onClick,
@@ -146,7 +149,10 @@ private fun formatDayLabel(date: LocalDate): String {
         today -> stringResource(R.string.wear_timeline_today)
         yesterday -> stringResource(R.string.wear_timeline_yesterday)
         else -> {
-            val monthName = date.month.name.lowercase().replaceFirstChar { it.uppercase() }
+            val monthName =
+                date.month.name
+                    .lowercase()
+                    .replaceFirstChar { it.uppercase() }
             stringResource(R.string.wear_timeline_date_format, monthName, date.day)
         }
     }

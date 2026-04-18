@@ -21,9 +21,7 @@ import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
 
 @Composable
-fun HealthDashboardScreen(
-    viewModel: HealthDashboardViewModel,
-) {
+fun HealthDashboardScreen(viewModel: HealthDashboardViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberScalingLazyListState()
 
@@ -40,9 +38,10 @@ fun HealthDashboardScreen(
                     text = "Health Today",
                     style = MaterialTheme.typography.titleSmall,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
                 )
             }
 
@@ -81,9 +80,10 @@ fun HealthDashboardScreen(
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                     )
-                    val stepsText = uiState.currentStepCount?.let {
-                        "%,d steps".format(it)
-                    } ?: "No reading"
+                    val stepsText =
+                        uiState.currentStepCount?.let {
+                            "%,d steps".format(it)
+                        } ?: "No reading"
                     Text(
                         text = stepsText,
                         style = MaterialTheme.typography.titleMedium,

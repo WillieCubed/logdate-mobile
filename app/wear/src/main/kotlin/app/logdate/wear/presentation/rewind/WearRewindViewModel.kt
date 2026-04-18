@@ -3,7 +3,6 @@ package app.logdate.wear.presentation.rewind
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.rewind.RewindRepository
-import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -36,24 +35,25 @@ data class WearRewindPlaybackState(
 class WearRewindViewModel(
     rewindRepository: RewindRepository,
 ) : ViewModel() {
-
-    private val allRewinds = rewindRepository.getAllRewinds()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    private val allRewinds =
+        rewindRepository
+            .getAllRewinds()
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val rewindListState: StateFlow<WearRewindListUiState> =
         allRewinds
             .map { rewinds ->
                 WearRewindListUiState(
-                    rewinds = rewinds.map { rewind ->
-                        WearRewindListItem(
-                            uid = rewind.uid,
-                            title = rewind.title,
-                            label = rewind.label,
-                        )
-                    },
+                    rewinds =
+                        rewinds.map { rewind ->
+                            WearRewindListItem(
+                                uid = rewind.uid,
+                                title = rewind.title,
+                                label = rewind.label,
+                            )
+                        },
                 )
-            }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, WearRewindListUiState())
+            }.stateIn(viewModelScope, SharingStarted.Eagerly, WearRewindListUiState())
 
     private val _playbackState = MutableStateFlow<WearRewindPlaybackState?>(null)
     val playbackState: StateFlow<WearRewindPlaybackState?> = _playbackState
@@ -61,11 +61,12 @@ class WearRewindViewModel(
     fun selectRewind(uid: Uuid) {
         val rewind = allRewinds.value.find { it.uid == uid } ?: return
         val panels = filterPanelsForWear(rewind.content)
-        _playbackState.value = WearRewindPlaybackState(
-            rewindTitle = rewind.title,
-            panels = panels,
-            currentIndex = 0,
-        )
+        _playbackState.value =
+            WearRewindPlaybackState(
+                rewindTitle = rewind.title,
+                panels = panels,
+                currentIndex = 0,
+            )
     }
 
     fun advance() {

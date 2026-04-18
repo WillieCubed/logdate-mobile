@@ -43,35 +43,32 @@ private const val ROUTE_QUICK_TEXT = "quick_text"
  */
 @OptIn(ExperimentalHorologistApi::class)
 class QuickCaptureTileService : SuspendingTileService() {
-
-    override suspend fun resourcesRequest(
-        requestParams: RequestBuilders.ResourcesRequest,
-    ): ResourceBuilders.Resources {
-        return ResourceBuilders.Resources.Builder()
+    override suspend fun resourcesRequest(requestParams: RequestBuilders.ResourcesRequest): ResourceBuilders.Resources =
+        ResourceBuilders.Resources
+            .Builder()
             .setVersion(RESOURCES_VERSION)
             .build()
-    }
 
-    override suspend fun tileRequest(
-        requestParams: RequestBuilders.TileRequest,
-    ): TileBuilders.Tile {
+    override suspend fun tileRequest(requestParams: RequestBuilders.TileRequest): TileBuilders.Tile {
         val entryCount = fetchTodayEntryCount()
         return quickCaptureTile(requestParams, this, entryCount)
     }
 
-    private suspend fun fetchTodayEntryCount(): Int {
-        return try {
-            val repository = org.koin.java.KoinJavaComponent
-                .getKoin()
-                .get<JournalNotesRepository>()
-            val today = Clock.System.now()
-                .toLocalDateTime(TimeZone.currentSystemDefault())
-                .date
+    private suspend fun fetchTodayEntryCount(): Int =
+        try {
+            val repository =
+                org.koin.java.KoinJavaComponent
+                    .getKoin()
+                    .get<JournalNotesRepository>()
+            val today =
+                Clock.System
+                    .now()
+                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                    .date
             repository.observeNotesForDay(today).first().size
         } catch (e: Exception) {
             0
         }
-    }
 }
 
 internal fun quickCaptureTile(
@@ -79,19 +76,22 @@ internal fun quickCaptureTile(
     context: Context,
     entryCount: Int,
 ): TileBuilders.Tile {
-    val timeline = TimelineBuilders.Timeline.Builder()
-        .addTimelineEntry(
-            TimelineBuilders.TimelineEntry.Builder()
-                .setLayout(
-                    LayoutElementBuilders.Layout.Builder()
-                        .setRoot(quickCaptureLayout(requestParams, context, entryCount))
-                        .build(),
-                )
-                .build(),
-        )
-        .build()
+    val timeline =
+        TimelineBuilders.Timeline
+            .Builder()
+            .addTimelineEntry(
+                TimelineBuilders.TimelineEntry
+                    .Builder()
+                    .setLayout(
+                        LayoutElementBuilders.Layout
+                            .Builder()
+                            .setRoot(quickCaptureLayout(requestParams, context, entryCount))
+                            .build(),
+                    ).build(),
+            ).build()
 
-    return TileBuilders.Tile.Builder()
+    return TileBuilders.Tile
+        .Builder()
         .setResourcesVersion(RESOURCES_VERSION)
         .setTileTimeline(timeline)
         .setFreshnessIntervalMillis(15 * 60 * 1000L) // Refresh every 15 minutes
@@ -103,36 +103,36 @@ private fun quickCaptureLayout(
     context: Context,
     entryCount: Int,
 ): LayoutElementBuilders.LayoutElement {
-    val entryLabel = context.resources.getQuantityString(
-        R.plurals.wear_tile_entry_count,
-        entryCount,
-        entryCount,
-    )
+    val entryLabel =
+        context.resources.getQuantityString(
+            R.plurals.wear_tile_entry_count,
+            entryCount,
+            entryCount,
+        )
 
-    return PrimaryLayout.Builder(requestParams.deviceConfiguration)
+    return PrimaryLayout
+        .Builder(requestParams.deviceConfiguration)
         .setResponsiveContentInsetEnabled(true)
         .setPrimaryLabelTextContent(
-            Text.Builder(context, context.getString(R.string.app_name))
+            Text
+                .Builder(context, context.getString(R.string.app_name))
                 .setColor(argb(Colors.DEFAULT.primary))
                 .setTypography(Typography.TYPOGRAPHY_CAPTION1)
                 .build(),
-        )
-        .setContent(
+        ).setContent(
             captureButtonRow(context),
-        )
-        .setSecondaryLabelTextContent(
-            Text.Builder(context, entryLabel)
+        ).setSecondaryLabelTextContent(
+            Text
+                .Builder(context, entryLabel)
                 .setColor(argb(Colors.DEFAULT.onSurface))
                 .setTypography(Typography.TYPOGRAPHY_CAPTION2)
                 .build(),
-        )
-        .build()
+        ).build()
 }
 
-private fun captureButtonRow(
-    context: Context,
-): LayoutElementBuilders.LayoutElement {
-    return LayoutElementBuilders.Row.Builder()
+private fun captureButtonRow(context: Context): LayoutElementBuilders.LayoutElement =
+    LayoutElementBuilders.Row
+        .Builder()
         .setWidth(wrap())
         .setHeight(wrap())
         .addContent(
@@ -141,103 +141,104 @@ private fun captureButtonRow(
                 label = context.getString(R.string.wear_tile_record),
                 route = ROUTE_QUICK_RECORD,
             ),
-        )
-        .addContent(spacer(8f))
+        ).addContent(spacer(8f))
         .addContent(
             captureButton(
                 context = context,
                 label = context.getString(R.string.wear_tile_voice),
                 route = ROUTE_VOICE_NOTE,
             ),
-        )
-        .addContent(spacer(8f))
+        ).addContent(spacer(8f))
         .addContent(
             captureButton(
                 context = context,
                 label = context.getString(R.string.wear_tile_mood),
                 route = ROUTE_MOOD,
             ),
-        )
-        .addContent(spacer(8f))
+        ).addContent(spacer(8f))
         .addContent(
             captureButton(
                 context = context,
                 label = context.getString(R.string.wear_tile_text),
                 route = ROUTE_QUICK_TEXT,
             ),
-        )
-        .build()
-}
+        ).build()
 
 private fun captureButton(
     context: Context,
     label: String,
     route: String,
 ): LayoutElementBuilders.LayoutElement {
-    val launchAction = ActionBuilders.LaunchAction.Builder()
-        .setAndroidActivity(
-            ActionBuilders.AndroidActivity.Builder()
-                .setPackageName(context.packageName)
-                .setClassName(
-                    ComponentName(context, "app.logdate.wear.presentation.MainActivity")
-                        .className,
-                )
-                .addKeyToExtraMapping(
-                    EXTRA_TILE_ROUTE,
-                    ActionBuilders.AndroidStringExtra.Builder()
-                        .setValue(route)
-                        .build(),
-                )
-                .build(),
-        )
-        .build()
+    val launchAction =
+        ActionBuilders.LaunchAction
+            .Builder()
+            .setAndroidActivity(
+                ActionBuilders.AndroidActivity
+                    .Builder()
+                    .setPackageName(context.packageName)
+                    .setClassName(
+                        ComponentName(context, "app.logdate.wear.presentation.MainActivity")
+                            .className,
+                    ).addKeyToExtraMapping(
+                        EXTRA_TILE_ROUTE,
+                        ActionBuilders.AndroidStringExtra
+                            .Builder()
+                            .setValue(route)
+                            .build(),
+                    ).build(),
+            ).build()
 
-    val clickable = ModifiersBuilders.Clickable.Builder()
-        .setOnClick(launchAction)
-        .setId(route)
-        .build()
+    val clickable =
+        ModifiersBuilders.Clickable
+            .Builder()
+            .setOnClick(launchAction)
+            .setId(route)
+            .build()
 
-    return LayoutElementBuilders.Box.Builder()
+    return LayoutElementBuilders.Box
+        .Builder()
         .setWidth(dp(48f))
         .setHeight(dp(48f))
         .setModifiers(
-            ModifiersBuilders.Modifiers.Builder()
+            ModifiersBuilders.Modifiers
+                .Builder()
                 .setClickable(clickable)
                 .setBackground(
-                    ModifiersBuilders.Background.Builder()
+                    ModifiersBuilders.Background
+                        .Builder()
                         .setColor(argb(Colors.DEFAULT.surface))
                         .setCorner(
-                            ModifiersBuilders.Corner.Builder()
+                            ModifiersBuilders.Corner
+                                .Builder()
                                 .setRadius(dp(24f))
                                 .build(),
-                        )
-                        .build(),
-                )
-                .build(),
-        )
-        .addContent(
-            Text.Builder(context, label)
+                        ).build(),
+                ).build(),
+        ).addContent(
+            Text
+                .Builder(context, label)
                 .setColor(argb(Colors.DEFAULT.onSurface))
                 .setTypography(Typography.TYPOGRAPHY_CAPTION2)
                 .build(),
-        )
-        .build()
+        ).build()
 }
 
-private fun spacer(widthDp: Float): LayoutElementBuilders.LayoutElement {
-    return LayoutElementBuilders.Spacer.Builder()
+private fun spacer(widthDp: Float): LayoutElementBuilders.LayoutElement =
+    LayoutElementBuilders.Spacer
+        .Builder()
         .setWidth(dp(widthDp))
         .build()
-}
 
 @Preview(device = WearDevices.SMALL_ROUND)
 @Preview(device = WearDevices.LARGE_ROUND)
-fun quickCaptureTilePreview(context: Context) = TilePreviewData(
-    onTileResourceRequest = {
-        ResourceBuilders.Resources.Builder()
-            .setVersion(RESOURCES_VERSION)
-            .build()
-    },
-) {
-    quickCaptureTile(it, context, entryCount = 3)
-}
+fun quickCaptureTilePreview(context: Context) =
+    TilePreviewData(
+        onTileResourceRequest = {
+            ResourceBuilders.Resources
+                .Builder()
+                .setVersion(RESOURCES_VERSION)
+                .build()
+        },
+    ) {
+        quickCaptureTile(it, context, entryCount = 3)
+    }

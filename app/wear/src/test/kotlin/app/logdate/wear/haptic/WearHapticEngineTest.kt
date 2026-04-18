@@ -12,7 +12,6 @@ import org.junit.Before
 import org.junit.Test
 
 class WearHapticEngineTest {
-
     private lateinit var vibrator: Vibrator
     private lateinit var engine: WearHapticEngine
     private val mockEffect: VibrationEffect = mockk()

@@ -13,7 +13,10 @@ interface WearDataLayerClient {
      * Puts a data item at the given [path] with the provided key-value [data].
      * Returns true if the put succeeded.
      */
-    suspend fun putDataItem(path: String, data: Map<String, String>): Boolean
+    suspend fun putDataItem(
+        path: String,
+        data: Map<String, String>,
+    ): Boolean
 
     /**
      * Deletes the data item at the given [path].
@@ -36,13 +39,19 @@ interface WearDataLayerClient {
      * via a channel at the given [channelPath].
      * Returns true if the transfer completed.
      */
-    suspend fun sendFile(channelPath: String, localFilePath: String): Boolean
+    suspend fun sendFile(
+        channelPath: String,
+        localFilePath: String,
+    ): Boolean
 
     /**
      * Sends a message to the connected phone node at the given [path].
      * Returns true if the message was delivered.
      */
-    suspend fun sendMessage(path: String, data: ByteArray = byteArrayOf()): Boolean
+    suspend fun sendMessage(
+        path: String,
+        data: ByteArray = byteArrayOf(),
+    ): Boolean
 
     /**
      * Requests an audio file for [noteId] from the phone and writes it to [destinationPath].

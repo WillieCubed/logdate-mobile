@@ -40,9 +40,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
 @Composable
-fun WearDayDetailScreen(
-    viewModel: WearTimelineViewModel,
-) {
+fun WearDayDetailScreen(viewModel: WearTimelineViewModel) {
     val detail by viewModel.selectedDayState.collectAsState()
     val playbackState by viewModel.playbackState.collectAsState()
     val outputState by viewModel.audioOutputState.collectAsState()
@@ -80,9 +78,10 @@ internal fun WearDayDetailContent(
                     text = formatDetailHeader(detail.date),
                     style = MaterialTheme.typography.titleSmall,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 4.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 4.dp),
                 )
             }
 
@@ -124,11 +123,12 @@ private fun NoteEntryCard(
 ) {
     val timezone = TimeZone.currentSystemDefault()
     val time = note.creationTimestamp.toLocalDateTime(timezone)
-    val timeLabel = "%d:%02d %s".format(
-        if (time.hour % 12 == 0) 12 else time.hour % 12,
-        time.minute,
-        if (time.hour < 12) "am" else "pm",
-    )
+    val timeLabel =
+        "%d:%02d %s".format(
+            if (time.hour % 12 == 0) 12 else time.hour % 12,
+            time.minute,
+            if (time.hour < 12) "am" else "pm",
+        )
 
     when (note) {
         is JournalNote.Audio -> {
@@ -207,9 +207,16 @@ private fun NoteEntryCard(
  */
 private sealed interface AudioCardState {
     data object NoOutput : AudioCardState
+
     data object Preparing : AudioCardState
-    data class Playing(val progress: Float, val durationMs: Long) : AudioCardState
+
+    data class Playing(
+        val progress: Float,
+        val durationMs: Long,
+    ) : AudioCardState
+
     data object Error : AudioCardState
+
     data object Idle : AudioCardState
 }
 
@@ -304,9 +311,10 @@ private fun AudioNoteCard(
                     IconButton(
                         onClick = onToggle,
                         modifier = Modifier.size(24.dp),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error,
-                        ),
+                        colors =
+                            IconButtonDefaults.iconButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error,
+                            ),
                     ) {
                         Icon(
                             Icons.Default.Stop,
@@ -358,15 +366,17 @@ private fun AudioNoteCard(
             is AudioCardState.Playing -> {
                 LinearProgressIndicator(
                     progress = { cardState.progress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
                 )
             }
             is AudioCardState.NoOutput,
             is AudioCardState.Preparing,
             is AudioCardState.Error,
-            is AudioCardState.Idle -> {
+            is AudioCardState.Idle,
+            -> {
                 Text(
                     text = timeLabel,
                     style = MaterialTheme.typography.labelSmall,
@@ -379,6 +389,9 @@ private fun AudioNoteCard(
 
 @Composable
 private fun formatDetailHeader(date: LocalDate): String {
-    val monthName = date.month.name.lowercase().replaceFirstChar { it.uppercase() }
+    val monthName =
+        date.month.name
+            .lowercase()
+            .replaceFirstChar { it.uppercase() }
     return stringResource(R.string.wear_day_detail_header, monthName, date.day, date.year)
 }

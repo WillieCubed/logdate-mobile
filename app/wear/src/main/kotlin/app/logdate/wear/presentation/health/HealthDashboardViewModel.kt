@@ -23,7 +23,6 @@ class HealthDashboardViewModel(
     private val healthSensorManager: WearHealthSensorManager,
     private val healthSnapshotDao: HealthSnapshotDao,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(HealthDashboardUiState())
     val uiState: StateFlow<HealthDashboardUiState> = _uiState.asStateFlow()
 

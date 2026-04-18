@@ -28,7 +28,6 @@ import kotlin.uuid.Uuid
  */
 @RunWith(AndroidJUnit4::class)
 class WearDayDetailPlaybackTest {
-
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -46,19 +45,19 @@ class WearDayDetailPlaybackTest {
         durationMs = durationMs,
     )
 
-    private fun textNote() = JournalNote.Text(
-        uid = Uuid.random(),
-        creationTimestamp = fixedTime,
-        lastUpdated = fixedTime,
-        content = "Hello world",
-    )
+    private fun textNote() =
+        JournalNote.Text(
+            uid = Uuid.random(),
+            creationTimestamp = fixedTime,
+            lastUpdated = fixedTime,
+            content = "Hello world",
+        )
 
-    private fun dayDetail(
-        entries: List<JournalNote> = listOf(audioNote()),
-    ) = WearDayDetailUiState(
-        date = LocalDate(2024, 3, 9),
-        entries = entries,
-    )
+    private fun dayDetail(entries: List<JournalNote> = listOf(audioNote())) =
+        WearDayDetailUiState(
+            date = LocalDate(2024, 3, 9),
+            entries = entries,
+        )
 
     // -----------------------------------------------------------------------
     // Idle state — play button + duration
@@ -127,11 +126,12 @@ class WearDayDetailPlaybackTest {
             MaterialTheme {
                 WearDayDetailContent(
                     detail = dayDetail(),
-                    playbackState = WearPlaybackUiState.Active(
-                        noteId = testNoteId,
-                        progress = 0.5f,
-                        durationMs = 15_000,
-                    ),
+                    playbackState =
+                        WearPlaybackUiState.Active(
+                            noteId = testNoteId,
+                            progress = 0.5f,
+                            durationMs = 15_000,
+                        ),
                     audioOutputState = AudioOutputState.SpeakerOnly,
                     onToggleNote = {},
                     onOpenBluetoothSettings = {},
@@ -148,11 +148,12 @@ class WearDayDetailPlaybackTest {
             MaterialTheme {
                 WearDayDetailContent(
                     detail = dayDetail(),
-                    playbackState = WearPlaybackUiState.Active(
-                        noteId = testNoteId,
-                        progress = 0.5f,
-                        durationMs = 60_000,
-                    ),
+                    playbackState =
+                        WearPlaybackUiState.Active(
+                            noteId = testNoteId,
+                            progress = 0.5f,
+                            durationMs = 60_000,
+                        ),
                     audioOutputState = AudioOutputState.SpeakerOnly,
                     onToggleNote = {},
                     onOpenBluetoothSettings = {},
@@ -171,11 +172,12 @@ class WearDayDetailPlaybackTest {
             MaterialTheme {
                 WearDayDetailContent(
                     detail = dayDetail(),
-                    playbackState = WearPlaybackUiState.Active(
-                        noteId = testNoteId,
-                        progress = 0.3f,
-                        durationMs = 15_000,
-                    ),
+                    playbackState =
+                        WearPlaybackUiState.Active(
+                            noteId = testNoteId,
+                            progress = 0.3f,
+                            durationMs = 15_000,
+                        ),
                     audioOutputState = AudioOutputState.SpeakerOnly,
                     onToggleNote = { toggled = true },
                     onOpenBluetoothSettings = {},
@@ -256,11 +258,12 @@ class WearDayDetailPlaybackTest {
             MaterialTheme {
                 WearDayDetailContent(
                     detail = dayDetail(),
-                    playbackState = WearPlaybackUiState.Active(
-                        noteId = otherNoteId,
-                        progress = 0.5f,
-                        durationMs = 10_000,
-                    ),
+                    playbackState =
+                        WearPlaybackUiState.Active(
+                            noteId = otherNoteId,
+                            progress = 0.5f,
+                            durationMs = 10_000,
+                        ),
                     audioOutputState = AudioOutputState.SpeakerOnly,
                     onToggleNote = {},
                     onOpenBluetoothSettings = {},

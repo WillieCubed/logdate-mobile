@@ -17,7 +17,6 @@ import kotlin.test.assertEquals
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WearOnboardingViewModelTest {
-
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var dataLayerClient: WearDataLayerClient
 
@@ -33,54 +32,58 @@ class WearOnboardingViewModelTest {
     }
 
     @Test
-    fun `emits Connected when phone is reachable`() = runTest {
-        coEvery { dataLayerClient.isPhoneConnected(any()) } returns true
+    fun `emits Connected when phone is reachable`() =
+        runTest {
+            coEvery { dataLayerClient.isPhoneConnected(any()) } returns true
 
-        val viewModel = WearOnboardingViewModel(dataLayerClient)
+            val viewModel = WearOnboardingViewModel(dataLayerClient)
 
-        viewModel.phoneCheckState.test {
-            assertEquals(PhoneCheckState.Connected, expectMostRecentItem())
+            viewModel.phoneCheckState.test {
+                assertEquals(PhoneCheckState.Connected, expectMostRecentItem())
+            }
         }
-    }
 
     @Test
-    fun `emits NotConnected when phone is not reachable`() = runTest {
-        coEvery { dataLayerClient.isPhoneConnected(any()) } returns false
+    fun `emits NotConnected when phone is not reachable`() =
+        runTest {
+            coEvery { dataLayerClient.isPhoneConnected(any()) } returns false
 
-        val viewModel = WearOnboardingViewModel(dataLayerClient)
+            val viewModel = WearOnboardingViewModel(dataLayerClient)
 
-        viewModel.phoneCheckState.test {
-            assertEquals(PhoneCheckState.NotConnected, expectMostRecentItem())
+            viewModel.phoneCheckState.test {
+                assertEquals(PhoneCheckState.NotConnected, expectMostRecentItem())
+            }
         }
-    }
 
     @Test
-    fun `emits NotConnected when check throws exception`() = runTest {
-        coEvery { dataLayerClient.isPhoneConnected(any()) } throws RuntimeException("no gms")
+    fun `emits NotConnected when check throws exception`() =
+        runTest {
+            coEvery { dataLayerClient.isPhoneConnected(any()) } throws RuntimeException("no gms")
 
-        val viewModel = WearOnboardingViewModel(dataLayerClient)
+            val viewModel = WearOnboardingViewModel(dataLayerClient)
 
-        viewModel.phoneCheckState.test {
-            assertEquals(PhoneCheckState.NotConnected, expectMostRecentItem())
+            viewModel.phoneCheckState.test {
+                assertEquals(PhoneCheckState.NotConnected, expectMostRecentItem())
+            }
         }
-    }
 
     @Test
-    fun `checkPhoneConnection retries the check`() = runTest {
-        coEvery { dataLayerClient.isPhoneConnected(any()) } returns false
+    fun `checkPhoneConnection retries the check`() =
+        runTest {
+            coEvery { dataLayerClient.isPhoneConnected(any()) } returns false
 
-        val viewModel = WearOnboardingViewModel(dataLayerClient)
+            val viewModel = WearOnboardingViewModel(dataLayerClient)
 
-        viewModel.phoneCheckState.test {
-            assertEquals(PhoneCheckState.NotConnected, expectMostRecentItem())
+            viewModel.phoneCheckState.test {
+                assertEquals(PhoneCheckState.NotConnected, expectMostRecentItem())
+            }
+
+            // Now the phone becomes available
+            coEvery { dataLayerClient.isPhoneConnected(any()) } returns true
+            viewModel.checkPhoneConnection()
+
+            viewModel.phoneCheckState.test {
+                assertEquals(PhoneCheckState.Connected, expectMostRecentItem())
+            }
         }
-
-        // Now the phone becomes available
-        coEvery { dataLayerClient.isPhoneConnected(any()) } returns true
-        viewModel.checkPhoneConnection()
-
-        viewModel.phoneCheckState.test {
-            assertEquals(PhoneCheckState.Connected, expectMostRecentItem())
-        }
-    }
 }

@@ -34,7 +34,6 @@ import kotlinx.coroutines.withContext
  * delay before dropping the event.
  */
 class WearDataLayerListenerService : WearableListenerService() {
-
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val noteDataMapper = NoteDataMapper()
     private val journalDataMapper = JournalDataMapper()
@@ -93,13 +92,17 @@ class WearDataLayerListenerService : WearableListenerService() {
         }
     }
 
-    private suspend fun handleNoteDelete(path: String, notesRepository: JournalNotesRepository) {
-        val noteId = try {
-            NoteDataMapper.noteIdFromPath(path)
-        } catch (e: IllegalArgumentException) {
-            Napier.w("Invalid note ID in delete path: $path", e)
-            return
-        }
+    private suspend fun handleNoteDelete(
+        path: String,
+        notesRepository: JournalNotesRepository,
+    ) {
+        val noteId =
+            try {
+                NoteDataMapper.noteIdFromPath(path)
+            } catch (e: IllegalArgumentException) {
+                Napier.w("Invalid note ID in delete path: $path", e)
+                return
+            }
 
         Napier.d("Received delete signal for note: $noteId")
         try {
@@ -131,13 +134,17 @@ class WearDataLayerListenerService : WearableListenerService() {
         }
     }
 
-    private suspend fun handleJournalDelete(path: String, journalRepository: JournalRepository) {
-        val journalId = try {
-            JournalDataMapper.journalIdFromPath(path)
-        } catch (e: IllegalArgumentException) {
-            Napier.w("Invalid journal ID in delete path: $path", e)
-            return
-        }
+    private suspend fun handleJournalDelete(
+        path: String,
+        journalRepository: JournalRepository,
+    ) {
+        val journalId =
+            try {
+                JournalDataMapper.journalIdFromPath(path)
+            } catch (e: IllegalArgumentException) {
+                Napier.w("Invalid journal ID in delete path: $path", e)
+                return
+            }
 
         Napier.d("Received delete signal for journal: $journalId")
         try {
@@ -174,12 +181,13 @@ class WearDataLayerListenerService : WearableListenerService() {
         path: String,
         koin: org.koin.core.Koin,
     ) {
-        val (journalId, contentId) = try {
-            AssociationDataMapper.idsFromPath(path)
-        } catch (e: Exception) {
-            Napier.w("Invalid association path: $path", e)
-            return
-        }
+        val (journalId, contentId) =
+            try {
+                AssociationDataMapper.idsFromPath(path)
+            } catch (e: Exception) {
+                Napier.w("Invalid association path: $path", e)
+                return
+            }
 
         Napier.d("Received association delete: journal=$journalId, content=$contentId")
         try {
@@ -225,7 +233,8 @@ class WearDataLayerListenerService : WearableListenerService() {
     private suspend fun resolveKoin(): org.koin.core.Koin? {
         repeat(MAX_KOIN_RETRIES) { attempt ->
             try {
-                return org.koin.java.KoinJavaComponent.getKoin()
+                return org.koin.java.KoinJavaComponent
+                    .getKoin()
             } catch (e: Exception) {
                 if (attempt < MAX_KOIN_RETRIES - 1) {
                     Napier.d("Koin not ready (attempt ${attempt + 1}/$MAX_KOIN_RETRIES), retrying...")

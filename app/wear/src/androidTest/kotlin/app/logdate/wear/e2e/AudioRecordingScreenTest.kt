@@ -39,10 +39,10 @@ import app.logdate.wear.presentation.audio.AudioRecordingUiState
 import app.logdate.wear.presentation.audio.components.AudioWaveform
 import app.logdate.wear.presentation.audio.components.RecordButton
 import app.logdate.wear.presentation.audio.components.RecordingTimer
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.junit.Assert.assertTrue
 
 /**
  * Instrumented tests for the audio recording screen.
@@ -52,7 +52,6 @@ import org.junit.Assert.assertTrue
  */
 @RunWith(AndroidJUnit4::class)
 class AudioRecordingScreenTest {
-
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -82,11 +81,12 @@ class AudioRecordingScreenTest {
         composeRule.setContent {
             MaterialTheme {
                 AudioRecordingTestContent(
-                    uiState = AudioRecordingUiState(
-                        isRecording = true,
-                        durationMs = 5_000,
-                        audioLevels = listOf(0.3f, 0.5f, 0.7f),
-                    ),
+                    uiState =
+                        AudioRecordingUiState(
+                            isRecording = true,
+                            durationMs = 5_000,
+                            audioLevels = listOf(0.3f, 0.5f, 0.7f),
+                        ),
                 )
             }
         }
@@ -146,10 +146,11 @@ class AudioRecordingScreenTest {
         composeRule.setContent {
             MaterialTheme {
                 AudioRecordingTestContent(
-                    uiState = AudioRecordingUiState(
-                        isRecording = true,
-                        isPaused = true,
-                    ),
+                    uiState =
+                        AudioRecordingUiState(
+                            isRecording = true,
+                            isPaused = true,
+                        ),
                 )
             }
         }
@@ -166,14 +167,16 @@ class AudioRecordingScreenTest {
         composeRule.setContent {
             MaterialTheme {
                 AudioRecordingTestContent(
-                    uiState = AudioRecordingUiState(
-                        errorMessage = "Not enough storage space for recording",
-                    ),
+                    uiState =
+                        AudioRecordingUiState(
+                            errorMessage = "Not enough storage space for recording",
+                        ),
                 )
             }
         }
 
-        composeRule.onNodeWithText("Not enough storage space for recording")
+        composeRule
+            .onNodeWithText("Not enough storage space for recording")
             .assertIsDisplayed()
     }
 
@@ -236,9 +239,10 @@ private fun AudioRecordingTestContent(
             contentAlignment = Alignment.Center,
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
@@ -255,57 +259,64 @@ private fun AudioRecordingTestContent(
                 if (uiState.isRecording) {
                     AudioWaveform(
                         audioLevels = uiState.audioLevels,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(24.dp)
-                            .padding(bottom = 4.dp)
-                            .testTag("audio_waveform"),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(24.dp)
+                                .padding(bottom = 4.dp)
+                                .testTag("audio_waveform"),
                     )
                     RecordingTimer(
                         durationMs = uiState.durationMs,
                         isRecording = uiState.isRecording,
-                        modifier = Modifier
-                            .padding(bottom = 8.dp)
-                            .testTag("recording_timer"),
+                        modifier =
+                            Modifier
+                                .padding(bottom = 8.dp)
+                                .testTag("recording_timer"),
                     )
                 }
 
                 RecordButton(
                     isRecording = uiState.isRecording,
                     onClick = onToggleRecording,
-                    modifier = Modifier
-                        .size(64.dp)
-                        .testTag("record_button"),
+                    modifier =
+                        Modifier
+                            .size(64.dp)
+                            .testTag("record_button"),
                 )
 
                 if (uiState.isRecording) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                     ) {
                         Button(
                             onClick = if (uiState.isPaused) onResume else onPause,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            ),
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                ),
                             modifier = Modifier.size(48.dp),
                         ) {
                             Icon(
-                                imageVector = if (uiState.isPaused) {
-                                    Icons.Filled.PlayArrow
-                                } else {
-                                    Icons.Filled.Pause
-                                },
+                                imageVector =
+                                    if (uiState.isPaused) {
+                                        Icons.Filled.PlayArrow
+                                    } else {
+                                        Icons.Filled.Pause
+                                    },
                                 contentDescription = if (uiState.isPaused) "Resume" else "Pause",
                             )
                         }
                         Button(
                             onClick = onCancel,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                            ),
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                ),
                             modifier = Modifier.size(48.dp),
                         ) {
                             Icon(

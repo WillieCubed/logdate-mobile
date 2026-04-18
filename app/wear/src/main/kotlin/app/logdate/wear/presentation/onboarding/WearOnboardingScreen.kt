@@ -55,13 +55,14 @@ private const val PERMISSION_GRANTED_DELAY_MS = 600L
  */
 private val screenAwareContentPadding = PaddingValues(horizontal = 24.dp)
 
-fun isOnboardingComplete(context: Context): Boolean {
-    return context.getSharedPreferences(ONBOARDING_PREFS, Context.MODE_PRIVATE)
+fun isOnboardingComplete(context: Context): Boolean =
+    context
+        .getSharedPreferences(ONBOARDING_PREFS, Context.MODE_PRIVATE)
         .getBoolean(KEY_ONBOARDING_COMPLETE, false)
-}
 
 private fun markOnboardingComplete(context: Context) {
-    context.getSharedPreferences(ONBOARDING_PREFS, Context.MODE_PRIVATE)
+    context
+        .getSharedPreferences(ONBOARDING_PREFS, Context.MODE_PRIVATE)
         .edit()
         .putBoolean(KEY_ONBOARDING_COMPLETE, true)
         .apply()
@@ -78,16 +79,18 @@ fun WearOnboardingScreen(
     when (currentPage) {
         0 -> WelcomePage(onNext = { currentPage = 1 })
         1 -> PermissionsPage(onNext = { currentPage = 2 })
-        2 -> PhoneConnectionPage(
-            viewModel = onboardingViewModel,
-            onNext = { currentPage = 3 },
-        )
-        3 -> CompletePage(
-            onStart = {
-                markOnboardingComplete(context)
-                onComplete()
-            },
-        )
+        2 ->
+            PhoneConnectionPage(
+                viewModel = onboardingViewModel,
+                onNext = { currentPage = 3 },
+            )
+        3 ->
+            CompletePage(
+                onStart = {
+                    markOnboardingComplete(context)
+                    onComplete()
+                },
+            )
     }
 }
 
@@ -116,18 +119,20 @@ private fun WelcomePage(onNext: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
                 )
             }
             item {
                 Button(
                     onClick = onNext,
                     label = { Text(stringResource(R.string.wear_onboarding_welcome_button)) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
                 )
             }
         }
@@ -146,11 +151,12 @@ private fun PermissionsPage(onNext: () -> Unit) {
         )
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        micGranted = granted
-    }
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            micGranted = granted
+        }
 
     // Auto-advance after permission is granted
     LaunchedEffect(micGranted) {
@@ -181,14 +187,16 @@ private fun PermissionsPage(onNext: () -> Unit) {
                 Icon(
                     imageVector = Icons.Default.Mic,
                     contentDescription = null,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .padding(top = 4.dp),
-                    tint = if (micGranted) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
+                    modifier =
+                        Modifier
+                            .size(32.dp)
+                            .padding(top = 4.dp),
+                    tint =
+                        if (micGranted) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                 )
             }
             item {
@@ -206,9 +214,10 @@ private fun PermissionsPage(onNext: () -> Unit) {
                         imageVector = Icons.Default.Check,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .padding(top = 8.dp),
+                        modifier =
+                            Modifier
+                                .size(32.dp)
+                                .padding(top = 8.dp),
                     )
                 }
                 item {
@@ -225,9 +234,10 @@ private fun PermissionsPage(onNext: () -> Unit) {
                     Button(
                         onClick = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
                         label = { Text(stringResource(R.string.wear_onboarding_permissions_allow)) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
                     )
                 }
                 item {
@@ -270,9 +280,10 @@ private fun PhoneConnectionPage(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
                         )
                     }
                 }
@@ -290,9 +301,10 @@ private fun PhoneConnectionPage(
                             text = stringResource(R.string.wear_onboarding_phone_connected),
                             style = MaterialTheme.typography.titleSmall,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
                         )
                     }
                     item(key = "detail") {
@@ -308,9 +320,10 @@ private fun PhoneConnectionPage(
                         Button(
                             onClick = onNext,
                             label = { Text(stringResource(R.string.wear_onboarding_continue)) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
                         )
                     }
                 }
@@ -328,9 +341,10 @@ private fun PhoneConnectionPage(
                             text = stringResource(R.string.wear_onboarding_phone_not_connected),
                             style = MaterialTheme.typography.titleSmall,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
                         )
                     }
                     item(key = "detail") {
@@ -346,9 +360,10 @@ private fun PhoneConnectionPage(
                         Button(
                             onClick = onNext,
                             label = { Text(stringResource(R.string.wear_onboarding_continue)) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
                         )
                     }
                 }
@@ -381,9 +396,10 @@ private fun CompletePage(onStart: () -> Unit) {
                     text = stringResource(R.string.wear_onboarding_done_title),
                     style = MaterialTheme.typography.titleSmall,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
                 )
             }
             item {
@@ -399,9 +415,10 @@ private fun CompletePage(onStart: () -> Unit) {
                 Button(
                     onClick = onStart,
                     label = { Text(stringResource(R.string.wear_onboarding_done_button)) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
                 )
             }
         }

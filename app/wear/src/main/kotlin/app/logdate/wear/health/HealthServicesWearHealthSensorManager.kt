@@ -20,7 +20,6 @@ import kotlinx.coroutines.sync.withLock
 class HealthServicesWearHealthSensorManager(
     private val context: Context,
 ) : WearHealthSensorManager {
-
     private val client by lazy {
         HealthServices.getClient(context).passiveMonitoringClient
     }
@@ -30,43 +29,44 @@ class HealthServicesWearHealthSensorManager(
     private var latestStepCount: Int? = null
     private var monitoring = false
 
-    private val callback = object : PassiveListenerCallback {
-        override fun onNewDataPointsReceived(dataPoints: DataPointContainer) {
-            dataPoints.getData(DataType.HEART_RATE_BPM).lastOrNull()?.let { sample ->
-                latestHeartRate = sample.value.toInt()
-            }
-            dataPoints.getData(DataType.STEPS_DAILY).lastOrNull()?.let { sample ->
-                latestStepCount = sample.value.toInt()
+    private val callback =
+        object : PassiveListenerCallback {
+            override fun onNewDataPointsReceived(dataPoints: DataPointContainer) {
+                dataPoints.getData(DataType.HEART_RATE_BPM).lastOrNull()?.let { sample ->
+                    latestHeartRate = sample.value.toInt()
+                }
+                dataPoints.getData(DataType.STEPS_DAILY).lastOrNull()?.let { sample ->
+                    latestStepCount = sample.value.toInt()
+                }
             }
         }
-    }
 
-    override suspend fun isAvailable(): Boolean {
-        return try {
+    override suspend fun isAvailable(): Boolean =
+        try {
             val capabilities = client.getCapabilities()
             capabilities.supportedDataTypesPassiveMonitoring.contains(DataType.HEART_RATE_BPM)
         } catch (e: Exception) {
             Napier.w("Health Services not available", e)
             false
         }
-    }
 
-    override suspend fun sampleCurrent(): HealthSnapshot {
-        return mutex.withLock {
+    override suspend fun sampleCurrent(): HealthSnapshot =
+        mutex.withLock {
             HealthSnapshot(
                 heartRateBpm = latestHeartRate,
                 stepCount = latestStepCount,
             )
         }
-    }
 
     override suspend fun startPassiveMonitoring() {
         mutex.withLock {
             if (monitoring) return
             try {
-                val config = PassiveListenerConfig.builder()
-                    .setDataTypes(setOf(DataType.HEART_RATE_BPM, DataType.STEPS_DAILY))
-                    .build()
+                val config =
+                    PassiveListenerConfig
+                        .builder()
+                        .setDataTypes(setOf(DataType.HEART_RATE_BPM, DataType.STEPS_DAILY))
+                        .build()
                 client.setPassiveListenerCallback(config, callback)
                 monitoring = true
                 Napier.d("Health Services passive monitoring started")

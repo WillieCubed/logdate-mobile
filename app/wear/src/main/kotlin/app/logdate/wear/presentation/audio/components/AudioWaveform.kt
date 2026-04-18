@@ -27,9 +27,10 @@ fun AudioWaveform(
     barWidth: Float = 3f,
 ) {
     Canvas(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(24.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .height(24.dp),
     ) {
         val width = size.width
         val height = size.height

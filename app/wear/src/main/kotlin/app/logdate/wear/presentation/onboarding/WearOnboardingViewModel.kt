@@ -18,7 +18,6 @@ import kotlinx.coroutines.launch
 class WearOnboardingViewModel(
     private val dataLayerClient: WearDataLayerClient,
 ) : ViewModel() {
-
     private val _phoneCheckState = MutableStateFlow<PhoneCheckState>(PhoneCheckState.Checking)
     val phoneCheckState: StateFlow<PhoneCheckState> = _phoneCheckState.asStateFlow()
 
@@ -31,11 +30,12 @@ class WearOnboardingViewModel(
         viewModelScope.launch {
             try {
                 val connected = dataLayerClient.isPhoneConnected()
-                _phoneCheckState.value = if (connected) {
-                    PhoneCheckState.Connected
-                } else {
-                    PhoneCheckState.NotConnected
-                }
+                _phoneCheckState.value =
+                    if (connected) {
+                        PhoneCheckState.Connected
+                    } else {
+                        PhoneCheckState.NotConnected
+                    }
             } catch (e: Exception) {
                 Napier.w("Phone connection check failed during onboarding", e)
                 _phoneCheckState.value = PhoneCheckState.NotConnected
@@ -49,6 +49,8 @@ class WearOnboardingViewModel(
  */
 sealed interface PhoneCheckState {
     data object Checking : PhoneCheckState
+
     data object Connected : PhoneCheckState
+
     data object NotConnected : PhoneCheckState
 }

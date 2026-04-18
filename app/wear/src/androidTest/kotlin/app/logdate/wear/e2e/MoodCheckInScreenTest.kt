@@ -10,15 +10,14 @@ import app.logdate.wear.presentation.mood.MoodOption
 import app.logdate.wear.presentation.mood.MoodSavedContent
 import app.logdate.wear.presentation.mood.SelectMoodContent
 import app.logdate.wear.presentation.mood.VoicePromptContent
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 
 @RunWith(AndroidJUnit4::class)
 class MoodCheckInScreenTest {
-
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -59,7 +58,8 @@ class MoodCheckInScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("${MoodOption.GREAT.emoji} ${MoodOption.GREAT.label}")
+        composeRule
+            .onNodeWithText("${MoodOption.GREAT.emoji} ${MoodOption.GREAT.label}")
             .performClick()
 
         assertEquals(MoodOption.GREAT, selectedMood)
@@ -74,7 +74,8 @@ class MoodCheckInScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("${MoodOption.SAD.emoji} ${MoodOption.SAD.label}")
+        composeRule
+            .onNodeWithText("${MoodOption.SAD.emoji} ${MoodOption.SAD.label}")
             .performClick()
 
         assertEquals(MoodOption.SAD, selectedMood)
@@ -89,7 +90,8 @@ class MoodCheckInScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("${MoodOption.ROUGH.emoji} ${MoodOption.ROUGH.label}")
+        composeRule
+            .onNodeWithText("${MoodOption.ROUGH.emoji} ${MoodOption.ROUGH.label}")
             .performClick()
 
         assertEquals(MoodOption.ROUGH, selectedMood)

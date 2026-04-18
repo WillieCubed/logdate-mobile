@@ -28,23 +28,27 @@ class WearPromptNotificationBuilder(
         if (type == PromptType.NONE) return
 
         val content = PromptContent.forType(type)
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            ?: Intent()
-        val pendingIntent = PendingIntent.getActivity(
-            context,
-            type.ordinal,
-            launchIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
+        val launchIntent =
+            context.packageManager.getLaunchIntentForPackage(context.packageName)
+                ?: Intent()
+        val pendingIntent =
+            PendingIntent.getActivity(
+                context,
+                type.ordinal,
+                launchIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle(content.title)
-            .setContentText(content.body)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .build()
+        val notification =
+            NotificationCompat
+                .Builder(context, CHANNEL_ID)
+                .setContentTitle(content.title)
+                .setContentText(content.body)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .build()
 
         notificationManager.notify(
             NOTIFICATION_ID_BASE + type.ordinal,
@@ -53,13 +57,14 @@ class WearPromptNotificationBuilder(
     }
 
     private fun createChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            context.getString(R.string.wear_prompt_channel_name),
-            NotificationManager.IMPORTANCE_DEFAULT,
-        ).apply {
-            description = context.getString(R.string.wear_prompt_channel_description)
-        }
+        val channel =
+            NotificationChannel(
+                CHANNEL_ID,
+                context.getString(R.string.wear_prompt_channel_name),
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply {
+                description = context.getString(R.string.wear_prompt_channel_description)
+            }
         notificationManager.createNotificationChannel(channel)
     }
 

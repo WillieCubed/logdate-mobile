@@ -6,7 +6,6 @@ import android.content.Intent
 import android.graphics.drawable.Icon
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationType
-import androidx.wear.watchface.complications.data.MonochromaticImage
 import androidx.wear.watchface.complications.data.PlainComplicationText
 import androidx.wear.watchface.complications.data.SmallImage
 import androidx.wear.watchface.complications.data.SmallImageComplicationData
@@ -21,7 +20,6 @@ import app.logdate.wear.R
  * Tapping opens the app directly to the voice recording screen.
  */
 class QuickCaptureComplicationService : SuspendingComplicationDataSourceService() {
-
     override fun getPreviewData(type: ComplicationType): ComplicationData? {
         if (type != ComplicationType.SMALL_IMAGE) return null
         return createComplicationData(
@@ -29,18 +27,18 @@ class QuickCaptureComplicationService : SuspendingComplicationDataSourceService(
         )
     }
 
-    override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData {
-        return createComplicationData(
+    override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData =
+        createComplicationData(
             contentDescription = getString(R.string.wear_complication_quick_capture_description),
             tapIntent = createVoiceCaptureIntent(),
         )
-    }
 
     private fun createVoiceCaptureIntent(): PendingIntent {
-        val intent = Intent(Intent.ACTION_MAIN).apply {
-            component = ComponentName(packageName, "app.logdate.wear.presentation.MainActivity")
-            putExtra("tile_route", "voice_note")
-        }
+        val intent =
+            Intent(Intent.ACTION_MAIN).apply {
+                component = ComponentName(packageName, "app.logdate.wear.presentation.MainActivity")
+                putExtra("tile_route", "voice_note")
+            }
         return PendingIntent.getActivity(
             this,
             QUICK_CAPTURE_REQUEST_CODE,
@@ -54,10 +52,11 @@ class QuickCaptureComplicationService : SuspendingComplicationDataSourceService(
         tapIntent: PendingIntent? = null,
     ): SmallImageComplicationData {
         val icon = Icon.createWithResource(this, R.drawable.ic_mic_complication)
-        val builder = SmallImageComplicationData.Builder(
-            smallImage = SmallImage.Builder(icon, SmallImageType.ICON).build(),
-            contentDescription = PlainComplicationText.Builder(contentDescription).build(),
-        )
+        val builder =
+            SmallImageComplicationData.Builder(
+                smallImage = SmallImage.Builder(icon, SmallImageType.ICON).build(),
+                contentDescription = PlainComplicationText.Builder(contentDescription).build(),
+            )
         if (tapIntent != null) {
             builder.setTapAction(tapIntent)
         }

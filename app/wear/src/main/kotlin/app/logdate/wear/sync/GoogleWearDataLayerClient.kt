@@ -11,9 +11,6 @@ import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.PutDataRequest
 import com.google.android.gms.wearable.Wearable
 import io.github.aakira.napier.Napier
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +20,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import kotlin.coroutines.resume
 import kotlin.uuid.Uuid
 
@@ -63,8 +63,11 @@ class GoogleWearDataLayerClient(
         audioTransferTimeoutMs = audioTransferTimeoutMs,
     )
 
-    override suspend fun putDataItem(path: String, data: Map<String, String>): Boolean {
-        return try {
+    override suspend fun putDataItem(
+        path: String,
+        data: Map<String, String>,
+    ): Boolean =
+        try {
             val request = putDataRequestFactory.create(path, data)
             dataClient.putDataItem(request).await()
             Napier.d("Data item put at path: $path")
@@ -73,29 +76,31 @@ class GoogleWearDataLayerClient(
             Napier.w("Failed to put data item at path: $path", e)
             false
         }
-    }
 
-    override suspend fun deleteDataItem(path: String): Boolean {
-        return try {
-            dataClient.deleteDataItems(
-                android.net.Uri.Builder()
-                    .scheme("wear")
-                    .path(path)
-                    .build(),
-            ).await()
+    override suspend fun deleteDataItem(path: String): Boolean =
+        try {
+            dataClient
+                .deleteDataItems(
+                    android.net.Uri
+                        .Builder()
+                        .scheme("wear")
+                        .path(path)
+                        .build(),
+                ).await()
             true
         } catch (e: Exception) {
             Napier.w("Failed to delete data item at path: $path", e)
             false
         }
-    }
 
-    override suspend fun isPhoneConnected(capability: String): Boolean {
-        return try {
-            val result = capabilityClient.getCapability(
-                capability,
-                CapabilityClient.FILTER_REACHABLE,
-            ).await()
+    override suspend fun isPhoneConnected(capability: String): Boolean =
+        try {
+            val result =
+                capabilityClient
+                    .getCapability(
+                        capability,
+                        CapabilityClient.FILTER_REACHABLE,
+                    ).await()
             result.nodes.isNotEmpty()
         } catch (e: Exception) {
             // Fallback: check if any nodes are connected at all
@@ -107,32 +112,39 @@ class GoogleWearDataLayerClient(
                 false
             }
         }
-    }
 
-    override suspend fun getConnectedPhoneName(): String? {
-        return try {
-            val result = capabilityClient.getCapability(
-                WearDataLayerClient.PHONE_CAPABILITY,
-                CapabilityClient.FILTER_REACHABLE,
-            ).await()
+    override suspend fun getConnectedPhoneName(): String? =
+        try {
+            val result =
+                capabilityClient
+                    .getCapability(
+                        WearDataLayerClient.PHONE_CAPABILITY,
+                        CapabilityClient.FILTER_REACHABLE,
+                    ).await()
             result.nodes.firstOrNull()?.displayName
         } catch (e: Exception) {
             try {
-                nodeClient.connectedNodes.await().firstOrNull()?.displayName
+                nodeClient.connectedNodes
+                    .await()
+                    .firstOrNull()
+                    ?.displayName
             } catch (e2: Exception) {
                 Napier.w("Failed to get phone name", e2)
                 null
             }
         }
-    }
 
-    override suspend fun sendMessage(path: String, data: ByteArray): Boolean {
+    override suspend fun sendMessage(
+        path: String,
+        data: ByteArray,
+    ): Boolean {
         return try {
             val nodes = nodeClient.connectedNodes.await()
-            val phoneNode = nodes.firstOrNull() ?: run {
-                Napier.w("No connected nodes for message")
-                return false
-            }
+            val phoneNode =
+                nodes.firstOrNull() ?: run {
+                    Napier.w("No connected nodes for message")
+                    return false
+                }
             messageClient
                 .sendMessage(phoneNode.id, path, data)
                 .await()
@@ -228,13 +240,17 @@ class GoogleWearDataLayerClient(
         return received == true
     }
 
-    override suspend fun sendFile(channelPath: String, localFilePath: String): Boolean {
+    override suspend fun sendFile(
+        channelPath: String,
+        localFilePath: String,
+    ): Boolean {
         return try {
             val nodes = nodeClient.connectedNodes.await()
-            val phoneNode = nodes.firstOrNull() ?: run {
-                Napier.w("No connected nodes for file transfer")
-                return false
-            }
+            val phoneNode =
+                nodes.firstOrNull() ?: run {
+                    Napier.w("No connected nodes for file transfer")
+                    return false
+                }
 
             val channel = channelClient.openChannel(phoneNode.id, channelPath).await()
             try {
@@ -259,11 +275,13 @@ class GoogleWearDataLayerClient(
 
         val defaultWearPutDataRequestFactory =
             WearPutDataRequestFactory { path, data ->
-                PutDataMapRequest.create(path).apply {
-                    data.forEach { (key, value) ->
-                        dataMap.putString(key, value)
-                    }
-                }.asPutDataRequest()
+                PutDataMapRequest
+                    .create(path)
+                    .apply {
+                        data.forEach { (key, value) ->
+                            dataMap.putString(key, value)
+                        }
+                    }.asPutDataRequest()
             }
     }
 }

@@ -16,8 +16,10 @@ import kotlin.time.Clock
  * if the cooldown allows it.
  */
 class WearPromptReceiver : BroadcastReceiver() {
-
-    override fun onReceive(context: Context, intent: Intent?) {
+    override fun onReceive(
+        context: Context,
+        intent: Intent?,
+    ) {
         val now = Clock.System.now()
         val localTime = now.toLocalDateTime(TimeZone.currentSystemDefault())
         val promptType = PromptType.forHour(localTime.hour)

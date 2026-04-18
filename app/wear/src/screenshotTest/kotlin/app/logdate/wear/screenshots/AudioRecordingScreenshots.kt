@@ -32,7 +32,6 @@ import app.logdate.wear.presentation.audio.components.RecordingTimer
 import com.android.tools.screenshot.PreviewTest
 
 class AudioRecordingScreenshots {
-
     @PreviewTest
     @WearScreenshotPreviewMatrix
     @Composable
@@ -50,14 +49,24 @@ class AudioRecordingScreenshots {
     fun S02_AudioRecordingActive() {
         MaterialTheme {
             AudioRecordingPreviewContent(
-                uiState = AudioRecordingUiState(
-                    isRecording = true,
-                    durationMs = 34_000,
-                    audioLevels = listOf(
-                        0.3f, 0.5f, 0.7f, 0.4f, 0.8f,
-                        0.6f, 0.9f, 0.5f, 0.3f, 0.7f,
+                uiState =
+                    AudioRecordingUiState(
+                        isRecording = true,
+                        durationMs = 34_000,
+                        audioLevels =
+                            listOf(
+                                0.3f,
+                                0.5f,
+                                0.7f,
+                                0.4f,
+                                0.8f,
+                                0.6f,
+                                0.9f,
+                                0.5f,
+                                0.3f,
+                                0.7f,
+                            ),
                     ),
-                ),
             )
         }
     }
@@ -68,12 +77,13 @@ class AudioRecordingScreenshots {
     fun S03_AudioRecordingPaused() {
         MaterialTheme {
             AudioRecordingPreviewContent(
-                uiState = AudioRecordingUiState(
-                    isRecording = true,
-                    isPaused = true,
-                    durationMs = 34_000,
-                    audioLevels = listOf(0.3f, 0.5f, 0.7f),
-                ),
+                uiState =
+                    AudioRecordingUiState(
+                        isRecording = true,
+                        isPaused = true,
+                        durationMs = 34_000,
+                        audioLevels = listOf(0.3f, 0.5f, 0.7f),
+                    ),
             )
         }
     }
@@ -84,9 +94,10 @@ class AudioRecordingScreenshots {
     fun S04_AudioRecordingError() {
         MaterialTheme {
             AudioRecordingPreviewContent(
-                uiState = AudioRecordingUiState(
-                    errorMessage = "Not enough storage space for recording",
-                ),
+                uiState =
+                    AudioRecordingUiState(
+                        errorMessage = "Not enough storage space for recording",
+                    ),
             )
         }
     }
@@ -99,9 +110,7 @@ class AudioRecordingScreenshots {
  * avoiding the need for a ViewModel or bound service.
  */
 @Composable
-private fun AudioRecordingPreviewContent(
-    uiState: AudioRecordingUiState,
-) {
+private fun AudioRecordingPreviewContent(uiState: AudioRecordingUiState) {
     ScreenScaffold(
         timeText = { TimeText() },
     ) {
@@ -110,9 +119,10 @@ private fun AudioRecordingPreviewContent(
             contentAlignment = Alignment.Center,
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
@@ -129,10 +139,11 @@ private fun AudioRecordingPreviewContent(
                 if (uiState.isRecording) {
                     AudioWaveform(
                         audioLevels = uiState.audioLevels,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(24.dp)
-                            .padding(bottom = 4.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(24.dp)
+                                .padding(bottom = 4.dp),
                     )
                     RecordingTimer(
                         durationMs = uiState.durationMs,
@@ -149,32 +160,36 @@ private fun AudioRecordingPreviewContent(
 
                 if (uiState.isRecording) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                     ) {
                         Button(
                             onClick = {},
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            ),
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                ),
                             modifier = Modifier.size(48.dp),
                         ) {
                             Icon(
-                                imageVector = if (uiState.isPaused) {
-                                    Icons.Filled.PlayArrow
-                                } else {
-                                    Icons.Filled.Pause
-                                },
+                                imageVector =
+                                    if (uiState.isPaused) {
+                                        Icons.Filled.PlayArrow
+                                    } else {
+                                        Icons.Filled.Pause
+                                    },
                                 contentDescription = if (uiState.isPaused) "Resume" else "Pause",
                             )
                         }
                         Button(
                             onClick = {},
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                            ),
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                ),
                             modifier = Modifier.size(48.dp),
                         ) {
                             Icon(

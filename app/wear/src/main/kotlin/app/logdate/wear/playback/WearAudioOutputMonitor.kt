@@ -43,15 +43,16 @@ class WearAudioOutputMonitor(
     private val _outputState = MutableStateFlow(deriveCurrentState())
     val outputState: StateFlow<AudioOutputState> = _outputState
 
-    private val deviceCallback = object : AudioDeviceCallback() {
-        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
-            refreshState()
-        }
+    private val deviceCallback =
+        object : AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
+                refreshState()
+            }
 
-        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
-            refreshState()
+            override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
+                refreshState()
+            }
         }
-    }
 
     init {
         audioManager.registerAudioDeviceCallback(deviceCallback, null)
@@ -68,12 +69,13 @@ class WearAudioOutputMonitor(
      * Opens the system Bluetooth settings to let the user connect audio devices.
      */
     fun launchBluetoothSettings() {
-        val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            putExtra("EXTRA_CONNECTION_ONLY", true)
-            putExtra("EXTRA_CLOSE_ON_CONNECT", true)
-            putExtra("android.bluetooth.devicepicker.extra.FILTER_TYPE", BLUETOOTH_FILTER_TYPE_AUDIO)
-        }
+        val intent =
+            Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                putExtra("EXTRA_CONNECTION_ONLY", true)
+                putExtra("EXTRA_CLOSE_ON_CONNECT", true)
+                putExtra("android.bluetooth.devicepicker.extra.FILTER_TYPE", BLUETOOTH_FILTER_TYPE_AUDIO)
+            }
         context.startActivity(intent)
     }
 
@@ -84,8 +86,10 @@ class WearAudioOutputMonitor(
     }
 
     private fun deriveCurrentState(): AudioOutputState {
-        val deviceTypes = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-            .map { it.type }
+        val deviceTypes =
+            audioManager
+                .getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                .map { it.type }
         return deriveOutputState(deviceTypes)
     }
 
@@ -105,11 +109,12 @@ class WearAudioOutputMonitor(
             }
         }
 
-        private val BLUETOOTH_AUDIO_TYPES = setOf(
-            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-            AudioDeviceInfo.TYPE_BLE_HEADSET,
-            AudioDeviceInfo.TYPE_BLE_SPEAKER,
-            AudioDeviceInfo.TYPE_BLE_BROADCAST,
-        )
+        private val BLUETOOTH_AUDIO_TYPES =
+            setOf(
+                AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+                AudioDeviceInfo.TYPE_BLE_HEADSET,
+                AudioDeviceInfo.TYPE_BLE_SPEAKER,
+                AudioDeviceInfo.TYPE_BLE_BROADCAST,
+            )
     }
 }

@@ -22,7 +22,6 @@ import kotlin.concurrent.thread
  * - Audio recording modules
  */
 class LogDateWearApplication : Application() {
-
     override fun onCreate() {
         super.onCreate()
 
@@ -47,7 +46,9 @@ class LogDateWearApplication : Application() {
         // runs in parallel with Activity creation instead of blocking the first UI frame.
         thread(name = "db-warmup", isDaemon = true) {
             try {
-                org.koin.java.KoinJavaComponent.getKoin().get<LogDateDatabase>()
+                org.koin.java.KoinJavaComponent
+                    .getKoin()
+                    .get<LogDateDatabase>()
             } catch (e: Exception) {
                 Napier.w("Background database warmup failed", e)
             }

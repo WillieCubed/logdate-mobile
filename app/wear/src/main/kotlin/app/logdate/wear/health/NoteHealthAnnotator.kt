@@ -30,15 +30,16 @@ class NoteHealthAnnotator(
                 return null
             }
 
-            val entity = HealthSnapshotEntity(
-                id = Uuid.random(),
-                noteId = noteId,
-                heartRateBpm = snapshot.heartRateBpm,
-                stepCount = snapshot.stepCount,
-                stressLevel = snapshot.stressLevel,
-                timestamp = Clock.System.now(),
-                source = "wear_health_services",
-            )
+            val entity =
+                HealthSnapshotEntity(
+                    id = Uuid.random(),
+                    noteId = noteId,
+                    heartRateBpm = snapshot.heartRateBpm,
+                    stepCount = snapshot.stepCount,
+                    stressLevel = snapshot.stressLevel,
+                    timestamp = Clock.System.now(),
+                    source = "wear_health_services",
+                )
             healthSnapshotDao.insert(entity)
             Napier.d("Health annotation saved for note $noteId: HR=${snapshot.heartRateBpm}, steps=${snapshot.stepCount}")
             entity

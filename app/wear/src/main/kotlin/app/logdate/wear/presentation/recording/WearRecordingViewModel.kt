@@ -55,7 +55,6 @@ class WearRecordingViewModel(
     private val dataLayerClient: WearDataLayerClient,
     private val clock: Clock = Clock.System,
 ) : ViewModel() {
-
     companion object {
         const val MIN_DURATION_MS = 500L
         const val MAX_DURATION_MS = 60_000L
@@ -254,21 +253,23 @@ class WearRecordingViewModel(
                 _uiState.update { it.copy(phase = RecordingPhase.SAVING) }
 
                 val now = clock.now()
-                val audioNote = JournalNote.Audio(
-                    mediaRef = filePath,
-                    uid = Uuid.random(),
-                    creationTimestamp = now,
-                    lastUpdated = now,
-                    durationMs = accumulatedDurationMs,
-                )
+                val audioNote =
+                    JournalNote.Audio(
+                        mediaRef = filePath,
+                        uid = Uuid.random(),
+                        creationTimestamp = now,
+                        lastUpdated = now,
+                        durationMs = accumulatedDurationMs,
+                    )
                 notesRepository.create(audioNote)
                 noteHealthAnnotator.annotate(audioNote.uid)
 
-                val feedback = if (dataLayerClient.isPhoneConnected()) {
-                    SaveFeedback.SYNCING_TO_PHONE
-                } else {
-                    SaveFeedback.SAVED_LOCALLY
-                }
+                val feedback =
+                    if (dataLayerClient.isPhoneConnected()) {
+                        SaveFeedback.SYNCING_TO_PHONE
+                    } else {
+                        SaveFeedback.SAVED_LOCALLY
+                    }
 
                 _uiState.update {
                     it.copy(
@@ -315,22 +316,24 @@ class WearRecordingViewModel(
 
     private fun startAudioLevelCollection() {
         audioLevelJob?.cancel()
-        audioLevelJob = viewModelScope.launch {
-            @OptIn(kotlinx.coroutines.FlowPreview::class)
-            recordingManager.getAudioLevelFlow()
-                .sample(periodMillis = 100)
-                .collect { level ->
-                    _uiState.update { state ->
-                        val levels = (state.audioLevels + level).takeLast(50)
-                        val segmentMs = clock.now().toEpochMilliseconds() - recordingStartTimeMs
-                        val durationMs = accumulatedDurationMs + segmentMs
-                        state.copy(
-                            audioLevels = levels,
-                            recordingDurationMs = durationMs,
-                        )
+        audioLevelJob =
+            viewModelScope.launch {
+                @OptIn(kotlinx.coroutines.FlowPreview::class)
+                recordingManager
+                    .getAudioLevelFlow()
+                    .sample(periodMillis = 100)
+                    .collect { level ->
+                        _uiState.update { state ->
+                            val levels = (state.audioLevels + level).takeLast(50)
+                            val segmentMs = clock.now().toEpochMilliseconds() - recordingStartTimeMs
+                            val durationMs = accumulatedDurationMs + segmentMs
+                            state.copy(
+                                audioLevels = levels,
+                                recordingDurationMs = durationMs,
+                            )
+                        }
                     }
-                }
-        }
+            }
     }
 
     private fun stopAudioLevelCollection() {
@@ -341,10 +344,11 @@ class WearRecordingViewModel(
     private fun startAutoStopTimer() {
         autoStopJob?.cancel()
         val remainingMs = MAX_DURATION_MS - accumulatedDurationMs
-        autoStopJob = viewModelScope.launch {
-            delay(remainingMs)
-            Napier.d("Auto-pause at ${MAX_DURATION_MS}ms")
-            onTouchUp()
-        }
+        autoStopJob =
+            viewModelScope.launch {
+                delay(remainingMs)
+                Napier.d("Auto-pause at ${MAX_DURATION_MS}ms")
+                onTouchUp()
+            }
     }
 }

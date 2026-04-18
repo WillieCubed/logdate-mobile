@@ -8,9 +8,9 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.wear.sync.WearDataLayerClient
 import io.github.aakira.napier.Napier
-import java.io.File
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
+import java.io.File
 
 interface WearSyncedAudioResolver {
     suspend fun resolvePlayableUri(note: JournalNote.Audio): Result<String>
@@ -23,29 +23,29 @@ class PhoneSyncedAudioResolver(
     private val notesRepository: JournalNotesRepository,
     private val ioDispatcher: CoroutineDispatcher,
 ) : WearSyncedAudioResolver {
-
     override suspend fun resolvePlayableUri(note: JournalNote.Audio): Result<String> {
-        val result = withContext(ioDispatcher) {
-            runCatching {
-                if (isLocallyPlayable(note.mediaRef)) {
-                    return@runCatching note.mediaRef
+        val result =
+            withContext(ioDispatcher) {
+                runCatching {
+                    if (isLocallyPlayable(note.mediaRef)) {
+                        return@runCatching note.mediaRef
+                    }
+
+                    check(dataLayerClient.isPhoneConnected()) {
+                        "No connected phone available to download audio ${note.uid}"
+                    }
+
+                    val extension = inferExtension(note.mediaRef)
+                    val target = audioStorage.createRecordingTarget(extension)
+                    val downloaded = dataLayerClient.downloadAudioFromPhone(note.uid, target.path)
+                    check(downloaded) { "Phone audio transfer failed for note ${note.uid}" }
+
+                    val syncableRepository = notesRepository as? SyncableJournalNotesRepository
+                    syncableRepository?.updateMediaRef(note.uid, target.path)
+
+                    target.path
                 }
-
-                check(dataLayerClient.isPhoneConnected()) {
-                    "No connected phone available to download audio ${note.uid}"
-                }
-
-                val extension = inferExtension(note.mediaRef)
-                val target = audioStorage.createRecordingTarget(extension)
-                val downloaded = dataLayerClient.downloadAudioFromPhone(note.uid, target.path)
-                check(downloaded) { "Phone audio transfer failed for note ${note.uid}" }
-
-                val syncableRepository = notesRepository as? SyncableJournalNotesRepository
-                syncableRepository?.updateMediaRef(note.uid, target.path)
-
-                target.path
             }
-        }
         result.onFailure { error ->
             Napier.w("Failed to resolve synced audio for note ${note.uid}", error)
         }

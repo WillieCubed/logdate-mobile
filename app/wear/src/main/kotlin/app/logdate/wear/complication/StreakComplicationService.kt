@@ -19,28 +19,29 @@ import app.logdate.wear.R
  * Supports SHORT_TEXT ("7d") and LONG_TEXT ("7 day streak") formats.
  */
 class StreakComplicationService : SuspendingComplicationDataSourceService() {
-
-    override fun getPreviewData(type: ComplicationType): ComplicationData? {
-        return when (type) {
-            ComplicationType.SHORT_TEXT -> createShortText(
-                streak = 7,
-                contentDescription = getString(R.string.wear_complication_streak_description),
-            )
-            ComplicationType.LONG_TEXT -> createLongText(
-                streak = 7,
-                contentDescription = getString(R.string.wear_complication_streak_description),
-            )
+    override fun getPreviewData(type: ComplicationType): ComplicationData? =
+        when (type) {
+            ComplicationType.SHORT_TEXT ->
+                createShortText(
+                    streak = 7,
+                    contentDescription = getString(R.string.wear_complication_streak_description),
+                )
+            ComplicationType.LONG_TEXT ->
+                createLongText(
+                    streak = 7,
+                    contentDescription = getString(R.string.wear_complication_streak_description),
+                )
             else -> null
         }
-    }
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData {
         val streak = calculateStreak()
-        val description = resources.getQuantityString(
-            R.plurals.wear_complication_streak_full,
-            streak,
-            streak,
-        )
+        val description =
+            resources.getQuantityString(
+                R.plurals.wear_complication_streak_full,
+                streak,
+                streak,
+            )
         val tapIntent = createOpenAppIntent()
         return when (request.complicationType) {
             ComplicationType.LONG_TEXT -> createLongText(streak, description, tapIntent)
@@ -48,20 +49,21 @@ class StreakComplicationService : SuspendingComplicationDataSourceService() {
         }
     }
 
-    private suspend fun calculateStreak(): Int {
-        return try {
-            val calculateStreakUseCase = org.koin.java.KoinJavaComponent
-                .getKoin()
-                .get<CalculateStreakUseCase>()
+    private suspend fun calculateStreak(): Int =
+        try {
+            val calculateStreakUseCase =
+                org.koin.java.KoinJavaComponent
+                    .getKoin()
+                    .get<CalculateStreakUseCase>()
             calculateStreakUseCase()
         } catch (e: Exception) {
             0
         }
-    }
 
     private fun createOpenAppIntent(): PendingIntent {
-        val intent = packageManager.getLaunchIntentForPackage(packageName)
-            ?: Intent()
+        val intent =
+            packageManager.getLaunchIntentForPackage(packageName)
+                ?: Intent()
         return PendingIntent.getActivity(
             this,
             STREAK_REQUEST_CODE,
@@ -76,10 +78,11 @@ class StreakComplicationService : SuspendingComplicationDataSourceService() {
         tapIntent: PendingIntent? = null,
     ): ShortTextComplicationData {
         val label = getString(R.string.wear_complication_streak_short, streak)
-        val builder = ShortTextComplicationData.Builder(
-            text = PlainComplicationText.Builder(label).build(),
-            contentDescription = PlainComplicationText.Builder(contentDescription).build(),
-        )
+        val builder =
+            ShortTextComplicationData.Builder(
+                text = PlainComplicationText.Builder(label).build(),
+                contentDescription = PlainComplicationText.Builder(contentDescription).build(),
+            )
         if (tapIntent != null) {
             builder.setTapAction(tapIntent)
         }
@@ -91,15 +94,17 @@ class StreakComplicationService : SuspendingComplicationDataSourceService() {
         contentDescription: String,
         tapIntent: PendingIntent? = null,
     ): LongTextComplicationData {
-        val label = resources.getQuantityString(
-            R.plurals.wear_complication_streak_full,
-            streak,
-            streak,
-        )
-        val builder = LongTextComplicationData.Builder(
-            text = PlainComplicationText.Builder(label).build(),
-            contentDescription = PlainComplicationText.Builder(contentDescription).build(),
-        )
+        val label =
+            resources.getQuantityString(
+                R.plurals.wear_complication_streak_full,
+                streak,
+                streak,
+            )
+        val builder =
+            LongTextComplicationData.Builder(
+                text = PlainComplicationText.Builder(label).build(),
+                contentDescription = PlainComplicationText.Builder(contentDescription).build(),
+            )
         if (tapIntent != null) {
             builder.setTapAction(tapIntent)
         }

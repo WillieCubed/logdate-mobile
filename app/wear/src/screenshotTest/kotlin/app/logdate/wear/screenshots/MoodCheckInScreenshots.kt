@@ -9,7 +9,6 @@ import app.logdate.wear.presentation.mood.VoicePromptContent
 import com.android.tools.screenshot.PreviewTest
 
 class MoodCheckInScreenshots {
-
     @PreviewTest
     @WearScreenshotPreviewMatrix
     @Composable

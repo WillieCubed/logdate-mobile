@@ -15,7 +15,9 @@ data object WearQuickTextRoute : NavKey
 
 data object WearTimelineRoute : NavKey
 
-data class WearTimelineDayDetailRoute(val date: LocalDate) : NavKey
+data class WearTimelineDayDetailRoute(
+    val date: LocalDate,
+) : NavKey
 
 data object WearRewindListRoute : NavKey
 

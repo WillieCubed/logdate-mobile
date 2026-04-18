@@ -19,7 +19,11 @@ import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-enum class MoodOption(val emoji: String, val label: String, val tag: String) {
+enum class MoodOption(
+    val emoji: String,
+    val label: String,
+    val tag: String,
+) {
     GREAT("\uD83D\uDE04", "Great", "great"),
     GOOD("\uD83D\uDE42", "Good", "good"),
     OK("\uD83D\uDE10", "OK", "ok"),
@@ -43,6 +47,7 @@ data class MoodCheckInUiState(
 
 sealed interface MoodCheckInEvent {
     data object NavigateBack : MoodCheckInEvent
+
     data object NavigateToVoiceNote : MoodCheckInEvent
 }
 
@@ -50,7 +55,6 @@ class MoodCheckInViewModel(
     private val notesRepository: JournalNotesRepository,
     private val dataLayerClient: WearDataLayerClient,
 ) : ViewModel() {
-
     companion object {
         private const val SAVED_DISPLAY_MS = 800L
     }
@@ -78,19 +82,21 @@ class MoodCheckInViewModel(
 
             try {
                 val now = Clock.System.now()
-                val note = JournalNote.Text(
-                    content = "#mood:${mood.tag} Feeling ${mood.label.lowercase()}",
-                    uid = Uuid.random(),
-                    creationTimestamp = now,
-                    lastUpdated = now,
-                )
+                val note =
+                    JournalNote.Text(
+                        content = "#mood:${mood.tag} Feeling ${mood.label.lowercase()}",
+                        uid = Uuid.random(),
+                        creationTimestamp = now,
+                        lastUpdated = now,
+                    )
                 notesRepository.create(note)
 
-                val feedback = if (dataLayerClient.isPhoneConnected()) {
-                    SaveFeedback.SYNCING_TO_PHONE
-                } else {
-                    SaveFeedback.SAVED_LOCALLY
-                }
+                val feedback =
+                    if (dataLayerClient.isPhoneConnected()) {
+                        SaveFeedback.SYNCING_TO_PHONE
+                    } else {
+                        SaveFeedback.SAVED_LOCALLY
+                    }
 
                 _uiState.update {
                     it.copy(

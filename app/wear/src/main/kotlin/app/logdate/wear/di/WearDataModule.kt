@@ -42,92 +42,93 @@ import org.koin.dsl.module
  * and offline-first repository implementations. Stubs out account, networking,
  * and Firebase bindings that are not applicable on Wear OS.
  */
-val wearDataModule = module {
-    includes(databaseModule)
-    includes(deviceInstanceModule)
-    includes(datastoreModule)
-    includes(configModule)
-    includes(conflictResolverModule)
+val wearDataModule =
+    module {
+        includes(databaseModule)
+        includes(deviceInstanceModule)
+        includes(datastoreModule)
+        includes(configModule)
+        includes(conflictResolverModule)
 
-    // JSON serialization
-    single {
-        Json {
-            ignoreUnknownKeys = true
-            isLenient = true
-            prettyPrint = false
-            encodeDefaults = true
+        // JSON serialization
+        single {
+            Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                prettyPrint = false
+                encodeDefaults = true
+            }
+        }
+
+        // Data Layer sync: watch <-> phone via Wearable Data API
+        single<WearDataLayerClient> { GoogleWearDataLayerClient(get(), get()) }
+        single { NoteDataMapper(get()) }
+        single { JournalDataMapper(get()) }
+        single { AssociationDataMapper() }
+        single { HealthSnapshotDataMapper(get()) }
+        single<SyncDeadLetterStore> { KeyValueSyncDeadLetterStore(get()) }
+        single<SyncRetryScheduleStore> { KeyValueSyncRetryScheduleStore(get()) }
+        single<SyncManager> {
+            WearDataLayerSyncManager(
+                dataLayerClient = get(),
+                syncMetadataService = get(),
+                retryScheduleStore = get(),
+                deadLetterStore = get(),
+                notesRepository = get(),
+                journalRepository = get(),
+                healthSnapshotDao = get(),
+                noteDataMapper = get(),
+                journalDataMapper = get(),
+                associationDataMapper = get(),
+                healthSnapshotDataMapper = get(),
+            )
+        }
+
+        // Health sensor manager: uses Health Services if available, stub otherwise
+        single<WearHealthSensorManager> {
+            try {
+                HealthServicesWearHealthSensorManager(get())
+            } catch (e: Exception) {
+                Napier.w("Health Services not available, using stub", e)
+                StubWearHealthSensorManager()
+            }
+        }
+        single { NoteHealthAnnotator(get(), get()) }
+
+        // Stub remote data source (no Firebase on Wear)
+        factory<RemoteJournalDataSource> { NoOpRemoteJournalDataSource }
+
+        // Draft storage
+        single<DraftRepository> { LocalFirstDraftRepository(get(), get()) }
+
+        // Journals
+        single<JournalRepository> {
+            OfflineFirstJournalRepository(
+                journalDao = get(),
+                remoteDataSource = get(),
+                draftRepository = get(),
+                syncManagerProvider = { get() },
+                syncMetadataService = get(),
+            )
+        }
+
+        // Notes
+        single<NotePlaceResolver> { EmptyNotePlaceResolver }
+        single<JournalNotesRepository> {
+            OfflineFirstJournalNotesRepository(
+                textNoteDao = get(),
+                imageNoteDao = get(),
+                audioNoteDao = get(),
+                videoNoteDao = get(),
+                journalContentDao = get(),
+                journalRepository = get(),
+                mediaCaptionDao = get(),
+                notePlaceResolver = get(),
+                syncManagerProvider = { get() },
+                syncMetadataService = get(),
+            )
         }
     }
-
-    // Data Layer sync: watch <-> phone via Wearable Data API
-    single<WearDataLayerClient> { GoogleWearDataLayerClient(get(), get()) }
-    single { NoteDataMapper(get()) }
-    single { JournalDataMapper(get()) }
-    single { AssociationDataMapper() }
-    single { HealthSnapshotDataMapper(get()) }
-    single<SyncDeadLetterStore> { KeyValueSyncDeadLetterStore(get()) }
-    single<SyncRetryScheduleStore> { KeyValueSyncRetryScheduleStore(get()) }
-    single<SyncManager> {
-        WearDataLayerSyncManager(
-            dataLayerClient = get(),
-            syncMetadataService = get(),
-            retryScheduleStore = get(),
-            deadLetterStore = get(),
-            notesRepository = get(),
-            journalRepository = get(),
-            healthSnapshotDao = get(),
-            noteDataMapper = get(),
-            journalDataMapper = get(),
-            associationDataMapper = get(),
-            healthSnapshotDataMapper = get(),
-        )
-    }
-
-    // Health sensor manager: uses Health Services if available, stub otherwise
-    single<WearHealthSensorManager> {
-        try {
-            HealthServicesWearHealthSensorManager(get())
-        } catch (e: Exception) {
-            Napier.w("Health Services not available, using stub", e)
-            StubWearHealthSensorManager()
-        }
-    }
-    single { NoteHealthAnnotator(get(), get()) }
-
-    // Stub remote data source (no Firebase on Wear)
-    factory<RemoteJournalDataSource> { NoOpRemoteJournalDataSource }
-
-    // Draft storage
-    single<DraftRepository> { LocalFirstDraftRepository(get(), get()) }
-
-    // Journals
-    single<JournalRepository> {
-        OfflineFirstJournalRepository(
-            journalDao = get(),
-            remoteDataSource = get(),
-            draftRepository = get(),
-            syncManagerProvider = { get() },
-            syncMetadataService = get(),
-        )
-    }
-
-    // Notes
-    single<NotePlaceResolver> { EmptyNotePlaceResolver }
-    single<JournalNotesRepository> {
-        OfflineFirstJournalNotesRepository(
-            textNoteDao = get(),
-            imageNoteDao = get(),
-            audioNoteDao = get(),
-            videoNoteDao = get(),
-            journalContentDao = get(),
-            journalRepository = get(),
-            mediaCaptionDao = get(),
-            notePlaceResolver = get(),
-            syncManagerProvider = { get() },
-            syncMetadataService = get(),
-        )
-    }
-}
 
 /**
  * No-op remote journal data source for Wear OS standalone mode.

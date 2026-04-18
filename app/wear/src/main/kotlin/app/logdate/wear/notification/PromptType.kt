@@ -6,7 +6,8 @@ package app.logdate.wear.notification
 enum class PromptType {
     MORNING,
     EVENING,
-    NONE;
+    NONE,
+    ;
 
     companion object {
         private val MORNING_HOURS = 6..11
@@ -15,11 +16,12 @@ enum class PromptType {
         /**
          * Returns the appropriate prompt type for the given hour of day (0-23).
          */
-        fun forHour(hour: Int): PromptType = when (hour) {
-            in MORNING_HOURS -> MORNING
-            in EVENING_HOURS -> EVENING
-            else -> NONE
-        }
+        fun forHour(hour: Int): PromptType =
+            when (hour) {
+                in MORNING_HOURS -> MORNING
+                in EVENING_HOURS -> EVENING
+                else -> NONE
+            }
     }
 }
 
@@ -31,17 +33,20 @@ data class PromptContent(
     val body: String,
 ) {
     companion object {
-        fun forType(type: PromptType): PromptContent = when (type) {
-            PromptType.MORNING -> PromptContent(
-                title = "Good morning!",
-                body = "How are you feeling today?",
-            )
-            PromptType.EVENING -> PromptContent(
-                title = "Time to reflect",
-                body = "How was your day?",
-            )
-            PromptType.NONE -> PromptContent(title = "", body = "")
-        }
+        fun forType(type: PromptType): PromptContent =
+            when (type) {
+                PromptType.MORNING ->
+                    PromptContent(
+                        title = "Good morning!",
+                        body = "How are you feeling today?",
+                    )
+                PromptType.EVENING ->
+                    PromptContent(
+                        title = "Time to reflect",
+                        body = "How was your day?",
+                    )
+                PromptType.NONE -> PromptContent(title = "", body = "")
+            }
     }
 }
 
@@ -53,11 +58,17 @@ data class PromptContent(
 class PromptCooldownTracker {
     private val sentPrompts = mutableMapOf<PromptType, Long>()
 
-    fun markSent(type: PromptType, dayEpoch: Long) {
+    fun markSent(
+        type: PromptType,
+        dayEpoch: Long,
+    ) {
         sentPrompts[type] = dayEpoch
     }
 
-    fun canSend(type: PromptType, dayEpoch: Long): Boolean {
+    fun canSend(
+        type: PromptType,
+        dayEpoch: Long,
+    ): Boolean {
         val lastSentDay = sentPrompts[type] ?: return true
         return dayEpoch > lastSentDay
     }

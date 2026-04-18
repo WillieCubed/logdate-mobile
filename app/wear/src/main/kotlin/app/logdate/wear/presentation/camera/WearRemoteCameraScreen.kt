@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -20,10 +24,6 @@ import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.IconButton
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 
 @Composable
 fun WearRemoteCameraScreen(
@@ -40,19 +40,22 @@ fun WearRemoteCameraScreen(
     when (uiState.phase) {
         RemoteCameraPhase.IDLE -> IdleContent(onRequest = viewModel::requestCamera)
         RemoteCameraPhase.REQUESTING -> RequestingContent()
-        RemoteCameraPhase.READY -> ReadyContent(
-            onCapture = viewModel::capture,
-            onCancel = viewModel::dismiss,
-        )
+        RemoteCameraPhase.READY ->
+            ReadyContent(
+                onCapture = viewModel::capture,
+                onCancel = viewModel::dismiss,
+            )
         RemoteCameraPhase.CAPTURING -> CapturingContent()
-        RemoteCameraPhase.PREVIEW -> PreviewContent(
-            onSave = viewModel::dismiss,
-            onMore = viewModel::captureMore,
-        )
-        RemoteCameraPhase.ERROR -> ErrorContent(
-            message = uiState.errorMessage,
-            onDismiss = viewModel::dismiss,
-        )
+        RemoteCameraPhase.PREVIEW ->
+            PreviewContent(
+                onSave = viewModel::dismiss,
+                onMore = viewModel::captureMore,
+            )
+        RemoteCameraPhase.ERROR ->
+            ErrorContent(
+                message = uiState.errorMessage,
+                onDismiss = viewModel::dismiss,
+            )
     }
 }
 
@@ -92,7 +95,10 @@ private fun RequestingContent() {
 }
 
 @Composable
-private fun ReadyContent(onCapture: () -> Unit, onCancel: () -> Unit) {
+private fun ReadyContent(
+    onCapture: () -> Unit,
+    onCancel: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -137,7 +143,10 @@ private fun CapturingContent() {
 }
 
 @Composable
-private fun PreviewContent(onSave: () -> Unit, onMore: () -> Unit) {
+private fun PreviewContent(
+    onSave: () -> Unit,
+    onMore: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -172,7 +181,10 @@ private fun PreviewContent(onSave: () -> Unit, onMore: () -> Unit) {
 }
 
 @Composable
-private fun ErrorContent(message: String?, onDismiss: () -> Unit) {
+private fun ErrorContent(
+    message: String?,
+    onDismiss: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,

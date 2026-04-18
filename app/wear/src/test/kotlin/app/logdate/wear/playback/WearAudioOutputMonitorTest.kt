@@ -1,17 +1,17 @@
 package app.logdate.wear.playback
 
 import android.media.AudioDeviceInfo
-import kotlin.test.assertEquals
 import org.junit.Test
+import kotlin.test.assertEquals
 
 class WearAudioOutputMonitorTest {
-
     @Test
     fun `speaker and bluetooth returns SpeakerAndBluetooth`() {
-        val types = listOf(
-            AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
-            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-        )
+        val types =
+            listOf(
+                AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
+                AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+            )
         assertEquals(AudioOutputState.SpeakerAndBluetooth, WearAudioOutputMonitor.deriveOutputState(types))
     }
 
@@ -47,10 +47,11 @@ class WearAudioOutputMonitorTest {
 
     @Test
     fun `speaker with BLE headset returns SpeakerAndBluetooth`() {
-        val types = listOf(
-            AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
-            AudioDeviceInfo.TYPE_BLE_HEADSET,
-        )
+        val types =
+            listOf(
+                AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
+                AudioDeviceInfo.TYPE_BLE_HEADSET,
+            )
         assertEquals(AudioOutputState.SpeakerAndBluetooth, WearAudioOutputMonitor.deriveOutputState(types))
     }
 
@@ -61,10 +62,11 @@ class WearAudioOutputMonitorTest {
 
     @Test
     fun `non-audio devices only returns Unavailable`() {
-        val types = listOf(
-            AudioDeviceInfo.TYPE_BUILTIN_MIC,
-            AudioDeviceInfo.TYPE_USB_DEVICE,
-        )
+        val types =
+            listOf(
+                AudioDeviceInfo.TYPE_BUILTIN_MIC,
+                AudioDeviceInfo.TYPE_USB_DEVICE,
+            )
         assertEquals(AudioOutputState.Unavailable, WearAudioOutputMonitor.deriveOutputState(types))
     }
 }

@@ -21,7 +21,6 @@ import kotlin.time.Clock
  * Tapping opens the LogDate app.
  */
 class EntryCountComplicationService : SuspendingComplicationDataSourceService() {
-
     override fun getPreviewData(type: ComplicationType): ComplicationData? {
         if (type != ComplicationType.SHORT_TEXT) {
             return null
@@ -36,32 +35,36 @@ class EntryCountComplicationService : SuspendingComplicationDataSourceService() 
         val count = fetchTodayEntryCount()
         return createComplicationData(
             count = count,
-            contentDescription = resources.getQuantityString(
-                R.plurals.wear_complication_entry_count_full,
-                count,
-                count,
-            ),
+            contentDescription =
+                resources.getQuantityString(
+                    R.plurals.wear_complication_entry_count_full,
+                    count,
+                    count,
+                ),
             tapIntent = createOpenAppIntent(),
         )
     }
 
-    private suspend fun fetchTodayEntryCount(): Int {
-        return try {
-            val repository = org.koin.java.KoinJavaComponent
-                .getKoin()
-                .get<JournalNotesRepository>()
-            val today = Clock.System.now()
-                .toLocalDateTime(TimeZone.currentSystemDefault())
-                .date
+    private suspend fun fetchTodayEntryCount(): Int =
+        try {
+            val repository =
+                org.koin.java.KoinJavaComponent
+                    .getKoin()
+                    .get<JournalNotesRepository>()
+            val today =
+                Clock.System
+                    .now()
+                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                    .date
             repository.observeNotesForDay(today).first().size
         } catch (e: Exception) {
             0
         }
-    }
 
     private fun createOpenAppIntent(): PendingIntent {
-        val intent = packageManager.getLaunchIntentForPackage(packageName)
-            ?: Intent()
+        val intent =
+            packageManager.getLaunchIntentForPackage(packageName)
+                ?: Intent()
         return PendingIntent.getActivity(
             this,
             0,
@@ -75,10 +78,11 @@ class EntryCountComplicationService : SuspendingComplicationDataSourceService() 
         contentDescription: String,
         tapIntent: PendingIntent? = null,
     ): ShortTextComplicationData {
-        val builder = ShortTextComplicationData.Builder(
-            text = PlainComplicationText.Builder(count.toString()).build(),
-            contentDescription = PlainComplicationText.Builder(contentDescription).build(),
-        )
+        val builder =
+            ShortTextComplicationData.Builder(
+                text = PlainComplicationText.Builder(count.toString()).build(),
+                contentDescription = PlainComplicationText.Builder(contentDescription).build(),
+            )
         if (tapIntent != null) {
             builder.setTapAction(tapIntent)
         }

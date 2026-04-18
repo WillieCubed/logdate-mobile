@@ -17,16 +17,16 @@ import app.logdate.wear.presentation.recording.TooShortContent
 import com.android.tools.screenshot.PreviewTest
 
 class WearRecordingScreenshots {
-
     @PreviewTest
     @WearScreenshotPreviewMatrix
     @Composable
     fun S01_RecordingReady() {
         MaterialTheme {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background),
                 contentAlignment = Alignment.Center,
             ) {
                 ReadyContent()
@@ -40,17 +40,27 @@ class WearRecordingScreenshots {
     fun S02_RecordingActive() {
         MaterialTheme {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFF8B1A1A)),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF8B1A1A)),
                 contentAlignment = Alignment.Center,
             ) {
                 ActiveRecordingContent(
                     durationMs = 4_200,
-                    audioLevels = listOf(
-                        0.3f, 0.5f, 0.7f, 0.4f, 0.8f,
-                        0.6f, 0.9f, 0.5f, 0.3f, 0.7f,
-                    ),
+                    audioLevels =
+                        listOf(
+                            0.3f,
+                            0.5f,
+                            0.7f,
+                            0.4f,
+                            0.8f,
+                            0.6f,
+                            0.9f,
+                            0.5f,
+                            0.3f,
+                            0.7f,
+                        ),
                 )
             }
         }
@@ -62,9 +72,10 @@ class WearRecordingScreenshots {
     fun S03_RecordingActiveLong() {
         MaterialTheme {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFF8B1A1A)),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF8B1A1A)),
                 contentAlignment = Alignment.Center,
             ) {
                 ActiveRecordingContent(
@@ -81,9 +92,10 @@ class WearRecordingScreenshots {
     fun S04_RecordingSaving() {
         MaterialTheme {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background),
                 contentAlignment = Alignment.Center,
             ) {
                 SavingContent()
@@ -97,9 +109,10 @@ class WearRecordingScreenshots {
     fun S05_RecordingSaved() {
         MaterialTheme {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFF1B5E20)),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF1B5E20)),
                 contentAlignment = Alignment.Center,
             ) {
                 SavedContent(durationMs = 4_200)
@@ -113,9 +126,10 @@ class WearRecordingScreenshots {
     fun S06_RecordingTooShort() {
         MaterialTheme {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background),
                 contentAlignment = Alignment.Center,
             ) {
                 TooShortContent()
@@ -129,9 +143,10 @@ class WearRecordingScreenshots {
     fun S07_RecordingError() {
         MaterialTheme {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background),
                 contentAlignment = Alignment.Center,
             ) {
                 RecordingErrorContent(message = "Microphone unavailable")
@@ -145,9 +160,10 @@ class WearRecordingScreenshots {
     fun S08_RecordingErrorNull() {
         MaterialTheme {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background),
                 contentAlignment = Alignment.Center,
             ) {
                 RecordingErrorContent(message = null)

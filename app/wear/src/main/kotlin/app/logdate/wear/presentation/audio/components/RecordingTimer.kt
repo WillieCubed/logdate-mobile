@@ -53,10 +53,11 @@ fun RecordingTimer(
             val alpha by transition.animateFloat(
                 initialValue = 1f,
                 targetValue = 0.3f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 500),
-                    repeatMode = RepeatMode.Reverse,
-                ),
+                animationSpec =
+                    infiniteRepeatable(
+                        animation = tween(durationMillis = 500),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
                 label = "pulse_alpha",
             )
 
@@ -64,10 +65,11 @@ fun RecordingTimer(
                 imageVector = Icons.Filled.FiberManualRecord,
                 contentDescription = null,
                 tint = color,
-                modifier = Modifier
-                    .size(12.dp)
-                    .alpha(alpha)
-                    .padding(end = 4.dp),
+                modifier =
+                    Modifier
+                        .size(12.dp)
+                        .alpha(alpha)
+                        .padding(end = 4.dp),
             )
         }
 

@@ -18,14 +18,13 @@ import app.logdate.wear.presentation.recording.SavedContent
 import app.logdate.wear.presentation.recording.SavingContent
 import app.logdate.wear.presentation.recording.TooShortContent
 import app.logdate.wear.presentation.recording.formatDuration
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.junit.Assert.assertEquals
 
 @RunWith(AndroidJUnit4::class)
 class WearRecordingScreenTest {
-
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -58,9 +57,10 @@ class WearRecordingScreenTest {
         composeRule.setContent {
             MaterialTheme {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF8B1A1A)),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF8B1A1A)),
                     contentAlignment = Alignment.Center,
                 ) {
                     ActiveRecordingContent(
@@ -141,9 +141,10 @@ class WearRecordingScreenTest {
         composeRule.setContent {
             MaterialTheme {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF1B5E20)),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF1B5E20)),
                     contentAlignment = Alignment.Center,
                 ) {
                     SavedContent(durationMs = 4_200)

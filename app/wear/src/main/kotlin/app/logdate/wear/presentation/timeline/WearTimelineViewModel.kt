@@ -5,12 +5,12 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.media.audio.AudioPlaybackStatusProvider
-import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import app.logdate.wear.playback.AudioOutputState
-import app.logdate.wear.playback.WearSyncedAudioResolver
 import app.logdate.wear.playback.WearAudioOutputMonitor
+import app.logdate.wear.playback.WearSyncedAudioResolver
 import app.logdate.wear.sync.WearDataLayerClient
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -50,14 +50,24 @@ data class WearDayDetailUiState(
  */
 sealed interface WearPlaybackUiState {
     data object Idle : WearPlaybackUiState
-    data class Preparing(val noteId: Uuid) : WearPlaybackUiState
+
+    data class Preparing(
+        val noteId: Uuid,
+    ) : WearPlaybackUiState
+
     data class Active(
         val noteId: Uuid,
         val progress: Float,
         val durationMs: Long,
     ) : WearPlaybackUiState
-    data class BlockedOutput(val noteId: Uuid) : WearPlaybackUiState
-    data class Error(val noteId: Uuid) : WearPlaybackUiState
+
+    data class BlockedOutput(
+        val noteId: Uuid,
+    ) : WearPlaybackUiState
+
+    data class Error(
+        val noteId: Uuid,
+    ) : WearPlaybackUiState
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -69,9 +79,9 @@ class WearTimelineViewModel(
     private val syncedAudioResolver: WearSyncedAudioResolver,
     private val dataLayerClient: WearDataLayerClient,
 ) : ViewModel() {
-
     val uiState: StateFlow<WearTimelineUiState> =
-        notesRepository.observeRecentNotes()
+        notesRepository
+            .observeRecentNotes()
             .map { notes -> groupNotesIntoDays(notes) }
             .stateIn(viewModelScope, SharingStarted.Eagerly, WearTimelineUiState())
 
@@ -87,8 +97,7 @@ class WearTimelineViewModel(
                         WearDayDetailUiState(date = date, entries = notes)
                     }
                 }
-            }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+            }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private val _playbackState = MutableStateFlow<WearPlaybackUiState>(WearPlaybackUiState.Idle)
     val playbackState: StateFlow<WearPlaybackUiState> = _playbackState
@@ -153,11 +162,12 @@ class WearTimelineViewModel(
                     return@launch
                 }
 
-                _playbackState.value = WearPlaybackUiState.Active(
-                    noteId = note.uid,
-                    progress = 0f,
-                    durationMs = note.durationMs,
-                )
+                _playbackState.value =
+                    WearPlaybackUiState.Active(
+                        noteId = note.uid,
+                        progress = 0f,
+                        durationMs = note.durationMs,
+                    )
 
                 audioPlaybackManager.startPlayback(
                     uri = playableUri,
@@ -216,20 +226,21 @@ class WearTimelineViewModel(
         }
 
         val timezone = TimeZone.currentSystemDefault()
-        val grouped = notes.groupBy { note ->
-            note.creationTimestamp.toLocalDateTime(timezone).date
-        }
-
-        val days = grouped
-            .map { (date, dayNotes) ->
-                WearTimelineDayUiState(
-                    date = date,
-                    entryCount = dayNotes.size,
-                    latestMood = extractMood(dayNotes),
-                    previewText = extractPreview(dayNotes),
-                )
+        val grouped =
+            notes.groupBy { note ->
+                note.creationTimestamp.toLocalDateTime(timezone).date
             }
-            .sortedByDescending { it.date }
+
+        val days =
+            grouped
+                .map { (date, dayNotes) ->
+                    WearTimelineDayUiState(
+                        date = date,
+                        entryCount = dayNotes.size,
+                        latestMood = extractMood(dayNotes),
+                        previewText = extractPreview(dayNotes),
+                    )
+                }.sortedByDescending { it.date }
 
         return WearTimelineUiState(days = days, isLoading = false)
     }
@@ -248,8 +259,9 @@ class WearTimelineViewModel(
     }
 
     private fun extractPreview(notes: List<JournalNote>): String? {
-        val firstText = notes.firstOrNull { it is JournalNote.Text } as? JournalNote.Text
-            ?: return null
+        val firstText =
+            notes.firstOrNull { it is JournalNote.Text } as? JournalNote.Text
+                ?: return null
         return firstText.content.take(50)
     }
 }

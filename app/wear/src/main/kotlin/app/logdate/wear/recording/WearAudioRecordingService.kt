@@ -16,7 +16,6 @@ import androidx.core.app.NotificationCompat
 import app.logdate.wear.R
 import app.logdate.wear.haptic.WearHapticEngine
 import io.github.aakira.napier.Napier
-import org.koin.android.ext.android.inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -25,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.koin.android.ext.android.inject
 import java.io.File
 import java.io.IOException
 
@@ -32,12 +32,13 @@ import java.io.IOException
  * Extension function to start the recording service for Wear OS
  */
 fun Context.startWearAudioRecordingService(outputFilePath: String? = null) {
-    val intent = Intent(this, WearAudioRecordingService::class.java).apply {
-        action = WearAudioRecordingService.ACTION_START
-        if (outputFilePath != null) {
-            putExtra(WearAudioRecordingService.EXTRA_OUTPUT_PATH, outputFilePath)
+    val intent =
+        Intent(this, WearAudioRecordingService::class.java).apply {
+            action = WearAudioRecordingService.ACTION_START
+            if (outputFilePath != null) {
+                putExtra(WearAudioRecordingService.EXTRA_OUTPUT_PATH, outputFilePath)
+            }
         }
-    }
     startForegroundService(intent)
 }
 
@@ -45,15 +46,16 @@ fun Context.startWearAudioRecordingService(outputFilePath: String? = null) {
  * Extension function to stop the recording service
  */
 fun Context.stopWearAudioRecordingService() {
-    val intent = Intent(this, WearAudioRecordingService::class.java).apply {
-        action = WearAudioRecordingService.ACTION_STOP
-    }
+    val intent =
+        Intent(this, WearAudioRecordingService::class.java).apply {
+            action = WearAudioRecordingService.ACTION_STOP
+        }
     stopService(intent)
 }
 
 /**
  * Foreground service for audio recording on Wear OS.
- * 
+ *
  * Optimized for wearable devices with:
  * - Simplified notification
  * - Haptic feedback
@@ -61,51 +63,54 @@ fun Context.stopWearAudioRecordingService() {
  * - Battery-efficient implementation
  */
 class WearAudioRecordingService : Service() {
-
     companion object {
         private const val NOTIFICATION_ID = 1001
         private const val NOTIFICATION_CHANNEL_ID = "recording_channel"
-        
+
         const val ACTION_START = "app.logdate.wear.action.START_RECORDING"
         const val ACTION_STOP = "app.logdate.wear.action.STOP_RECORDING"
         const val ACTION_PAUSE = "app.logdate.wear.action.PAUSE_RECORDING"
         const val ACTION_RESUME = "app.logdate.wear.action.RESUME_RECORDING"
         const val EXTRA_OUTPUT_PATH = "app.logdate.wear.extra.OUTPUT_PATH"
     }
-    
+
     // Binder for clients
     inner class AudioServiceBinder : Binder() {
         fun getService(): WearAudioRecordingService = this@WearAudioRecordingService
     }
-    
+
     private val binder = AudioServiceBinder()
-    
+
     // Coroutine scope for service operations
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    
+
     // Recording state
     private var mediaRecorder: MediaRecorder? = null
     private var outputFile: File? = null
     private var recordingStartTime: Long = 0
     private var isPaused: Boolean = false
-    
+
     // Wake lock to keep recording when the screen is off
     private var wakeLock: PowerManager.WakeLock? = null
-    
+
     // Haptic feedback engine
     private val hapticEngine: WearHapticEngine by inject()
-    
+
     // State flow for UI updates
     private val _recordingState = MutableStateFlow(WearRecordingState())
     val recordingState = _recordingState.asStateFlow()
-    
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
         Napier.d("Wear OS audio recording service created")
     }
-    
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
         when (intent?.action) {
             ACTION_START -> {
                 Napier.d("Starting Wear OS audio recording service")
@@ -131,15 +136,13 @@ class WearAudioRecordingService : Service() {
                 resumeRecording()
             }
         }
-        
+
         // Restart if killed
         return START_STICKY
     }
-    
-    override fun onBind(intent: Intent): IBinder {
-        return binder
-    }
-    
+
+    override fun onBind(intent: Intent): IBinder = binder
+
     override fun onDestroy() {
         Napier.d("Wear OS audio recording service destroyed")
         releaseWakeLock()
@@ -147,7 +150,7 @@ class WearAudioRecordingService : Service() {
         serviceScope.cancel()
         super.onDestroy()
     }
-    
+
     /**
      * Creates the notification channel for recording service
      */
@@ -155,16 +158,17 @@ class WearAudioRecordingService : Service() {
         val name = getString(R.string.wear_recording_channel_name)
         val description = getString(R.string.wear_recording_channel_description)
         val importance = NotificationManager.IMPORTANCE_DEFAULT
-        val channel = NotificationChannel(NOTIFICATION_CHANNEL_ID, name, importance).apply {
-            this.description = description
-            enableVibration(false) // We'll handle vibration manually
-            setSound(null, null) // No sound as we'll use haptic feedback
-        }
-        
+        val channel =
+            NotificationChannel(NOTIFICATION_CHANNEL_ID, name, importance).apply {
+                this.description = description
+                enableVibration(false) // We'll handle vibration manually
+                setSound(null, null) // No sound as we'll use haptic feedback
+            }
+
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.createNotificationChannel(channel)
     }
-    
+
     /**
      * Starts foreground recording with notification
      */
@@ -172,73 +176,74 @@ class WearAudioRecordingService : Service() {
         try {
             // Create a simple notification for the small screen
             val notification = createRecordingNotification()
-            
+
             // Acquire wake lock to keep recording when screen is off
             acquireWakeLock()
-            
+
             // Start foreground service with microphone type
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(
                     NOTIFICATION_ID,
                     notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
                 )
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
-            
+
             startRecording(outputPath)
         } catch (e: Exception) {
             Napier.e("Error starting Wear OS foreground service", e)
             stopSelf()
         }
     }
-    
+
     /**
      * Creates the recording notification
      */
-    private fun createRecordingNotification(): Notification {
-        return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+    private fun createRecordingNotification(): Notification =
+        NotificationCompat
+            .Builder(this, NOTIFICATION_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher) // Use app icon as recording indicator
             .setContentTitle(getString(R.string.wear_recording_title))
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    getString(R.string.wear_recording_in_progress)
-                )
-            )
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    getString(R.string.wear_recording_in_progress),
+                ),
+            ).setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setOngoing(true)
             .setUsesChronometer(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .build()
-    }
-    
+
     /**
      * Starts the actual recording process
      */
     private fun startRecording(outputPath: String?) {
         try {
             // Create output file in cache directory
-            outputFile = if (outputPath != null) {
-                val file = File(outputPath)
-                file.parentFile?.mkdirs()
-                if (file.exists()) {
-                    file.delete()
+            outputFile =
+                if (outputPath != null) {
+                    val file = File(outputPath)
+                    file.parentFile?.mkdirs()
+                    if (file.exists()) {
+                        file.delete()
+                    }
+                    file
+                } else {
+                    val outputDir = applicationContext.cacheDir
+                    File.createTempFile("wear_audio_", ".m4a", outputDir)
                 }
-                file
-            } else {
-                val outputDir = applicationContext.cacheDir
-                File.createTempFile("wear_audio_", ".m4a", outputDir)
-            }
-            
+
             // Initialize MediaRecorder
-            mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                MediaRecorder(this)
-            } else {
-                @Suppress("DEPRECATION")
-                MediaRecorder()
-            }
-            
+            mediaRecorder =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    MediaRecorder(this)
+                } else {
+                    @Suppress("DEPRECATION")
+                    MediaRecorder()
+                }
+
             mediaRecorder?.apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
@@ -246,21 +251,21 @@ class WearAudioRecordingService : Service() {
                 setOutputFile(outputFile?.absolutePath)
                 setAudioEncodingBitRate(128000) // 128kbps for good quality
                 setAudioSamplingRate(44100) // 44.1kHz standard for audio
-                
+
                 try {
                     prepare()
                     start()
                     recordingStartTime = System.currentTimeMillis()
                     isPaused = false
-                    
+
                     // Update state
                     _recordingState.update {
                         it.copy(
                             isRecording = true,
-                            startTime = recordingStartTime
+                            startTime = recordingStartTime,
                         )
                     }
-                    
+
                     // Monitor audio levels and duration in a single loop
                     serviceScope.launch {
                         while (_recordingState.value.isRecording) {
@@ -283,17 +288,17 @@ class WearAudioRecordingService : Service() {
                             kotlinx.coroutines.delay(250)
                         }
                     }
-                    
+
                     Napier.d("Wear OS recording started successfully")
                 } catch (e: IOException) {
                     Napier.e("Failed to start Wear OS recording", e)
                     reset()
                     release()
-                    
+
                     _recordingState.update {
                         it.copy(
                             isRecording = false,
-                            error = "Failed to start recording: ${e.message}"
+                            error = "Failed to start recording: ${e.message}",
                         )
                     }
                 }
@@ -301,16 +306,16 @@ class WearAudioRecordingService : Service() {
         } catch (e: Exception) {
             Napier.e("Error setting up Wear OS recording", e)
             stopRecording()
-            
+
             _recordingState.update {
                 it.copy(
                     isRecording = false,
-                    error = "Error setting up recording: ${e.message}"
+                    error = "Error setting up recording: ${e.message}",
                 )
             }
         }
     }
-    
+
     /**
      * Pauses the current recording
      */
@@ -318,7 +323,7 @@ class WearAudioRecordingService : Service() {
         if (!_recordingState.value.isRecording || isPaused) {
             return
         }
-        
+
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 mediaRecorder?.pause()
@@ -327,13 +332,13 @@ class WearAudioRecordingService : Service() {
                 Napier.w("Pause recording not supported below Android N")
                 return
             }
-            
+
             Napier.d("Wear OS recording paused")
         } catch (e: Exception) {
             Napier.e("Error pausing Wear OS recording", e)
         }
     }
-    
+
     /**
      * Resumes a paused recording
      */
@@ -341,7 +346,7 @@ class WearAudioRecordingService : Service() {
         if (!_recordingState.value.isRecording || !isPaused) {
             return
         }
-        
+
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 mediaRecorder?.resume()
@@ -350,13 +355,13 @@ class WearAudioRecordingService : Service() {
                 Napier.w("Resume recording not supported below Android N")
                 return
             }
-            
+
             Napier.d("Wear OS recording resumed")
         } catch (e: Exception) {
             Napier.e("Error resuming Wear OS recording", e)
         }
     }
-    
+
     /**
      * Stops the current recording
      * @return The path to the recorded file, or null if recording failed
@@ -365,70 +370,67 @@ class WearAudioRecordingService : Service() {
         if (!_recordingState.value.isRecording) {
             return null
         }
-        
+
         try {
             mediaRecorder?.apply {
                 stop()
                 release()
             }
-            
+
             mediaRecorder = null
             releaseWakeLock()
-            
+
             // Update state
             _recordingState.update {
                 it.copy(
                     isRecording = false,
-                    recordedFilePath = outputFile?.absolutePath
+                    recordedFilePath = outputFile?.absolutePath,
                 )
             }
-            
+
             return outputFile?.absolutePath
         } catch (e: Exception) {
             Napier.e("Error stopping Wear OS recording", e)
-            
+
             _recordingState.update {
                 it.copy(
                     isRecording = false,
-                    error = "Error stopping recording: ${e.message}"
+                    error = "Error stopping recording: ${e.message}",
                 )
             }
-            
+
             return null
         }
     }
-    
+
     /**
      * Gets the recorded file path
      */
-    fun getRecordedFilePath(): String? {
-        return outputFile?.absolutePath
-    }
-    
+    fun getRecordedFilePath(): String? = outputFile?.absolutePath
+
     /**
      * Checks if recording is currently paused
      */
-    fun isRecordingPaused(): Boolean {
-        return isPaused && _recordingState.value.isRecording
-    }
-    
+    fun isRecordingPaused(): Boolean = isPaused && _recordingState.value.isRecording
+
     /**
      * Acquires a wake lock to keep recording when screen is off
      */
     private fun acquireWakeLock() {
         try {
             val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-            wakeLock = powerManager.newWakeLock(
-                PowerManager.PARTIAL_WAKE_LOCK,
-                "LogDate:AudioRecordingWakeLock"
-            )
+            wakeLock =
+                powerManager.newWakeLock(
+                    PowerManager.PARTIAL_WAKE_LOCK,
+                    "LogDate:AudioRecordingWakeLock",
+                )
             wakeLock?.acquire(30 * 60 * 1000L) // 30 minutes max
             Napier.d("Wake lock acquired for audio recording")
         } catch (e: Exception) {
             Napier.e("Failed to acquire wake lock", e)
         }
     }
-    
+
     /**
      * Releases the wake lock
      */
@@ -442,7 +444,6 @@ class WearAudioRecordingService : Service() {
             Napier.e("Error releasing wake lock", e)
         }
     }
-    
 }
 
 /**
@@ -454,5 +455,5 @@ data class WearRecordingState(
     val durationSeconds: Int = 0,
     val audioLevel: Float = 0f,
     val recordedFilePath: String? = null,
-    val error: String? = null
+    val error: String? = null,
 )

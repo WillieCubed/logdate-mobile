@@ -157,11 +157,12 @@ class WearHapticEngine(
         allowReduced: Boolean,
         effect: () -> VibrationEffect,
     ) {
-        val shouldVibrate = when (preference) {
-            HapticPreference.FULL -> true
-            HapticPreference.REDUCED -> allowReduced
-            HapticPreference.OFF -> false
-        }
+        val shouldVibrate =
+            when (preference) {
+                HapticPreference.FULL -> true
+                HapticPreference.REDUCED -> allowReduced
+                HapticPreference.OFF -> false
+            }
         if (shouldVibrate) {
             vibrator.vibrate(effect())
         }

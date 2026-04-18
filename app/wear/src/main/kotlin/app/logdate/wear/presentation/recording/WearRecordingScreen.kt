@@ -38,9 +38,9 @@ import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import app.logdate.wear.R
-import app.logdate.wear.presentation.common.SaveFeedback
 import app.logdate.wear.presentation.audio.components.AudioWaveform
 import app.logdate.wear.presentation.audio.components.RecordingTimer
+import app.logdate.wear.presentation.common.SaveFeedback
 import kotlinx.coroutines.flow.collectLatest
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -60,60 +60,66 @@ fun WearRecordingScreen(
     }
 
     val backgroundColor by animateColorAsState(
-        targetValue = when (uiState.phase) {
-            RecordingPhase.RECORDING -> Color(0xFF8B1A1A)
-            RecordingPhase.SAVED -> Color(0xFF1B5E20)
-            else -> MaterialTheme.colorScheme.background
-        },
+        targetValue =
+            when (uiState.phase) {
+                RecordingPhase.RECORDING -> Color(0xFF8B1A1A)
+                RecordingPhase.SAVED -> Color(0xFF1B5E20)
+                else -> MaterialTheme.colorScheme.background
+            },
         animationSpec = tween(200),
         label = "bg",
     )
 
     // Full-screen touch handler is only active during READY and RECORDING.
     // In PAUSED state, buttons handle interaction directly.
-    val useTouchHandler = uiState.phase == RecordingPhase.READY ||
-        uiState.phase == RecordingPhase.RECORDING
+    val useTouchHandler =
+        uiState.phase == RecordingPhase.READY ||
+            uiState.phase == RecordingPhase.RECORDING
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(backgroundColor)
-            .then(
-                if (useTouchHandler) {
-                    Modifier.pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                when (event.type) {
-                                    PointerEventType.Press -> viewModel.onTouchDown()
-                                    PointerEventType.Release -> viewModel.onTouchUp()
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(backgroundColor)
+                .then(
+                    if (useTouchHandler) {
+                        Modifier.pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    when (event.type) {
+                                        PointerEventType.Press -> viewModel.onTouchDown()
+                                        PointerEventType.Release -> viewModel.onTouchUp()
+                                    }
                                 }
                             }
                         }
-                    }
-                } else {
-                    Modifier
-                },
-            ),
+                    } else {
+                        Modifier
+                    },
+                ),
         contentAlignment = Alignment.Center,
     ) {
         when (uiState.phase) {
             RecordingPhase.READY -> ReadyContent()
-            RecordingPhase.RECORDING -> ActiveRecordingContent(
-                durationMs = uiState.recordingDurationMs,
-                audioLevels = uiState.audioLevels,
-            )
-            RecordingPhase.PAUSED -> PausedContent(
-                durationMs = uiState.recordingDurationMs,
-                onResume = viewModel::onTouchDown,
-                onSave = viewModel::save,
-                onDiscard = viewModel::discard,
-            )
+            RecordingPhase.RECORDING ->
+                ActiveRecordingContent(
+                    durationMs = uiState.recordingDurationMs,
+                    audioLevels = uiState.audioLevels,
+                )
+            RecordingPhase.PAUSED ->
+                PausedContent(
+                    durationMs = uiState.recordingDurationMs,
+                    onResume = viewModel::onTouchDown,
+                    onSave = viewModel::save,
+                    onDiscard = viewModel::discard,
+                )
             RecordingPhase.SAVING -> SavingContent()
-            RecordingPhase.SAVED -> SavedContent(
-                durationMs = uiState.savedDurationMs,
-                saveFeedback = uiState.saveFeedback,
-            )
+            RecordingPhase.SAVED ->
+                SavedContent(
+                    durationMs = uiState.savedDurationMs,
+                    saveFeedback = uiState.saveFeedback,
+                )
             RecordingPhase.TOO_SHORT -> TooShortContent()
             RecordingPhase.ERROR -> RecordingErrorContent(message = uiState.errorMessage)
         }
@@ -126,10 +132,11 @@ internal fun ReadyContent() {
     val alpha by transition.animateFloat(
         initialValue = 0.6f,
         targetValue = 0.85f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500),
-            repeatMode = RepeatMode.Reverse,
-        ),
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(1500),
+                repeatMode = RepeatMode.Reverse,
+            ),
         label = "textAlpha",
     )
 
@@ -205,9 +212,10 @@ internal fun PausedContent(
             }
             Button(
                 onClick = onSave,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                ),
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    ),
                 modifier = Modifier.size(48.dp),
             ) {
                 Icon(
@@ -217,9 +225,10 @@ internal fun PausedContent(
             }
             Button(
                 onClick = onDiscard,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                ),
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                    ),
                 modifier = Modifier.size(48.dp),
             ) {
                 Icon(
@@ -255,11 +264,12 @@ internal fun SavedContent(
             tint = Color.White,
             modifier = Modifier.size(48.dp),
         )
-        val feedbackText = when (saveFeedback) {
-            SaveFeedback.SYNCING_TO_PHONE -> stringResource(R.string.wear_saved_syncing_to_phone)
-            SaveFeedback.SAVED_LOCALLY -> stringResource(R.string.wear_saved_on_watch)
-            null -> stringResource(R.string.wear_recording_saved)
-        }
+        val feedbackText =
+            when (saveFeedback) {
+                SaveFeedback.SYNCING_TO_PHONE -> stringResource(R.string.wear_saved_syncing_to_phone)
+                SaveFeedback.SAVED_LOCALLY -> stringResource(R.string.wear_saved_on_watch)
+                null -> stringResource(R.string.wear_recording_saved)
+            }
         Text(
             text = feedbackText,
             style = MaterialTheme.typography.titleSmall,

@@ -40,7 +40,6 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 class MainActivity : ComponentActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -55,11 +54,12 @@ class MainActivity : ComponentActivity() {
 fun WearApp() {
     LogDateTheme {
         val context = LocalContext.current
-        val startRoute: NavKey = if (isOnboardingComplete(context)) {
-            WearHomeRoute
-        } else {
-            WearOnboardingRoute
-        }
+        val startRoute: NavKey =
+            if (isOnboardingComplete(context)) {
+                WearHomeRoute
+            } else {
+                WearOnboardingRoute
+            }
         val backStack = remember { mutableStateListOf(startRoute) }
         val navigateBack: () -> Unit = {
             if (backStack.size > 1) {
@@ -70,86 +70,87 @@ fun WearApp() {
         NavDisplay(
             backStack = backStack,
             onBack = navigateBack,
-            entryProvider = entryProvider {
-                entry<WearOnboardingRoute> {
-                    WearOnboardingScreen(
-                        onComplete = {
-                            backStack.clear()
-                            backStack.add(WearHomeRoute)
-                        },
-                    )
-                }
-                entry<WearHomeRoute> {
-                    WearHomeScreen(
-                        onNavigateToMoodCheckIn = {
-                            backStack.add(WearMoodCheckInRoute)
-                        },
-                        onNavigateToQuickText = {
-                            backStack.add(WearQuickTextRoute)
-                        },
-                        onNavigateToTimeline = {
-                            backStack.add(WearTimelineRoute)
-                        },
-                        onNavigateToSettings = {
-                            backStack.add(WearSettingsRoute)
-                        },
-                    )
-                }
-                entry<WearQuickRecordRoute> {
-                    WearRecordingScreen(onNavigateBack = navigateBack)
-                }
-                entry<WearMoodCheckInRoute> {
-                    MoodCheckInScreen(
-                        onNavigateBack = navigateBack,
-                        onNavigateToVoiceNote = {
-                            navigateBack()
-                            backStack.add(WearQuickRecordRoute)
-                        },
-                    )
-                }
-                entry<WearQuickTextRoute> {
-                    val notesRepository = koinInject<JournalNotesRepository>()
-                    QuickTextLauncher(
-                        notesRepository = notesRepository,
-                        onDone = navigateBack,
-                    )
-                }
-                entry<WearTimelineRoute> {
-                    val timelineViewModel = koinViewModel<WearTimelineViewModel>()
-                    WearTimelineScreen(
-                        onNavigateBack = navigateBack,
-                        onNavigateToDay = { date ->
-                            timelineViewModel.selectDay(date)
-                            backStack.add(WearTimelineDayDetailRoute(date))
-                        },
-                        viewModel = timelineViewModel,
-                    )
-                }
-                entry<WearTimelineDayDetailRoute> {
-                    val timelineViewModel = koinViewModel<WearTimelineViewModel>()
-                    WearDayDetailScreen(viewModel = timelineViewModel)
-                }
-                entry<WearRewindListRoute> {
-                    val rewindViewModel = koinViewModel<WearRewindViewModel>()
-                    WearRewindListScreen(
-                        viewModel = rewindViewModel,
-                        onSelectRewind = { uid ->
-                            rewindViewModel.selectRewind(uid)
-                            backStack.add(WearRewindPlaybackRoute)
-                        },
-                    )
-                }
-                entry<WearRewindPlaybackRoute> {
-                    val rewindViewModel = koinViewModel<WearRewindViewModel>()
-                    WearRewindPlaybackScreen(
-                        viewModel = rewindViewModel,
-                        onExit = navigateBack,
-                    )
-                }
-                entry<WearSettingsRoute> {
-                    WearSettingsScreen(onNavigateBack = navigateBack)
-                }
-            },
+            entryProvider =
+                entryProvider {
+                    entry<WearOnboardingRoute> {
+                        WearOnboardingScreen(
+                            onComplete = {
+                                backStack.clear()
+                                backStack.add(WearHomeRoute)
+                            },
+                        )
+                    }
+                    entry<WearHomeRoute> {
+                        WearHomeScreen(
+                            onNavigateToMoodCheckIn = {
+                                backStack.add(WearMoodCheckInRoute)
+                            },
+                            onNavigateToQuickText = {
+                                backStack.add(WearQuickTextRoute)
+                            },
+                            onNavigateToTimeline = {
+                                backStack.add(WearTimelineRoute)
+                            },
+                            onNavigateToSettings = {
+                                backStack.add(WearSettingsRoute)
+                            },
+                        )
+                    }
+                    entry<WearQuickRecordRoute> {
+                        WearRecordingScreen(onNavigateBack = navigateBack)
+                    }
+                    entry<WearMoodCheckInRoute> {
+                        MoodCheckInScreen(
+                            onNavigateBack = navigateBack,
+                            onNavigateToVoiceNote = {
+                                navigateBack()
+                                backStack.add(WearQuickRecordRoute)
+                            },
+                        )
+                    }
+                    entry<WearQuickTextRoute> {
+                        val notesRepository = koinInject<JournalNotesRepository>()
+                        QuickTextLauncher(
+                            notesRepository = notesRepository,
+                            onDone = navigateBack,
+                        )
+                    }
+                    entry<WearTimelineRoute> {
+                        val timelineViewModel = koinViewModel<WearTimelineViewModel>()
+                        WearTimelineScreen(
+                            onNavigateBack = navigateBack,
+                            onNavigateToDay = { date ->
+                                timelineViewModel.selectDay(date)
+                                backStack.add(WearTimelineDayDetailRoute(date))
+                            },
+                            viewModel = timelineViewModel,
+                        )
+                    }
+                    entry<WearTimelineDayDetailRoute> {
+                        val timelineViewModel = koinViewModel<WearTimelineViewModel>()
+                        WearDayDetailScreen(viewModel = timelineViewModel)
+                    }
+                    entry<WearRewindListRoute> {
+                        val rewindViewModel = koinViewModel<WearRewindViewModel>()
+                        WearRewindListScreen(
+                            viewModel = rewindViewModel,
+                            onSelectRewind = { uid ->
+                                rewindViewModel.selectRewind(uid)
+                                backStack.add(WearRewindPlaybackRoute)
+                            },
+                        )
+                    }
+                    entry<WearRewindPlaybackRoute> {
+                        val rewindViewModel = koinViewModel<WearRewindViewModel>()
+                        WearRewindPlaybackScreen(
+                            viewModel = rewindViewModel,
+                            onExit = navigateBack,
+                        )
+                    }
+                    entry<WearSettingsRoute> {
+                        WearSettingsScreen(onNavigateBack = navigateBack)
+                    }
+                },
         )
     }
 }
