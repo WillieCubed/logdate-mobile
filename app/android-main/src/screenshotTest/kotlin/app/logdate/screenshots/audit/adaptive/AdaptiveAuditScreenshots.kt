@@ -125,12 +125,12 @@ fun A03_CloudAccountSetup() {
     ScreenshotTheme {
         CloudAccountSetupContent(
             useCompactLayout = false,
-            selectedOption = null,
             onBack = {},
-            onOptionSelected = {},
             onContinue = {},
             onSkip = {},
-            onPlanSelected = { _ -> },
+            onPlanSelected = {},
+            selectedOption = null,
+            onOptionSelected = {},
         )
     }
 }
@@ -163,6 +163,7 @@ fun A05_SearchWithResults() {
             onCommitSearch = {},
             onNavigateToDay = {},
             onNavigateToJournal = {},
+            onNavigateToPerson = {},
             onGoBack = {},
             queryText = "train",
         )
