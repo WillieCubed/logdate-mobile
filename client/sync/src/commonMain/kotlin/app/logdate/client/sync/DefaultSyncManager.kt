@@ -32,6 +32,7 @@ import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
+import app.logdate.client.sync.metadata.SyncBackoff
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.client.util.platformIODispatcher
@@ -78,6 +79,7 @@ class DefaultSyncManager(
     private val syncMetadataService: SyncMetadataService,
     private val transactionManager: SyncTransactionManager,
     private val dataUsagePolicy: DataUsagePolicy,
+    private val backoff: SyncBackoff = SyncBackoff(),
     private val syncScope: CoroutineScope = CoroutineScope(platformIODispatcher),
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
@@ -869,16 +871,10 @@ class DefaultSyncManager(
         return false
     }
 
-    private fun computeBackoffMs(retryCount: Int): Long {
-        val exponent = (retryCount - 1).coerceAtLeast(0).coerceAtMost(6)
-        val delay = RETRY_BASE_DELAY_MS * (1L shl exponent)
-        return delay.coerceAtMost(RETRY_MAX_DELAY_MS)
-    }
+    private fun computeBackoffMs(retryCount: Int): Long = backoff.nextDelayMs(retryCount)
 
     private companion object {
-        const val MAX_RETRY_ATTEMPTS = 5
-        const val RETRY_BASE_DELAY_MS = 5_000L
-        const val RETRY_MAX_DELAY_MS = 300_000L
+        const val MAX_RETRY_ATTEMPTS = 9
         const val SYNC_PAGE_SIZE = 200
     }
 
