@@ -1,42 +1,43 @@
 #!/usr/bin/env bash
 #
-# deploy-production.sh
+# deploy-production.sh — Interactive turnkey production deploy for the LogDate
+# Ktor server on GCP Cloud Run.
 #
-# One-command production deploy for the LogDate Ktor server. Intended for a
-# Cloud Run instance that already has a GCP project, runtime service account,
-# and Workload Identity Federation configured by `./scripts/setup-gcp-deploy.sh`
-# (or `./scripts/bootstrap-gcp-fresh.sh` for a brand-new project).
+# Defaults to zero-flag interactive mode: run `./run deploy:production` with no
+# arguments and the script walks you through every missing input. Every
+# interactive prompt can be pre-answered with an env var or a CLI flag for
+# unattended reruns.
 #
-# Phases (each is idempotent; skip with the matching flag):
-#   0. Prereq validation
-#   1. Domain ownership pre-flight (halts if unverified)
+# Phases (each idempotent, each skippable via --skip-<phase>):
+#   0. Prereq validation + gcloud auth
+#   1. Domain ownership pre-flight (Search Console verify URLs)
 #   2. Write infra/terraform/production.tfvars (if missing or --overwrite)
 #   3. terraform init + plan + apply
-#   4. Populate Secret Manager values (auto-generates JWT secret; prompts for rest)
+#   4. Populate Secret Manager (auto-generates JWT; prompts for DB/OIDC/Redis)
 #   5. Build + push Docker image, deploy to Cloud Run
-#   6. Emit the DNS resource records Cloud Run wants published
-#   7. Verify /health on the service URL and each custom domain (waits for SSL)
+#   6. Publish DNS records (via Cloudflare API) or print them for manual entry
+#   7. Verify /health on the service URL and each custom domain
 #
-# Usage:
-#   ./scripts/deploy-production.sh --project-id <GCP_PROJECT_ID> [flags]
+# Usage (all flags optional — script prompts for missing values):
+#   ./scripts/deploy-production.sh [flags]
 #
 # Flags:
-#   --project-id <id>            GCP project (required)
+#   --project-id <id>            GCP project (default: auto-detect)
 #   --region <region>            Default: us-central1
 #   --primary-domain <host>      Default: logdate.hypertext.studio
-#   --secondary-domain <host>    Default: cloud.logdate.app
+#   --secondary-domain <host>    Default: cloud.logdate.app (empty string to skip)
 #   --webauthn-rp-id <host>      Default: primary domain
-#   --overwrite                  Overwrite an existing production.tfvars
-#   --auto-approve               Skip the terraform apply confirmation prompt
-#   --skip-prereqs               Skip Phase 0
-#   --skip-domain-check          Skip Phase 1
-#   --skip-tfvars                Skip Phase 2
-#   --skip-terraform             Skip Phase 3
-#   --skip-secrets               Skip Phase 4
-#   --skip-image                 Skip Phase 5
-#   --skip-dns                   Skip Phase 6
-#   --skip-verify                Skip Phase 7
-#   -h, --help                   Show this help
+#   --dns-provider <prov>        cloudflare | manual  (default: prompt)
+#   --overwrite                  Overwrite existing production.tfvars
+#   --auto-approve               Skip terraform apply confirmation
+#   --non-interactive            Fail instead of prompting for missing inputs
+#   --skip-prereqs, --skip-domain-check, --skip-tfvars, --skip-terraform,
+#   --skip-secrets, --skip-image, --skip-dns, --skip-verify
+#   -h, --help
+#
+# Env vars (all optional; every one can also be set via a flag or prompt):
+#   LOGDATE_GCP_PROJECT_ID       GCP project
+#   CLOUDFLARE_API_TOKEN         Cloudflare API token with Zone:DNS:Edit
 
 set -euo pipefail
 
@@ -46,13 +47,15 @@ TF_DIR="${REPO_ROOT}/infra/terraform"
 TFVARS_PATH="${TF_DIR}/production.tfvars"
 BUILD_SCRIPT="${SCRIPT_DIR}/deploy-cloud-run.sh"
 
-PROJECT_ID=""
+PROJECT_ID="${LOGDATE_GCP_PROJECT_ID:-}"
 REGION="us-central1"
 PRIMARY_DOMAIN="logdate.hypertext.studio"
 SECONDARY_DOMAIN="cloud.logdate.app"
 WEBAUTHN_RP_ID=""
+DNS_PROVIDER=""
 OVERWRITE_TFVARS="false"
 AUTO_APPROVE="false"
+NON_INTERACTIVE="false"
 SKIP_PREREQS="false"
 SKIP_DOMAIN_CHECK="false"
 SKIP_TFVARS="false"
@@ -80,8 +83,33 @@ die() {
 }
 
 print_usage() {
-    sed -n '2,40p' "$0" | sed 's/^# \?//'
+    sed -n '2,43p' "$0" | sed 's/^# \?//'
     exit 0
+}
+
+prompt_or_die() {
+    local prompt="$1"
+    local default="${2:-}"
+    local out
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then
+        [[ -n "$default" ]] && { echo "$default"; return; }
+        die "Missing required input ($prompt) in --non-interactive mode"
+    fi
+    if [[ -n "$default" ]]; then
+        read -rp "$prompt [$default]: " out
+        echo "${out:-$default}"
+    else
+        read -rp "$prompt: " out
+        echo "$out"
+    fi
+}
+
+prompt_secret_value() {
+    local prompt="$1"
+    local out
+    read -rsp "$prompt: " out
+    echo >&2
+    echo "$out"
 }
 
 parse_args() {
@@ -92,8 +120,10 @@ parse_args() {
             --primary-domain) PRIMARY_DOMAIN="$2"; shift 2 ;;
             --secondary-domain) SECONDARY_DOMAIN="$2"; shift 2 ;;
             --webauthn-rp-id) WEBAUTHN_RP_ID="$2"; shift 2 ;;
+            --dns-provider) DNS_PROVIDER="$2"; shift 2 ;;
             --overwrite) OVERWRITE_TFVARS="true"; shift ;;
             --auto-approve) AUTO_APPROVE="true"; shift ;;
+            --non-interactive) NON_INTERACTIVE="true"; shift ;;
             --skip-prereqs) SKIP_PREREQS="true"; shift ;;
             --skip-domain-check) SKIP_DOMAIN_CHECK="true"; shift ;;
             --skip-tfvars) SKIP_TFVARS="true"; shift ;;
@@ -106,13 +136,108 @@ parse_args() {
             *) die "Unknown flag: $1 (run $0 --help)" ;;
         esac
     done
-
-    [[ -z "$PROJECT_ID" ]] && die "--project-id is required"
-    [[ -z "$WEBAUTHN_RP_ID" ]] && WEBAUTHN_RP_ID="$PRIMARY_DOMAIN"
 }
 
-require_cmd() {
-    command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
+# ----------------------------------------------------------------------------
+# Auto-detection helpers
+# ----------------------------------------------------------------------------
+
+# Read `project_id = "foo"` out of an existing tfvars file.
+read_tfvars_project_id() {
+    local file="$1"
+    [[ -f "$file" ]] || return 1
+    awk -F'=' '/^[[:space:]]*project_id[[:space:]]*=/ {
+        gsub(/[[:space:]"]/, "", $2); print $2; exit
+    }' "$file"
+}
+
+detect_project_id() {
+    if [[ -n "$PROJECT_ID" ]]; then
+        log_info "Using project id from flag/env: $PROJECT_ID"
+        return
+    fi
+
+    local candidates=()
+
+    local committed
+    committed=$(read_tfvars_project_id "$TFVARS_PATH" 2>/dev/null || true)
+    [[ -n "$committed" ]] && candidates+=("$committed (infra/terraform/production.tfvars)")
+
+    if [[ -d "${REPO_ROOT}/.logdate/deploy" ]]; then
+        local bootstrap_dir
+        while IFS= read -r bootstrap_dir; do
+            local id
+            id=$(basename "$bootstrap_dir")
+            [[ -n "$id" ]] && candidates+=("$id (.logdate/deploy/$id)")
+        done < <(find "${REPO_ROOT}/.logdate/deploy" -mindepth 1 -maxdepth 1 -type d 2>/dev/null || true)
+    fi
+
+    local active
+    active=$(gcloud config get-value project 2>/dev/null || true)
+    [[ -n "$active" && "$active" != "(unset)" ]] && candidates+=("$active (gcloud active project)")
+
+    if [[ ${#candidates[@]} -eq 0 ]]; then
+        PROJECT_ID=$(prompt_or_die "GCP project ID")
+        [[ -z "$PROJECT_ID" ]] && die "Project ID is required"
+        return
+    fi
+
+    if [[ ${#candidates[@]} -eq 1 ]]; then
+        local only="${candidates[0]}"
+        PROJECT_ID="${only%% *}"
+        log_info "Detected project id: $only"
+        return
+    fi
+
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then
+        log_error "Multiple project candidates found:"
+        printf '  • %s\n' "${candidates[@]}"
+        die "Pass --project-id to disambiguate in non-interactive mode"
+    fi
+
+    echo "Multiple project candidates found:"
+    local i=1
+    for c in "${candidates[@]}"; do
+        printf '  %d) %s\n' "$i" "$c"
+        ((i++))
+    done
+    local choice
+    read -rp "Select [1]: " choice
+    choice="${choice:-1}"
+    [[ "$choice" =~ ^[0-9]+$ ]] || die "Invalid selection: $choice"
+    (( choice >= 1 && choice <= ${#candidates[@]} )) || die "Selection out of range"
+    local picked="${candidates[$((choice - 1))]}"
+    PROJECT_ID="${picked%% *}"
+    log_info "Using $PROJECT_ID"
+}
+
+detect_dns_provider() {
+    if [[ -n "$DNS_PROVIDER" ]]; then
+        return
+    fi
+
+    if [[ -n "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+        DNS_PROVIDER="cloudflare"
+        log_info "CLOUDFLARE_API_TOKEN present → DNS provider: cloudflare"
+        return
+    fi
+
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then
+        DNS_PROVIDER="manual"
+        return
+    fi
+
+    echo
+    echo "Pick a DNS provider for publishing the Cloud Run mapping records:"
+    echo "  1) manual      — script prints records for you to copy into your registrar"
+    echo "  2) cloudflare  — script publishes records via the Cloudflare API (needs CLOUDFLARE_API_TOKEN)"
+    local choice
+    read -rp "Select [1]: " choice
+    case "${choice:-1}" in
+        1) DNS_PROVIDER="manual" ;;
+        2) DNS_PROVIDER="cloudflare" ;;
+        *) die "Invalid DNS provider choice: $choice" ;;
+    esac
 }
 
 # ----------------------------------------------------------------------------
@@ -121,19 +246,20 @@ require_cmd() {
 phase_0_prereqs() {
     log_phase "Phase 0 — Prereq validation"
 
-    require_cmd gcloud
-    require_cmd terraform
-    require_cmd docker
-    require_cmd jq
-    require_cmd openssl
-    require_cmd curl
-    log_info "CLI tools present"
+    local required=(gcloud terraform docker jq openssl curl)
+    for cmd in "${required[@]}"; do
+        command -v "$cmd" >/dev/null 2>&1 || die "Missing required command: $cmd"
+    done
+    log_info "CLI tools present: ${required[*]}"
 
     if ! gcloud auth list --filter=status:ACTIVE --format='value(account)' | grep -q '@'; then
+        if [[ "$NON_INTERACTIVE" == "true" ]]; then
+            die "No active gcloud credential — rerun without --non-interactive or run 'gcloud auth login' first"
+        fi
         log_warn "No active gcloud credential — launching browser login"
         gcloud auth login
     fi
-    log_info "gcloud authenticated as $(gcloud config get-value account 2>/dev/null)"
+    log_info "gcloud account: $(gcloud config get-value account 2>/dev/null)"
 
     gcloud config set project "$PROJECT_ID" >/dev/null
     log_info "Active project: $PROJECT_ID"
@@ -152,9 +278,7 @@ phase_0_prereqs() {
     enabled=$(gcloud services list --enabled --project "$PROJECT_ID" --format='value(config.name)')
     local missing=()
     for svc in "${required_services[@]}"; do
-        if ! grep -qx "$svc" <<<"$enabled"; then
-            missing+=("$svc")
-        fi
+        grep -qx "$svc" <<<"$enabled" || missing+=("$svc")
     done
     if [[ ${#missing[@]} -gt 0 ]]; then
         log_info "Enabling services: ${missing[*]}"
@@ -172,8 +296,11 @@ phase_1_domain_check() {
     local verified
     verified=$(gcloud domains list-user-verified --format='value(id)' 2>/dev/null || true)
 
+    local targets=("$PRIMARY_DOMAIN")
+    [[ -n "$SECONDARY_DOMAIN" ]] && targets+=("$SECONDARY_DOMAIN")
+
     local unverified=()
-    for domain in "$PRIMARY_DOMAIN" "$SECONDARY_DOMAIN"; do
+    for domain in "${targets[@]}"; do
         if grep -qx "$domain" <<<"$verified"; then
             log_info "$domain — verified"
         else
@@ -181,22 +308,46 @@ phase_1_domain_check() {
         fi
     done
 
-    if [[ ${#unverified[@]} -gt 0 ]]; then
-        log_error "The following domains are not yet verified in Search Console:"
-        for domain in "${unverified[@]}"; do
-            printf '  • %s\n' "$domain"
-            printf '    → %s\n' "https://search.google.com/search-console/welcome?resource_id=$domain"
-        done
-        cat <<'EOF'
+    if [[ ${#unverified[@]} -eq 0 ]]; then
+        return
+    fi
+
+    log_warn "The following domains are not yet verified in Search Console:"
+    for domain in "${unverified[@]}"; do
+        printf '  • %s\n' "$domain"
+        printf '    → https://search.google.com/search-console/welcome?resource_id=%s\n' "$domain"
+    done
+
+    cat <<'EOF'
 
 Domain verification is a one-time browser flow. Steps:
-  1. Open each URL above and choose "DNS record" verification.
-  2. Publish the TXT record Google gives you at your DNS provider.
+  1. Open each URL above, choose "DNS record" verification.
+  2. Publish the TXT record Google gives you at your DNS provider
+     (if Cloudflare is configured here, publish via the Cloudflare dashboard
+     or its API — this script only manages Cloud Run mapping records, not
+     the Search Console TXT).
   3. Click "Verify" in Search Console; it usually takes under a minute.
-  4. Rerun this script — or pass --skip-domain-check if verification is already in flight elsewhere.
 EOF
+
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then
         die "Halting until domains are verified"
     fi
+
+    if command -v open >/dev/null 2>&1; then
+        read -rp "Open the verification URLs in your browser now? [Y/n] " do_open
+        if [[ ! "$do_open" =~ ^[nN]$ ]]; then
+            for domain in "${unverified[@]}"; do
+                open "https://search.google.com/search-console/welcome?resource_id=$domain" || true
+            done
+        fi
+    fi
+
+    read -rp "Press Enter once every domain above shows as verified (or Ctrl-C to abort) " _
+    verified=$(gcloud domains list-user-verified --format='value(id)' 2>/dev/null || true)
+    for domain in "${unverified[@]}"; do
+        grep -qx "$domain" <<<"$verified" || die "$domain still not verified — rerun once it is"
+    done
+    log_info "All target domains verified"
 }
 
 # ----------------------------------------------------------------------------
@@ -210,8 +361,17 @@ phase_2_tfvars() {
         return
     fi
 
+    [[ -z "$WEBAUTHN_RP_ID" ]] && WEBAUTHN_RP_ID="$PRIMARY_DOMAIN"
     local webauthn_origin="https://$WEBAUTHN_RP_ID"
-    local allowed_origins="https://$PRIMARY_DOMAIN,https://$SECONDARY_DOMAIN"
+
+    local allowed_origins="https://$PRIMARY_DOMAIN"
+    local domains_list="[\"$PRIMARY_DOMAIN\""
+    if [[ -n "$SECONDARY_DOMAIN" ]]; then
+        allowed_origins="$allowed_origins,https://$SECONDARY_DOMAIN"
+        domains_list="$domains_list, \"$SECONDARY_DOMAIN\""
+    fi
+    domains_list="$domains_list]"
+
     local github_repo
     github_repo=$(git -C "$REPO_ROOT" config --get remote.origin.url 2>/dev/null \
         | sed -E 's#(git@github\.com:|https?://github\.com/)##; s#\.git$##' \
@@ -233,7 +393,7 @@ enable_github_oidc = true
 github_repo        = "$github_repo"
 
 enable_domain_mapping = true
-domains               = ["$PRIMARY_DOMAIN", "$SECONDARY_DOMAIN"]
+domains               = $domains_list
 
 create_gcs_bucket = true
 gcs_bucket_name   = "logdate-media-$PROJECT_ID"
@@ -275,6 +435,9 @@ phase_3_terraform() {
         terraform plan -input=false -var-file=production.tfvars -out=prod.tfplan
 
         if [[ "$AUTO_APPROVE" != "true" ]]; then
+            if [[ "$NON_INTERACTIVE" == "true" ]]; then
+                die "Refusing to apply without --auto-approve in --non-interactive mode"
+            fi
             read -rp "Apply the plan above? [y/N] " confirm
             [[ "$confirm" =~ ^[yY]$ ]] || die "Aborted by user"
         fi
@@ -289,8 +452,7 @@ phase_3_terraform() {
 # Phase 4 — Populate Secret Manager
 # ----------------------------------------------------------------------------
 secret_has_version() {
-    local secret_id="$1"
-    gcloud secrets versions list "$secret_id" \
+    gcloud secrets versions list "$1" \
         --project "$PROJECT_ID" \
         --limit 1 \
         --format='value(name)' 2>/dev/null | grep -q .
@@ -302,7 +464,7 @@ put_secret_value() {
     printf '%s' "$value" | gcloud secrets versions add "$secret_id" \
         --project "$PROJECT_ID" \
         --data-file=- >/dev/null
-    log_info "  · wrote value for $secret_id"
+    log_info "  · wrote version for $secret_id"
 }
 
 prompt_secret() {
@@ -317,15 +479,19 @@ prompt_secret() {
     fi
 
     local value
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then
+        log_warn "$secret_id missing a version; pass it via gcloud secrets or rerun interactively"
+        return
+    fi
+
     if [[ "$is_password" == "true" ]]; then
-        read -rsp "Enter $label (hidden): " value
-        echo
+        value=$(prompt_secret_value "Enter $label (hidden)")
     else
         read -rp "Enter $label: " value
     fi
 
     if [[ -z "$value" && "$allow_empty" != "true" ]]; then
-        log_warn "$secret_id left unset — rerun with --skip-prereqs --skip-domain-check --skip-tfvars --skip-terraform --skip-image --skip-dns --skip-verify to prompt again"
+        log_warn "$secret_id left unset — rerun with --skip-* flags to prompt again"
         return
     fi
     put_secret_value "$secret_id" "$value"
@@ -334,7 +500,6 @@ prompt_secret() {
 phase_4_secrets() {
     log_phase "Phase 4 — Populate Secret Manager"
 
-    # JWT secret: auto-generate if unset
     if secret_has_version logdate-jwt-secret; then
         log_info "logdate-jwt-secret already has a version — skipping"
     else
@@ -346,13 +511,13 @@ phase_4_secrets() {
     fi
 
     echo
-    log_info "Database credentials — these must match the Cloud SQL user configured in Terraform."
-    prompt_secret logdate-db-url "JDBC URL (e.g. jdbc:postgresql:///logdate?cloudSqlInstance=<instance>&socketFactory=com.google.cloud.sql.postgres.SocketFactory)" "false"
+    log_info "Database credentials — must match the Cloud SQL user configured by Terraform."
+    prompt_secret logdate-db-url "JDBC URL (jdbc:postgresql:///logdate?cloudSqlInstance=...&socketFactory=com.google.cloud.sql.postgres.SocketFactory)" "false"
     prompt_secret logdate-db-user "database username" "false"
     prompt_secret logdate-db-password "database password" "true"
 
     echo
-    log_info "Google OIDC client IDs — comma-separated, one per target platform (Android release, Android debug, iOS, Web)."
+    log_info "Google OIDC client IDs — comma-separated, one per platform (Android release, Android debug, iOS, Web)."
     prompt_secret logdate-google-oidc-client-ids "client IDs (CSV, blank to skip)" "false" "true"
 
     echo
@@ -363,7 +528,7 @@ phase_4_secrets() {
 }
 
 # ----------------------------------------------------------------------------
-# Phase 5 — Build image and deploy to Cloud Run
+# Phase 5 — Build image and deploy
 # ----------------------------------------------------------------------------
 phase_5_image() {
     log_phase "Phase 5 — Build image and deploy"
@@ -379,40 +544,155 @@ phase_5_image() {
 }
 
 # ----------------------------------------------------------------------------
-# Phase 6 — Emit DNS records
+# Phase 6 — DNS records
 # ----------------------------------------------------------------------------
-print_records_for() {
-    local domain="$1"
-    local json
-    json=$(gcloud beta run domain-mappings describe \
-        --domain "$domain" \
+
+# Fetch the resourceRecords Cloud Run wants for a given domain.
+cloud_run_records_json() {
+    gcloud beta run domain-mappings describe \
+        --domain "$1" \
         --region "$REGION" \
         --project "$PROJECT_ID" \
-        --format=json 2>/dev/null || true)
+        --format=json 2>/dev/null || echo ''
+}
 
-    if [[ -z "$json" ]] || [[ "$json" == "null" ]]; then
+print_manual_records_for() {
+    local domain="$1"
+    local json
+    json=$(cloud_run_records_json "$domain")
+    if [[ -z "$json" || "$json" == "null" ]]; then
         log_warn "No domain mapping found for $domain — Phase 3 may not have created it yet"
         return
     fi
-
     echo
     printf '%bDNS records for %s%b\n' "$BOLD" "$domain" "$NC"
     jq -r '.status.resourceRecords // [] | .[] | "  \(.type)  \(.name)  →  \(.rrdata)"' <<<"$json"
 }
 
+# Resolve the Cloudflare zone id whose name is a suffix of `$domain`.
+cloudflare_zone_id_for() {
+    local domain="$1"
+    local zones
+    zones=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+        "https://api.cloudflare.com/client/v4/zones?per_page=50" 2>/dev/null || echo '')
+    [[ -z "$zones" ]] && { log_error "Failed to list Cloudflare zones (token or network)"; return 1; }
+    jq -r --arg domain "$domain" '
+        .result // [] |
+        map(select($domain | endswith(.name))) |
+        sort_by(.name | length) | reverse | .[0].id // empty
+    ' <<<"$zones"
+}
+
+# Check if a record already exists at (zone, type, name). Echoes the record id.
+cloudflare_find_record() {
+    local zone_id="$1" rtype="$2" rname="$3"
+    curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+        "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records?type=$rtype&name=$rname" 2>/dev/null \
+        | jq -r '.result // [] | .[0].id // empty'
+}
+
+# Upsert a single DNS record at Cloudflare. Returns 0 on success.
+cloudflare_upsert_record() {
+    local zone_id="$1" rtype="$2" rname="$3" rcontent="$4"
+    # Strip any trailing dot Google returns for the rrdata.
+    rcontent="${rcontent%.}"
+    rname="${rname%.}"
+
+    local existing
+    existing=$(cloudflare_find_record "$zone_id" "$rtype" "$rname")
+    local body
+    body=$(jq -n \
+        --arg type "$rtype" \
+        --arg name "$rname" \
+        --arg content "$rcontent" \
+        '{type:$type, name:$name, content:$content, ttl:300, proxied:false}')
+
+    local url method
+    if [[ -n "$existing" ]]; then
+        url="https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records/$existing"
+        method="PUT"
+    else
+        url="https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records"
+        method="POST"
+    fi
+
+    local resp
+    resp=$(curl -fsS -X "$method" \
+        -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+        -H "Content-Type: application/json" \
+        --data "$body" \
+        "$url" 2>/dev/null || echo '')
+    [[ -z "$resp" ]] && { log_error "Cloudflare $method failed for $rtype $rname"; return 1; }
+    if [[ $(jq -r '.success // false' <<<"$resp") != "true" ]]; then
+        log_error "Cloudflare rejected $rtype $rname → $rcontent"
+        jq -r '.errors // [] | .[] | "  · \(.message)"' <<<"$resp" >&2
+        return 1
+    fi
+    log_info "  · $rtype $rname → $rcontent  ($(echo "$method" | tr '[:upper:]' '[:lower:]'))"
+}
+
+publish_cloudflare_records_for() {
+    local domain="$1"
+    local json
+    json=$(cloud_run_records_json "$domain")
+    if [[ -z "$json" || "$json" == "null" ]]; then
+        log_warn "No domain mapping found for $domain — Phase 3 may not have created it yet"
+        return
+    fi
+    local zone_id
+    zone_id=$(cloudflare_zone_id_for "$domain" || true)
+    if [[ -z "$zone_id" ]]; then
+        log_warn "No Cloudflare zone found for $domain — falling back to manual output"
+        print_manual_records_for "$domain"
+        return
+    fi
+    log_info "Publishing $domain records to Cloudflare zone $zone_id"
+    local count
+    count=$(jq '.status.resourceRecords // [] | length' <<<"$json")
+    if [[ "$count" == "0" ]]; then
+        log_warn "Cloud Run emitted zero records for $domain; nothing to publish"
+        return
+    fi
+    while IFS=$'\t' read -r rtype rname rcontent; do
+        cloudflare_upsert_record "$zone_id" "$rtype" "$rname" "$rcontent" || true
+    done < <(jq -r '.status.resourceRecords // [] | .[] | [.type, .name, .rrdata] | @tsv' <<<"$json")
+}
+
 phase_6_dns() {
-    log_phase "Phase 6 — DNS resource records to publish"
+    log_phase "Phase 6 — DNS records"
 
-    print_records_for "$PRIMARY_DOMAIN"
-    print_records_for "$SECONDARY_DOMAIN"
+    local targets=("$PRIMARY_DOMAIN")
+    [[ -n "$SECONDARY_DOMAIN" ]] && targets+=("$SECONDARY_DOMAIN")
 
-    cat <<EOF
+    case "$DNS_PROVIDER" in
+        cloudflare)
+            [[ -n "${CLOUDFLARE_API_TOKEN:-}" ]] || {
+                if [[ "$NON_INTERACTIVE" == "true" ]]; then
+                    die "CLOUDFLARE_API_TOKEN env var is required for --dns-provider cloudflare"
+                fi
+                CLOUDFLARE_API_TOKEN=$(prompt_secret_value "Enter CLOUDFLARE_API_TOKEN (Zone:DNS:Edit)")
+                export CLOUDFLARE_API_TOKEN
+            }
+            for domain in "${targets[@]}"; do
+                publish_cloudflare_records_for "$domain"
+            done
+            ;;
+        manual|"")
+            for domain in "${targets[@]}"; do
+                print_manual_records_for "$domain"
+            done
+            cat <<EOF
 
-Publish each record above at the respective DNS provider. Typical subdomains
-resolve via a single CNAME to ghs.googlehosted.com; apex domains need four A
-and four AAAA records. SSL provisioning begins once DNS is live and typically
-completes within 15–30 minutes.
+Publish each record above at the respective DNS provider. Typical subdomain
+mappings resolve via a single CNAME to ghs.googlehosted.com; apex domains
+need four A and four AAAA records. SSL provisioning begins once DNS is live
+and typically completes within 15–30 minutes.
 EOF
+            ;;
+        *)
+            die "Unsupported DNS provider: $DNS_PROVIDER (supported: cloudflare, manual)"
+            ;;
+    esac
 }
 
 # ----------------------------------------------------------------------------
@@ -450,13 +730,13 @@ phase_7_verify() {
 
     wait_health "$service_url" "Cloud Run URL"
     wait_health "https://$PRIMARY_DOMAIN" "Primary domain"
-    wait_health "https://$SECONDARY_DOMAIN" "Secondary domain"
+    [[ -n "$SECONDARY_DOMAIN" ]] && wait_health "https://$SECONDARY_DOMAIN" "Secondary domain"
 
     echo
-    log_info "Deployment verified. Final checks:"
+    log_info "Deployment verified."
     printf '  • %s/health → 200\n' "$service_url"
     printf '  • https://%s/health → 200\n' "$PRIMARY_DOMAIN"
-    printf '  • https://%s/health → 200\n' "$SECONDARY_DOMAIN"
+    [[ -n "$SECONDARY_DOMAIN" ]] && printf '  • https://%s/health → 200\n' "$SECONDARY_DOMAIN"
 }
 
 # ----------------------------------------------------------------------------
@@ -465,11 +745,15 @@ phase_7_verify() {
 main() {
     parse_args "$@"
 
+    detect_project_id
+    detect_dns_provider
+
     log_info "Project: $PROJECT_ID"
     log_info "Region: $REGION"
     log_info "Primary domain: $PRIMARY_DOMAIN"
-    log_info "Secondary domain: $SECONDARY_DOMAIN"
-    log_info "WebAuthn rpId: $WEBAUTHN_RP_ID"
+    log_info "Secondary domain: ${SECONDARY_DOMAIN:-<none>}"
+    log_info "WebAuthn rpId: ${WEBAUTHN_RP_ID:-$PRIMARY_DOMAIN}"
+    log_info "DNS provider: $DNS_PROVIDER"
 
     [[ "$SKIP_PREREQS" == "true" ]] || phase_0_prereqs
     [[ "$SKIP_DOMAIN_CHECK" == "true" ]] || phase_1_domain_check

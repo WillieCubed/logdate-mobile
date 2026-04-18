@@ -64,7 +64,7 @@ docs|docs:performance|Open performance documentation index|open docs/performance
 deploy|deploy:setup|One-time GCP infrastructure setup|./scripts/setup-gcp-deploy.sh
 deploy|deploy:cloud-run|Deploy server to Cloud Run|./scripts/deploy-cloud-run.sh
 deploy|deploy:bootstrap|Bootstrap a fresh GCP LogDate Cloud instance|./scripts/bootstrap-gcp-fresh.sh
-deploy|deploy:production|One-shot production deploy (tfvars + terraform + secrets + image + DNS)|./scripts/deploy-production.sh
+deploy|deploy:production|Interactive turnkey production deploy (autoconfigures project, Cloudflare DNS, secrets)|./scripts/deploy-production.sh
 
 setup|setup:hooks|Configure git hooks for commit validation|./scripts/setup-hooks.sh
 
