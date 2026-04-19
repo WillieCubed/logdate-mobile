@@ -54,6 +54,9 @@ Terraform lives in `infra/terraform`.
 - `webauthn_origin`: `https://cloud.logdate.app`
 - `create_gcs_bucket`: true for managed media storage
 - `cloud_run_secret_env`: map of env var name -> secret ID
+- `request_concurrency`: tune per-environment instead of relying on Cloud Run's default 80; this repo now uses 16 as the starting point for the JVM API.
+- `startup_cpu_boost`: keep enabled to reduce cold-start latency on scale-from-zero revisions.
+- `cpu_idle`: set explicitly; use `true` to preserve request-only CPU allocation when custom resource limits are configured.
 - `SYNC_MEDIA_SIGNED_URLS`: true to return short-lived GCS signed URLs for media downloads
 - `SYNC_MEDIA_SIGNED_URL_TTL_HOURS`: signed URL TTL in hours (1-24)
 
@@ -88,9 +91,12 @@ Image-only mode expects the service to already exist.
 ## Health checks
 - Runtime `/health` endpoint is used by deploy verification.
 - Cloud Run performs startup/readiness checks on the exposed port.
+- Terraform-managed services also use `/health` for startup and liveness probes on port `8080`.
 
 ## Post-deploy validation
-- Verify `/health` for the Cloud Run URL and custom domain.
+- Verify `/health` for the Cloud Run URL and custom domain. The CI workflow and
+  `scripts/deploy-cloud-run.sh` now retry health checks instead of failing on a
+  single cold-start window.
 - Validate WebAuthn RP ID/origin matches the deployed domain.
 - Confirm database connectivity and media uploads.
 - If `SYNC_MEDIA_SIGNED_URLS` is enabled, verify download URLs are signed and time-limited.
