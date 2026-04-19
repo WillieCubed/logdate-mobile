@@ -36,6 +36,10 @@ sensitive_patterns=(
     'secret'
     '\.pem$'
     '\.p12$'
+    '\.tfplan$'
+    '/production\.env$'
+    '\.env\.production$'
+    '\.env\.secrets$'
 )
 
 sensitive_found=()
@@ -72,6 +76,23 @@ secret_line_patterns=(
     'AKIA[0-9A-Z]{16}'
     '-----BEGIN (RSA|EC|DSA|OPENSSH|PGP) PRIVATE KEY-----'
     '(api[_-]?key|secret|token|password)[[:space:]]*[:=][[:space:]]*["'"'"'][^"'"'"']{8,}["'"'"']'
+    # URL-embedded basic-auth credentials: `…://user:pass@host` — user may
+    # be empty (Redis auth-token form), pass must be 6+ chars to avoid
+    # matching placeholder docs. Anchors on `://` so any scheme matches,
+    # including jdbc:postgresql://, postgresql://, rediss://, redis://.
+    '://[^/:@[:space:]"'"'"']*:[^/@[:space:]"'"'"']{6,}@'
+    # Postgres/JDBC query-string credentials: `?password=<value>` where
+    # value is 6+ safe chars. Catches Neon/Supabase JDBC URLs.
+    '[?&]password=[A-Za-z0-9+/=_.-]{6,}'
+    # Stripe/GitHub style hard-coded tokens
+    'sk_live_[0-9A-Za-z]{16,}'
+    'rk_live_[0-9A-Za-z]{16,}'
+    'whsec_[0-9A-Za-z]{16,}'
+    'ghp_[0-9A-Za-z]{30,}'
+    'gho_[0-9A-Za-z]{30,}'
+    # Google API keys + service account private_key blocks
+    'AIza[0-9A-Za-z_-]{30,}'
+    '"type": "service_account"'
 )
 
 secret_hits=()
