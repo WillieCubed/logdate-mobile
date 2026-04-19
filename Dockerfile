@@ -5,30 +5,31 @@
 # Build stage
 FROM gradle:8.10.2-jdk17 AS build
 
-WORKDIR /app
+WORKDIR /workspace
 ENV GRADLE_USER_HOME=/home/gradle/.gradle
 
-# Copy gradle files first for better caching
-COPY --link gradle/ gradle/
-COPY --link gradlew gradlew.bat gradle.properties settings.gradle.kts ./
+# Copy only the Gradle files needed for the server dependency graph. The
+# normal repo settings pull the full monorepo into configuration, which makes
+# container builds slower and invalidates cache layers more often than needed.
+COPY --link gradle/wrapper/ gradle/wrapper/
 COPY --link gradle/libs.versions.toml gradle/libs.versions.toml
+COPY --link gradle/server-docker.settings.gradle.kts settings.gradle.kts
+COPY --link gradle/server-docker.build.gradle.kts build.gradle.kts
+COPY --link gradlew gradlew.bat gradle.properties ./
 COPY --link build-logic/ build-logic/
 
-# Copy project structure and build files
-COPY --link build.gradle.kts ./
-COPY --link app/ app/
-COPY --link client/ client/
-COPY --link integration/ integration/
-COPY --link samples/ samples/
+# Copy only the modules required to build the server artifact.
+COPY --link client/util/ client/util/
 COPY --link shared/ shared/
 COPY --link server/ server/
 
-# Build the application with cached Gradle dependencies
+# Build only the runnable server artifact plus the OpenAPI verification we need
+# for deploy safety; skip packaging work that is irrelevant to the container.
 RUN --mount=type=cache,target=/home/gradle/.gradle \
-    ./gradlew :server:build -x test --no-daemon --build-cache
+    ./gradlew :server:shadowJar :server:validateOpenApi -x test --no-daemon --build-cache
 
 # Development stage (for docker-compose)
-FROM openjdk:17-jdk-slim AS development
+FROM eclipse-temurin:17-jre-jammy AS development
 
 WORKDIR /app
 
@@ -39,7 +40,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy built application
-COPY --link --from=build /app/server/build/libs/logdate-server.jar logdate-server.jar
+COPY --link --from=build /workspace/server/build/libs/logdate-server-all.jar logdate-server.jar
 
 # Development environment variables
 ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
@@ -54,18 +55,13 @@ EXPOSE 8080
 CMD ["java", "-jar", "logdate-server.jar"]
 
 # Production stage (for Cloud Run)
-FROM eclipse-temurin:17-jre-jammy AS production
+FROM gcr.io/distroless/java17-debian12:nonroot AS production
 
 WORKDIR /app
 
-# Create non-root user for security
-RUN groupadd -r logdate \
-    && useradd -r -g logdate -d /app -s /usr/sbin/nologin logdate
-
 # Copy built application with locked-down permissions
-COPY --link --chown=logdate:logdate --chmod=0444 \
-    --from=build /app/server/build/libs/logdate-server.jar /app/logdate-server.jar
-USER logdate
+COPY --link --chown=nonroot:nonroot --chmod=0444 \
+    --from=build /workspace/server/build/libs/logdate-server-all.jar /app/logdate-server.jar
 
 # Production JVM optimizations for Cloud Run
 ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:G1HeapRegionSize=16m -XX:+UseStringDeduplication -Djava.security.egd=file:/dev/./urandom -Djava.io.tmpdir=/tmp"
@@ -75,8 +71,7 @@ ENV PORT=8080
 ENV HOST=0.0.0.0
 ENV KTOR_DEVELOPMENT=false
 
-EXPOSE $PORT
+EXPOSE 8080
 
 # Use exec form for better signal handling
-ENTRYPOINT ["java"]
-CMD ["-jar", "/app/logdate-server.jar"]
+ENTRYPOINT ["java", "-jar", "/app/logdate-server.jar"]

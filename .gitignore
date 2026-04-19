@@ -23,6 +23,15 @@ captures
 **/*.tfstate.*
 **/*.tfvars
 !infra/terraform/*.tfvars
+# Plan files embed the resolved value of every variable, including any
+# secrets threaded in via -var=… — never commit them.
+**/*.tfplan
+# Developer-only env files for the deploy script. production.env carries real
+# DATABASE_URL / OIDC / Redis credentials; it must stay out of git even if
+# someone force-adds or renames it.
+**/production.env
+**/*.env.production
+**/*.env.secrets
 
 **/.claude/settings.local.json
 **/.claude/worktrees/

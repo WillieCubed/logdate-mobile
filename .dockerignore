@@ -65,23 +65,34 @@ Thumbs.db
 
 # Gradle wrapper (keep gradlew and gradle-wrapper.jar but not gradle directory cache)
 .gradle/
+gradle/gradle-daemon-jvm.properties
+
+# Exclude monorepo modules that are not needed for server container builds
+app/
+benchmark/
+infra/
+integration/
+iosApp/
+kotlin-js-store/
+libs/
+samples/
+scripts/
+tests/
+client/*
+!client/util/
+!client/util/**
 
 # Keep only server-related files and shared dependencies
 !gradle/
 !gradlew
 !gradlew.bat
 !gradle.properties
-!settings.gradle.kts
-!build.gradle.kts
 !gradle/libs.versions.toml
+!gradle/server-docker.settings.gradle.kts
+!gradle/server-docker.build.gradle.kts
 !build-logic/
-!app/
-!client/
-!integration/
-!samples/
 !server/
 !shared/
-!client/util/
 
 # Exclude non-essential server files
 server/src/test/
