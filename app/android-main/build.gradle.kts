@@ -5,6 +5,7 @@ import com.android.build.api.dsl.ApplicationExtension
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.gradlePlayPublisher)
     alias(libs.plugins.googleServices)
     alias(libs.plugins.screenshot)
 }
@@ -19,13 +20,14 @@ val androidTestPackageOverride = providers.gradleProperty("logdate.androidTestPa
 /**
  * Production release versionCode comes from CI. Priority order:
  *
- *  1. `LOGDATE_VERSION_CODE` env var (CI sets this per-build — typically a bumpable counter).
+ *  1. `LOGDATE_VERSION_CODE` env var (CI sets this from the latest `android-v*` tag and commit
+ *     distance on the ref being published).
  *  2. `logdate.versionCode` Gradle property (for ad-hoc local release builds).
  *  3. Fallback `1` — the historical hard-coded value, kept so `assembleDebug` still works
  *     without extra configuration.
  *
  * Play Store requires monotonically-increasing versionCodes per upload, so keeping this in CI
- * rather than hard-coding prevents collisions.
+ * rather than hard-coding prevents collisions and keeps Git-based release automation in one place.
  */
 val resolvedVersionCode: Int =
     (
@@ -37,6 +39,10 @@ val resolvedVersionName: String =
     System.getenv("LOGDATE_VERSION_NAME")
         ?: providers.gradleProperty("logdate.versionName").orNull
         ?: "0.1.0"
+val resolvedPlayTrack: String =
+    System.getenv("LOGDATE_PLAY_TRACK")
+        ?: providers.gradleProperty("logdate.play.track").orNull
+        ?: "internal"
 
 /**
  * Release signing material. Set these via env (CI/secrets) or `~/.gradle/gradle.properties`:
@@ -233,6 +239,11 @@ configurations.all {
             useVersion("1.11.0-beta01")
         }
     }
+}
+
+play {
+    track.set(resolvedPlayTrack)
+    defaultToAppBundles.set(true)
 }
 
 dependencies {

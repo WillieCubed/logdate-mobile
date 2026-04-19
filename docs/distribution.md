@@ -15,6 +15,10 @@ This assumes you have Android Studio installed and set up.
 For information on how to build the app for Android, see
 the [Android documentation][android-publishing-tutorial].
 
+For LogDate's automated Play Console publishing flow, required GitHub secrets,
+and tag-based Android versioning, see
+[`docs/reference/google-play-publishing.md`](./reference/google-play-publishing.md).
+
 #### Wear OS App
 
 ```shell

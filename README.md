@@ -190,6 +190,9 @@ docker-compose --profile full-stack up
 # Build and install Android app
 ./gradlew :app:android-main:installDebug
 
+# Build a release app bundle
+./gradlew :app:android-main:bundleRelease
+
 # Build and install Wear OS app
 ./gradlew :app:wear:installDebug
 
@@ -205,6 +208,10 @@ docker-compose --profile full-stack up
 # Run single test
 ./gradlew :module:test --tests "package.TestClass.testMethod"
 ```
+
+For automated Play Console publishing, GitHub Actions setup, and Android
+release versioning, see
+[`docs/reference/google-play-publishing.md`](docs/reference/google-play-publishing.md).
 
 ### Code Quality
 ```bash
