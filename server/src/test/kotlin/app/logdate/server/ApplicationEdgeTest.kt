@@ -1,5 +1,7 @@
 package app.logdate.server
 
+import app.logdate.server.config.RuntimeProfile
+import app.logdate.server.config.profileAwareBoolEnv
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.options
@@ -131,7 +133,13 @@ class ApplicationEdgeTest {
         }
 
     private fun Application.edgeModule(env: Map<String, String>) {
-        installNetworkEdge(readEnv = env::get)
+        val reader: (String) -> String? = env::get
+        val profile = RuntimeProfile.fromEnvironment(reader)
+        installNetworkEdge(
+            allowedOrigins = env["ALLOWED_ORIGINS"] ?: "",
+            trustForwarded = profileAwareBoolEnv("TRUST_FORWARDED_HEADERS", true, true, reader, profile),
+            requireHttps = profileAwareBoolEnv("REQUIRE_HTTPS", true, false, reader, profile),
+        )
         routing {
             get("/test") { call.respondText("ok") }
         }

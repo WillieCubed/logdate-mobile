@@ -1,18 +1,14 @@
 package app.logdate.server
 
 import app.logdate.SERVER_PORT
-import app.logdate.server.atproto.AtprotoPasswordService
-import app.logdate.server.atproto.AtprotoPdsSessionService
 import app.logdate.server.atproto.AtprotoSessionTokenService
-import app.logdate.server.atproto.LogDatePdsBlobStore
-import app.logdate.server.atproto.LogDateRepoStore
 import app.logdate.server.auth.AccountDeletionService
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.AuthMetricsRegistry
 import app.logdate.server.auth.GoogleIdTokenVerifier
-import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.SessionManager
+import app.logdate.server.auth.TokenService
 import app.logdate.server.config.ProductionConfigValidator
 import app.logdate.server.config.RuntimeProfile
 import app.logdate.server.config.profileAwareBoolEnv
@@ -21,15 +17,12 @@ import app.logdate.server.di.serverModule
 import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.entitlements.EntitlementService
 import app.logdate.server.entitlements.entitlementsModule
+import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.logdate.CompositeLogDateMediaBlobRepository
-import app.logdate.server.logdate.FilesystemLogDateBlobStorage
-import app.logdate.server.logdate.LogDateAtprotoBlobRepository
 import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateBlobStorage
-import app.logdate.server.logdate.LogDateCollectionsMetadataStore
-import app.logdate.server.logdate.LogDateMediaRepository
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
@@ -45,21 +38,24 @@ import app.logdate.server.routes.authV1Routes
 import app.logdate.server.routes.identityApiRoutes
 import app.logdate.server.routes.identityRoutes
 import app.logdate.server.routes.oauthRoutes
-import app.logdate.server.routes.openApiRoutes
 import app.logdate.server.routes.serverInfoRoutes
 import app.logdate.server.routes.syncRoutes
 import app.logdate.server.routes.xrpcRoutes
-import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncRepository
 import app.logdate.util.UuidSerializer
+import io.github.aakira.napier.Napier
+import io.github.smiley4.ktoropenapi.OpenApi
+import io.github.smiley4.ktoropenapi.config.AuthScheme
+import io.github.smiley4.ktoropenapi.config.AuthType
+import io.github.smiley4.ktoropenapi.openApi
+import io.github.smiley4.ktorswaggerui.swaggerUI
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.install
-import io.ktor.server.application.log
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
@@ -69,7 +65,6 @@ import io.ktor.server.plugins.httpsredirect.HttpsRedirect
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
-import io.ktor.server.routing.openapi.registerBearerAuthSecurityScheme
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.CancellationException
@@ -84,17 +79,19 @@ import kotlinx.serialization.modules.SerializersModule
 import org.koin.ktor.ext.inject
 import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
-import studio.hypertext.atproto.pds.DescribeServerResponse
-import studio.hypertext.atproto.pds.runtime.DefaultPdsBlobService
-import studio.hypertext.atproto.pds.runtime.DefaultPdsRepoService
-import studio.hypertext.atproto.pds.runtime.DefaultPdsSyncService
-import studio.hypertext.atproto.pds.runtime.StaticPdsDiscoveryService
-import studio.hypertext.atproto.repo.RepoBlockStore
+import studio.hypertext.atproto.pds.PdsBlobService
+import studio.hypertext.atproto.pds.PdsDiscoveryService
+import studio.hypertext.atproto.pds.PdsRepoService
+import studio.hypertext.atproto.pds.PdsSessionService
+import studio.hypertext.atproto.pds.PdsSyncService
+import java.net.URI
+import java.time.Duration
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 fun main() {
-    ProductionConfigValidator.validate(RuntimeProfile.fromEnvironment())
+    val profile = RuntimeProfile.fromEnvironment()
+    ProductionConfigValidator.validate(profile)
 
     val isDatabaseAvailable = initializeDatabase()
 
@@ -119,11 +116,28 @@ private fun buildMainServer(
 
 @OptIn(ExperimentalUuidApi::class)
 fun Application.module(isDatabaseAvailable: Boolean = false) {
-    registerBearerAuthSecurityScheme(
-        name = "bearerAuth",
-        description = "JWT bearer token for authenticated endpoints.",
-        bearerFormat = "JWT",
-    )
+    val profile = RuntimeProfile.fromEnvironment()
+    install(OpenApi) {
+        security {
+            securityScheme("bearerAuth") {
+                type = AuthType.HTTP
+                scheme = AuthScheme.BEARER
+                bearerFormat = "JWT"
+                description = "JWT bearer token for authenticated endpoints."
+            }
+        }
+        info {
+            title = "LogDate Server API"
+            version = "1.0.0"
+            description = "Machine-readable contract for LogDate auth and sync endpoints."
+        }
+        if (!profile.isProduction) {
+            server {
+                url = "http://localhost:8080"
+                description = "Local development server"
+            }
+        }
+    }
 
     // Stop any existing Koin instance to ensure clean state for tests
     runCatching {
@@ -141,110 +155,52 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
         )
     }
 
-    val syncRepository: SyncRepository by inject()
-    val syncMetrics: SyncMetricsRegistry by inject()
-    val authMetrics: AuthMetricsRegistry by inject()
-    val tokenService: JwtTokenService by inject()
-    val accountRepository: AccountRepository by inject()
-    val accountIdentityRepository: AccountIdentityRepository by inject()
-    val googleIdTokenVerifier: GoogleIdTokenVerifier by inject()
-    val sessionManager: SessionManager by inject()
-    val webAuthnService: WebAuthnPasskeyService by inject()
-    val restoreCredentialService: RestoreCredentialService by inject()
-    val atprotoIdentityService: AtprotoIdentityService by inject()
-    val serverDescriptorConfig: ServerDescriptorConfig by inject()
-    val signingKeyService: SigningKeyService by inject()
-    val oauthConfig: OAuthConfig by inject()
-    val oauthKeyService: OAuthKeyService by inject()
-    val oauthNonceService: OAuthNonceService by inject()
-    val oauthDpopVerifier: OAuthDpopVerifier by inject()
-    val oauthAccessTokenService: OAuthAccessTokenService by inject()
-    val oauthAuthorizationService: OAuthAuthorizationService by inject()
-    val atprotoPasswordService: AtprotoPasswordService by inject()
-    val atprotoSessionTokenService: AtprotoSessionTokenService by inject()
-    val atprotoPdsSessionService: AtprotoPdsSessionService by inject()
-    val webAuthnConfig: WebAuthnConfig by inject()
-    val repoBlockStore: RepoBlockStore by inject()
-    val logDateCollectionsMetadataStore: LogDateCollectionsMetadataStore by inject()
-    val logDateMediaRepository: LogDateMediaRepository by inject()
-    val logDateBackupRepository: LogDateBackupRepository by inject()
-    val entitlementEnforcer: EntitlementEnforcer by inject()
-    val entitlementService: EntitlementService by inject()
-    val syncRateLimiter = SlidingWindowRateLimiter()
-    // Deferred construction: blobStorage isn't resolvable from Koin yet, so we build the service
-    // after the repositories are wired a few lines below.
-    val logDateAtprotoBlobRepository: LogDateAtprotoBlobRepository by inject()
-    val logDateMediaBlobRepository =
-        CompositeLogDateMediaBlobRepository(
-            mediaRepository = logDateMediaRepository,
-            atprotoBlobRepository = logDateAtprotoBlobRepository,
-        )
-    val blobStorage: LogDateBlobStorage? =
-        GcsMediaStorage.fromEnvironment()
-            ?: FilesystemLogDateBlobStorage.fromEnvironment()
-    if (blobStorage == null) {
-        log.warn(
-            "No blob storage configured: media and backup endpoints will reject uploads. " +
-                "Set GCS_* for Google Cloud Storage or LOGDATE_BLOB_STORAGE_DIR for an on-disk store.",
-        )
-    }
-    val accountDeletionService =
-        AccountDeletionService(
-            accountRepository = accountRepository,
-            mediaBlobRepository = logDateMediaBlobRepository,
-            backupRepository = logDateBackupRepository,
-            blobStorage = blobStorage,
-        )
-    val logDateCollectionsRepository =
-        RepoBackedLogDateCollectionsRepository(
-            accountRepository = accountRepository,
-            identityService = atprotoIdentityService,
-            signingKeyService = signingKeyService,
-            blockStore = repoBlockStore,
-            metadataStore = logDateCollectionsMetadataStore,
-        )
-    val logDateRepoStore =
-        LogDateRepoStore(
-            collectionsRepository = logDateCollectionsRepository,
-            identityService = atprotoIdentityService,
-            signingKeyService = signingKeyService,
-            accountRepository = accountRepository,
-            blockStore = repoBlockStore,
-        )
-    atprotoIdentityService.setRepoCollectionsResolver(logDateRepoStore::collectionsForDid)
-    val pdsRepoService = DefaultPdsRepoService(logDateRepoStore)
-    val pdsSyncService = DefaultPdsSyncService(logDateRepoStore)
-    val pdsBlobService =
-        blobStorage?.let { configuredStorage ->
-            DefaultPdsBlobService(
-                LogDatePdsBlobStore(
-                    identityService = atprotoIdentityService,
-                    mediaBlobRepository = logDateMediaBlobRepository,
-                    blobStorage = configuredStorage,
-                ),
-            )
-        }
-    val pdsDiscoveryService =
-        StaticPdsDiscoveryService(
-            authorizationServerMetadata = oauthConfig.authorizationServerMetadata(),
-            protectedResourceMetadata = oauthConfig.protectedResourceMetadata(),
-            describeServerResponse =
-                DescribeServerResponse(
-                    did = atprotoIdentityService.config.serverDid,
-                    availableUserDomains = listOf(atprotoIdentityService.config.normalizedHandleDomain),
-                    inviteCodeRequired = false,
-                    phoneVerificationRequired = false,
-                ),
-        )
+    val accountRepository by inject<AccountRepository>()
+    val accountIdentityRepository by inject<AccountIdentityRepository>()
+    val sessionManager by inject<SessionManager>()
+    val webAuthnService by inject<WebAuthnPasskeyService>()
+    val restoreCredentialService by inject<RestoreCredentialService>()
+    val atprotoIdentityService by inject<AtprotoIdentityService>()
+    val tokenService by inject<TokenService>()
+    val googleIdTokenVerifier by inject<GoogleIdTokenVerifier>()
+    val authMetrics by inject<AuthMetricsRegistry>()
+    val accountDeletionService by inject<AccountDeletionService>()
+    val entitlementService by inject<EntitlementService>()
+    val syncRepository by inject<SyncRepository>()
+    val syncMetrics by inject<SyncMetricsRegistry>()
+    val logDateCollectionsRepository by inject<RepoBackedLogDateCollectionsRepository>()
+    val logDateMediaBlobRepository by inject<CompositeLogDateMediaBlobRepository>()
+    val logDateBackupRepository by inject<LogDateBackupRepository>()
+    val blobStorage by inject<LogDateBlobStorage>()
+    val entitlementEnforcer by inject<EntitlementEnforcer>()
+    val signingKeyService by inject<SigningKeyService>()
+
+    val pdsDiscoveryService by inject<PdsDiscoveryService>()
+    val pdsRepoService by inject<PdsRepoService>()
+    val pdsSessionService by inject<PdsSessionService>()
+    val pdsSyncService by inject<PdsSyncService>()
+    val pdsBlobService by inject<PdsBlobService>()
+    val atprotoSessionTokenService by inject<AtprotoSessionTokenService>()
+
+    val oauthConfig by inject<OAuthConfig>()
+    val oauthKeyService by inject<OAuthKeyService>()
+    val oauthAuthorizationService by inject<OAuthAuthorizationService>()
+    val oauthAccessTokenService by inject<OAuthAccessTokenService>()
+    val oauthDpopVerifier by inject<OAuthDpopVerifier>()
+    val oauthNonceService by inject<OAuthNonceService>()
+
+    val serverDescriptorConfig by inject<ServerDescriptorConfig>()
+    val atprotoIdentityConfig by inject<AtprotoIdentityConfig>()
+    val webAuthnConfig by inject<WebAuthnConfig>()
+
     val serverDescriptor =
         serverDescriptorConfig.toDescriptor(
-            identityConfig = atprotoIdentityService.config,
+            identityConfig = atprotoIdentityConfig,
             webAuthnRpId = webAuthnConfig.relyingPartyId,
             webAuthnRpName = webAuthnConfig.relyingPartyName,
         )
 
-    runCatching { runBlocking { atprotoIdentityService.backfillMissingIdentities() } }
-        .onFailure { log.warn("Failed to backfill AT Protocol identities on startup", it) }
+    val syncRateLimiter = SlidingWindowRateLimiter()
 
     val maintenanceReadEnv: (String) -> String? =
         if (isDatabaseAvailable) {
@@ -276,7 +232,15 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     }
 
     routing {
-        openApiRoutes()
+        route("openapi.json") {
+            openApi()
+        }
+        route("openapi.yaml") {
+            openApi()
+        }
+        route("swagger") {
+            swaggerUI("/openapi.json")
+        }
 
         get("/") {
             call.respondText("LogDate Server API v1.0")
@@ -311,7 +275,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
             accountRepository = accountRepository,
             tokenService = tokenService,
             repoService = pdsRepoService,
-            sessionService = atprotoPdsSessionService,
+            sessionService = pdsSessionService,
             syncService = pdsSyncService,
             blobService = pdsBlobService,
             atprotoSessionTokenService = atprotoSessionTokenService,
@@ -371,152 +335,115 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
  *  - `REQUIRE_HTTPS` — when `true`, installs [HttpsRedirect]. **Defaults to `true` in production.**
  *    Combined with [XForwardedHeaders] above, a request the LB received over HTTPS will pass
  *    through (scheme reads as `https`) while a request the LB received over HTTP gets 301'd. With
- *    `TRUST_FORWARDED_HEADERS=false` the redirect looks at the raw socket scheme — correct for
- *    direct-facing deployments, wrong for LB-fronted ones.
+ *    [HttpsRedirect], any request that comes in as `http` (but not from `localhost` or `127.0.0.1`)
+ *    is redirected to `https`.
  */
-internal fun Application.installNetworkEdge(readEnv: (String) -> String? = System::getenv) {
-    val allowedOrigins = parseAllowedOrigins(readEnv("ALLOWED_ORIGINS"))
-    if (allowedOrigins.isNotEmpty()) {
+internal fun Application.installNetworkEdge(
+    allowedOrigins: String = System.getenv("ALLOWED_ORIGINS") ?: "",
+    trustForwarded: Boolean = profileAwareBoolEnv("TRUST_FORWARDED_HEADERS", productionDefault = true, devDefault = true),
+    requireHttps: Boolean = profileAwareBoolEnv("REQUIRE_HTTPS", productionDefault = true, devDefault = false),
+) {
+    val parsedOrigins = parseAllowedOrigins(allowedOrigins)
+    if (parsedOrigins.isNotEmpty()) {
         install(CORS) {
-            allowedOrigins.forEach { origin ->
-                val scheme = origin.scheme
-                val hostWithPort =
-                    if (origin.port != null) "${origin.host}:${origin.port}" else origin.host
-                allowHost(hostWithPort, schemes = listOf(scheme))
+            parsedOrigins.forEach { origin ->
+                val originStr =
+                    buildString {
+                        append(origin.scheme)
+                        append("://")
+                        append(origin.host)
+                        origin.port?.let { append(":").append(it) }
+                    }
+                allowHost(originStr)
             }
-            allowMethod(HttpMethod.Get)
-            allowMethod(HttpMethod.Post)
+            allowMethod(HttpMethod.Options)
             allowMethod(HttpMethod.Put)
             allowMethod(HttpMethod.Patch)
             allowMethod(HttpMethod.Delete)
-            allowMethod(HttpMethod.Options)
-            allowHeader(HttpHeaders.Authorization)
             allowHeader(HttpHeaders.ContentType)
-            allowHeader(HttpHeaders.Accept)
+            allowHeader(HttpHeaders.Authorization)
             allowCredentials = true
-            maxAgeInSeconds = 3600
         }
-        log.info("CORS enabled for ${allowedOrigins.size} origin(s): ${allowedOrigins.joinToString { it.raw }}")
-    } else {
-        log.info("CORS disabled (ALLOWED_ORIGINS not set)")
     }
 
-    val trustForwarded =
-        profileAwareBoolEnv(
-            "TRUST_FORWARDED_HEADERS",
-            productionDefault = true,
-            devDefault = false,
-            readEnv = readEnv,
-        )
     if (trustForwarded) {
         install(XForwardedHeaders)
-        log.info("XForwardedHeaders installed; request scheme/host will follow forwarded headers")
     }
 
-    val requireHttps =
-        profileAwareBoolEnv(
-            "REQUIRE_HTTPS",
-            productionDefault = true,
-            devDefault = false,
-            readEnv = readEnv,
-        )
     if (requireHttps) {
         install(HttpsRedirect)
-        log.info("HttpsRedirect enabled (production default, or REQUIRE_HTTPS=true)")
     }
 }
 
-internal data class AllowedOrigin(
-    val raw: String,
-    val scheme: String,
-    val host: String,
-    val port: Int?,
-)
-
+/**
+ * Parses a comma-separated list of origin URIs into a list of [AllowedOrigin] structures.
+ * Malformed entries are logged and skipped.
+ */
 internal fun parseAllowedOrigins(raw: String?): List<AllowedOrigin> {
     if (raw.isNullOrBlank()) return emptyList()
     return raw
-        .split(',')
-        .map(String::trim)
-        .filter(String::isNotEmpty)
-        .mapNotNull { entry ->
+        .split(",")
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .mapNotNull { originStr ->
             runCatching {
-                val uri = java.net.URI(entry)
-                val scheme = uri.scheme?.lowercase()
-                val host = uri.host
-                if (scheme.isNullOrBlank() || host.isNullOrBlank()) return@runCatching null
+                val uri = URI(originStr)
+                requireNotNull(uri.scheme) { "Missing scheme in origin: $originStr" }
+                requireNotNull(uri.host) { "Missing host in origin: $originStr" }
                 AllowedOrigin(
-                    raw = entry,
-                    scheme = scheme,
-                    host = host,
-                    port = if (uri.port == -1) null else uri.port,
+                    scheme = uri.scheme,
+                    host = uri.host,
+                    port = if (uri.port != -1) uri.port else null,
                 )
-            }.getOrNull()
+            }.getOrElse { error ->
+                Napier.w("Skipping malformed ALLOWED_ORIGINS entry: $originStr", error)
+                null
+            }
         }
 }
 
-private const val SYNC_PURGE_METRIC_NAME = "sync.maintenance.purge"
-private const val MILLIS_PER_HOUR = 60 * 60 * 1000L
-private const val MILLIS_PER_DAY = 24 * MILLIS_PER_HOUR
+/**
+ * Structured breakdown of a trusted origin for CORS configuration.
+ */
+internal data class AllowedOrigin(
+    val scheme: String,
+    val host: String,
+    val port: Int? = null,
+)
 
-private fun Application.startSyncMaintenance(
-    repository: SyncRepository,
+private fun startSyncMaintenance(
+    syncRepository: SyncRepository,
     metrics: SyncMetricsRegistry,
     readEnv: (String) -> String?,
 ): Job? {
-    val enabled = readBooleanEnv("SYNC_TOMBSTONE_PURGE_ENABLED", defaultValue = true, readEnv = readEnv)
-    if (!enabled) {
-        log.info("Sync tombstone purge disabled by SYNC_TOMBSTONE_PURGE_ENABLED")
-        return null
-    }
+    val enabled = readEnv("SYNC_TOMBSTONE_PURGE_ENABLED")?.toBooleanStrictOrNull() ?: true
+    if (!enabled) return null
 
+    val intervalMinutes = readEnv("SYNC_TOMBSTONE_PURGE_INTERVAL_MINUTES")?.toLongOrNull() ?: 60L
     val retentionDays = readEnv("SYNC_TOMBSTONE_RETENTION_DAYS")?.toLongOrNull() ?: 30L
-    val intervalHours = readEnv("SYNC_TOMBSTONE_PURGE_INTERVAL_HOURS")?.toLongOrNull() ?: 24L
-    val safeRetentionDays = retentionDays.coerceIn(1L, 3650L)
-    val safeIntervalHours = intervalHours.coerceAtLeast(1L)
-    val intervalMs = safeIntervalHours * MILLIS_PER_HOUR
 
-    log.info(
-        "Starting sync tombstone purge: retentionDays={}, intervalHours={}",
-        safeRetentionDays,
-        safeIntervalHours,
-    )
-
-    return launch(Dispatchers.IO) {
-        while (isActive) {
-            val start = System.currentTimeMillis()
-            val cutoff = System.currentTimeMillis() - (safeRetentionDays * MILLIS_PER_DAY)
-            try {
-                val result = repository.purgeTombstonesOlderThan(cutoff)
-                metrics.recordOperation(SYNC_PURGE_METRIC_NAME, System.currentTimeMillis() - start, true)
-                log.info(
-                    "Purged sync tombstones older than {} days: content={}, journals={}, associations={}, media={}",
-                    safeRetentionDays,
-                    result.contentPurged,
-                    result.journalPurged,
-                    result.associationPurged,
-                    result.mediaPurged,
-                )
-            } catch (e: Exception) {
-                metrics.recordOperation(SYNC_PURGE_METRIC_NAME, System.currentTimeMillis() - start, false)
-                log.error("Sync tombstone purge failed", e)
-            }
-            try {
-                delay(intervalMs)
-            } catch (_: CancellationException) {
-                break
+    return runBlocking(Dispatchers.Default) {
+        launch {
+            while (isActive) {
+                val start = System.currentTimeMillis()
+                var success = false
+                try {
+                    val cutoff = System.currentTimeMillis() - retentionDays * 24 * 60 * 60 * 1000
+                    syncRepository.purgeTombstonesOlderThan(cutoff)
+                    Napier.i("Purged sync tombstones older than $retentionDays days")
+                    success = true
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    Napier.e("Failed to purge sync tombstones", e)
+                } finally {
+                    metrics.recordOperation(
+                        "maintenance.tombstone_purge",
+                        System.currentTimeMillis() - start,
+                        success,
+                    )
+                }
+                delay(Duration.ofMinutes(intervalMinutes).toMillis())
             }
         }
     }
-}
-
-private fun readBooleanEnv(
-    name: String,
-    defaultValue: Boolean,
-    readEnv: (String) -> String?,
-): Boolean {
-    val raw = readEnv(name) ?: return defaultValue
-    return raw.equals("true", ignoreCase = true) ||
-        raw.equals("yes", ignoreCase = true) ||
-        raw == "1"
 }

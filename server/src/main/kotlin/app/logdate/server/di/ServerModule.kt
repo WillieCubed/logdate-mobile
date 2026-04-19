@@ -8,6 +8,9 @@ import app.logdate.server.atproto.AtprotoSessionRepository
 import app.logdate.server.atproto.AtprotoSessionTokenService
 import app.logdate.server.atproto.InMemoryAtprotoPasswordCredentialRepository
 import app.logdate.server.atproto.InMemoryAtprotoSessionRepository
+import app.logdate.server.atproto.LogDatePdsBlobStore
+import app.logdate.server.atproto.LogDateRepoStore
+import app.logdate.server.auth.AccountDeletionService
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.AuthMetricsRegistry
@@ -18,6 +21,7 @@ import app.logdate.server.auth.InMemoryAccountRepository
 import app.logdate.server.auth.InMemorySessionManager
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.SessionManager
+import app.logdate.server.auth.TokenService
 import app.logdate.server.database.AccountIdentitiesTable
 import app.logdate.server.database.AccountLinkEventsTable
 import app.logdate.server.database.AccountsTable
@@ -62,14 +66,20 @@ import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.PlcIdentityService
 import app.logdate.server.identity.SigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.logdate.CompositeLogDateMediaBlobRepository
+import app.logdate.server.logdate.FilesystemLogDateBlobStorage
 import app.logdate.server.logdate.InMemoryLogDateAtprotoBlobRepository
 import app.logdate.server.logdate.InMemoryLogDateBackupRepository
+import app.logdate.server.logdate.InMemoryLogDateBlobStorage
 import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
 import app.logdate.server.logdate.InMemoryLogDateMediaRepository
 import app.logdate.server.logdate.LogDateAtprotoBlobRepository
 import app.logdate.server.logdate.LogDateBackupRepository
+import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateCollectionsMetadataStore
+import app.logdate.server.logdate.LogDateMediaBlobRepository
 import app.logdate.server.logdate.LogDateMediaRepository
+import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
 import app.logdate.server.oauth.InMemoryOAuthRuntimeStateRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
@@ -90,6 +100,7 @@ import app.logdate.server.sync.AssociationSyncTable
 import app.logdate.server.sync.BackupSyncTable
 import app.logdate.server.sync.ContentSyncTable
 import app.logdate.server.sync.DbSyncRepository
+import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.JournalSyncTable
 import app.logdate.server.sync.MediaSyncTable
@@ -100,10 +111,23 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import org.jetbrains.exposed.v1.jdbc.SchemaUtils
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.koin.dsl.bind
 import org.koin.dsl.module
+import studio.hypertext.atproto.pds.DescribeServerResponse
+import studio.hypertext.atproto.pds.PdsBlobService
+import studio.hypertext.atproto.pds.PdsDiscoveryService
+import studio.hypertext.atproto.pds.PdsRepoService
+import studio.hypertext.atproto.pds.PdsSessionService
+import studio.hypertext.atproto.pds.PdsSyncService
+import studio.hypertext.atproto.pds.runtime.DefaultPdsBlobService
+import studio.hypertext.atproto.pds.runtime.DefaultPdsRepoService
+import studio.hypertext.atproto.pds.runtime.DefaultPdsSyncService
+import studio.hypertext.atproto.pds.runtime.StaticPdsDiscoveryService
 import studio.hypertext.atproto.plc.KtorPlcDirectoryClient
 import studio.hypertext.atproto.repo.InMemoryRepoBlockStore
 import studio.hypertext.atproto.repo.RepoBlockStore
+import studio.hypertext.atproto.repo.RepoEngine
+import studio.hypertext.atproto.repo.RepoRecordStore
 
 /**
  * Initializes the database connection and tables.
@@ -289,7 +313,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
         }
         single { AtprotoPasswordService(repository = get()) }
         single { AtprotoSessionTokenService(sessionRepository = get()) }
-        single {
+        single<PdsSessionService> {
             AtprotoPdsSessionService(
                 accountRepository = get(),
                 identityService = get(),
@@ -349,9 +373,25 @@ fun serverModule(isDatabaseAvailable: Boolean) =
         single { SyncMetricsRegistry() }
         single { AuthMetricsRegistry() }
 
-        single {
+        single<TokenService> {
             JwtTokenService(
                 secret = System.getenv("JWT_SECRET") ?: JwtTokenService.generateSecret(),
+            )
+        }
+
+        single {
+            CompositeLogDateMediaBlobRepository(
+                mediaRepository = get(),
+                atprotoBlobRepository = get(),
+            )
+        } bind LogDateMediaBlobRepository::class
+
+        single {
+            AccountDeletionService(
+                accountRepository = get(),
+                mediaBlobRepository = get(),
+                backupRepository = get(),
+                blobStorage = getOrNull<LogDateBlobStorage>(),
             )
         }
 
@@ -363,5 +403,58 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                     .filter { it.isNotBlank() }
                     .toSet()
             HttpGoogleIdTokenVerifier(allowedClientIds = allowedClientIds)
+        }
+
+        single<LogDateBlobStorage> {
+            GcsMediaStorage.fromEnvironment()
+                ?: FilesystemLogDateBlobStorage.fromEnvironment()
+                ?: InMemoryLogDateBlobStorage()
+        }
+
+        // AT Protocol Runtime Services
+        single {
+            RepoBackedLogDateCollectionsRepository(
+                accountRepository = get(),
+                identityService = get(),
+                signingKeyService = get(),
+                blockStore = get(),
+                metadataStore = get(),
+            )
+        }
+        single {
+            LogDateRepoStore(
+                collectionsRepository = get<RepoBackedLogDateCollectionsRepository>(),
+                identityService = get(),
+                signingKeyService = get(),
+                accountRepository = get(),
+                blockStore = get(),
+            )
+        } bind RepoEngine::class bind RepoRecordStore::class
+
+        single<PdsRepoService> { DefaultPdsRepoService(get()) }
+        single<PdsSyncService> { DefaultPdsSyncService(get()) }
+        single<PdsBlobService> {
+            DefaultPdsBlobService(
+                LogDatePdsBlobStore(
+                    identityService = get(),
+                    mediaBlobRepository = get(),
+                    blobStorage = get(),
+                ),
+            )
+        }
+        single<PdsDiscoveryService> {
+            val oauthConfig: OAuthConfig = get()
+            val identityConfig: AtprotoIdentityConfig = get()
+            StaticPdsDiscoveryService(
+                authorizationServerMetadata = oauthConfig.authorizationServerMetadata(),
+                protectedResourceMetadata = oauthConfig.protectedResourceMetadata(),
+                describeServerResponse =
+                    DescribeServerResponse(
+                        did = identityConfig.serverDid,
+                        availableUserDomains = listOf(identityConfig.normalizedHandleDomain),
+                        inviteCodeRequired = false,
+                        phoneVerificationRequired = false,
+                    ),
+            )
         }
     }
