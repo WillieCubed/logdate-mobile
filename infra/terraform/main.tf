@@ -9,8 +9,9 @@ provider "google-beta" {
 }
 
 locals {
+  # Cloud Run v2 reserves PORT (and the K_* family) and sets it automatically
+  # at runtime. Including it in the env block fails with HTTP 400.
   base_env = {
-    PORT           = "8080"
     HOST           = "0.0.0.0"
     GCS_PROJECT_ID = var.project_id
   }
@@ -54,19 +55,26 @@ locals {
     var.domains,
     var.domain != "" ? [var.domain] : [],
   ))
-}
 
-resource "google_project_service" "required" {
-  for_each = var.enable_services ? toset([
+  always_on_services = [
     "run.googleapis.com",
-    "sqladmin.googleapis.com",
     "artifactregistry.googleapis.com",
     "iam.googleapis.com",
     "iamcredentials.googleapis.com",
     "cloudresourcemanager.googleapis.com",
     "secretmanager.googleapis.com",
-    "storage.googleapis.com"
-  ]) : toset([])
+  ]
+
+  conditional_services = concat(
+    var.create_gcs_bucket ? ["storage.googleapis.com"] : [],
+    var.create_cloud_sql_instance ? ["sqladmin.googleapis.com"] : [],
+  )
+
+  required_services = concat(local.always_on_services, local.conditional_services)
+}
+
+resource "google_project_service" "required" {
+  for_each = var.enable_services ? toset(local.required_services) : toset([])
 
   service            = each.key
   disable_on_destroy = false
@@ -115,7 +123,7 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     "attribute.repository_owner" = "assertion.repository_owner"
   }
 
-  attribute_condition = "assertion.repository == '${var.github_repo}' && (assertion.ref == 'refs/heads/main' || startsWith(assertion.ref, 'refs/tags/'))"
+  attribute_condition = "assertion.repository == '${var.github_repo}' && (assertion.ref == 'refs/heads/main' || assertion.ref.startsWith('refs/tags/'))"
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"
   }
@@ -249,8 +257,9 @@ resource "google_cloud_run_v2_service" "server" {
   labels   = var.labels
 
   template {
-    service_account = google_service_account.runtime.email
-    timeout         = "${var.timeout_seconds}s"
+    service_account                  = google_service_account.runtime.email
+    timeout                          = "${var.timeout_seconds}s"
+    max_instance_request_concurrency = var.request_concurrency
 
     scaling {
       min_instance_count = var.min_instances
@@ -260,10 +269,37 @@ resource "google_cloud_run_v2_service" "server" {
     containers {
       image = var.cloud_run_image
 
+      ports {
+        container_port = 8080
+      }
+
       resources {
         limits = {
           cpu    = var.cpu
           memory = var.memory
+        }
+        cpu_idle          = var.cpu_idle
+        startup_cpu_boost = var.startup_cpu_boost
+      }
+
+      startup_probe {
+        timeout_seconds   = 5
+        period_seconds    = 5
+        failure_threshold = 12
+        http_get {
+          path = "/health"
+          port = 8080
+        }
+      }
+
+      liveness_probe {
+        initial_delay_seconds = 15
+        timeout_seconds       = 5
+        period_seconds        = 30
+        failure_threshold     = 3
+        http_get {
+          path = "/health"
+          port = 8080
         }
       }
 

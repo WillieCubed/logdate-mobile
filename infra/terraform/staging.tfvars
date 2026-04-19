@@ -14,6 +14,10 @@ domains               = ["cloud-staging.logdate.app"]
 create_gcs_bucket = true
 gcs_bucket_name   = "logdate-media-staging"
 
+request_concurrency = 16
+cpu_idle            = true
+startup_cpu_boost   = true
+
 cloud_run_env = {
   AUTO_MIGRATE = "true"
 }

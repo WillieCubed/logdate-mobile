@@ -58,8 +58,12 @@ terraform apply -var-file=staging.tfvars
 ```
 
 Set environment variables with `cloud_run_env` and secrets with `cloud_run_secret_env`.
-The module automatically injects `PORT`, `HOST`, `GCS_PROJECT_ID`, and optionally
+The module automatically injects `HOST`, `GCS_PROJECT_ID`, and optionally
 `GCS_BUCKET_NAME`, `WEBAUTHN_RP_ID`, `WEBAUTHN_ORIGIN`.
+
+Cloud Run runtime tuning is configured with `request_concurrency`, `cpu_idle`,
+and `startup_cpu_boost`. The service template also wires `/health` startup and
+liveness probes on port `8080` so deploys fail faster when a revision cannot boot.
 
 Terraform ignores image changes by default so CI can update images without causing drift.
 To pin images explicitly, remove the `ignore_changes` block from `infra/terraform/main.tf`.
@@ -81,6 +85,10 @@ github_repo        = "your-org/logdate"
 
 create_gcs_bucket = true
 gcs_bucket_name   = "logdate-media-staging"
+
+request_concurrency = 16
+cpu_idle            = true
+startup_cpu_boost   = true
 
 cloud_run_env = {
   AUTO_MIGRATE = "true"

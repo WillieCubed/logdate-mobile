@@ -115,6 +115,7 @@ if [[ -n "$RUNTIME_SERVICE_ACCOUNT" ]]; then
 fi
 
 IMAGE_URI="$REGION-docker.pkg.dev/$PROJECT_ID/$ARTIFACT_REGISTRY_REPO/$SERVICE_NAME"
+CACHE_REF="$IMAGE_URI:buildcache"
 
 CONFIG_ENV_ARGS=()
 CONFIG_SECRET_ARGS=()
@@ -130,7 +131,6 @@ if [[ "$CONFIG_MODE" == "full" ]]; then
         WEBAUTHN_ORIGIN_VALUE="https://$WEBAUTHN_RP_ID_VALUE"
     fi
 
-    CONFIG_ENV_ARGS+=(--set-env-vars "PORT=8080")
     CONFIG_ENV_ARGS+=(--set-env-vars "HOST=0.0.0.0")
     CONFIG_ENV_ARGS+=(--set-env-vars "GCS_PROJECT_ID=$GCS_PROJECT_ID_VALUE")
 
@@ -164,12 +164,18 @@ if [[ "$CONFIG_MODE" == "full" ]]; then
     MEMORY_VALUE="${MEMORY:-$(tf_value memory)}"
     CPU_VALUE="${CPU:-$(tf_value cpu)}"
     TIMEOUT_SECONDS_VALUE="${TIMEOUT_SECONDS:-$(tf_value timeout_seconds)}"
+    REQUEST_CONCURRENCY_VALUE="${REQUEST_CONCURRENCY:-$(tf_value request_concurrency)}"
+    STARTUP_CPU_BOOST_VALUE="${STARTUP_CPU_BOOST:-$(tf_value startup_cpu_boost)}"
+    CPU_IDLE_VALUE="${CPU_IDLE:-$(tf_value cpu_idle)}"
 
     MIN_INSTANCES_VALUE="${MIN_INSTANCES_VALUE:-0}"
     MAX_INSTANCES_VALUE="${MAX_INSTANCES_VALUE:-10}"
     MEMORY_VALUE="${MEMORY_VALUE:-512Mi}"
     CPU_VALUE="${CPU_VALUE:-1}"
     TIMEOUT_SECONDS_VALUE="${TIMEOUT_SECONDS_VALUE:-60}"
+    REQUEST_CONCURRENCY_VALUE="${REQUEST_CONCURRENCY_VALUE:-80}"
+    STARTUP_CPU_BOOST_VALUE="${STARTUP_CPU_BOOST_VALUE:-true}"
+    CPU_IDLE_VALUE="${CPU_IDLE_VALUE:-true}"
 
     if [[ -n "${TIMEOUT:-}" ]]; then
         CONFIG_RUNTIME_ARGS+=(--timeout "${TIMEOUT}")
@@ -181,34 +187,67 @@ if [[ "$CONFIG_MODE" == "full" ]]; then
     CONFIG_RUNTIME_ARGS+=(--max-instances "$MAX_INSTANCES_VALUE")
     CONFIG_RUNTIME_ARGS+=(--memory "$MEMORY_VALUE")
     CONFIG_RUNTIME_ARGS+=(--cpu "$CPU_VALUE")
+    CONFIG_RUNTIME_ARGS+=(--concurrency "$REQUEST_CONCURRENCY_VALUE")
+    CONFIG_RUNTIME_ARGS+=(--port "8080")
+    CONFIG_RUNTIME_ARGS+=(--startup-probe "timeoutSeconds=5,periodSeconds=5,failureThreshold=12,httpGet.path=/health,httpGet.port=8080")
+    CONFIG_RUNTIME_ARGS+=(--liveness-probe "initialDelaySeconds=15,timeoutSeconds=5,periodSeconds=30,failureThreshold=3,httpGet.path=/health,httpGet.port=8080")
+
+    if [[ "$STARTUP_CPU_BOOST_VALUE" == "true" ]]; then
+        CONFIG_RUNTIME_ARGS+=(--cpu-boost)
+    else
+        CONFIG_RUNTIME_ARGS+=(--no-cpu-boost)
+    fi
+
+    if [[ "$CPU_IDLE_VALUE" == "true" ]]; then
+        CONFIG_RUNTIME_ARGS+=(--cpu-throttling)
+    else
+        CONFIG_RUNTIME_ARGS+=(--no-cpu-throttling)
+    fi
 fi
 
 gcloud config set project "$PROJECT_ID"
 
 gcloud auth configure-docker "$REGION-docker.pkg.dev"
 
+BUILD_TAG_ARGS=("-t" "$IMAGE_URI:$IMAGE_TAG")
+if [[ "$IMAGE_TAG" != "latest" ]]; then
+    BUILD_TAG_ARGS+=("-t" "$IMAGE_URI:latest")
+fi
+
 docker buildx build \
     --platform "$DOCKER_PLATFORM" \
     --target production \
-    -t "$IMAGE_URI:$IMAGE_TAG" \
-    -t "$IMAGE_URI:latest" \
-    --load \
+    --cache-from "type=registry,ref=$CACHE_REF" \
+    --cache-to "type=registry,ref=$CACHE_REF,mode=max" \
+    "${BUILD_TAG_ARGS[@]}" \
+    --push \
     .
 
-docker push "$IMAGE_URI:$IMAGE_TAG"
-if [[ "$IMAGE_TAG" != "latest" ]]; then
-    docker push "$IMAGE_URI:latest"
+DEPLOY_ARGS=(
+    gcloud run deploy "$SERVICE_NAME"
+    --image "$IMAGE_URI:$IMAGE_TAG"
+    --platform managed
+    --region "$REGION"
+    --project "$PROJECT_ID"
+)
+
+if (( ${#SERVICE_ACCOUNT_ARGS[@]} > 0 )); then
+    DEPLOY_ARGS+=("${SERVICE_ACCOUNT_ARGS[@]}")
 fi
 
-gcloud run deploy "$SERVICE_NAME" \
-    --image "$IMAGE_URI:$IMAGE_TAG" \
-    --platform managed \
-    --region "$REGION" \
-    --project "$PROJECT_ID" \
-    "${SERVICE_ACCOUNT_ARGS[@]}" \
-    "${CONFIG_ENV_ARGS[@]}" \
-    "${CONFIG_SECRET_ARGS[@]}" \
-    "${CONFIG_RUNTIME_ARGS[@]}"
+if (( ${#CONFIG_ENV_ARGS[@]} > 0 )); then
+    DEPLOY_ARGS+=("${CONFIG_ENV_ARGS[@]}")
+fi
+
+if (( ${#CONFIG_SECRET_ARGS[@]} > 0 )); then
+    DEPLOY_ARGS+=("${CONFIG_SECRET_ARGS[@]}")
+fi
+
+if (( ${#CONFIG_RUNTIME_ARGS[@]} > 0 )); then
+    DEPLOY_ARGS+=("${CONFIG_RUNTIME_ARGS[@]}")
+fi
+
+"${DEPLOY_ARGS[@]}"
 
 SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" \
     --platform managed \
@@ -217,3 +256,14 @@ SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" \
     --format 'value(status.url)')
 
 echo "Cloud Run URL: $SERVICE_URL"
+
+for attempt in $(seq 1 30); do
+    if curl -sf --max-time 10 "$SERVICE_URL/health"; then
+        echo
+        exit 0
+    fi
+    sleep 2
+done
+
+echo "Deployment finished, but /health did not become ready in time."
+exit 1

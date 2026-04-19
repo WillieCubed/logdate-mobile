@@ -68,6 +68,24 @@ variable "timeout_seconds" {
   default     = 60
 }
 
+variable "request_concurrency" {
+  type        = number
+  description = "Maximum concurrent requests per Cloud Run instance. Use 0 to accept Cloud Run's default."
+  default     = 80
+}
+
+variable "cpu_idle" {
+  type        = bool
+  description = "Whether CPU is only allocated while requests are actively being served."
+  default     = true
+}
+
+variable "startup_cpu_boost" {
+  type        = bool
+  description = "Whether Cloud Run should temporarily boost CPU during instance startup to reduce cold-start latency."
+  default     = true
+}
+
 variable "ingress" {
   type        = string
   description = "Cloud Run ingress setting."

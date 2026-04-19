@@ -89,9 +89,7 @@ jobs:
 
             tf_value() {
               local value
-              value=$(terraform -chdir="$TF_DIR" console -var-file="$TFVARS_FILE" <<EOF | sed -e 's/^> //' | sed '/^$/d' | tail -n 1)
-var.$1
-EOF
+              value=$(printf 'var.%s\n' "$1" | terraform -chdir="$TF_DIR" console -var-file="$TFVARS_FILE" | sed -e 's/^> //' | sed '/^$/d' | tail -n 1)
               value="${value%\"}"
               value="${value#\"}"
               if [[ "$value" == "null" ]]; then
@@ -171,13 +169,18 @@ EOF
         uses: docker/build-push-action@v6
         with:
           context: .
+          platforms: linux/amd64
           target: production
           push: true
           tags: |
             ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:${{ env.DEPLOY_SHA }}
             ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=registry,ref=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:buildcache
+            type=gha
+          cache-to: |
+            type=registry,ref=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:buildcache,mode=max
+            type=gha,mode=max
 
       - name: Deploy to Cloud Run
         run: |
@@ -190,6 +193,21 @@ EOF
 
       - name: Verify deployment
         run: |
+          wait_for_health() {
+            local url="$1"
+            local attempts="$2"
+            local sleep_seconds="$3"
+
+            for _ in $(seq 1 "$attempts"); do
+              if curl -sf --max-time 10 "$url/health" >/dev/null; then
+                return 0
+              fi
+              sleep "$sleep_seconds"
+            done
+
+            return 1
+          }
+
           SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
             --platform managed \
             --region ${{ env.REGION }} \
@@ -203,12 +221,12 @@ EOF
 
           # Health check on Cloud Run URL
           echo "Checking health on Cloud Run URL..."
-          curl -f "$SERVICE_URL/health" || exit 1
+          wait_for_health "$SERVICE_URL" 30 2 || exit 1
 
           # Check custom domain (may fail initially while SSL provisions)
           if [[ -n "${DOMAIN}" ]]; then
             echo "Checking custom domain (may take 15-30 min for SSL)..."
-            if curl -sf "https://${{ env.DOMAIN }}/health" --max-time 10; then
+            if wait_for_health "https://${{ env.DOMAIN }}" 10 3; then
               echo "Custom domain is working!"
             else
               echo "Custom domain not yet responding - SSL may still be provisioning"

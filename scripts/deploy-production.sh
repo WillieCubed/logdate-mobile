@@ -82,6 +82,25 @@ die() {
     exit 1
 }
 
+# Normalize a yes/no reply — strip CR/LF/whitespace, lowercase. Defends
+# against terminals that emit `\r\n` (Windows / some SSH clients) and
+# against leftover stdin bytes from a previous subcommand.
+normalize_reply() {
+    printf '%s' "$1" | tr -d '[:space:]\r' | tr '[:upper:]' '[:lower:]'
+}
+
+reply_is_yes() {
+    local norm
+    norm=$(normalize_reply "$1")
+    [[ "$norm" == "y" || "$norm" == "yes" ]]
+}
+
+reply_is_no() {
+    local norm
+    norm=$(normalize_reply "$1")
+    [[ "$norm" == "n" || "$norm" == "no" ]]
+}
+
 print_usage() {
     sed -n '2,43p' "$0" | sed 's/^# \?//'
     exit 0
@@ -111,6 +130,58 @@ prompt_secret_value() {
     echo >&2
     echo "$out"
 }
+
+# Prompt repeatedly until the user supplies a non-empty value. Honors
+# NON_INTERACTIVE by returning empty and letting the caller decide. Echoes
+# the resulting value on stdout so it's capture-able via $(...).
+read_nonempty() {
+    local label="$1"
+    local value=""
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then
+        return 0
+    fi
+    while [[ -z "$value" ]]; do
+        read -rp "$label: " value || {
+            # EOF (e.g. ctrl-D) — surface as empty and bail.
+            echo >&2
+            return 1
+        }
+        if [[ -z "$value" ]]; then
+            log_warn "Value cannot be empty — try again, or Ctrl-C to abort."
+        fi
+    done
+    printf '%s' "$value"
+}
+
+# Prompt until the user picks a numeric choice in [1,max]. Returns the choice.
+# `default` (optional) is returned for empty input. EOF returns 1.
+read_menu_choice() {
+    local label="$1"
+    local max="$2"
+    local default="${3:-}"
+    local choice=""
+    while :; do
+        local displayed="$label"
+        [[ -n "$default" ]] && displayed="$label [$default]"
+        if ! read -rp "$displayed: " choice; then
+            echo >&2
+            return 1
+        fi
+        choice="${choice:-$default}"
+        if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= max )); then
+            printf '%s' "$choice"
+            return 0
+        fi
+        log_warn "Please enter a number between 1 and $max."
+    done
+}
+
+on_interrupt() {
+    echo
+    log_warn "Interrupted. Exiting; rerun the script to resume."
+    exit 130
+}
+trap on_interrupt INT
 
 parse_args() {
     while [[ $# -gt 0 ]]; do
@@ -177,10 +248,25 @@ detect_project_id() {
     [[ -n "$active" && "$active" != "(unset)" ]] && candidates+=("$active (gcloud active project)")
 
     if [[ ${#candidates[@]} -eq 0 ]]; then
-        PROJECT_ID=$(prompt_or_die "GCP project ID")
-        [[ -z "$PROJECT_ID" ]] && die "Project ID is required"
+        if [[ "$NON_INTERACTIVE" == "true" ]]; then
+            die "GCP project ID is required — pass --project-id or set LOGDATE_GCP_PROJECT_ID."
+        fi
+        PROJECT_ID=$(read_nonempty "GCP project ID") || die "Aborted."
         return
     fi
+
+    # Dedupe by project id — keep the first candidate per id, which preserves
+    # the most authoritative source (committed tfvars > bootstrap state > gcloud).
+    local -a unique_candidates=()
+    local seen=""
+    for c in "${candidates[@]}"; do
+        local id="${c%% *}"
+        case "$seen" in
+            *"|$id|"*) ;;
+            *) unique_candidates+=("$c"); seen="$seen|$id|" ;;
+        esac
+    done
+    candidates=("${unique_candidates[@]}")
 
     if [[ ${#candidates[@]} -eq 1 ]]; then
         local only="${candidates[0]}"
@@ -202,10 +288,7 @@ detect_project_id() {
         ((i++))
     done
     local choice
-    read -rp "Select [1]: " choice
-    choice="${choice:-1}"
-    [[ "$choice" =~ ^[0-9]+$ ]] || die "Invalid selection: $choice"
-    (( choice >= 1 && choice <= ${#candidates[@]} )) || die "Selection out of range"
+    choice=$(read_menu_choice "Select" "${#candidates[@]}" 1) || die "Aborted."
     local picked="${candidates[$((choice - 1))]}"
     PROJECT_ID="${picked%% *}"
     log_info "Using $PROJECT_ID"
@@ -232,17 +315,16 @@ detect_dns_provider() {
     echo "  1) manual      — script prints records for you to copy into your registrar"
     echo "  2) cloudflare  — script publishes records via the Cloudflare API (needs CLOUDFLARE_API_TOKEN)"
     local choice
-    read -rp "Select [1]: " choice
-    case "${choice:-1}" in
+    choice=$(read_menu_choice "Select" 2 1) || { DNS_PROVIDER="manual"; return; }
+    case "$choice" in
         1) DNS_PROVIDER="manual" ;;
         2) DNS_PROVIDER="cloudflare" ;;
-        *) die "Invalid DNS provider choice: $choice" ;;
     esac
 }
 
 # ----------------------------------------------------------------------------
-# gcloud identity confirmation — runs before any mutating action so the user
-# can catch a wrong-account mistake before resources are touched.
+# gcloud identity confirmation — prints the active account for audit, but
+# doesn't prompt. Pass --confirm-account to force the interactive picker.
 # ----------------------------------------------------------------------------
 confirm_gcloud_identity() {
     log_phase "Confirming gcloud identity"
@@ -301,18 +383,14 @@ confirm_gcloud_identity() {
     printf '  %d) Log in as a different account\n' "$i"
 
     local choice
-    read -rp "Select [1]: " choice
-    choice="${choice:-1}"
-    [[ "$choice" =~ ^[0-9]+$ ]] || die "Invalid selection: $choice"
+    choice=$(read_menu_choice "Select" "$i" 1) || return 0
 
     if (( choice == i )); then
         gcloud auth login
         active=$(gcloud config get-value account 2>/dev/null || true)
-    elif (( choice >= 1 && choice < i )); then
+    else
         active="${ids[$((choice - 1))]}"
         gcloud config set account "$active"
-    else
-        die "Selection out of range"
     fi
     log_info "Now using gcloud account: $active"
 }
@@ -323,35 +401,88 @@ confirm_gcloud_identity() {
 phase_0_prereqs() {
     log_phase "Phase 0 — Prereq validation"
 
-    gcloud config set project "$PROJECT_ID" >/dev/null
+    log_info "Verifying project ${PROJECT_ID}…"
+    local current_env
+    current_env=$(gcloud projects describe "$PROJECT_ID" \
+        --format='value(labels.environment)' --quiet 2>/dev/null) \
+        || die "Cannot read project $PROJECT_ID — check the ID and the gcloud account's viewer access."
+    gcloud config set project "$PROJECT_ID" --quiet >/dev/null
     log_info "Active project: $PROJECT_ID"
 
-    local required_services=(
-        run.googleapis.com
-        artifactregistry.googleapis.com
-        secretmanager.googleapis.com
-        sqladmin.googleapis.com
-        iam.googleapis.com
-        iamcredentials.googleapis.com
-        cloudresourcemanager.googleapis.com
-        storage.googleapis.com
-    )
-    local enabled
-    enabled=$(gcloud services list --enabled --project "$PROJECT_ID" --format='value(config.name)')
-    local missing=()
-    for svc in "${required_services[@]}"; do
-        grep -qx "$svc" <<<"$enabled" || missing+=("$svc")
-    done
-    if [[ ${#missing[@]} -gt 0 ]]; then
-        log_info "Enabling services: ${missing[*]}"
-        gcloud services enable "${missing[@]}" --project "$PROJECT_ID"
+    # `--update-labels` lives only in `gcloud alpha projects update` (GA only
+    # supports `--name`). Non-fatal; the tag is cosmetic.
+    if [[ "$current_env" == "production" ]]; then
+        log_info "Project already tagged environment=production"
+    elif gcloud components list --filter='id=alpha AND state.name=Installed' \
+             --format='value(id)' --quiet 2>/dev/null | grep -q '^alpha$'; then
+        log_info "Tagging $PROJECT_ID with environment=production (via gcloud alpha)"
+        gcloud alpha projects update "$PROJECT_ID" \
+            --update-labels=environment=production --quiet >/dev/null \
+            || log_warn "Tagging failed — cosmetic only; continuing."
+    else
+        log_warn "Skipping project label — the CLI flag lives in the alpha channel. To set it later:"
+        log_warn "  gcloud components install alpha --quiet"
+        log_warn "  gcloud alpha projects update $PROJECT_ID --update-labels=environment=production"
     fi
-    log_info "All required GCP APIs are enabled"
+
+    # Billing must be linked, or nothing downstream will work. Use GA
+    # `gcloud billing` (not beta) to avoid a component-install prompt, and
+    # wrap in an explicit backgrounded-call timeout so a silent stall on the
+    # billing API is visible rather than indefinite.
+    log_info "Checking billing link…"
+    local billing_enabled=""
+    if billing_enabled=$(gcloud billing projects describe "$PROJECT_ID" \
+        --format='value(billingEnabled)' --quiet 2>/dev/null); then
+        :
+    else
+        log_warn "gcloud billing describe failed or is unavailable; skipping billing check."
+        log_warn "If deploy fails with quota/billing errors, link a billing account at:"
+        log_warn "  https://console.cloud.google.com/billing/linkedaccount?project=$PROJECT_ID"
+        billing_enabled="skipped"
+    fi
+    case "$billing_enabled" in
+        True) log_info "Billing is linked to $PROJECT_ID" ;;
+        skipped) ;;
+        *) die "Project $PROJECT_ID has no active billing account. Link one: https://console.cloud.google.com/billing/linkedaccount?project=$PROJECT_ID" ;;
+    esac
+
+    # docker buildx plugin is required by scripts/deploy-cloud-run.sh.
+    log_info "Checking docker buildx…"
+    if ! docker buildx version >/dev/null 2>&1; then
+        die "docker buildx plugin is required (install: https://docs.docker.com/build/install-buildx/)"
+    fi
+
+    ensure_docker_daemon_running
+
+    # Enable only the APIs the script calls directly before Terraform runs.
+    # Terraform's google_project_service.required enables the rest on apply.
+    # `services enable` is idempotent, so skip the `services list` diff.
+    log_info "Ensuring script-level APIs are enabled…"
+    gcloud services enable --project "$PROJECT_ID" --quiet \
+        run.googleapis.com \
+        artifactregistry.googleapis.com \
+        secretmanager.googleapis.com
 }
 
 # ----------------------------------------------------------------------------
 # Phase 1 — Domain ownership pre-flight
 # ----------------------------------------------------------------------------
+is_covered_by_verified() {
+    # `gcloud domains list-user-verified` returns apex/registrable domains,
+    # and a verified apex covers every subdomain under it for Cloud Run
+    # domain mapping. So `logdate.app` in the list covers `cloud.logdate.app`.
+    local domain="$1"
+    local verified_list="$2"
+    local entry
+    while IFS= read -r entry; do
+        [[ -z "$entry" ]] && continue
+        if [[ "$domain" == "$entry" || "$domain" == *".$entry" ]]; then
+            return 0
+        fi
+    done <<<"$verified_list"
+    return 1
+}
+
 phase_1_domain_check() {
     log_phase "Phase 1 — Domain ownership pre-flight"
 
@@ -363,8 +494,8 @@ phase_1_domain_check() {
 
     local unverified=()
     for domain in "${targets[@]}"; do
-        if grep -qx "$domain" <<<"$verified"; then
-            log_info "$domain — verified"
+        if is_covered_by_verified "$domain" "$verified"; then
+            log_info "$domain — covered by a verified apex"
         else
             unverified+=("$domain")
         fi
@@ -408,14 +539,14 @@ EOF
     echo "  4) Abort"
 
     local choice
-    read -rp "Select [1]: " choice
-    case "${choice:-1}" in
+    choice=$(read_menu_choice "Select" 4 1) || die "Aborted."
+    case "$choice" in
         1)
             for domain in "${unverified[@]}"; do
                 log_info "Opening verification flow for $domain"
                 gcloud domains verify "$domain" || log_warn "gcloud domains verify $domain exited non-zero; verify manually"
             done
-            read -rp "Press Enter once every domain above shows as verified " _
+            read -rp "Press Enter once every domain above shows as verified " _ || true
             ;;
         2) ;;
         3)
@@ -423,13 +554,12 @@ EOF
             return
             ;;
         4) die "Aborted by user" ;;
-        *) die "Invalid selection: $choice" ;;
     esac
 
     verified=$(gcloud domains list-user-verified --format='value(id)' 2>/dev/null || true)
     local still_missing=()
     for domain in "${unverified[@]}"; do
-        grep -qx "$domain" <<<"$verified" || still_missing+=("$domain")
+        is_covered_by_verified "$domain" "$verified" || still_missing+=("$domain")
     done
     if [[ ${#still_missing[@]} -eq 0 ]]; then
         log_info "All target domains verified"
@@ -438,7 +568,7 @@ EOF
     log_warn "'gcloud domains list-user-verified' still doesn't show: ${still_missing[*]}"
     log_warn "This can be a cache/scope drift — check the Search Console URLs above."
     read -rp "Proceed anyway and let Cloud Run decide at apply time? [y/N] " fallback
-    [[ "$fallback" =~ ^[yY]$ ]] || die "Aborting; rerun once verification is reflected."
+    reply_is_yes "$fallback" || die "Aborting; rerun once verification is reflected. (received: '$fallback')"
 }
 
 # ----------------------------------------------------------------------------
@@ -452,8 +582,13 @@ phase_2_tfvars() {
         return
     fi
 
-    [[ -z "$WEBAUTHN_RP_ID" ]] && WEBAUTHN_RP_ID="$PRIMARY_DOMAIN"
-    local webauthn_origin="https://$WEBAUTHN_RP_ID"
+    # WebAuthn rpId is pinned to `logdate.app` so passkeys work across every
+    # *.logdate.app origin (primary auth lives at cloud.logdate.app). Override
+    # with --webauthn-rp-id only if you really know why. The rpId does NOT
+    # cover *.hypertext.studio origins — those serve API-only traffic for
+    # clients already holding a JWT.
+    [[ -z "$WEBAUTHN_RP_ID" ]] && WEBAUTHN_RP_ID="logdate.app"
+    local webauthn_origin="https://cloud.logdate.app"
 
     local allowed_origins="https://$PRIMARY_DOMAIN"
     local domains_list="[\"$PRIMARY_DOMAIN\""
@@ -476,7 +611,10 @@ phase_2_tfvars() {
 project_id      = "$PROJECT_ID"
 region          = "$REGION"
 service_name    = "logdate-server"
-cloud_run_image = "$REGION-docker.pkg.dev/$PROJECT_ID/logdate/logdate-server:latest"
+# Placeholder image used ONLY for the initial terraform apply. The real
+# image is pushed + deployed by scripts/deploy-cloud-run.sh in Phase 5;
+# terraform's lifecycle { ignore_changes = [image] } prevents drift after.
+cloud_run_image = "us-docker.pkg.dev/cloudrun/container/hello"
 webauthn_rp_id  = "$WEBAUTHN_RP_ID"
 webauthn_origin = "$webauthn_origin"
 
@@ -488,6 +626,12 @@ domains               = $domains_list
 
 create_gcs_bucket = true
 gcs_bucket_name   = "logdate-media-$PROJECT_ID"
+
+# Default to "bring your own Postgres" to keep cold-start costs near zero —
+# populate DATABASE_URL in Secret Manager with a Neon/Supabase/Cloud SQL
+# connection string. Flip this to `true` only if you want Terraform to
+# provision a managed Cloud SQL instance (and pay the monthly baseline).
+create_cloud_sql_instance = false
 
 cloud_run_env = {
   LOGDATE_ENV     = "production"
@@ -515,33 +659,238 @@ EOF
 # ----------------------------------------------------------------------------
 # Phase 3 — Terraform apply
 # ----------------------------------------------------------------------------
-phase_3_terraform() {
-    log_phase "Phase 3 — terraform apply"
 
-    [[ -f "$TFVARS_PATH" ]] || die "$TFVARS_PATH missing — run without --skip-tfvars first"
+# Terraform uses Application Default Credentials, not the gcloud user session.
+# Sensitive creates (service accounts, Workload Identity pools) require a
+# fresh reauth persistent token (RAPT); if yours has expired you'll get
+# `invalid_grant / invalid_rapt` mid-apply. Probe by making a small
+# privileged call and auto-refresh if it fails.
+ensure_adc_fresh() {
+    if ! gcloud auth application-default print-access-token --quiet >/dev/null 2>&1; then
+        if [[ "$NON_INTERACTIVE" == "true" ]]; then
+            die "No Application Default Credentials — run 'gcloud auth application-default login' first."
+        fi
+        log_warn "No Application Default Credentials found — launching login."
+        gcloud auth application-default login
+        return
+    fi
+
+    # Probe RAPT freshness by reading the project — cheaper than listing
+    # service accounts. Returns 200 when auth is good, 401/403 on expired RAPT.
+    local probe_output
+    probe_output=$(curl -fsS -o /dev/null -w '%{http_code}' \
+        -H "Authorization: Bearer $(gcloud auth application-default print-access-token --quiet)" \
+        "https://cloudresourcemanager.googleapis.com/v1/projects/$PROJECT_ID" 2>&1 || echo "000")
+
+    if [[ "$probe_output" == "200" ]]; then
+        log_info "Application Default Credentials OK."
+        return
+    fi
+
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then
+        die "ADC probe returned $probe_output — refresh with 'gcloud auth application-default login'."
+    fi
+
+    log_warn "ADC probe returned HTTP $probe_output — refreshing reauth token."
+    gcloud auth application-default login
+}
+
+# Core terraform apply with optional extra -var overrides. Handles init,
+# plan, the y/n prompt, and plan-file cleanup. Auto-confirms when the plan
+# is purely additive (no destroys, no replacements) — only asks the user
+# when something destructive is about to happen.
+terraform_plan_and_apply() {
+    local label="$1"
+    shift  # remaining args are passed to terraform plan/apply as -var=… etc.
+
+    ensure_adc_fresh
 
     (
         cd "$TF_DIR"
         terraform init -input=false
-        terraform plan -input=false -var-file=production.tfvars -out=prod.tfplan
+    )
+    reconcile_state_with_gcp
 
-        if [[ "$AUTO_APPROVE" != "true" ]]; then
-            if [[ "$NON_INTERACTIVE" == "true" ]]; then
-                die "Refusing to apply without --auto-approve in --non-interactive mode"
+    (
+        cd "$TF_DIR"
+        terraform plan -input=false -var-file=production.tfvars "$@" -out=prod.tfplan
+
+        # Inspect the plan for destroys/replaces. Surface them concretely in
+        # the confirmation prompt; hard-refuse the cases that will wreck the
+        # deploy regardless of what the user types.
+        local destroyed_list
+        destroyed_list=$(terraform show -json prod.tfplan \
+            | jq -r '[.resource_changes[]? | select((.change.actions | index("delete")) or (.change.actions | index("replace"))) | .address] | .[]')
+        local destructive=0
+        [[ -n "$destroyed_list" ]] && destructive=$(wc -l <<<"$destroyed_list" | tr -d ' ')
+
+        # Auto-heal plans that would destroy protected resources. Skip this
+        # apply — the next phase's plan, without the `enable_cloud_run_service=false`
+        # override, will produce a clean no-op. Don't touch state; that's what
+        # triggered the "already exists" 409 last time.
+        local protected_destroys=""
+        protected_destroys=$(grep -E '^(google_cloud_run_v2_service\.server|google_sql_database_instance\.postgres|google_storage_bucket\.media|google_secret_manager_secret\.env)' <<<"$destroyed_list" || true)
+        if [[ -n "$protected_destroys" ]]; then
+            log_info "Auto-healing: plan would destroy protected resource(s). Skipping this apply; next phase reconciles:"
+            while IFS= read -r addr; do
+                printf '  %b•%b %s\n' "$YELLOW" "$NC" "$addr"
+            done <<<"$protected_destroys"
+            rm -f prod.tfplan
+            exit 0  # subshell-only — falls through to the next phase in main()
+        fi
+
+        if [[ "$destructive" -eq 0 ]]; then
+            if [[ "$NON_INTERACTIVE" != "true" && "$AUTO_APPROVE" != "true" ]]; then
+                log_info "Plan is purely additive; auto-applying ($label)."
             fi
-            read -rp "Apply the plan above? [y/N] " confirm
-            [[ "$confirm" =~ ^[yY]$ ]] || die "Aborted by user"
+        else
+            log_warn "Plan DESTROYS the following $destructive resource(s):"
+            while IFS= read -r addr; do
+                printf '  %b-%b %s\n' "$RED" "$NC" "$addr"
+            done <<<"$destroyed_list"
+            if [[ "$NON_INTERACTIVE" == "true" ]]; then
+                die "Refusing to apply a destructive plan non-interactively. Inspect and rerun with --auto-approve if intentional."
+            fi
+            if [[ "$AUTO_APPROVE" != "true" ]]; then
+                local confirm
+                read -rp "Type 'destroy' exactly to confirm, anything else aborts: " confirm
+                [[ "$confirm" == "destroy" ]] || die "Aborted — no changes made."
+            fi
         fi
         terraform apply -input=false prod.tfplan
         rm -f prod.tfplan
     )
+}
 
-    log_info "Terraform apply complete"
+# Returns 0 iff `google_cloud_run_v2_service.server[0]` is already in state.
+cloud_run_in_state() {
+    (cd "$TF_DIR" && terraform state list 2>/dev/null \
+        | grep -q '^google_cloud_run_v2_service\.server\[0\]$')
+}
+
+# Pull `project_id` / `region` / `service_name` out of the active tfvars so we
+# can compute canonical import IDs without hard-coding.
+tfvars_get() {
+    local key="$1"
+    awk -F'=' -v key="$key" '$1 ~ "^[[:space:]]*"key"[[:space:]]*$" {
+        gsub(/[[:space:]"]/, "", $2); print $2; exit
+    }' "$TFVARS_PATH"
+}
+
+# If a resource is tracked by us (known import-id format) and exists in GCP
+# but not in state, import it. Idempotent and silent when state already has it.
+reconcile_state_with_gcp() {
+    local project region service
+    project=$(tfvars_get project_id)
+    region=$(tfvars_get region)
+    service=$(tfvars_get service_name)
+    [[ -z "$project" || -z "$region" || -z "$service" ]] && return 0
+
+    local state
+    state=$(cd "$TF_DIR" && terraform state list 2>/dev/null || true)
+
+    _import_if_missing() {
+        local addr="$1" id="$2"
+        grep -qxF "$addr" <<<"$state" && return 0
+        log_info "Auto-importing $addr (exists in GCP, missing from state)"
+        (cd "$TF_DIR" && terraform import -var-file=production.tfvars "$addr" "$id") >/dev/null 2>&1 \
+            || log_warn "  · import failed — terraform may still propose create and fail at apply"
+    }
+
+    # Cloud Run service — import only if it's actually alive in GCP.
+    if gcloud run services describe "$service" --region="$region" --project="$project" --format='value(name)' --quiet >/dev/null 2>&1; then
+        _import_if_missing "google_cloud_run_v2_service.server[0]" \
+            "projects/$project/locations/$region/services/$service"
+    fi
+
+    # Public invoker IAM binding — only meaningful if the service exists.
+    if grep -qxF 'google_cloud_run_v2_service.server[0]' <<<"$state" \
+       || gcloud run services describe "$service" --region="$region" --project="$project" --format='value(name)' --quiet >/dev/null 2>&1; then
+        _import_if_missing "google_cloud_run_v2_service_iam_member.public_invoker[0]" \
+            "projects/$project/locations/$region/services/$service roles/run.invoker allUsers"
+    fi
+
+    # Domain mappings — one per entry in `domains = [...]`. Each mapping's ID
+    # is `locations/<region>/namespaces/<project>/domainmappings/<domain>`.
+    local domains
+    domains=$(awk '/^[[:space:]]*domains[[:space:]]*=/,/\]/' "$TFVARS_PATH" \
+        | grep -oE '"[^"]+"' | tr -d '"')
+    while IFS= read -r domain; do
+        [[ -z "$domain" ]] && continue
+        if gcloud beta run domain-mappings describe --domain="$domain" --region="$region" --project="$project" --format='value(metadata.name)' --quiet >/dev/null 2>&1; then
+            _import_if_missing "google_cloud_run_domain_mapping.default[\"$domain\"]" \
+                "locations/$region/namespaces/$project/domainmappings/$domain"
+        fi
+    done <<<"$domains"
+}
+
+# Starts Docker Desktop on macOS if the daemon isn't running, then waits up
+# to 60s for it. A clean-run deploy should never have to fail just because
+# Docker wasn't booted first.
+ensure_docker_daemon_running() {
+    if docker info >/dev/null 2>&1; then
+        return 0
+    fi
+    case "$(uname -s)" in
+        Darwin)
+            log_warn "Docker daemon isn't running — launching Docker.app and waiting up to 60s…"
+            open -a Docker >/dev/null 2>&1 || die "Couldn't launch Docker.app. Start Docker Desktop manually and rerun."
+            ;;
+        Linux)
+            log_warn "Docker daemon isn't running — try 'sudo systemctl start docker' or start Docker Desktop."
+            ;;
+        *)
+            log_warn "Docker daemon isn't running on an unrecognized platform — start it manually."
+            ;;
+    esac
+    local i=0
+    until docker info >/dev/null 2>&1; do
+        i=$((i + 2))
+        (( i > 60 )) && die "Docker daemon did not become ready within 60s."
+        sleep 2
+    done
+    log_info "Docker daemon is ready."
+}
+
+# Phase 3a — bootstrap-only infra pass. Runs `terraform apply` with
+# `enable_cloud_run_service=false` so Cloud Run isn't created before its
+# secrets and image exist. This is ONLY safe when Cloud Run is not yet
+# managed by Terraform — on a re-run, the same override would destroy the
+# already-created service and domain mappings, so we skip outright.
+phase_3a_infra() {
+    log_phase "Phase 3a — applying infra (APIs, IAM, registry, secrets, bucket)"
+
+    [[ -f "$TFVARS_PATH" ]] || die "$TFVARS_PATH missing — run without --skip-tfvars first"
+
+    if cloud_run_in_state; then
+        log_info "Cloud Run already managed by Terraform — skipping 3a to avoid destroying it."
+        log_info "Phase 3b will reconcile the full config, no-op if everything is in sync."
+        return
+    fi
+
+    terraform_plan_and_apply "infra" -var=enable_cloud_run_service=false
+}
+
+# Phase 3b — full apply. Idempotent: creates Cloud Run + domain mappings on
+# the first pass, and acts as a no-op reconciler on every subsequent run.
+phase_3b_cloud_run() {
+    log_phase "Phase 3b — applying Cloud Run service + domain mappings"
+
+    [[ -f "$TFVARS_PATH" ]] || die "$TFVARS_PATH missing — run without --skip-tfvars first"
+
+    terraform_plan_and_apply "cloud-run"
 }
 
 # ----------------------------------------------------------------------------
 # Phase 4 — Populate Secret Manager
 # ----------------------------------------------------------------------------
+# Optional secrets (OIDC, Redis) are wired up only when they're *both*
+# referenced in production.tfvars AND have a value in production.env. This
+# avoids writing empty-payload sentinels, which Cloud Run rejects when
+# resolving the secret's `latest` version at boot.
+
+PRODUCTION_ENV_FILE="${TF_DIR}/production.env"
+
 secret_has_version() {
     gcloud secrets versions list "$1" \
         --project "$PROJECT_ID" \
@@ -552,38 +901,94 @@ secret_has_version() {
 put_secret_value() {
     local secret_id="$1"
     local value="$2"
+    if [[ -z "$value" ]]; then
+        log_warn "Refusing to write empty version for $secret_id — skipping"
+        return 1
+    fi
     printf '%s' "$value" | gcloud secrets versions add "$secret_id" \
         --project "$PROJECT_ID" \
         --data-file=- >/dev/null
     log_info "  · wrote version for $secret_id"
 }
 
-prompt_secret() {
+# Returns 0 if the secret id is referenced in the current production.tfvars
+# cloud_run_secret_env block. Used to decide whether to populate an optional
+# secret or ignore it silently.
+secret_is_referenced() {
+    grep -qE "secret_id[[:space:]]*=[[:space:]]*\"$1\"" "$TFVARS_PATH"
+}
+
+# Export key=value pairs from $PRODUCTION_ENV_FILE as env vars, treating
+# everything after the first `=` as a literal value. `source`-ing the file
+# directly would expand `$var` references inside secret values (common in
+# JDBC URLs and redis tokens), which is wrong.
+load_production_env() {
+    [[ -f "$PRODUCTION_ENV_FILE" ]] || return 0
+    log_info "Reading pre-populated secrets from $PRODUCTION_ENV_FILE"
+    while IFS= read -r line; do
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        local key="${line%%=*}"
+        local value="${line#*=}"
+        # Strip matching outer single/double quotes if present.
+        if [[ ( "$value" == \"*\" || "$value" == \'*\' ) && ${#value} -ge 2 ]]; then
+            value="${value:1:${#value}-2}"
+        fi
+        export "$key=$value"
+    done <"$PRODUCTION_ENV_FILE"
+}
+
+# Extract a query-param value from a URL. Anchored on `?` or `&` so a key
+# that appears as a substring of another token (e.g. `password=` within a
+# trailing `resetpassword=`) doesn't match. Returns 1 when absent.
+url_param() {
+    local url="$1"
+    local key="$2"
+    awk -v key="$key" '
+        {
+            n = split($0, parts, /[?&]/)
+            for (i = 1; i <= n; i++) {
+                if (index(parts[i], key "=") == 1) {
+                    sub("^" key "=", "", parts[i])
+                    print parts[i]
+                    exit 0
+                }
+            }
+            exit 1
+        }
+    ' <<<"$url"
+}
+
+# Resolve a required secret's value and write it to Secret Manager. Precedence:
+#   1. env var (from production.env or exported shell env)
+#   2. `url_param` against DATABASE_URL when $url_key is non-empty
+#   3. interactive prompt (unless NON_INTERACTIVE)
+#
+# Uses `eval` for indirect expansion because bash 3.2 on macOS doesn't
+# handle `${!var:-default}` the same way bash 4+ does.
+resolve_and_put_secret() {
     local secret_id="$1"
-    local label="$2"
-    local is_password="$3"
-    local allow_empty="${4:-false}"
+    local env_key="$2"
+    local url_key="$3"
+    local prompt_label="$4"
 
     if secret_has_version "$secret_id"; then
         log_info "$secret_id already has a version — skipping"
         return
     fi
 
-    local value
-    if [[ "$NON_INTERACTIVE" == "true" ]]; then
-        log_warn "$secret_id missing a version; pass it via gcloud secrets or rerun interactively"
-        return
+    local value=""
+    eval "value=\${${env_key}:-}"
+    if [[ -z "$value" && -n "$url_key" ]]; then
+        value=$(url_param "${DATABASE_URL:-}" "$url_key" || true)
+        if [[ -n "$value" ]]; then
+            log_info "Derived $env_key from DATABASE_URL"
+        fi
     fi
-
-    if [[ "$is_password" == "true" ]]; then
-        value=$(prompt_secret_value "Enter $label (hidden)")
-    else
-        read -rp "Enter $label: " value
-    fi
-
-    if [[ -z "$value" && "$allow_empty" != "true" ]]; then
-        log_warn "$secret_id left unset — rerun with --skip-* flags to prompt again"
-        return
+    if [[ -z "$value" ]]; then
+        if [[ "$NON_INTERACTIVE" == "true" ]]; then
+            die "$env_key missing — populate $PRODUCTION_ENV_FILE before --non-interactive runs."
+        fi
+        value=$(read_nonempty "$prompt_label") || die "Aborted."
     fi
     put_secret_value "$secret_id" "$value"
 }
@@ -591,31 +996,48 @@ prompt_secret() {
 phase_4_secrets() {
     log_phase "Phase 4 — Populate Secret Manager"
 
+    load_production_env
+
     if secret_has_version logdate-jwt-secret; then
         log_info "logdate-jwt-secret already has a version — skipping"
     else
         log_info "Generating JWT secret via openssl rand -base64 48"
-        local jwt
-        jwt=$(openssl rand -base64 48 | tr -d '\n')
-        put_secret_value logdate-jwt-secret "$jwt"
-        unset jwt
+        put_secret_value logdate-jwt-secret "$(openssl rand -base64 48 | tr -d '\n')"
     fi
 
-    echo
-    log_info "Database credentials — must match the Cloud SQL user configured by Terraform."
-    prompt_secret logdate-db-url "JDBC URL (jdbc:postgresql:///logdate?cloudSqlInstance=...&socketFactory=com.google.cloud.sql.postgres.SocketFactory)" "false"
-    prompt_secret logdate-db-user "database username" "false"
-    prompt_secret logdate-db-password "database password" "true"
+    resolve_and_put_secret logdate-db-url      DATABASE_URL      ""         "DATABASE_URL (jdbc:postgresql://host/db?user=X&password=Y&sslmode=require)"
+    resolve_and_put_secret logdate-db-user     DATABASE_USER     user       "DATABASE_USER"
+    resolve_and_put_secret logdate-db-password DATABASE_PASSWORD password   "DATABASE_PASSWORD"
 
-    echo
-    log_info "Google OIDC client IDs — comma-separated, one per platform (Android release, Android debug, iOS, Web)."
-    prompt_secret logdate-google-oidc-client-ids "client IDs (CSV, blank to skip)" "false" "true"
-
-    echo
-    log_info "Redis URL — optional; leave blank to skip."
-    prompt_secret logdate-redis-url "redis:// URL (blank to skip)" "false" "true"
+    # Optional: only populated if the secret is referenced in production.tfvars
+    # AND a value is in production.env. No empty payloads get written.
+    populate_optional_secret logdate-google-oidc-client-ids "${GOOGLE_OIDC_CLIENT_IDS:-}"
+    populate_optional_secret logdate-redis-url "${REDIS_URL:-}"
 
     log_info "Secret Manager population complete"
+}
+
+populate_optional_secret() {
+    local secret_id="$1"
+    local value="$2"
+
+    if secret_has_version "$secret_id"; then
+        log_info "$secret_id already has a version — skipping"
+        return
+    fi
+
+    if ! secret_is_referenced "$secret_id"; then
+        log_info "$secret_id not referenced in tfvars — skipping"
+        return
+    fi
+
+    if [[ -z "$value" ]]; then
+        log_warn "$secret_id is referenced in tfvars but no value supplied in $PRODUCTION_ENV_FILE — either add it there or remove the ref from cloud_run_secret_env."
+        return
+    fi
+
+    log_info "Loaded value for $secret_id from $PRODUCTION_ENV_FILE"
+    put_secret_value "$secret_id" "$value"
 }
 
 # ----------------------------------------------------------------------------
@@ -722,6 +1144,22 @@ cloudflare_upsert_record() {
     log_info "  · $rtype $rname → $rcontent  ($(echo "$method" | tr '[:upper:]' '[:lower:]'))"
 }
 
+# Return 0 if `dig NS` for the domain (or its ancestors) reports Cloudflare.
+cloudflare_is_authoritative_for() {
+    local probe="$1"
+    command -v dig >/dev/null 2>&1 || return 0  # skip silently if dig absent
+    while [[ "$probe" == *.* ]]; do
+        local ns
+        ns=$(dig +short NS "$probe" 2>/dev/null || true)
+        if [[ -n "$ns" ]]; then
+            grep -qi 'cloudflare\.com\.\?$' <<<"$ns" && return 0
+            return 1
+        fi
+        probe="${probe#*.}"
+    done
+    return 1
+}
+
 publish_cloudflare_records_for() {
     local domain="$1"
     local json
@@ -736,6 +1174,11 @@ publish_cloudflare_records_for() {
         log_warn "No Cloudflare zone found for $domain — falling back to manual output"
         print_manual_records_for "$domain"
         return
+    fi
+    if ! cloudflare_is_authoritative_for "$domain"; then
+        log_warn "$domain NS records do not currently delegate to Cloudflare."
+        log_warn "Records will be written to Cloudflare zone $zone_id, but the public internet"
+        log_warn "will keep resolving via whatever nameservers are live until NS records are updated."
     fi
     log_info "Publishing $domain records to Cloudflare zone $zone_id"
     local count
@@ -850,8 +1293,9 @@ main() {
     [[ "$SKIP_PREREQS" == "true" ]] || phase_0_prereqs
     [[ "$SKIP_DOMAIN_CHECK" == "true" ]] || phase_1_domain_check
     [[ "$SKIP_TFVARS" == "true" ]] || phase_2_tfvars
-    [[ "$SKIP_TERRAFORM" == "true" ]] || phase_3_terraform
+    [[ "$SKIP_TERRAFORM" == "true" ]] || phase_3a_infra
     [[ "$SKIP_SECRETS" == "true" ]] || phase_4_secrets
+    [[ "$SKIP_TERRAFORM" == "true" ]] || phase_3b_cloud_run
     [[ "$SKIP_IMAGE" == "true" ]] || phase_5_image
     [[ "$SKIP_DNS" == "true" ]] || phase_6_dns
     [[ "$SKIP_VERIFY" == "true" ]] || phase_7_verify
