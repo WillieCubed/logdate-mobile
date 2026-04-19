@@ -7,11 +7,11 @@ import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.responses.error
 import app.logdate.server.sync.SyncMetricsRegistry
+import io.github.smiley4.ktoropenapi.post
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import kotlinx.serialization.Serializable
 
@@ -28,7 +28,7 @@ internal fun Route.syncMaintenanceRoutes(
     backupRepository: LogDateBackupRepository,
 ) {
     route("/ops/sync") {
-        post("/tombstones:purge") {
+        post("/tombstones:purge", {}) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -61,7 +61,7 @@ internal fun Route.syncMaintenanceRoutes(
     }
 
     route("/ops/backups") {
-        post(":purge") {
+        post(":purge", {}) {
             val start = System.currentTimeMillis()
             var success = false
             try {

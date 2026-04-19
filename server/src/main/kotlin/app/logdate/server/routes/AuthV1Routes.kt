@@ -40,6 +40,10 @@ import app.logdate.shared.model.UpdateAccountProfileRequest
 import app.logdate.shared.model.UsernameAvailabilityData
 import app.logdate.shared.model.UsernameAvailabilityResponse
 import io.github.aakira.napier.Napier
+import io.github.smiley4.ktoropenapi.delete
+import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.post
+import io.github.smiley4.ktoropenapi.put
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -53,10 +57,6 @@ import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.delete
-import io.ktor.server.routing.get
-import io.ktor.server.routing.post
-import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -509,7 +509,20 @@ fun Route.authV1Routes(
                 }
             }
 
-            post("/google") {
+            post("/google", {
+                tags = listOf("Auth")
+                summary = "Authenticate with Google"
+                description = "Register a new account or sign in using a Google ID token."
+                request {
+                    body<GoogleAuthRequest>()
+                }
+                response {
+                    HttpStatusCode.OK to {
+                        description = "Successfully authenticated"
+                        body<AccountTokens>()
+                    }
+                }
+            }) {
                 val start = System.currentTimeMillis()
                 var success = false
                 try {
@@ -719,7 +732,20 @@ fun Route.authV1Routes(
                 }
             }
 
-            post("/google") {
+            post("/google", {
+                tags = listOf("Auth")
+                summary = "Authenticate with Google"
+                description = "Register a new account or sign in using a Google ID token."
+                request {
+                    body<GoogleAuthRequest>()
+                }
+                response {
+                    HttpStatusCode.OK to {
+                        description = "Successfully authenticated"
+                        body<AccountTokens>()
+                    }
+                }
+            }) {
                 val start = System.currentTimeMillis()
                 var success = false
                 try {

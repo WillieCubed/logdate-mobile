@@ -16,6 +16,9 @@ import app.logdate.shared.model.sync.BackupInfoResponse
 import app.logdate.shared.model.sync.BackupListResponse
 import app.logdate.shared.model.sync.BackupUploadResponse
 import io.github.aakira.napier.Napier
+import io.github.smiley4.ktoropenapi.delete
+import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.post
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -23,9 +26,6 @@ import io.ktor.server.application.call
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.delete
-import io.ktor.server.routing.get
-import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import java.util.UUID
 
@@ -46,7 +46,23 @@ internal fun Route.syncBackupRoutes(
 ) {
     val mediaAccessPolicy = config.mediaAccessPolicy
     route("/backups") {
-        post {
+        post({
+            tags = listOf("Backups")
+            summary = "Upload backup"
+            description = "Upload an encrypted device backup."
+            securitySchemeNames = listOf("bearerAuth")
+            request {
+                body<ByteArray> {
+                    mediaTypes = setOf(ContentType.MultiPart.FormData)
+                }
+            }
+            response {
+                HttpStatusCode.Created to {
+                    description = "Backup uploaded successfully"
+                    body<BackupUploadResponse>()
+                }
+            }
+        }) {
             val start = System.currentTimeMillis()
             var success = false
             var bytes = 0L
@@ -132,7 +148,18 @@ internal fun Route.syncBackupRoutes(
             }
         }
 
-        get {
+        get({
+            tags = listOf("Backups")
+            summary = "List backups"
+            description = "Retrieve a list of all backups for the authenticated user."
+            securitySchemeNames = listOf("bearerAuth")
+            response {
+                HttpStatusCode.OK to {
+                    description = "Backups listed successfully"
+                    body<BackupListResponse>()
+                }
+            }
+        }) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -158,7 +185,7 @@ internal fun Route.syncBackupRoutes(
             }
         }
 
-        get("/{backupId}") {
+        get("/{backupId}", {}) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -184,7 +211,25 @@ internal fun Route.syncBackupRoutes(
             }
         }
 
-        get("/{backupId}/binary") {
+        get("/{backupId}/binary", {
+            tags = listOf("Backups")
+            summary = "Download backup binary"
+            description = "Download the raw encrypted binary data of a backup."
+            securitySchemeNames = listOf("bearerAuth")
+            request {
+                pathParameter<String>("backupId") {
+                    description = "The ID of the backup to download."
+                }
+            }
+            response {
+                HttpStatusCode.OK to {
+                    description = "Backup binary data retrieved successfully"
+                    body<ByteArray> {
+                        mediaTypes = setOf(ContentType.Application.OctetStream)
+                    }
+                }
+            }
+        }) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -223,7 +268,7 @@ internal fun Route.syncBackupRoutes(
             }
         }
 
-        delete("/{backupId}") {
+        delete("/{backupId}", {}) {
             val start = System.currentTimeMillis()
             var success = false
             try {

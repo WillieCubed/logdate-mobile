@@ -10,6 +10,8 @@ import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthDpopVerifier
 import app.logdate.server.oauth.OAuthNonceService
 import app.logdate.server.oauth.OAuthUseDpopNonceException
+import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.post
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -23,8 +25,6 @@ import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.get
-import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -72,7 +72,7 @@ fun Route.xrpcRoutes(
     oauthNonceService: OAuthNonceService? = null,
 ) {
     route("/xrpc") {
-        get("/com.atproto.identity.resolveHandle") {
+        get("/com.atproto.identity.resolveHandle", {}) {
             val handleValue =
                 call.request.queryParameters["handle"]
                     ?.trim()
@@ -98,7 +98,7 @@ fun Route.xrpcRoutes(
             call.respond(HttpStatusCode.OK, resolved)
         }
 
-        post("/com.atproto.server.createAccount") {
+        post("/com.atproto.server.createAccount", {}) {
             val sessions =
                 sessionService ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
@@ -114,7 +114,7 @@ fun Route.xrpcRoutes(
             call.respond(HttpStatusCode.OK, session)
         }
 
-        post("/com.atproto.server.createSession") {
+        post("/com.atproto.server.createSession", {}) {
             val sessions =
                 sessionService ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
@@ -130,7 +130,7 @@ fun Route.xrpcRoutes(
             call.respond(HttpStatusCode.OK, session)
         }
 
-        get("/com.atproto.server.getSession") {
+        get("/com.atproto.server.getSession", {}) {
             val sessions =
                 sessionService ?: return@get call.respond(
                     HttpStatusCode.NotImplemented,
@@ -146,7 +146,7 @@ fun Route.xrpcRoutes(
             call.respond(HttpStatusCode.OK, session)
         }
 
-        post("/com.atproto.server.refreshSession") {
+        post("/com.atproto.server.refreshSession", {}) {
             val sessions =
                 sessionService ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
@@ -162,7 +162,7 @@ fun Route.xrpcRoutes(
             call.respond(HttpStatusCode.OK, session)
         }
 
-        post("/com.atproto.server.deleteSession") {
+        post("/com.atproto.server.deleteSession", {}) {
             val sessions =
                 sessionService ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
@@ -177,7 +177,7 @@ fun Route.xrpcRoutes(
             call.respond(HttpStatusCode.OK, EmptyPdsResponse())
         }
 
-        get("/com.atproto.server.describeServer") {
+        get("/com.atproto.server.describeServer", {}) {
             val response =
                 discoveryService?.describeServer()
                     ?: studio.hypertext.atproto.pds.DescribeServerResponse(
@@ -189,7 +189,7 @@ fun Route.xrpcRoutes(
             call.respond(HttpStatusCode.OK, response)
         }
 
-        get("/com.atproto.repo.describeRepo") {
+        get("/com.atproto.repo.describeRepo", {}) {
             val repoValue =
                 call.request.queryParameters["repo"]
                     ?.trim()
@@ -215,7 +215,7 @@ fun Route.xrpcRoutes(
             call.respond(HttpStatusCode.OK, repoDescription)
         }
 
-        get("/com.atproto.sync.getRepo") {
+        get("/com.atproto.sync.getRepo", {}) {
             val syncApi =
                 syncService ?: return@get call.respond(
                     HttpStatusCode.NotImplemented,
@@ -253,7 +253,7 @@ fun Route.xrpcRoutes(
             )
         }
 
-        get("/com.atproto.sync.getLatestCommit") {
+        get("/com.atproto.sync.getLatestCommit", {}) {
             val syncApi =
                 syncService ?: return@get call.respond(
                     HttpStatusCode.NotImplemented,
@@ -277,7 +277,7 @@ fun Route.xrpcRoutes(
             call.respond(HttpStatusCode.OK, latestCommit)
         }
 
-        get("/com.atproto.sync.getRepoStatus") {
+        get("/com.atproto.sync.getRepoStatus", {}) {
             val syncApi =
                 syncService ?: return@get call.respond(
                     HttpStatusCode.NotImplemented,
@@ -301,7 +301,7 @@ fun Route.xrpcRoutes(
             call.respond(HttpStatusCode.OK, repoStatus)
         }
 
-        get("/com.atproto.repo.getRecord") {
+        get("/com.atproto.repo.getRecord", {}) {
             val repoApi =
                 repoService ?: return@get call.respond(
                     HttpStatusCode.NotImplemented,
@@ -362,7 +362,7 @@ fun Route.xrpcRoutes(
             call.respond(HttpStatusCode.OK, record)
         }
 
-        get("/com.atproto.repo.listRecords") {
+        get("/com.atproto.repo.listRecords", {}) {
             val repoApi =
                 repoService ?: return@get call.respond(
                     HttpStatusCode.NotImplemented,
@@ -420,7 +420,7 @@ fun Route.xrpcRoutes(
             call.respondForRepoError(result.exceptionOrNull())
         }
 
-        post("/com.atproto.repo.createRecord") {
+        post("/com.atproto.repo.createRecord", {}) {
             val repoApi =
                 repoService ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
@@ -468,7 +468,7 @@ fun Route.xrpcRoutes(
             call.respondForRepoError(result.exceptionOrNull())
         }
 
-        post("/com.atproto.repo.putRecord") {
+        post("/com.atproto.repo.putRecord", {}) {
             val repoApi =
                 repoService ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
@@ -516,7 +516,7 @@ fun Route.xrpcRoutes(
             call.respondForRepoError(result.exceptionOrNull())
         }
 
-        post("/com.atproto.repo.deleteRecord") {
+        post("/com.atproto.repo.deleteRecord", {}) {
             val repoApi =
                 repoService ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
@@ -561,7 +561,7 @@ fun Route.xrpcRoutes(
             call.respondForRepoError(result.exceptionOrNull())
         }
 
-        post("/com.atproto.repo.uploadBlob") {
+        post("/com.atproto.repo.uploadBlob", {}) {
             val pdsBlobService =
                 blobService ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
@@ -614,7 +614,7 @@ fun Route.xrpcRoutes(
             call.respondForBlobError(result.exceptionOrNull())
         }
 
-        get("/com.atproto.sync.getBlob") {
+        get("/com.atproto.sync.getBlob", {}) {
             val pdsBlobService =
                 blobService ?: return@get call.respond(
                     HttpStatusCode.NotImplemented,

@@ -4,12 +4,13 @@ import app.logdate.server.auth.TokenService
 import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.responses.simpleSuccess
 import app.logdate.server.sync.SyncMetricsRegistry
+import io.github.smiley4.ktoropenapi.get
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.get
 import kotlinx.serialization.Serializable
 
 /**
@@ -24,7 +25,18 @@ internal fun Route.syncStatusRoutes(
     metrics: SyncMetricsRegistry,
     collectionsRepository: LogDateCollectionsRepository,
 ) {
-    get("/ops/sync/status") {
+    get("/ops/sync/status", {
+        tags = listOf("Sync")
+        summary = "Get sync status"
+        description = "Retrieve the count of entities synced for the current account."
+        securitySchemeNames = listOf("bearerAuth")
+        response {
+            HttpStatusCode.OK to {
+                description = "Sync status retrieved successfully"
+                body<SyncStatusSnapshot>()
+            }
+        }
+    }) {
         val start = System.currentTimeMillis()
         var success = false
         try {
@@ -44,7 +56,17 @@ internal fun Route.syncStatusRoutes(
         }
     }
 
-    get("/ops/sync/metrics") {
+    get("/ops/sync/metrics", {
+        tags = listOf("Ops")
+        summary = "Get sync metrics"
+        description = "Retrieve a snapshot of the server's sync metrics."
+        securitySchemeNames = listOf("bearerAuth")
+        response {
+            HttpStatusCode.OK to {
+                description = "Metrics retrieved successfully"
+            }
+        }
+    }) {
         val start = System.currentTimeMillis()
         var success = false
         try {
@@ -57,7 +79,20 @@ internal fun Route.syncStatusRoutes(
         }
     }
 
-    get("/ops/sync/metrics/prometheus") {
+    get("/ops/sync/metrics/prometheus", {
+        tags = listOf("Ops")
+        summary = "Get Prometheus metrics"
+        description = "Retrieve server metrics in Prometheus exposition format."
+        securitySchemeNames = listOf("bearerAuth")
+        response {
+            HttpStatusCode.OK to {
+                description = "Prometheus metrics retrieved successfully"
+                body<String> {
+                    mediaTypes = setOf(ContentType.Text.Plain)
+                }
+            }
+        }
+    }) {
         val start = System.currentTimeMillis()
         var success = false
         try {

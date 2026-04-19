@@ -16,6 +16,9 @@ import app.logdate.shared.model.sync.DeviceId
 import app.logdate.shared.model.sync.MediaMetadataResponse
 import app.logdate.shared.model.sync.MediaUploadResponse
 import io.github.aakira.napier.Napier
+import io.github.smiley4.ktoropenapi.delete
+import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.post
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -23,9 +26,6 @@ import io.ktor.server.application.call
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.delete
-import io.ktor.server.routing.get
-import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import java.util.UUID
 
@@ -48,7 +48,23 @@ internal fun Route.syncMediaRoutes(
 ) {
     val mediaAccessPolicy = config.mediaAccessPolicy
     route("/media") {
-        post {
+        post({
+            tags = listOf("Media")
+            summary = "Upload media"
+            description = "Upload a media file (image, video, etc.) for a content entry."
+            securitySchemeNames = listOf("bearerAuth")
+            request {
+                body<ByteArray> {
+                    mediaTypes = setOf(ContentType.MultiPart.FormData)
+                }
+            }
+            response {
+                HttpStatusCode.Created to {
+                    description = "Media uploaded successfully"
+                    body<MediaUploadResponse>()
+                }
+            }
+        }) {
             val start = System.currentTimeMillis()
             var success = false
             var bytes = 0L
@@ -146,7 +162,23 @@ internal fun Route.syncMediaRoutes(
             }
         }
 
-        get("/{mediaId}") {
+        get("/{mediaId}", {
+            tags = listOf("Media")
+            summary = "Get media metadata"
+            description = "Retrieve metadata for a specific media file."
+            securitySchemeNames = listOf("bearerAuth")
+            request {
+                pathParameter<String>("mediaId") {
+                    description = "The ID of the media to retrieve metadata for."
+                }
+            }
+            response {
+                HttpStatusCode.OK to {
+                    description = "Media metadata retrieved successfully"
+                    body<MediaMetadataResponse>()
+                }
+            }
+        }) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -173,7 +205,25 @@ internal fun Route.syncMediaRoutes(
             }
         }
 
-        get("/{mediaId}/binary") {
+        get("/{mediaId}/binary", {
+            tags = listOf("Media")
+            summary = "Download media binary"
+            description = "Download the raw binary data of a media file."
+            securitySchemeNames = listOf("bearerAuth")
+            request {
+                pathParameter<String>("mediaId") {
+                    description = "The ID of the media to download."
+                }
+            }
+            response {
+                HttpStatusCode.OK to {
+                    description = "Media binary data retrieved successfully"
+                    body<ByteArray> {
+                        mediaTypes = setOf(ContentType.Application.OctetStream)
+                    }
+                }
+            }
+        }) {
             val start = System.currentTimeMillis()
             var success = false
             var bytes = 0L
@@ -221,7 +271,22 @@ internal fun Route.syncMediaRoutes(
             }
         }
 
-        delete("/{mediaId}") {
+        delete("/{mediaId}", {
+            tags = listOf("Media")
+            summary = "Delete media"
+            description = "Delete a specific media file and its metadata."
+            securitySchemeNames = listOf("bearerAuth")
+            request {
+                pathParameter<String>("mediaId") {
+                    description = "The ID of the media to delete."
+                }
+            }
+            response {
+                HttpStatusCode.NoContent to {
+                    description = "Media deleted successfully"
+                }
+            }
+        }) {
             val start = System.currentTimeMillis()
             var success = false
             try {

@@ -10,6 +10,8 @@ import app.logdate.server.oauth.OAuthException
 import app.logdate.server.oauth.OAuthInvalidRequestException
 import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthUseDpopNonceException
+import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.post
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -22,8 +24,6 @@ import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.get
-import io.ktor.server.routing.post
 import studio.hypertext.atproto.pds.AuthorizationCodeTokenRequest
 import studio.hypertext.atproto.pds.AuthorizationDecisionRequest
 import studio.hypertext.atproto.pds.AuthorizationPrompt
@@ -51,19 +51,19 @@ fun Route.oauthRoutes(
     tokenService: TokenService? = null,
     identityService: AtprotoIdentityService? = null,
 ) {
-    get("/.well-known/oauth-authorization-server") {
+    get("/.well-known/oauth-authorization-server", {}) {
         call.respond(HttpStatusCode.OK, discoveryService?.authorizationServerMetadata() ?: config.authorizationServerMetadata())
     }
 
-    get("/.well-known/oauth-protected-resource") {
+    get("/.well-known/oauth-protected-resource", {}) {
         call.respond(HttpStatusCode.OK, discoveryService?.protectedResourceMetadata() ?: config.protectedResourceMetadata())
     }
 
-    get("/oauth/jwks") {
+    get("/oauth/jwks", {}) {
         call.respond(HttpStatusCode.OK, keyService.jwks())
     }
 
-    post("/oauth/par") {
+    post("/oauth/par", {}) {
         val service =
             authorizationService ?: return@post call.respond(
                 HttpStatusCode.NotImplemented,
@@ -106,7 +106,7 @@ fun Route.oauthRoutes(
         }
     }
 
-    get("/oauth/authorize") {
+    get("/oauth/authorize", {}) {
         val service =
             authorizationService ?: return@get call.respond(
                 HttpStatusCode.NotImplemented,
@@ -138,7 +138,7 @@ fun Route.oauthRoutes(
         }
     }
 
-    post("/oauth/authorize") {
+    post("/oauth/authorize", {}) {
         val service =
             authorizationService ?: return@post call.respond(
                 HttpStatusCode.NotImplemented,
@@ -180,7 +180,7 @@ fun Route.oauthRoutes(
         }
     }
 
-    post("/oauth/token") {
+    post("/oauth/token", {}) {
         val service =
             authorizationService ?: return@post call.respond(
                 HttpStatusCode.NotImplemented,
@@ -235,7 +235,7 @@ fun Route.oauthRoutes(
         }
     }
 
-    post("/oauth/revoke") {
+    post("/oauth/revoke", {}) {
         val service =
             authorizationService ?: return@post call.respond(
                 HttpStatusCode.NotImplemented,

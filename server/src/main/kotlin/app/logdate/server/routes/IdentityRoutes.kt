@@ -1,6 +1,7 @@
 package app.logdate.server.routes
 
 import app.logdate.server.identity.AtprotoIdentityService
+import io.github.smiley4.ktoropenapi.get
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
@@ -8,10 +9,9 @@ import io.ktor.server.request.host
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.get
 
 fun Route.identityRoutes(identityService: AtprotoIdentityService) {
-    get("/.well-known/atproto-did") {
+    get("/.well-known/atproto-did", {}) {
         val host = call.request.host().lowercase()
         val account =
             identityService.findByHandle(host)
@@ -24,7 +24,7 @@ fun Route.identityRoutes(identityService: AtprotoIdentityService) {
         )
     }
 
-    get("/.well-known/did.json") {
+    get("/.well-known/did.json", {}) {
         val host = call.request.host().lowercase()
         if (host == identityService.config.normalizedHandleDomain) {
             call.respond(HttpStatusCode.OK, identityService.serverDocument())

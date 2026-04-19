@@ -33,16 +33,17 @@ import app.logdate.shared.model.sync.JournalUploadRequest
 import app.logdate.shared.model.sync.JournalUploadResponse
 import app.logdate.shared.model.sync.VersionConstraint
 import io.github.aakira.napier.Napier
+import io.github.smiley4.ktoropenapi.delete
+import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.patch
+import io.github.smiley4.ktoropenapi.post
+import io.github.smiley4.ktoropenapi.put
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.delete
-import io.ktor.server.routing.get
-import io.ktor.server.routing.patch
-import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 import kotlinx.serialization.Serializable
 
@@ -68,7 +69,22 @@ private fun Route.contentRoutes(
     collectionsRepository: LogDateCollectionsRepository,
 ) {
     route("/contents") {
-        put("/{contentId}") {
+        put("/{contentId}", {
+            tags = listOf("Contents")
+            summary = "Upsert content"
+            description = "Create or update a content entry by ID."
+            securitySchemeNames = listOf("bearerAuth")
+            request {
+                pathParameter<String>("contentId") {
+                    description = "The ID of the content to upsert."
+                }
+                body<ContentUploadRequest>()
+            }
+            response {
+                HttpStatusCode.OK to { description = "Content updated" }
+                HttpStatusCode.Created to { description = "Content created" }
+            }
+        }) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -117,7 +133,18 @@ private fun Route.contentRoutes(
             }
         }
 
-        get {
+        get({
+            tags = listOf("Contents")
+            summary = "Get contents"
+            description = "Retrieve all contents for the authenticated user."
+            securitySchemeNames = listOf("bearerAuth")
+            response {
+                HttpStatusCode.OK to {
+                    description = "Successful retrieval"
+                    body<ContentChangesResponse>()
+                }
+            }
+        }) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -150,7 +177,24 @@ private fun Route.contentRoutes(
             }
         }
 
-        patch("/{contentId}") {
+        patch("/{contentId}", {
+            tags = listOf("Contents")
+            summary = "Patch content"
+            description = "Update specific fields of a content entry with optimistic locking."
+            securitySchemeNames = listOf("bearerAuth")
+            request {
+                pathParameter<String>("contentId") {
+                    description = "The ID of the content to patch."
+                }
+                body<ContentUpdateRequest>()
+            }
+            response {
+                HttpStatusCode.OK to {
+                    description = "Content patched successfully"
+                    body<ContentUpdateResponse>()
+                }
+            }
+        }) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -210,7 +254,28 @@ private fun Route.journalRoutes(
     collectionsRepository: LogDateCollectionsRepository,
 ) {
     route("/journals") {
-        put("/{journalId}") {
+        put("/{journalId}", {
+            tags = listOf("Journals")
+            summary = "Upsert journal"
+            description = "Create or update a journal by ID."
+            securitySchemeNames = listOf("bearerAuth")
+            request {
+                pathParameter<String>("journalId") {
+                    description = "The ID of the journal to upsert."
+                }
+                body<JournalUploadRequest>()
+            }
+            response {
+                HttpStatusCode.OK to {
+                    description = "Journal updated"
+                    body<JournalUploadResponse>()
+                }
+                HttpStatusCode.Created to {
+                    description = "Journal created"
+                    body<JournalUploadResponse>()
+                }
+            }
+        }) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -252,7 +317,18 @@ private fun Route.journalRoutes(
             }
         }
 
-        get {
+        get({
+            tags = listOf("Journals")
+            summary = "Get journals"
+            description = "Retrieve all journals for the authenticated user."
+            securitySchemeNames = listOf("bearerAuth")
+            response {
+                HttpStatusCode.OK to {
+                    description = "Successful retrieval"
+                    body<JournalChangesResponse>()
+                }
+            }
+        }) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -285,7 +361,24 @@ private fun Route.journalRoutes(
             }
         }
 
-        patch("/{journalId}") {
+        patch("/{journalId}", {
+            tags = listOf("Journals")
+            summary = "Patch journal"
+            description = "Update specific fields of a journal with optimistic locking."
+            securitySchemeNames = listOf("bearerAuth")
+            request {
+                pathParameter<String>("journalId") {
+                    description = "The ID of the journal to patch."
+                }
+                body<JournalUpdateRequest>()
+            }
+            response {
+                HttpStatusCode.OK to {
+                    description = "Journal patched successfully"
+                    body<JournalUpdateResponse>()
+                }
+            }
+        }) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -344,11 +437,26 @@ private fun Route.associationRoutes(
     collectionsRepository: LogDateCollectionsRepository,
 ) {
     route("/associations") {
-        put {
+        post({
+            tags = listOf("Associations")
+            summary = "Upload associations"
+            description = "Batch upload associations between entities."
+            securitySchemeNames = listOf("bearerAuth")
+            request {
+                body<AssociationUploadRequest>()
+            }
+            response {
+                HttpStatusCode.OK to {
+                    description = "Associations uploaded successfully"
+                    body<AssociationUploadResponse>()
+                }
+            }
+        }) {
             val start = System.currentTimeMillis()
+
             var success = false
             try {
-                val userId = extractUserId(call, tokenService) ?: return@put
+                val userId = extractUserId(call, tokenService) ?: return@post
                 val req = call.receive<AssociationUploadRequest>()
                 val uploadedAt = System.currentTimeMillis()
                 collectionsRepository.upsertAssociations(
@@ -371,7 +479,18 @@ private fun Route.associationRoutes(
             }
         }
 
-        get {
+        get({
+            tags = listOf("Associations")
+            summary = "Get associations"
+            description = "Retrieve all associations for the authenticated user."
+            securitySchemeNames = listOf("bearerAuth")
+            response {
+                HttpStatusCode.OK to {
+                    description = "Successful retrieval"
+                    body<AssociationChangesResponse>()
+                }
+            }
+        }) {
             val start = System.currentTimeMillis()
             var success = false
             try {
