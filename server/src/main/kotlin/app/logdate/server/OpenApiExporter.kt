@@ -22,13 +22,18 @@ fun main() {
     val port = ServerSocket(0).use { it.localPort }
 
     val server =
-        embeddedServer(Netty, host = "127.0.0.1", port = port) {
+        embeddedServer(Netty, host = "localhost", port = port) {
             module(isDatabaseAvailable = false)
         }
 
     server.start(wait = false)
     try {
-        val httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS)).build()
+        val httpClient =
+            HttpClient
+                .newBuilder()
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .connectTimeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))
+                .build()
 
         val openApiJson = fetchOpenApi(httpClient, port, OPENAPI_JSON_PATH)
         val openApiYaml = fetchOpenApi(httpClient, port, OPENAPI_YAML_PATH)
@@ -45,10 +50,17 @@ private fun fetchOpenApi(
     port: Int,
     path: String,
 ): String {
+    val acceptHeader =
+        when {
+            path.endsWith(".json") -> "application/json"
+            path.endsWith(".yaml") || path.endsWith(".yml") -> "application/x-yaml"
+            else -> "application/json"
+        }
     val request =
         HttpRequest
             .newBuilder()
-            .uri(URI("http://127.0.0.1:$port$path"))
+            .uri(URI("http://localhost:$port$path"))
+            .header("Accept", acceptHeader)
             .timeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))
             .GET()
             .build()

@@ -2,6 +2,9 @@
 # Build Plugin Versions
 desugar_jdk_libs = "2.1.5"
 filekitCompose = "0.8.8"
+googleCloudStorage = "2.67.0"
+h2 = "2.4.240"
+jackson = "2.18.2"
 kotlin = "2.3.20"
 dokkaGradlePlugin = "2.2.0"
 compose-multiplatform = "1.11.0-beta02"
@@ -11,6 +14,7 @@ agp = "9.1.1"
 googleServicesPlugin = "4.4.4"
 buildConfigPlugin = "6.0.9"
 kover = "0.9.8"
+postgresSocketFactory = "1.28.2"
 screenshot = "0.0.1-alpha14"
 benManesVersions = "0.53.0"
 ktlint = "13.1.0"
@@ -37,6 +41,7 @@ kotlinx-coroutines = "1.10.2"
 kotlinx-serialization = "1.11.0"
 kotlinx-datetime = "0.7.1"
 ktor = "3.4.2"
+ktor-swagger-ui = "5.6.0"
 logback = "1.5.32"
 androidx-navigation-compose = "2.9.2"
 nav3Core = "1.1.0"
@@ -138,6 +143,9 @@ commonsCompress = "1.28.0"
 [libraries]
 desugar_jdk_libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar_jdk_libs" }
 filekit-compose = { module = "io.github.vinceglb:filekit-compose", version.ref = "filekitCompose" }
+google-cloud-storage = { module = "com.google.cloud:google-cloud-storage", version.ref = "googleCloudStorage" }
+h2 = { module = "com.h2database:h2", version.ref = "h2" }
+postgres-socket-factory = { module = "com.google.cloud.sql:postgres-socket-factory", version.ref = "postgresSocketFactory" }
 screenshot-validation-api = { group = "com.android.tools.screenshot", name = "screenshot-validation-api", version.ref = "screenshot" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
@@ -258,6 +266,7 @@ exposed-dao = { group = "org.jetbrains.exposed", name = "exposed-dao", version.r
 exposed-kotlin-datetime = { group = "org.jetbrains.exposed", name = "exposed-kotlin-datetime", version.ref = "exposed" }
 postgresql = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
 hikariCP = { group = "com.zaxxer", name = "HikariCP", version.ref = "hikariCP" }
+jackson-dataformat-yaml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml", version.ref = "jackson" }
 flyway-core = { group = "org.flywaydb", name = "flyway-core", version.ref = "flyway" }
 flyway-database-postgresql = { group = "org.flywaydb", name = "flyway-database-postgresql", version.ref = "flyway" }
 
@@ -349,6 +358,8 @@ ktor-server-openapi = { module = "io.ktor:ktor-server-openapi-jvm", version.ref 
 ktor-server-routing-openapi = { module = "io.ktor:ktor-server-routing-openapi-jvm", version.ref = "ktor" }
 ktor-server-swagger = { module = "io.ktor:ktor-server-swagger-jvm", version.ref = "ktor" }
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
+ktor-swagger-ui = { module = "io.github.smiley4:ktor-swagger-ui", version.ref = "ktor-swagger-ui" }
+ktor-openapi = { module = "io.github.smiley4:ktor-openapi", version.ref = "ktor-swagger-ui" }
 
 # Android Credentials
 androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "androidxCredentials" }

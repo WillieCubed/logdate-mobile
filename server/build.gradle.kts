@@ -13,7 +13,8 @@ version = "0.1.0"
 
 application {
     mainClass.set("app.logdate.server.ApplicationKt")
-    applicationDefaultJvmArgs = listOf("-Dio.ktor.development=${extra["io.ktor.development"] ?: "false"}")
+    applicationDefaultJvmArgs =
+        listOf("-Dio.ktor.development=${extra["io.ktor.development"] ?: "false"}")
 }
 
 kotlin {
@@ -48,10 +49,10 @@ dependencies {
     implementation(libs.ktor.server.cors)
     implementation(libs.ktor.server.forwarded.header)
     implementation(libs.ktor.server.http.redirect)
-    implementation(libs.ktor.server.openapi)
-    implementation(libs.ktor.server.routing.openapi)
-    implementation(libs.ktor.server.swagger)
+    implementation(libs.ktor.swagger.ui)
+    implementation(libs.ktor.openapi)
     implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.jackson.dataformat.yaml)
     implementation(libs.ktor.client.okhttp)
 
     // Serialization
@@ -73,13 +74,13 @@ dependencies {
     implementation(libs.exposed.dao)
     implementation(libs.exposed.kotlin.datetime)
     implementation(libs.postgresql)
-    implementation("com.google.cloud.sql:postgres-socket-factory:1.28.2")
+    implementation(libs.postgres.socket.factory)
     implementation(libs.hikariCP)
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.postgresql)
 
     // Google Cloud Storage
-    implementation("com.google.cloud:google-cloud-storage:2.67.0")
+    implementation(libs.google.cloud.storage)
 
     // Koin DI
     implementation(platform(libs.koin.bom))
@@ -91,7 +92,7 @@ dependencies {
     testImplementation(libs.ktor.client.mock)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation("com.h2database:h2:2.4.240")
+    testImplementation(libs.h2)
 
     // E2E Testing
     testImplementation(libs.testcontainers.testcontainers)
@@ -144,6 +145,10 @@ tasks.jacocoTestCoverageVerification {
 
 tasks.named<Jar>("jar") {
     archiveFileName.set("logdate-server.jar")
+}
+
+tasks.named<Jar>("shadowJar") {
+    archiveFileName.set("logdate-server-all.jar")
 }
 
 val openApiOutputDir = layout.buildDirectory.dir("openapi")
