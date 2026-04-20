@@ -209,8 +209,8 @@ docker-compose --profile full-stack up
 ./gradlew :module:test --tests "package.TestClass.testMethod"
 ```
 
-For automated Play Console publishing, GitHub Actions setup, and Android
-release versioning, see
+For automated Play Console publishing, promotion-based production releases, and
+Android release provenance/versioning, see
 [`docs/reference/google-play-publishing.md`](docs/reference/google-play-publishing.md).
 
 ### Code Quality

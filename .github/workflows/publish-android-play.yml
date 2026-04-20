@@ -48,34 +48,15 @@ jobs:
         shell: bash
         run: ./scripts/resolve-android-play-version.sh
 
-      - name: Validate publish credentials
+      - name: Prepare Play publish inputs
+        id: prepare
         shell: bash
-        run: |
-          for name in \
-            ANDROID_PUBLISHER_CREDENTIALS \
-            LOGDATE_ANDROID_GOOGLE_SERVICES_JSON \
-            LOGDATE_RELEASE_STORE_BASE64 \
-            LOGDATE_RELEASE_STORE_PASSWORD \
-            LOGDATE_RELEASE_KEY_ALIAS \
-            LOGDATE_RELEASE_KEY_PASSWORD; do
-            if [[ -z "${!name}" ]]; then
-              echo "$name must be configured before Android Play publishing can run."
-              exit 1
-            fi
-          done
-
-      - name: Materialize release files
-        shell: bash
-        env:
-          RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/logdate-release.jks
-        run: |
-          printf '%s' "$LOGDATE_RELEASE_STORE_BASE64" | base64 --decode > "$RELEASE_KEYSTORE_PATH"
-          printf '%s' "$LOGDATE_ANDROID_GOOGLE_SERVICES_JSON" > app/android-main/google-services.json
-          chmod 600 "$RELEASE_KEYSTORE_PATH" app/android-main/google-services.json
-          echo "LOGDATE_RELEASE_STORE_FILE=$RELEASE_KEYSTORE_PATH" >> "$GITHUB_ENV"
+        run: ./scripts/prepare-android-play-publishing.sh internal
 
       - name: Publish release bundle to Play internal track
-        run: ./gradlew :app:android-main:publishReleaseBundle
+        run: >
+          ./gradlew :app:android-main:publishReleaseBundle
+          --release-name "${{ steps.version.outputs.internal_release_name }}"
         env:
           LOGDATE_PLAY_TRACK: ${{ env.PLAY_TRACK }}
           LOGDATE_VERSION_CODE: ${{ steps.version.outputs.version_code }}
@@ -94,8 +75,12 @@ jobs:
         if: always()
         shell: bash
         run: |
-          rm -f "${LOGDATE_RELEASE_STORE_FILE:-}"
-          rm -f app/android-main/google-services.json
+          if [[ -n "${{ steps.prepare.outputs.keystore_path }}" ]]; then
+            rm -f "${{ steps.prepare.outputs.keystore_path }}"
+          fi
+          if [[ -n "${{ steps.prepare.outputs.google_services_path }}" ]]; then
+            rm -f "${{ steps.prepare.outputs.google_services_path }}"
+          fi
 
   publish-production:
     if: ${{ vars.LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/android-v') }}
@@ -104,13 +89,7 @@ jobs:
       contents: read
 
     env:
-      PLAY_TRACK: production
       ANDROID_PUBLISHER_CREDENTIALS: ${{ secrets.ANDROID_PUBLISHER_CREDENTIALS }}
-      LOGDATE_ANDROID_GOOGLE_SERVICES_JSON: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON }}
-      LOGDATE_RELEASE_STORE_BASE64: ${{ secrets.LOGDATE_RELEASE_STORE_BASE64 }}
-      LOGDATE_RELEASE_STORE_PASSWORD: ${{ secrets.LOGDATE_RELEASE_STORE_PASSWORD }}
-      LOGDATE_RELEASE_KEY_ALIAS: ${{ secrets.LOGDATE_RELEASE_KEY_ALIAS }}
-      LOGDATE_RELEASE_KEY_PASSWORD: ${{ secrets.LOGDATE_RELEASE_KEY_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
@@ -133,51 +112,15 @@ jobs:
         shell: bash
         run: ./scripts/resolve-android-play-version.sh
 
-      - name: Validate publish credentials
+      - name: Validate Play credentials
         shell: bash
-        run: |
-          for name in \
-            ANDROID_PUBLISHER_CREDENTIALS \
-            LOGDATE_ANDROID_GOOGLE_SERVICES_JSON \
-            LOGDATE_RELEASE_STORE_BASE64 \
-            LOGDATE_RELEASE_STORE_PASSWORD \
-            LOGDATE_RELEASE_KEY_ALIAS \
-            LOGDATE_RELEASE_KEY_PASSWORD; do
-            if [[ -z "${!name}" ]]; then
-              echo "$name must be configured before Android Play publishing can run."
-              exit 1
-            fi
-          done
+        run: ./scripts/prepare-android-play-publishing.sh production
 
-      - name: Materialize release files
-        shell: bash
-        env:
-          RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/logdate-release.jks
-        run: |
-          printf '%s' "$LOGDATE_RELEASE_STORE_BASE64" | base64 --decode > "$RELEASE_KEYSTORE_PATH"
-          printf '%s' "$LOGDATE_ANDROID_GOOGLE_SERVICES_JSON" > app/android-main/google-services.json
-          chmod 600 "$RELEASE_KEYSTORE_PATH" app/android-main/google-services.json
-          echo "LOGDATE_RELEASE_STORE_FILE=$RELEASE_KEYSTORE_PATH" >> "$GITHUB_ENV"
-
-      - name: Publish release bundle to Play production track
-        run: ./gradlew :app:android-main:publishReleaseBundle
-        env:
-          LOGDATE_PLAY_TRACK: ${{ env.PLAY_TRACK }}
-          LOGDATE_VERSION_CODE: ${{ steps.version.outputs.version_code }}
-          LOGDATE_VERSION_NAME: ${{ steps.version.outputs.version_name }}
-
-      - name: Upload release bundle
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-release-bundle-${{ env.PLAY_TRACK }}-${{ github.sha }}
-          path: app/android-main/build/outputs/bundle/release/*.aab
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Clean up release files
-        if: always()
-        shell: bash
-        run: |
-          rm -f "${LOGDATE_RELEASE_STORE_FILE:-}"
-          rm -f app/android-main/google-services.json
+      - name: Promote tested internal release to Play production
+        run: >
+          ./gradlew :app:android-main:promoteReleaseArtifact
+          --from-track internal
+          --promote-track production
+          --version-code "${{ steps.version.outputs.version_code }}"
+          --release-name "${{ steps.version.outputs.production_release_name }}"
+          --release-status completed

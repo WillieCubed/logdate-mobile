@@ -23,9 +23,20 @@ require_git_repo() {
     }
 }
 
-resolve_base_tag() {
+resolve_current_tag() {
     if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]] && [[ "${GITHUB_REF_NAME:-}" == android-v* ]]; then
         printf '%s' "$GITHUB_REF_NAME"
+        return 0
+    fi
+
+    git tag --points-at HEAD --list 'android-v*' | LC_ALL=C sort -V | tail -n 1
+}
+
+resolve_base_tag() {
+    local current_tag
+    current_tag="$(resolve_current_tag)"
+    if [[ -n "$current_tag" ]]; then
+        printf '%s' "$current_tag"
         return 0
     fi
 
@@ -48,6 +59,15 @@ parse_semver() {
     VERSION_NAME_BASE="${MAJOR}.${MINOR}.${PATCH}"
 }
 
+resolve_commit_metadata() {
+    COMMIT_COUNT="$(git rev-list --count HEAD)"
+    SHORT_SHA="$(git rev-parse --short=7 HEAD)"
+
+    local hash_seed
+    hash_seed="${SHORT_SHA:0:5}"
+    HASH_FRAGMENT=$((16#$hash_seed % 1000))
+}
+
 resolve_commit_distance() {
     local tag="$1"
     DISTANCE="$(git rev-list --count "${tag}..HEAD")"
@@ -58,22 +78,15 @@ resolve_commit_distance() {
 }
 
 resolve_version_name() {
-    if (( DISTANCE == 0 )); then
-        VERSION_NAME="$VERSION_NAME_BASE"
+    if [[ -n "$CURRENT_TAG" ]]; then
+        VERSION_NAME="${CURRENT_TAG#android-v}+${SHORT_SHA}"
     else
-        VERSION_NAME="${VERSION_NAME_BASE}-main.${DISTANCE}"
+        VERSION_NAME="${VERSION_NAME_BASE}-main.${DISTANCE}+${SHORT_SHA}"
     fi
 }
 
 resolve_version_code() {
-    if (( MINOR > 99 || PATCH > 99 )); then
-        log_error "Minor and patch components must stay <= 99 so Play versionCode packing remains monotonic."
-        exit 1
-    fi
-
-    local packed_version
-    packed_version=$(( ((MAJOR * 100) + MINOR) * 100 + PATCH ))
-    VERSION_CODE=$(( (packed_version * 1000) + DISTANCE ))
+    VERSION_CODE=$(( (COMMIT_COUNT * 1000) + HASH_FRAGMENT ))
 
     if (( VERSION_CODE > 2147483647 )); then
         log_error "Resolved versionCode ${VERSION_CODE} exceeds the Android int limit."
@@ -81,20 +94,38 @@ resolve_version_code() {
     fi
 }
 
+resolve_release_names() {
+    INTERNAL_RELEASE_NAME="internal ${VERSION_NAME_BASE} ${SHORT_SHA}"
+    if [[ -n "$CURRENT_TAG" ]]; then
+        PRODUCTION_RELEASE_NAME="production ${CURRENT_TAG#android-v} ${SHORT_SHA}"
+    else
+        PRODUCTION_RELEASE_NAME="production ${VERSION_NAME_BASE} ${SHORT_SHA}"
+    fi
+}
+
 main() {
     require_git_repo
 
-    local base_tag
-    base_tag="$(resolve_base_tag)"
-    parse_semver "$base_tag"
-    resolve_commit_distance "$base_tag"
+    BASE_TAG="$(resolve_base_tag)"
+    CURRENT_TAG="$(resolve_current_tag)"
+    parse_semver "$BASE_TAG"
+    resolve_commit_metadata
+    resolve_commit_distance "$BASE_TAG"
     resolve_version_name
     resolve_version_code
+    resolve_release_names
 
-    write_output "base_tag" "$base_tag"
+    write_output "base_tag" "$BASE_TAG"
+    write_output "current_tag" "$CURRENT_TAG"
+    write_output "base_version" "$VERSION_NAME_BASE"
+    write_output "commit_count" "$COMMIT_COUNT"
     write_output "distance" "$DISTANCE"
+    write_output "short_sha" "$SHORT_SHA"
+    write_output "hash_fragment" "$HASH_FRAGMENT"
     write_output "version_name" "$VERSION_NAME"
     write_output "version_code" "$VERSION_CODE"
+    write_output "internal_release_name" "$INTERNAL_RELEASE_NAME"
+    write_output "production_release_name" "$PRODUCTION_RELEASE_NAME"
 }
 
 main "$@"

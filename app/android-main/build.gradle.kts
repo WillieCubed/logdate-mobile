@@ -20,14 +20,14 @@ val androidTestPackageOverride = providers.gradleProperty("logdate.androidTestPa
 /**
  * Production release versionCode comes from CI. Priority order:
  *
- *  1. `LOGDATE_VERSION_CODE` env var (CI sets this from the latest `android-v*` tag and commit
- *     distance on the ref being published).
+ *  1. `LOGDATE_VERSION_CODE` env var (CI sets this from the commit graph plus a
+ *     small commit-hash-derived provenance fragment).
  *  2. `logdate.versionCode` Gradle property (for ad-hoc local release builds).
  *  3. Fallback `1` — the historical hard-coded value, kept so `assembleDebug` still works
  *     without extra configuration.
  *
  * Play Store requires monotonically-increasing versionCodes per upload, so keeping this in CI
- * rather than hard-coding prevents collisions and keeps Git-based release automation in one place.
+ * rather than hard-coding prevents collisions while keeping release provenance tied to a commit.
  */
 val resolvedVersionCode: Int =
     (

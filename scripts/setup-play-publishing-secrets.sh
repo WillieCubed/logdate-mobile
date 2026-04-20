@@ -268,7 +268,8 @@ main() {
 
     log_phase "Next steps"
     log_info "Internal publishing runs from every main commit and workflow_dispatch once LOGDATE_PLAY_INTERNAL_PUBLISH_ENABLED=true."
-    log_info "Production publishing runs only from android-v<major>.<minor>.<patch> tag pushes once LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED=true."
+    log_info "Production publishing now promotes the matching internal release from android-v<major>.<minor>.<patch> tag pushes once LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED=true."
+    log_info "Tag only commits that have already been published successfully to the internal track."
     log_info "Google Play still requires the very first app upload to be done manually in Play Console."
 }
 

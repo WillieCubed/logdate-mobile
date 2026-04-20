@@ -11,7 +11,7 @@ The automated path is intentionally narrow:
 - publish the Android app bundle (`.aab`) only
 - publish **internal** builds on every push to `main`
 - allow **manual** internal publishes via `workflow_dispatch`
-- publish **production** builds only from `android-v*` tag pushes
+- publish **production** releases only from `android-v*` tag pushes
 - stay disabled until maintainers explicitly enable each path
 
 The workflow lives in
@@ -34,14 +34,14 @@ production roll out independently.
 
 ## Required Secrets
 
-| Purpose | Secret name | Notes |
-| --- | --- | --- |
-| Play Developer API credentials | `ANDROID_PUBLISHER_CREDENTIALS` | Raw service-account JSON content. |
-| Firebase/Google Services config | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON` | Raw `google-services.json` content written into `app/android-main/` during CI. |
-| Release keystore file | `LOGDATE_RELEASE_STORE_BASE64` | Base64-encoded `.jks` or `.keystore` file content. |
-| Release keystore password | `LOGDATE_RELEASE_STORE_PASSWORD` | Passed into the existing Android release signing config. |
-| Release key alias | `LOGDATE_RELEASE_KEY_ALIAS` | Passed into the existing Android release signing config. |
-| Release key password | `LOGDATE_RELEASE_KEY_PASSWORD` | Passed into the existing Android release signing config. |
+| Purpose | Secret name | Required for | Notes |
+| --- | --- | --- | --- |
+| Play Developer API credentials | `ANDROID_PUBLISHER_CREDENTIALS` | Internal + production | Raw service-account JSON content. |
+| Firebase/Google Services config | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON` | Internal only | Raw `google-services.json` content written into `app/android-main/` during CI. |
+| Release keystore file | `LOGDATE_RELEASE_STORE_BASE64` | Internal only | Base64-encoded `.jks` or `.keystore` file content. |
+| Release keystore password | `LOGDATE_RELEASE_STORE_PASSWORD` | Internal only | Passed into the existing Android release signing config. |
+| Release key alias | `LOGDATE_RELEASE_KEY_ALIAS` | Internal only | Passed into the existing Android release signing config. |
+| Release key password | `LOGDATE_RELEASE_KEY_PASSWORD` | Internal only | Passed into the existing Android release signing config. |
 
 The workflow materializes the keystore and `google-services.json` at runtime and
 removes them before the job exits.
@@ -66,6 +66,10 @@ The helper:
 If you want either publish path to stay disabled until later, leave its prompt
 at `n`.
 
+Production enablement assumes the tagged commit has already been published to the
+internal track, because production releases now **promote** that tested internal
+release instead of rebuilding the app bundle from source.
+
 ## Versioning Model
 
 Automated Play publishing derives app versioning from git history via:
@@ -86,15 +90,22 @@ Examples:
 Rules:
 
 1. The latest reachable `android-v*` tag defines the base version.
-2. `versionCode` is packed from the tag's semantic version plus the commit
-   distance from that tag.
-3. Internal builds from non-tag refs use a derived `versionName` like `1.4.2-main.3`.
-4. More than `999` commits from the same base tag are rejected; cut a new tag.
-5. The first-ever Play upload must still be done manually in Play Console before
+2. `versionCode` is commit-stable and does **not** depend on whether a release
+   tag exists yet for that commit.
+3. The high-significance digits come from the reachable commit count.
+4. The low-significance three digits are a deterministic fragment derived from
+   the short commit SHA.
+5. Internal builds from non-tag refs use a derived `versionName` like
+   `1.4.2-main.3+abc1234`.
+6. Tag builds resolve a tag-flavored `versionName`, but production promotion
+   uses the already-tested internal artifact identified by the same
+   commit-stable `versionCode`.
+7. The first-ever Play upload must still be done manually in Play Console before
    Gradle Play Publisher can publish subsequent releases.
 
-Because `versionCode` is derived from the release tag lineage, new `android-v*`
-tags must move forward semantically. Do not reuse or move Android release tags.
+Because `versionCode` is anchored to the commit graph, the same commit resolves
+to the same Play version code on `main`, manual dispatch, and a later
+`android-v*` tag. This is what makes promotion-from-internal possible.
 
 ## Workflow Behavior
 
@@ -116,25 +127,31 @@ The workflow has two publish paths:
   - `LOGDATE_PLAY_TRACK=internal`
   - `LOGDATE_VERSION_CODE=<derived>`
   - `LOGDATE_VERSION_NAME=<derived>`
+  - `--release-name "<internal release name with short SHA>"`
 
 ### Production track
 
 - Triggers only on `android-v<major>.<minor>.<patch>` tag pushes
 - Requires `LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED=true`
-- Publishes the same signed bundle task with:
+- Promotes the already-tested internal release with:
 
   ```bash
-  ./gradlew :app:android-main:publishReleaseBundle
+  ./gradlew :app:android-main:promoteReleaseArtifact \
+    --from-track internal \
+    --promote-track production \
+    --version-code <derived> \
+    --release-name "<tag release name with short SHA>" \
+    --release-status completed
   ```
 
-  using:
+The production path is intentionally lighter than the internal one:
 
-  - `LOGDATE_PLAY_TRACK=production`
-  - `LOGDATE_VERSION_CODE=<tag-derived exact release code>`
-  - `LOGDATE_VERSION_NAME=<tag version>`
+- it only needs the Play service-account secret
+- it does **not** rebuild the app bundle
+- it does **not** require the keystore or `google-services.json`
 
-The Android module defaults the Play track to `internal`, but CI passes the
-track explicitly so the workflow behavior stays obvious in one place.
+That optimization is safe only because the production job promotes the exact
+internal artifact already tested for the same commit/versionCode.
 
 ## Local Verification
 
@@ -150,6 +167,7 @@ To inspect the Gradle Play Publisher task surface:
 
 ```bash
 ./gradlew :app:android-main:help --task publishReleaseBundle
+./gradlew :app:android-main:help --task promoteReleaseArtifact
 ```
 
 Local publishing is possible too, but it requires the same Play service-account
