@@ -11,6 +11,13 @@ import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * Tests for the OpenAPI tooling, including the exporter and the validator.
+ *
+ * This suite ensures that the server can correctly generate its own API
+ * specification in both JSON and YAML formats and that the validation logic
+ * correctly identifies discrepancies or missing routes in the generated documentation.
+ */
 class OpenApiToolingTest {
     @Test
     fun `openapi exporter writes json and yaml and validator accepts output`() {

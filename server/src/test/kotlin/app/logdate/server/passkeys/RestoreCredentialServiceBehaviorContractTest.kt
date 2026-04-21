@@ -36,6 +36,14 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Tests the specialized behavior of the [RestoreCredentialService].
+ *
+ * Restore credentials are a specific type of passkey used for account recovery.
+ * This suite verifies the unique lifecycle of these credentials, including
+ * the automatic deactivation of previous restore credentials upon successful
+ * registration and the prevention of credential replay during authentication.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class RestoreCredentialServiceBehaviorContractTest {
     // -----------------------------------------------------------------------

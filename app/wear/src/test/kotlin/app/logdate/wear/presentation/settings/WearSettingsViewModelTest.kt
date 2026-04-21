@@ -30,6 +30,14 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 
+/**
+ * Tests for [WearSettingsViewModel], focusing on the accurate representation of system
+ * synchronization and connectivity status on Wear OS.
+ *
+ * These tests verify that the settings UI correctly reflects the state of the connected phone,
+ * including its reachability, pending upload counts, and any synchronization errors, while
+ * also ensuring that manual sync requests are properly dispatched to the underlying manager.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WearSettingsViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()

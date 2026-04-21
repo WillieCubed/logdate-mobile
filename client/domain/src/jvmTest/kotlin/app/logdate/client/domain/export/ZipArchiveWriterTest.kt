@@ -9,6 +9,13 @@ import org.junit.Test
 import java.nio.file.Files
 import java.util.zip.ZipFile
 
+/**
+ * Tests the functionality of [ZipArchiveWriter] in creating ZIP archives for data export.
+ *
+ * This test suite verifies that the writer correctly handles various types of archive entries,
+ * including raw bytes and files, and ensures that the resulting ZIP file contains the
+ * expected entries and data.
+ */
 class ZipArchiveWriterTest {
     private val writer = ZipArchiveWriter(FileSystem.SYSTEM)
 

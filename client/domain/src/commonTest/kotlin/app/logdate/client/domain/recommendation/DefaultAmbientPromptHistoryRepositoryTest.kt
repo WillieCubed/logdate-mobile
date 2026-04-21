@@ -11,6 +11,13 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
+/**
+ * Unit tests for [DefaultAmbientPromptHistoryRepository].
+ *
+ * Tests the history tracking and suppression logic for ambient prompts,
+ * ensuring that cooldown periods, daily limits, and deduplication rules
+ * are correctly enforced to prevent prompt fatigue.
+ */
 class DefaultAmbientPromptHistoryRepositoryTest {
     @Test
     fun `suppresses any prompt when another prompt was shown within the last hour`() =

@@ -23,6 +23,16 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Unit and integration tests for [DatabaseConfig], ensuring robust database connection management.
+ *
+ * This test suite covers:
+ * - Parsing and normalization of various database connection URL formats (postgres, postgresql, jdbc).
+ * - Configuration of Hikari connection pools with appropriate driver and performance settings.
+ * - Dynamic data source creation for different environments, including Google Cloud SQL.
+ * - Credential resolution logic from environment variables and connection strings.
+ * - Database migration orchestration using Flyway, including error handling and profile-specific behavior.
+ */
 class DatabaseConfigTest {
     @AfterTest
     fun cleanupMocks() {

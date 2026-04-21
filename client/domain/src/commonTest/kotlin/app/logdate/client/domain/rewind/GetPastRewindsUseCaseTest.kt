@@ -15,6 +15,12 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [GetPastRewindsUseCase].
+ *
+ * Confirms that the use case correctly fetches and returns the full history
+ * of generated rewinds from the repository, maintaining their original order.
+ */
 class GetPastRewindsUseCaseTest {
     private lateinit var mockRepository: MockRewindRepository
     private lateinit var useCase: GetPastRewindsUseCase

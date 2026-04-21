@@ -7,6 +7,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * Verifies the resolution of `did:web` identifiers into standard DID Documents.
+ *
+ * This test suite covers the mapping of hostnames and ports to HTTP well-known
+ * endpoints, JSON decoding of documents, and error handling for invalid
+ * responses, network failures, and document mismatches.
+ */
 class DidWebResolverTest {
     @Test
     fun buildsWellKnownUrl() {

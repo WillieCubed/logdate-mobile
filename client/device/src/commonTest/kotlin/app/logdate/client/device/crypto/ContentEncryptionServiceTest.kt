@@ -7,6 +7,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 
+/**
+ * Tests for [ContentEncryptionService].
+ *
+ * Verifies that the service correctly encrypts and decrypts content,
+ * ensuring data confidentiality and integrity.
+ */
 class ContentEncryptionServiceTest {
     private val mockSecureStorage = InMemorySecureStorage()
     private val cryptoManager = TestCryptoManager()

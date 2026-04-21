@@ -26,6 +26,15 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Instant
 
+/**
+ * Exercises the [MemorySelectionViewModel] to ensure smooth media curation during onboarding.
+ *
+ * This suite validates the reactive UI state management for:
+ * - Fetching and displaying personal media (memories) for user selection
+ * - Falling back to recent media when requested date ranges are empty
+ * - Curating memories using a local or generative AI client
+ * - Recovering gracefully from media access or loading failures
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MemorySelectionViewModelTest {
     private val testDispatcher = StandardTestDispatcher()

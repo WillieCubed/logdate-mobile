@@ -5,6 +5,13 @@ import app.logdate.client.domain.dayboundary.HealthConnectGateState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Unit tests for the state resolution logic of the onboarding's day boundaries screen.
+ *
+ * This suite verifies the complex state machine involved in integrating Health Connect,
+ * ensuring correct post-permission actions based on gate status, user consent, and
+ * whether permission requests are in-flight.
+ */
 class OnboardingDayBoundariesScreenStateTest {
     @Test
     fun `post-permission action stays idle until enable flow is active`() {

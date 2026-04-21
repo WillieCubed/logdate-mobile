@@ -55,6 +55,13 @@ import org.junit.runner.RunWith
 import org.junit.runners.model.Statement
 import java.time.LocalDate
 
+/**
+ * Comprehensive E2E tests for the multi-step user onboarding journey.
+ *
+ * This suite walks through the entire first-run experience, verifying that
+ * profile creation, feature education, permission requests, and cloud setup
+ * steps are correctly sequenced and maintain state across configuration changes.
+ */
 @RunWith(AndroidJUnit4::class)
 class OnboardingJourneyE2ETest {
     private val environment = OnboardingJourneyEnvironment()
@@ -331,6 +338,10 @@ class OnboardingJourneyE2ETest {
     }
 }
 
+/**
+ * A [TestRule] that overrides the activity launch configuration to use a specific
+ * onboarding fixture during tests.
+ */
 private class OnboardingLaunchOverrideRule : TestRule {
     override fun apply(
         base: Statement,

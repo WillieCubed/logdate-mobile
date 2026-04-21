@@ -32,6 +32,13 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * Unit tests for [AudioViewModel].
+ *
+ * This test suite validates the audio recording and playback state management,
+ * ensuring that UI states correctly reflect the recording progress, transcription
+ * updates, and playback control actions.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AudioViewModelTest {
     private val dispatcher = StandardTestDispatcher()

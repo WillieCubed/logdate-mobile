@@ -11,6 +11,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Unit tests for repository-related data models and their serialization.
+ *
+ * These tests ensure that repository identifiers (e.g., [RepoRecordId]) correctly derive
+ * corresponding AT URIs and that core repository types (e.g., [RepoRecord], [RepoWriteResult])
+ * serialize into their expected wire formats, including proper handling of validation statuses.
+ */
 class RepoModelsTest {
     private val json = Json { encodeDefaults = true }
 

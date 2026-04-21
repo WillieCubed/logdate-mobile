@@ -42,6 +42,14 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 
+/**
+ * Comprehensive tests for [DefaultPasskeyAccountRepository] covering the full lifecycle of
+ * passkey-based account management.
+ *
+ * This includes verifying account creation and authentication flows, session persistence,
+ * automatic token refreshing, and integration with platform-level account managers and
+ * passkey providers.
+ */
 class DefaultPasskeyAccountRepositoryTest {
     private val testAccount =
         LogDateAccount(

@@ -25,6 +25,15 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Integration tests for ATProto XRPC blob management endpoints.
+ *
+ * This suite verifies the implementation of `com.atproto.repo.uploadBlob` and
+ * `com.atproto.sync.getBlob`. It ensures that blobs are correctly uploaded with
+ * appropriate metadata (CID, mimeType, size), can be retrieved by their content
+ * identifiers, and that authentication and "not found" scenarios are handled
+ * according to the ATProto specification.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class XrpcBlobRoutesTest {
     private val json = Json { ignoreUnknownKeys = true }

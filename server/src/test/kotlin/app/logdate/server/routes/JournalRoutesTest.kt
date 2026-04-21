@@ -10,6 +10,13 @@ import io.ktor.server.testing.testApplication
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Verifies the high-level routing constraints and authentication requirements for journals.
+ *
+ * This focused test suite ensures that all journal-related endpoints are protected by
+ * mandatory authentication and that they strictly enforce the permitted HTTP methods,
+ * preventing unauthorized access and invalid interaction patterns.
+ */
 class JournalRoutesTest {
     @Test
     fun testJournalRoutesRequireAuthAndEnforceMethods() =

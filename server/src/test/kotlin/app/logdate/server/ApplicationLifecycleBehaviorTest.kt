@@ -20,6 +20,14 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Tests for the high-level application lifecycle and background maintenance tasks.
+ *
+ * This suite verifies that the server can boot and shut down correctly, that
+ * environment variables are parsed as expected, and that the background sync
+ * maintenance job (which purges old tombstones) operates correctly with proper
+ * metrics reporting.
+ */
 class ApplicationLifecycleBehaviorTest {
     @AfterTest
     fun cleanup() {

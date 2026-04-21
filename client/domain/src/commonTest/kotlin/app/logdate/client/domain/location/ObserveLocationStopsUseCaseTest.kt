@@ -16,6 +16,14 @@ import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
+/**
+ * Unit tests for [ObserveLocationStopsUseCase].
+ *
+ * Validates the algorithm for identifying significant "stops" from a stream
+ * of location history points. It ensures that points are correctly grouped
+ * by proximity and time, while appropriately handling gaps in data or
+ * specific capture sources.
+ */
 class ObserveLocationStopsUseCaseTest {
     @Test
     fun `invoke groups nearby consecutive points into one stop`() =

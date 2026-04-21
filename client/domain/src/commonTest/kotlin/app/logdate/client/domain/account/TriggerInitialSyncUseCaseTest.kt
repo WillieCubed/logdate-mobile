@@ -18,6 +18,12 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
+/**
+ * Tests for [TriggerInitialSyncUseCase].
+ *
+ * Verifies the initial synchronization flow, including handling of successful sync,
+ * partial success with errors, timeouts, and unexpected failures.
+ */
 class TriggerInitialSyncUseCaseTest {
     @Test
     fun `returns Success when fullSync succeeds cleanly`() =
@@ -76,6 +82,9 @@ class TriggerInitialSyncUseCaseTest {
             assertEquals("boom", error.message)
         }
 
+    /**
+     * A fake implementation of [SyncManager] for testing.
+     */
     private open class FakeSyncManager(
         private val fullSyncResult: SyncResult,
     ) : SyncManager {
@@ -130,12 +139,18 @@ class TriggerInitialSyncUseCaseTest {
         override suspend fun discardDeadLetter(id: String) = Unit
     }
 
+    /**
+     * A [SyncManager] that never completes a full sync, used to test timeout scenarios.
+     */
     private class NeverCompletingSyncManager : FakeSyncManager(SyncResult(success = true)) {
         private val never = CompletableDeferred<SyncResult>()
 
         override suspend fun fullSync(): SyncResult = never.await()
     }
 
+    /**
+     * A [SyncManager] that throws an exception during full sync, used to test error handling.
+     */
     private class ThrowingSyncManager : FakeSyncManager(SyncResult(success = true)) {
         override suspend fun fullSync(): SyncResult = throw RuntimeException("boom")
     }

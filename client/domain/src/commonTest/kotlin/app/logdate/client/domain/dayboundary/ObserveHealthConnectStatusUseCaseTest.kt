@@ -7,6 +7,13 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Verifies that [ObserveHealthConnectStatusUseCase] correctly transforms the raw health
+ * repository availability into a structured [HealthConnectStatus] stream.
+ *
+ * Ensures that various Health Connect states (e.g., update required, not installed, connected)
+ * are properly mapped and emitted to downstream consumers.
+ */
 class ObserveHealthConnectStatusUseCaseTest {
     private val repository = FakeHealthRepository()
     private val useCase = ObserveHealthConnectStatusUseCase(repository)

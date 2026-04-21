@@ -19,6 +19,14 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
+/**
+ * Unit tests for [ObserveUserIdentityUseCase].
+ *
+ * Verifies the consolidation of user identity data from multiple sources,
+ * including local profile storage, cloud account metadata, and active
+ * session state. It specifically tests the precedence logic where local
+ * overrides (like display name or bio) take priority over cloud-provided values.
+ */
 class ObserveUserIdentityUseCaseTest {
     // region Fakes
 

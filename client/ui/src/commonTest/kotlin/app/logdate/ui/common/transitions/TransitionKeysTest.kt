@@ -5,6 +5,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.uuid.Uuid
 
+/**
+ * Ensures that the generation of transition keys for UI animations is consistent
+ * and unique.
+ *
+ * This suite verifies that shared element transition keys, particularly for the note
+ * viewer, are correctly derived from entity IDs to prevent animation conflicts
+ * between different pieces of content.
+ */
 class TransitionKeysTest {
     @Test
     fun `note viewer transition includes note id`() {

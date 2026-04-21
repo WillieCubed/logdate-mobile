@@ -17,6 +17,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests the server discovery mechanism used to bootstrap communication with a LogDate server.
+ *
+ * This suite verifies that [DefaultServerDiscoveryClient] can successfully retrieve and
+ * parse server metadata, including deployment details and supported capabilities, from
+ * a well-known discovery endpoint.
+ */
 class ServerDiscoveryClientTest {
     @Test
     fun `discoverServer reads descriptor from selected origin`() =

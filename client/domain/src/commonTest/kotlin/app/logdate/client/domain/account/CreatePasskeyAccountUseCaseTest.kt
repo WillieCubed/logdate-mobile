@@ -11,6 +11,13 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
+/**
+ * Tests for [CreatePasskeyAccountUseCase].
+ *
+ * Verifies the account creation flow, including validation of username and display name,
+ * and handling of various repository responses such as successful creation,
+ * username unavailability, and errors.
+ */
 class CreatePasskeyAccountUseCaseTest {
     private val mockAccount =
         LogDateAccount(

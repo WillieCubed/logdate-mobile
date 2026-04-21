@@ -20,6 +20,13 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [GcsMediaStorage], validating the integration with Google Cloud Storage
+ * for persisting media assets and backups.
+ *
+ * This suite verifies path sanitization, KMS-based encryption support, signed URL
+ * generation, and the mapping of GCS-specific errors to internal exceptions.
+ */
 class GcsMediaStorageTest {
     @Test
     fun `upload media returns storage path and sanitizes filename`() {

@@ -32,6 +32,14 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [SummarizeJournalEntriesUseCase].
+ *
+ * Verifies the AI-driven summarization of journal entries, ensuring correct behavior
+ * across various states such as empty input, network unavailability, and successful
+ * AI client interaction. It also validates that summaries are cached consistently
+ * for identical sets of entries.
+ */
 class SummarizeJournalEntriesUseCaseTest {
     private lateinit var fakeCache: FakeGenerativeAICache
     private lateinit var fakeChatClient: FakeGenerativeAIChatClient

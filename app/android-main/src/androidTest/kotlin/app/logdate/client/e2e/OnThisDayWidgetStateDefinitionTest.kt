@@ -20,6 +20,13 @@ import kotlin.uuid.Uuid
  *
  * Each test uses a unique fileKey to avoid cross-test DataStore cache pollution.
  */
+/**
+ * Tests the Glance [GlanceStateDefinition] for the "On This Day" widget.
+ *
+ * These tests verify that the widget's [OnThisDayWidgetState] is correctly serialized
+ * to and from the local [DataStore], ensuring that widget content (like dates and
+ * summaries) survives system-initiated process deaths and updates.
+ */
 @RunWith(AndroidJUnit4::class)
 class OnThisDayWidgetStateDefinitionTest {
     private val context: Context = ApplicationProvider.getApplicationContext()

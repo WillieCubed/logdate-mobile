@@ -39,6 +39,15 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Extensive validation and edge-case tests for the V1 Authentication routes.
+ *
+ * This class focuses on the rigorous validation of registration and authentication
+ * inputs, including username and display name constraints, session token integrity,
+ * email binding verification, and Google identity normalization. It also tests the
+ * system's response to misconfigured authentication providers and unauthorized
+ * access attempts across various profile and maintenance endpoints.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class AuthV1RoutesValidationTest {
     private val json = Json { ignoreUnknownKeys = true }

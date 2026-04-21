@@ -3,6 +3,13 @@ package app.logdate.server.audit
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
+/**
+ * Unit tests for [AuditLogger], focusing on the JSON-based rendering of audit events.
+ *
+ * These tests ensure that audit payloads are valid JSON, handle null values
+ * gracefully, escape special characters correctly, and maintain deterministic
+ * field ordering for predictable logging.
+ */
 class AuditLoggerTest {
     @Test
     fun `renders category and fields as single-line JSON`() {

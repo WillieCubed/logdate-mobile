@@ -6,6 +6,13 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [WearAudioRequestPaths].
+ *
+ * Verifies the path construction and parsing logic used for transferring audio
+ * data between the phone and Wear OS device, ensuring correct identification
+ * of audio transfer and request paths.
+ */
 class WearAudioRequestPathsTest {
     private val noteId = Uuid.parse("550e8400-e29b-41d4-a716-446655440000")
 

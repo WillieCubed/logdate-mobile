@@ -13,6 +13,14 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [NoteHealthAnnotator], which enriches journal notes with biometric context on Wear OS.
+ *
+ * This suite validates the acquisition of health metrics (such as heart rate and step counts)
+ * from system sensors at the time of note creation, ensuring that this data is correctly
+ * associated with the note and persisted for future synchronization. It also confirms
+ * graceful degradation when sensors are unavailable or data is sparse.
+ */
 class NoteHealthAnnotatorTest {
     private val healthSensorManager = mockk<WearHealthSensorManager>()
     private val healthSnapshotDao = mockk<HealthSnapshotDao>(relaxed = true)

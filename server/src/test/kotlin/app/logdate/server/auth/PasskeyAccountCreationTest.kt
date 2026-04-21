@@ -17,6 +17,13 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Integration tests for the end-to-end account creation workflow using passkeys.
+ *
+ * This class coordinates multiple components—repositories, passkey services, and
+ * session managers—to simulate the full user journey from generating registration
+ * options to successfully persisting a new account and its associated credentials.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class PasskeyAccountCreationTest {
     private lateinit var accountRepository: AccountRepository

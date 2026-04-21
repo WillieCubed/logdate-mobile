@@ -31,6 +31,15 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [GoogleWearDataLayerClient], the concrete implementation of the Wearable
+ * communication bridge using Google Play Services.
+ *
+ * These tests verify the robustness of data item persistence, message passing, and complex
+ * channel-based file transfers between the watch and phone. It specifically focuses on
+ * error handling for common wearable scenarios, such as node unreachability, transfer timeouts,
+ * and stream failures during audio synchronization.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class GoogleWearDataLayerClientTest {
     private val dataClient = mockk<DataClient>()

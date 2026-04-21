@@ -5,6 +5,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Validates the elliptic curve cryptography (ECC) utility functions used for AT
+ * Protocol identities.
+ *
+ * This test suite covers key pair generation, public key encoding into
+ * multibase formats, and signature generation and verification for supported
+ * curves (K-256 and P-256).
+ */
 class EcKeySupportTest {
     @Test
     fun `generate key pair and multikey round trip for supported curves`() {

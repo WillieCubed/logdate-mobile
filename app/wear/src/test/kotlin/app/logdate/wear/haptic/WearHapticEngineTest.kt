@@ -11,6 +11,15 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 
+/**
+ * Comprehensive tests for [WearHapticEngine], validating that tactile feedback aligns with
+ * user intensity preferences.
+ *
+ * This suite ensures that the engine correctly filters haptic events based on the active
+ * [HapticPreference], distinguishing between "critical" feedback (like recording starts)
+ * and "cosmetic" feedback (like scroll ticks) to respect the user's desired level of
+ * physical interaction.
+ */
 class WearHapticEngineTest {
     private lateinit var vibrator: Vibrator
     private lateinit var engine: WearHapticEngine

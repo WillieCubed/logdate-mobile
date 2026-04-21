@@ -13,6 +13,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [ShareJournalViewModel], which manages the user interactions for sharing
+ * entire journals with others.
+ *
+ * This suite verifies that the view model correctly handles requests to share journals
+ * via deep links or QR codes by delegating to the appropriate system sharing mechanisms.
+ */
 class ShareJournalViewModelTest {
     private val journal = Journal(id = Uuid.random(), title = "Weekend Trip")
     private val sharingLauncher = RecordingSharingLauncher()

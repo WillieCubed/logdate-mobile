@@ -25,6 +25,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests the enforcement of authorization and operational policies within the Sync API.
+ *
+ * This suite validates that sync-related operations correctly reject unauthorized or
+ * malformed access tokens and that the API responds with appropriate errors when
+ * internal services are misconfigured. It also tests the logic for operational tasks,
+ * such as parameter clamping during tombstone purging.
+ */
 class SyncAuthorizationAndOpsPolicyTest {
     @Test
     fun `sync operations reject invalid token payload and require explicit token service wiring`() =

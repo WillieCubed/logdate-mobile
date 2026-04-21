@@ -39,6 +39,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 
+/**
+ * Integration tests for the media and backup lifecycle within the Sync API.
+ *
+ * This class validates the complex interaction between the sync routes, encryption
+ * services, and external blob storage. It covers end-to-end scenarios including multipart
+ * uploads, storage-level failures, decryption errors, and the retrieval of binaries via
+ * both direct downloads and signed URLs.
+ */
 class SyncMediaAndBackupLifecycleTest {
     @Test
     fun `media and backup endpoints surface storage failures and preserve backup list behavior`() =

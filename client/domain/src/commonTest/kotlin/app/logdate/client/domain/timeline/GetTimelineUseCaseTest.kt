@@ -45,6 +45,15 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [GetTimelineUseCase].
+ *
+ * Verifies the retrieval and assembly of the full journal timeline, ensuring that:
+ * - Entries are grouped correctly by logical day.
+ * - Sorting orders (chronological and reverse chronological) are respected.
+ * - Enriched data such as visited places and derived "day parts" are correctly included.
+ * - The timeline remains stable and accurate even with empty or single-entry datasets.
+ */
 class GetTimelineUseCaseTest {
     private lateinit var mockNotesRepository: MockJournalNotesRepository
     private lateinit var useCase: GetTimelineUseCase

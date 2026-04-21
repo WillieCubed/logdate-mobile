@@ -9,6 +9,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
+/**
+ * Tests the visual transition mapping between the empty editor state and media pickers.
+ *
+ * These tests ensure that editor blocks (text, audio, image, etc.) correctly map to
+ * their corresponding UI tile IDs to enable seamless animations when adding content.
+ */
 class EmptyEditorTransitionStateTest {
     @Test
     fun testMatchingPickerTileIdsReuseSupportedBlockIds() {

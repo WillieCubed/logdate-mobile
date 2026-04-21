@@ -7,6 +7,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [CheckUsernameAvailabilityUseCase].
+ *
+ * Verifies that the use case correctly validates username format and checks
+ * availability through the [PasskeyAccountRepository].
+ */
 class CheckUsernameAvailabilityUseCaseTest {
     @Test
     fun `invoke with available username should return success true`() =

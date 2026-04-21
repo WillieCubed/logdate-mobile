@@ -23,6 +23,16 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for the Wear OS Health Dashboard experience.
+ *
+ * This suite verifies the [HealthDashboardViewModel]'s ability to aggregate and
+ * present health-related data. It tests:
+ * - Real-time sampling of heart rate and step counts via [WearHealthSensorManager].
+ * - Retrieval and display of historical health snapshots from local storage.
+ * - Generation of basic correlation insights between health metrics and user notes.
+ * - Graceful handling of sensor availability and data loading errors.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class HealthDashboardViewModelTest {
     private val testDispatcher = StandardTestDispatcher()

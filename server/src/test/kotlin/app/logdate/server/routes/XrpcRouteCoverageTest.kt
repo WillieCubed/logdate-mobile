@@ -92,6 +92,14 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * A comprehensive coverage suite for XRPC routing and model behavior.
+ *
+ * This class verifies the structural integrity of AT Protocol DTOs and ensures that XRPC
+ * routes correctly handle multiple authentication schemes, including OAuth with DPoP. It
+ * also tests the proxying logic for core AT Protocol services such as session management,
+ * handle resolution, and repository synchronization.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class XrpcRouteCoverageTest {
     private val json = Json { ignoreUnknownKeys = true }

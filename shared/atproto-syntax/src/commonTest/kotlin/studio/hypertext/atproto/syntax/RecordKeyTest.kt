@@ -6,6 +6,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * Validates the strict character and length constraints for AT Protocol `RecordKey`
+ * identifiers.
+ *
+ * This test suite covers parsing allowed character sets (alphanumeric, hyphens,
+ * underscores, etc.), rejecting prohibited structures like dot-segments, and
+ * ensuring correct JSON serialization.
+ */
 class RecordKeyTest {
     @Test
     fun acceptsSpecExamples() {

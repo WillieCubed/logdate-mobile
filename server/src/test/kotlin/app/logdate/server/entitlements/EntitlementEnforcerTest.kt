@@ -7,6 +7,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [EntitlementEnforcer], validating the logic that governs user quotas
+ * and service access based on subscription tiers.
+ *
+ * This suite covers various scenarios including free vs. unlimited plans,
+ * storage and backup count limit enforcement, and the handling of edge cases
+ * like past-due or cancelled subscription statuses.
+ */
 class EntitlementEnforcerTest {
     private val accountId = UUID.randomUUID()
 

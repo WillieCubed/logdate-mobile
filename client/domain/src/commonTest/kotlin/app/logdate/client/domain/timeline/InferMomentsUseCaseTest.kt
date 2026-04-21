@@ -36,6 +36,13 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Verifies the logic for grouping journal entries into cohesive "moments" via [InferMomentsUseCase].
+ *
+ * These tests cover both AI-driven inference (using generative models to identify semantic
+ * boundaries and labels) and a robust heuristic fallback that groups entries by time-of-day
+ * and location when AI is unavailable or fails.
+ */
 class InferMomentsUseCaseTest {
     private val date = LocalDate(2025, 3, 15)
 

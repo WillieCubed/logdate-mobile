@@ -3,6 +3,13 @@ package studio.hypertext.atproto.repo
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Integration tests for ensuring compatibility of repository types with JVM consumers.
+ *
+ * These tests verify that types defined in common code—particularly those utilizing inline or value
+ * classes—behave predictably when accessed from the JVM, including scenarios involving reflection
+ * and standard JVM method signatures.
+ */
 class RepoJvmInteropTest {
     @Test
     fun `jvm consumers can read boxed cid values`() {

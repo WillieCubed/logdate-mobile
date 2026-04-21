@@ -17,6 +17,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
+/**
+ * Tests for the application's "edge" configurations, focusing on network-level
+ * concerns like CORS, HTTPS redirection, and forwarded header trust.
+ *
+ * This suite verifies that allowed origins are parsed correctly, that CORS
+ * headers are only present when configured, and that environment-specific
+ * security policies (like production HTTPS enforcement) are active.
+ */
 class ApplicationEdgeTest {
     @Test
     fun `parseAllowedOrigins returns empty list for null or blank`() {

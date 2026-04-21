@@ -9,6 +9,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
+/**
+ * Tests for [GetDayBoundsUseCase].
+ *
+ * Verifies the resolution of a calendar date into its corresponding start and end [Instant]s,
+ * checking both successful retrieval from the repository and appropriate error propagation
+ * when the underlying data source fails.
+ */
 class GetDayBoundsUseCaseTest {
     private val repository = FakeHealthRepository()
     private val useCase = GetDayBoundsUseCase(repository, FakeDayBoundarySettingsRepository())

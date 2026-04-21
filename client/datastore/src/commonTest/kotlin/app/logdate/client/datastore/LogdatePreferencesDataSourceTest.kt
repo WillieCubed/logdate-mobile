@@ -11,6 +11,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [LogdatePreferencesDataSource], which provides a high-level API for
+ * accessing and modifying application-wide user preferences.
+ *
+ * This suite verifies that default preference values are correctly set and that
+ * many changes to settings (such as search visibility or feature toggles) are correctly
+ * persisted to the underlying [DataStore].
+ */
 class LogdatePreferencesDataSourceTest {
     private val dataSource = LogdatePreferencesDataSource(TestPreferencesDataStore())
 
@@ -108,6 +116,9 @@ class LogdatePreferencesDataSourceTest {
         }
 }
 
+/**
+ * A test implementation of [DataStore<Preferences>] for testing.
+ */
 private class TestPreferencesDataStore : DataStore<Preferences> {
     private val preferencesFlow = MutableStateFlow(emptyPreferences())
 

@@ -20,6 +20,13 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [NoteViewerViewModel], which manages the display and interaction logic
+ * for viewing individual journal notes of various types (text, image, video, and audio).
+ *
+ * This suite verifies that domain-level note models are correctly mapped to UI states,
+ * and that user actions like deleting or sharing a note are properly executed.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class NoteViewerViewModelTest {
     private val dispatcher = StandardTestDispatcher()

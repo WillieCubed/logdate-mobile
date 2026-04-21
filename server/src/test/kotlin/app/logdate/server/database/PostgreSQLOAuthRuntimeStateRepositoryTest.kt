@@ -12,6 +12,17 @@ import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 
+/**
+ * Integration tests for [PostgreSQLOAuthRuntimeStateRepository] focusing on OAuth 2.0 state persistence.
+ *
+ * This test suite exercises the storage, lookup, and consumption patterns for:
+ * - Temporary OAuth authorization requests.
+ * - Short-lived authorization codes (ensuring single-use semantics).
+ * - Persistent refresh tokens, including revocation and manual deletion.
+ *
+ * The tests use an H2 database to simulate the relational storage environment required
+ * for securing the OAuth flow.
+ */
 class PostgreSQLOAuthRuntimeStateRepositoryTest {
     @Test
     fun `oauth runtime repository stores and consumes state`() =

@@ -11,6 +11,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [CalculateStreakUseCase].
+ *
+ * Validates the core logic for computing consecutive days of user activity.
+ * Tests various scenarios including active streaks, broken streaks due to
+ * gaps, month boundaries, and the maximum lookback constraints.
+ */
 class CalculateStreakUseCaseTest {
     private val fixedTimeZone = TimeZone.UTC
 

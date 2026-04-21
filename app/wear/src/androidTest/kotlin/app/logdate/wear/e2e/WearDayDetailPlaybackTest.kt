@@ -21,10 +21,13 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * Instrumented tests for audio playback controls in the day detail screen.
+ * Instrumented UI tests for audio playback interaction within the Wear OS Day Detail screen.
  *
- * Tests the content composable directly with controlled state, verifying
- * that idle, playing, and no-output states render the correct UI elements.
+ * This suite validates the rendering and behavior of the [WearDayDetailContent] when
+ * interacting with voice notes. It ensures that the UI correctly transitions between
+ * idle, playing, and blocked states (e.g., when no audio output device is connected),
+ * verifying that appropriate icons, progress indicators, and instructional prompts
+ * are visible and functional.
  */
 @RunWith(AndroidJUnit4::class)
 class WearDayDetailPlaybackTest {

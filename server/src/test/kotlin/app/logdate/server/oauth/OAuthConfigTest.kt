@@ -6,6 +6,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [OAuthConfig], ensuring that the server's OAuth 2.0 and AT Protocol
+ * discovery metadata are correctly derived and formatted.
+ *
+ * This suite verifies:
+ * - Proper normalization of issuer and resource URLs (e.g., trailing slash handling).
+ * - Automatic generation of standard OAuth 2.0 authorization server metadata.
+ * - Consistent derivation of various internal endpoints (PAR, Token, Revocation, etc.).
+ * - Environment-based configuration loading with intelligent defaults.
+ * - Strict validation of protocol requirements, such as requiring HTTPS for all endpoints.
+ * - Proper serialization of core OAuth data models like JSON Web Keys (JWK).
+ */
 class OAuthConfigTest {
     private val json = Json { ignoreUnknownKeys = true }
 

@@ -4,6 +4,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
+/**
+ * Tests the logic for reconstructing timed utterances from raw transcription tokens and timestamps.
+ *
+ * The primary focus is on [TimedTranscriptBuilder.buildUtterance], ensuring it correctly
+ * handles token-to-word reconstruction (including BPE/SentencePiece subword joining) and
+ * maintains accurate timing for each word within the utterance.
+ */
 class TimedTranscriptBuilderTest {
     @Test
     fun buildUtteranceGroupsSentencePieceTokensIntoWords() {

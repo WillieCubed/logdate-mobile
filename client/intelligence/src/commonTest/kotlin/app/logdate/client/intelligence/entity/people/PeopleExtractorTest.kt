@@ -17,6 +17,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
+/**
+ * Tests the [PeopleExtractor]'s ability to identify and extract names of individuals
+ * mentioned in journal text using generative AI.
+ *
+ * This suite verifies the extractor's performance across various name formats and
+ * contexts, while also ensuring that results are correctly cached and that the
+ * system gracefully handles offline states or malformed AI responses.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PeopleExtractorTest {
     private val testDispatcher = StandardTestDispatcher()
@@ -388,6 +396,9 @@ class PeopleExtractorTest {
         return """{"names":[$quoted]}"""
     }
 
+    /**
+     * A test implementation of [NetworkAvailabilityMonitor] for testing.
+     */
     private class TestNetworkAvailabilityMonitor(
         private var available: Boolean = true,
     ) : NetworkAvailabilityMonitor {

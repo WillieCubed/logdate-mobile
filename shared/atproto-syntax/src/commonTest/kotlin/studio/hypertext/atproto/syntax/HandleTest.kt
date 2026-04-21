@@ -6,6 +6,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * Validates the AT Protocol `Handle` format for user identifiers.
+ *
+ * This test suite covers domain name normalization to lowercase, support for
+ * IDNA Punycode formats, and strict length/segment limits required for
+ * interoperability across the network.
+ */
 class HandleTest {
     @Test
     fun normalizesHandlesToLowercase() {

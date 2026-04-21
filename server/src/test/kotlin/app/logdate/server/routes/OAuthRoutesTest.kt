@@ -55,6 +55,14 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Comprehensive integration tests for the OAuth 2.0 and AT Protocol OAuth implementation.
+ *
+ * This class verifies the entire OAuth flow, including metadata discovery, Pushed
+ * Authorization Requests (PAR), authorization approval, and the issuance and rotation
+ * of tokens with DPoP (Demonstrating Proof-of-Possession). It also covers error paths,
+ * such as nonce-based retries and invalid grant handling.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class OAuthRoutesTest {
     private val json = Json { ignoreUnknownKeys = true }

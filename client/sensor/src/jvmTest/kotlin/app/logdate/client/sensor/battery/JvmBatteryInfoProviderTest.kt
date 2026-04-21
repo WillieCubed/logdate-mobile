@@ -9,6 +9,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 
+/**
+ * Tests the JVM (desktop/stub) implementation of [JvmBatteryInfoProvider].
+ *
+ * This suite verifies the default state and behavior of the battery provider on
+ * platforms where a physical battery or native API may not be present, ensuring
+ * a consistent "full and charging" fallback.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class JvmBatteryInfoProviderTest {
     private lateinit var batteryInfoProvider: JvmBatteryInfoProvider

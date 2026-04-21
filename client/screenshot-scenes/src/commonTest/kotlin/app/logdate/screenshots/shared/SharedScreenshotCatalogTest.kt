@@ -4,6 +4,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests for the [SharedScreenshotCatalog], ensuring the integrity and uniqueness of
+ * defined screenshot scenes and their variants.
+ *
+ * These tests prevent collisions in scene identifiers and baseline names, which are
+ * critical for automated screenshot testing and comparison.
+ */
 class SharedScreenshotCatalogTest {
     @Test
     fun sceneIds_are_unique() {

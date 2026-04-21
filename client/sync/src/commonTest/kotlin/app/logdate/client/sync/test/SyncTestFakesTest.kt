@@ -16,7 +16,11 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 
 /**
- * Tests for the sync test fakes to ensure they work correctly for sync testing.
+ * Unit tests for the sync testing infrastructure.
+ *
+ * This suite ensures that the fakes used in sync integration tests (e.g.,
+ * [FakeCloudApiClient], [TrackingSyncManager]) behave consistently and
+ * accurately simulate real-world conditions like network failures.
  */
 class SyncTestFakesTest {
     @Test

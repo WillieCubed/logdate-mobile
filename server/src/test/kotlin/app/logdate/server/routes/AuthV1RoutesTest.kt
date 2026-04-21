@@ -33,6 +33,14 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Comprehensive integration tests for the V1 Authentication routes.
+ *
+ * This suite verifies the primary authentication flows including Google-based
+ * signup and sign-in, passkey-based registration with email binding, and
+ * rate limiting logic. It also ensures that system metrics are correctly
+ * recorded and exposed for monitoring.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class AuthV1RoutesTest {
     private val json = Json { ignoreUnknownKeys = true }

@@ -30,6 +30,19 @@ import kotlin.io.path.exists
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
+/**
+ * Automated visual regression suite for the LogDate Desktop application.
+ *
+ * This test class renders Compose scenes into Swing panels and captures them as PNG images.
+ * It compares the rendered output against stored baseline screenshots to detect visual
+ * regressions. The suite integrates with [SharedScreenshotCatalog] to test cross-platform
+ * scenes and includes desktop-specific visual tests like the lock screen.
+ *
+ * Features include:
+ * - Deterministic rendering with warmup passes.
+ * - Pixel-by-pixel image comparison with red-mask diff generation.
+ * - Support for dark/light theme variants and custom viewports.
+ */
 class DesktopScreenshotTest {
     @Test
     fun shared_catalog_matches_baselines() {

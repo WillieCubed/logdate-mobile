@@ -12,6 +12,12 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
+/**
+ * Tests the content search functionality provided by [SearchEntriesUseCase].
+ *
+ * Validates that search queries are correctly propagated to the underlying search repository,
+ * handles empty or blank queries appropriately, and respects result limits when requested.
+ */
 class SearchEntriesUseCaseTest {
     private val sampleResults =
         listOf(

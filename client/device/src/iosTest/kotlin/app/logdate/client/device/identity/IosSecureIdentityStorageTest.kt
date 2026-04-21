@@ -9,6 +9,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [IosSecureIdentityStorage], verifying the secure persistence of sensitive
+ * user identity and migration state data on iOS.
+ *
+ * This suite ensures that [Uuid] identifiers and complex [MigrationState] objects
+ * are correctly serialized and stored in the iOS Keychain, and can be reliably
+ * cleared when needed.
+ */
 class IosSecureIdentityStorageTest {
     private lateinit var keychainWrapper: FakeKeychainWrapper
     private lateinit var storage: IosSecureIdentityStorage

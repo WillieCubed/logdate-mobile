@@ -5,6 +5,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [SlidingWindowRateLimiter], ensuring that request quotas are
+ * correctly enforced over a rolling time window.
+ *
+ * This suite verifies basic allowance logic, key-based isolation, window sliding
+ * behavior, and the accurate calculation of retry-after wait times.
+ */
 class SlidingWindowRateLimiterTest {
     private val policy = RateLimitPolicy(maxRequests = 3, windowSeconds = 60)
 

@@ -26,6 +26,14 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Contract tests for the passkey-based sign-in flow.
+ *
+ * This class verifies the multi-step passkey authentication process, ensuring that
+ * authentication options are correctly generated, credentials are verified against
+ * the user's stored passkeys, and that the system handles both successful logins
+ * and various server-side failures during the sign-in lifecycle.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class AuthSigninFlowContractsTest {
     @Test

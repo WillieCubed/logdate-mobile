@@ -6,6 +6,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * Unit tests for [ExportSchemaVersion].
+ *
+ * Validates the versioning logic for the data export system, including parsing from
+ * strings, semantic version comparisons, and correct serialization/deserialization
+ * behavior to ensure backward compatibility.
+ */
 class ExportSchemaVersionTest {
     @Test
     fun `parse valid version string`() {

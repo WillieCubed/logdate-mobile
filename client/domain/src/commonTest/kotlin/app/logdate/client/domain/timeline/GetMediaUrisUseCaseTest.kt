@@ -20,6 +20,13 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
+/**
+ * Unit tests for [GetMediaUrisUseCase].
+ *
+ * Verifies that the use case correctly interacts with the [MediaManager] to retrieve
+ * media assets for a specific date, ensuring the query time ranges are accurately
+ * calculated for the given time zone.
+ */
 class GetMediaUrisUseCaseTest {
     private lateinit var mockMediaManager: MockMediaManager
     private lateinit var useCase: GetMediaUrisUseCase

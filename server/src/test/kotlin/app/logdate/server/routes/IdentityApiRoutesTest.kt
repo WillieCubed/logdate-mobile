@@ -51,6 +51,14 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Integration tests for the identity management API routes.
+ *
+ * This suite covers the lifecycle of cryptographic signing keys, including export,
+ * rotation, and import operations. It validates complex identity workflows such as
+ * DID PLC recovery, cross-account key migration, and passphrase-protected key
+ * material handling, ensuring compatibility with both DID Web and DID PLC methods.
+ */
 @OptIn(ExperimentalUuidApi::class, ExperimentalEncodingApi::class)
 class IdentityApiRoutesTest {
     private val json = Json { ignoreUnknownKeys = true }

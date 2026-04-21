@@ -6,6 +6,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
+/**
+ * Tests for the mapping logic between domain-level memory recall data and the UI state
+ * required by the "On This Day" Android widget.
+ *
+ * This ensures that dates are formatted correctly, media thumbnails are correctly extracted,
+ * and fallback summaries are used when necessary.
+ */
 class OnThisDayWidgetStateMapperTest {
     @Test
     fun `toWidgetState maps date to ISO string`() {

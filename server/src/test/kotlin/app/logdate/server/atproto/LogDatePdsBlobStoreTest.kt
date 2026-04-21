@@ -23,6 +23,13 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Verifies the functionality of the Personal Data Server (PDS) blob storage implementation.
+ *
+ * These tests ensure that binary data can be correctly uploaded to and retrieved from
+ * the blob store using AT Protocol identifiers (DID and CID). It validates the integration
+ * between the identity service, media repositories, and the underlying blob storage.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class LogDatePdsBlobStoreTest {
     @Test

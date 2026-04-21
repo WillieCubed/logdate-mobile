@@ -7,6 +7,12 @@ import kotlin.test.assertEquals
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Validates the planning logic for automatic audio transcription in the timeline.
+ *
+ * This suite ensures that transcription requests are only generated for notes that
+ * are currently visible and do not already have an active or completed transcription.
+ */
 class TimelineTranscriptionPlannerTest {
     @Test
     fun `autoRequestableNoteIds returns only visible notes without transcription`() {

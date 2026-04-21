@@ -7,6 +7,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
+/**
+ * Integration tests for [PostgreSQLLogDateAtprotoBlobRepository] using an H2 database.
+ *
+ * Verifies that AT Protocol blob metadata, identified by Content Identifiers (CIDs),
+ * can be stored, updated, and retrieved correctly. This ensures that the server
+ * accurately tracks the association between users, blobs, and their physical storage locations.
+ */
 class PostgreSQLLogDateAtprotoBlobRepositoryTest {
     @Test
     fun `postgres atproto blob repository stores and updates blob metadata`() {

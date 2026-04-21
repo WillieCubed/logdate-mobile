@@ -6,6 +6,13 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 
+/**
+ * Tests for DAO interface existence and provider configuration.
+ *
+ * This suite ensures that all required DAO classes are correctly defined
+ * and available in the dependency injection container, which is critical
+ * for database stability.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class DaoInterfaceTest : BaseDatabaseTest() {
     @Test

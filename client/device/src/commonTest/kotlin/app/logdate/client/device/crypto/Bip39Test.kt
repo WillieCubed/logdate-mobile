@@ -5,6 +5,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * Tests for the BIP-39 implementation, ensuring compliance with the Bitcoin Improvement
+ * Proposal for deterministic mnemonic phrases.
+ *
+ * This suite verifies the conversion between entropy and mnemonic words, validates
+ * checksums, and confirms compatibility with known test vectors from the BIP-39
+ * specification.
+ */
 class Bip39Test {
     @Test
     fun testGenerateMnemonic() {

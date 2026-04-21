@@ -23,6 +23,16 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for the Wear OS Rewind summary experience.
+ *
+ * This class validates the [WearRewindViewModel], which handles the presentation
+ * of personal summaries (Rewinds) on Wear. Key behaviors tested include:
+ * - Fetching and listing available Rewinds from the repository.
+ * - Managing panel-based playback navigation (advancing, rewinding, and exiting).
+ * - Filtering content to ensure only Wear-compatible media (text/narrative) is
+ *   presented, excluding unsupported types like images or videos.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WearRewindViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()

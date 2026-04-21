@@ -5,6 +5,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Instant
 
+/**
+ * Tests the state management and filtering logic for the editor's image picker.
+ *
+ * This suite verifies that recent media previews are correctly limited, filtered
+ * to only include image types, and sorted with the newest items appearing first.
+ */
 class ImagePickerStateTest {
     @Test
     fun testRecentImagePreviewsOnlyReturnsImagesSortedNewestFirst() {

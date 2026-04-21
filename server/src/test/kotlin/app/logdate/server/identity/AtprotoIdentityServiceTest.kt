@@ -22,6 +22,19 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [AtprotoIdentityService], the central orchestrator for AT Protocol
+ * identity lifecycle management.
+ *
+ * This suite verifies the complex integration between account management and
+ * decentralized identity providers (PLC and Web). Key areas of focus include:
+ * - Provisioning of new identities (DIDs, handles, and signing keys) for user accounts.
+ * - Handle normalization and disambiguation logic for managed subdomains.
+ * - Resolution of identities via both handles and DIDs across different DID methods.
+ * - Advanced identity lifecycle operations: signing key rotation, PLC recovery key
+ *   registration, and cross-account key imports.
+ * - Generation of compliant DID documents for use by the wider AT Protocol network.
+ */
 @OptIn(ExperimentalUuidApi::class, ExperimentalEncodingApi::class)
 class AtprotoIdentityServiceTest {
     @Test

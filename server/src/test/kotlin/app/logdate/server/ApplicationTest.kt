@@ -18,6 +18,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * High-level integration tests for the [Application], verifying that the Ktor
+ * server correctly mounts and responds to its primary endpoints.
+ *
+ * This suite covers root routes, health checks, OAuth discovery metadata,
+ * API v1 mounting, and the availability of OpenAPI/Swagger documentation.
+ */
 class ApplicationTest {
     private val json = Json { ignoreUnknownKeys = true }
 

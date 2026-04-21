@@ -11,6 +11,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Instant
 
+/**
+ * Unit tests for [ObserveCloudQuotaUseCase].
+ *
+ * Validates the reactive observation of cloud storage quota updates, ensuring the
+ * flow correctly propagates information about total capacity, used bytes, and
+ * category-specific usage from the [CloudQuotaManager].
+ */
 class ObserveCloudQuotaUseCaseTest {
     private class MockCloudQuotaManager : CloudQuotaManager {
         var observeQuotaResult: Flow<CloudStorageQuota> =

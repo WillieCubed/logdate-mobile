@@ -5,6 +5,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Contract and behavior tests for internal synchronization data structures and helpers.
+ *
+ * This suite uses reflection to verify that private or internally-scoped classes and utility
+ * functions maintain their expected API contracts. This includes checking for the existence
+ * and correctness of property getters, verifying Prometheus metric formatting and escaping
+ * logic, and ensuring that internal request objects can be correctly instantiated.
+ */
 class SyncRouteBehaviorContractTest {
     @Test
     fun `private sync snapshots expose expected getters`() {

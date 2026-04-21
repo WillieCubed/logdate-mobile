@@ -10,6 +10,19 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
+/**
+ * Tests for [OAuthDpopVerifier], the component responsible for validating
+ * Demonstrating Proof-of-Possession (DPoP) proofs at the application layer.
+ *
+ * This suite provides exhaustive coverage of the DPoP validation logic, including:
+ * - Validation of DPoP JWTs across multiple elliptic curves (P-256 and K-256).
+ * - Verification of the cryptographic binding between the proof and the request
+ *   (HTTP method and URL).
+ * - Enforcement of server-issued nonces to prevent replay attacks.
+ * - Validation of access token hashes (ath) to bind the proof to a specific token.
+ * - Rigorous negative testing against various attack vectors: tampered signatures,
+ *   stale timestamps, mismatched algorithms, and malformed header types.
+ */
 class OAuthDpopVerifierTest {
     @Test
     fun `verifier accepts valid proofs and computes token hashes`() {

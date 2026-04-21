@@ -7,6 +7,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests the standard API response helpers and their serialization.
+ *
+ * Ensures that the standard success and error response structures are correctly
+ * formatted and include necessary metadata like timestamps. It also validates
+ * that these structures are compatible with the project's JSON serialization configuration.
+ */
 class ApiResponseTest {
     private val json = Json { ignoreUnknownKeys = true }
 

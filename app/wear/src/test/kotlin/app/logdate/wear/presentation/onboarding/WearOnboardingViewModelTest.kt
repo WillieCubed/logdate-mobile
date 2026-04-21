@@ -15,6 +15,15 @@ import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
 
+/**
+ * Unit tests for the Wear OS onboarding experience.
+ *
+ * This class validates the [WearOnboardingViewModel]'s logic for managing the
+ * connection state between the watch and the companion phone app. It uses
+ * [WearDataLayerClient] to simulate various connectivity scenarios, ensuring
+ * the UI correctly reflects whether the phone is reachable, disconnected,
+ * or experiencing GMS-related errors.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WearOnboardingViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()

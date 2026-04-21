@@ -4,6 +4,12 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 
+/**
+ * Tests for [GetTimelineItemUseCase].
+ *
+ * Currently verifies the basic invocation and stability of the timeline item retrieval
+ * logic, ensuring the use case completes successfully under standard conditions.
+ */
 class GetTimelineItemUseCaseTest {
     private lateinit var useCase: GetTimelineItemUseCase
 

@@ -16,6 +16,16 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
+/**
+ * Integration tests for the Ktor-based implementation of [PlcDirectoryClient].
+ *
+ * This test suite validates the interaction with a PLC directory server (e.g., plc.directory).
+ * It ensures correct handling of:
+ * - URL path construction for various PLC-specific resources.
+ * - Retrieval and polymorphic decoding of DID documents, operation logs, and audit logs.
+ * - Large-scale data exports using newline-delimited JSON formats.
+ * - Secure submission of signed operations to the directory service.
+ */
 class KtorPlcDirectoryClientTest {
     @Test
     fun `document log audit and export urls use plc directory paths`() {

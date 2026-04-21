@@ -10,6 +10,14 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Comprehensive integration tests for [DbSyncRepository], ensuring correct persistence
+ * and synchronization behavior for the core LogDate data model.
+ *
+ * This suite verifies the full lifecycle of content records, journals, associations,
+ * and media, including server-side versioning, pagination of changes, user isolation,
+ * and tombstone management for deleted data.
+ */
 class DbSyncRepositoryTest {
     @Test
     fun `content journal and association changes include updates and tombstones`() {

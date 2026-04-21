@@ -22,6 +22,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [AndroidHealthConnectRepository], which bridges the application with Android's
+ * Health Connect ecosystem.
+ *
+ * This suite verifies the integration with the Health Connect SDK, including permission
+ * negotiation and the sophisticated logic used to derive "personalized day bounds" from
+ * sleep records. It ensures that the user's timeline correctly aligns with their actual
+ * circadian rhythms while providing sensible defaults when data is unavailable.
+ */
 class AndroidHealthConnectRepositoryTest {
 
     private val mockContext = mockk<Context>()

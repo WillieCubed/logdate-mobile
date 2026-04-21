@@ -46,6 +46,14 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Comprehensive tests for [ExportUserDataUseCase].
+ *
+ * Verifies the complete lifecycle of exporting user data, ensuring that all entities
+ * (journals, notes, media, profiles, places, and location history) are accurately
+ * bundled. These tests cover progress reporting, date range filtering, media path
+ * normalization, and robust error handling when individual data sources fail.
+ */
 class ExportUserDataUseCaseTest {
     private lateinit var mockJournalRepository: MockJournalRepository
     private lateinit var mockNotesRepository: MockJournalNotesRepository

@@ -15,6 +15,17 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Integration tests for [PostgreSQLRepoBlockStore] focused on AT Protocol repository storage.
+ *
+ * This test suite validates the persistence layer for:
+ * - Repository heads (tracking the latest commit and revision).
+ * - Content-addressed blocks (IPLD data).
+ * - Repository commits and their cryptographic links.
+ *
+ * It also ensures that repository isolation is maintained during data cleanup operations,
+ * confirming that clearing one repository does not affect others.
+ */
 class PostgreSQLRepoBlockStoreTest {
     @Test
     fun `repo block store persists heads blocks and commits by repo`() {

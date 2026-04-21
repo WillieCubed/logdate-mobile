@@ -16,6 +16,14 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [GetExportCountsUseCase].
+ *
+ * Verifies the logic for aggregating counts of journals, notes, drafts, and media items
+ * to be displayed in the export summary. These tests ensure that different types of
+ * media (images, audio, video) are correctly identified and that no items are
+ * double-counted across categories.
+ */
 class GetExportCountsUseCaseTest {
     private lateinit var mockJournalRepository: MockJournalRepository
     private lateinit var mockNotesRepository: MockJournalNotesRepository

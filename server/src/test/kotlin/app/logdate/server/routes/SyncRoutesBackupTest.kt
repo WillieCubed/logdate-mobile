@@ -31,6 +31,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 
+/**
+ * Integration tests for the backup management endpoints within the Sync API.
+ *
+ * This class validates the full lifecycle of user backups, including multipart uploads of
+ * encrypted manifests and data, retrieving a list of available backups, and downloading
+ * backup binaries. It also verifies that the system gracefully handles scenarios where
+ * backup storage is unconfigured.
+ */
 class SyncRoutesBackupTest {
     private val testUserId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000")
     private val jwtService = JwtTokenService("test-secret-for-jwt-signing-1234567890")

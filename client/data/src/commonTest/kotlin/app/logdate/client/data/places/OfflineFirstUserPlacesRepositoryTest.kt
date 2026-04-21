@@ -10,6 +10,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests the [OfflineFirstUserPlacesRepository] implementation for managing and
+ * querying user-defined locations.
+ *
+ * This suite focuses on proximity-based location queries, ensuring that the repository
+ * correctly filters and ranks stored places based on distance from the user.
+ */
 class OfflineFirstUserPlacesRepositoryTest {
     @Test
     fun `getPlacesNear filters to requested radius and sorts by distance`() =

@@ -31,6 +31,14 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Contract and validation tests for user profile and authentication metrics endpoints.
+ *
+ * This suite verifies the robustness of the `/auth/me` and `/auth/metrics` routes,
+ * ensuring they correctly handle invalid tokens, enforce input constraints (such as
+ * username length and availability), and gracefully report internal service or
+ * repository failures.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class AuthProfileAndMetricsRouteContractsTest {
     @Test

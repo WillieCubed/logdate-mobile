@@ -12,6 +12,14 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Tests the in-memory implementation of the [PasskeyRepository].
+ *
+ * This suite validates the full lifecycle of passkey metadata storage, including
+ * credential persistence, user-to-credential mapping, sign count updates, and
+ * passkey deactivation. It serves as a behavioral baseline for all passkey
+ * repository implementations.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class InMemoryPasskeyRepositoryTest {
     @Test

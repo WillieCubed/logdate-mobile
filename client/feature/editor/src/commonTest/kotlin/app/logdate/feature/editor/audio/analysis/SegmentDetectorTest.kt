@@ -5,6 +5,15 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Validates the audio segmentation algorithm used for detecting logical events in recordings.
+ *
+ * These tests verify [SegmentDetector]'s ability to accurately identify:
+ * - Speech onsets after periods of silence
+ * - Significant volume peaks
+ * - Substantial pauses vs short, ignorable gaps
+ * - Sorted temporal sequencing of all detected segments
+ */
 class SegmentDetectorTest {
     private val detector = SegmentDetector()
 

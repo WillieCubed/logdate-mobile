@@ -7,6 +7,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 
+/**
+ * Validates the schema migration logic for exported user data.
+ *
+ * These tests ensure that [ExportMigrationRunner] correctly upgrades legacy export
+ * formats (e.g., V1.0 to V1.1) by populating missing fields and restructuring data
+ * to match the current schema, while preserving existing user content.
+ */
 class ExportMigrationsTest {
     private val now = Clock.System.now()
     private val runner = ExportMigrationRunner(exportMigrations)

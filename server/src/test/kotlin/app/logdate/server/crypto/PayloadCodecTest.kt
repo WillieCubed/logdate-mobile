@@ -6,6 +6,20 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [PayloadCodec] and the associated binary payload format used for
+ * server-side encryption of media and backups.
+ *
+ * This suite provides deep verification of the server's data-at-rest protection:
+ * - Ensures correct application of protocol-specific prefixes (`LDSM1` for media,
+ *   `LDBK1` for backups).
+ * - Validates the cryptographic round-trip (encryption/decryption) using AES-GCM.
+ * - Tests the integrity and versioning of the payload header format, including
+ *   key ID and IV management.
+ * - Confirms robust error handling for missing keys, tampered data, and
+ *   unsupported protocol versions.
+ * - Exercises edge cases such as empty payloads and large multi-megabyte data streams.
+ */
 class PayloadCodecTest {
     private val testKey = Base64.getDecoder().decode("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
     private val keyring =

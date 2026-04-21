@@ -36,6 +36,15 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
+/**
+ * Integration tests for media encryption within the synchronization routes.
+ *
+ * This class verifies that the server correctly handles both server-side encryption at rest
+ * and client-side end-to-end encryption. It ensures that uploaded media is stored in an
+ * encrypted format (with appropriate headers) and can be retrieved in its original form,
+ * either by server-side decryption or by passing through client-encrypted blobs without
+ * modification.
+ */
 class SyncRoutesMediaEncryptionTest {
     private val json = Json { ignoreUnknownKeys = true }
 

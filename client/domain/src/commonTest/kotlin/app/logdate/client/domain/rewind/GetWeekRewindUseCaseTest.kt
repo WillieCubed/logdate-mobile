@@ -61,6 +61,13 @@ import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [GetWeekRewindUseCase].
+ *
+ * Validates the calculation of weekly boundaries based on user preferences
+ * for the first day of the week and ensures correct delegation to the
+ * underlying rewind retrieval logic.
+ */
 class GetWeekRewindUseCaseTest {
     private lateinit var rewindRepository: FakeRewindRepository
     private lateinit var getRewindUseCase: GetRewindUseCase

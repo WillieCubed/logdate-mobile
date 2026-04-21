@@ -6,6 +6,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * Unit tests for the onboarding flow planning logic.
+ *
+ * This suite validates the state machine used to determine the sequence of
+ * onboarding steps based on the user's entry mode (fresh vs. returning) and
+ * the current device's configuration state.
+ */
 class OnboardingFlowPlannerTest {
     @Test
     fun `fresh flow includes full setup sequence when nothing is configured`() {

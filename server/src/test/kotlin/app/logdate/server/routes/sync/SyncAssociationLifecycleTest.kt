@@ -17,6 +17,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests the lifecycle of journal-to-content associations in the Sync API.
+ *
+ * These tests ensure that associations between journals and content items can be
+ * created and deleted, and that deletions are correctly propagated through the
+ * synchronization changes feed to enable client-side reconciliation.
+ */
 class SyncAssociationLifecycleTest {
     @Test
     fun `association deletions are represented in changes feed`() =

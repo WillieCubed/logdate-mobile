@@ -14,6 +14,12 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Tests the synchronization logic for waiting for a fresh camera preview stream.
+ *
+ * This suite validates [CameraPreviewStreamingGate]'s ability to handle already-streaming
+ * states, detect fresh false-to-true cycles, and support caller-defined timeouts.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CameraPreviewStreamingGateTest {
     @Test

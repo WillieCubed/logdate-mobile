@@ -5,6 +5,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.uuid.Uuid
 
+/**
+ * Tests the parsing logic for Android Launcher Shortcuts.
+ *
+ * This class ensures that data extracted from shortcut intents—specifically journal
+ * identifiers—is correctly converted into strongly-typed domain objects (UUIDs).
+ * It verifies both successful parsing of valid IDs and graceful handling of
+ * malformed input.
+ */
 class SharingShortcutParsersTest {
     @Test
     fun `parseLauncherShortcutTargetJournalId returns parsed uuid when raw value is present`() {

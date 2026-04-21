@@ -18,6 +18,14 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Verifies that [OfflineIndexedMediaRepository] correctly aggregates and filters locally
+ * indexed media from various DAO sources.
+ *
+ * The tests focus on the repository's ability to combine disparate media types (images and videos)
+ * into a unified stream for a given time period, ensuring that updates to either source are
+ * correctly reflected in the resulting flow.
+ */
 class OfflineIndexedMediaRepositoryTest {
     @Test
     fun `getForPeriod emits empty list initially`() =

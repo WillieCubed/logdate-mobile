@@ -7,6 +7,15 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Integration tests for the foundational authentication and onboarding flow against a
+ * live server environment.
+ *
+ * These tests verify the security-critical paths of identity creation using synthetic
+ * passkeys, username availability negotiation, and the subsequent lifecycle of
+ * OAuth-style access and refresh tokens, ensuring a seamless and secure entry point
+ * for new and returning users.
+ */
 class AuthOnboardingAndSigninClientServerE2ETest {
     @Test
     fun `client signup and token lifecycle succeed against real server`() =

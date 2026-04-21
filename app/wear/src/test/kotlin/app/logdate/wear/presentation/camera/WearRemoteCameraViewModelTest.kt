@@ -21,6 +21,14 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Tests the [WearRemoteCameraViewModel], which facilitates remote control of the phone's camera
+ * from a Wear OS device.
+ *
+ * The suite covers the coordination between the watch and phone via the Wear Data Layer,
+ * ensuring that requests to open the camera, capture images, and dismiss the remote session
+ * are correctly messaged and that the UI state accurately reflects the remote operation's progress.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WearRemoteCameraViewModelTest {
     private val testDispatcher = StandardTestDispatcher()

@@ -18,6 +18,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Validates the core data models used for ATProto PDS (Personal Data Server) interactions.
+ *
+ * This suite ensures that models for repository discovery, record manipulation, and blob
+ * management correctly serialize to their expected ATProto wire formats. It specifically
+ * checks that typed identifiers (DIDs, NSIDs, CIDs) are preserved and that the JSON
+ * structure matches the requirements of the ATProto lexicon.
+ */
 class PdsModelsTest {
     private val json = Json { ignoreUnknownKeys = true }
 

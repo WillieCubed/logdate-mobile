@@ -21,21 +21,16 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
- * Unit tests for [OfflineFirstEntryDraftRepository].
+ * Exercises the [OfflineFirstEntryDraftRepository] to ensure reliable local persistence
+ * and management of journal entry drafts.
  *
- * These tests validate the repository's implementation of [EntryDraftRepository],
- * focusing on operations with entry drafts including creation, updating, and deletion.
- * The tests use fake implementations of dependencies to isolate the repository's behavior.
- *
- * Test cases cover:
- * - Retrieving drafts (empty state, after creation)
- * - Creating new drafts
- * - Updating existing drafts
- * - Retrieving specific drafts by ID
- * - Deleting drafts
- * - Error handling for operations on non-existent drafts
+ * The tests focus on the repository's role as the source of truth for unsaved entries,
+ * validating:
+ * - Reactive updates of draft lists via Coroutine Flows
+ * - Full CRUD lifecycle (creation, updates, deletion) and its persistence to the underlying store
+ * - Accurate state recovery during repository initialization
+ * - Graceful error handling for missing or malformed draft data
  */
-
 @OptIn(ExperimentalCoroutinesApi::class)
 class OfflineFirstEntryDraftRepositoryTest {
     private lateinit var draftStore: FakeLocalEntryDraftStore

@@ -6,6 +6,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * Validates the AT Protocol `Nsid` (Namespaced Identifier) format.
+ *
+ * This test suite enforces reverse-domain name structure, normalization rules
+ * (such as lowercase-only authorities), and character restrictions on authority
+ * and method names, ensuring interoperability across lexicographic contexts.
+ */
 class NsidTest {
     @Test
     fun normalizesAuthorityToLowercase() {

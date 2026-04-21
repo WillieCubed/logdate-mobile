@@ -102,6 +102,13 @@ private val testMetadataJson =
     }
     """.trimIndent()
 
+/**
+ * Unit tests for [UserDataRestoreViewModel].
+ *
+ * Validates the user data restoration flow, including file selection, archive
+ * previewing, progress tracking during restoration, and handling of various
+ * success and failure outcomes.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class UserDataRestoreViewModelTest {
     private val testDispatcher = StandardTestDispatcher()

@@ -15,6 +15,20 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
+/**
+ * Tests for [OAuthClientMetadataResolver], which manages the discovery and validation
+ * of OAuth 2.0 client metadata.
+ *
+ * These tests simulate the dynamic nature of OAuth client registration in the
+ * AT Protocol ecosystem by:
+ * - Verifying secure resolution and caching of client metadata documents over HTTP.
+ * - Enforcing strict validation rules for client IDs, redirect URIs, and supported
+ *   grant/response types.
+ * - Testing support for both public clients (no authentication) and confidential
+ *   clients using `private_key_jwt` authentication.
+ * - Validating JWT-based client assertions, including signature verification and
+ *   replay protection.
+ */
 class OAuthClientMetadataResolverTest {
     @Test
     fun `resolver validates client metadata and caches successful lookups`() =

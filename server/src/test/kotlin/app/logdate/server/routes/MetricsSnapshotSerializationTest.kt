@@ -9,6 +9,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests for the serialization and recording logic of system metrics.
+ *
+ * This class ensures that both authentication and synchronization metrics are correctly
+ * captured, aggregated into snapshots, and serialized to JSON. It verifies that various
+ * metrics—such as operation durations, error counts, rate-limiting events, conflict
+ * occurrences, and data throughput—are accurately reflected in the final snapshots.
+ */
 class MetricsSnapshotSerializationTest {
     private val json = Json { ignoreUnknownKeys = true }
 

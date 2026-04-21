@@ -34,6 +34,15 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [WearDataLayerSyncManager], the orchestrator of data consistency between the
+ * Wear OS client and the companion mobile application.
+ *
+ * This suite validates the management of the sync outbox, the prioritization of different
+ * entity types (Notes, Journals, etc.), and the sophisticated retry logic required to
+ * maintain a reliable "offline-first" experience. It ensures that both metadata updates
+ * and binary asset transfers are correctly tracked and marked as synchronized.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WearDataLayerSyncManagerTest {
     private lateinit var dataLayerClient: WearDataLayerClient

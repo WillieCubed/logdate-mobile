@@ -8,6 +8,10 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * A suite of utility tests used for interactive debugging and inspection of
+ * server responses and JSON structures during development.
+ */
 class DebugTest {
     private val json = Json { ignoreUnknownKeys = true }
 

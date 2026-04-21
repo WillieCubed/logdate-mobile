@@ -39,6 +39,13 @@ import kotlin.time.Duration.Companion.seconds
  * Verifies the mini-player appears when audio is playing, displays contextual
  * information, and responds to user controls.
  */
+/**
+ * Instrumented E2E tests for the audio playback experience.
+ *
+ * This suite verifies the visibility and behavior of the audio mini-player,
+ * ensuring it correctly displays playback metadata (like titles and journal
+ * associations) and responds to user controls like pausing and stopping.
+ */
 @RunWith(AndroidJUnit4::class)
 class AudioPlaybackE2ETest {
     private val fakePlaybackManager = FakePlaybackManagerWithStatus()

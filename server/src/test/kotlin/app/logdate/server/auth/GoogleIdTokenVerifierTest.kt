@@ -20,6 +20,14 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Validates the Google ID Token verification logic.
+ *
+ * This suite tests the validation of OpenID Connect (OIDC) tokens issued by Google,
+ * ensuring they meet strict security requirements including issuer validity,
+ * audience matching, expiration checks, and nonce verification. It covers both
+ * the HTTP-based verifier and a fake implementation for testing.
+ */
 class GoogleIdTokenVerifierTest {
     @Test
     fun `blank token and empty client-id config return null`() {

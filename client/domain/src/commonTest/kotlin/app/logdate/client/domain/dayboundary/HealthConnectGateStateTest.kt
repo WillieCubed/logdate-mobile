@@ -3,6 +3,13 @@ package app.logdate.client.domain.dayboundary
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Validates the state reduction logic for Health Connect gates via [reduceHealthConnectGateState].
+ *
+ * These tests ensure that the UI can correctly determine whether to show a setup prompt,
+ * a permission request, a recovery flow, or if the feature is ready, based on a combination
+ * of user preferences, system availability, and permission status.
+ */
 class HealthConnectGateStateTest {
     @Test
     fun `connected status resolves ready gate`() {

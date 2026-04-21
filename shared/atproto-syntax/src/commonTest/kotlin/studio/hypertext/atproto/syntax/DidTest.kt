@@ -6,6 +6,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * Validates the core syntactical structure and parsing of decentralized identifiers (DIDs).
+ *
+ * This test suite covers method/identifier splitting, supporting arbitrary DID
+ * methods, and enforcing strict requirements for lowercase method names and
+ * valid identifier characters.
+ */
 class DidTest {
     @Test
     fun parsesMethodAndIdentifier() {

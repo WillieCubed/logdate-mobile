@@ -7,6 +7,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [SignOutUseCase].
+ *
+ * Verifies that the use case correctly handles the sign-out process by interacting
+ * with [PasskeyAccountRepository], including successful sign-out and error handling.
+ */
 class SignOutUseCaseTest {
     @Test
     fun `invoke should return success when repository signout succeeds`() =

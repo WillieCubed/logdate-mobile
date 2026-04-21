@@ -20,6 +20,14 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [PhoneSyncedAudioResolver], which manages the availability of remote audio
+ * resources on the local Wear OS device.
+ *
+ * The test suite validates the logic for resolving playable URIs, including the "just-in-time"
+ * downloading of audio files from the connected phone when they aren't yet cached locally,
+ * and the subsequent update of the local repository to ensure future playback is instantaneous.
+ */
 class PhoneSyncedAudioResolverTest {
     private val context = mockk<Context>(relaxed = true)
     private val audioStorage = mockk<AudioStorage>()

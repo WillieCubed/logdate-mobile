@@ -5,6 +5,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
+/**
+ * Validates the construction and message formatting of identity-related exceptions.
+ *
+ * This test suite ensures that resolution failures for DIDs and handles produce
+ * human-readable error messages that include relevant identifiers and status codes,
+ * and that underlying causes are correctly preserved.
+ */
 class IdentityExceptionTest {
     @Test
     fun constructsExceptionMessagesAndCauses() {

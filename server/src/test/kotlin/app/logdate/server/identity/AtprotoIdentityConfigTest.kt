@@ -5,6 +5,19 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [AtprotoIdentityConfig], ensuring the server's identity management
+ * is correctly configured through defaults and environment overrides.
+ *
+ * This suite verifies:
+ * - Proper initialization of default values for the LogDate ecosystem.
+ * - Robust environment variable parsing, including normalization of hostnames,
+ *   casing, and trailing slashes for PDS and PLC endpoints.
+ * - Correct handling of configuration flags for PLC operation publishing and
+ *   DID method selection.
+ * - Strict validation to prevent unsupported or invalid identity configurations
+ *   from being used at runtime.
+ */
 class AtprotoIdentityConfigTest {
     @Test
     fun `default config uses logdate host defaults`() {

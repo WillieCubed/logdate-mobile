@@ -27,7 +27,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** Covers manual update actions and server persistence behavior in advanced settings. */
+/**
+ * Unit tests for [AdvancedSettingsViewModel].
+ *
+ * Covers manual update actions, server discovery, and health check validation
+ * within the advanced settings interface. These tests ensure that server URLs
+ * are correctly validated and persisted.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AdvancedSettingsViewModelTest {
     private val testDispatcher = StandardTestDispatcher()

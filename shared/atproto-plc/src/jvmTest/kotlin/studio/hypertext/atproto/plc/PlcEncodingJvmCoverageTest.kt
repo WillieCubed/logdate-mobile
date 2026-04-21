@@ -8,6 +8,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * JVM-specific coverage tests for low-level PLC encoding and data handling utilities.
+ *
+ * This suite uses reflection to exercise private encoding helpers within [PlcEncoding],
+ * ensuring that the custom CBOR-like binary format correctly handles various data types,
+ * numeric ranges, and encoding schemes (such as Base32). It also verifies the behavior
+ * of default methods on common PLC interfaces within the JVM environment.
+ */
 class PlcEncodingJvmCoverageTest {
     @Test
     fun `private encoding helpers cover numeric and primitive branches on jvm`() {

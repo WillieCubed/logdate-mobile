@@ -26,6 +26,15 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
+/**
+ * Comprehensive tests for [AndroidAudioPlaybackManager], the Media3-based audio engine
+ * for playback on Android and Wear OS.
+ *
+ * This test suite validates the lifecycle of the media session and controller, ensuring
+ * accurate progress tracking, responsive playback controls (seek, pause, stop), and the
+ * correct handling of hardware-level events such as audio output suppression and
+ * completion signals.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AndroidAudioPlaybackManagerTest {
     private val context = mockk<Context>()

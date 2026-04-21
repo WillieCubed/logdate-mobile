@@ -41,6 +41,14 @@ private const val SYNC_HMAC_KEY = "sync-route-secret"
 private const val SYNC_VALIDATION_HMAC_KEY = "sync-validation-secret"
 private const val SYNC_ROUTE_VALIDATION_HMAC_KEY = "sync-route-validation-secret"
 
+/**
+ * Validation and error-handling tests for the synchronization API endpoints.
+ *
+ * This class focuses on the robustness of the sync routes, ensuring that they correctly
+ * enforce authentication requirements, validate multipart form-data structure, and handle
+ * edge cases such as missing configuration or storage failures. It also verifies that the
+ * system gracefully falls back to direct binary downloads if signed URL generation fails.
+ */
 class SyncRoutesValidationTest {
     @Test
     fun `sync status returns unauthorized when auth header is missing`() =
@@ -247,6 +255,9 @@ class SyncRoutesValidationTest {
             assertTrue(backupResponse.bodyAsText().contains("/api/v1/backups/$backupId/binary"))
         }
 
+    /**
+     * Encapsulates the test environment for synchronization routes.
+     */
     private data class SyncEnv(
         val repository: InMemorySyncRepository,
         val tokenService: JwtTokenService,

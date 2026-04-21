@@ -4,6 +4,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
+/**
+ * Unit tests for the [PlcOperations] factory, ensuring canonical construction of PLC operations.
+ *
+ * This suite validates the creation of both genesis and update operations for the AT Protocol,
+ * confirming that all required fields (services, verification methods, and rotation keys)
+ * are correctly formatted and that strictly enforced constraints (such as HTTPS-only
+ * endpoints and valid handles) are respected.
+ */
 class PlcOperationsTest {
     @Test
     fun `atprotoGenesis builds canonical unsigned plc operation`() {

@@ -9,6 +9,15 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Integration tests for the media repository implementation backed by the
+ * synchronization layer.
+ *
+ * This suite ensures that media metadata—including content linkage, file properties,
+ * and encryption state—is correctly managed within the sync-backed store. It verifies
+ * that media records can be reliably persisted, retrieved, and deleted while
+ * maintaining integrity with the underlying storage system.
+ */
 class SyncBackedLogDateMediaRepositoryTest {
     @Test
     fun `media metadata round trips through sync-backed repository`() {

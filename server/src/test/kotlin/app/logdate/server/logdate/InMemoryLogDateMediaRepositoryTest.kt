@@ -9,6 +9,10 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [InMemoryLogDateMediaRepository], verifying the storage, retrieval,
+ * and tombstoning of media assets within a user-scoped context.
+ */
 class InMemoryLogDateMediaRepositoryTest {
     @Test
     fun `media repository stores fetches and tombstones user-scoped media`() {

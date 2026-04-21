@@ -5,6 +5,13 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
+/**
+ * Validates the `Base58Btc` encoding and decoding implementation.
+ *
+ * This test suite covers the specific behavior for leading zero bytes (which
+ * must be encoded as '1' characters), handling of empty inputs, and round-trip
+ * verification for arbitrary data payloads.
+ */
 class Base58BtcTest {
     @Test
     fun `encode handles empty bytes`() {

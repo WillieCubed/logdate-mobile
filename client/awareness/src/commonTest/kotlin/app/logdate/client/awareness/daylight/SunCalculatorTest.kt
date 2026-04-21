@@ -4,6 +4,14 @@ import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [SunCalculator], which provides astronomical calculations for sunrise,
+ * sunset, and solar noon.
+ *
+ * This suite validates the accuracy of the calculator across different latitudes,
+ * longitudes, and dates, ensuring it correctly handles southern hemisphere seasons
+ * and equinoxes.
+ */
 class SunCalculatorTest {
     @Test
     fun calculatesReasonableSunriseForNycSummer() {

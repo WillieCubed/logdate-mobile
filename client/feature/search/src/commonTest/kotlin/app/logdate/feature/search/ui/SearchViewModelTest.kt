@@ -27,6 +27,13 @@ import kotlin.test.assertIs
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [SearchViewModel].
+ *
+ * Verifies the end-to-end search flow from query input to result display,
+ * including debouncing logic, handling of empty or short queries, and
+ * integration with recent search history.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SearchViewModelTest {
     private val dispatcher = StandardTestDispatcher()

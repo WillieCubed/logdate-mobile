@@ -3,6 +3,15 @@ package app.logdate.client.launch
 import kotlin.test.Test
 import kotlin.test.assertIs
 
+/**
+ * Unit tests for the application's launch state machine logic.
+ *
+ * This suite validates the `reduceLaunchBootstrapState` function, ensuring the app
+ * follows the correct transition path from initial startup to a ready state. It
+ * tests the interplay between internal initialization stages (like activity creation
+ * and UI attachment) and external safety mechanisms like the launch watchdog timer
+ * to guarantee a smooth user experience even if some components take longer to load.
+ */
 class LaunchBootstrapStateTest {
     @Test
     fun `startup remains splash-blocking before watchdog expires`() {

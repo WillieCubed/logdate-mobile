@@ -3,6 +3,13 @@ package app.logdate.client.media.audio.transcription
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Verifies the behavior of [TranscriptAccumulator] in assembling full transcripts from incremental updates.
+ *
+ * These tests ensure that the accumulator correctly handles the transition between partial,
+ * real-time updates and finalized transcript segments, while maintaining proper string
+ * concatenation and timing information for [TimedUtterance]s.
+ */
 class TranscriptAccumulatorTest {
     @Test
     fun buildReturnsEmptyWhenNoSegmentsOrPartial() {

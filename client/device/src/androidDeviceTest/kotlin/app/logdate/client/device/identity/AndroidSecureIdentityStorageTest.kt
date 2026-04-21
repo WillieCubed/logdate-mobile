@@ -16,6 +16,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [AndroidSecureIdentityStorage].
+ *
+ * Validates the persistence of sensitive user identity data on Android,
+ * including user IDs and migration states, ensuring they are correctly
+ * stored and cleared from the underlying preference store.
+ */
 @RunWith(AndroidJUnit4::class)
 class AndroidSecureIdentityStorageTest {
     private lateinit var dataStore: DataStore<Preferences>

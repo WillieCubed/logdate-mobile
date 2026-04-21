@@ -15,6 +15,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
+/**
+ * Tests for [ResolveLocationToPlaceUseCase].
+ *
+ * Verifies that the use case correctly resolves a geographical location to a [Place],
+ * including fallback logic when user-defined places or external providers are unavailable.
+ */
 class ResolveLocationToPlaceUseCaseTest {
     @Test
     fun `falls back to external places when user place lookup fails`() =
@@ -70,6 +76,9 @@ class ResolveLocationToPlaceUseCaseTest {
         }
 }
 
+/**
+ * A [UserPlacesRepository] that throws an error for most operations, used to test fallback logic.
+ */
 private class ThrowingUserPlacesRepository : UserPlacesRepository {
     override suspend fun getAllPlaces(): List<Place> = emptyList()
 
@@ -92,12 +101,18 @@ private class ThrowingUserPlacesRepository : UserPlacesRepository {
     override suspend fun searchPlaces(query: String): List<Place> = emptyList()
 }
 
+/**
+ * A fake [ExternalPlacesProvider] that returns a predefined list of suggestions.
+ */
 private class FakeExternalPlacesProvider(
     private val suggestions: List<PlaceSuggestion>,
 ) : ExternalPlacesProvider {
     override suspend fun searchNearbyPlaces(location: Location): List<PlaceSuggestion> = suggestions
 }
 
+/**
+ * An [ExternalPlacesProvider] that throws an error, used to test error handling and fallback logic.
+ */
 private class ThrowingExternalPlacesProvider : ExternalPlacesProvider {
     override suspend fun searchNearbyPlaces(location: Location): List<PlaceSuggestion> = error("network unavailable")
 }

@@ -17,6 +17,13 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for the search indexing logic on the JVM.
+ *
+ * These tests verify that journal entries, transcriptions, and ambient sound
+ * tags are correctly indexed in the database for full-text search (FTS),
+ * and that indexed content is properly updated when the source data changes.
+ */
 class SearchIndexBootstrapperJvmTest {
     private var database: LogDateDatabase? = null
     private var databasePath = Files.createTempFile("logdate-search-index", ".db")

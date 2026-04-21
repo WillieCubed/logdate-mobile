@@ -11,6 +11,13 @@ import org.junit.runner.RunWith
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 
+/**
+ * Unit tests for [AndroidDeviceIdProvider].
+ *
+ * Verifies the generation and persistence of unique device identifiers on
+ * Android, ensuring consistency across app restarts and correct behavior
+ * during ID refreshes.
+ */
 @RunWith(AndroidJUnit4::class)
 class AndroidDeviceIdProviderTest {
     private lateinit var context: Context

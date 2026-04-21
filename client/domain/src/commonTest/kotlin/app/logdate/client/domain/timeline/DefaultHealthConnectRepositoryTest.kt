@@ -11,6 +11,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.time.Instant
 
+/**
+ * Unit tests for [DefaultHealthConnectRepository], focusing on the logic for calculating
+ * day boundaries and verifying Health Connect availability.
+ *
+ * These tests ensure that calendar dates are correctly mapped to [Instant] ranges based on
+ * time zones, handling edge cases such as leap years, year boundaries, and different
+ * regional offsets.
+ */
 class DefaultHealthConnectRepositoryTest {
     private val repository = DefaultHealthConnectRepository()
     private val testTimeZone = TimeZone.of("UTC")

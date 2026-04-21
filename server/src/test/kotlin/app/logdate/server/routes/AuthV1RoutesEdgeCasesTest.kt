@@ -32,6 +32,14 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Integration tests for edge cases and specialized failure modes in the V1 Auth API.
+ *
+ * This class exercises less common paths in the authentication flow, such as handling
+ * dangling identities, validating username availability under repository failure, and
+ * ensuring that metrics labels are correctly escaped for Prometheus. It also verifies
+ * that passkey-based logins correctly update identity 'last used' metadata.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class AuthV1RoutesEdgeCasesTest {
     @Test

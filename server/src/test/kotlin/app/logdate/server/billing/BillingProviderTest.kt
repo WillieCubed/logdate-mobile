@@ -5,6 +5,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * Tests the configuration logic of [BillingProvider] for determining active payment backends.
+ *
+ * This suite ensures that the server correctly interprets environment variables to enable
+ * or disable Stripe and Google Play billing integrations, including support for enabling
+ * both simultaneously and falling back to a disabled state for unrecognized configurations.
+ */
 class BillingProviderTest {
     @Test
     fun `unset BILLING_PROVIDER defaults to disabled`() {

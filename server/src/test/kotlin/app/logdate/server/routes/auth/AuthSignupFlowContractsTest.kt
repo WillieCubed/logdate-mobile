@@ -39,6 +39,15 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Comprehensive contract tests for Google and Passkey account registration flows.
+ *
+ * This suite validates the complex signup logic, including identity provider linking,
+ * automatic username generation and collision resolution, unverified email rejection,
+ * and session-based account creation. It ensures that the system maintains integrity
+ * across multiple authentication providers and handles edge cases in the registration
+ * pipeline.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class AuthSignupFlowContractsTest {
     @Test

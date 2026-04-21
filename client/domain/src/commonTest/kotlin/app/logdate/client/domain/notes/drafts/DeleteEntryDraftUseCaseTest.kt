@@ -16,6 +16,12 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [DeleteEntryDraftUseCase].
+ *
+ * Validates that the use case correctly triggers the deletion of entry drafts
+ * by ID and handles multiple deletion requests or repository errors as expected.
+ */
 class DeleteEntryDraftUseCaseTest {
     private lateinit var mockRepository: MockEntryDraftRepository
     private lateinit var useCase: DeleteEntryDraftUseCase

@@ -6,6 +6,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Unit tests for the data classes defined in the sync repository.
+ *
+ * This suite ensures that the core sync records, markers, and response models
+ * are correctly constructed and maintain their expected property values.
+ */
 class SyncRepositoryModelsTest {
     @Test
     fun `sync model data classes construct correctly`() {

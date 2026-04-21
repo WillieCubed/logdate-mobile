@@ -3,6 +3,13 @@ package app.logdate.server.passkeys
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Tests the configuration logic for WebAuthn and Relying Party (RP) parameters.
+ *
+ * Ensures that WebAuthn properties such as RP ID, RP Name, and Origin are correctly
+ * derived from environment variables or server endpoints, and that explicit configuration
+ * values take precedence over derived defaults.
+ */
 class WebAuthnConfigTest {
     @Test
     fun `derives origin and RP ID from server endpoint when webauthn env is absent`() {

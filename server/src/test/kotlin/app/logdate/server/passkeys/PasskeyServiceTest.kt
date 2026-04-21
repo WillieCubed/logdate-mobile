@@ -16,6 +16,14 @@ import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Functional tests for the [SimplePasskeyService].
+ *
+ * This suite exercises the core passkey workflows: generating registration and
+ * authentication options, verifying responses from authenticators, managing
+ * multiple credentials per user, and handling common error conditions such
+ * as invalid challenges or missing credentials.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class PasskeyServiceTest {
     private lateinit var passkeyService: SimplePasskeyService

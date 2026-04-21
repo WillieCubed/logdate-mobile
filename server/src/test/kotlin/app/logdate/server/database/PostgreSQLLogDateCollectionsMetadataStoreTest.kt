@@ -11,6 +11,20 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [PostgreSQLLogDateCollectionsMetadataStore], the component
+ * responsible for tracking the synchronization state of user collections.
+ *
+ * This suite verifies the metadata tracking required for efficient
+ * synchronization of AT Protocol records:
+ * - Accurate version tracking for individual records within a collection (Entries,
+ *   Journals, etc.).
+ * - Correct generation of delta "change sets" for incremental syncing, including
+ *   pagination and tombstone (deletion) support.
+ * - Aggregation of collection status metrics (e.g., total record counts).
+ * - Maintenance operations such as the purging of old tombstones to manage
+ *   database growth.
+ */
 class PostgreSQLLogDateCollectionsMetadataStoreTest {
     @Test
     fun `metadata store tracks versions changes and purge counts by collection`() {

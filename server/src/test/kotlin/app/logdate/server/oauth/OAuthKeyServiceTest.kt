@@ -8,6 +8,17 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [OAuthKeyService], ensuring the server's internal OAuth signing infrastructure
+ * is robust and standard-compliant.
+ *
+ * This suite validates:
+ * - The stable exposure of the server's public key material via JSON Web Key Sets (JWKS).
+ * - Correct implementation of ES256 (ECDSA with P-256) for token signing.
+ * - Compatibility of generated signatures with standard Java security providers.
+ * - Internal cryptographic helpers, such as fixed-width byte array conversion for
+ *   elliptic curve coordinates.
+ */
 class OAuthKeyServiceTest {
     @Test
     fun `jwks exposes stable es256 public key`() {

@@ -60,6 +60,14 @@ import kotlin.uuid.Uuid
  * Uses two separate in-memory Room databases with real DAO and repository
  * implementations to verify data survives a complete export → import round-trip.
  */
+/**
+ * Instrumented E2E tests for the core export and import use cases.
+ *
+ * Unlike the archive-level tests, this suite focuses on the high-level data
+ * transformation logic, using in-memory databases to ensure that journals,
+ * notes, locations, and drafts are correctly serialized and re-materialized
+ * across the entire repository stack.
+ */
 @RunWith(AndroidJUnit4::class)
 class ExportImportE2ETest {
     private lateinit var sourceDb: LogDateDatabase

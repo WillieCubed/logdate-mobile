@@ -5,6 +5,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [WearNotificationScheduler], responsible for the intelligent delivery of
+ * proactive engagement prompts on Wear OS.
+ *
+ * The test suite ensures that notification types are correctly resolved based on the time
+ * of day, that the generated content is contextually appropriate (e.g., morning greetings
+ * vs. evening reflections), and that strict cooldown logic prevents over-notifying the user
+ * within a single day.
+ */
 class WearNotificationSchedulerTest {
     // =======================================================================
     // Prompt type resolution

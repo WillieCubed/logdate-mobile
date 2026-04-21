@@ -15,6 +15,13 @@ import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for the WebAuthn and Passkey data models.
+ *
+ * Validates the correct instantiation and property behavior of data transfer objects
+ * (DTOs) used in passkey workflows, including challenges, registration/authentication
+ * responses, and the various options structures required by the WebAuthn API.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class SimplePasskeyTest {
     @Test

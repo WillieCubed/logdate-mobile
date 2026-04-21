@@ -5,6 +5,15 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
+/**
+ * Tests the data normalization and merging logic used when importing contacts into the people system.
+ *
+ * This suite ensures that external contact data is sanitized and reconciled correctly by:
+ * - Trimming and deduplicating person aliases in a case-insensitive manner
+ * - Removing redundant aliases that match the primary display name
+ * - Cleaning optional text fields by collapsing blank strings to nulls
+ * - Resolving conflicts between existing and imported contact origins based on source "strength"
+ */
 class PeopleImportNormalizationTest {
     @Test
     fun `normalizePersonAliases trims blanks and removes case-insensitive duplicates`() {

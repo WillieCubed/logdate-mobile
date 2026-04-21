@@ -21,6 +21,13 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [LibraryViewModel].
+ *
+ * Tests the logic for aggregating and grouping indexed media and journal notes
+ * into the library view, ensuring that items are correctly prioritized,
+ * grouped by date, and categorized by media type.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class LibraryViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()

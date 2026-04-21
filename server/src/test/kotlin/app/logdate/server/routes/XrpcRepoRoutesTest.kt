@@ -24,6 +24,14 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Integration tests for AT Protocol `com.atproto.repo` XRPC endpoints.
+ *
+ * This class validates the core repository operations, including record creation, listing,
+ * retrieval, and deletion. It specifically tests the enforcement of repository ownership,
+ * AT Protocol URI generation, and the use of CIDs for optimistic concurrency control via
+ * swap semantics.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class XrpcRepoRoutesTest {
     private val json = Json { ignoreUnknownKeys = true }

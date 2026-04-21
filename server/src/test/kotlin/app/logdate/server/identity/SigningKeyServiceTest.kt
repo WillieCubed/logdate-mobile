@@ -10,6 +10,17 @@ import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [SigningKeyService], focusing on the secure management of account-level
+ * signing keys.
+ *
+ * These tests cover the full lifecycle of cryptographic keys used for AT Protocol
+ * identity operations, including:
+ * - Deterministic and random key generation across supported elliptic curves (P-256, K-256).
+ * - Key rotation and active key management to ensure continuity of identity.
+ * - Secure export and import workflows using passphrase-based encryption (PBKDF2/AES).
+ * - Two-stage key activation ("prepare" and "activate") for safe infrastructure migrations.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class SigningKeyServiceTest {
     @Test

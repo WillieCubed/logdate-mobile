@@ -7,6 +7,18 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
+/**
+ * Unit tests for the PLC (Placeholder) DID method encoding and derivation logic.
+ *
+ * This suite validates the cryptographic and structural requirements for `did:plc`
+ * identifiers, specifically:
+ * - Deterministic encoding of signed operations.
+ * - Correct derivation of the DID string from genesis operations.
+ * - Validation of operation integrity (signatures, sequence, and payload).
+ *
+ * The tests use real-world audit samples to ensure compatibility with the
+ * official AT Protocol PLC specification.
+ */
 class PlcEncodingTest {
     @Test
     fun `signed genesis derives stable plc did from real audit sample`() {

@@ -286,6 +286,12 @@ private class InMemoryRecentSearchesRepository : RecentSearchesRepository {
     }
 }
 
+/**
+ * A simple in-memory implementation of [DataStore] for testing.
+ *
+ * This allows tests to observe and update [Preferences] without requiring
+ * disk I/O, facilitating fast and isolated tests.
+ */
 private class TestPreferencesDataStore : DataStore<Preferences> {
     private val preferencesFlow = MutableStateFlow(emptyPreferences())
 

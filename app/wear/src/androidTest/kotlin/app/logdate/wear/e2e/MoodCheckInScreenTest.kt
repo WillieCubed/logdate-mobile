@@ -16,6 +16,15 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/**
+ * UI verification suite for the Wear OS Mood Check-in flow.
+ *
+ * This test class covers the multi-step mood capture experience on Wear, validating:
+ * - The mood selection grid and its associated labels/emojis.
+ * - The optional voice prompt follow-up, ensuring contextual mood feedback is shown.
+ * - Navigation and callback logic for both mood selection and voice attachment.
+ * - Final confirmation screens after a successful check-in.
+ */
 @RunWith(AndroidJUnit4::class)
 class MoodCheckInScreenTest {
     @get:Rule

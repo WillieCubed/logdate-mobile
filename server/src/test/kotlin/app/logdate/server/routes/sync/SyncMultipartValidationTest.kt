@@ -13,6 +13,13 @@ import io.ktor.server.testing.testApplication
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Tests the validation logic for multipart form data within the Sync API.
+ *
+ * This suite ensures that the server correctly identifies and rejects requests with
+ * missing or blank mandatory fields, such as `contentId` for media uploads and `deviceId`
+ * for backup uploads, maintaining data integrity during the synchronization process.
+ */
 class SyncMultipartValidationTest {
     @Test
     fun `multipart upload endpoints reject blank required fields`() =

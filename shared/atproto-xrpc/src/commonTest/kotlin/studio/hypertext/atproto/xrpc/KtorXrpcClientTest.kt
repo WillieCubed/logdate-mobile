@@ -15,6 +15,16 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
+/**
+ * Integration tests for the Ktor-based XRPC client implementation.
+ *
+ * This suite validates the transformation of XRPC queries and procedures into
+ * standard HTTP requests using Ktor's [HttpClient]. Key areas of focus include:
+ * - Proper construction of GET and POST requests, including URL parameters and headers.
+ * - Accurate serialization and deserialization of request/response bodies.
+ * - Comprehensive error mapping from HTTP-level failures to XRPC-specific exceptions.
+ * - Support for various authentication mechanisms, such as Bearer tokens.
+ */
 class KtorXrpcClientTest {
     @Test
     fun queryBuildsGetRequestAndDecodesJson(): Unit =

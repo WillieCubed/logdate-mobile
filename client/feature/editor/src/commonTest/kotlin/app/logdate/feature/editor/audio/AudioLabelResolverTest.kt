@@ -8,6 +8,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
+/**
+ * Tests the logic for resolving user-friendly labels for audio recordings.
+ *
+ * This suite exercises [AudioLabelResolver]'s ability to combine multiple contextual
+ * signals, including:
+ * - Direct user-provided captions
+ * - Recording location names
+ * - Automatic period-of-day classification based on sunlight periods
+ */
 class AudioLabelResolverTest {
     private val resolver = AudioLabelResolver()
     private val validPeriods =

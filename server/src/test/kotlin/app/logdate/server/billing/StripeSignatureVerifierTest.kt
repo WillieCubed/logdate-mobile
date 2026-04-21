@@ -6,6 +6,13 @@ import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
+/**
+ * Verifies the implementation of [StripeSignatureVerifier] for validating incoming Stripe webhooks.
+ *
+ * The tests ensure that the verifier correctly calculates HMAC-SHA256 signatures, respects
+ * time-based tolerance windows to prevent replay attacks, and handles multiple 'v1' signatures
+ * to support seamless webhook secret rotation.
+ */
 class StripeSignatureVerifierTest {
     private val secret = "whsec_test_abc_123"
     private val verifier = StripeSignatureVerifier(secret)

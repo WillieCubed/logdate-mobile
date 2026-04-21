@@ -9,6 +9,13 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [HealthSnapshotDataMapper].
+ *
+ * Validates the serialization and deserialization of health snapshots between
+ * local models and Wear OS Data Layer maps, ensuring data integrity for heart
+ * rate, steps, and other health metrics.
+ */
 class HealthSnapshotDataMapperTest {
     private val mapper = HealthSnapshotDataMapper()
 

@@ -5,6 +5,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Unit tests for the backup retention and purging logic.
+ *
+ * This class validates the policy-driven cleanup of user backups, ensuring that the
+ * system correctly balances between keeping a minimum number of recent backups per
+ * device and enforcing a maximum age cutoff for older archives. It also tests various
+ * edge cases such as empty backup lists and zero-retention configurations.
+ */
 class BackupRetentionPolicyTest {
     @Test
     fun `keeps the latest N per device and purges the rest`() {

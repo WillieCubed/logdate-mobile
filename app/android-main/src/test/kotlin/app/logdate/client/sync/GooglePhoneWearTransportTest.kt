@@ -16,6 +16,13 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * Verifies the Google Play Services implementation of the [PhoneWearTransport] interface.
+ *
+ * These tests ensure that [GooglePhoneWearTransport] correctly interacts with the
+ * Android Wearable [DataClient] and [ChannelClient] to push data items and manage
+ * byte-stream channels for cross-device communication.
+ */
 class GooglePhoneWearTransportTest {
 
     private val dataClient = mockk<DataClient>()

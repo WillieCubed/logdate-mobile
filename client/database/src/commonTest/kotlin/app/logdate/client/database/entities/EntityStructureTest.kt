@@ -10,6 +10,13 @@ import kotlin.test.assertNotNull
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for database entity structures.
+ *
+ * Validates the construction, equality, and mapping of Room entities (Journals,
+ * Notes, Cross-references), ensuring that the data layer correctly implements
+ * common interfaces like [GenericNoteData].
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class EntityStructureTest : BaseDatabaseTest() {
     @Test

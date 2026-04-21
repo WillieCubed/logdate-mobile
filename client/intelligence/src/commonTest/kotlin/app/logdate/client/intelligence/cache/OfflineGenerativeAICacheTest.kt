@@ -9,6 +9,14 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
+/**
+ * Tests the [OfflineGenerativeAICache] to ensure efficient and reliable storage of AI-generated
+ * content.
+ *
+ * This suite validates critical cache behaviors such as Time-To-Live (TTL) expiration,
+ * entry eviction when reaching maximum capacity, and correct interaction with the
+ * underlying persistent data source.
+ */
 class OfflineGenerativeAICacheTest {
     @Test
     fun getEntry_expiresAfterTtl() =
@@ -77,6 +85,9 @@ class OfflineGenerativeAICacheTest {
             policy = AICachePolicy(ttlSeconds = ttlSeconds),
         )
 
+    /**
+     * A test implementation of [Clock] that allows manual time advancement for testing.
+     */
     private class TestClock(
         private var current: Instant,
     ) : Clock {
@@ -87,6 +98,9 @@ class OfflineGenerativeAICacheTest {
         }
     }
 
+    /**
+     * A test implementation of [AICacheLocalDataSource] that stores entries in memory.
+     */
     private class TestLocalDataSource : AICacheLocalDataSource {
         private val store = mutableMapOf<String, GenerativeAICacheEntry>()
 

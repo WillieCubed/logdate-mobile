@@ -4,6 +4,12 @@ import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Tests for the date formatting extensions used within the widget features.
+ *
+ * These tests ensure that [LocalDate] instances are correctly formatted into human-readable
+ * strings for display on the device, accounting for month names and day-of-month padding.
+ */
 class DateFormatTest {
     @Test
     fun `formats January date correctly`() {

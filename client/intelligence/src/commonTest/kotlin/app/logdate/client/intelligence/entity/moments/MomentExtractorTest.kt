@@ -17,6 +17,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Validates the [MomentExtractor]'s ability to identify significant time-based events
+ * from journal entries using AI.
+ *
+ * This suite tests the extraction of "moments"—including their labels, estimated time
+ * ranges, and associated evidence—while ensuring robust handling of network states,
+ * caching, and various AI response qualities.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MomentExtractorTest {
     private val testDispatcher = StandardTestDispatcher()
@@ -229,6 +237,9 @@ class MomentExtractorTest {
             policy = AICachePolicy(ttlSeconds = 60L * 60L * 24L * 7L),
         )
 
+    /**
+     * A test implementation of [NetworkAvailabilityMonitor] for testing.
+     */
     private class TestNetworkAvailabilityMonitor(
         private var available: Boolean = true,
     ) : NetworkAvailabilityMonitor {

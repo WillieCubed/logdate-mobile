@@ -27,6 +27,15 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Comprehensive integration tests for the primary synchronization routes.
+ *
+ * This suite covers the end-to-end lifecycle of synchronized data, including journals,
+ * content entries, associations, and media blobs. It verifies core synchronization
+ * mechanics such as incremental change feeds (since/limit), conflict detection using
+ * version constraints, tombstone-based deletions, and administrative operations like
+ * maintenance purges.
+ */
 class SyncRoutesTest {
     private val json = Json { ignoreUnknownKeys = true }
 

@@ -29,6 +29,14 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Android instrumentation tests for verifying Room database migrations and overall data integrity.
+ *
+ * This test suite utilizes [MigrationTestHelper] to perform step-through migrations across
+ * various schema versions of [LogDateDatabase]. It ensures that existing data is correctly
+ * transformed, new tables and indices are properly created, and that the database remains
+ * functional after both individual migrations and long-chain migration paths.
+ */
 @OptIn(ExperimentalUuidApi::class)
 @RunWith(AndroidJUnit4::class)
 class DatabaseMigrationIntegrationTest {

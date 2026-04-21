@@ -21,6 +21,13 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [HostedRepoCommitSigner], ensuring that it correctly signs AT Protocol
+ * repository commits using the server's signing infrastructure.
+ *
+ * This suite verifies that signed repository exports are valid and can be
+ * successfully imported and verified by other standard repository engines.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class HostedRepoCommitSignerTest {
     @Test

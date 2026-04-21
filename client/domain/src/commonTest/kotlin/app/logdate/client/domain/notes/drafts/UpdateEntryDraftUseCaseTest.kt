@@ -12,6 +12,13 @@ import kotlin.test.assertEquals
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [UpdateEntryDraftUseCase].
+ *
+ * Verifies that the use case correctly updates entry drafts with new content,
+ * handles both manual note lists and [EntryDraft] objects, and properly
+ * interacts with the [EntryDraftRepository].
+ */
 class UpdateEntryDraftUseCaseTest {
     private lateinit var mockRepository: MockEntryDraftRepository
     private lateinit var useCase: UpdateEntryDraftUseCase

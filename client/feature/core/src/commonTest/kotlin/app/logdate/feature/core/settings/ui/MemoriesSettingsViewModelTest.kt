@@ -21,6 +21,13 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Unit tests for [MemoriesSettingsViewModel].
+ *
+ * Tests the configuration of "Memories" features, including widget installation
+ * control, content type filtering for home screen widgets, and recall mode
+ * settings.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MemoriesSettingsViewModelTest {
     private val testDispatcher = StandardTestDispatcher()

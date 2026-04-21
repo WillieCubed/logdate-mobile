@@ -15,6 +15,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Coverage-focused unit tests for repository models, exceptions, and store interfaces.
+ *
+ * These tests ensure that repository types maintain expected default behaviors across
+ * their public APIs, that exceptions correctly preserve context, and that interface
+ * default arguments are properly forwarded to implementations.
+ */
 class RepoCoverageTest {
     private val repo = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
     private val collection = Nsid.require("studio.hypertext.logdate.content")
@@ -68,6 +75,9 @@ class RepoCoverageTest {
         assertNull(store.deleteSwapRecord)
     }
 
+    /**
+     * A mock implementation of [RepoRecordStore] that captures invocation arguments for verification.
+     */
     private class RecordingRepoRecordStore : RepoRecordStore {
         var listLimit: Int? = null
         var listCursor: String? = "unset"

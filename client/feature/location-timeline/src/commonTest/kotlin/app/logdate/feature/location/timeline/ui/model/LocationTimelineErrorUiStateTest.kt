@@ -3,6 +3,10 @@ package app.logdate.feature.location.timeline.ui.model
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Tests for the mapping logic that converts various system and application exceptions
+ * into [LocationTimelineErrorUiState] for the UI to consume.
+ */
 class LocationTimelineErrorUiStateTest {
     private class SecurityException(
         message: String,

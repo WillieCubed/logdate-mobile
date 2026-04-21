@@ -50,6 +50,14 @@ import kotlin.time.Instant
 import kotlin.time.TimeSource
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [GetStreamingTimelineUseCase].
+ *
+ * This test suite focuses on the high-performance "streaming" timeline, which is
+ * designed to provide near-instant UI feedback. It verifies the multi-stage loading
+ * process where the first emission provides raw content (without slow AI processing)
+ * and subsequent emissions enrich the data with summaries and metadata.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class GetStreamingTimelineUseCaseTest {
     private lateinit var mockNotesRepository: MockJournalNotesRepository

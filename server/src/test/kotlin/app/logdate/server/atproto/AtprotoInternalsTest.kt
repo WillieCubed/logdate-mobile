@@ -9,6 +9,14 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests internal AT Protocol utilities and low-level helpers.
+ *
+ * This suite verifies the behavior of synthetic CID generation, custom exceptions, and
+ * cryptographic byte manipulation that underpin the AT Protocol implementation. It
+ * employs reflection to validate internal logic that is not exposed via public APIs
+ * but is critical for protocol correctness.
+ */
 class AtprotoInternalsTest {
     @Test
     fun `invalid swap exception exposes expected and provided cids`() {

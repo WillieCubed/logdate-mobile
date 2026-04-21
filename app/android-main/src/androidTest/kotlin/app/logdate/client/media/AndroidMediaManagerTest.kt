@@ -38,6 +38,14 @@ import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Instrumented tests for the [AndroidMediaManager] implementation.
+ *
+ * This suite validates the application's interaction with the Android [MediaStore] and
+ * local file system. It specifically tests media discovery, persistence of newly
+ * captured images and videos, and complex recovery scenarios for media files with
+ * missing or corrupted metadata across various Android API levels.
+ */
 @RunWith(AndroidJUnit4::class)
 class AndroidMediaManagerTest {
     private val context: Context = ApplicationProvider.getApplicationContext()

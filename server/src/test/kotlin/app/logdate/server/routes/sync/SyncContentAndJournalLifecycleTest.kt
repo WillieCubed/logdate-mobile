@@ -21,6 +21,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Validates the lifecycle management for content and journal records in the Sync API.
+ *
+ * This suite verifies the consistency of resource identifiers, the correct handling of
+ * version-based concurrency conflicts during updates, and the proper processing of
+ * full and partial (PATCH) updates for both content and journal collections.
+ */
 class SyncContentAndJournalLifecycleTest {
     @Test
     fun `content and journal endpoints enforce id consistency and version conflict behavior`() =

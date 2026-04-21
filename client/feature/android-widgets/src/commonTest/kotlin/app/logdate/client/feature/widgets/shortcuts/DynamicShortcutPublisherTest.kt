@@ -21,6 +21,15 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for the [DynamicShortcutPublisher], which manages the creation and updating of
+ * dynamic shortcuts and Direct Share targets on Android.
+ *
+ * This suite verifies the priority logic for different shortcut types (e.g., drafts,
+ * rewinds, and current timeline), ensures that shortcuts are only shown when relevant
+ * (e.g., within freshness windows), and confirms that shortcut IDs remain stable
+ * to support pinned launcher icons.
+ */
 class DynamicShortcutPublisherTest {
     @Test
     fun `returns only TodayTimeline when no draft and no rewind`() =

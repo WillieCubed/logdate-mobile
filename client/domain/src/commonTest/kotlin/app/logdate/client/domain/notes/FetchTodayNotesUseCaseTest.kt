@@ -15,6 +15,13 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [FetchTodayNotesUseCase].
+ *
+ * Tests the retrieval of journal notes for the current day, specifically
+ * focusing on the time-windowing logic including the use of configurable
+ * buffers to capture late-night entries from the previous day.
+ */
 class FetchTodayNotesUseCaseTest {
     private lateinit var mockRepository: MockJournalNotesRepository
     private lateinit var useCase: FetchTodayNotesUseCase

@@ -19,6 +19,14 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 
+/**
+ * Comprehensive tests for the JWT-based [TokenService].
+ *
+ * Validates the generation and verification of various token types (access, refresh,
+ * and session tokens), ensuring that JWT claims, signatures, and expiration are
+ * handled correctly. It also tests security-critical features such as HMAC-SHA256
+ * signature validation and protection against token tampering.
+ */
 class JwtTokenServiceTest {
     private val hmacKey = "test-secret-0123456789"
     private val issuer = "issuer-a"

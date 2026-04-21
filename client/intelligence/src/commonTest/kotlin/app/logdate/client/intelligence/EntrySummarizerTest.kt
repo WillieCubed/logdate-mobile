@@ -15,6 +15,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
+/**
+ * Verifies the [EntrySummarizer]'s ability to generate concise, second-person summaries
+ * of journal entries.
+ *
+ * This test suite covers the end-to-end summarization flow, including interaction with
+ * generative AI models, cache integration to avoid redundant calls, handling of
+ * network unavailability, and validation of the system prompts used to guide the AI.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class EntrySummarizerTest {
     private val testDispatcher = StandardTestDispatcher()
@@ -291,6 +299,9 @@ class EntrySummarizerTest {
             assertEquals(2, fakeAIClient.submissions.size)
         }
 
+    /**
+     * A test implementation of [NetworkAvailabilityMonitor] for testing.
+     */
     private class TestNetworkAvailabilityMonitor(
         private var available: Boolean = true,
     ) : NetworkAvailabilityMonitor {

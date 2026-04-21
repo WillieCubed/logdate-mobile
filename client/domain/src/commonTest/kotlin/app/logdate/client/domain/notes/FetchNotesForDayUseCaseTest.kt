@@ -18,6 +18,13 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [FetchNotesForDayUseCase].
+ *
+ * Verifies the retrieval of journal entries for a specific calendar date, ensuring
+ * that the correct 24-hour time range is calculated and used to query the repository
+ * based on the system's default time zone.
+ */
 class FetchNotesForDayUseCaseTest {
     private lateinit var mockRepository: MockJournalNotesRepository
     private lateinit var useCase: FetchNotesForDayUseCase

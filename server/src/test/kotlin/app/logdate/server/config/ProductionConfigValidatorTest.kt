@@ -5,6 +5,10 @@ import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * Tests the [profileAwareBoolEnv] utility function for resolving boolean environment variables
+ * with profile-specific defaults.
+ */
 class ProfileAwareBoolEnvTest {
     @Test
     fun `unset env picks productionDefault in production`() {
@@ -59,6 +63,14 @@ class ProfileAwareBoolEnvTest {
     }
 }
 
+/**
+ * Tests the security validation logic for server configurations.
+ *
+ * Ensures that the server correctly enforces strict security requirements when
+ * running in a production profile, such as mandatory high-entropy secrets and
+ * database passwords, while allowing more flexible configurations for development
+ * and testing environments.
+ */
 class ProductionConfigValidatorTest {
     @Test
     fun `development profile skips validation`() {

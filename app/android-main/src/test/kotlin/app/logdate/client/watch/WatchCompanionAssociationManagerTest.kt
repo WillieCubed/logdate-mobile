@@ -21,6 +21,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests the [WatchCompanionAssociationManager]'s interaction with the Companion Device Manager.
+ *
+ * This suite validates the lifecycle of a Wear OS device association, including
+ * initiating the system pairing flow, handling association callbacks, and
+ * persisting the resulting association state within the application.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WatchCompanionAssociationManagerTest {
     private val dispatcher = StandardTestDispatcher()

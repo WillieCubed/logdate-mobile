@@ -22,6 +22,14 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests the [WeekNarrativeSynthesizer]'s capacity to aggregate diverse weekly data
+ * into a cohesive narrative.
+ *
+ * These tests simulate various life scenarios (such as vacations or stressful work
+ * weeks) to verify that the synthesizer correctly identifies themes, emotional
+ * tones, and key story beats from a mix of text entries, media, and social mentions.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WeekNarrativeSynthesizerTest {
     private val testDispatcher = StandardTestDispatcher()
@@ -506,6 +514,9 @@ class WeekNarrativeSynthesizerTest {
         return result.value
     }
 
+    /**
+     * A test implementation of [NetworkAvailabilityMonitor] for testing.
+     */
     private class TestNetworkAvailabilityMonitor(
         private var available: Boolean = true,
     ) : NetworkAvailabilityMonitor {

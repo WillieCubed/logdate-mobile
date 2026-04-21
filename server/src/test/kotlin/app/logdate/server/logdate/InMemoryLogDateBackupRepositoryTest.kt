@@ -5,6 +5,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
+/**
+ * Tests for [InMemoryLogDateBackupRepository], ensuring that backups are correctly
+ * stored, listed in reverse chronological order, and strictly isolated between users.
+ */
 class InMemoryLogDateBackupRepositoryTest {
     @Test
     fun `backup repository lists most recent backups first and isolates users`() {

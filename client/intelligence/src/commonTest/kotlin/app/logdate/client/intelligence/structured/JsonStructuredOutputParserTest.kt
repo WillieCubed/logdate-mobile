@@ -5,6 +5,15 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
+/**
+ * Verifies the robustness of the [JsonStructuredOutputParser] when extracting typed data from
+ * AI model responses.
+ *
+ * These tests confirm that the parser correctly handles clean JSON, empty input, and malformed
+ * strings. It also validates the "embedded JSON" feature, which allows the parser to
+ * locate and extract a valid JSON block even when it is surrounded by unrelated conversational
+ * text.
+ */
 class JsonStructuredOutputParserTest {
     private val json = Json { ignoreUnknownKeys = true }
 

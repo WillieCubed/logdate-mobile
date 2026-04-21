@@ -6,6 +6,14 @@ import java.nio.file.Paths
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Tests for the [AuditLogSchema], ensuring that audit entries are formatted
+ * consistently and that the schema documentation remains in sync with the code.
+ *
+ * It verifies the deterministic rendering of key-value pairs, proper handling
+ * of null fields, and that all defined audit categories and keys are present
+ * in the external documentation.
+ */
 class AuditLogSchemaTest {
     @Test
     fun `formatAuditLog renders stable sorted key-value payload`() {

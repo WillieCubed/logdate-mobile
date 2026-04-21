@@ -9,6 +9,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Unit tests for repository block storage implementations.
+ *
+ * These tests verify the core behaviors of [RepoBlockStore], including block persistence,
+ * commit history management, and the ability to clear repository-specific state while
+ * maintaining global block availability.
+ */
 class RepoBlockStoreTest {
     @Test
     fun `clearing a repo removes its head blocks and commit history`() {

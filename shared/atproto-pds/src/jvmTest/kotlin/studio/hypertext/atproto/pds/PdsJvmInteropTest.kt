@@ -6,6 +6,15 @@ import studio.hypertext.atproto.syntax.RecordKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Verifies the binary compatibility and JVM-level interoperability of ATProto PDS models.
+ *
+ * This test suite ensures that Kotlin properties in PDS data classes are correctly
+ * exposed via standard JVM getter conventions. This is critical for consumers
+ * interacting with these models from Java or other JVM languages that rely on
+ * stable method signatures for property access, especially when dealing with
+ * property renaming or aliasing.
+ */
 class PdsJvmInteropTest {
     @Test
     fun `jvm consumers can read aliased oauth response properties`() {

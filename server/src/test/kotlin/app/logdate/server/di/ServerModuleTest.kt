@@ -53,6 +53,18 @@ import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
+/**
+ * Tests for the Koin dependency injection configuration in [ServerModule].
+ *
+ * This suite ensures the structural integrity of the server's dependency graph by:
+ * - Verifying the correct wiring of services and repositories for both development
+ *   (in-memory) and production (PostgreSQL) environments.
+ * - Testing the graceful degradation and fallback logic when the database is unavailable.
+ * - Validating the successful initialization of the database schema and shared
+ *   cryptographic services.
+ * - Ensuring that all required components for AT Protocol identity and OAuth
+ *   flows are correctly provided and injectable.
+ */
 class ServerModuleTest {
     @AfterTest
     fun cleanupKoin() {

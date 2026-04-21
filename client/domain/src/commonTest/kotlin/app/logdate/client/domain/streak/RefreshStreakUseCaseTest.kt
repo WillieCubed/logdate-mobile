@@ -13,6 +13,13 @@ import kotlin.test.assertEquals
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [RefreshStreakUseCase].
+ *
+ * Ensures that the streak refresh process correctly triggers a recalculation
+ * of the user's activity streak and persists the result to the cached
+ * settings repository.
+ */
 class RefreshStreakUseCaseTest {
     @Test
     fun `refresh calculates streak and writes to cache`() =

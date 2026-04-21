@@ -15,6 +15,12 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [FetchEntryDraftUseCase].
+ *
+ * Ensures that the use case correctly retrieves entry drafts from the repository,
+ * appropriately handling cases where a draft exists or is missing.
+ */
 class FetchEntryDraftUseCaseTest {
     private lateinit var mockRepository: MockEntryDraftRepository
     private lateinit var useCase: FetchEntryDraftUseCase

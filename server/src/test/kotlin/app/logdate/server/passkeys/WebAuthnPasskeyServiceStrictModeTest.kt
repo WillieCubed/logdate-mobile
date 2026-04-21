@@ -11,6 +11,14 @@ import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Validates the strict verification behavior of the WebAuthn passkey service.
+ *
+ * This suite specifically tests the "strict mode" configuration, ensuring that the service
+ * rigorously enforces Base64URL encoding requirements and protocol-compliant payloads
+ * for both registration and authentication, while allowing for more relaxed behavior
+ * during development or testing when strict mode is disabled.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class WebAuthnPasskeyServiceStrictModeTest {
     @Test

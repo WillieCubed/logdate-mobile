@@ -49,6 +49,15 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Comprehensive tests for [RestoreUserDataUseCase] covering the complete restoration of
+ * user data from backup archives.
+ *
+ * This includes verifying the "happy path" for all entity types (journals, notes, drafts,
+ * profiles, places), testing various merge strategies (replace vs. keep newest),
+ * ensuring data integrity via metadata validation, and validating transactional rollback
+ * behavior on failure.
+ */
 class RestoreUserDataUseCaseTest {
     private lateinit var journalRepo: FakeJournalRepository
     private lateinit var notesRepo: FakeJournalNotesRepository

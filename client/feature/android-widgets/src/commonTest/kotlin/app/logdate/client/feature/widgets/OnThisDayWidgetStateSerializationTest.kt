@@ -6,6 +6,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
+/**
+ * Tests for the JSON serialization of [OnThisDayWidgetState].
+ *
+ * This suite verifies that all states of the "On This Day" widget—including loading,
+ * new user orientation, no memories available, and active memory display—can be
+ * correctly persisted and restored.
+ */
 class OnThisDayWidgetStateSerializationTest {
     private val json =
         Json {

@@ -10,6 +10,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.Uuid
 
+/**
+ * Verifies the behavior of [GetPeopleUseCase] in retrieving the full list of tracked people.
+ *
+ * Ensures that the use case correctly proxies data from [PeopleRepository], handles
+ * empty result sets, and maintains the order and integrity of the emitted [Person] flows.
+ */
 class GetPeopleUseCaseTest {
     private class MockPeopleRepository : PeopleRepository {
         var getAllPeopleResult: Flow<List<Person>> = flowOf(emptyList())

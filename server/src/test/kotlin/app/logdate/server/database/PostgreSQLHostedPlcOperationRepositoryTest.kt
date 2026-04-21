@@ -10,6 +10,18 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [PostgreSQLHostedPlcOperationRepository], verifying the persistent
+ * storage of AT Protocol PLC operations in a relational database.
+ *
+ * This suite uses an embedded database (H2 in PostgreSQL compatibility mode)
+ * to ensure that:
+ * - Signed PLC operations are correctly inserted with all required metadata
+ *   (CIDs, operation types, and raw JSON).
+ * - The sequential history of an identity is maintained via `prev` CID linking.
+ * - Operations can be efficiently queried and reconstructed for both internal
+ *   account management and external AT Protocol audit logs.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class PostgreSQLHostedPlcOperationRepositoryTest {
     @Test

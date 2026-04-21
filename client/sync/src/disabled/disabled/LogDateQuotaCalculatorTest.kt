@@ -18,6 +18,13 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [LogDateQuotaCalculator].
+ *
+ * These tests verify the calculation of storage usage across different categories
+ * (text, image, video, audio, and journals), including validation of file sizes
+ * and character encoding considerations for metadata.
+ */
 class LogDateQuotaCalculatorTest {
 
     private val mockTextNoteDao = MockTextNoteDao()

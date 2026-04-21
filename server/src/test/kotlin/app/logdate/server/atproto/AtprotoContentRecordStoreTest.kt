@@ -32,6 +32,14 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Comprehensive test suite for the AT Protocol content record store.
+ *
+ * This class validates the core repository operations for managing LogDate entries
+ * within an AT Protocol repo. It covers the full CRUD lifecycle, collection discovery,
+ * forward and reverse pagination with opaque cursors, and optimistic concurrency
+ * control via swap record validation.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class AtprotoContentRecordStoreTest {
     @Test

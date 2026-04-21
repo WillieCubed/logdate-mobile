@@ -20,6 +20,14 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [AudioNoteViewerViewModel], which manages the interactive playback and
+ * visualization of audio-based journal notes.
+ *
+ * This suite verifies that audio metadata (like duration) and visualization context
+ * (waveforms) are correctly loaded, and that playback controls like toggling and
+ * seeking work as expected across various playback states.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AudioNoteViewerViewModelTest {
     private val dispatcher = StandardTestDispatcher()

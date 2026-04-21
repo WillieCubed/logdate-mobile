@@ -3,6 +3,13 @@ package app.logdate.server.auth
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Tests the default method implementations in the [TokenService] interface.
+ *
+ * Uses reflection to verify that the Kotlin interface's default implementations
+ * correctly delegate to the underlying implementation while maintaining
+ * expected parameter defaults, such as optional DIDs.
+ */
 class TokenServiceDefaultMethodsTest {
     @Test
     fun `token service default methods pass null did`() {

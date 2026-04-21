@@ -16,6 +16,12 @@ import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.uuid.Uuid
 
+/**
+ * Verifies the Koin dependency injection configuration for the data layer.
+ *
+ * These tests ensure that key abstractions (like [NotePlaceResolver]) are correctly
+ * bound to their concrete, persistent implementations in the data module's graph.
+ */
 class DataModuleTest {
     @Test
     fun dataModule_resolvesDatabaseNotePlaceResolverAsNotePlaceResolver() {

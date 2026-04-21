@@ -3,6 +3,13 @@ package studio.hypertext.atproto.syntax
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Ensures that AT Protocol value classes correctly expose their backing properties on the JVM.
+ *
+ * This test uses reflection to verify that `getValue` methods are correctly generated
+ * and accessible when identifiers are boxed, maintaining compatibility with
+ * Java-interoperability and library-specific data mapping.
+ */
 class ValueClassGetterCoverageJvmTest {
     @Test
     fun `boxed value classes expose backing value getters on jvm`() {

@@ -11,6 +11,13 @@ import kotlin.test.Test
 import org.junit.Rule
 import org.junit.runner.RunWith
 
+/**
+ * End-to-end tests for the Notifications row in the Settings Overview screen.
+ *
+ * Verifies that the Notifications row is correctly displayed or hidden based
+ * on whether a navigation callback is provided to the [SettingsOverviewContent]
+ * composable.
+ */
 @RunWith(AndroidJUnit4::class)
 class SettingsOverviewNotificationsRowTest {
 

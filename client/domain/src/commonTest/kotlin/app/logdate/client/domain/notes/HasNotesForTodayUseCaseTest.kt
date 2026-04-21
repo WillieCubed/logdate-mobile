@@ -16,6 +16,12 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [HasNotesForTodayUseCase].
+ *
+ * Verifies the logic for determining whether any journal notes exist within
+ * the 24-hour window of the current day.
+ */
 class HasNotesForTodayUseCaseTest {
     private lateinit var mockRepository: MockJournalNotesRepository
     private lateinit var useCase: HasNotesForTodayUseCase

@@ -24,6 +24,14 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/**
+ * Instrumented tests for various sharing entry points across the application.
+ *
+ * This suite verifies that sharing actions in the timeline, media detail view,
+ * and journal screens correctly capture and emit the expected state (like
+ * memory details, media references, or journal metadata) to their respective
+ * share handlers.
+ */
 @RunWith(AndroidJUnit4::class)
 class SharingEntryPointsE2ETest {
     @get:Rule

@@ -23,6 +23,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for the Wear OS Mood Check-in state machine and business logic.
+ *
+ * This class validates the [MoodCheckInViewModel], ensuring it correctly manages the
+ * multi-step capture flow (mood selection -> optional voice prompt -> success).
+ * It verifies that journal notes are persisted with appropriate mood-specific
+ * metadata (tags) and that the view model emits the correct navigation and
+ * UI events during the check-in lifecycle.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MoodCheckInViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()

@@ -6,6 +6,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [MediaAccessPolicy], focusing on the parsing of security and access
+ * configuration from environment variables.
+ *
+ * It ensures that TTL bounds for signed URLs are correctly enforced and that
+ * various boolean representations (e.g., "yes", "1", "true") are parsed consistently.
+ */
 class MediaAccessPolicyTest {
     @Test
     fun `media access policy reads environment defaults and boolean parser`() {

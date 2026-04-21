@@ -11,6 +11,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [DesktopDeviceIdProvider], ensuring that unique device identifiers are
+ * correctly managed in a desktop environment.
+ *
+ * These tests verify that the provider can generate new IDs, persist them using
+ * the provided [KeyValueStorage], handle invalid stored data, and provide a stable
+ * identifier until an explicit refresh is requested.
+ */
 class DesktopDeviceIdProviderTest {
     private lateinit var storage: InMemoryKeyValueStorage
     private lateinit var provider: DesktopDeviceIdProvider

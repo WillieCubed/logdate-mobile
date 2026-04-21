@@ -33,6 +33,13 @@ import kotlin.test.assertNull
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [DefaultCloudAccountRepository].
+ *
+ * Verifies that the repository correctly manages cloud account information,
+ * including completion of account creation, storage of decentralized identifiers (DIDs),
+ * and handling of sign-out operations.
+ */
 class DefaultCloudAccountRepositoryTest {
     @Test
     fun `complete account creation stores did and handle for later load`() =
@@ -136,6 +143,9 @@ private fun scopedKey(
     backendUrl: String,
 ): String = "${baseKey}_${backendUrl.trim().removePrefix("https://").removePrefix("http://").replace(Regex("[^A-Za-z0-9]"), "_")}"
 
+/**
+ * A fake [CloudApiClient] for testing account repository operations.
+ */
 private class FakeCloudApiClient(
     private val completeAccountCreationResult: CompleteAccountCreationResponse? = null,
 ) : CloudApiClient {
@@ -240,6 +250,9 @@ private class FakeCloudApiClient(
     ): Result<MediaDownloadResponse> = Result.failure(NotImplementedError())
 }
 
+/**
+ * An in-memory implementation of [KeyValueStorage] for unit testing.
+ */
 private class InMemoryKeyValueStorage : KeyValueStorage {
     private val values = mutableMapOf<String, String>()
 

@@ -14,6 +14,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Verifies the [IdentityApiClient] correctly communicates with the server's identity-related
+ * endpoints.
+ *
+ * This test suite ensures that requests for identity status, signing key exports, and
+ * PLC (Placeholder) operations use the correct API paths, include necessary authorization
+ * headers, and properly deserialize successful server responses.
+ */
 class IdentityApiClientTest {
     private fun createClient(mockEngine: MockEngine): IdentityApiClient {
         val httpClient =

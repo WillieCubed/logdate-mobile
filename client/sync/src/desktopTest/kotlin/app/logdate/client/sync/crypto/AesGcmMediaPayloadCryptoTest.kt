@@ -6,6 +6,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * Unit tests for media payload encryption using AES-GCM.
+ *
+ * These tests verify the cryptographic operations of [AesGcmMediaPayloadCrypto], ensuring
+ * that plaintext media is correctly encrypted with a specific prefix, that already
+ * encrypted payloads are handled gracefully, and that decryption fails appropriately
+ * when the ciphertext or tag has been tampered with.
+ */
 class AesGcmMediaPayloadCryptoTest {
     @Test
     fun encryptAddsPrefixAndDecrypts() =

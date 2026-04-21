@@ -12,6 +12,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [SaveReflectionPromptResponseUseCase].
+ *
+ * Verifies the processing of user responses to reflection prompts, ensuring
+ * that meaningful content is saved while empty or whitespace-only responses
+ * result in the deletion of existing records.
+ */
 class SaveReflectionPromptResponseUseCaseTest {
     private lateinit var fakeRepository: FakeReflectionPromptResponseRepository
     private lateinit var useCase: SaveReflectionPromptResponseUseCase

@@ -361,6 +361,9 @@ class TextProcessingAccuracyTest {
         return """{"names":[$quoted]}"""
     }
 
+    /**
+     * A test implementation of [NetworkAvailabilityMonitor] for testing.
+     */
     private class TestNetworkAvailabilityMonitor(
         private var available: Boolean = true,
     ) : NetworkAvailabilityMonitor {

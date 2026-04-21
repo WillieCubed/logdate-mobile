@@ -7,6 +7,13 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Unit tests for the search query preparation logic in [OfflineFirstSearchRepository].
+ *
+ * These tests verify how raw search queries are transformed into FTS-compatible
+ * queries, ensuring correct handling of prefix matching, explicit syntax,
+ * and single-character queries.
+ */
 class OfflineFirstSearchRepositoryQueryTest {
     @Test
     fun prepareFtsQuery_usesPrefixMatchingForPlainTyping() {

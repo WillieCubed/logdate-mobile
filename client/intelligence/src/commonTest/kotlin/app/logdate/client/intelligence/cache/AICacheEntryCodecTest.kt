@@ -7,6 +7,12 @@ import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * Verifies the [JsonAICacheEntryCodec]'s ability to serialize and deserialize AI cache entries.
+ *
+ * This suite ensures that [GenerativeAICacheEntry] objects, including their associated
+ * metadata and timestamps, can be reliably converted to and from JSON for persistent storage.
+ */
 class AICacheEntryCodecTest {
     @Test
     fun decode_withInvalidPayload_returnsNull() {

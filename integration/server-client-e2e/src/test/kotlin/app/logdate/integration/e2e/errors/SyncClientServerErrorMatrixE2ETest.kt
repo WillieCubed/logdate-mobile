@@ -11,6 +11,14 @@ import app.logdate.shared.model.sync.VersionConstraint
 import kotlin.random.Random
 import kotlin.test.Test
 
+/**
+ * Integration test matrix for verifying client-side resilience against server-side sync errors.
+ *
+ * This suite executes end-to-end scenarios to ensure the sync client correctly interprets
+ * and surfaces various HTTP error states from the cloud backend. It covers critical
+ * failure modes including authentication expiration (401), concurrent update conflicts (409),
+ * payload validation failures (400), and missing resource lookups (404).
+ */
 class SyncClientServerErrorMatrixE2ETest {
     @Test
     fun `sync endpoints map auth validation conflict and not-found errors`() =

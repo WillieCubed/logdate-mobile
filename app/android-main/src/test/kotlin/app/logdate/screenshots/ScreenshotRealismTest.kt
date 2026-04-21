@@ -10,6 +10,15 @@ import kotlin.io.path.readText
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
+/**
+ * Static analysis tests to enforce visual fidelity and realism in the application's
+ * screenshot testing suite.
+ *
+ * This test scans preview and screenshot source files to ensure they avoid synthetic
+ * "placeholder" states, blank scaffolding, or fake data labels. By enforcing the use of
+ * realistic content in tests, it ensures that visual regressions are caught against
+ * production-like UI states rather than idealized or simplified models.
+ */
 class ScreenshotRealismTest {
     private val repoRoot = locateRepoRoot(Paths.get(System.getProperty("user.dir") ?: ".").toAbsolutePath())
     private val screenshotsDir =

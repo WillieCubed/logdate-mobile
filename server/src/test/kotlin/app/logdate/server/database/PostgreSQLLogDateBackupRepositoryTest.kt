@@ -7,6 +7,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
+/**
+ * Integration tests for [PostgreSQLLogDateBackupRepository] using an H2 in-memory database.
+ *
+ * Verifies the full lifecycle of backup metadata management, including creation,
+ * retrieval (both individual and list-based), and deletion. These tests ensure
+ * that backup records are correctly associated with users and devices.
+ */
 class PostgreSQLLogDateBackupRepositoryTest {
     @Test
     fun `postgres backup repository stores lists and deletes backups`() {

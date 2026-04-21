@@ -8,6 +8,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * JVM-based regression tests for LogDate-specific Lexicon definitions.
+ *
+ * These tests ensure that the custom Lexicons used by the LogDate application
+ * are internally consistent, valid according to AT Protocol standards, and that
+ * the checked-in generated Kotlin code remains perfectly synchronized with the
+ * source JSON definitions. It also validates the behavior of the codegen CLI tool.
+ */
 class LogDateLexiconJvmTest {
     @Test
     fun `logdate lexicon documents validate and generated sources stay in sync`() {

@@ -4,6 +4,19 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [AADBuilder], ensuring the deterministic generation of Additional
+ * Authenticated Data (AAD) for use in AEAD (Authenticated Encryption with
+ * Associated Data) constructions.
+ *
+ * This suite verifies:
+ * - The correct formatting of context-specific metadata for both media and
+ *   backup encryption types.
+ * - Proper inclusion of unique identifiers (user IDs, media IDs, content IDs)
+ *   to ensure cryptographic binding to the specific data being protected.
+ * - Deterministic output to ensure that AAD can be reliably reconstructed
+ *   during the decryption process.
+ */
 class AADBuilderTest {
     @Test
     fun `aad builder generates deterministic media and backup context`() {

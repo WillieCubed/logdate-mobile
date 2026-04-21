@@ -7,6 +7,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Validates the [parseSnippetMarkers] logic for converting plain-text search results
+ * into formatted UI snippets.
+ *
+ * These tests ensure that bracketed markers (e.g., `[match]`) are correctly identified,
+ * removed from the visible text, and converted into bold span styles within a Compose
+ * `AnnotatedString`.
+ */
 class SnippetHighlighterTest {
     @Test
     fun `plain text without markers returns unformatted string`() {

@@ -5,6 +5,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [AndroidCryptoManager], verifying the Android-specific implementation of
+ * cryptographic primitives.
+ *
+ * This suite confirms that recovery phrases are generated correctly, master keys
+ * are derived deterministically from those phrases, and random byte generation
+ * meets the required length specifications.
+ */
 class AndroidCryptoManagerTest {
     private val cryptoManager = AndroidCryptoManager()
 

@@ -12,6 +12,13 @@ import kotlin.test.assertEquals
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [GetCurrentUserJournalsUseCase].
+ *
+ * Verifies the retrieval of all journals belonging to the current user, ensuring the
+ * resulting flow correctly reflects the current state and any reactive updates from
+ * the [JournalRepository].
+ */
 class GetCurrentUserJournalsUseCaseTest {
     private class MockJournalRepository : JournalRepository {
         var allJournalsObservedResult: Flow<List<Journal>> = flowOf(emptyList())

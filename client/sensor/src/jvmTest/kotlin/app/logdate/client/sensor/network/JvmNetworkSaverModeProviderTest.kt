@@ -9,6 +9,12 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 
+/**
+ * Tests the JVM (desktop/stub) implementation of [JvmNetworkSaverModeProvider].
+ *
+ * This suite ensures that the provider returns predictable network and data saver
+ * states on non-Android platforms, providing a baseline for cross-platform sensor code.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class JvmNetworkSaverModeProviderTest {
     private lateinit var networkSaverModeProvider: JvmNetworkSaverModeProvider

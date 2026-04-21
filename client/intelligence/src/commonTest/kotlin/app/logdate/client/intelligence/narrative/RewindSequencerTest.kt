@@ -17,6 +17,14 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Validates the [RewindSequencer]'s logic for constructing a cohesive visual narrative
+ * from a collection of memories.
+ *
+ * These tests ensure that the sequencer correctly organizes story beats, chronological
+ * evidence (text and media), and narrative transitions into an ordered sequence of
+ * panels suitable for the "Rewind" storytelling experience.
+ */
 class RewindSequencerTest {
     private val sequencer = RewindSequencer()
     private val emptyStats = WeekStatsSnapshot(photoCount = 0, textNoteCount = 0, distinctLocations = 0, distinctPeople = 0)

@@ -5,6 +5,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * Validates the parsing, validation, and document URL generation for AT Protocol-supported
+ * DID methods (`did:plc` and `did:web`).
+ *
+ * This test suite enforces method-specific restrictions, such as prohibiting paths
+ * in `did:web` and requiring specific identifier lengths for `did:plc`, and
+ * ensures correct mapping to remote document endpoints.
+ */
 class AtprotoDidTest {
     @Test
     fun acceptsDidPlc() {

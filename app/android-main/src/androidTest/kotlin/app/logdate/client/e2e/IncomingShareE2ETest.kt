@@ -40,6 +40,13 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
+/**
+ * Instrumented E2E tests for handling incoming Android share intents.
+ *
+ * This suite verifies that the application correctly responds to `ACTION_SEND` and
+ * `ACTION_SEND_MULTIPLE` intents from other apps, pre-filling the journal editor
+ * with shared text, single images, or multiple media attachments.
+ */
 @RunWith(AndroidJUnit4::class)
 class IncomingShareE2ETest {
     private val fakeMediaManager = RecordingMediaManager()

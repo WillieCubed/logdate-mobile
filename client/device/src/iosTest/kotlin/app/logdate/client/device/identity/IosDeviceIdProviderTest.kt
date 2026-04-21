@@ -9,6 +9,14 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for the [IosDeviceIdProvider], ensuring that unique device identifiers are
+ * correctly managed within the iOS Keychain.
+ *
+ * These tests verify that the provider can generate new IDs, persist them across
+ * app restarts, handle invalid stored data, and provide a stable identifier until
+ * an explicit refresh is requested.
+ */
 class IosDeviceIdProviderTest {
     private lateinit var keychainWrapper: FakeKeychainWrapper
     private lateinit var provider: IosDeviceIdProvider

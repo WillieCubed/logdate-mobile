@@ -6,6 +6,15 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
+/**
+ * Unit tests for the AT Protocol Lexicon processing pipeline.
+ *
+ * This suite exercises the fundamental components of Lexicon handling:
+ * - [LexiconParser]: Parsing Lexicon JSON definitions into structured models.
+ * - [LexiconValidator]: Enforcing schema correctness and resolving cross-document references.
+ * - [LexiconCodegen]: Deterministic generation of Kotlin source code from Lexicon models,
+ *   supporting various AT Protocol specific types like `blob`, `ref`, and `unknown`.
+ */
 class LexiconParserTest {
     @Test
     fun `parser reads query params and output schemas`() {

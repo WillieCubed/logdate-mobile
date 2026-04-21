@@ -4,6 +4,14 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Validates the serialization and deserialization of standard DID documents and
+ * their subcomponents.
+ *
+ * This test ensures that `DidDocument`, `VerificationMethod`, and `Service`
+ * objects correctly round-trip through JSON, preserving mandatory fields and
+ * correctly handling optional context and aliases.
+ */
 class DidDocumentTest {
     private val json: Json = Json { encodeDefaults = true }
 

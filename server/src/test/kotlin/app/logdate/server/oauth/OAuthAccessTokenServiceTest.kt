@@ -10,6 +10,19 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
+/**
+ * Tests for [OAuthAccessTokenService], covering the generation and cryptographic
+ * validation of OAuth 2.0 access tokens.
+ *
+ * This suite focuses on the security and integrity of the server's JWT-based access
+ * tokens by:
+ * - Validating the successful issuance of tokens with correct claims (subject,
+ *   audience, issuer, and client ID).
+ * - Verifying the inclusion of DPoP key thumbprints (jkt) for proof-of-possession.
+ * - Testing the robustness of token validation against common failure modes:
+ *   expiration, tampered payloads, signature mismatches, and incorrect audience/issuer.
+ * - Ensuring the correctness of token data models and their associated serializers.
+ */
 class OAuthAccessTokenServiceTest {
     @Test
     fun `issued access tokens validate against the configured issuer resource and key`() {

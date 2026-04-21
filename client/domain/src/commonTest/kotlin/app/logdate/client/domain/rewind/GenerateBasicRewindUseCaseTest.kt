@@ -61,6 +61,14 @@ import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [GenerateBasicRewindUseCase].
+ *
+ * Verifies the logic for generating a "Rewind" (narrative summary) for a
+ * specific time period, including content filtering, error handling for
+ * empty periods, and integration with various data sources like notes,
+ * media, and location history.
+ */
 class GenerateBasicRewindUseCaseTest {
     @Test
     fun `returns NoContent when media flow never emits and notes are empty`() =

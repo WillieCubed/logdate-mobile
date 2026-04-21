@@ -14,6 +14,14 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/**
+ * UI tests for the Wear OS Home Screen.
+ *
+ * This class verifies the layout and interactivity of the primary landing screen on Wear.
+ * It ensures that the greeting and all capture entry points (Mood, Quick Text, Timeline,
+ * and Settings) are correctly rendered and that their respective navigation callbacks
+ * are triggered when interacted with by the user.
+ */
 @RunWith(AndroidJUnit4::class)
 class WearHomeScreenTest {
     @get:Rule

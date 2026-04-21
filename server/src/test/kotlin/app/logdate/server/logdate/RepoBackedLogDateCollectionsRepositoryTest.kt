@@ -22,6 +22,15 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for the repository implementation backed by ATProto repositories.
+ *
+ * This suite verifies that user data (entries, journals, and associations) are
+ * correctly persisted as canonical records within a block-stored repository. It
+ * ensures that the implementation maintains synchronization capabilities, such as
+ * change feeds and tombstone management, while leveraging the ATProto repository
+ * model for data integrity and identity linkage.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class RepoBackedLogDateCollectionsRepositoryTest {
     @Test

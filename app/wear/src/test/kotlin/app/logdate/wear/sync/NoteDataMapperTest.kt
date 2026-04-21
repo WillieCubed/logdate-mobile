@@ -12,6 +12,15 @@ import kotlin.test.assertNull
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [NoteDataMapper], which handles the bidirectional transformation of journal notes
+ * for the Wear Data Layer.
+ *
+ * This suite ensures that all note types (Text, Audio, Image, Video) and their associated
+ * metadata—including complex objects like location and coordinates—can be losslessly
+ * serialized into a format suitable for cross-device synchronization and correctly
+ * reconstructed on the receiving end.
+ */
 class NoteDataMapperTest {
     private val mapper = NoteDataMapper()
 

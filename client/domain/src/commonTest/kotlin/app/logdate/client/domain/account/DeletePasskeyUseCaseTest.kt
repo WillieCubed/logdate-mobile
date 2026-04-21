@@ -8,6 +8,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [DeletePasskeyUseCase].
+ *
+ * Verifies that the use case correctly handles the deletion of a passkey credential,
+ * including mapping successful repository responses and error conditions.
+ */
 class DeletePasskeyUseCaseTest {
     @Test
     fun `invoke returns Success when repository deletion succeeds`() =

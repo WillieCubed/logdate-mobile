@@ -22,6 +22,14 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [GetMemoryRecallUseCase].
+ *
+ * Ensures that memory recall surfaces the most relevant past entries based
+ * on anniversary windows ("On This Day") or notable historical data
+ * ("Rediscover"), while respecting content type filters and AI-assisted
+ * suggestion precedence.
+ */
 class GetMemoryRecallUseCaseTest {
     private lateinit var notesRepository: FakeJournalNotesRepository
     private lateinit var useCase: GetMemoryRecallUseCase

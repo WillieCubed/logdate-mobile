@@ -30,6 +30,12 @@ import kotlin.test.assertIs
 import kotlin.time.Clock
 import kotlin.time.Instant
 
+/**
+ * Unit tests for [AppViewModel].
+ *
+ * Tests global application state management, including session restoration,
+ * network availability monitoring, and onboarding state initialization.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModelTest {
     private val testDispatcher = StandardTestDispatcher()

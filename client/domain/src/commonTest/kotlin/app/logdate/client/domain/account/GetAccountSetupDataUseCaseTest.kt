@@ -9,6 +9,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
+/**
+ * Tests the lifecycle management of temporary account setup data via [GetAccountSetupDataUseCase].
+ *
+ * Ensures that user-provided information during the onboarding or account creation flow
+ * (such as username and display name) is correctly persisted in temporary storage,
+ * retrievable across sessions, and can be cleared upon completion or cancellation.
+ */
 class GetAccountSetupDataUseCaseTest {
     @Test
     fun `should return empty data when no setup data exists`() =

@@ -14,6 +14,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 
+/**
+ * Verifies the routing and endpoint availability for passkey-related operations.
+ *
+ * These tests ensure that passkey registration and authentication endpoints are correctly
+ * mapped and respond with appropriate status codes (like 404 for unimplemented routes)
+ * when the server is in various configuration states. It also includes basic checks for
+ * server health and root API accessibility.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class PasskeyRoutesTest {
     @Test

@@ -11,6 +11,14 @@ import kotlin.test.fail
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
+/**
+ * End-to-end encryption tests for cloud media storage.
+ *
+ * Verifies that media files are correctly encrypted before being uploaded to
+ * the cloud and successfully decrypted after being downloaded, ensuring data
+ * privacy. It also checks that tampering with encrypted data leads to
+ * decryption failure.
+ */
 class CloudMediaE2EEncryptionTest {
     @Test
     fun `media upload encrypts and download decrypts`() =
@@ -64,6 +72,9 @@ class CloudMediaE2EEncryptionTest {
         }
 }
 
+/**
+ * A [CloudApiClient] that records media uploads and provides them for download verification.
+ */
 private class RecordingCloudApiClient : FakeCloudApiClient() {
     var lastUpload: MediaUploadRequest? = null
         private set
@@ -104,6 +115,9 @@ private class RecordingCloudApiClient : FakeCloudApiClient() {
         )
     }
 
+    /**
+     * Tampers with the stored encrypted data to simulate data corruption or unauthorized modification.
+     */
     fun tamperStoredData() {
         if (storedData.isNotEmpty()) {
             storedData[storedData.lastIndex] = (storedData.last().toInt() xor 0xFF).toByte()

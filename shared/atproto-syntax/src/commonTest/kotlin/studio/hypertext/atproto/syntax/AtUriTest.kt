@@ -7,6 +7,13 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Validates the resolution and normalization of AT Protocol URIs (`at://`).
+ *
+ * This test suite covers component normalization (authority and collection),
+ * correctly splitting optional segments like record keys, and rejecting
+ * non-compliant URI structures like trailing slashes or query parameters.
+ */
 class AtUriTest {
     @Test
     fun normalizesHandleAuthorityAndCollection() {

@@ -22,6 +22,15 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Validates the management of decentralized account identities within [DefaultAccountIdentityRepository].
+ *
+ * This suite exercises the cryptographic lifecycle of user identities, including:
+ * - Session-aware identity status retrieval
+ * - Secure export and import of signing keys using passphrase-based encryption
+ * - Client-side derivation and registration of PLC (Placeholder) recovery keys
+ * - Verification of signed operation payloads for identity recovery
+ */
 class DefaultAccountIdentityRepositoryTest {
     private val json = Json { prettyPrint = true }
 

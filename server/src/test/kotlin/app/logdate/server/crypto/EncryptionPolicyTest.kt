@@ -5,6 +5,17 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [EncryptionPolicy], which defines the server's high-level strategy
+ * for handling incoming data security.
+ *
+ * These tests validate the decision engine that determines whether to accept,
+ * reject, or re-encrypt data based on:
+ * - The configured [EncryptionMode] (e.g., `AT_REST_ONLY` vs `E2EE_REQUIRED`).
+ * - The type of incoming data (plaintext, client-side ciphertext, or server-side ciphertext).
+ * - Administrative flags such as whether server-side encryption is globally enabled
+ *   or if client-side passthrough is permitted.
+ */
 class EncryptionPolicyTest {
     @Test
     fun `AT_REST_ONLY accepts plaintext and encrypts`() {

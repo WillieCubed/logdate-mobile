@@ -8,6 +8,13 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [SyntheticCid], validating the deterministic generation of Content
+ * Identifiers for repository records.
+ *
+ * It ensures that the underlying encoding (varint, base32) is correct and that
+ * the resulting CIDs are stable for identical inputs.
+ */
 class SyntheticCidTest {
     @Test
     fun `synthetic cid helpers handle varint and base32 edge cases`() {

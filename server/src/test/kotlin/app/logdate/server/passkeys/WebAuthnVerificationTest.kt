@@ -15,6 +15,13 @@ import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Focuses on the verification logic and protocol requirements of WebAuthn.
+ *
+ * These tests ensure that the passkey service correctly enforces protocol constraints
+ * such as challenge uniqueness, challenge format, and the mandatory presence of
+ * required fields in registration and authentication responses.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class WebAuthnVerificationTest {
     private lateinit var passkeyService: SimplePasskeyService

@@ -3,6 +3,14 @@ package studio.hypertext.atproto.identity
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * JVM-specific coverage tests for [AtprotoDid] to ensure compatibility with platform
+ * reflection and interop requirements.
+ *
+ * This test specifically verifies that the underlying value of the DID is accessible
+ * through standard Java-style getters, which is essential for certain serialization
+ * and dependency injection frameworks on the JVM.
+ */
 class AtprotoDidJvmCoverageTest {
     @Test
     fun `boxed atproto did exposes backing value getter on jvm`() {

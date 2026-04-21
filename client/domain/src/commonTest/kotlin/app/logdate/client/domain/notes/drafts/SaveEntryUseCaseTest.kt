@@ -37,6 +37,14 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [SaveEntryUseCase].
+ *
+ * Verifies the process of promoting an [EntryDraft] to permanent journal entries.
+ * These tests ensure that all notes within a draft are correctly passed to the
+ * [AddNoteUseCase] and that the transition handles various draft sizes and potential
+ * downstream errors gracefully.
+ */
 class SaveEntryUseCaseTest {
     private lateinit var mockDraftRepository: MockEntryDraftRepository
     private lateinit var notesRepository: RecordingJournalNotesRepository

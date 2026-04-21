@@ -4,6 +4,13 @@ import app.logdate.feature.core.settings.ui.watch.WatchConnectionState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Tests the logic for resolving the unified watch connection state.
+ *
+ * This class verifies how disparate signals—such as system-level device association,
+ * Bluetooth connectivity, and app installation status—are mapped into a single,
+ * high-level state used to drive the wearable settings and status UI.
+ */
 class WatchConnectionStateResolverTest {
     @Test
     fun `connected associated watch resolves to connected`() {

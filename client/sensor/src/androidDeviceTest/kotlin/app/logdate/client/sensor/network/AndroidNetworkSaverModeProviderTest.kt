@@ -10,6 +10,14 @@ import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertNotNull
 
+/**
+ * Instrumentation tests for [AndroidNetworkSaverModeProvider] ensuring accurate
+ * reporting of network status and data saver preferences on Android.
+ *
+ * These tests exercise the provider's ability to interface with the system Connectivity
+ * Manager to detect active network types (Wi-Fi, Cellular, etc.) and respect user-defined
+ * data restriction settings.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AndroidNetworkSaverModeProviderTest {
     private lateinit var context: Context

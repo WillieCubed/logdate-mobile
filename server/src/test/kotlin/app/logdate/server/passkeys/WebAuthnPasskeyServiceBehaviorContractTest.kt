@@ -36,6 +36,14 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Behavioral contract tests for the [WebAuthnPasskeyService].
+ *
+ * This exhaustive test suite validates the internal state transitions and error
+ * handling of the WebAuthn service. It covers edge cases in both simplified and
+ * strict modes, including repository failures, malformed payloads, and detailed
+ * WebAuthn structure validation using mocked components.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class WebAuthnPasskeyServiceBehaviorContractTest {
     @Test

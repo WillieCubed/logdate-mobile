@@ -9,6 +9,14 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
+/**
+ * Tests for [AndroidPhoneAudioStreamOpener], facilitating the retrieval of audio content
+ * from the phone's local storage for synchronization.
+ *
+ * The test suite validates the resolution of local file paths into readable byte streams,
+ * ensuring that the synchronization engine can reliably access recorded media assets
+ * before they are transmitted to the server or shared with other devices.
+ */
 class AndroidPhoneAudioStreamOpenerTest {
 
     private val opener = AndroidPhoneAudioStreamOpener(mockk<ContentResolver>(relaxed = true))

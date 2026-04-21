@@ -25,6 +25,14 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
 
+/**
+ * Comprehensive coverage tests for the repository engine and its underlying codecs.
+ *
+ * This test suite exercises the core components of the AT Protocol repository implementation,
+ * including CID encoding/decoding, DAG-CBOR and CAR codecs, Merkle Search Tree (MST)
+ * operations, and the high-level [DefaultRepoEngine] logic for record management and
+ * repository exports.
+ */
 class RepoEngineCoverageTest {
     private val repo = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
     private val collection = Nsid.require("studio.hypertext.logdate.entry")
@@ -443,6 +451,9 @@ class RepoEngineCoverageTest {
         return outcome!!.getOrThrow()
     }
 
+    /**
+     * A clock implementation that always returns a fixed point in time for deterministic testing.
+     */
     private class FixedClock(
         private val instant: Instant,
     ) : Clock {

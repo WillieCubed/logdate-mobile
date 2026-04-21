@@ -26,6 +26,14 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Integration tests for ATProto identity-related well-known routes.
+ *
+ * This suite verifies the correctness of the `/.well-known/atproto-did` and
+ * `/.well-known/did.json` endpoints. It ensures that the server correctly resolves
+ * its own DID document and provides appropriate error responses for unknown hosts
+ * or missing identity records.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class IdentityRouteCoverageTest {
     private val json = Json { ignoreUnknownKeys = true }

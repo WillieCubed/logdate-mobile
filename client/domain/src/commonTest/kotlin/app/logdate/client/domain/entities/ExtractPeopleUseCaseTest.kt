@@ -6,6 +6,14 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Verifies the behavior of [ExtractPeopleUseCase] in identifying and extracting person
+ * entities from unstructured text.
+ *
+ * These tests ensure that the use case correctly delegates to the underlying AI extraction
+ * engine, handles empty or whitespace-only inputs, and properly propagates successfully
+ * extracted [Person] lists or extraction failures.
+ */
 class ExtractPeopleUseCaseTest {
     @Test
     fun `invoke should delegate to PeopleExtractor`() =

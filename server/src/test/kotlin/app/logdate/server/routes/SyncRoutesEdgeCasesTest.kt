@@ -31,6 +31,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Comprehensive integration tests for edge cases and error conditions across the Sync API.
+ *
+ * This suite exercises less common paths and failure modes, such as metric retrieval via
+ * Prometheus, handling of missing resources, batch deletion of associations, and error
+ * recovery for media and backup operations when storage is unavailable or decryption fails.
+ */
 class SyncRoutesEdgeCasesTest {
     @Test
     fun `prometheus and by-id endpoints return expected results and validation errors`() =

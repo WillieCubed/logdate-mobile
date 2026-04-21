@@ -23,6 +23,13 @@ import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 import org.koin.dsl.module
 
+/**
+ * Instrumented E2E tests verifying UI state preservation during activity recreation.
+ *
+ * This suite ensures that the [MainActivity] correctly saves and restores its
+ * navigation and input state—specifically within the entry editor—when the
+ * system triggers an activity restart (e.g., due to a configuration change).
+ */
 @RunWith(AndroidJUnit4::class)
 class MainActivityRecreationE2ETest {
     private val koinRule = OnboardingKoinModuleOverrideRule(module {})

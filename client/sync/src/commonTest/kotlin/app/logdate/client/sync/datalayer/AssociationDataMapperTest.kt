@@ -7,6 +7,13 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [AssociationDataMapper].
+ *
+ * Validates the mapping of associations between journals and content for sync
+ * over the Wear OS Data Layer, including composite key generation and deletion
+ * path handling.
+ */
 class AssociationDataMapperTest {
     private val mapper = AssociationDataMapper()
 

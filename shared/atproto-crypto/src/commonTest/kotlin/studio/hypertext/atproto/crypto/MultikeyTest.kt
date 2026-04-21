@@ -5,6 +5,13 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * Tests the [Multikey] utility for encoding and decoding AT Protocol multikey strings.
+ *
+ * These tests verify the correct application of multicodec prefixes and base58btc multibase
+ * encoding for various elliptic curve public keys, including P-256 and K-256 (secp256k1).
+ * It also ensures robust error handling for invalid key lengths and malformed input strings.
+ */
 class MultikeyTest {
     @Test
     fun `encodeP256PublicKey produces base58btc multibase value`() {

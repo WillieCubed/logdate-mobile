@@ -35,6 +35,17 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for the Wear OS audio capture engine and recording view model.
+ *
+ * This suite provides comprehensive coverage of the [AudioRecordingViewModel],
+ * validating the full recording lifecycle:
+ * - Pre-recording safety checks, such as verifying available storage space.
+ * - Core recording operations including start, pause, resume, stop, and cancel.
+ * - Real-time audio level collection and duration tracking.
+ * - Persistence of captured audio as journal notes, including health data annotations.
+ * - Robust error handling for hardware failures or insufficient resources.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AudioRecordingViewModelTest {
     private val testDispatcher = StandardTestDispatcher()

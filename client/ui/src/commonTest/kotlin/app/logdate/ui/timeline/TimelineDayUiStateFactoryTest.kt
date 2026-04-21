@@ -11,6 +11,15 @@ import kotlin.test.assertNull
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests the [createTimelineDayUiState] factory function to ensure it selects the most
+ * appropriate layout for a day's timeline card.
+ *
+ * This suite verifies that the factory correctly prioritizes different media types—such
+ * as favoring "Media Led" layouts when photos are present or "Voice Led" layouts when
+ * audio is the primary signal—to create a visually rich and contextually relevant
+ * summary of the user's day.
+ */
 class TimelineDayUiStateFactoryTest {
     @Test
     fun `createTimelineDayUiState chooses media led layout when visual media is present`() {

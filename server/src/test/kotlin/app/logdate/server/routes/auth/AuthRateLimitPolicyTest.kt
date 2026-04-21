@@ -15,6 +15,14 @@ import io.ktor.server.testing.testApplication
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Integration tests for authentication rate-limiting policies.
+ *
+ * This class verifies that the server correctly identifies and throttles excessive
+ * authentication attempts across various signup and sign-in routes (Google and Passkeys).
+ * It ensures that the `TooManyRequests` status is returned once the configured
+ * thresholds for repeated attempts are exceeded.
+ */
 class AuthRateLimitPolicyTest {
     @Test
     fun `authentication handlers enforce rate limits for repeated failed attempts`() =

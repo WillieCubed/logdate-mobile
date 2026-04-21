@@ -34,6 +34,17 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Comprehensive business logic tests for the Wear OS Timeline experience.
+ *
+ * This suite validates the [WearTimelineViewModel], covering the end-to-end lifecycle
+ * of journal note presentation on Wear. Key responsibilities tested include:
+ * - Grouping and sorting notes into a chronological day-based hierarchy.
+ * - Extracting and summarizing mood data and preview text for the timeline list.
+ * - Managing audio playback state, including coordination with [AudioPlaybackManager]
+ *   and monitoring for suitable audio output (speakers/Bluetooth).
+ * - Handling synchronized audio resolution and triggering phone-side sync requests.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WearTimelineViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()

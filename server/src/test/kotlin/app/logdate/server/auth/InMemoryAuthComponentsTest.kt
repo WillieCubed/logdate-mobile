@@ -12,6 +12,13 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Tests the in-memory implementations of core authentication and account repositories.
+ *
+ * This class ensures that the volatile storage components used for testing and
+ * development correctly maintain account state, identity links, and temporary
+ * sessions according to the defined service interfaces.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class InMemoryAuthComponentsTest {
     @Test

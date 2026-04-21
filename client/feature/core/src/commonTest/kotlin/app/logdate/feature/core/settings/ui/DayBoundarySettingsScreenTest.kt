@@ -7,6 +7,13 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * Tests the visibility and behavior of the sleep-based day boundary settings UI.
+ *
+ * This suite ensures that the sleep-based toggle is only exposed when the underlying
+ * Health Connect "gate" is in a ready state, correctly hiding it during checks or
+ * when requirements (like permissions) are missing.
+ */
 class DayBoundarySettingsScreenTest {
     @Test
     fun `ready gate shows the real toggle`() {

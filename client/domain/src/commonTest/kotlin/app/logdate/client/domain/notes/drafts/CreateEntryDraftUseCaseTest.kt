@@ -12,6 +12,13 @@ import kotlin.test.assertEquals
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [CreateEntryDraftUseCase].
+ *
+ * Validates the creation of new entry drafts, ensuring that provided notes are
+ * correctly persisted via the [EntryDraftRepository] and that the newly generated
+ * draft ID is returned to the caller.
+ */
 class CreateEntryDraftUseCaseTest {
     private lateinit var mockRepository: MockEntryDraftRepository
     private lateinit var useCase: CreateEntryDraftUseCase

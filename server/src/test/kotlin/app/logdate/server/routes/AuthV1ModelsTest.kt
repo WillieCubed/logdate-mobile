@@ -20,6 +20,13 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Tests the serialization and integrity of Data Transfer Objects (DTOs) for the V1 Auth API.
+ *
+ * This suite ensures that all models used for passkey-based signup, sign-in, account views,
+ * and authentication metrics correctly serialize to and from JSON. It also validates the
+ * behavior of default constructors and property accessors for these models.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class AuthV1ModelsTest {
     private val json = Json { ignoreUnknownKeys = true }

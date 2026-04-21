@@ -7,6 +7,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * Tests the [DidPlcResolver] implementation for resolving AT Protocol "did:plc"
+ * identifiers.
+ *
+ * This suite covers the interaction with the PLC (Placeholder) directory, validating
+ * URL construction, successful document retrieval, and the handling of various error
+ * conditions such as network failures, malformed JSON, or mismatches between the
+ * requested DID and the returned document.
+ */
 class DidPlcResolverTest {
     @Test
     fun buildsPlcDirectoryUrl() {

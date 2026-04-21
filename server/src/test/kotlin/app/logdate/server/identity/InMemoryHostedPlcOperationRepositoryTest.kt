@@ -5,6 +5,15 @@ import kotlin.test.assertEquals
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [InMemoryHostedPlcOperationRepository], providing a lightweight
+ * implementation for tracking AT Protocol PLC operations during testing or
+ * for small deployments.
+ *
+ * This suite validates the basic persistence and retrieval operations for
+ * signed PLC operations, specifically ensuring that operations can be accurately
+ * listed and filtered by both the internal account ID and the public AT Protocol DID.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class InMemoryHostedPlcOperationRepositoryTest {
     @Test

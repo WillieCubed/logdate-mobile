@@ -14,6 +14,13 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [GetAllDraftsUseCase].
+ *
+ * Verifies the retrieval of all currently stored entry drafts, ensuring the flow
+ * correctly propagates the list of drafts from the repository while maintaining
+ * their original order.
+ */
 class GetAllDraftsUseCaseTest {
     private lateinit var mockRepository: MockEntryDraftRepository
     private lateinit var useCase: GetAllDraftsUseCase

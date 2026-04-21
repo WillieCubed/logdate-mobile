@@ -10,6 +10,15 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
+/**
+ * Validates the [DefaultDataUsagePolicy] logic for determining network usage restrictions.
+ *
+ * These tests ensure that the application correctly transitions between unrestricted,
+ * conservative, and restricted data modes based on the combination of network type
+ * (Wi-Fi, Cellular, etc.) and the system's data saver state. It also verifies the
+ * behavior of extension functions that control specific features like media sync and
+ * AI calls.
+ */
 class DefaultDataUsagePolicyTest {
     private val networkSaverProvider = ConfigurableNetworkSaverModeProvider()
     private val policy = DefaultDataUsagePolicy(networkSaverProvider)

@@ -5,6 +5,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Unit tests for [SyncBackoff].
+ *
+ * Verifies the exponential backoff strategy used for sync retries, ensuring
+ * that the delay ladder matches the documented schedule and that jitter is
+ * correctly applied to prevent thundering herd problems.
+ */
 class SyncBackoffTest {
     @Test
     fun `base ladder matches the documented schedule`() {

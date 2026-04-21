@@ -198,6 +198,13 @@ private fun createFailingGetExportCountsUseCase(): GetExportCountsUseCase {
     return GetExportCountsUseCase(journalRepo, failingNotesRepo)
 }
 
+/**
+ * Unit tests for [UserDataExportViewModel].
+ *
+ * Verifies the user data export process, including configuration of export
+ * options, estimation of data counts, progress reporting, and completion
+ * handling.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class UserDataExportViewModelTest {
     private val testDispatcher = StandardTestDispatcher()

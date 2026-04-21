@@ -21,6 +21,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Instant
 
+/**
+ * Unit tests for [CaptureLocationForTimelineReviewUseCase].
+ *
+ * Verifies that location capture for timeline reviews correctly respects
+ * user privacy settings and only triggers data recording when the
+ * appropriate tracking options are enabled.
+ */
 class CaptureLocationForTimelineReviewUseCaseTest {
     @Test
     fun `invoke skips location capture when timeline review tracking is disabled`() =

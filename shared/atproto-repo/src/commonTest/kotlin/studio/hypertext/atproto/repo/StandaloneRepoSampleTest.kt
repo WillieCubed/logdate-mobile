@@ -13,6 +13,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
+/**
+ * End-to-end integration tests and usage samples for the AT Protocol repository engine.
+ *
+ * These tests demonstrate and verify the complete lifecycle of a repository, including
+ * record creation, full repository export, importing into a fresh engine instance, and
+ * subsequent verification of restored records, heads, and commit history.
+ */
 class StandaloneRepoSampleTest {
     @Test
     fun `standalone consumer can create export import and read a repo`() =

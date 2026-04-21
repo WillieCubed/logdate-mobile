@@ -6,6 +6,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * Validates the base32-sortable `Tid` (Timestamp Identifier) class.
+ *
+ * This test suite ensures that TIDs follow the AT Protocol format (13 base32
+ * characters), correctly handles conversion to and from 64-bit integer values,
+ * and maintains lexicographical ordering and JSON serialization.
+ */
 class TidTest {
     @Test
     fun acceptsValidTid() {

@@ -21,6 +21,13 @@ import org.junit.runner.RunWith
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
+/**
+ * Instrumented E2E tests for the [ShareReceiver] component.
+ *
+ * This suite validates the application's ability to handle custom broadcast intents
+ * for sharing operations, such as copying deep links to the system clipboard and
+ * launching the system share sheet with generated QR code assets.
+ */
 @RunWith(AndroidJUnit4::class)
 class ShareReceiverE2ETest {
     private lateinit var context: Context

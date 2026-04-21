@@ -6,6 +6,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
+/**
+ * Unit tests for the in-memory ATProto blob metadata repository.
+ *
+ * This class verifies the basic storage and retrieval operations for ATProto blob
+ * records, ensuring that blobs are correctly scoped to individual users and can
+ * be looked up by their content identifiers (CID).
+ */
 class InMemoryLogDateAtprotoBlobRepositoryTest {
     @Test
     fun `atproto blob repository stores and fetches user scoped blobs`() {

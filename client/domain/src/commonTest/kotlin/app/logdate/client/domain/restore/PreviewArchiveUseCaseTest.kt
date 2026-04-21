@@ -6,6 +6,13 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * Tests the archive preview functionality provided by [PreviewArchiveUseCase].
+ *
+ * Verifies that the use case can correctly parse export metadata JSON and transform it into
+ * a user-friendly [ExportArchivePreview], including account statistics, app version
+ * compatibility, and flags for optional content like drafts and media.
+ */
 class PreviewArchiveUseCaseTest {
     private val useCase = PreviewArchiveUseCase()
 

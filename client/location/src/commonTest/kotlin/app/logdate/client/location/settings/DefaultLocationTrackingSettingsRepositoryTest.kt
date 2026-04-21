@@ -13,6 +13,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [DefaultLocationTrackingSettingsRepository], which manages the user's
+ * configuration for background location tracking and data capture.
+ *
+ * These tests verify that settings are correctly persisted, that invalid values
+ * are safely clamped to defaults, and that legacy configuration values are
+ * correctly migrated to the current schema.
+ */
 class DefaultLocationTrackingSettingsRepositoryTest {
     @Test
     fun `getSettings clamps interval and falls back on unknown capture mode`() =

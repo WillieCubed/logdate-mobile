@@ -18,6 +18,19 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
+/**
+ * Tests for [OAuthAuthorizationService], the primary entry point for the server's
+ * OAuth 2.0 and DPoP-enabled authorization flows.
+ *
+ * This comprehensive test suite exercises the end-to-end authorization lifecycle
+ * required for AT Protocol clients, specifically:
+ * - Pushed Authorization Requests (PAR) for secure, pre-authenticated request parameters.
+ * - The transition from authorization codes to access and refresh tokens.
+ * - Cryptographic binding of tokens to client keys via DPoP (Demonstrating Proof-of-Possession).
+ * - Refresh token rotation and secure revocation.
+ * - Strict validation of request integrity, login hints, and authorization expiry.
+ * - Proper handling of confidential client authentication throughout the entire flow.
+ */
 class OAuthAuthorizationServiceTest {
     @Test
     fun `authorization service completes pushed auth code refresh and revoke flow`() =

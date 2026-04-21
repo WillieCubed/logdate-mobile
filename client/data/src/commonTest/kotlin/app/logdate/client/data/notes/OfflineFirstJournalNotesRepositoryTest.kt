@@ -52,7 +52,6 @@ import kotlin.uuid.Uuid
  * - Creating and removing different types of notes
  * - Associating notes with journals and removing those associations
  */
-
 class OfflineFirstJournalNotesRepositoryTest {
     private lateinit var textNoteDao: FakeTextNoteDao
     private lateinit var imageNoteDao: FakeImageNoteDao

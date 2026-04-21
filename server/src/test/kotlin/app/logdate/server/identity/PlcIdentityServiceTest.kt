@@ -20,6 +20,19 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [PlcIdentityService], the specialized component for managing
+ * identities using the `did:plc` (Placeholder Library Client) method.
+ *
+ * This suite focuses on the complex state transitions and external directory
+ * interactions required for PLC-based identities:
+ * - Provisioning of signed PLC operations for new account creation.
+ * - Integration with the PLC directory for publishing and auditing identity logs.
+ * - Secure management of the PLC operation chain, including CID-based sequence tracking.
+ * - Identity lifecycle events: rotation of signing keys and updating of recovery keys.
+ * - Implementation of the recovery flow, allowing an identity to be reclaimed or
+ *   migrated using a registered recovery key.
+ */
 @OptIn(ExperimentalUuidApi::class, ExperimentalEncodingApi::class)
 class PlcIdentityServiceTest {
     @Test

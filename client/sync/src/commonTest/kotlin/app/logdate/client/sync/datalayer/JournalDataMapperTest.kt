@@ -10,6 +10,12 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [JournalDataMapper].
+ *
+ * Verifies the serialization of journal metadata for Wear OS Data Layer sync,
+ * including support for favorited status, Unicode content, and sync versions.
+ */
 class JournalDataMapperTest {
     private val mapper = JournalDataMapper()
 

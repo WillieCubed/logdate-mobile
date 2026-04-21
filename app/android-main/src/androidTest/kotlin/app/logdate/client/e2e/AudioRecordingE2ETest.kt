@@ -53,6 +53,15 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
+/**
+ * Instrumented tests for the audio recording experience within the editor.
+ *
+ * This suite verifies the end-to-end flow of starting, finishing, and
+ * persisting an audio recording block, ensuring that the recorded duration
+ * is correctly displayed in the editor after capture completes. It uses a
+ * [FakeAudioRecordingManager] to simulate recording events without requiring
+ * real hardware.
+ */
 @RunWith(AndroidJUnit4::class)
 class AudioRecordingE2ETest {
 

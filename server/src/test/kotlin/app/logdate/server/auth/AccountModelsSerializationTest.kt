@@ -8,6 +8,13 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Verifies the JSON serialization and deserialization of authentication models.
+ *
+ * This suite ensures that core domain models such as [Account], [DeviceInfo],
+ * and [TemporarySession] can be correctly persisted and transmitted over the
+ * network using Kotlinx Serialization, maintaining type safety and data integrity.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class AccountModelsSerializationTest {
     private val json = Json { ignoreUnknownKeys = true }

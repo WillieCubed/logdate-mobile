@@ -16,9 +16,11 @@ import kotlin.uuid.Uuid
 /**
  * Instrumented tests verifying the Data Layer sync pipeline on a real Wear OS device/emulator.
  *
- * These tests exercise the serialization, path generation, and data integrity aspects
- * of the sync flow without requiring an actual paired phone. The transport layer
- * (DataClient) is not tested here — those require a real device pair.
+ * This suite exercises the [NoteDataMapper] and the underlying Data Layer serialization
+ * logic within the actual Android runtime environment. It ensures that complex journal
+ * notes—including those with audio metadata and location coordinates—correctly survive
+ * round-trip serialization. It also validates the path generation logic used for
+ * cross-device communication between the watch and phone.
  */
 @RunWith(AndroidJUnit4::class)
 class WearSyncE2ETest {

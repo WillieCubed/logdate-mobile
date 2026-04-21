@@ -11,6 +11,15 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
+/**
+ * Coverage-focused unit tests for the XRPC client abstractions.
+ *
+ * This test suite exercises the [XrpcClient] interface, [XrpcRequestBuilder], and associated
+ * extension functions using a simulated transport layer. It ensures that:
+ * - Both raw and typed query and procedure calls correctly marshal data.
+ * - Request configuration (headers, parameters, authentication) is accurately captured.
+ * - XRPC-specific exception types provide stable and informative error messages.
+ */
 class XrpcClientCoverageTest {
     @OptIn(ExperimentalSerializationApi::class)
     @Test

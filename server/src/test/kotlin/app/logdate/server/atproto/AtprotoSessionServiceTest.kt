@@ -14,6 +14,14 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 
+/**
+ * Tests AT Protocol session management and account provisioning.
+ *
+ * Verifies the lifecycle of user sessions within the PDS, including account creation with
+ * password provisioning, session authentication (login), token refreshing, and session
+ * revocation. It ensures that hosted identities are correctly managed and JWT tokens
+ * are issued according to the protocol.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class AtprotoSessionServiceTest {
     @Test

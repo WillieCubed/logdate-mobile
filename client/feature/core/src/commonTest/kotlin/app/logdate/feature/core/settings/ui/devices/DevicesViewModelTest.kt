@@ -30,6 +30,13 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [DevicesViewModel].
+ *
+ * Validates the device management interface, ensuring that associated devices
+ * can be listed, renamed, or removed, and that the current device's identity
+ * is correctly handled.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class DevicesViewModelTest {
     private lateinit var deviceIdProvider: FakeDeviceIdProvider

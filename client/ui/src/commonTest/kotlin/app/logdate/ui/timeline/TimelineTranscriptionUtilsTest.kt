@@ -8,6 +8,14 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests utility functions designed to optimize the display and loading of timeline
+ * content.
+ *
+ * This suite validates the logic for generating concise transcript excerpts for
+ * UI previews and the strategy for pre-loading audio note IDs based on the user's
+ * current scroll position in the timeline.
+ */
 class TimelineTranscriptionUtilsTest {
     @Test
     fun `buildTranscriptExcerpt returns first sentence when it stands on its own`() {

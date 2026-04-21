@@ -8,6 +8,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * JVM-based validation and synchronization tests for official AT Protocol Lexicons.
+ *
+ * This test suite verifies that the project's handling of core AT Protocol Lexicons
+ * (such as `com.atproto.identity` and `com.atproto.repo`) is accurate. It performs
+ * full-schema validation and ensures that the generated client/server boilerplate
+ * matches the latest official definitions provided in the resource folder.
+ */
 class OfficialAtprotoLexiconJvmTest {
     @Test
     fun `official atproto lexicon documents validate and generated sources stay in sync`() {

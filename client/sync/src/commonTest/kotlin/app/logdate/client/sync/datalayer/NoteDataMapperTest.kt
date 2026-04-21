@@ -15,6 +15,13 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [NoteDataMapper].
+ *
+ * Ensures that different types of journal notes (text, audio, image, video) are
+ * correctly mapped to and from the Wear OS Data Layer, preserving metadata
+ * like locations and sync versions.
+ */
 class NoteDataMapperTest {
     private val mapper = NoteDataMapper()
 

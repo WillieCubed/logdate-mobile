@@ -57,6 +57,13 @@ import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [GetRewindUseCase].
+ *
+ * Tests the retrieval and state management of rewinds for arbitrary time
+ * periods, including handling of in-progress generations, missing data,
+ * and future-dated requests.
+ */
 class GetRewindUseCaseTest {
     private lateinit var rewindRepository: FakeRewindRepository
     private lateinit var generationManager: FakeRewindGenerationManager

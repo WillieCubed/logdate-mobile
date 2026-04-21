@@ -8,6 +8,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Basic smoke test for the LogDate server application.
+ *
+ * This test ensures that the server can start up correctly using the Ktor test engine
+ * and that the root endpoint is accessible and returning the expected branding information.
+ * It serves as a minimal verification of the server's routing and module initialization.
+ */
 class SimpleTest {
     @Test
     fun testBasicServerSetup() =

@@ -30,6 +30,14 @@ import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [GetHomeRecommendationUseCase].
+ *
+ * Verifies the decision logic for surfaced recommendations on the home
+ * screen. This includes prioritizing active drafts over new entries,
+ * encouraging activity on empty days, and responding reactively to
+ * changes in the underlying data.
+ */
 class GetHomeRecommendationUseCaseTest {
     private lateinit var mockNotesRepository: MockJournalNotesRepository
     private lateinit var mockDraftRepository: MockEntryDraftRepository

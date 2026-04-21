@@ -25,6 +25,20 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Comprehensive integration tests for core PostgreSQL-backed identity and session repositories.
+ *
+ * This suite provides broad coverage for the primary authentication and account management
+ * components, including:
+ * - [PostgreSQLAccountRepository]: Full account lifecycle (creation, lookup, deactivation, deletion).
+ * - [PostgreSQLAccountIdentityRepository]: Management of external identity providers (e.g., Google)
+ *   and their linkage to internal accounts.
+ * - [PostgreSQLSigningKeyRepository]: Storage and revocation of account-level signing keys.
+ * - [PostgreSQLPasskeyRepository]: Robust WebAuthn credential management, including signature
+ *   counts and device metadata.
+ * - [PostgreSQLSessionManager]: Lifecycle of temporary sessions for account creation and
+ *   authentication flows, including automatic expiration and cleanup.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class PostgreSqlRepositoriesTest {
     @Test

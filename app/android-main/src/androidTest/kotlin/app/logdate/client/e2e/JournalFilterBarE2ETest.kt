@@ -24,6 +24,13 @@ import org.junit.runner.RunWith
  * Verifies that the layout toggle, sort dropdown, and filter chips respond
  * correctly to user taps and reflect updated state.
  */
+/**
+ * Instrumented UI tests for the [JournalFilterBar] component.
+ *
+ * These tests validate the interactive elements of the journal gallery header,
+ * ensuring that layout toggles, sort selection menus, and multi-select filter
+ * chips correctly update the UI state and trigger their respective callbacks.
+ */
 @RunWith(AndroidJUnit4::class)
 class JournalFilterBarE2ETest {
 

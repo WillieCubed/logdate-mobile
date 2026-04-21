@@ -12,6 +12,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Enforces structural and naming conventions for the project's screenshot testing suite.
+ *
+ * This test acts as a linter for the `screenshotTest` source set, ensuring that developers
+ * follow the established hierarchy (audit, common, components, flows) and use the
+ * required numbering/naming patterns for flow-based visual regressions.
+ */
 class ScreenshotOrganizationTest {
     private val repoRoot = locateRepoRoot(Paths.get(System.getProperty("user.dir")).toAbsolutePath())
     private val screenshotsDir =

@@ -37,6 +37,12 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [MediaDetailViewModel].
+ *
+ * Validates the detailed view of media items, including metadata extraction (EXIF),
+ * location resolution, and cross-referencing with associated journals.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MediaDetailViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()

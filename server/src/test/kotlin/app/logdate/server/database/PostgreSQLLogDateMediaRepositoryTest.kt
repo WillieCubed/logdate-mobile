@@ -10,6 +10,17 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Integration tests for [PostgreSQLLogDateMediaRepository] utilizing an H2 database.
+ *
+ * This suite validates the persistence and management of media records, specifically:
+ * - Idempotent upsert operations (creation and updates).
+ * - Media record retrieval by unique identifiers.
+ * - Graceful deletion (tombstoning) of media content.
+ *
+ * It ensures that media-specific metadata, such as encryption details and device associations,
+ * are correctly handled.
+ */
 class PostgreSQLLogDateMediaRepositoryTest {
     @Test
     fun `postgres media repository stores updates and tombstones media`() {

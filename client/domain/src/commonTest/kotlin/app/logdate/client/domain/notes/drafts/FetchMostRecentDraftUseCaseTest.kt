@@ -16,6 +16,12 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [FetchMostRecentDraftUseCase].
+ *
+ * Verifies the logic for identifying and retrieving the single draft with the most
+ * recent [EntryDraft.updatedAt] timestamp from the set of all available drafts.
+ */
 class FetchMostRecentDraftUseCaseTest {
     private lateinit var mockRepository: MockEntryDraftRepository
     private lateinit var useCase: FetchMostRecentDraftUseCase

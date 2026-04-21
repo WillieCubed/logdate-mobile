@@ -6,6 +6,13 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * Unit tests for computing location tracking execution decisions based on user settings.
+ *
+ * These tests verify that different [LocationCaptureMode] settings correctly trigger the
+ * appropriate start and stop actions for various tracking channels (e.g., scheduled,
+ * optimized background, and activity-aware tracking).
+ */
 class LocationTrackingExecutionDecisionTest {
     @Test
     fun `disabled background tracking stops everything`() {
@@ -60,6 +67,13 @@ class LocationTrackingExecutionDecisionTest {
     }
 }
 
+/**
+ * Unit tests for managing the foreground/background state of the application's UI.
+ *
+ * These tests ensure that the activity counter correctly transitions the application's
+ * perceived lifecycle state as activities are resumed and paused, handling multiple
+ * concurrent activities and preventing negative counter values.
+ */
 class ForegroundActivityCounterTest {
     @Test
     fun `first resume transitions to foreground`() {

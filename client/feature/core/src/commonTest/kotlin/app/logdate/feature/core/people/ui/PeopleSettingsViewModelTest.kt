@@ -42,6 +42,13 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [PeopleSettingsViewModel].
+ *
+ * This suite verifies the management of people-related settings, including
+ * contact import permissions, access modes (full vs selected), and integration
+ * with inferred people clusters.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PeopleSettingsViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()

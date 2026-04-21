@@ -16,6 +16,9 @@ class ConflictResolutionTest {
     private val journalResolver = JournalConflictResolver()
     private val noteResolver = JournalNoteConflictResolver()
 
+    /**
+     * A simple entity used to test conflict resolution logic.
+     */
     data class TestEntity(
         val id: String,
         val content: String,

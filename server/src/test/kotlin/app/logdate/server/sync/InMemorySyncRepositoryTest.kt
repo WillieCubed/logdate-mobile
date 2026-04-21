@@ -8,6 +8,13 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [InMemorySyncRepository], providing a lightweight validation of the
+ * sync repository's core logic without requiring a database.
+ *
+ * It ensures that the repository correctly handles user isolation, CRUD operations,
+ * pagination of change sets, and the management of tombstone markers for deletions.
+ */
 class InMemorySyncRepositoryTest {
     @Test
     fun `repository enforces user isolation and supports CRUD flows`() {

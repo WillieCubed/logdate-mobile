@@ -41,6 +41,18 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Verifies the behavior of [GenerateAmbientPromptCandidatesUseCase] in surfacing relevant
+ * journal prompts based on the user's current environment.
+ *
+ * These tests simulate various "ambient" triggers—such as scheduled morning/evening checks
+ * or periodic background evaluations—to ensure the use case correctly prioritizes and
+ * filters candidates like:
+ * - Rescue nudges for existing drafts
+ * - Periodic memory recalls for past events
+ * - Context-aware capture nudges for novel locations
+ * - Upcoming event reminders from the calendar
+ */
 class GenerateAmbientPromptCandidatesUseCaseTest {
     @Test
     fun `morning schedule creates a capture nudge when today is empty`() =
@@ -215,6 +227,10 @@ class GenerateAmbientPromptCandidatesUseCaseTest {
         )
 }
 
+/**
+ * A test harness for [GenerateAmbientPromptCandidatesUseCase] to simplify setup
+ * and provide mock/fake implementations of its dependencies.
+ */
 private class AmbientPromptTestHarness(
     private val now: Instant,
     notes: List<JournalNote> = emptyList(),
@@ -286,6 +302,9 @@ private fun testHarness(
         externalSuggestions = externalSuggestions,
     )
 
+/**
+ * A test implementation of [JournalNotesRepository] for testing.
+ */
 private class TestJournalNotesRepository(
     private val notes: List<JournalNote>,
 ) : JournalNotesRepository {
@@ -328,6 +347,9 @@ private class TestJournalNotesRepository(
     ) = Unit
 }
 
+/**
+ * A test implementation of [EntryDraftRepository] for testing.
+ */
 private class TestEntryDraftRepository(
     drafts: List<EntryDraft>,
 ) : EntryDraftRepository {
@@ -357,6 +379,9 @@ private class TestEntryDraftRepository(
     override suspend fun deleteExpiredDrafts(maxAge: Duration): Int = 0
 }
 
+/**
+ * A test implementation of [LocationHistoryRepository] for testing.
+ */
 private class TestLocationHistoryRepository(
     history: List<LocationHistoryItem>,
 ) : LocationHistoryRepository {
@@ -401,6 +426,9 @@ private class TestLocationHistoryRepository(
     override suspend fun getLocationCount(): Int = state.value.size
 }
 
+/**
+ * A [UserPlacesRepository] that returns no places, used for testing purposes.
+ */
 private class EmptyUserPlacesRepository : UserPlacesRepository {
     override suspend fun getAllPlaces(): List<Place> = emptyList()
 
@@ -423,10 +451,16 @@ private class EmptyUserPlacesRepository : UserPlacesRepository {
     override suspend fun searchPlaces(query: String): List<Place> = emptyList()
 }
 
+/**
+ * A [ReverseGeocodingProvider] that always returns null, used for testing.
+ */
 private class EmptyReverseGeocodingProvider : ReverseGeocodingProvider {
     override suspend fun reverseGeocode(location: Location): GeocodedAddress? = null
 }
 
+/**
+ * A test implementation of [app.logdate.client.location.places.ExternalPlacesProvider] that uses a map for lookups.
+ */
 private class TestExternalPlacesProvider(
     private val suggestionsByLocationKey: Map<String, List<PlaceSuggestion>>,
 ) : app.logdate.client.location.places.ExternalPlacesProvider {

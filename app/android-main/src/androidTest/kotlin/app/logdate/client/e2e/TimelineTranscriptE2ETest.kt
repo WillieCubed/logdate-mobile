@@ -25,6 +25,15 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/**
+ * Instrumented tests for audio transcript visualization in the timeline.
+ *
+ * This suite verifies that both legacy and semantic audio cards correctly
+ * display sentence-bounded excerpts when collapsed and expand to show full
+ * transcripts when interacted with. It ensures that the [TimelineList]
+ * correctly integrates with the [TranscriptionProvider] to resolve and
+ * display text for recorded notes.
+ */
 @RunWith(AndroidJUnit4::class)
 class TimelineTranscriptE2ETest {
 

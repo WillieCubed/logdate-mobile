@@ -16,6 +16,16 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Comprehensive coverage tests for the PLC (Placeholder) data models and client logic.
+ *
+ * This suite focuses on the behavioral aspects of the PLC implementation, including:
+ * - Structural helpers and signing logic for [PlcOperation] and [PlcTombstone].
+ * - Correct serialization and deserialization of polymorphic log entries.
+ * - Edge cases in the directory client, such as default parameter handling and error
+ *   response mapping.
+ * - Lifecycle management of indexed operations within the PLC ecosystem.
+ */
 class PlcCoverageTest {
     @Test
     fun `plc models expose tombstone and indexed helpers`() {

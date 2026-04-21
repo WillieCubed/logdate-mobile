@@ -28,6 +28,13 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [GenerateAnnualRewindUseCase].
+ *
+ * Ensures that the annual rewind generation correctly aggregates data for
+ * a full year and gracefully handles scenarios where insufficient data
+ * (such as missing weekly rewinds) is available.
+ */
 class GenerateAnnualRewindUseCaseTest {
     @Test
     fun `returns NoContent when annual source flows do not emit`() =

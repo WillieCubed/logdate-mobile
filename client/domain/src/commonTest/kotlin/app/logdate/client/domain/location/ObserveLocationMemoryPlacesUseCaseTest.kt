@@ -21,6 +21,13 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [ObserveLocationMemoryPlacesUseCase].
+ *
+ * Verifies the logic for grouping and filtering journal notes based on their
+ * location metadata. It tests semantic place grouping, coordinate-based
+ * proximity clustering, and time-window filtering for memory retrieval.
+ */
 class ObserveLocationMemoryPlacesUseCaseTest {
     @Test
     fun `invoke groups notes with the same semantic place together`() =

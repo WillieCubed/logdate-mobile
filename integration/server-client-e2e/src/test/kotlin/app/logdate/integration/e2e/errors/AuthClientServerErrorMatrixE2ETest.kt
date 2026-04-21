@@ -11,6 +11,14 @@ import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
+/**
+ * End-to-end test matrix for validating the client's authentication error handling.
+ *
+ * This suite verifies that the `apiClient` correctly maps and surfaces various
+ * server-side authentication and authorization failures. It tests a range of
+ * scenarios including invalid usernames (400), expired or missing session tokens (401),
+ * malformed refresh tokens, and unauthorized access to account information.
+ */
 class AuthClientServerErrorMatrixE2ETest {
     @Test
     fun `auth endpoints surface validation and authorization errors to client`() =

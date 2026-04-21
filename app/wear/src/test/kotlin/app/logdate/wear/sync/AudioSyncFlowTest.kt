@@ -31,14 +31,12 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * End-to-end unit test simulating the critical path:
+ * Simulation of the end-to-end audio synchronization pipeline originating from the Wear OS device.
  *
- * Recording stops on watch → JournalNote.Audio created → outbox enqueued →
- * WearDataLayerSyncManager uploads → DataItem put + file sent → marked synced
- *
- * This test verifies the entire watch-side sync pipeline using mocks at the
- * transport boundary (WearDataLayerClient) while exercising real logic in
- * WearDataLayerSyncManager and NoteDataMapper.
+ * This test suite validates the critical path from the moment an audio recording is finalized on
+ * the watch, through its enqueueing in the sync outbox, to its eventual transmission via the
+ * Wear Data Layer. It verifies the coordination between metadata persistence and binary file
+ * transfer, ensuring data integrity even under adverse conditions like intermittent connectivity.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AudioSyncFlowTest {

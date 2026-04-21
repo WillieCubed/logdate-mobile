@@ -49,6 +49,14 @@ import kotlin.time.Instant
  * the right outcome. Uses [TestListenableWorkerBuilder] with a Koin module wiring
  * fake/mock dependencies.
  */
+/**
+ * Instrumented tests for the [RestoreWorker] background task.
+ *
+ * This suite validates the [WorkManager] integration for data restoration,
+ * ensuring the worker correctly handles ZIP archive validation, manages
+ * dependencies via Koin, and reports its success or failure back to the
+ * application's restoration launcher.
+ */
 @RunWith(AndroidJUnit4::class)
 class RestoreWorkerTest {
     private val context: Context = ApplicationProvider.getApplicationContext()

@@ -22,6 +22,13 @@ import kotlin.test.assertNotNull
 import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
+/**
+ * Tests for [LocationRetryWorker].
+ *
+ * Verifies that the worker correctly handles retrying location log operations,
+ * ensuring that the original observed metadata is preserved while updating the
+ * logging timestamp.
+ */
 class LocationRetryWorkerTest {
     @Test
     fun `retry preserves observed payload and only refreshes logged time`() =
@@ -78,6 +85,9 @@ class LocationRetryWorkerTest {
         }
 }
 
+/**
+ * A fake [ClientLocationProvider] for testing.
+ */
 private class FakeLocationProvider : ClientLocationProvider {
     override val currentLocation = kotlinx.coroutines.flow.MutableSharedFlow<Location>(replay = 1)
 
@@ -93,6 +103,9 @@ private class FakeLocationProvider : ClientLocationProvider {
     override suspend fun refreshLocation() = Unit
 }
 
+/**
+ * A [LocationHistoryRepository] that records the last logged record for verification.
+ */
 private class RecordingLocationHistoryRepository : LocationHistoryRepository {
     var lastRecord: LocationLogRecord? = null
 

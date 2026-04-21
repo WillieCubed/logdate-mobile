@@ -43,6 +43,13 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests the [PhoneDataLayerListenerService] handling of incoming Wear OS events.
+ *
+ * This suite validates the service's ability to decode Wearable Data Layer messages
+ * and data events, ensuring they trigger the correct side effects—such as launching
+ * the camera, syncing health snapshots, or updating local journal repositories.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PhoneDataLayerListenerServiceTest {
     private val noteDataMapper = NoteDataMapper()
@@ -616,6 +623,9 @@ class PhoneDataLayerListenerServiceTest {
 
     private fun instant(value: String): Instant = Instant.parse(value)
 
+    /**
+     * A test implementation of [PhoneDataLayerListenerService] for testing.
+     */
     private class TestPhoneDataLayerListenerService(
         override val serviceScope: CoroutineScope,
         private val syncBridge: PhoneWearSyncBridge? = null,

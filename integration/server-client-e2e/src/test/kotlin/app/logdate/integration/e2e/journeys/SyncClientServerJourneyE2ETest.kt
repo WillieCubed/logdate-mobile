@@ -18,6 +18,15 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Integration journey test validating the end-to-end synchronization lifecycle between
+ * the client application and a live server instance.
+ *
+ * This suite exercises the full spectrum of the sync API, including the creation and
+ * modification of multi-modal content (text and media), the management of journal
+ * hierarchies, and the resolution of cross-entity associations, ensuring that the
+ * distributed system maintains consistency across all standard user operations.
+ */
 class SyncClientServerJourneyE2ETest {
     @Test
     fun `client sync lifecycle succeeds against real server routes`() =

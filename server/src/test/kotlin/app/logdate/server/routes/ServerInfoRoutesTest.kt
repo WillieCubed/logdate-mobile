@@ -19,6 +19,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests the server information and capability discovery endpoints.
+ *
+ * This class ensures that the `/server/info` route correctly reports the server's
+ * deployment type—distinguishing between self-hosted and first-party environments—and
+ * accurately lists available capabilities like authentication methods, sync features,
+ * and billing support based on the server's active configuration.
+ */
 class ServerInfoRoutesTest {
     private val json = Json { ignoreUnknownKeys = true }
 

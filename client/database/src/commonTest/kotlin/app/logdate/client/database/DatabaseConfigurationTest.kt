@@ -34,6 +34,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
+/**
+ * Unit tests for database configuration and migrations.
+ *
+ * Verifies that database constants, Room migrations, type converters, and
+ * DAO modules are correctly configured and that the schema versions match
+ * the expected migration path.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class DatabaseConfigurationTest : BaseDatabaseTest() {
     @Test

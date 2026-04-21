@@ -7,6 +7,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
+/**
+ * Integration tests for the backup repository implementation backed by the
+ * synchronization system.
+ *
+ * This class verifies the management of full-device backup metadata, ensuring that
+ * backup records can be created, listed, and retrieved correctly. It focuses on
+ * the persistence of manifest data and storage paths through the synchronization-backed
+ * storage layer.
+ */
 class SyncBackedLogDateBackupRepositoryTest {
     @Test
     fun `backup metadata round trips through sync-backed repository`() {

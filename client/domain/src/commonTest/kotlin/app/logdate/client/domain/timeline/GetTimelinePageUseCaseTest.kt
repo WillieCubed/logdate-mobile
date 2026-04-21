@@ -15,6 +15,13 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests the paginated retrieval and date-based grouping of journal entries for the timeline.
+ *
+ * Ensures that [GetTimelinePageUseCase] correctly handles page requests, maintains
+ * chronological order, avoids duplicating entries at page boundaries, and accurately
+ * reports when more historical content is available.
+ */
 class GetTimelinePageUseCaseTest {
     @Test
     fun `invoke returns newest complete days and indicates more history`() =

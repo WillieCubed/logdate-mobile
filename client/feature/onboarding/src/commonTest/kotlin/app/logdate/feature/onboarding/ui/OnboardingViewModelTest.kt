@@ -54,6 +54,15 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests the central [OnboardingViewModel] orchestrating the multi-step setup flow.
+ *
+ * These tests verify the state machine and cross-repository delegation for:
+ * - Managing user identity and profile setup (e.g., birthday, profile photos)
+ * - Toggling high-level system preferences for recommendations, location tracking, and day boundaries
+ * - Handling Health Connect availability and its impact on day boundary choices
+ * - Enforcing required completion steps before transitioning out of onboarding
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class OnboardingViewModelTest {
     private val testDispatcher = StandardTestDispatcher()

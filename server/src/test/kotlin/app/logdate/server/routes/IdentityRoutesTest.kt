@@ -20,6 +20,14 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Tests the identity resolution and metadata endpoints for AT Protocol compatibility.
+ *
+ * This suite validates the server's ability to resolve DIDs via `.well-known` paths for
+ * both PLC and Web methods. It also covers XRPC endpoints for handle resolution and
+ * repository/server descriptions, ensuring that the server correctly identifies itself
+ * and its users to the broader AT Protocol network.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class IdentityRoutesTest {
     private val json = Json { ignoreUnknownKeys = true }

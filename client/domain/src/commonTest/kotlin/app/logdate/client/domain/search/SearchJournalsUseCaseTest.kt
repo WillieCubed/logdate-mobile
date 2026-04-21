@@ -7,6 +7,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
+/**
+ * Tests the filtering logic of [SearchJournalsUseCase] for journal-based searches.
+ *
+ * Ensures that search queries are applied correctly against journal metadata, including
+ * case-insensitive title and description matching, handling of empty queries, and
+ * partial string matching.
+ */
 class SearchJournalsUseCaseTest {
     private val tripJournal =
         Journal(

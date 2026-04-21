@@ -34,6 +34,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [JournalsOverviewViewModel], which powers the primary list of journals
+ * and the global search experience.
+ *
+ * This suite ensures that the initial UI state is correct, that journals can be
+ * filtered by title or description, and that the search query logic correctly
+ * triggers preview searches for matching entries.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class JournalsOverviewViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
@@ -174,6 +182,9 @@ class JournalsOverviewViewModelTest {
         }
     }
 
+    /**
+     * A test implementation of [JournalRepository] for testing.
+     */
     private class TestJournalRepository(
         initialJournals: List<Journal>,
     ) : JournalRepository {
@@ -205,6 +216,9 @@ class JournalsOverviewViewModelTest {
         override suspend fun deleteDraft(id: Uuid) {}
     }
 
+    /**
+     * A test implementation of [SearchRepository] for testing.
+     */
     private class TestSearchRepository : SearchRepository {
         val limitedQueries = mutableListOf<Pair<String, Int>>()
 
@@ -232,6 +246,9 @@ class JournalsOverviewViewModelTest {
         ): Flow<List<SearchResult>> = flowOf(emptyList())
     }
 
+    /**
+     * A test implementation of [DataStore<Preferences>] for testing.
+     */
     private class TestPreferencesDataStore : DataStore<Preferences> {
         private val prefsFlow = MutableStateFlow(emptyPreferences())
         override val data: Flow<Preferences> = prefsFlow

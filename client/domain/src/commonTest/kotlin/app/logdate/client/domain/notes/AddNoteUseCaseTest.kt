@@ -35,6 +35,14 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [AddNoteUseCase].
+ *
+ * Verifies the creation of journal notes and their association with journals and
+ * attachments. These tests also validate the atomic nature of note-journal linking
+ * and ensure that optional features like location logging are correctly triggered
+ * based on user settings.
+ */
 class AddNoteUseCaseTest {
     private lateinit var mockRepository: MockJournalNotesRepository
     private lateinit var mockJournalContentRepository: MockJournalContentRepository

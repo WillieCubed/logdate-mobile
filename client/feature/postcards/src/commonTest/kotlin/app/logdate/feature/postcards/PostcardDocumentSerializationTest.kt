@@ -7,6 +7,13 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for the serialization and deserialization of [PostcardDocument] and its constituents.
+ *
+ * This suite ensures that all postcard elements (photos, text, ink, shapes, and stickers)
+ * can be safely round-tripped through JSON, maintaining their properties, z-index,
+ * and transformation data.
+ */
 class PostcardDocumentSerializationTest {
     private val json =
         Json {

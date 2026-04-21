@@ -13,6 +13,13 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import org.junit.runner.RunWith
 
+/**
+ * Verifies the registration and management of Android notification channels.
+ *
+ * This suite ensures that the [LogDateNotificationRegistrar] correctly maps the
+ * application's notification catalog to the system [NotificationManager],
+ * including the creation of channel groups and the cleanup of legacy channels.
+ */
 @RunWith(AndroidJUnit4::class)
 class LogDateNotificationRegistrarTest {
 

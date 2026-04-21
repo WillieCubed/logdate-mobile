@@ -10,6 +10,15 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Integration tests for the collections repository implementation backed by the
+ * synchronization system.
+ *
+ * This suite verifies the full lifecycle of log entries, journals, and associations
+ * when persisted through the sync layer. It ensures that the repository correctly
+ * handles incremental updates (change feeds), conflict-aware upserts, tombstone-based
+ * deletions, and maintenance-driven data purging.
+ */
 class SyncBackedLogDateCollectionsRepositoryTest {
     @Test
     fun `entries round trip through snapshots changes and deletions`() =

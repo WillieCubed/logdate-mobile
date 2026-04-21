@@ -9,6 +9,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [RemoveNoteUseCase].
+ *
+ * Verifies that the use case correctly delegates note removal to the underlying
+ * repository and appropriately handles repository-level exceptions during the process.
+ */
 class RemoveNoteUseCaseTest {
     private lateinit var mockRepository: MockJournalNotesRepository
     private lateinit var useCase: RemoveNoteUseCase

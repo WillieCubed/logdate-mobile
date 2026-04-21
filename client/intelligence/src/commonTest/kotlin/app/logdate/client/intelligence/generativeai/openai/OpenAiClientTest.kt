@@ -4,6 +4,13 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Tests the OpenAI-specific implementation of the generative AI client.
+ *
+ * This suite ensures that internal chat message models are correctly mapped to the
+ * OpenAI API format and that the request/response data classes maintain their
+ * structural integrity during serialization.
+ */
 class OpenAiClientTest {
     @Test
     fun toOpenAiChatMessage_convertsCorrectly() {

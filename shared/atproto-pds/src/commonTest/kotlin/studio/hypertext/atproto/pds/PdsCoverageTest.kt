@@ -17,6 +17,15 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * A comprehensive regression suite providing exhaustive serialization coverage for PDS models.
+ *
+ * This class performs deep round-trip serialization tests for the entire ATProto PDS
+ * model surface, including OAuth metadata, session management, repository sync, and
+ * error handling. It validates that default values are correctly handled, wire-format
+ * field names (like `rkey`) are preserved, and that exceptions map to the correct
+ * HTTP status codes and error shapes defined in the ATProto specification.
+ */
 class PdsCoverageTest {
     private val json = Json { encodeDefaults = true }
     private val repoDid = AtprotoDid.require("did:web:alice.logdate.app")

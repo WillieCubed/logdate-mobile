@@ -7,6 +7,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
+/**
+ * Validates the coordination between DID and handle resolvers in `DefaultIdentityResolver`.
+ *
+ * This test suite ensures that identities can be resolved from either handles or
+ * DIDs, and that failures in handle resolution are correctly propagated without
+ * attempting unnecessary DID resolution.
+ */
 class DefaultIdentityResolverTest {
     @Test
     fun resolvesHandleThenDocument(): Unit =

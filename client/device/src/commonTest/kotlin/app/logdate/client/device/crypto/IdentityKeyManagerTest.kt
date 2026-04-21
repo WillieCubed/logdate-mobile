@@ -11,6 +11,13 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [IdentityKeyManager], which coordinates the lifecycle of the user's
+ * primary identity keys.
+ *
+ * These tests cover the initial setup of an identity, recovery from a mnemonic phrase,
+ * and the secure clearing of identity material from storage.
+ */
 class IdentityKeyManagerTest {
     private val mockSecureStorage = InMemorySecureStorage()
     private val cryptoManager = FakeCryptoManager()
@@ -88,6 +95,10 @@ class IdentityKeyManagerTest {
         }
 }
 
+/**
+ * Tests for [KeyDerivation] logic, ensuring that sub-keys for specific contexts
+ * (like journal entries or media) are derived deterministically from the master identity key.
+ */
 class KeyDerivationTest {
     private val cryptoManager = FakeCryptoManager()
     private val keyDerivation = KeyDerivation(cryptoManager)
@@ -131,6 +142,12 @@ class KeyDerivationTest {
     }
 }
 
+/**
+ * Tests for the PLC (Personalized Learning Cloud / ATProto) recovery key management.
+ *
+ * This suite verifies that DID keys are derived deterministically from recovery
+ * phrases and that payloads can be signed using these keys for account recovery purposes.
+ */
 class PlcRecoveryKeyManagerTest {
     private val cryptoManager = FakeCryptoManager()
     private val keySupport = FakePlcRecoveryKeySupport()

@@ -4,6 +4,14 @@ import android.media.AudioDeviceInfo
 import org.junit.Test
 import kotlin.test.assertEquals
 
+/**
+ * Tests for [WearAudioOutputMonitor], ensuring the correct derivation of audio output states
+ * from Android's hardware device information.
+ *
+ * This suite validates the mapping of various [AudioDeviceInfo] combinations to high-level
+ * [AudioOutputState]s, confirming that the system accurately identifies when audio will play
+ * through the built-in speaker, a Bluetooth headset, both, or if no valid output is available.
+ */
 class WearAudioOutputMonitorTest {
     @Test
     fun `speaker and bluetooth returns SpeakerAndBluetooth`() {

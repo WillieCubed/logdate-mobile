@@ -21,6 +21,13 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Unit tests for [WatchSettingsViewModel].
+ *
+ * Verifies the coordination between the phone and a paired Wear OS device,
+ * including association flows, connection state monitoring, and synchronization
+ * of notifications and data.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WatchSettingsViewModelTest {
     private val testDispatcher = StandardTestDispatcher()

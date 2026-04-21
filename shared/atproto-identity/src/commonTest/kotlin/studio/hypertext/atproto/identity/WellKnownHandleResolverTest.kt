@@ -15,6 +15,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * Verifies the resolution of handles to DIDs using the standard HTTP well-known
+ * endpoint `.well-known/atproto-did`.
+ *
+ * This test suite covers successful DID resolution from a plaintext response,
+ * and failure scenarios including network errors, not-found status, and
+ * malformed DID bodies.
+ */
 class WellKnownHandleResolverTest {
     @Test
     fun resolvesHandleViaWellKnownEndpoint(): Unit =

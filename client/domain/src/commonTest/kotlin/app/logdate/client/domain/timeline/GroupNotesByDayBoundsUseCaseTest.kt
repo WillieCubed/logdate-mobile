@@ -15,6 +15,16 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [GroupNotesByDayBoundsUseCase], which handles the complex logic of grouping
+ * journal entries into logical "days" based on user-defined or sleep-aware boundaries.
+ *
+ * These tests verify:
+ * - Attribution of late-night notes to the correct logical day (e.g., 2 AM entry belonging to the previous day).
+ * - Robustness when sleep data is missing or discontinuous (ensuring no notes are "lost" in gaps).
+ * - Fallback behavior when health data is unavailable.
+ * - Correct handling of skipped sleep or irregular sleep patterns.
+ */
 class GroupNotesByDayBoundsUseCaseTest {
     private val timezone = TimeZone.UTC
     private val date = LocalDate(2025, 3, 15)

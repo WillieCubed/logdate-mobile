@@ -3,6 +3,13 @@ package app.logdate.client.intelligence.cache
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Tests the stability and correctness of the [DefaultAICacheKeyStrategy].
+ *
+ * This suite ensures that the cache key generation logic is deterministic, producing
+ * identical keys for logically equivalent inputs even when they differ in non-functional
+ * ways like extra whitespace in the input text.
+ */
 class AICacheKeyStrategyTest {
     @Test
     fun createKey_withSameInput_producesStableKey() {

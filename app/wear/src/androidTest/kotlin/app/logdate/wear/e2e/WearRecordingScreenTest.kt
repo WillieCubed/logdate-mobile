@@ -23,6 +23,14 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/**
+ * UI verification suite for the Wear OS audio recording experience.
+ *
+ * This test class exercises the various states of the recording lifecycle on a Wear device,
+ * including initial readiness, active recording with waveform feedback, the saving
+ * process, and post-capture success or failure states. It ensures that critical
+ * instructional text and timer formatting are correctly displayed to the user.
+ */
 @RunWith(AndroidJUnit4::class)
 class WearRecordingScreenTest {
     @get:Rule

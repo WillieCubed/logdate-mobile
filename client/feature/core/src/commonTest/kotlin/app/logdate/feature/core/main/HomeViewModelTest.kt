@@ -76,6 +76,13 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Unit tests for [HomeViewModel].
+ *
+ * Validates the primary timeline view on the home screen, focusing on
+ * paginated loading of journal entries, day boundary handling, and the
+ * integration of contextual recommendations.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
     private val dispatcher = StandardTestDispatcher()

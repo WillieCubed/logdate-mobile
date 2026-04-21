@@ -7,6 +7,20 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [EncryptionKeyring] implementations, focusing on the secure loading
+ * and validation of server-side encryption keys.
+ *
+ * This suite covers:
+ * - Loading of AES keys from environment variables with support for explicit
+ *   key IDs and versioning.
+ * - Strict validation of key material, including base64 decoding integrity
+ *   and enforcement of standard AES key lengths (128, 192, or 256 bits).
+ * - Proper handling of missing or malformed configuration to prevent insecure
+ *   server startup.
+ * - Verification of fallback and "no-op" implementations used in development
+ *   or non-encrypted environments.
+ */
 class EncryptionKeyringTest {
     @Test
     fun `environment keyring default constructor path is invocable`() {

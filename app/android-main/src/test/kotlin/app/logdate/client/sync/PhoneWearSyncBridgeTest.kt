@@ -18,6 +18,13 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests the orchestration of data synchronization between the phone and Wear OS devices.
+ *
+ * This suite verifies that [DefaultPhoneWearSyncBridge] correctly transforms repository entities
+ * into wire-compatible formats and utilizes the [PhoneWearTransport] to deliver both
+ * discrete data items (like text notes) and binary streams (like audio recordings).
+ */
 class PhoneWearSyncBridgeTest {
 
     private val notesRepository = mockk<JournalNotesRepository>()

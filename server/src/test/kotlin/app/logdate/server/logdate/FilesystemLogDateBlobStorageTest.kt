@@ -9,6 +9,13 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Tests for [FilesystemLogDateBlobStorage], validating that binary blobs are
+ * correctly persisted to and retrieved from the local filesystem.
+ *
+ * This test suite covers the full lifecycle of a blob—including creation,
+ * retrieval, and deletion—as well as environment-based initialization logic.
+ */
 class FilesystemLogDateBlobStorageTest {
     @Test
     fun `round-trips bytes through disk`() {

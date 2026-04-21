@@ -37,6 +37,15 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [WearRecordingViewModel], ensuring robust handling of the audio recording lifecycle
+ * on Wear OS.
+ *
+ * This test suite verifies the complex state transitions between recording phases (Ready, Recording,
+ * Paused, Saving, etc.), storage availability enforcement, and the graceful handling of hardware
+ * failures. It also validates that audio levels are correctly sampled and that the final
+ * recording is properly persisted with the necessary metadata and health annotations.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WearRecordingViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
@@ -731,6 +740,9 @@ class WearRecordingViewModelTest {
     // Test Clock
     // -----------------------------------------------------------------------
 
+    /**
+     * A test implementation of [Clock] that allows manual time advancement for testing.
+     */
     private class TestClock(
         private var currentMs: Long = 1_000_000L,
     ) : Clock {

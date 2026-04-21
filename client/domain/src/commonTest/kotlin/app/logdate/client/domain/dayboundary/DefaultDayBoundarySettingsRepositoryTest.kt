@@ -10,6 +10,13 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Tests the persistence and retrieval of day boundary settings in [DefaultDayBoundarySettingsRepository].
+ *
+ * These tests ensure that user preferences for sleep-based boundaries are correctly stored
+ * and retrieved from [KeyValueStorage], and that the repository's observable flows correctly
+ * reflect updates to these settings.
+ */
 class DefaultDayBoundarySettingsRepositoryTest {
     @Test
     fun `default settings have sleep boundaries disabled`() =

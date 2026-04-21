@@ -34,6 +34,16 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Unit tests for the core Personal Data Server (PDS) runtime services.
+ *
+ * This test suite exercises the primary components responsible for PDS operation:
+ * - [StaticPdsDiscoveryService]: Delivery of OAuth and server discovery metadata.
+ * - [DefaultPdsRepoService]: Management of repository data through high-level XRPC-like interfaces.
+ * - [DefaultPdsBlobService]: Handling of binary content (blobs) with persistence.
+ * - [DefaultPdsSyncService]: Facilitating repository synchronization via CAR file exports
+ *   and commit status reporting.
+ */
 class PdsRuntimeTest {
     private val repo = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
     private val collection = Nsid.require("studio.hypertext.logdate.content")

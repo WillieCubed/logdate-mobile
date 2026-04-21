@@ -23,6 +23,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Tests the [PasskeyApiClient]'s implementation of the passkey-based authentication lifecycle.
+ *
+ * This suite covers the multi-step workflows for account creation and sign-in, verifying
+ * that username availability checks, challenge-response exchanges, and token refreshes
+ * are correctly handled across the expected API routes.
+ */
 class PasskeyApiClientTest {
     private fun createMockApiClient(mockEngine: MockEngine): PasskeyApiClient {
         val httpClient =

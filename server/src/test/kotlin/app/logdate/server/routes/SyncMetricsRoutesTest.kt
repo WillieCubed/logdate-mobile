@@ -20,6 +20,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Integration tests for the Sync API's operational metrics reporting.
+ *
+ * This class ensures that synchronization activities—such as content uploads—are accurately
+ * tracked and reported through the metrics API. It validates that the recorded telemetry
+ * correctly reflects successful operations, providing essential visibility into the
+ * health and performance of the sync subsystem.
+ */
 class SyncMetricsRoutesTest {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -28,6 +36,10 @@ class SyncMetricsRoutesTest {
         return "Bearer ${tokenService.generateAccessToken(accountId)}"
     }
 
+    /**
+     * Represents the response payload for sync metrics, containing a snapshot
+     * of all recorded synchronization operations.
+     */
     @Serializable
     private data class SyncMetricsPayload(
         val data: SyncMetricsSnapshot,

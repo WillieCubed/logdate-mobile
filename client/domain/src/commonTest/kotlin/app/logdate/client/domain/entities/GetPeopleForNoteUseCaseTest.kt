@@ -25,6 +25,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [GetPeopleForNoteUseCase], which is responsible for identifying people
+ * associated with a specific note.
+ *
+ * Note: The current implementation is a placeholder that validates the expected
+ * [NotImplementedError] behavior across various input scenarios.
+ */
 class GetPeopleForNoteUseCaseTest {
     private val existingPerson = Person(name = "Jane Doe")
     private val repository = FakePeopleRepository(listOf(existingPerson))

@@ -6,6 +6,16 @@ import kotlin.test.assertNotEquals
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
+/**
+ * Tests for [OAuthNonceService], which manages short-lived cryptographic nonces
+ * used primarily in DPoP flows.
+ *
+ * These tests ensure:
+ * - Nonce stability within its configured time-to-live (TTL).
+ * - Correct rotation and invalidation of nonces after manual refresh.
+ * - Proper expiration behavior, forcing the generation of a new nonce after the
+ *   TTL has elapsed to maintain security against replay attempts.
+ */
 class OAuthNonceServiceTest {
     @Test
     fun `nonce stays stable until refreshed or expired`() {

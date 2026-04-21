@@ -28,6 +28,14 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/**
+ * Tests for [LogDateRepoStore], validating the persistence and management of
+ * LogDate records within an AT Protocol repository.
+ *
+ * This suite ensures that records are correctly stored, listed, and deleted,
+ * and that changes made through higher-level repositories are correctly
+ * reflected in the underlying repository store.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class LogDateRepoStoreTest {
     @Test
