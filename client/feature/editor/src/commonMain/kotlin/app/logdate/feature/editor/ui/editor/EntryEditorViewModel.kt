@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.editor.ObserveEditorDataUseCase
 import app.logdate.client.domain.editor.SaveEntryUseCase
+import app.logdate.feature.editor.ui.editor.delegate.AudioBlockFinalizer
 import app.logdate.feature.editor.ui.editor.delegate.ContentLoader
 import app.logdate.feature.editor.ui.editor.delegate.DraftManager
 import app.logdate.feature.editor.ui.mapper.toDomainBlock
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -31,6 +33,7 @@ class EntryEditorViewModel(
     private val saveEntryUseCase: SaveEntryUseCase,
     private val draftManager: DraftManager,
     private val contentLoader: ContentLoader,
+    private val audioBlockFinalizer: AudioBlockFinalizer = AudioBlockFinalizer.NoOp,
 ) : ViewModel() {
     // Internal mutable state that can be modified by UI
     private val mutableEditorState =
@@ -262,20 +265,33 @@ class EntryEditorViewModel(
 
     /**
      * Saves the current entry.
+     *
+     * Pending audio blocks are finalized first so a recording whose URI hasn't yet
+     * been propagated into the block from the recording side is absorbed into the
+     * save instead of being silently dropped by the mapper.
      */
     fun saveEntry(state: EditorState) {
         cancelPendingAutoSave()
         mutableEditorState.update { it.copy(isSaving = true) }
 
         viewModelScope.launch {
+            val resolvedAudio = finalizePendingAudio() ?: return@launch
+
             val latestState = editorState.value
             val notes =
                 latestState.blocks.mapNotNull { block ->
                     if (latestState.isReadOnly(block.id)) return@mapNotNull null
-                    block.toJournalNote()
+                    val effective =
+                        if (block is AudioBlockUiState && block.id in resolvedAudio) {
+                            block.copy(captureState = resolvedAudio.getValue(block.id))
+                        } else {
+                            block
+                        }
+                    effective.toJournalNote()
                 }
 
             if (notes.isEmpty()) {
+                applyResolvedAudio(resolvedAudio)
                 mutableEditorState.update { it.copy(shouldExit = true, isSaving = false) }
                 return@launch
             }
@@ -283,6 +299,7 @@ class EntryEditorViewModel(
             try {
                 val activeDraftId = (latestState.draftState as? DraftState.Active)?.id
                 saveEntryUseCase(notes, latestState.selectedJournalIds, activeDraftId)
+                applyResolvedAudio(resolvedAudio)
                 mutableEditorState.update {
                     it.copy(
                         draftState = DraftState.None,
@@ -294,10 +311,83 @@ class EntryEditorViewModel(
                 }
             } catch (e: Exception) {
                 Napier.e("Failed to save entry: ${e.message}", e)
+                applyResolvedAudio(resolvedAudio)
                 mutableEditorState.update {
                     it.copy(errorMessage = "Failed to save: ${e.message}", isSaving = false)
                 }
             }
+        }
+    }
+
+    /**
+     * Drives any in-flight audio recordings to a finalized state.
+     *
+     * Returns a map of blockId → resolved [AudioCaptureState] when every finalize
+     * succeeds (possibly empty if no pending audio existed). Returns null when
+     * any finalize times out or returns [AudioCaptureState.Failed] — in that case
+     * the editor's [EditorState.errorMessage] is set and [EditorState.isSaving]
+     * is cleared so the caller can abort the save without further work.
+     *
+     * The returned map is applied to [mutableEditorState] only after the save
+     * completes, to avoid relying on [editorState] (a combined flow) re-emitting
+     * synchronously within this coroutine.
+     */
+    private suspend fun finalizePendingAudio(): Map<Uuid, AudioCaptureState>? {
+        val initialState = editorState.value
+        val pendingBlocks =
+            initialState.blocks.filterIsInstance<AudioBlockUiState>().filter { block ->
+                !initialState.isReadOnly(block.id) && !block.isPersistable()
+            }
+        if (pendingBlocks.isEmpty()) return emptyMap()
+
+        val resolved = mutableMapOf<Uuid, AudioCaptureState>()
+        for (block in pendingBlocks) {
+            val finalized =
+                withTimeoutOrNull(AUDIO_FINALIZE_TIMEOUT_MS) {
+                    audioBlockFinalizer.finalize(block.id, block.captureState)
+                }
+            when (finalized) {
+                null -> {
+                    Napier.w("Audio finalization timed out for block ${block.id}")
+                    mutableEditorState.update {
+                        it.copy(
+                            errorMessage = "Recording is still finalizing. Try again in a moment.",
+                            isSaving = false,
+                        )
+                    }
+                    return null
+                }
+                is AudioCaptureState.Failed -> {
+                    Napier.w("Audio finalization failed for block ${block.id}: ${finalized.reason}")
+                    mutableEditorState.update {
+                        it.copy(errorMessage = finalized.reason, isSaving = false)
+                    }
+                    return null
+                }
+                else -> resolved[block.id] = finalized
+            }
+        }
+        return resolved
+    }
+
+    /**
+     * Pushes the resolved capture states from [finalizePendingAudio] back into
+     * [mutableEditorState] so the UI reflects finalized recordings even on the
+     * non-exit paths (e.g., `notes.isEmpty()`, save failure).
+     */
+    private fun applyResolvedAudio(resolved: Map<Uuid, AudioCaptureState>) {
+        if (resolved.isEmpty()) return
+        mutableEditorState.update { state ->
+            state.copy(
+                blocks =
+                    state.blocks.map { existing ->
+                        if (existing is AudioBlockUiState && existing.id in resolved) {
+                            existing.copy(captureState = resolved.getValue(existing.id))
+                        } else {
+                            existing
+                        }
+                    },
+            )
         }
     }
 
@@ -549,5 +639,15 @@ class EntryEditorViewModel(
                 },
             )
         }
+    }
+
+    private companion object {
+        /**
+         * Maximum time to wait for any single pending audio block to finalize during save.
+         * MediaRecorder.stop() typically completes in well under a second; the bound is
+         * generous so a slow flush on an aging device doesn't cost the user their entry,
+         * but tight enough to surface a recoverable error if the recorder is stuck.
+         */
+        const val AUDIO_FINALIZE_TIMEOUT_MS: Long = 5_000L
     }
 }

@@ -9,6 +9,8 @@ import app.logdate.client.media.audio.download.ModelDownloadStatus
 import app.logdate.client.media.audio.tagging.AudioTaggingService
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
+import app.logdate.feature.editor.ui.editor.AudioCaptureState
+import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +36,8 @@ class AudioViewModel(
     private val audioDurationResolver: AudioDurationResolver,
     private val transcriptionService: TranscriptionService,
     private val audioTaggingService: AudioTaggingService,
-) : ViewModel() {
+) : ViewModel(),
+    PendingAudioResolver {
     // StateFlow to expose immutable UI state
     private val _uiState = MutableStateFlow(AudioUiState())
     val uiState: StateFlow<AudioUiState> = _uiState.asStateFlow()
@@ -403,6 +406,34 @@ class AudioViewModel(
 
     fun clearRecordedAudio() {
         _uiState.update { it.copy(recordedAudioUri = null) }
+    }
+
+    /**
+     * Surfaces a pending recording so the editor's save path can absorb a URI
+     * that hasn't yet been transferred to the block via the Compose-side
+     * `LaunchedEffect` in `AudioBlockEditor`.
+     *
+     * Returns null when no recording state is associated with [blockId].
+     * Drives an active recording to completion before returning.
+     */
+    override suspend fun resolvePending(blockId: Uuid): AudioCaptureState? {
+        if (lastTargetNoteId != blockId) return null
+        val initial = _uiState.value
+        val pendingUri = initial.recordedAudioUri
+        if (pendingUri != null) {
+            _uiState.update { it.copy(recordedAudioUri = null) }
+            return AudioCaptureState.Ready(uri = pendingUri, durationMs = initial.duration.inWholeMilliseconds)
+        }
+        if (initial.isRecording) {
+            stopRecordingInternal()
+            val after = _uiState.value
+            val resolvedUri =
+                after.recordedAudioUri
+                    ?: return AudioCaptureState.Failed("Recording could not be finalized")
+            _uiState.update { it.copy(recordedAudioUri = null) }
+            return AudioCaptureState.Ready(uri = resolvedUri, durationMs = after.duration.inWholeMilliseconds)
+        }
+        return null
     }
 
     /**
