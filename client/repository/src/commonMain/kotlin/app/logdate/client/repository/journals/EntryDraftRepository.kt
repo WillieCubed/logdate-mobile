@@ -43,6 +43,20 @@ interface EntryDraftRepository {
     ): Uuid
 
     /**
+     * Replaces the [EntryDraft.pendingMedia] list of the draft with [uid].
+     *
+     * This is the durable record of in-flight media (e.g., audio recordings that
+     * have started but not yet finalized into a [JournalNote]) so the editor can
+     * survive process death and reattach the recording to its draft on relaunch.
+     *
+     * No-op when no draft with [uid] exists.
+     */
+    suspend fun setPendingMedia(
+        uid: Uuid,
+        pendingMedia: List<PendingMediaRecord>,
+    )
+
+    /**
      * Deletes any drafts with the given UID.
      *
      * If no draft with the given UID exists, this is a no-op.
@@ -64,6 +78,11 @@ interface EntryDraftRepository {
 
 /**
  * An entry draft consists of a series of journal notes produced in a single editing session.
+ *
+ * [pendingMedia] tracks in-flight media (e.g., audio recordings whose URI has not
+ * yet been resolved) so the editor can recover the recording on relaunch. The
+ * field defaults to an empty list, which keeps deserialization backward-compatible
+ * with drafts written by older app versions.
  */
 @Serializable
 data class EntryDraft(
@@ -72,4 +91,32 @@ data class EntryDraft(
     val notes: List<JournalNote>,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val pendingMedia: List<PendingMediaRecord> = emptyList(),
+)
+
+/** Type of pending media. Currently only audio is wired; camera/video will follow. */
+@Serializable
+enum class PendingMediaType {
+    AUDIO,
+}
+
+/**
+ * A record of in-flight media owned by an [EntryDraft].
+ *
+ * Persisted alongside the draft so a recording started in one process can be
+ * recovered by a future process — the draft is the registry, no separate
+ * orphan-tracking is needed (per design: "all notes should already be associated
+ * with entry drafts").
+ *
+ * @property filePath Absolute path on the recording device, when known. May be
+ *   null for transient states where the path has not yet been resolved by the
+ *   recording side.
+ */
+@Serializable
+data class PendingMediaRecord(
+    @Serializable(with = UuidSerializer::class)
+    val blockId: Uuid,
+    val mediaType: PendingMediaType,
+    val createdAt: Instant,
+    val filePath: String? = null,
 )

@@ -140,6 +140,11 @@ class FetchMostRecentDraftUseCaseTest {
             notes: List<JournalNote>,
         ): Uuid = uid
 
+        override suspend fun setPendingMedia(
+            uid: Uuid,
+            pendingMedia: List<app.logdate.client.repository.journals.PendingMediaRecord>,
+        ) = Unit
+
         override suspend fun deleteDraft(uid: Uuid) = Unit
 
         override suspend fun deleteAllDrafts() {}

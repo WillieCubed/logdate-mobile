@@ -16,6 +16,7 @@ import app.logdate.client.domain.notes.drafts.DeleteEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.notes.drafts.GetAllDraftsUseCase
+import app.logdate.client.domain.notes.drafts.SetEntryDraftPendingMediaUseCase
 import app.logdate.client.domain.notes.drafts.UpdateEntryDraftUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
 import app.logdate.client.repository.journals.JournalNote
@@ -118,6 +119,7 @@ class DraftManagementTest {
                 deleteEntryDraft = deleteEntryDraft,
                 deleteAllDraftsUseCase = DeleteAllDraftsUseCase(entryDraftRepository),
                 cleanupExpiredDraftsUseCase = CleanupExpiredDraftsUseCase(entryDraftRepository),
+                setPendingMedia = SetEntryDraftPendingMediaUseCase(entryDraftRepository),
             )
         val contentLoader =
             ContentLoader(

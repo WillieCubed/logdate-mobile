@@ -12,6 +12,7 @@ import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.PendingMediaRecord
 import app.logdate.client.repository.location.LocationHistoryItem
 import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.timeline.ActivityTimelineRepository
@@ -210,6 +211,19 @@ class FakeEntryDraftRepository : EntryDraftRepository {
             }
         drafts.value = drafts.value.filterNot { it.id == uid } + updated
         return uid
+    }
+
+    override suspend fun setPendingMedia(
+        uid: Uuid,
+        pendingMedia: List<PendingMediaRecord>,
+    ) {
+        val existing = drafts.value.firstOrNull { it.id == uid } ?: return
+        val updated =
+            existing.copy(
+                pendingMedia = pendingMedia,
+                updatedAt = Clock.System.now(),
+            )
+        drafts.value = drafts.value.filterNot { it.id == uid } + updated
     }
 
     override suspend fun deleteDraft(uid: Uuid) {

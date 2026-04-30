@@ -297,6 +297,11 @@ private class FakeDraftRepository : EntryDraftRepository {
         return uid
     }
 
+    override suspend fun setPendingMedia(
+        uid: Uuid,
+        pendingMedia: List<app.logdate.client.repository.journals.PendingMediaRecord>,
+    ) = Unit
+
     override suspend fun deleteDraft(uid: Uuid) {
         drafts.value = drafts.value.filterNot { it.id == uid }
     }

@@ -3,6 +3,7 @@ package app.logdate.client.data.notes.drafts
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.PendingMediaRecord
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -86,6 +87,26 @@ class OfflineFirstEntryDraftRepository(
         draftStore.saveDraft(updatedDraft)
 
         return uid
+    }
+
+    override suspend fun setPendingMedia(
+        uid: Uuid,
+        pendingMedia: List<PendingMediaRecord>,
+    ) {
+        val currentDrafts = draftsFlow.value
+        val existingDraft = currentDrafts[uid] ?: return
+
+        val updatedDraft =
+            existingDraft.copy(
+                pendingMedia = pendingMedia,
+                updatedAt = Clock.System.now(),
+            )
+
+        val updatedDrafts = currentDrafts.toMutableMap()
+        updatedDrafts[uid] = updatedDraft
+        draftsFlow.value = updatedDrafts
+
+        draftStore.saveDraft(updatedDraft)
     }
 
     override suspend fun deleteDraft(uid: Uuid) {

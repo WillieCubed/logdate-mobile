@@ -51,6 +51,7 @@ import app.logdate.client.domain.notes.drafts.DeleteEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.notes.drafts.GetAllDraftsUseCase
+import app.logdate.client.domain.notes.drafts.SetEntryDraftPendingMediaUseCase
 import app.logdate.client.domain.notes.drafts.UpdateEntryDraftUseCase
 import app.logdate.client.domain.onboarding.ProcessPersonalIntroductionUseCase
 import app.logdate.client.domain.places.PlaceResolutionCache
@@ -68,13 +69,13 @@ import app.logdate.client.domain.recommendation.PlaceFamiliarityRepository
 import app.logdate.client.domain.restore.PreviewArchiveUseCase
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.domain.rewind.DeleteRewindUseCase
-import app.logdate.client.domain.rewind.MarkRewindViewedUseCase
 import app.logdate.client.domain.rewind.GenerateAnnualRewindUseCase
 import app.logdate.client.domain.rewind.GenerateBasicRewindUseCase
 import app.logdate.client.domain.rewind.GenerateRewindTitleUseCase
 import app.logdate.client.domain.rewind.GetPastRewindsUseCase
 import app.logdate.client.domain.rewind.GetRewindUseCase
 import app.logdate.client.domain.rewind.GetWeekRewindUseCase
+import app.logdate.client.domain.rewind.MarkRewindViewedUseCase
 import app.logdate.client.domain.rewind.ObserveReflectionPromptResponsesUseCase
 import app.logdate.client.domain.rewind.SaveReflectionPromptResponseUseCase
 import app.logdate.client.domain.search.ObserveRecentSearchesUseCase
@@ -96,8 +97,6 @@ import app.logdate.client.domain.timeline.GroupNotesByDayBoundsUseCase
 import app.logdate.client.domain.timeline.InferMomentsUseCase
 import app.logdate.client.domain.timeline.SummarizeJournalEntriesUseCase
 import app.logdate.client.intelligence.events.EventNamingExtractor
-import app.logdate.client.repository.media.IndexedMediaRepository
-import app.logdate.client.repository.rewind.RewindGenerationManager
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -149,6 +148,7 @@ val domainModule: Module =
         factory { FetchMostRecentDraftUseCase(get()) }
         factory { GetAllDraftsUseCase(get()) }
         factory { UpdateEntryDraftUseCase(get()) }
+        factory { SetEntryDraftPendingMediaUseCase(get()) }
 
         // Editor
         factory { ObserveEditorDataUseCase(get(), get(), get(), get()) }

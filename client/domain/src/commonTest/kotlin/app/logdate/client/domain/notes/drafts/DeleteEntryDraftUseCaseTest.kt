@@ -76,6 +76,11 @@ class DeleteEntryDraftUseCaseTest {
         val deletedDraftIds = mutableListOf<Uuid>()
         var shouldThrowException = false
 
+        override suspend fun setPendingMedia(
+            uid: Uuid,
+            pendingMedia: List<app.logdate.client.repository.journals.PendingMediaRecord>,
+        ) = Unit
+
         override suspend fun deleteDraft(uid: Uuid) {
             if (shouldThrowException) {
                 throw Exception("Repository error")
