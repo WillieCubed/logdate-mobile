@@ -3,6 +3,7 @@ package app.logdate.feature.editor.ui.mapper
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
+import app.logdate.feature.editor.ui.editor.AudioCaptureState
 import app.logdate.feature.editor.ui.editor.CameraBlockUiState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
@@ -29,31 +30,58 @@ class NoteMappersTest {
     // --- Audio: the bug-class focus ---
 
     @Test
-    fun `audio block without uri maps to null`() {
+    fun `audio block in empty capture state maps to null`() {
         val block =
             AudioBlockUiState(
                 id = Uuid.random(),
                 timestamp = fixedTimestamp,
-                uri = null,
+                captureState = AudioCaptureState.Empty,
             )
 
-        assertNull(block.toJournalNote(), "Audio block without a URI must not be persisted")
+        assertNull(block.toJournalNote(), "Audio block without a finalized recording must not be persisted")
     }
 
     @Test
-    fun `audio block with empty uri maps to journal note audio`() {
+    fun `audio block in recording capture state maps to null`() {
+        val block =
+            AudioBlockUiState(
+                id = Uuid.random(),
+                timestamp = fixedTimestamp,
+                captureState = AudioCaptureState.Recording,
+            )
+
+        assertNull(block.toJournalNote(), "Recording-in-progress audio must not be persisted as a journal note")
+    }
+
+    @Test
+    fun `audio block in stopping capture state maps to null`() {
+        val block =
+            AudioBlockUiState(
+                id = Uuid.random(),
+                timestamp = fixedTimestamp,
+                captureState = AudioCaptureState.Stopping,
+            )
+
+        assertNull(block.toJournalNote(), "Audio waiting for finalization must not be persisted yet")
+    }
+
+    @Test
+    fun `audio block in ready capture state maps to journal note audio`() {
         val id = Uuid.random()
         val block =
             AudioBlockUiState(
                 id = id,
                 timestamp = fixedTimestamp,
-                uri = "file:///audio_notes/recording_$id.m4a",
-                duration = 4_200L,
+                captureState =
+                    AudioCaptureState.Ready(
+                        uri = "file:///audio_notes/recording_$id.m4a",
+                        durationMs = 4_200L,
+                    ),
             )
 
         val note = block.toJournalNote()
 
-        assertNotNull(note, "Audio block with a URI must persist")
+        assertNotNull(note, "Audio block in Ready state must persist")
         val audio = assertIs<JournalNote.Audio>(note)
         assertEquals(id, audio.uid)
         assertEquals(fixedTimestamp, audio.creationTimestamp)
@@ -68,7 +96,7 @@ class NoteMappersTest {
             AudioBlockUiState(
                 id = id,
                 timestamp = fixedTimestamp,
-                uri = "file:///audio_notes/x.m4a",
+                captureState = AudioCaptureState.Ready("file:///audio_notes/x.m4a", 0L),
             )
 
         val note = assertIs<JournalNote.Audio>(block.toJournalNote())
@@ -92,8 +120,10 @@ class NoteMappersTest {
 
         val audio = assertIs<AudioBlockUiState>(block)
         assertEquals(id, audio.id)
-        assertEquals("file:///audio_notes/round_trip.m4a", audio.uri)
-        assertEquals(9_001L, audio.duration)
+        val ready = assertIs<AudioCaptureState.Ready>(audio.captureState)
+        assertEquals("file:///audio_notes/round_trip.m4a", ready.uri)
+        assertEquals(9_001L, ready.durationMs)
+        assertEquals(true, audio.isPersistable())
     }
 
     // --- Text ---

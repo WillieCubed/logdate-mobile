@@ -3,6 +3,7 @@ package app.logdate.feature.editor.ui.mapper
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
+import app.logdate.feature.editor.ui.editor.AudioCaptureState
 import app.logdate.feature.editor.ui.editor.CameraBlockUiState
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
@@ -48,8 +49,7 @@ fun JournalNote.toDomainBlock(): EntryBlockUiState =
                 id = uid,
                 timestamp = creationTimestamp,
                 location = null,
-                uri = mediaRef,
-                duration = durationMs,
+                captureState = AudioCaptureState.Ready(uri = mediaRef, durationMs = durationMs),
             )
     }
 
@@ -117,13 +117,13 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
         }
 
         is AudioBlockUiState -> {
-            if (!hasContent()) return null
+            val ready = captureState as? AudioCaptureState.Ready ?: return null
             JournalNote.Audio(
                 uid = id,
                 creationTimestamp = timestamp,
                 lastUpdated = now,
-                mediaRef = uri ?: return null,
-                durationMs = duration,
+                mediaRef = ready.uri,
+                durationMs = ready.durationMs,
             )
         }
     }

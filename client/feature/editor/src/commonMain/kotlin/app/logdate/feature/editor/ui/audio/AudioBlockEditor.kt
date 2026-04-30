@@ -13,6 +13,7 @@ import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.feature.editor.audio.AudioLabelResolver
 import app.logdate.feature.editor.audio.formatAudioLabel
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
+import app.logdate.feature.editor.ui.editor.AudioCaptureState
 import app.logdate.feature.editor.ui.editor.RecordingState
 import app.logdate.util.formatDateLocalized
 import kotlinx.datetime.TimeZone
@@ -57,7 +58,8 @@ fun AudioBlockEditor(
     val audioUiState by audioViewModel.uiState.collectAsState()
 
     // Determine if we're in recording mode or playback mode
-    val hasExistingAudio = block.uri != null
+    val existingAudioUri = block.uri
+    val hasExistingAudio = existingAudioUri != null
     val isRecording = audioUiState.isRecording
 
     // Determine current recording state
@@ -83,8 +85,11 @@ fun AudioBlockEditor(
     val handleSaveRecording = { uri: String ->
         onBlockUpdated(
             block.copy(
-                uri = uri,
-                duration = audioUiState.duration.inWholeMilliseconds,
+                captureState =
+                    AudioCaptureState.Ready(
+                        uri = uri,
+                        durationMs = audioUiState.duration.inWholeMilliseconds,
+                    ),
                 transcription = audioUiState.transcription ?: block.transcription,
             ),
         )
@@ -119,7 +124,7 @@ fun AudioBlockEditor(
     // Use AudioPermissionWrapper to handle permissions
     Box(modifier = modifier) {
         AudioPermissionWrapper {
-            if (hasExistingAudio) {
+            if (existingAudioUri != null) {
                 AudioBlockContent(
                     block = block,
                     isExpanded = true,
@@ -127,7 +132,7 @@ fun AudioBlockEditor(
                     timedTranscript = audioUiState.timedTranscript,
                     playbackProgress = audioUiState.playbackProgress,
                     onPlayPauseClicked = {
-                        audioViewModel.togglePlayback(block.uri, playbackMetadata)
+                        audioViewModel.togglePlayback(existingAudioUri, playbackMetadata)
                     },
                     onSeekPositionChanged = { position ->
                         audioViewModel.seekTo(position)

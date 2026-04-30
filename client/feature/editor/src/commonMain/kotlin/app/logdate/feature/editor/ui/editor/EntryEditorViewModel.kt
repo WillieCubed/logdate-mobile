@@ -491,7 +491,11 @@ class EntryEditorViewModel(
                         }
                         BlockType.AUDIO -> {
                             val block = createNewBlock(BlockType.AUDIO) as AudioBlockUiState
-                            updateBlock(block.copy(uri = uri))
+                            updateBlock(
+                                block.copy(
+                                    captureState = AudioCaptureState.Ready(uri = uri, durationMs = 0L),
+                                ),
+                            )
                         }
                         else -> {
                             Napier.w("Unhandled attachment type for URI: $uri")

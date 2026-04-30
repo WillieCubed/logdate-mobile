@@ -126,15 +126,33 @@ data class VideoBlockUiState(
 
 /**
  * Audio block data representing an audio recording in a journal entry.
+ *
+ * The recording lifecycle lives in [captureState]. Transient recording progress
+ * (Recording / Stopping) is represented inside the block itself so the editor
+ * can persist intent into a draft and reason about pending media at save time
+ * — instead of holding the in-flight URI inside an app-scoped ViewModel where
+ * a save action could race past it.
  */
 data class AudioBlockUiState(
     override val id: Uuid = Uuid.random(),
     override val timestamp: Instant = Clock.System.now(),
     override val location: Location? = null,
-    override val uri: String? = null,
+    val captureState: AudioCaptureState = AudioCaptureState.Empty,
     override val caption: String = "",
-    val duration: Long = 0,
     val transcription: String = "",
 ) : MediaBlockUiState {
-    override fun hasContent(): Boolean = uri != null
+    override val uri: String?
+        get() = (captureState as? AudioCaptureState.Ready)?.uri
+
+    val durationMs: Long
+        get() = (captureState as? AudioCaptureState.Ready)?.durationMs ?: 0L
+
+    /** Backward-compatible alias for [durationMs]. Prefer [durationMs] in new code. */
+    val duration: Long
+        get() = durationMs
+
+    override fun hasContent(): Boolean = captureState !is AudioCaptureState.Empty
+
+    /** True only when the recording is finalized and ready to be persisted as a journal note. */
+    fun isPersistable(): Boolean = captureState is AudioCaptureState.Ready
 }
