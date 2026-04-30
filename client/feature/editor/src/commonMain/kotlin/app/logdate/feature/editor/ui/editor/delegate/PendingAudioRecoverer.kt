@@ -2,6 +2,7 @@ package app.logdate.feature.editor.ui.editor.delegate
 
 import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.feature.editor.ui.editor.AudioCaptureState
+import io.github.aakira.napier.Napier
 
 /**
  * Resolves audio capture states left behind by a prior session.
@@ -33,11 +34,9 @@ class DefaultPendingAudioRecoverer(
     override suspend fun recover(state: AudioCaptureState.Stopping): AudioCaptureState {
         val path = state.filePath ?: return AudioCaptureState.Failed(RECORDING_LOST_REASON)
         val durationMs =
-            try {
-                durationResolver.resolveDurationMs(path)
-            } catch (e: Exception) {
-                null
-            }
+            runCatching { durationResolver.resolveDurationMs(path) }
+                .onFailure { Napier.w("Could not resolve duration for recovered audio $path", it) }
+                .getOrNull()
         return if (durationMs != null) {
             AudioCaptureState.Ready(uri = path, durationMs = durationMs)
         } else {

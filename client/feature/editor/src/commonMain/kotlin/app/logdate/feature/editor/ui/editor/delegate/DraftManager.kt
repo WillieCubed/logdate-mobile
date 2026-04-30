@@ -7,6 +7,7 @@ import app.logdate.client.domain.notes.drafts.DeleteEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.SetEntryDraftPendingMediaUseCase
 import app.logdate.client.domain.notes.drafts.UpdateEntryDraftUseCase
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.PendingMediaRecord
 import app.logdate.client.repository.journals.PendingMediaType
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
@@ -19,6 +20,7 @@ import app.logdate.feature.editor.ui.mapper.toJournalNote
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.first
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -52,12 +54,18 @@ class DraftManager(
      * @return The draft ID if a draft was created or updated, null if skipped.
      */
     suspend fun autoSave(state: EditorState): Uuid? {
-        val notes =
-            state.blocks.mapNotNull { block ->
-                if (!block.hasContent() || state.isReadOnly(block.id)) return@mapNotNull null
-                block.toJournalNote()
+        val now = Clock.System.now()
+        val notes = mutableListOf<JournalNote>()
+        val pendingMedia = mutableListOf<PendingMediaRecord>()
+        for (block in state.blocks) {
+            if (state.isReadOnly(block.id)) continue
+            if (block.hasContent()) {
+                block.toJournalNote()?.let(notes::add)
             }
-        val pendingMedia = state.blocks.toPendingMediaRecords(state)
+            if (block is AudioBlockUiState) {
+                block.toPendingMediaRecord(now)?.let(pendingMedia::add)
+            }
+        }
 
         if (notes.isEmpty() && pendingMedia.isEmpty()) {
             Napier.d("Skip autosave: no editable content")
@@ -145,27 +153,22 @@ class DraftManager(
  * skipped. So are Empty and Ready audio blocks — Empty has no content, and
  * Ready becomes a [JournalNote.Audio] in the draft's notes list.
  */
-private fun List<EntryBlockUiState>.toPendingMediaRecords(state: EditorState): List<PendingMediaRecord> {
-    val now = Clock.System.now()
-    return mapNotNull { block ->
-        if (state.isReadOnly(block.id)) return@mapNotNull null
-        if (block !is AudioBlockUiState) return@mapNotNull null
-        val filePath =
-            when (val capture = block.captureState) {
-                is AudioCaptureState.Recording -> capture.filePath
-                is AudioCaptureState.Stopping -> capture.filePath
-                AudioCaptureState.Empty,
-                is AudioCaptureState.Ready,
-                is AudioCaptureState.Failed,
-                -> return@mapNotNull null
-            }
-        PendingMediaRecord(
-            blockId = block.id,
-            mediaType = PendingMediaType.AUDIO,
-            createdAt = now,
-            filePath = filePath,
-        )
-    }
+private fun AudioBlockUiState.toPendingMediaRecord(now: Instant): PendingMediaRecord? {
+    val filePath =
+        when (val capture = captureState) {
+            is AudioCaptureState.Recording -> capture.filePath
+            is AudioCaptureState.Stopping -> capture.filePath
+            AudioCaptureState.Empty,
+            is AudioCaptureState.Ready,
+            is AudioCaptureState.Failed,
+            -> return null
+        }
+    return PendingMediaRecord(
+        blockId = id,
+        mediaType = PendingMediaType.AUDIO,
+        createdAt = now,
+        filePath = filePath,
+    )
 }
 
 /**

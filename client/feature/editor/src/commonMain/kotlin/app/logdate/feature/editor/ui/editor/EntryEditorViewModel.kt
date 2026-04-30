@@ -12,6 +12,9 @@ import app.logdate.feature.editor.ui.mapper.toDomainBlock
 import app.logdate.feature.editor.ui.mapper.toJournalNote
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -342,15 +345,24 @@ class EntryEditorViewModel(
             }
         if (pendingBlocks.isEmpty()) return emptyMap()
 
+        val finalized: List<Pair<Uuid, AudioCaptureState?>> =
+            coroutineScope {
+                pendingBlocks
+                    .map { block ->
+                        async {
+                            block.id to
+                                withTimeoutOrNull(AUDIO_FINALIZE_TIMEOUT_MS) {
+                                    audioBlockFinalizer.finalize(block.id, block.captureState)
+                                }
+                        }
+                    }.awaitAll()
+            }
+
         val resolved = mutableMapOf<Uuid, AudioCaptureState>()
-        for (block in pendingBlocks) {
-            val finalized =
-                withTimeoutOrNull(AUDIO_FINALIZE_TIMEOUT_MS) {
-                    audioBlockFinalizer.finalize(block.id, block.captureState)
-                }
-            when (finalized) {
+        for ((blockId, state) in finalized) {
+            when (state) {
                 null -> {
-                    Napier.w("Audio finalization timed out for block ${block.id}")
+                    Napier.w("Audio finalization timed out for block $blockId")
                     mutableEditorState.update {
                         it.copy(
                             errorMessage = "Recording is still finalizing. Try again in a moment.",
@@ -360,13 +372,13 @@ class EntryEditorViewModel(
                     return null
                 }
                 is AudioCaptureState.Failed -> {
-                    Napier.w("Audio finalization failed for block ${block.id}: ${finalized.reason}")
+                    Napier.w("Audio finalization failed for block $blockId: ${state.reason}")
                     mutableEditorState.update {
-                        it.copy(errorMessage = finalized.reason, isSaving = false)
+                        it.copy(errorMessage = state.reason, isSaving = false)
                     }
                     return null
                 }
-                else -> resolved[block.id] = finalized
+                else -> resolved[blockId] = state
             }
         }
         return resolved
@@ -666,10 +678,8 @@ class EntryEditorViewModel(
 
     private companion object {
         /**
-         * Maximum time to wait for any single pending audio block to finalize during save.
          * MediaRecorder.stop() typically completes in well under a second; the bound is
-         * generous so a slow flush on an aging device doesn't cost the user their entry,
-         * but tight enough to surface a recoverable error if the recorder is stuck.
+         * generous so a slow flush on an aging device doesn't cost the user their entry.
          */
         const val AUDIO_FINALIZE_TIMEOUT_MS: Long = 5_000L
     }

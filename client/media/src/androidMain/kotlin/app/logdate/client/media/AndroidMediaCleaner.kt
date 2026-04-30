@@ -1,5 +1,6 @@
 package app.logdate.client.media
 
+import android.net.Uri
 import io.github.aakira.napier.Napier
 import java.io.File
 
@@ -12,15 +13,11 @@ import java.io.File
  */
 class AndroidMediaCleaner : MediaCleaner {
     override suspend fun delete(path: String) {
-        val absolutePath =
-            when {
-                path.startsWith(FILE_URI_PREFIX) -> path.removePrefix(FILE_URI_PREFIX)
-                path.startsWith("/") -> path
-                else -> {
-                    Napier.d("MediaCleaner: ignoring non-filesystem path: $path")
-                    return
-                }
-            }
+        val absolutePath = path.toFilesystemPath()
+        if (absolutePath == null) {
+            Napier.d("MediaCleaner: ignoring non-filesystem path: $path")
+            return
+        }
         try {
             val file = File(absolutePath)
             if (file.exists() && !file.delete()) {
@@ -31,7 +28,10 @@ class AndroidMediaCleaner : MediaCleaner {
         }
     }
 
-    private companion object {
-        const val FILE_URI_PREFIX: String = "file://"
-    }
+    private fun String.toFilesystemPath(): String? =
+        when {
+            startsWith("/") -> this
+            startsWith("file:") -> Uri.parse(this).path
+            else -> null
+        }
 }
