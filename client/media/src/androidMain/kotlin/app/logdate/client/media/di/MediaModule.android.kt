@@ -1,7 +1,9 @@
 package app.logdate.client.media.di
 
 import android.content.ContentResolver
+import app.logdate.client.media.AndroidMediaCleaner
 import app.logdate.client.media.AndroidMediaManager
+import app.logdate.client.media.MediaCleaner
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.audio.transcription.AndroidTranscriptionManager
 import app.logdate.client.media.audio.transcription.TranscriptionManager
@@ -21,6 +23,7 @@ actual val mediaModule: Module =
         // Media manager dependencies
         single<ContentResolver> { androidContext().contentResolver }
         single<MediaManager> { AndroidMediaManager(get(), get()) }
+        single<MediaCleaner> { AndroidMediaCleaner() }
 
         // Transcription manager
         single<TranscriptionManager> { AndroidTranscriptionManager(androidContext()) }

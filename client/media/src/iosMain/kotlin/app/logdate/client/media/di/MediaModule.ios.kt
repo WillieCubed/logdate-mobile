@@ -1,7 +1,9 @@
 package app.logdate.client.media.di
 
 import app.logdate.client.media.IosMediaManager
+import app.logdate.client.media.MediaCleaner
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.NoOpMediaCleaner
 import app.logdate.client.media.audio.transcription.IosTranscriptionManager
 import app.logdate.client.media.audio.transcription.TranscriptionManager
 import app.logdate.client.media.display.RemoteDisplayManager
@@ -18,6 +20,7 @@ actual val mediaModule: Module =
         includes(audioModule)
 
         single<MediaManager> { IosMediaManager() }
+        single<MediaCleaner> { NoOpMediaCleaner }
 
         // Transcription manager for iOS
         single<TranscriptionManager> {

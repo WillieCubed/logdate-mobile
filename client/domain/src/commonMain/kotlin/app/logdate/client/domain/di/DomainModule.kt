@@ -143,7 +143,7 @@ val domainModule: Module =
         factory { CleanupExpiredDraftsUseCase(get()) }
         factory { CreateEntryDraftUseCase(get()) }
         factory { DeleteAllDraftsUseCase(get()) }
-        factory { DeleteEntryDraftUseCase(get()) }
+        factory { DeleteEntryDraftUseCase(get(), get()) }
         factory { FetchEntryDraftUseCase(get()) }
         factory { FetchMostRecentDraftUseCase(get()) }
         factory { GetAllDraftsUseCase(get()) }

@@ -1,7 +1,9 @@
 package app.logdate.client.media.di
 
 import app.logdate.client.media.DesktopMediaManager
+import app.logdate.client.media.MediaCleaner
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.NoOpMediaCleaner
 import app.logdate.client.media.audio.transcription.DesktopTranscriptionManager
 import app.logdate.client.media.audio.transcription.TranscriptionManager
 import app.logdate.client.media.display.RemoteDisplayManager
@@ -19,6 +21,7 @@ actual val mediaModule: Module =
 
         // Media manager
         single<MediaManager> { DesktopMediaManager() }
+        single<MediaCleaner> { NoOpMediaCleaner }
 
         // Transcription manager for desktop
         single<TranscriptionManager> {
