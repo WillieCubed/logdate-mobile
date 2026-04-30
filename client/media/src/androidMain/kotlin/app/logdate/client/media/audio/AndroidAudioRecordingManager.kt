@@ -108,6 +108,9 @@ class AndroidAudioRecordingManager(
     override val isRecording: Boolean
         get() = recordingActive
 
+    override val currentRecordingPath: String?
+        get() = recordingTarget?.path
+
     override fun setTranscriptionService(service: TranscriptionService) {
         this.transcriptionService = service
 

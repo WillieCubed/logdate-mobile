@@ -103,6 +103,24 @@ fun AudioBlockEditor(
         }
     }
 
+    LaunchedEffect(
+        audioUiState.isRecording,
+        audioUiState.recordingTargetNoteId,
+        audioUiState.recordingFilePath,
+        block.captureState,
+    ) {
+        val ownsActiveRecording =
+            audioUiState.isRecording && audioUiState.recordingTargetNoteId == block.id
+        if (!ownsActiveRecording) return@LaunchedEffect
+        val livePath = audioUiState.recordingFilePath
+        val current = block.captureState
+        val needsUpdate =
+            current !is AudioCaptureState.Recording || current.filePath != livePath
+        if (needsUpdate) {
+            onBlockUpdated(block.copy(captureState = AudioCaptureState.Recording(filePath = livePath)))
+        }
+    }
+
     LaunchedEffect(audioUiState.transcription, block.uri, block.transcription) {
         val latestTranscript = audioUiState.transcription?.trim().orEmpty()
         if (block.uri != null && latestTranscript.isNotBlank() && latestTranscript != block.transcription) {

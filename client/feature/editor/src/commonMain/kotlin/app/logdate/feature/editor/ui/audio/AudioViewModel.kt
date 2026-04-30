@@ -131,6 +131,8 @@ class AudioViewModel(
                         duration = Duration.ZERO,
                         transcriptionState = transcriptionState,
                         error = null,
+                        recordingFilePath = audioRecordingManager.currentRecordingPath,
+                        recordingTargetNoteId = targetNoteId,
                     )
                 }
                 Napier.d("AudioViewModel: Recording started")
@@ -173,6 +175,8 @@ class AudioViewModel(
                     isRecording = false,
                     isPaused = false,
                     recordedAudioUri = uri,
+                    recordingFilePath = null,
+                    recordingTargetNoteId = null,
                     duration = resolvedDuration ?: it.duration,
                     transcriptionState = updatedTranscription,
                 )

@@ -5,6 +5,7 @@ import app.logdate.client.media.audio.transcription.TimedTranscript
 import app.logdate.client.media.audio.transcription.TranscriptionFailure
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.ZERO
+import kotlin.uuid.Uuid
 
 /**
  * Data class representing the UI state for audio recording and playback.
@@ -14,6 +15,17 @@ data class AudioUiState(
     val isRecording: Boolean = false,
     val isPaused: Boolean = false, // New state for pause/resume functionality
     val recordedAudioUri: String? = null,
+    /**
+     * Filesystem path of the recording the manager is currently writing to. Surfaced so
+     * the editor can persist it as the recovery anchor in the draft's pending-media list
+     * while the recording is in flight.
+     */
+    val recordingFilePath: String? = null,
+    /**
+     * Block id the active recording is bound to. Multiple audio blocks may exist in the
+     * editor; only the one matching this id should reflect the recording's live state.
+     */
+    val recordingTargetNoteId: Uuid? = null,
     val audioLevels: List<Float> = emptyList(),
     val duration: Duration = ZERO,
     // Playback state

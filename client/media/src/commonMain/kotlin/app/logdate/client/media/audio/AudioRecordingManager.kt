@@ -98,4 +98,17 @@ interface AudioRecordingManager {
      * Whether recording is currently in progress
      */
     val isRecording: Boolean
+
+    /**
+     * Filesystem path of the active recording target, or null when nothing is recording.
+     *
+     * Surfaced so the editor can write the path into the entry draft's pending-media list
+     * while a recording is in flight — that's the recovery anchor used to validate or
+     * delete the file if the process dies before the recording finalizes.
+     *
+     * Default null so platforms that don't surface a path (or that don't support recording)
+     * fall through gracefully; orphan recovery on those platforms degrades to "Failed".
+     */
+    val currentRecordingPath: String?
+        get() = null
 }
