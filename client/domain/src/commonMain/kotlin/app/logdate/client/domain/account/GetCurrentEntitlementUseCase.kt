@@ -20,12 +20,16 @@ class GetCurrentEntitlementUseCase(
     private val apiClient: PasskeyApiClientContract,
 ) {
     sealed class Result {
-        data class Success(val entitlement: EntitlementResponse) : Result()
+        data class Success(
+            val entitlement: EntitlementResponse,
+        ) : Result()
 
         /** No signed-in session; nothing to fetch. Caller should treat as local-only mode. */
         data object NotSignedIn : Result()
 
-        data class Error(val message: String) : Result()
+        data class Error(
+            val message: String,
+        ) : Result()
     }
 
     suspend operator fun invoke(): Result {

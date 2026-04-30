@@ -37,7 +37,9 @@ class TriggerInitialSyncUseCase(
         object TimedOut : Result()
 
         /** An unexpected throwable escaped from sync. */
-        data class Error(val message: String) : Result()
+        data class Error(
+            val message: String,
+        ) : Result()
     }
 
     suspend operator fun invoke(): Result =

@@ -8,8 +8,8 @@ import app.logdate.client.domain.account.CreateRemoteAccountUseCase
 import app.logdate.client.domain.account.DeletePasskeyUseCase
 import app.logdate.client.domain.account.GetAccountSetupDataUseCase
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
-import app.logdate.client.domain.account.HasLogDateCloudAccountUseCase
 import app.logdate.client.domain.account.GetCurrentEntitlementUseCase
+import app.logdate.client.domain.account.HasLogDateCloudAccountUseCase
 import app.logdate.client.domain.account.TriggerInitialSyncUseCase
 import app.logdate.client.domain.account.TryRestoreSignInUseCase
 import app.logdate.client.domain.user.GetUserIdUseCase

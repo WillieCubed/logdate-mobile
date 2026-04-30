@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
