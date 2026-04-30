@@ -47,7 +47,7 @@ class NoteMappersTest {
             AudioBlockUiState(
                 id = Uuid.random(),
                 timestamp = fixedTimestamp,
-                captureState = AudioCaptureState.Recording,
+                captureState = AudioCaptureState.Recording(),
             )
 
         assertNull(block.toJournalNote(), "Recording-in-progress audio must not be persisted as a journal note")
@@ -59,7 +59,7 @@ class NoteMappersTest {
             AudioBlockUiState(
                 id = Uuid.random(),
                 timestamp = fixedTimestamp,
-                captureState = AudioCaptureState.Stopping,
+                captureState = AudioCaptureState.Stopping(),
             )
 
         assertNull(block.toJournalNote(), "Audio waiting for finalization must not be persisted yet")

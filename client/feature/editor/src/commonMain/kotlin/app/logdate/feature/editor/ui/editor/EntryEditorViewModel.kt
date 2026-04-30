@@ -7,6 +7,7 @@ import app.logdate.client.domain.editor.SaveEntryUseCase
 import app.logdate.feature.editor.ui.editor.delegate.AudioBlockFinalizer
 import app.logdate.feature.editor.ui.editor.delegate.ContentLoader
 import app.logdate.feature.editor.ui.editor.delegate.DraftManager
+import app.logdate.feature.editor.ui.editor.delegate.PendingAudioRecoverer
 import app.logdate.feature.editor.ui.mapper.toDomainBlock
 import app.logdate.feature.editor.ui.mapper.toJournalNote
 import io.github.aakira.napier.Napier
@@ -34,6 +35,7 @@ class EntryEditorViewModel(
     private val draftManager: DraftManager,
     private val contentLoader: ContentLoader,
     private val audioBlockFinalizer: AudioBlockFinalizer = AudioBlockFinalizer.NoOp,
+    private val pendingAudioRecoverer: PendingAudioRecoverer? = null,
 ) : ViewModel() {
     // Internal mutable state that can be modified by UI
     private val mutableEditorState =
@@ -453,9 +455,10 @@ class EntryEditorViewModel(
         viewModelScope.launch {
             draftManager.loadDraft(draftId).fold(
                 onSuccess = { loaded ->
+                    val recoveredBlocks = recoverPendingAudio(loaded.blocks)
                     mutableEditorState.update { currentState ->
                         currentState.copy(
-                            blocks = loaded.blocks,
+                            blocks = recoveredBlocks,
                             draftState = DraftState.Active(loaded.draftId),
                             isModified = true,
                             errorMessage = null,
@@ -469,6 +472,26 @@ class EntryEditorViewModel(
                     }
                 },
             )
+        }
+    }
+
+    /**
+     * Resolves any [AudioCaptureState.Stopping] blocks restored from a draft into
+     * either [AudioCaptureState.Ready] (when the file on disk is parseable) or
+     * [AudioCaptureState.Failed] (when the path is missing or the file is unusable).
+     *
+     * No-op when [pendingAudioRecoverer] is not wired — blocks remain Stopping,
+     * which the editor's UI surfaces as a recovery affordance.
+     */
+    private suspend fun recoverPendingAudio(blocks: List<EntryBlockUiState>): List<EntryBlockUiState> {
+        val recoverer = pendingAudioRecoverer ?: return blocks
+        return blocks.map { block ->
+            val capture = (block as? AudioBlockUiState)?.captureState
+            if (capture is AudioCaptureState.Stopping) {
+                block.copy(captureState = recoverer.recover(capture))
+            } else {
+                block
+            }
         }
     }
 

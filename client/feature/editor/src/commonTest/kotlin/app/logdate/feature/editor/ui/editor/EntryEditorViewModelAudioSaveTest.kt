@@ -205,7 +205,7 @@ class EntryEditorViewModelAudioSaveTest {
         testScope.runTest {
             val viewModel = buildViewModel()
             viewModel.editorState.first()
-            val seeded = viewModel.seedAudioBlock(AudioCaptureState.Recording)
+            val seeded = viewModel.seedAudioBlock(AudioCaptureState.Recording())
             advanceUntilIdle()
             fakeFinalizer.respondWith(
                 seeded.id,
@@ -228,7 +228,7 @@ class EntryEditorViewModelAudioSaveTest {
         testScope.runTest {
             val viewModel = buildViewModel()
             viewModel.editorState.first()
-            val seeded = viewModel.seedAudioBlock(AudioCaptureState.Recording)
+            val seeded = viewModel.seedAudioBlock(AudioCaptureState.Recording())
             advanceUntilIdle()
             fakeFinalizer.respondWith(seeded.id, AudioCaptureState.Failed("Recording could not be finalized"))
 
@@ -249,7 +249,7 @@ class EntryEditorViewModelAudioSaveTest {
             val stallingFinalizer = StallingAudioBlockFinalizer()
             val viewModel = buildViewModel(finalizer = stallingFinalizer)
             viewModel.editorState.first()
-            viewModel.seedAudioBlock(AudioCaptureState.Stopping)
+            viewModel.seedAudioBlock(AudioCaptureState.Stopping())
             advanceUntilIdle()
 
             viewModel.saveEntry(viewModel.editorState.value)

@@ -8,7 +8,9 @@ import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.delegate.AudioBlockFinalizer
 import app.logdate.feature.editor.ui.editor.delegate.ContentLoader
 import app.logdate.feature.editor.ui.editor.delegate.DefaultAudioBlockFinalizer
+import app.logdate.feature.editor.ui.editor.delegate.DefaultPendingAudioRecoverer
 import app.logdate.feature.editor.ui.editor.delegate.DraftManager
+import app.logdate.feature.editor.ui.editor.delegate.PendingAudioRecoverer
 import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.factoryOf
@@ -34,6 +36,7 @@ val editorFeatureModule: Module =
         // path can absorb a recording whose URI is still in flight on the audio side.
         factory<PendingAudioResolver> { get<AudioViewModel>() }
         factory<AudioBlockFinalizer> { DefaultAudioBlockFinalizer(resolver = get()) }
+        factory<PendingAudioRecoverer> { DefaultPendingAudioRecoverer(durationResolver = get()) }
 
         viewModel {
             CameraViewModel(
@@ -48,6 +51,7 @@ val editorFeatureModule: Module =
                 draftManager = get(),
                 contentLoader = get(),
                 audioBlockFinalizer = get(),
+                pendingAudioRecoverer = get(),
             )
         }
     }

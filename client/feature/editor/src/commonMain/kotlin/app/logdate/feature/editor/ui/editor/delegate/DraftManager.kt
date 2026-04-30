@@ -149,17 +149,22 @@ private fun List<EntryBlockUiState>.toPendingMediaRecords(state: EditorState): L
     val now = Clock.System.now()
     return mapNotNull { block ->
         if (state.isReadOnly(block.id)) return@mapNotNull null
-        when {
-            block is AudioBlockUiState &&
-                block.captureState !is AudioCaptureState.Empty &&
-                block.captureState !is AudioCaptureState.Ready ->
-                PendingMediaRecord(
-                    blockId = block.id,
-                    mediaType = PendingMediaType.AUDIO,
-                    createdAt = now,
-                )
-            else -> null
-        }
+        if (block !is AudioBlockUiState) return@mapNotNull null
+        val filePath =
+            when (val capture = block.captureState) {
+                is AudioCaptureState.Recording -> capture.filePath
+                is AudioCaptureState.Stopping -> capture.filePath
+                AudioCaptureState.Empty,
+                is AudioCaptureState.Ready,
+                is AudioCaptureState.Failed,
+                -> return@mapNotNull null
+            }
+        PendingMediaRecord(
+            blockId = block.id,
+            mediaType = PendingMediaType.AUDIO,
+            createdAt = now,
+            filePath = filePath,
+        )
     }
 }
 
@@ -176,6 +181,6 @@ private fun PendingMediaRecord.toBlock(): EntryBlockUiState? =
             AudioBlockUiState(
                 id = blockId,
                 timestamp = createdAt,
-                captureState = AudioCaptureState.Stopping,
+                captureState = AudioCaptureState.Stopping(filePath = filePath),
             )
     }

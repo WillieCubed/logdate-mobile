@@ -24,11 +24,27 @@ sealed interface AudioCaptureState {
     /** The block has no recording attached. */
     data object Empty : AudioCaptureState
 
-    /** A recording is in progress; no file is yet available. */
-    data object Recording : AudioCaptureState
+    /**
+     * A recording is in progress.
+     *
+     * [filePath] is the durable path the recorder is writing to, when the recording side
+     * has surfaced it. May be null in the current wiring, in which case orphan recovery
+     * after process death cannot validate the file and the block will surface as [Failed].
+     */
+    data class Recording(
+        val filePath: String? = null,
+    ) : AudioCaptureState
 
-    /** Stop has been requested; the file is being closed and its URI awaited. */
-    data object Stopping : AudioCaptureState
+    /**
+     * Stop has been requested and the recording is being finalized.
+     *
+     * [filePath] is populated as soon as the recording side returns the URI for the
+     * finalized file, which is the right moment for an autosave to persist the
+     * recovery anchor into the draft.
+     */
+    data class Stopping(
+        val filePath: String? = null,
+    ) : AudioCaptureState
 
     /** Recording is finalized. [uri] points at the durable file; [durationMs] is the resolved length. */
     data class Ready(
