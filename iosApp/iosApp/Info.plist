@@ -22,6 +22,29 @@
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>LogDate needs access to your photo library to show recent photos in the editor and attach them to your entries.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>LogDate saves shared images and exported postcards to your photo library when you ask it to.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>LogDate uses the microphone to record audio notes you can attach to entries.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>LogDate transcribes your audio notes on-device so you can search and read them as text.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>LogDate tags entries with your current location and shows where moments happened on your timeline.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>LogDate uses location in the background to build your location timeline so you can see where you were on a given day.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>LogDate reads events from your calendars to add context and reminders to your timeline.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>LogDate reads events from your calendars to add context and reminders to your timeline.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>LogDate uses motion sensors to enrich entries with activity context.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>instagram</string>
+		<string>instagram-stories</string>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
@@ -41,7 +64,7 @@
 	<dict/>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
