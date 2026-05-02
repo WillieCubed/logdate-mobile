@@ -46,8 +46,7 @@ class DynamicShortcutRefreshObserver(
                     observeJournals().mapToJournalSnapshots(),
                 ) { draft, rewind, journals ->
                     ShortcutRefreshState(draft = draft, rewind = rewind, journals = journals)
-                }
-                    .distinctUntilChanged()
+                }.distinctUntilChanged()
                     .drop(1)
                     .debounce(500.milliseconds)
                     .collect {

@@ -15,9 +15,8 @@ import kotlin.uuid.Uuid
  */
 const val EXTRA_SHORTCUT_TARGET_JOURNAL_ID: String = "logdate.shortcuts.extra.TARGET_JOURNAL_ID"
 
-internal fun Intent.parseLauncherShortcutTargetJournalId(): Uuid? {
-    return parseLauncherShortcutTargetJournalId(getStringExtra(EXTRA_SHORTCUT_TARGET_JOURNAL_ID))
-}
+internal fun Intent.parseLauncherShortcutTargetJournalId(): Uuid? =
+    parseLauncherShortcutTargetJournalId(getStringExtra(EXTRA_SHORTCUT_TARGET_JOURNAL_ID))
 
 internal fun parseLauncherShortcutTargetJournalId(rawJournalId: String?): Uuid? {
     rawJournalId ?: return null

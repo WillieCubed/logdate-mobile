@@ -87,7 +87,11 @@ class RewindOverviewViewModel(
                     val textCount = rewind.content.count { it is RewindContent.TextNote }
                     val peopleCount = rewind.metadata?.peopleHighlighted?.size ?: 0
                     val primaryLocation = rewind.metadata?.locationSummary?.primaryLocation
-                    val themes = rewind.metadata?.detectedActivities?.map { it.name }.orEmpty()
+                    val themes =
+                        rewind.metadata
+                            ?.detectedActivities
+                            ?.map { it.name }
+                            .orEmpty()
                     RewindHistoryUiState(
                         uid = rewind.uid,
                         title = rewind.title,
@@ -138,7 +142,11 @@ class RewindOverviewViewModel(
                     val textCount = rewind.content.count { it is RewindContent.TextNote }
                     val peopleCount = rewind.metadata?.peopleHighlighted?.size ?: 0
                     val primaryLocation = rewind.metadata?.locationSummary?.primaryLocation
-                    val themes = rewind.metadata?.detectedActivities?.map { it.name }.orEmpty()
+                    val themes =
+                        rewind.metadata
+                            ?.detectedActivities
+                            ?.map { it.name }
+                            .orEmpty()
                     RewindOverviewScreenUiState.Ready(
                         pastRewinds = pastRewinds,
                         mostRecentRewind =

@@ -77,7 +77,14 @@ private fun WidgetContainer(
     val isCompact = size.height < 120.dp || size.width < 200.dp
     val isNarrow = size.width < 190.dp
     val verticalPadding = if (isCompact) 12.dp else 16.dp
-    val horizontalPadding = if (isNarrow) 14.dp else if (isCompact) 16.dp else 20.dp
+    val horizontalPadding =
+        if (isNarrow) {
+            14.dp
+        } else if (isCompact) {
+            16.dp
+        } else {
+            20.dp
+        }
 
     val baseModifier =
         modifier

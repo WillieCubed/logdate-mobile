@@ -54,9 +54,9 @@ import logdate.client.feature.core.generated.resources.day_schedule_fallback_tim
 import logdate.client.feature.core.generated.resources.day_schedule_health_checking
 import logdate.client.feature.core.generated.resources.day_schedule_health_checking_detail
 import logdate.client.feature.core.generated.resources.day_schedule_health_grant_access
-import logdate.client.feature.core.generated.resources.day_schedule_health_open_settings
 import logdate.client.feature.core.generated.resources.day_schedule_health_not_available
 import logdate.client.feature.core.generated.resources.day_schedule_health_not_available_detail
+import logdate.client.feature.core.generated.resources.day_schedule_health_open_settings
 import logdate.client.feature.core.generated.resources.day_schedule_health_permission_denied_detail
 import logdate.client.feature.core.generated.resources.day_schedule_health_permissions_needed
 import logdate.client.feature.core.generated.resources.day_schedule_health_permissions_needed_detail
@@ -307,11 +307,12 @@ private fun HealthConnectGateCard(
                             // Send the user to Health Connect settings to grant manually.
                             HealthConnectGateKind.PERMISSION_DENIED,
                             HealthConnectGateKind.RECOVERY_REQUIRED,
-                            -> when (gateState.missingRequirement) {
-                                HealthConnectMissingRequirement.PERMISSION -> onOpenHealthConnectPermissions()
-                                HealthConnectMissingRequirement.SETUP -> onSetUpHealthConnect()
-                                HealthConnectMissingRequirement.UNAVAILABLE, null -> Unit
-                            }
+                            ->
+                                when (gateState.missingRequirement) {
+                                    HealthConnectMissingRequirement.PERMISSION -> onOpenHealthConnectPermissions()
+                                    HealthConnectMissingRequirement.SETUP -> onSetUpHealthConnect()
+                                    HealthConnectMissingRequirement.UNAVAILABLE, null -> Unit
+                                }
                             HealthConnectGateKind.NEEDS_SETUP -> onSetUpHealthConnect()
                             HealthConnectGateKind.CHECKING,
                             HealthConnectGateKind.UNAVAILABLE,

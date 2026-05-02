@@ -17,10 +17,10 @@ import app.logdate.client.database.entities.people.PersonEntity
 import app.logdate.client.database.entities.people.PersonLinkEntity
 import app.logdate.client.database.entities.people.PersonResolutionDecisionEntity
 import app.logdate.client.database.migrations.MIGRATION_1_2
-import app.logdate.client.database.migrations.MIGRATION_39_40
-import app.logdate.client.database.migrations.MIGRATION_40_41
 import app.logdate.client.database.migrations.MIGRATION_2_3
+import app.logdate.client.database.migrations.MIGRATION_39_40
 import app.logdate.client.database.migrations.MIGRATION_3_4
+import app.logdate.client.database.migrations.MIGRATION_40_41
 import app.logdate.client.database.migrations.MIGRATION_4_5
 import app.logdate.client.database.migrations.MIGRATION_5_6
 import app.logdate.client.database.migrations.MIGRATION_6_7

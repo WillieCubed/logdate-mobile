@@ -157,10 +157,11 @@ fun RewindStoryView(
             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
             entranceScale.animateTo(
                 targetValue = 1f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow,
-                ),
+                animationSpec =
+                    spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow,
+                    ),
             )
             onFirstViewConsumed?.invoke()
         }
@@ -235,8 +236,10 @@ fun RewindStoryView(
     Box(
         modifier =
             modifier
-                .graphicsLayer { scaleX = entranceScale.value; scaleY = entranceScale.value }
-                .background(Color.Black)
+                .graphicsLayer {
+                    scaleX = entranceScale.value
+                    scaleY = entranceScale.value
+                }.background(Color.Black)
                 .statusBarsPadding()
                 // Swipe gesture with accumulated drag distance
                 .pointerInput(Unit) {

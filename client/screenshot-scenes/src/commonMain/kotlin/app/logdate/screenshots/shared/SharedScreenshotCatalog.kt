@@ -1,11 +1,8 @@
 package app.logdate.screenshots.shared
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -772,14 +769,12 @@ object SharedScreenshotCatalog {
     val allScenes: List<SharedScreenshotSceneSpec> =
         onboardingMainScenes + onboardingExtendedScenes + settingsScenes + searchScenes + desktopOnlyScenes
 
-    fun scene(id: SharedScreenshotSceneId): SharedScreenshotSceneSpec =
-        allScenes.first { it.id == id }
+    fun scene(id: SharedScreenshotSceneId): SharedScreenshotSceneSpec = allScenes.first { it.id == id }
 }
 
 @Composable
-fun SharedScreenshotScene(
-    sceneId: SharedScreenshotSceneId,
-) {
+@Suppress("ktlint:standard:function-naming")
+fun SharedScreenshotScene(sceneId: SharedScreenshotSceneId) {
     SharedScreenshotCatalog.scene(sceneId).content()
 }
 

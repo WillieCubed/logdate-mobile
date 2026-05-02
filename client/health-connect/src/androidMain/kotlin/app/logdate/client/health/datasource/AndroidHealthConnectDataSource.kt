@@ -244,15 +244,16 @@ class AndroidHealthConnectDataSource(
      * snippets that resolve each error.
      */
     private fun warnIfManifestRequirementsMissing() {
-        val appInfo = try {
-            context.packageManager.getApplicationInfo(
-                context.packageName,
-                PackageManager.GET_META_DATA,
-            )
-        } catch (e: PackageManager.NameNotFoundException) {
-            Napier.e("Health Connect: could not read ApplicationInfo to verify manifest requirements", e)
-            return
-        }
+        val appInfo =
+            try {
+                context.packageManager.getApplicationInfo(
+                    context.packageName,
+                    PackageManager.GET_META_DATA,
+                )
+            } catch (e: PackageManager.NameNotFoundException) {
+                Napier.e("Health Connect: could not read ApplicationInfo to verify manifest requirements", e)
+                return
+            }
 
         if (appInfo.metaData?.getString("health_connect.privacy_policy_url") == null) {
             Napier.e(
@@ -263,9 +264,12 @@ class AndroidHealthConnectDataSource(
             )
         }
 
-        val stringId = context.resources.getIdentifier(
-            "health_permissions", "string", context.packageName,
-        )
+        val stringId =
+            context.resources.getIdentifier(
+                "health_permissions",
+                "string",
+                context.packageName,
+            )
         if (stringId == 0) {
             Napier.e(
                 "Health Connect: <string name=\"health_permissions\"> is missing from strings.xml. " +
@@ -275,8 +279,9 @@ class AndroidHealthConnectDataSource(
         }
 
         // Android 13 and earlier: HC permission dialog → rationale screen
-        val rationaleIntent = Intent("androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE")
-            .setPackage(context.packageName)
+        val rationaleIntent =
+            Intent("androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE")
+                .setPackage(context.packageName)
         if (context.packageManager.resolveActivity(rationaleIntent, 0) == null) {
             Napier.e(
                 "Health Connect: No activity responds to ACTION_SHOW_PERMISSIONS_RATIONALE. " +
@@ -287,9 +292,10 @@ class AndroidHealthConnectDataSource(
         }
 
         // Android 14+: HC settings → manage app permissions (also controls HC app-list visibility)
-        val viewUsageIntent = Intent("android.intent.action.VIEW_PERMISSION_USAGE")
-            .addCategory("android.intent.category.HEALTH_PERMISSIONS")
-            .setPackage(context.packageName)
+        val viewUsageIntent =
+            Intent("android.intent.action.VIEW_PERMISSION_USAGE")
+                .addCategory("android.intent.category.HEALTH_PERMISSIONS")
+                .setPackage(context.packageName)
         if (context.packageManager.resolveActivity(viewUsageIntent, 0) == null) {
             Napier.e(
                 "Health Connect: No activity responds to VIEW_PERMISSION_USAGE + HEALTH_PERMISSIONS. " +

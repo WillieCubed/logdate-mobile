@@ -96,8 +96,7 @@ class DynamicShortcutPublisher(
                 .sortedWith(
                     compareByDescending<Journal> { it.isFavorited }
                         .thenByDescending { it.lastUpdated },
-                )
-                .map { journal ->
+                ).map { journal ->
                     DynamicShortcutDescriptor.ShareToJournal(
                         journalId = journal.id,
                         journalTitle = journal.title,

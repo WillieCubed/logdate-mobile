@@ -11,12 +11,12 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposePanel
 import androidx.compose.ui.unit.dp
+import app.logdate.client.ui.LockableContent
+import app.logdate.screenshots.shared.ScreenshotSceneVariant
 import app.logdate.screenshots.shared.SharedScreenshotCatalog
 import app.logdate.screenshots.shared.SharedScreenshotSceneId
 import app.logdate.screenshots.shared.SharedScreenshotSceneSpec
-import app.logdate.screenshots.shared.ScreenshotSceneVariant
 import app.logdate.screenshots.shared.screenshotBaselineName
-import app.logdate.client.ui.LockableContent
 import app.logdate.ui.theme.LogDateTheme
 import java.awt.Dimension
 import java.awt.image.BufferedImage
@@ -63,6 +63,7 @@ class DesktopScreenshotTest {
 }
 
 @Composable
+@Suppress("ktlint:standard:function-naming")
 private fun ScreenshotSurface(
     darkTheme: Boolean,
     contentPadding: PaddingValues = PaddingValues(),
@@ -194,7 +195,11 @@ private fun renderSingleScreenshot(
 
     SwingUtilities.invokeAndWait {
         panel =
-            ComposePanel(renderSettings = androidx.compose.ui.awt.RenderSettings.SwingGraphics()).apply {
+            ComposePanel(
+                renderSettings =
+                    androidx.compose.ui.awt.RenderSettings
+                        .SwingGraphics(),
+            ).apply {
                 preferredSize = Dimension(width, height)
                 setSize(width, height)
                 isFocusable = false
@@ -343,7 +348,8 @@ private val desktopScreenshotVisibleMode: Boolean =
     System.getProperty("logdate.desktopScreenshots.visible")?.toBooleanStrictOrNull() == true
 
 private val desktopScreenshotSceneFilter: String? =
-    System.getProperty("logdate.desktopScreenshots.sceneFilter")
+    System
+        .getProperty("logdate.desktopScreenshots.sceneFilter")
         ?.trim()
         ?.takeIf { it.isNotEmpty() }
 
