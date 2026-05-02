@@ -5,5 +5,5 @@ import androidx.compose.runtime.Composable
 @Suppress("ktlint:standard:function-naming")
 @Composable
 internal actual fun VisualNoteEditor(cameraEnabled: Boolean) {
-    TODO("VisualNoteEditor not implemented on iOS")
+    TODO("VisualNoteEditor not implemented on iOS — needs AVCaptureSession-backed capture flow")
 }

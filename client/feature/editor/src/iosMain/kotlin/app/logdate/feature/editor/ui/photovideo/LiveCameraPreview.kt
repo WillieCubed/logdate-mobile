@@ -10,5 +10,5 @@ actual fun LiveCameraPreview(
     cameraType: CameraType,
     modifier: Modifier,
 ) {
-    TODO("Camera preview not currently supported on iOS")
+    TODO("LiveCameraPreview not implemented on iOS — needs AVCaptureVideoPreviewLayer wrapper")
 }
