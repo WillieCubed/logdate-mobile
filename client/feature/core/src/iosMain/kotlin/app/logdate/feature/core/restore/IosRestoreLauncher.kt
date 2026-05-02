@@ -265,11 +265,7 @@ class IosRestoreLauncher(
                     data = bytes,
                 )
             val savedPath = mediaManager.saveMedia(payload)
-            if (savedPath != null) {
-                Napier.d("iOS: Successfully imported media from archive: $exportPath")
-            } else {
-                Napier.w("iOS: Failed to save media during restore: $normalizedPath")
-            }
+            Napier.d("iOS: Successfully imported media from archive: $exportPath")
             savedPath
         }.onFailure { Napier.e("iOS: Exception importing media from archive at path: $exportPath", it) }
             .getOrNull()

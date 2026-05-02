@@ -70,14 +70,14 @@ internal class IosSoundAnalysisTaggingService : AudioTaggingService {
                     classifierIdentifier = SNClassifierIdentifierVersion1,
                     error = errorPtr.ptr,
                 )
-            if (request == null || errorPtr.value != null) {
+            if (errorPtr.value != null) {
                 return AudioTaggingResult.Error(
                     "Failed to create sound classifier: ${errorPtr.value?.localizedDescription}",
                 )
             }
 
             val analyzer = SNAudioFileAnalyzer(uRL = url, error = errorPtr.ptr)
-            if (analyzer == null || errorPtr.value != null) {
+            if (errorPtr.value != null) {
                 return AudioTaggingResult.Error(
                     "Failed to open audio for analysis: ${errorPtr.value?.localizedDescription}",
                 )

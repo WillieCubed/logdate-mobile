@@ -97,7 +97,7 @@ internal class IosTranscriptionService : TranscriptionService {
                             cont.resume(result.bestTranscription.formattedString)
                     }
                 }
-            cont.invokeOnCancellation { task?.cancel() }
+            cont.invokeOnCancellation { task.cancel() }
         }
 
     override fun cancelTranscription() = Unit
