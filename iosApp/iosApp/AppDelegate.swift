@@ -28,11 +28,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     private func handleAppRefresh(task: BGAppRefreshTask) {
         scheduleAppRefresh()
 
+        let runner = BackgroundSyncRunner()
+
         task.expirationHandler = {
-            // No cancellation hook yet; next refresh will retry.
+            runner.cancel()
+            task.setTaskCompleted(success: false)
         }
 
-        BackgroundSyncRunner().run { success in
+        runner.run { success in
             task.setTaskCompleted(success: success)
         }
     }
