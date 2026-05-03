@@ -62,6 +62,7 @@ class LogdateApplication :
         Log.i(APP_STARTUP_TAG, "Application onCreate: initializing logging and DI")
 
         Napier.base(DebugAntilog())
+        Napier.base(CrashlyticsAntilog())
         initializeKoin()
         Log.i(APP_STARTUP_TAG, "Application onCreate: Koin initialized")
         runCatching {

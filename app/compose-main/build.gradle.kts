@@ -140,6 +140,8 @@ kotlin {
             implementation(libs.coil.video)
             implementation(libs.play.services.wearable)
             implementation(libs.wear.remote.interactions)
+            implementation(project.dependencies.platform(libs.firebase.bom))
+            implementation(libs.firebase.crashlytics)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
