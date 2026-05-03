@@ -64,6 +64,36 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         completionHandler()
     }
 
+    // MARK: - APNs
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        IosPushKt.HandleApnsTokenRegistered(tokenHex: token)
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        IosPushKt.HandleApnsRegistrationFailed(localizedDescription: error.localizedDescription)
+    }
+
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        if let link = userInfo["logdate.deeplink"] as? String {
+            _ = IosDeepLinksKt.HandleIosDeepLink(urlString: link)
+        }
+        IosPushKt.HandleSilentPushSync { success in
+            completionHandler(success ? .newData : .failed)
+        }
+    }
+
     private func registerBackgroundTasks() {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: syncTaskIdentifier, using: nil) { task in
             self.handleAppRefresh(task: task as! BGAppRefreshTask)

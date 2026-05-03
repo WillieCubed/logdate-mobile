@@ -61,6 +61,7 @@ import platform.Photos.PHAuthorizationStatusRestricted
 import platform.Photos.PHPhotoLibrary
 import platform.UIKit.UIApplication
 import platform.UIKit.UIApplicationOpenSettingsURLString
+import platform.UIKit.registerForRemoteNotifications
 import platform.UserNotifications.UNAuthorizationOptionAlert
 import platform.UserNotifications.UNAuthorizationOptionBadge
 import platform.UserNotifications.UNAuthorizationOptionSound
@@ -238,6 +239,11 @@ class IosPermissionManager(
                     } else {
                         status
                     }
+                if (final == PermissionStatus.GRANTED) {
+                    // Asking iOS to deliver an APNs token now means the AppDelegate registration
+                    // handler fires immediately on grant rather than waiting for the next launch.
+                    UIApplication.sharedApplication.registerForRemoteNotifications()
+                }
                 cacheAndDeliver(PermissionType.NOTIFICATION, final, onResult)
             }
         }
