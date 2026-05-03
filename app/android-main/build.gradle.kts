@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.gradlePlayPublisher)
     alias(libs.plugins.googleServices)
+    alias(libs.plugins.crashlytics)
     alias(libs.plugins.screenshot)
 }
 
@@ -251,6 +252,10 @@ dependencies {
     implementation(projects.client.location)
     implementation(libs.androidx.profileinstaller)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.crashlytics)
+    implementation(libs.firebase.analytics)
     if (baselineProfileRequested) {
         add("baselineProfile", project(":benchmark:phone-baselineprofile"))
     }

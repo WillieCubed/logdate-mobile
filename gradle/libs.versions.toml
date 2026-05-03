@@ -12,6 +12,7 @@ compose-material3 = "1.11.0-alpha06"
 compose-material-icons = "1.7.3"
 agp = "9.1.1"
 googleServicesPlugin = "4.4.4"
+crashlyticsPlugin = "3.0.6"
 gradlePlayPublisher = "4.0.0"
 buildConfigPlugin = "6.0.9"
 kover = "0.9.8"
@@ -414,6 +415,7 @@ ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokkaGradlePlugin" }
 room = { id = "androidx.room", version.ref = "room" }
 googleServices = { id = "com.google.gms.google-services", version.ref = "googleServicesPlugin" }
+crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "crashlyticsPlugin" }
 gradlePlayPublisher = { id = "com.github.triplet.play", version.ref = "gradlePlayPublisher" }
 buildConfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildConfigPlugin" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
