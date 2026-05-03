@@ -34,8 +34,8 @@ import app.logdate.client.data.search.OfflineFirstSearchRepository
 import app.logdate.client.data.streak.DefaultStreakSettingsRepository
 import app.logdate.client.data.timeline.OfflineFirstActivityTimelineRepository
 import app.logdate.client.data.transcription.OfflineFirstTranscriptionRepository
+import app.logdate.client.data.user.OfflineFirstUserStateRepository
 import app.logdate.client.data.user.StubUserDeviceRepository
-import app.logdate.client.data.user.StubUserStateRepository
 import app.logdate.client.database.databaseModule
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.di.datastoreModule
@@ -205,7 +205,7 @@ actual val dataModule: Module =
 
         // User
         single<UserDeviceRepository> { StubUserDeviceRepository }
-        single<UserStateRepository> { StubUserStateRepository }
+        single<UserStateRepository> { OfflineFirstUserStateRepository(get()) }
 
         // Quota
         factory<RemoteQuotaDataSource> { StubRemoteQuotaDataSource() }
