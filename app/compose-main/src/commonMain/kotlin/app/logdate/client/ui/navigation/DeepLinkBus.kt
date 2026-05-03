@@ -33,4 +33,6 @@ sealed class DeepLinkAction {
     data class OpenRewind(
         val id: Uuid,
     ) : DeepLinkAction()
+
+    data object OpenLocationTimeline : DeepLinkAction()
 }

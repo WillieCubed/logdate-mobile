@@ -44,6 +44,7 @@ private fun resolveSegments(
     type: String,
     rest: List<String>,
 ): DeepLinkAction? {
+    if (type == TYPE_LOCATION_TIMELINE) return DeepLinkAction.OpenLocationTimeline
     val first = rest.firstOrNull() ?: return null
     val id = parseUuid(first) ?: return null
     return when (type) {
@@ -61,3 +62,4 @@ private const val LOGDATE_HOST = "logdate.app"
 private const val TYPE_JOURNAL = "journal"
 private const val TYPE_NOTE = "note"
 private const val TYPE_REWIND = "rewind"
+private const val TYPE_LOCATION_TIMELINE = "location-timeline"

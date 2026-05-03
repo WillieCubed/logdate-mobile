@@ -29,6 +29,7 @@ import app.logdate.feature.library.navigation.MediaDetailRoute
 import app.logdate.feature.library.navigation.libraryRoute
 import app.logdate.feature.library.navigation.mediaDetailRoute
 import app.logdate.feature.library.ui.LibraryScreen
+import app.logdate.feature.location.timeline.ui.LocationTimelineScreen
 import app.logdate.feature.onboarding.navigation.onboardingGraph
 import app.logdate.feature.rewind.navigation.navigateToRewind
 import app.logdate.feature.rewind.navigation.rewindRoutes
@@ -37,6 +38,9 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 internal data object SearchRoute
+
+@Serializable
+internal data object LocationTimelineRoute
 
 /**
  * The root composable for app-wide navigation.
@@ -159,6 +163,11 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
                 onGoBack = { navController.popBackStack() },
                 onNavigateToDay = { /* Timeline day detail not available in common nav */ },
                 onNavigateToJournal = { journalId -> navController.navigateToJournal(journalId) },
+            )
+        }
+        composable<LocationTimelineRoute> {
+            LocationTimelineScreen(
+                onOpenNote = { noteId -> navController.navigateToNoteDetail(noteId) },
             )
         }
     }

@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.navigation.compose.rememberNavController
 import app.logdate.client.ui.navigation.DeepLinkAction
 import app.logdate.client.ui.navigation.DeepLinkBus
+import app.logdate.client.ui.navigation.LocationTimelineRoute
 import app.logdate.client.ui.navigation.LogDateNavHost
 import app.logdate.feature.core.GlobalAppUiLoadedState
 import app.logdate.feature.core.main.navigateHome
@@ -58,6 +59,7 @@ fun LogDateAppRoot(
                 is DeepLinkAction.OpenJournal -> navController.navigateToJournal(action.id)
                 is DeepLinkAction.OpenNote -> navController.navigateToNoteDetail(action.id)
                 is DeepLinkAction.OpenRewind -> navController.navigateToRewind(action.id)
+                DeepLinkAction.OpenLocationTimeline -> navController.navigate(LocationTimelineRoute)
             }
         }
     }
