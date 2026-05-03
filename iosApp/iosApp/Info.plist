@@ -49,6 +49,17 @@
 		<string>instagram</string>
 		<string>instagram-stories</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>app.logdate.LogDate</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>logdate</string>
+			</array>
+		</dict>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
