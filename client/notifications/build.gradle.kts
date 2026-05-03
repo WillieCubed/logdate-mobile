@@ -40,6 +40,13 @@ kotlin {
             compilerOptions.freeCompilerArgs.set(listOf("-Xexpect-actual-classes"))
         }
 
+        commonMain.dependencies {
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.napier)
+            implementation(project.dependencies.platform(libs.koin.bom))
+            implementation(libs.koin.core)
+        }
+
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
