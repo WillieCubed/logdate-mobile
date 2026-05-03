@@ -22,6 +22,10 @@ import platform.AVFoundation.AVCaptureDevice
 import platform.AVFoundation.AVCaptureDeviceInput
 import platform.AVFoundation.AVCaptureDevicePositionBack
 import platform.AVFoundation.AVCaptureDevicePositionFront
+import platform.AVFoundation.AVCaptureFileOutput
+import platform.AVFoundation.AVCaptureFileOutputRecordingDelegateProtocol
+import platform.AVFoundation.AVCaptureInput
+import platform.AVFoundation.AVCaptureMovieFileOutput
 import platform.AVFoundation.AVCapturePhoto
 import platform.AVFoundation.AVCapturePhotoCaptureDelegateProtocol
 import platform.AVFoundation.AVCapturePhotoOutput
@@ -29,6 +33,7 @@ import platform.AVFoundation.AVCapturePhotoSettings
 import platform.AVFoundation.AVCaptureSession
 import platform.AVFoundation.AVCaptureVideoPreviewLayer
 import platform.AVFoundation.AVLayerVideoGravityResizeAspectFill
+import platform.AVFoundation.AVMediaTypeAudio
 import platform.AVFoundation.AVMediaTypeVideo
 import platform.AVFoundation.authorizationStatusForMediaType
 import platform.AVFoundation.fileDataRepresentation
@@ -43,16 +48,13 @@ import platform.darwin.NSObject
 import kotlin.uuid.Uuid
 
 /**
- * iOS [CameraCaptureManager] backed by `AVCaptureSession` with `AVCapturePhotoOutput`.
+ * iOS [CameraCaptureManager] backed by `AVCaptureSession` with photo and video outputs.
  *
- * Photo capture is fully wired: photos are saved as JPEGs under the app's
- * `Documents/imports/` directory and the resulting file URL is published through
- * [CameraCaptureState.lastCapturedUri]. Video recording remains a TODO — the contract is
- * preserved so the editor screen does not crash, but `startVideoRecording` / `stopVideoRecording`
- * surface a clear unsupported-state error.
+ * Photo capture saves JPEGs to `Documents/imports/`; video recording saves MOV files to the same
+ * folder. Both surface their final file URL through [CameraCaptureState.lastCapturedUri].
  *
- * The exposed [previewLayer] is intended to be embedded in a Compose [androidx.compose.ui.viewinterop.UIKitView]
- * so the live preview renders inside the editor screen.
+ * The exposed [previewLayer] is intended to be embedded in a Compose
+ * [androidx.compose.ui.viewinterop.UIKitView] so the live preview renders inside the editor.
  */
 class IosCameraCaptureManager : CameraCaptureManager {
     private val _state = MutableStateFlow(CameraCaptureState())
@@ -60,9 +62,13 @@ class IosCameraCaptureManager : CameraCaptureManager {
 
     private val session = AVCaptureSession()
     private val photoOutput = AVCapturePhotoOutput()
-    private var currentInput: AVCaptureDeviceInput? = null
-    private var pendingCapture: CompletableDeferred<String?>? = null
+    private val movieOutput = AVCaptureMovieFileOutput()
+    private var videoInput: AVCaptureDeviceInput? = null
+    private var audioInput: AVCaptureDeviceInput? = null
+    private var pendingPhoto: CompletableDeferred<String?>? = null
+    private var pendingVideo: CompletableDeferred<String?>? = null
     private val photoDelegate = PhotoCaptureDelegate()
+    private val movieDelegate = MovieCaptureDelegate()
 
     val previewLayer: AVCaptureVideoPreviewLayer =
         AVCaptureVideoPreviewLayer(session = session).apply {
@@ -82,7 +88,7 @@ class IosCameraCaptureManager : CameraCaptureManager {
         }
         try {
             withContext(Dispatchers.Default) {
-                ensureInputForFacing(facing)
+                ensureVideoInputForFacing(facing)
                 if (!session.isRunning()) session.startRunning()
             }
             _state.update {
@@ -99,10 +105,13 @@ class IosCameraCaptureManager : CameraCaptureManager {
     }
 
     override suspend fun stopPreview() {
+        if (movieOutput.isRecording()) {
+            movieOutput.stopRecording()
+        }
         if (session.isRunning()) {
             withContext(Dispatchers.Default) { session.stopRunning() }
         }
-        _state.update { it.copy(isPreviewActive = false) }
+        _state.update { it.copy(isPreviewActive = false, isRecording = false) }
     }
 
     override suspend fun capturePhoto(): String? {
@@ -111,7 +120,7 @@ class IosCameraCaptureManager : CameraCaptureManager {
             return null
         }
         val deferred = CompletableDeferred<String?>()
-        pendingCapture = deferred
+        pendingPhoto = deferred
         withContext(Dispatchers.Main) {
             photoOutput.capturePhotoWithSettings(
                 settings = AVCapturePhotoSettings.photoSettings(),
@@ -126,22 +135,52 @@ class IosCameraCaptureManager : CameraCaptureManager {
     }
 
     override suspend fun startVideoRecording() {
-        // Video recording isn't wired yet — would require AVCaptureMovieFileOutput plus a separate
-        // AVCaptureFileOutputRecordingDelegate to persist the temp URL after didFinishRecording.
-        _state.update { it.copy(error = CameraCaptureError.RecordingFailed) }
+        if (!session.isRunning() || videoInput == null) {
+            _state.update { it.copy(error = CameraCaptureError.RecordingFailed) }
+            return
+        }
+        if (movieOutput.isRecording()) return
+
+        withContext(Dispatchers.Default) {
+            session.beginConfiguration()
+            if (!session.outputs.contains(movieOutput) && session.canAddOutput(movieOutput)) {
+                session.addOutput(movieOutput)
+            }
+            ensureAudioInput()
+            session.commitConfiguration()
+        }
+
+        val outputUrl = createVideoCaptureUrl()
+        if (outputUrl == null) {
+            _state.update { it.copy(error = CameraCaptureError.RecordingFailed) }
+            return
+        }
+        val deferred = CompletableDeferred<String?>()
+        pendingVideo = deferred
+        withContext(Dispatchers.Main) {
+            movieOutput.startRecordingToOutputFileURL(
+                outputFileURL = outputUrl,
+                recordingDelegate = movieDelegate,
+            )
+        }
+        _state.update { it.copy(isRecording = true, error = null) }
     }
 
     override suspend fun stopVideoRecording(): String? {
-        _state.update { it.copy(isRecording = false) }
-        return null
+        if (!movieOutput.isRecording()) return null
+        val deferred = pendingVideo ?: return null
+        withContext(Dispatchers.Main) { movieOutput.stopRecording() }
+        val uri = deferred.await()
+        _state.update { it.copy(isRecording = false, lastCapturedUri = uri ?: it.lastCapturedUri) }
+        return uri
     }
 
     override suspend fun switchCamera() {
         val nextFacing = if (_state.value.cameraFacing == CameraFacing.BACK) CameraFacing.FRONT else CameraFacing.BACK
         withContext(Dispatchers.Default) {
             session.beginConfiguration()
-            currentInput?.let { session.removeInput(it) }
-            ensureInputForFacing(nextFacing)
+            videoInput?.let { session.removeInput(it) }
+            ensureVideoInputForFacing(nextFacing)
             session.commitConfiguration()
         }
         _state.update { it.copy(cameraFacing = nextFacing) }
@@ -160,13 +199,16 @@ class IosCameraCaptureManager : CameraCaptureManager {
     }
 
     override fun release() {
+        if (movieOutput.isRecording()) movieOutput.stopRecording()
         if (session.isRunning()) session.stopRunning()
-        currentInput?.let { session.removeInput(it) }
-        currentInput = null
+        videoInput?.let { session.removeInput(it) }
+        audioInput?.let { session.removeInput(it) }
+        videoInput = null
+        audioInput = null
         _state.update { it.copy(isPreviewActive = false, isRecording = false) }
     }
 
-    private fun ensureInputForFacing(facing: CameraFacing) {
+    private fun ensureVideoInputForFacing(facing: CameraFacing) {
         val targetPosition =
             if (facing == CameraFacing.FRONT) AVCaptureDevicePositionFront else AVCaptureDevicePositionBack
         @Suppress("UNCHECKED_CAST")
@@ -186,9 +228,26 @@ class IosCameraCaptureManager : CameraCaptureManager {
             }
             if (session.canAddInput(input)) {
                 session.addInput(input)
-                currentInput = input
+                videoInput = input
             } else {
                 _state.update { it.copy(error = CameraCaptureError.CameraNotAvailable) }
+            }
+        }
+    }
+
+    private fun ensureAudioInput() {
+        if (audioInput != null) return
+        val device = AVCaptureDevice.defaultDeviceWithMediaType(AVMediaTypeAudio) ?: return
+        memScoped {
+            val errorPtr = alloc<ObjCObjectVar<NSError?>>()
+            val input = AVCaptureDeviceInput.deviceInputWithDevice(device = device, error = errorPtr.ptr)
+            if (input == null) {
+                Napier.w("AVCaptureDeviceInput audio creation failed: ${errorPtr.value?.localizedDescription}")
+                return
+            }
+            if (session.canAddInput(input)) {
+                session.addInput(input)
+                audioInput = input
             }
         }
     }
@@ -201,8 +260,8 @@ class IosCameraCaptureManager : CameraCaptureManager {
             didFinishProcessingPhoto: AVCapturePhoto,
             error: NSError?,
         ) {
-            val callback = pendingCapture ?: return
-            pendingCapture = null
+            val callback = pendingPhoto ?: return
+            pendingPhoto = null
             if (error != null) {
                 Napier.w("AVCapturePhotoOutput error: ${error.localizedDescription}")
                 callback.complete(null)
@@ -213,7 +272,7 @@ class IosCameraCaptureManager : CameraCaptureManager {
                 callback.complete(null)
                 return
             }
-            val destPath = createCapturePath()
+            val destPath = createPhotoCapturePath()
             if (destPath == null) {
                 callback.complete(null)
                 return
@@ -222,9 +281,33 @@ class IosCameraCaptureManager : CameraCaptureManager {
             callback.complete(if (ok) "file://$destPath" else null)
         }
     }
+
+    private inner class MovieCaptureDelegate :
+        NSObject(),
+        AVCaptureFileOutputRecordingDelegateProtocol {
+        override fun captureOutput(
+            output: AVCaptureFileOutput,
+            didFinishRecordingToOutputFileAtURL: NSURL,
+            fromConnections: List<*>,
+            error: NSError?,
+        ) {
+            val callback = pendingVideo ?: return
+            pendingVideo = null
+            if (error != null) {
+                Napier.w("AVCaptureMovieFileOutput error: ${error.localizedDescription}")
+                callback.complete(null)
+                return
+            }
+            callback.complete(didFinishRecordingToOutputFileAtURL.absoluteString)
+        }
+    }
 }
 
-private fun createCapturePath(): String? {
+private fun createPhotoCapturePath(): String? = createImportsUrl(extension = "jpg")?.path
+
+private fun createVideoCaptureUrl(): NSURL? = createImportsUrl(extension = "mov")
+
+private fun createImportsUrl(extension: String): NSURL? {
     val docs =
         NSFileManager.defaultManager.URLForDirectory(
             directory = NSDocumentDirectory,
@@ -240,6 +323,5 @@ private fun createCapturePath(): String? {
         attributes = null,
         error = null,
     )
-    val dest: NSURL = importsDir.URLByAppendingPathComponent("${Uuid.random()}.jpg") ?: return null
-    return dest.path
+    return importsDir.URLByAppendingPathComponent("${Uuid.random()}.$extension")
 }

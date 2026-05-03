@@ -18,6 +18,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FiberManualRecord
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -47,9 +50,8 @@ import platform.UIKit.UIView
 
 /**
  * iOS camera UI for the entry editor. Hosts the live `AVCaptureVideoPreviewLayer` from
- * [IosCameraCaptureManager] inside a `UIKitView` and exposes capture / switch / close affordances
- * matching the Android version's primary actions. Video recording is intentionally hidden — the
- * underlying manager does not yet support it (see `startVideoRecording` in `IosCameraCaptureManager`).
+ * [IosCameraCaptureManager] inside a `UIKitView` and exposes capture / switch / mode toggle / close
+ * affordances matching the Android version's primary actions.
  */
 @Composable
 actual fun CameraCaptureContent(
@@ -111,20 +113,59 @@ actual fun CameraCaptureContent(
                     ) {
                         Icon(Icons.Default.Cameraswitch, contentDescription = "Switch", tint = Color.White)
                     }
+                    val isVideo = state.captureMode == CaptureMode.VIDEO
+                    val isRecording = state.isRecording
                     Button(
                         onClick = {
                             scope.launch {
-                                val uri = manager.capturePhoto()
-                                if (uri != null) {
-                                    onMediaCaptured(uri, CapturedMediaType.PHOTO, 0L)
+                                if (isVideo) {
+                                    if (isRecording) {
+                                        val uri = manager.stopVideoRecording()
+                                        if (uri != null) {
+                                            onMediaCaptured(uri, CapturedMediaType.VIDEO, 0L)
+                                        }
+                                    } else {
+                                        manager.startVideoRecording()
+                                    }
+                                } else {
+                                    val uri = manager.capturePhoto()
+                                    if (uri != null) {
+                                        onMediaCaptured(uri, CapturedMediaType.PHOTO, 0L)
+                                    }
                                 }
                             }
                         },
                         shape = CircleShape,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = if (isRecording) Color.Red else Color.White,
+                            ),
                         modifier = Modifier.size(72.dp).align(Alignment.Center),
                     ) {
-                        Icon(Icons.Default.CameraAlt, contentDescription = "Capture", tint = Color.Black)
+                        val (icon, label) =
+                            when {
+                                isVideo && isRecording -> Icons.Default.Stop to "Stop"
+                                isVideo -> Icons.Default.FiberManualRecord to "Record"
+                                else -> Icons.Default.CameraAlt to "Capture"
+                            }
+                        Icon(
+                            icon,
+                            contentDescription = label,
+                            tint = if (isRecording) Color.White else Color.Black,
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            manager.setCaptureMode(if (isVideo) CaptureMode.PHOTO else CaptureMode.VIDEO)
+                        },
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                        enabled = !isRecording,
+                    ) {
+                        Icon(
+                            imageVector = if (isVideo) Icons.Default.CameraAlt else Icons.Default.Videocam,
+                            contentDescription = if (isVideo) "Switch to photo" else "Switch to video",
+                            tint = Color.White,
+                        )
                     }
                 }
             }
@@ -171,7 +212,7 @@ private fun ErrorOverlay(error: CameraCaptureError) {
             CameraCaptureError.PermissionDenied -> "Camera permission required. Open Settings to enable."
             CameraCaptureError.CameraNotAvailable -> "No camera available on this device."
             CameraCaptureError.CaptureFailed -> "Couldn't capture photo. Try again."
-            CameraCaptureError.RecordingFailed -> "Video recording isn't supported on iOS yet."
+            CameraCaptureError.RecordingFailed -> "Couldn't record video. Try again."
             is CameraCaptureError.Unknown -> "Camera error: ${error.message}"
         }
     Box(
