@@ -10,7 +10,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        KoinIosKt.initKoinIos()
+        KoinIosKt.doInitKoinIos()
         registerBackgroundTasks()
         scheduleAppRefresh()
         UNUserNotificationCenter.current().delegate = self
@@ -90,7 +90,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
             _ = IosDeepLinksKt.HandleIosDeepLink(urlString: link)
         }
         IosPushKt.HandleSilentPushSync { success in
-            completionHandler(success ? .newData : .failed)
+            completionHandler(success.boolValue ? .newData : .failed)
         }
     }
 
@@ -111,7 +111,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         }
 
         runner.run { success in
-            task.setTaskCompleted(success: success)
+            task.setTaskCompleted(success: success.boolValue)
         }
     }
 
