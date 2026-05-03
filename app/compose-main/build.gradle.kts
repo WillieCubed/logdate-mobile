@@ -89,6 +89,7 @@ kotlin {
             implementation(projects.client.sync)
             implementation(projects.client.healthConnect)
             implementation(projects.client.calendarSync)
+            implementation(projects.client.notifications)
             implementation(projects.client.util)
             implementation(projects.shared.model)
             // External dependencies
@@ -132,7 +133,6 @@ kotlin {
             implementation(libs.koin.android)
             implementation(libs.koin.androidx.workmanager)
             implementation(projects.client.feature.androidWidgets)
-            implementation(projects.client.notifications)
             implementation(libs.material)
             implementation(libs.play.app.update.ktx)
             implementation(libs.play.feature.delivery.ktx)

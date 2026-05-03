@@ -13,6 +13,7 @@ import app.logdate.client.domain.events.NoopCalendarImportLauncher
 import app.logdate.client.domain.events.NoopEventInferenceLauncher
 import app.logdate.client.media.di.audioModule
 import app.logdate.client.networking.di.networkingModule
+import app.logdate.client.notifications.di.iosNotificationsModule
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -39,6 +40,7 @@ actual val appModule: Module =
         includes(calendarSyncModule) // EventKit-backed DeviceCalendarReader on iOS
         includes(domainModule) // Main domain module with no circular deps
         includes(audioModule)
+        includes(iosNotificationsModule)
 
         single<EventInferenceLauncher> { NoopEventInferenceLauncher }
         single<CalendarImportLauncher> { NoopCalendarImportLauncher }
