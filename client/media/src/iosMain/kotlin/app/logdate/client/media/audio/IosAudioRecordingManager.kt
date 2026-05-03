@@ -5,6 +5,7 @@
 
 package app.logdate.client.media.audio
 
+import app.logdate.client.media.audio.iosbackground.AudioSessionEvent
 import app.logdate.client.media.audio.iosbackground.IosAudioSessionController
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import io.github.aakira.napier.Napier
@@ -58,6 +59,36 @@ class IosAudioRecordingManager(
 
     init {
         Napier.d("IosAudioRecordingManager initialized")
+        scope.launch {
+            audioSessionController.events.collect { event ->
+                handleSessionEvent(event)
+            }
+        }
+    }
+
+    private suspend fun handleSessionEvent(event: AudioSessionEvent) {
+        when (event) {
+            AudioSessionEvent.InterruptionBegan -> {
+                // iOS forcibly suspends the recorder when an interruption arrives; mirror that
+                // in our own state so the UI doesn't keep showing "recording" while the input
+                // is silenced.
+                if (recordingActive && !recordingPaused) {
+                    pauseRecording()
+                }
+            }
+            is AudioSessionEvent.InterruptionEnded -> {
+                if (event.shouldResume && recordingActive && recordingPaused) {
+                    resumeRecording()
+                }
+            }
+            AudioSessionEvent.OutputRouteRemoved -> {
+                // Headphones unplugged or AirPlay disconnected — pause so the user notices
+                // before audio routes through an unexpected speaker.
+                if (recordingActive && !recordingPaused) {
+                    pauseRecording()
+                }
+            }
+        }
     }
 
     override suspend fun startRecording(targetNoteId: Uuid?): Boolean {
