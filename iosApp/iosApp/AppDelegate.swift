@@ -1,8 +1,9 @@
 import UIKit
 import BackgroundTasks
+import UserNotifications
 import ComposeApp
 
-final class AppDelegate: NSObject, UIApplicationDelegate {
+final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     private let syncTaskIdentifier = "app.logdate.sync.refresh"
 
     func application(
@@ -12,6 +13,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         KoinIosKt.initKoinIos()
         registerBackgroundTasks()
         scheduleAppRefresh()
+        UNUserNotificationCenter.current().delegate = self
         return true
     }
 
@@ -37,6 +39,29 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             return false
         }
         return IosDeepLinksKt.HandleIosDeepLink(urlString: url.absoluteString)
+    }
+
+    // MARK: - UNUserNotificationCenterDelegate
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        // Show banner + sound + list while the app is foreground; mirrors the iOS 14+ default.
+        completionHandler([.banner, .list, .sound])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let payload = response.notification.request.content.userInfo
+        if let link = payload["logdate.deeplink"] as? String {
+            _ = IosDeepLinksKt.HandleIosDeepLink(urlString: link)
+        }
+        completionHandler()
     }
 
     private func registerBackgroundTasks() {
