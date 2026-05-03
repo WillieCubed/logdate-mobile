@@ -26,15 +26,13 @@ if [[ ! -f "$src_svg" ]]; then
   exit 1
 fi
 
+# qlmanage writes <input>.png next to the input, so stage the SVG inside work_dir.
 cp "$src_svg" "$work_dir/icon.svg"
-
-# Render at 1024 via Quick Look (RGBA output).
 qlmanage -t -s 1024 -o "$work_dir" "$work_dir/icon.svg" >/dev/null
 
-# Flatten alpha by round-tripping through JPEG, then back to PNG. App
-# Store rejects icons with an alpha channel even when fully opaque.
+# Flatten alpha by round-tripping through JPEG. App Store rejects icons
+# with an alpha channel even when fully opaque.
 sips -s format jpeg "$work_dir/icon.svg.png" --out "$work_dir/flat.jpg" >/dev/null
-sips -s format png "$work_dir/flat.jpg" --out "$work_dir/flat.png" >/dev/null
-sips -z 1024 1024 "$work_dir/flat.png" --out "$out_dir/icon-1024.png" >/dev/null
+sips -s format png "$work_dir/flat.jpg" --out "$out_dir/icon-1024.png" >/dev/null
 
 echo "Wrote $out_dir/icon-1024.png"
