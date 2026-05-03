@@ -1,5 +1,6 @@
 package app.logdate.client.data.di
 
+import app.logdate.client.data.account.DefaultPasskeyAccountRepository
 import app.logdate.client.data.account.StubAccountIdentityRepository
 import app.logdate.client.data.account.StubAccountRepository
 import app.logdate.client.data.events.OfflineFirstEventRepository
@@ -38,9 +39,12 @@ import app.logdate.client.data.user.StubUserStateRepository
 import app.logdate.client.database.databaseModule
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.di.datastoreModule
+import app.logdate.client.networking.PasskeyApiClient
+import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.client.permissions.di.permissionsModule
 import app.logdate.client.repository.account.AccountIdentityRepository
 import app.logdate.client.repository.account.AccountRepository
+import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.EntryDraftRepository
@@ -69,6 +73,7 @@ import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.repository.user.devices.UserDeviceRepository
 import app.logdate.shared.config.configModule
+import kotlinx.serialization.json.Json
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -79,6 +84,16 @@ actual val dataModule: Module =
         includes(databaseModule)
         includes(configModule)
         includes(permissionsModule)
+
+        // JSON serialization
+        single {
+            Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                prettyPrint = false
+                encodeDefaults = true
+            }
+        }
 
         // Journals
         factory<RemoteJournalDataSource> { StubJournalDataSource }
@@ -171,9 +186,22 @@ actual val dataModule: Module =
         // Profile
         single<ProfileRepository> { OfflineFirstProfileRepository(get()) }
 
+        // Networking clients
+        single<PasskeyApiClientContract> { PasskeyApiClient(get(), get()) }
+
         // Account
         single<AccountRepository> { StubAccountRepository() }
         single<AccountIdentityRepository> { StubAccountIdentityRepository() }
+        single<PasskeyAccountRepository> {
+            DefaultPasskeyAccountRepository(
+                apiClient = get(),
+                passkeyManager = get(),
+                restoreCredentialManager = get(),
+                sessionStorage = get(),
+                platformAccountManager = get(),
+                configRepository = get(),
+            )
+        }
 
         // User
         single<UserDeviceRepository> { StubUserDeviceRepository }

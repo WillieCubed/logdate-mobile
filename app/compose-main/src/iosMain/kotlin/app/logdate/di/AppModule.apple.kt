@@ -14,6 +14,7 @@ import app.logdate.client.domain.events.NoopEventInferenceLauncher
 import app.logdate.client.media.di.audioModule
 import app.logdate.client.networking.di.networkingModule
 import app.logdate.client.notifications.di.iosNotificationsModule
+import app.logdate.client.sensor.di.sensorModule
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -28,6 +29,7 @@ actual val appModule: Module =
         // Base modules first
         includes(defaultModules)
         includes(appDataModule)
+        includes(sensorModule)
         includes(networkingModule)
         includes(deviceModule)
 
