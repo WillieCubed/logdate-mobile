@@ -42,6 +42,8 @@
 	<string>LogDate uses motion sensors to enrich entries with activity context.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>LogDate can read your contacts to suggest people to tag in entries.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>LogDate reads sleep data from Apple Health to set your day boundaries automatically based on your wake and sleep times.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSApplicationQueriesSchemes</key>

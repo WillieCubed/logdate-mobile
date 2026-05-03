@@ -15,6 +15,10 @@ import platform.Contacts.CNContactStore
 import platform.Contacts.CNEntityType
 import platform.EventKit.EKEntityType
 import platform.EventKit.EKEventStore
+import platform.HealthKit.HKAuthorizationStatusSharingAuthorized
+import platform.HealthKit.HKCategoryTypeIdentifierSleepAnalysis
+import platform.HealthKit.HKHealthStore
+import platform.HealthKit.HKObjectType
 import platform.Photos.PHAccessLevelReadWrite
 import platform.Photos.PHPhotoLibrary
 import platform.UserNotifications.UNAuthorizationOptionAlert
@@ -54,20 +58,54 @@ actual fun rememberNotificationPermissionState(): NotificationPermissionState {
 }
 
 @Composable
-actual fun rememberHealthConnectPermissionState(): HealthConnectPermissionState =
-    // Not implemented on iOS yet — needs HKHealthStore.requestAuthorization on
-    // HKCategoryTypeIdentifierSleepAnalysis plus the HealthKit entitlement on the iOS target.
-    // Until both land this is a hard-coded "no permission" stub; UI gated on this hook should
-    // hide the entry point rather than render a request-permission button.
-    HealthConnectPermissionState(
-        hasPermission = false,
-        permissionRequested = false,
-        isRequestInFlight = false,
+actual fun rememberHealthConnectPermissionState(): HealthConnectPermissionState {
+    val healthStore = remember { HKHealthStore() }
+    val sleepType = remember { HKObjectType.categoryTypeForIdentifier(HKCategoryTypeIdentifierSleepAnalysis) }
+    val healthAvailable = remember { HKHealthStore.isHealthDataAvailable() && sleepType != null }
+
+    var hasPermission by remember { mutableStateOf(false) }
+    var permissionRequested by remember { mutableStateOf(false) }
+    var isRequestInFlight by remember { mutableStateOf(false) }
+    var refreshNonce by remember { mutableStateOf(0) }
+
+    // HealthKit deliberately does not expose read-permission status to apps to prevent
+    // probing — `authorizationStatusForType` reflects share-write authorization only.
+    // Treat write-authorized as "permission granted" for the purpose of the onboarding gate;
+    // the actual sleep query will return no data if the user denied read access.
+    LaunchedEffect(refreshNonce) {
+        hasPermission =
+            healthAvailable &&
+                sleepType != null &&
+                healthStore.authorizationStatusForType(sleepType) == HKAuthorizationStatusSharingAuthorized
+    }
+
+    return HealthConnectPermissionState(
+        hasPermission = hasPermission,
+        permissionRequested = permissionRequested,
+        isRequestInFlight = isRequestInFlight,
         requestPermission = {
-            TODO("rememberHealthConnectPermissionState.requestPermission not implemented on iOS")
+            if (!healthAvailable || sleepType == null) {
+                permissionRequested = true
+                return@HealthConnectPermissionState
+            }
+            isRequestInFlight = true
+            healthStore.requestAuthorizationToShareTypes(
+                typesToShare = null,
+                readTypes = setOf(sleepType),
+            ) { _, error ->
+                if (error != null) {
+                    Napier.w("HealthKit authorization failed: ${error.localizedDescription}")
+                }
+                permissionRequested = true
+                isRequestInFlight = false
+                refreshNonce += 1
+            }
         },
-        refreshPermissionState = {},
+        refreshPermissionState = {
+            refreshNonce += 1
+        },
     )
+}
 
 @Composable
 actual fun rememberMediaLibraryPermissionState(): MediaLibraryPermissionState {
