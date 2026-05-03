@@ -15,10 +15,10 @@ import platform.AVFAudio.AVAudioSession
 import platform.AVFAudio.AVAudioSessionCategoryOptionAllowBluetooth
 import platform.AVFAudio.AVAudioSessionCategoryOptionAllowBluetoothA2DP
 import platform.AVFAudio.AVAudioSessionCategoryOptionDefaultToSpeaker
-import platform.AVFAudio.AVAudioSessionCategoryOptionDuckOthers
-import platform.AVFAudio.AVAudioSessionCategoryOptionMixWithOthers
 import platform.AVFAudio.AVAudioSessionCategoryPlayAndRecord
-import platform.AVFAudio.AVAudioSessionModeDefault
+import platform.AVFAudio.AVAudioSessionModeSpokenAudio
+import platform.AVFAudio.AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation
+import platform.AVFAudio.setActive
 import platform.Foundation.NSError
 
 /**
@@ -37,96 +37,70 @@ class IosAudioSessionController {
     fun setupAudioSessionForRecording(): Boolean {
         Napier.d("Setting up iOS audio session for recording")
 
-        try {
-            // Set category to allow simultaneous recording and playback
-            val categoryOptions =
-                AVAudioSessionCategoryOptionDefaultToSpeaker or
-                    AVAudioSessionCategoryOptionAllowBluetooth or
-                    AVAudioSessionCategoryOptionAllowBluetoothA2DP or
-                    AVAudioSessionCategoryOptionDuckOthers
+        val categoryOptions =
+            AVAudioSessionCategoryOptionDefaultToSpeaker or
+                AVAudioSessionCategoryOptionAllowBluetooth or
+                AVAudioSessionCategoryOptionAllowBluetoothA2DP
 
-            val categoryError =
-                memScoped {
-                    val errorPtr = alloc<ObjCObjectVar<NSError?>>()
-                    audioSession.setCategory(
-                        AVAudioSessionCategoryPlayAndRecord,
-                        withOptions = categoryOptions,
-                        error = errorPtr.ptr,
-                    )
-                    errorPtr.value
-                }
-
-            if (categoryError != null) {
-                Napier.e("Failed to set audio session category: ${categoryError.localizedDescription}")
-                return false
+        val categoryError =
+            memScoped {
+                val errorPtr = alloc<ObjCObjectVar<NSError?>>()
+                audioSession.setCategory(
+                    AVAudioSessionCategoryPlayAndRecord,
+                    withOptions = categoryOptions,
+                    error = errorPtr.ptr,
+                )
+                errorPtr.value
             }
-
-            // Set mode to default
-            val modeError =
-                memScoped {
-                    val errorPtr = alloc<ObjCObjectVar<NSError?>>()
-                    audioSession.setMode(AVAudioSessionModeDefault, error = errorPtr.ptr)
-                    errorPtr.value
-                }
-
-            if (modeError != null) {
-                Napier.e("Failed to set audio session mode: ${modeError.localizedDescription}")
-                return false
-            }
-
-            // Activation is platform-managed on iOS; avoid explicit activation here.
-
-            // Configure for background operation
-            setupBackgroundRecordingCapabilities()
-
-            Napier.d("iOS audio session set up successfully")
-            return true
-        } catch (e: Exception) {
-            Napier.e("Exception setting up audio session: ${e.message}", e)
+        if (categoryError != null) {
+            Napier.e("Failed to set audio session category: ${categoryError.localizedDescription}")
             return false
         }
-    }
 
-    /**
-     * Sets up the audio session for background operation.
-     */
-    private fun setupBackgroundRecordingCapabilities() {
-        try {
-            // Required to continue audio recording in the background
-            val options =
-                AVAudioSessionCategoryOptionAllowBluetooth or
-                    AVAudioSessionCategoryOptionMixWithOthers or
-                    AVAudioSessionCategoryOptionDefaultToSpeaker
-
-            val sessionError =
-                memScoped {
-                    val errorPtr = alloc<ObjCObjectVar<NSError?>>()
-                    audioSession.setCategory(
-                        AVAudioSessionCategoryPlayAndRecord,
-                        withOptions = options,
-                        error = errorPtr.ptr,
-                    )
-                    errorPtr.value
-                }
-
-            if (sessionError != null) {
-                Napier.e("Failed to set background audio options: ${sessionError.localizedDescription}")
-            } else {
-                Napier.d("Successfully configured background audio recording")
+        val modeError =
+            memScoped {
+                val errorPtr = alloc<ObjCObjectVar<NSError?>>()
+                audioSession.setMode(AVAudioSessionModeSpokenAudio, error = errorPtr.ptr)
+                errorPtr.value
             }
-        } catch (e: Exception) {
-            Napier.e("Exception configuring background audio: ${e.message}", e)
+        if (modeError != null) {
+            Napier.e("Failed to set audio session mode: ${modeError.localizedDescription}")
+            return false
         }
+
+        val activateError =
+            memScoped {
+                val errorPtr = alloc<ObjCObjectVar<NSError?>>()
+                audioSession.setActive(true, error = errorPtr.ptr)
+                errorPtr.value
+            }
+        if (activateError != null) {
+            Napier.e("Failed to activate audio session: ${activateError.localizedDescription}")
+            return false
+        }
+
+        Napier.d("iOS audio session activated for recording")
+        return true
     }
 
     /**
-     * Ends the audio session.
+     * Releases the audio session so other apps' audio resumes promptly.
      */
     fun endAudioSession() {
-        try {
-            Napier.d("Audio session ended")
-        } catch (e: Exception) {
-            Napier.e("Exception ending audio session: ${e.message}", e)
+        val error =
+            memScoped {
+                val errorPtr = alloc<ObjCObjectVar<NSError?>>()
+                audioSession.setActive(
+                    active = false,
+                    withOptions = AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation,
+                    error = errorPtr.ptr,
+                )
+                errorPtr.value
+            }
+        if (error != null) {
+            Napier.w("Failed to deactivate audio session: ${error.localizedDescription}")
+        } else {
+            Napier.d("Audio session deactivated")
         }
     }
 }
