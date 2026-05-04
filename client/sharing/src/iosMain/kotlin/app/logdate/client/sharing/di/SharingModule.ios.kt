@@ -1,8 +1,8 @@
 package app.logdate.client.sharing.di
 
+import app.logdate.client.sharing.IosRewindQuoteCardRenderer
+import app.logdate.client.sharing.IosRewindStatsSummaryRenderer
 import app.logdate.client.sharing.IosSharingLauncher
-import app.logdate.client.sharing.NoOpRewindQuoteCardRenderer
-import app.logdate.client.sharing.NoOpRewindStatsSummaryRenderer
 import app.logdate.client.sharing.RewindQuoteCardRenderer
 import app.logdate.client.sharing.RewindStatsSummaryRenderer
 import app.logdate.client.sharing.SharingLauncher
@@ -20,6 +20,6 @@ actual val sharingModule: Module =
                 mediaManager = get(),
             )
         }
-        single<RewindQuoteCardRenderer> { NoOpRewindQuoteCardRenderer }
-        single<RewindStatsSummaryRenderer> { NoOpRewindStatsSummaryRenderer }
+        single<RewindQuoteCardRenderer> { IosRewindQuoteCardRenderer() }
+        single<RewindStatsSummaryRenderer> { IosRewindStatsSummaryRenderer() }
     }
