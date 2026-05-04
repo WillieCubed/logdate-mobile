@@ -193,6 +193,11 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
                 onGoBack = { navController.popBackStack() },
                 onNavigateToDay = { date -> navController.navigateToTimelineDay(date) },
                 onNavigateToJournal = { journalId -> navController.navigateToJournal(journalId) },
+                onNavigateToPerson = { personId ->
+                    navController.navigate(
+                        app.logdate.feature.core.settings.navigation.PersonDetailRoute(personId),
+                    )
+                },
             )
         }
         composable<LocationTimelineRoute> {
