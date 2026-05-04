@@ -32,6 +32,7 @@ import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
 import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
 import app.logdate.feature.core.settings.ui.StreakSettingsViewModel
 import app.logdate.feature.core.settings.ui.TimelineSettingsViewModel
+import app.logdate.feature.core.settings.ui.VoiceNotesSettingsViewModel
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import app.logdate.feature.core.settings.updates.UnsupportedAppUpdateController
 import org.koin.core.module.Module
@@ -120,6 +121,7 @@ actual val coreFeatureModule: Module =
         // TODO(desktop): Wire location settings UX and platform permissions; keep settings storage available for now.
         viewModel { LocationSettingsViewModel(get()) }
         viewModel { MemoriesSettingsViewModel(get(), get()) }
+        viewModel { VoiceNotesSettingsViewModel(get(), get()) }
         viewModel { StreakSettingsViewModel(get(), get(), get()) }
         viewModel { TimelineSettingsViewModel(get(), get(), get()) }
         viewModel { DayBoundarySettingsViewModel(get(), get(), get()) }
