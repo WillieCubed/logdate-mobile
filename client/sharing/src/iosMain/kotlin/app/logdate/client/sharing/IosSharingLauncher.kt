@@ -308,7 +308,7 @@ class IosSharingLauncher(
         private const val STORY_TITLE_X = 96.0
         private const val STORY_TITLE_Y = 800.0
         private const val STORY_PASTEBOARD_LIFETIME_SECONDS = 60.0 * 5.0
-        private const val STORIES_DEEP_LINK = "instagram-stories://share?source_application=app.logdate.LogDate"
+        private const val STORIES_DEEP_LINK = "instagram-stories://share?source_application=studio.hypertext.LogDate"
         private const val STICKER_BACKGROUND_KEY = "com.instagram.sharedSticker.backgroundImage"
     }
 }
