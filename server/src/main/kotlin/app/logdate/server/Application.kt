@@ -82,6 +82,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.modules.SerializersModule
 import org.koin.ktor.ext.inject
 import org.koin.ktor.plugin.Koin
@@ -92,6 +94,7 @@ import studio.hypertext.atproto.pds.PdsRepoService
 import studio.hypertext.atproto.pds.PdsSessionService
 import studio.hypertext.atproto.pds.PdsSyncService
 import java.net.URI
+import java.security.MessageDigest
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.uuid.ExperimentalUuidApi
@@ -130,7 +133,10 @@ private fun buildMainServer(
 }
 
 @OptIn(ExperimentalUuidApi::class)
-fun Application.module(isDatabaseAvailable: Boolean = false) {
+fun Application.module(
+    isDatabaseAvailable: Boolean = false,
+    healthInternalToken: String = System.getenv("HEALTH_INTERNAL_TOKEN").orEmpty(),
+) {
     val profile = RuntimeProfile.fromEnvironment()
     val openApiSpec = AtomicReference<OpenAPI?>()
     install(OpenApi) {
@@ -292,7 +298,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
         }
 
         get("/health") {
-            val status =
+            call.respond(
                 mapOf(
                     "status" to "healthy",
                     "timestamp" to
@@ -300,8 +306,41 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
                             .now()
                             .toString(),
                     "version" to "1.0.0",
-                )
-            call.respond(status)
+                ),
+            )
+        }
+
+        // Same shape as /health plus db_connected, which an external monitor
+        // needs to distinguish "JVM bound port 8080" from "actually serving
+        // requests against Postgres". Gated behind a shared-secret header so
+        // the public surface still gives away nothing about the deployment's
+        // internal state. If the token isn't provisioned the route refuses to
+        // answer rather than degrading to a public unauth'd endpoint, and the
+        // comparison is constant-time so a brute-forcer can't time their way
+        // to the secret.
+        get("/health/internal") {
+            val provided = call.request.headers["X-LogDate-Health-Token"].orEmpty()
+            val tokenMatches =
+                healthInternalToken.isNotEmpty() &&
+                    provided.isNotEmpty() &&
+                    MessageDigest.isEqual(healthInternalToken.toByteArray(), provided.toByteArray())
+            if (!tokenMatches) {
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to "not found"))
+                return@get
+            }
+            call.respond(
+                buildJsonObject {
+                    put("status", "healthy")
+                    put(
+                        "timestamp",
+                        kotlin.time.Clock.System
+                            .now()
+                            .toString(),
+                    )
+                    put("version", "1.0.0")
+                    put("db_connected", isDatabaseAvailable)
+                },
+            )
         }
 
         identityRoutes(atprotoIdentityService)
