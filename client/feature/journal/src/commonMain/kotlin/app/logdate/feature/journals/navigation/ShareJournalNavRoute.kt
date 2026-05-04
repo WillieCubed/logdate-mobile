@@ -14,7 +14,9 @@ import kotlin.uuid.Uuid
  * given journal.
  */
 @Serializable
-data class ShareJournalRoute(val journalId: String) : NavKey {
+data class ShareJournalRoute(
+    val journalId: String,
+) : NavKey {
     constructor(journalId: Uuid) : this(journalId.toString())
 }
 
