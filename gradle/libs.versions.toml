@@ -48,6 +48,13 @@ logback = "1.5.32"
 androidx-navigation-compose = "2.9.2"
 nav3Core = "1.1.0"
 material3AdaptiveNav3 = "1.3.0-alpha10"
+# JetBrains-published Navigation 3 multiplatform — same API as androidx.navigation3 but
+# published under org.jetbrains.androidx.navigation3 with iOS / desktop / web targets.
+# Used by the in-progress migration from androidx.navigation.compose / androidx.navigation3
+# to a single shared graph.
+jetbrains-navigation3 = "1.0.0-alpha05"
+jetbrains-lifecycleViewmodelNav3 = "2.10.0-alpha05"
+jetbrains-material3AdaptiveNav3 = "1.3.0-alpha02"
 lifecycleViewmodelNav3 = "2.11.0-alpha03"
 
 coil = "3.4.0"
@@ -180,6 +187,12 @@ androidx-navigation3-ui = { module = "androidx.navigation3:navigation3-ui", vers
 # Optional add-on libraries
 androidx-material3-adaptive-navigation3 = { group = "androidx.compose.material3.adaptive", name = "adaptive-navigation3", version.ref = "material3AdaptiveNav3" }
 androidx-lifecycle-viewmodel-navigation3 = { module = "androidx.lifecycle:lifecycle-viewmodel-navigation3", version.ref = "lifecycleViewmodelNav3" }
+
+# JetBrains Navigation 3 multiplatform (commonMain) — used by the cross-platform graph.
+jetbrains-navigation3-runtime = { module = "org.jetbrains.androidx.navigation3:navigation3-runtime", version.ref = "jetbrains-navigation3" }
+jetbrains-navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "jetbrains-navigation3" }
+jetbrains-lifecycle-viewmodel-navigation3 = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-navigation3", version.ref = "jetbrains-lifecycleViewmodelNav3" }
+jetbrains-material3-adaptive-navigation3 = { module = "org.jetbrains.compose.material3.adaptive:adaptive-navigation3", version.ref = "jetbrains-material3AdaptiveNav3" }
 
 # Coroutines
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
