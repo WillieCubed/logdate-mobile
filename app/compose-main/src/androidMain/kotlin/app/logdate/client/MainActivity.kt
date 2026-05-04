@@ -59,7 +59,6 @@ import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_ID
 import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_TARGET
 import app.logdate.client.rewind.REWIND_NOTIFICATION_TARGET_DETAIL
-import app.logdate.client.sharing.NoOpSharingLauncher
 import app.logdate.client.sharing.SharingLauncher
 import app.logdate.client.testing.navigation.readNavigationTestDestination
 import app.logdate.client.testing.onboarding.OnboardingTestFixtureApplier
@@ -80,6 +79,7 @@ import app.logdate.feature.core.restore.AndroidRestoreLauncher
 import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
+import app.logdate.navigation.LogDateNavDisplay
 import app.logdate.navigation.routes.core.EntryEditor
 import app.logdate.navigation.routes.core.EventDetailRoute
 import app.logdate.navigation.routes.core.LocationRoute
@@ -287,28 +287,13 @@ class MainActivity : FragmentActivity() {
         setContent {
             val state = appUiState as? GlobalAppUiLoadedState
             if (state != null) {
-                MainActivityUiRoot(
+                LogDateNavDisplay(
                     appUiState = state,
                     onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
-                    pendingNavKey = pendingNavKey,
-                    onDeepLinkHandled = { pendingNavKey = null },
-                    onInitialNavigationReady = {
-                        markLaunchStage(LaunchStage.InitialNavigationReady)
-                        reportFullyDrawn()
-                    },
-                    databaseStartupState = databaseStartupState,
-                    onResetEncryptedStorage = ::resetEncryptedStorageAndRestart,
-                    isPostCloudRestore = postRestoreType == PostRestoreType.CLOUD_RESTORE,
-                    onAcknowledgeCloudRestore = ::acknowledgeCloudRestore,
-                    appUpdateUiState = appUpdateUiState,
-                    onCompleteAppUpdate = {
-                        lifecycleScope.launch {
-                            playInAppUpdateController.completeUpdate()
-                        }
-                    },
-                    onCurrentDestinationChanged = { currentNavKey = it },
-                    sharingLauncher = sharingLauncher,
                 )
+                // TODO(android): port deep-link push, post-restore prompt, app-update sheet,
+                // multi-window dispatch, and adaptive scenes from the legacy
+                // MainActivityUiRoot onto the new commonMain graph.
             } else {
                 MainActivityLoadingRoot()
             }
@@ -578,10 +563,9 @@ private fun resolveNavKey(intent: Intent?): NavKey? {
 @Suppress("ktlint:standard:function-naming")
 @Composable
 fun AppAndroidPreview() {
-    MainActivityUiRoot(
+    app.logdate.navigation.LogDateNavDisplay(
         appUiState = GlobalAppUiLoadedState(),
         onShowUnlockPrompt = { /* No-op for preview */ },
-        sharingLauncher = NoOpSharingLauncher,
     )
 }
 
