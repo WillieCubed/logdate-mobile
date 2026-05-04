@@ -11,6 +11,8 @@ import app.logdate.client.sync.cloud.di.cloudAccountModule
 import app.logdate.client.sync.conflict.KeyValueSyncConflictStore
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.metadata.KeyValueMediaSyncRefStore
+import app.logdate.client.sync.migration.di.migrationCoreModule
+import app.logdate.client.sync.migration.di.migrationModule
 import app.logdate.client.sync.metadata.KeyValueSyncDeadLetterStore
 import app.logdate.client.sync.metadata.KeyValueSyncRetryScheduleStore
 import app.logdate.client.sync.metadata.MediaSyncRefStore
@@ -63,6 +65,8 @@ actual val syncModule: Module =
             cloudModule,
             deviceInstanceModule,
             conflictResolverModule,
+            migrationCoreModule,
+            migrationModule,
             app.logdate.client.media.di.mediaModule,
         )
     }
