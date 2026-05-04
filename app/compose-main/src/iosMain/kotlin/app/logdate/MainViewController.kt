@@ -11,6 +11,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Suppress("ktlint:standard:function-naming")
 fun MainViewController() =
     ComposeUIViewController {
+        startCrashReportingUserBridge()
         val viewModel: AppViewModel = koinViewModel()
         val uiState by viewModel.uiState.collectAsState()
         val loadedState = (uiState as? GlobalAppUiLoadedState) ?: GlobalAppUiLoadedState()
