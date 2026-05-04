@@ -1,7 +1,14 @@
-project_id      = "logdate-staging"
+project_id      = "logdate-dev"
 region          = "us-central1"
 service_name    = "logdate-server-staging"
-cloud_run_image = "us-central1-docker.pkg.dev/logdate-staging/logdate/logdate-server:latest"
+# Placeholder image only used for the initial terraform apply. Real images get
+# pushed by the CI Deploy Server workflow (in repo_vars mode for this env).
+cloud_run_image = "us-central1-docker.pkg.dev/logdate-dev/logdate/logdate-server:latest"
+# WebAuthn rpId is intentionally bound to the staging subdomain rather than the
+# registrable apex `logdate.app`. Production uses the apex so passkeys work
+# across `*.logdate.app`; if staging used the apex too, a passkey created here
+# would also unlock prod (`cloud.logdate.app`). Subdomain-bound rpId keeps the
+# two environments isolated.
 webauthn_rp_id  = "cloud-staging.logdate.app"
 webauthn_origin = "https://cloud-staging.logdate.app"
 
@@ -19,16 +26,27 @@ cpu_idle            = true
 startup_cpu_boost   = true
 
 cloud_run_env = {
-  AUTO_MIGRATE = "true"
+  LOGDATE_ENV     = "production"
+  AUTO_MIGRATE    = "true"
+  ALLOWED_ORIGINS = "https://cloud-staging.logdate.app"
+  REQUIRE_HTTPS   = "true"
 }
 
+# Secret IDs are scoped to this project's Secret Manager namespace (separate
+# from the prod project's identically-named secrets, no collision).
 cloud_run_secret_env = {
-  DATABASE_URL           = { secret_id = "logdate-db-url" }
-  DATABASE_USER          = { secret_id = "logdate-db-user" }
-  DATABASE_PASSWORD      = { secret_id = "logdate-db-password" }
-  JWT_SECRET             = { secret_id = "logdate-jwt-secret" }
-  GOOGLE_OIDC_CLIENT_IDS = { secret_id = "logdate-google-oidc-client-ids" }
-  REDIS_URL              = { secret_id = "logdate-redis-url" }
+  DATABASE_URL      = { secret_id = "logdate-db-url" }
+  DATABASE_USER     = { secret_id = "logdate-db-user" }
+  DATABASE_PASSWORD = { secret_id = "logdate-db-password" }
+  JWT_SECRET        = { secret_id = "logdate-jwt-secret" }
+  # Opt-in only — populate the secret container then add an entry here:
+  #   GOOGLE_OIDC_CLIENT_IDS = { secret_id = "logdate-google-oidc-client-ids" }
+  #   REDIS_URL              = { secret_id = "logdate-redis-url" }
 }
+
+secret_ids = [
+  "logdate-google-oidc-client-ids",
+  "logdate-redis-url",
+]
 
 create_secrets = true
