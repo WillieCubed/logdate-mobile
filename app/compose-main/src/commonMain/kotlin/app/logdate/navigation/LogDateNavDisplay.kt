@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
@@ -92,6 +93,8 @@ import app.logdate.feature.core.settings.ui.SyncSettingsScreen
 import app.logdate.feature.core.settings.ui.TimelineSettingsScreen
 import app.logdate.feature.core.settings.ui.VoiceNotesSettingsScreen
 import app.logdate.feature.core.settings.ui.devices.DevicesScreen
+import app.logdate.feature.core.sync.SyncIssuesScreen
+import app.logdate.feature.core.sync.navigation.SyncIssuesRoute
 import app.logdate.feature.editor.navigation.EntryEditorRoute
 import app.logdate.feature.editor.ui.NoteEditorScreen
 import app.logdate.feature.events.navigation.EventDetailRoute
@@ -150,6 +153,9 @@ import app.logdate.feature.core.account.OnboardingStep as CloudAccountStep
 fun LogDateNavDisplay(
     appUiState: GlobalAppUiLoadedState,
     onShowUnlockPrompt: () -> Unit,
+    pendingNavKey: NavKey? = null,
+    onPendingNavKeyConsumed: () -> Unit = {},
+    onCurrentNavKeyChanged: (NavKey?) -> Unit = {},
 ) {
     val backStack = rememberNavBackStack(appNavSavedStateConfiguration, BaseRoute)
     var hasRequestedUnlock by remember { mutableStateOf(false) }
@@ -172,6 +178,17 @@ fun LogDateNavDisplay(
             backStack.clear()
             backStack.add(HomeRoute)
         }
+    }
+
+    LaunchedEffect(pendingNavKey, appUiState.isOnboarded, appUiState.requiresUnlock) {
+        val target = pendingNavKey ?: return@LaunchedEffect
+        if (!appUiState.isOnboarded || appUiState.requiresUnlock) return@LaunchedEffect
+        backStack.add(target)
+        onPendingNavKeyConsumed()
+    }
+
+    LaunchedEffect(backStack.lastOrNull()) {
+        onCurrentNavKeyChanged(backStack.lastOrNull())
     }
 
     LaunchedEffect(backStack, appUiState.isOnboarded, appUiState.requiresUnlock) {
@@ -215,6 +232,7 @@ fun LogDateNavDisplay(
                                             },
                                             onImportBackup = { backStack.add(ExportSettingsRoute) },
                                             onOpenMediaDetail = { backStack.add(MediaDetailRoute(it)) },
+                                            onOpenSyncIssues = { backStack.add(SyncIssuesRoute) },
                                             libraryContent = { modifier ->
                                                 LibraryScreen(
                                                     onOpenMediaDetail = { backStack.add(MediaDetailRoute(it)) },
@@ -227,6 +245,11 @@ fun LogDateNavDisplay(
                                                     modifier = modifier,
                                                 )
                                             },
+                                        )
+                                    }
+                                    entry<SyncIssuesRoute> {
+                                        SyncIssuesScreen(
+                                            onGoBack = { backStack.removeLastOrNull() },
                                         )
                                     }
                                     entry<JournalsOverviewRoute> {

@@ -36,6 +36,7 @@ import app.logdate.feature.core.settings.ui.StreakSettingsViewModel
 import app.logdate.feature.core.settings.ui.TimelineSettingsViewModel
 import app.logdate.feature.core.settings.ui.VoiceNotesSettingsViewModel
 import app.logdate.feature.core.settings.updates.AppUpdateController
+import app.logdate.feature.core.sync.SyncIssuesViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.workmanager.dsl.workerOf
 import org.koin.core.module.Module
@@ -75,6 +76,7 @@ actual val coreFeatureModule: Module =
         viewModel { AppViewModel(get(), get(), get(), get(), get()) }
         viewModel {
             AccountSettingsViewModel(
+                get(),
                 get(),
                 get(),
                 get(),
@@ -130,7 +132,7 @@ actual val coreFeatureModule: Module =
                 linkNoteToEvent = get(),
             )
         }
-        viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get(), get()) }
+        viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
         viewModel { LocationSettingsViewModel(get()) }
         viewModel { MemoriesSettingsViewModel(get(), get<MemoriesWidgetInstallController>()) }
         viewModel { VoiceNotesSettingsViewModel(get(), get()) }
@@ -142,6 +144,7 @@ actual val coreFeatureModule: Module =
         viewModel { PeopleDirectoryViewModel(get(), get()) }
         viewModel { PeopleInboxViewModel(get()) }
         viewModel { PersonDetailViewModel(get(), get()) }
+        viewModel { SyncIssuesViewModel(get()) }
     }
 
 // TODO: Fix this obvious code smell

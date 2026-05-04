@@ -41,6 +41,7 @@ import app.logdate.feature.core.settings.navigation.StreakSettingsRoute
 import app.logdate.feature.core.settings.navigation.SyncSettingsRoute
 import app.logdate.feature.core.settings.navigation.TimelineSettingsRoute
 import app.logdate.feature.core.settings.navigation.VoiceNotesSettingsRoute
+import app.logdate.feature.core.sync.navigation.SyncIssuesRoute
 import app.logdate.feature.editor.navigation.EntryEditorRoute
 import app.logdate.feature.events.navigation.EventDetailRoute
 import app.logdate.feature.journals.navigation.JournalCreationRoute
@@ -95,6 +96,7 @@ val appNavSavedStateConfiguration: SavedStateConfiguration =
                     subclass(BaseRoute::class, BaseRoute.serializer())
                     subclass(HomeRoute::class, HomeRoute.serializer())
                     subclass(ProfileRoute::class, ProfileRoute.serializer())
+                    subclass(SyncIssuesRoute::class, SyncIssuesRoute.serializer())
 
                     // Onboarding
                     subclass(OnboardingRoute::class, OnboardingRoute.serializer())

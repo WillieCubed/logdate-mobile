@@ -35,6 +35,7 @@ import app.logdate.feature.core.settings.ui.TimelineSettingsViewModel
 import app.logdate.feature.core.settings.ui.VoiceNotesSettingsViewModel
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import app.logdate.feature.core.settings.updates.UnsupportedAppUpdateController
+import app.logdate.feature.core.sync.SyncIssuesViewModel
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -79,6 +80,7 @@ actual val coreFeatureModule: Module =
         viewModel { AppViewModel(get(), get(), get(), get(), get()) }
         viewModel {
             AccountSettingsViewModel(
+                get(),
                 get(),
                 get(),
                 get(),
@@ -134,7 +136,7 @@ actual val coreFeatureModule: Module =
                 linkNoteToEvent = get(),
             )
         }
-        viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get(), get()) }
+        viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
         // TODO(ios): Wire location settings UX and platform permissions; keep settings storage available for now.
         viewModel { LocationSettingsViewModel(get()) }
         viewModel { MemoriesSettingsViewModel(get(), get()) }
@@ -147,4 +149,5 @@ actual val coreFeatureModule: Module =
         viewModel { PeopleDirectoryViewModel(get(), get()) }
         viewModel { PeopleInboxViewModel(get()) }
         viewModel { PersonDetailViewModel(get(), get()) }
+        viewModel { SyncIssuesViewModel(get()) }
     }

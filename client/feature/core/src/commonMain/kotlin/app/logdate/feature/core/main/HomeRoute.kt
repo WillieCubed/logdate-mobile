@@ -36,6 +36,7 @@ fun NavGraphBuilder.homeGraph(
     onOpenDraft: (draftId: String) -> Unit = {},
     onImportBackup: () -> Unit = {},
     onOpenMediaDetail: (Uuid) -> Unit = {},
+    onOpenSyncIssues: () -> Unit = {},
     libraryContent: @Composable (Modifier) -> Unit = {},
     locationContent: @Composable (Modifier) -> Unit = {},
 ) {
@@ -51,6 +52,7 @@ fun NavGraphBuilder.homeGraph(
             onOpenDraft = onOpenDraft,
             onImportBackup = onImportBackup,
             onOpenMediaDetail = onOpenMediaDetail,
+            onOpenSyncIssues = onOpenSyncIssues,
             libraryContent = libraryContent,
             locationContent = locationContent,
         )

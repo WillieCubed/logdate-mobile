@@ -2,6 +2,7 @@
 
 package app.logdate.feature.core.main
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -42,6 +43,7 @@ import app.logdate.client.domain.timeline.TimelinePageRequest
 import app.logdate.client.domain.timeline.TimelinePlaceVisit
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.feature.core.sync.SyncIssuesBanner
 import app.logdate.feature.journals.ui.JournalClickCallback
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
 import app.logdate.feature.rewind.ui.RewindOverviewScreen
@@ -101,6 +103,7 @@ fun HomeScreen(
     onOpenDraft: (draftId: String) -> Unit = {},
     onImportBackup: () -> Unit = {},
     onOpenMediaDetail: (Uuid) -> Unit = {},
+    onOpenSyncIssues: () -> Unit = {},
     locationContent: @Composable (Modifier) -> Unit = {},
     libraryContent: @Composable (Modifier) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -166,28 +169,32 @@ fun HomeScreen(
             when (currentDestination) {
                 HomeRouteDestination.Timeline -> {
                     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-                    TimelinePane(
-                        uiState =
-                            TimelineUiState(
-                                items = uiState.items,
-                                loadingState = uiState.loadingState,
-                                isLoadingMore = uiState.isLoadingMore,
-                                hasMoreOlderContent = uiState.hasMoreOlderContent,
-                                appendError = uiState.appendError,
-                            ),
-                        onNewEntry = onNewEntry,
-                        onOpenDay = { date -> viewModel.selectDay(date) },
-                        onLoadMoreOlder = viewModel::loadMoreOlder,
-                        onProfileClick = onOpenSettings,
-                        onSearchClick = onOpenSearch,
-                        onOpenDraft = onOpenDraft,
-                        onImportBackup = onImportBackup,
-                        timelineSuggestion = uiState.timelineSuggestion,
+                    Column(
                         modifier =
                             Modifier
                                 .applyScreenStyles()
                                 .safeDrawingPadding(),
-                    )
+                    ) {
+                        SyncIssuesBanner(onOpenSyncIssues = onOpenSyncIssues)
+                        TimelinePane(
+                            uiState =
+                                TimelineUiState(
+                                    items = uiState.items,
+                                    loadingState = uiState.loadingState,
+                                    isLoadingMore = uiState.isLoadingMore,
+                                    hasMoreOlderContent = uiState.hasMoreOlderContent,
+                                    appendError = uiState.appendError,
+                                ),
+                            onNewEntry = onNewEntry,
+                            onOpenDay = { date -> viewModel.selectDay(date) },
+                            onLoadMoreOlder = viewModel::loadMoreOlder,
+                            onProfileClick = onOpenSettings,
+                            onSearchClick = onOpenSearch,
+                            onOpenDraft = onOpenDraft,
+                            onImportBackup = onImportBackup,
+                            timelineSuggestion = uiState.timelineSuggestion,
+                        )
+                    }
                 }
 
                 HomeRouteDestination.LocationHistory -> {
