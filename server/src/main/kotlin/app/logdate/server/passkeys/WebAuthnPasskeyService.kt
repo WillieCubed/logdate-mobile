@@ -65,6 +65,18 @@ class WebAuthnPasskeyService(
         val error: String? = null,
     )
 
+    /**
+     * Output of a successful crypto-only registration verification. The caller (typically the
+     * signup route handler) decides when to actually persist this; that lets the account row be
+     * created first so the passkeys → accounts foreign key holds.
+     */
+    data class VerifiedRegistration(
+        val credentialId: String,
+        val publicKey: ByteArray,
+        val signCount: Long,
+        val passkey: PasskeyInfo,
+    )
+
     data class AuthenticationResult(
         val success: Boolean,
         val userId: Uuid? = null,
@@ -137,16 +149,77 @@ class WebAuthnPasskeyService(
         )
     }
 
+    /**
+     * Two-step convenience wrapper that verifies the registration and immediately stores it.
+     * Suitable for callers that already have an `accounts` row for [userId]. New signup flows
+     * should prefer [verifyRegistrationOnly] + [storeVerifiedPasskey] so they can create the
+     * account row before inserting the passkey (which carries an FK to `accounts`).
+     */
     fun verifyRegistration(
         userId: Uuid,
         challenge: String,
         registrationResponse: PasskeyRegistrationResponse,
-    ): RegistrationResult =
-        if (strictVerificationEnabled) {
-            verifyRegistrationStrict(userId, challenge, registrationResponse)
-        } else {
-            verifyRegistrationSimplified(userId, challenge, registrationResponse)
+    ): RegistrationResult {
+        val verified = verifyRegistrationOnly(userId, challenge, registrationResponse)
+        return when (verified) {
+            is VerificationOutcome.Failure -> RegistrationResult(success = false, error = verified.error)
+            is VerificationOutcome.Success -> {
+                val data = verified.data
+                val storeResult = runCatching { storeVerifiedPasskey(userId, data) }
+                when {
+                    storeResult.isFailure -> {
+                        val cause = storeResult.exceptionOrNull()
+                        RegistrationResult(
+                            success = false,
+                            error = "Registration verification failed: ${cause?.message}",
+                        )
+                    }
+                    storeResult.getOrDefault(false) ->
+                        RegistrationResult(success = true, credentialId = data.credentialId, passkey = data.passkey)
+                    else ->
+                        RegistrationResult(success = false, error = "Failed to store passkey")
+                }
+            }
         }
+    }
+
+    /**
+     * Verifies a registration response cryptographically without writing to the database. Returns
+     * a [VerifiedRegistration] the caller can hand back to [storeVerifiedPasskey] once the
+     * account row exists. Marking the challenge consumed is part of verification, so a failed
+     * verify will not leave the challenge re-usable.
+     */
+    fun verifyRegistrationOnly(
+        userId: Uuid,
+        challenge: String,
+        registrationResponse: PasskeyRegistrationResponse,
+    ): VerificationOutcome =
+        if (strictVerificationEnabled) {
+            verifyRegistrationStrictOnly(userId, challenge, registrationResponse)
+        } else {
+            verifyRegistrationSimplifiedOnly(userId, challenge, registrationResponse)
+        }
+
+    /** Persists a previously-verified passkey. Returns true on success. */
+    fun storeVerifiedPasskey(
+        userId: Uuid,
+        verified: VerifiedRegistration,
+    ): Boolean =
+        runBlocking {
+            passkeyRepository.storePasskey(
+                userId = userId,
+                credentialId = verified.credentialId,
+                publicKey = verified.publicKey,
+                signCount = verified.signCount,
+                info = verified.passkey,
+            )
+        }
+
+    /** Result of [verifyRegistrationOnly] — either verified data or a structured error. */
+    sealed interface VerificationOutcome {
+        data class Success(val data: VerifiedRegistration) : VerificationOutcome
+        data class Failure(val error: String) : VerificationOutcome
+    }
 
     fun verifyAuthentication(
         challenge: String,
@@ -172,75 +245,65 @@ class WebAuthnPasskeyService(
 
     fun getUserCredentials(userId: Uuid): List<String> = runBlocking { passkeyRepository.getCredentialIdsForUser(userId) }
 
-    private fun verifyRegistrationSimplified(
+    private fun verifyRegistrationSimplifiedOnly(
         userId: Uuid,
         challenge: String,
         registrationResponse: PasskeyRegistrationResponse,
-    ): RegistrationResult {
+    ): VerificationOutcome {
         return try {
             val challengeData =
                 validateChallenge(
                     challenge = challenge,
                     expectedType = "registration",
                     expectedUserId = userId,
-                ) ?: return RegistrationResult(success = false, error = "Invalid challenge")
+                ) ?: return VerificationOutcome.Failure("Invalid challenge")
             challenges[challenge] = challengeData.copy(isUsed = true)
 
             val credentialId = normalizeCredentialId(registrationResponse.id) ?: registrationResponse.id
-            val passkey =
-                PasskeyInfo(
-                    id = Uuid.random(),
+            VerificationOutcome.Success(
+                VerifiedRegistration(
                     credentialId = credentialId,
-                    nickname = relyingPartyName,
-                    deviceType = "platform",
-                    createdAt = Clock.System.now(),
-                    lastUsedAt = null,
-                    isActive = true,
-                )
-
-            val stored =
-                runBlocking {
-                    passkeyRepository.storePasskey(
-                        userId = userId,
+                    publicKey = registrationResponse.response.attestationObject.toByteArray(),
+                    signCount = 0L,
+                    passkey = PasskeyInfo(
+                        id = Uuid.random(),
                         credentialId = credentialId,
-                        publicKey = registrationResponse.response.attestationObject.toByteArray(),
-                        signCount = 0L,
-                        info = passkey,
-                    )
-                }
-            if (!stored) {
-                return RegistrationResult(success = false, error = "Failed to store passkey")
-            }
-
-            RegistrationResult(success = true, credentialId = credentialId, passkey = passkey)
+                        nickname = relyingPartyName,
+                        deviceType = "platform",
+                        createdAt = Clock.System.now(),
+                        lastUsedAt = null,
+                        isActive = true,
+                    ),
+                ),
+            )
         } catch (e: Exception) {
-            RegistrationResult(success = false, error = "Registration verification failed: ${e.message}")
+            VerificationOutcome.Failure("Registration verification failed: ${e.message}")
         }
     }
 
-    private fun verifyRegistrationStrict(
+    private fun verifyRegistrationStrictOnly(
         userId: Uuid,
         challenge: String,
         registrationResponse: PasskeyRegistrationResponse,
-    ): RegistrationResult {
+    ): VerificationOutcome {
         return try {
             val challengeData =
                 validateChallenge(
                     challenge = challenge,
                     expectedType = "registration",
                     expectedUserId = userId,
-                ) ?: return RegistrationResult(success = false, error = "Invalid challenge")
+                ) ?: return VerificationOutcome.Failure("Invalid challenge")
             challenges[challenge] = challengeData.copy(isUsed = true)
 
             val challengeBytes =
                 decodeBase64Url(challenge)
-                    ?: return RegistrationResult(success = false, error = "Challenge is not valid base64url")
+                    ?: return VerificationOutcome.Failure("Challenge is not valid base64url")
             val attestationObjectBytes =
                 decodeBase64Url(registrationResponse.response.attestationObject)
-                    ?: return RegistrationResult(success = false, error = "Attestation object is not valid base64url")
+                    ?: return VerificationOutcome.Failure("Attestation object is not valid base64url")
             val clientDataJsonBytes =
                 decodeBase64Url(registrationResponse.response.clientDataJSON)
-                    ?: return RegistrationResult(success = false, error = "Client data is not valid base64url")
+                    ?: return VerificationOutcome.Failure("Client data is not valid base64url")
 
             val serverProperty =
                 ServerProperty
@@ -255,49 +318,39 @@ class WebAuthnPasskeyService(
             val registrationData = webAuthnManager.verify(registrationRequest, registrationParameters)
             val attestationObject =
                 registrationData.attestationObject
-                    ?: return RegistrationResult(success = false, error = "Attestation object is missing")
+                    ?: return VerificationOutcome.Failure("Attestation object is missing")
             val authenticatorData = attestationObject.authenticatorData
 
             val attestedCredentialData =
                 authenticatorData.attestedCredentialData
-                    ?: return RegistrationResult(success = false, error = "Attested credential data is missing")
+                    ?: return VerificationOutcome.Failure("Attested credential data is missing")
 
             val canonicalCredentialId = encodeBase64Url(attestedCredentialData.credentialId)
             val normalizedCredentialId = normalizeCredentialId(registrationResponse.id)
             if (normalizedCredentialId != null && normalizedCredentialId != canonicalCredentialId) {
-                return RegistrationResult(success = false, error = "Credential ID mismatch")
+                return VerificationOutcome.Failure("Credential ID mismatch")
             }
 
-            val passkey =
-                PasskeyInfo(
-                    id = Uuid.random(),
+            VerificationOutcome.Success(
+                VerifiedRegistration(
                     credentialId = canonicalCredentialId,
-                    nickname = relyingPartyName,
-                    deviceType = "platform",
-                    createdAt = Clock.System.now(),
-                    lastUsedAt = null,
-                    isActive = true,
-                )
-
-            val stored =
-                runBlocking {
-                    passkeyRepository.storePasskey(
-                        userId = userId,
+                    publicKey = attestedCredentialDataConverter.convert(attestedCredentialData),
+                    signCount = authenticatorData.signCount,
+                    passkey = PasskeyInfo(
+                        id = Uuid.random(),
                         credentialId = canonicalCredentialId,
-                        publicKey = attestedCredentialDataConverter.convert(attestedCredentialData),
-                        signCount = authenticatorData.signCount,
-                        info = passkey,
-                    )
-                }
-            if (!stored) {
-                return RegistrationResult(success = false, error = "Failed to store passkey")
-            }
-
-            RegistrationResult(success = true, credentialId = canonicalCredentialId, passkey = passkey)
+                        nickname = relyingPartyName,
+                        deviceType = "platform",
+                        createdAt = Clock.System.now(),
+                        lastUsedAt = null,
+                        isActive = true,
+                    ),
+                ),
+            )
         } catch (e: DataConversionException) {
-            RegistrationResult(success = false, error = "Registration data conversion failed")
+            VerificationOutcome.Failure("Registration data conversion failed")
         } catch (e: Exception) {
-            RegistrationResult(success = false, error = "Registration verification failed: ${e.message}")
+            VerificationOutcome.Failure("Registration verification failed: ${e.message}")
         }
     }
 

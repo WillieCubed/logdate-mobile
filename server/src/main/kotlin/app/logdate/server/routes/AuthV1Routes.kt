@@ -364,35 +364,25 @@ fun Route.authV1Routes(
                             )
                         }
 
-                        val verificationResult =
-                            webAuthnService.verifyRegistration(
+                        // Verify the passkey cryptographically *before* writing anything. The
+                        // verifier no longer touches the database, so a failed verify costs
+                        // nothing and we never have to roll back an orphan account row.
+                        val verifiedOutcome =
+                            webAuthnService.verifyRegistrationOnly(
                                 userId = session.temporaryUserId,
                                 challenge = session.challenge,
                                 registrationResponse = request.credential.toPasskeyRegistrationResponse(),
                             )
-                        if (!verificationResult.success) {
-                            return@post call.respondApiError(
-                                HttpStatusCode.BadRequest,
-                                "PASSKEY_VERIFICATION_FAILED",
-                                verificationResult.error ?: "Failed to verify passkey",
-                                metrics,
-                            )
+                        val verified = when (verifiedOutcome) {
+                            is WebAuthnPasskeyService.VerificationOutcome.Failure ->
+                                return@post call.respondApiError(
+                                    HttpStatusCode.BadRequest,
+                                    "PASSKEY_VERIFICATION_FAILED",
+                                    verifiedOutcome.error,
+                                    metrics,
+                                )
+                            is WebAuthnPasskeyService.VerificationOutcome.Success -> verifiedOutcome.data
                         }
-
-                        val now = Clock.System.now()
-                        // Keep account ID aligned with the WebAuthn user ID used during signup begin.
-                        // This ensures passkey ownership resolves to the created account on signin.
-                        val accountId = session.temporaryUserId
-                        var account =
-                            Account(
-                                id = accountId,
-                                username = session.username,
-                                displayName = session.displayName,
-                                bio = session.bio,
-                                createdAt = now,
-                                lastSignInAt = now,
-                                isActive = true,
-                            )
 
                         if (
                             request.emailBinding?.source == EMAIL_BINDING_SOURCE_GOOGLE &&
@@ -427,18 +417,44 @@ fun Route.authV1Routes(
                                     metrics,
                                 )
                             }
-
-                            account =
-                                account.copy(
-                                    email = bindingClaims.email.lowercase(),
-                                    emailVerified = bindingClaims.emailVerified,
-                                )
                         }
 
-                        account = accountRepository.save(account)
+                        val now = Clock.System.now()
+                        // Keep account ID aligned with the WebAuthn user ID used during signup begin.
+                        // This ensures passkey ownership resolves to the created account on signin.
+                        val accountId = session.temporaryUserId
+                        val initialAccount =
+                            Account(
+                                id = accountId,
+                                username = session.username,
+                                displayName = session.displayName,
+                                bio = session.bio,
+                                createdAt = now,
+                                lastSignInAt = now,
+                                isActive = true,
+                                email = bindingClaims?.email?.lowercase(),
+                                emailVerified = bindingClaims?.emailVerified ?: false,
+                            )
+
+                        // Account row first so the passkey FK to accounts(id) holds. Passkey
+                        // store is a single repository call right after — if it fails we delete
+                        // the account, but the failure window is two adjacent DB writes rather
+                        // than the verify+save+store surface the previous flow had.
+                        val account = accountRepository.save(initialAccount)
+                        val passkeyStored = webAuthnService.storeVerifiedPasskey(account.id, verified)
+                        if (!passkeyStored) {
+                            runCatching { accountRepository.deleteAccount(account.id) }
+                                .onFailure { Napier.w("Failed to roll back orphan account ${account.id}", it) }
+                            return@post call.respondApiError(
+                                HttpStatusCode.InternalServerError,
+                                "PASSKEY_STORE_FAILED",
+                                "Failed to store passkey",
+                                metrics,
+                            )
+                        }
                         sessionManager.markSessionUsed(request.sessionToken)
 
-                        val passkeySubject = verificationResult.credentialId ?: request.credential.id
+                        val passkeySubject = verified.credentialId
                         identityRepository.save(
                             AccountIdentity(
                                 id = Uuid.random(),
