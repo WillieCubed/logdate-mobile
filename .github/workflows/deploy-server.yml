@@ -86,10 +86,16 @@ jobs:
             echo "Using repository deployment variables because LOGDATE_DEPLOY_SOURCE=repo_vars."
           elif [[ -f "$TFVARS_FILE" ]]; then
             terraform -chdir="$TF_DIR" init -backend=false -input=false
+            # `terraform -chdir=X -var-file=Y` resolves Y relative to X. The workflow-level
+            # $TFVARS_FILE is a path from the workspace root, so pass the basename here so
+            # it isn't double-prefixed (which produced the
+            # "Failed to read variables file" error and turned every var into the literal
+            # string "::error::Terraform exited with code 1.").
+            TFVARS_BASENAME="$(basename "$TFVARS_FILE")"
 
             tf_value() {
               local value
-              value=$(printf 'var.%s\n' "$1" | terraform -chdir="$TF_DIR" console -var-file="$TFVARS_FILE" | sed -e 's/^> //' | sed '/^$/d' | tail -n 1)
+              value=$(printf 'var.%s\n' "$1" | terraform -chdir="$TF_DIR" console -var-file="$TFVARS_BASENAME" 2>/dev/null | sed -e 's/^> //' | sed '/^$/d' | tail -n 1)
               value="${value%\"}"
               value="${value#\"}"
               if [[ "$value" == "null" ]]; then
@@ -134,6 +140,11 @@ jobs:
       - name: Validate deployment configuration
         run: |
           if [[ -z "${SERVICE_NAME}" || -z "${PROJECT_ID}" || -z "${REGION}" ]]; then
+            echo "SERVICE_NAME, PROJECT_ID, and REGION must be set in infra/terraform/${ENVIRONMENT}.tfvars or repository variables."
+            exit 1
+          fi
+          # Catch the case where Terraform's actionlint wrapper turned an error into the variable value.
+          if [[ "${PROJECT_ID}" == *"Terraform exited with code"* || "${REGION}" == *"Terraform exited with code"* ]]; then
             echo "SERVICE_NAME, PROJECT_ID, and REGION must be set in infra/terraform/${ENVIRONMENT}.tfvars or repository variables."
             exit 1
           fi
