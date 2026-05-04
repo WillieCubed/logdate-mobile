@@ -22,6 +22,7 @@ import app.logdate.client.repository.journals.NotePlace
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.sync.NoOpSyncManager
+import app.logdate.client.sync.SyncDebouncer
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.metadata.AssociationPendingKey
@@ -545,15 +546,17 @@ class OfflineFirstJournalNotesRepository(
         videoNoteDao.updateContentUri(noteId, mediaRef)
     }
 
-    private fun triggerContentSync() {
-        syncScope.launch {
-            try {
-                syncManagerProvider().syncContent()
-            } catch (e: Exception) {
-                Napier.w("Failed to sync content after note change", e)
-            }
+    private val contentSyncDebouncer =
+        SyncDebouncer(scope = syncScope) {
+            syncManagerProvider().syncContent()
         }
-    }
+
+    private val associationSyncDebouncer =
+        SyncDebouncer(scope = syncScope) {
+            syncManagerProvider().syncAssociations()
+        }
+
+    private fun triggerContentSync() = contentSyncDebouncer.trigger()
 
     private fun JournalNote.withCaption(captionMap: Map<Uuid, String>): JournalNote =
         when (this) {
@@ -562,15 +565,7 @@ class OfflineFirstJournalNotesRepository(
             else -> this
         }
 
-    private fun triggerAssociationSync() {
-        syncScope.launch {
-            try {
-                syncManagerProvider().syncAssociations()
-            } catch (e: Exception) {
-                Napier.w("Failed to sync associations after journal change", e)
-            }
-        }
-    }
+    private fun triggerAssociationSync() = associationSyncDebouncer.trigger()
 
     override suspend fun exportContentToFile(
         destination: String,

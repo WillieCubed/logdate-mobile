@@ -5,6 +5,7 @@ import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.client.sync.NoOpSyncManager
+import app.logdate.client.sync.SyncDebouncer
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
@@ -40,6 +41,11 @@ class OfflineFirstJournalRepository(
     private val externalScope: CoroutineScope = CoroutineScope(dispatcher),
 ) : JournalRepository,
     SyncableJournalRepository {
+    private val syncDebouncer =
+        SyncDebouncer(scope = externalScope) {
+            syncManagerProvider().syncJournals()
+        }
+
     override val allJournalsObserved: Flow<List<Journal>>
         get() =
             journalDao.observeAll().map { journals ->
@@ -68,14 +74,7 @@ class OfflineFirstJournalRepository(
                 operation = PendingOperation.CREATE,
             )
 
-            // Trigger sync after successful creation
-            externalScope.launch {
-                try {
-                    syncManagerProvider().syncJournals()
-                } catch (e: Exception) {
-                    Napier.w("Failed to sync after journal creation", e)
-                }
-            }
+            syncDebouncer.trigger()
 
             journalId
         }
@@ -90,14 +89,7 @@ class OfflineFirstJournalRepository(
                 operation = PendingOperation.UPDATE,
             )
 
-            // Trigger sync after successful update
-            externalScope.launch {
-                try {
-                    syncManagerProvider().syncJournals()
-                } catch (e: Exception) {
-                    Napier.w("Failed to sync after journal update", e)
-                }
-            }
+            syncDebouncer.trigger()
         }
 
     override suspend fun delete(journalId: Uuid): Unit =
@@ -113,14 +105,7 @@ class OfflineFirstJournalRepository(
                 operation = PendingOperation.DELETE,
             )
 
-            // Trigger sync after successful deletion
-            externalScope.launch {
-                try {
-                    syncManagerProvider().syncJournals()
-                } catch (e: Exception) {
-                    Napier.w("Failed to sync after journal deletion", e)
-                }
-            }
+            syncDebouncer.trigger()
         }
 
     // Draft-related methods delegating to the DraftRepository
