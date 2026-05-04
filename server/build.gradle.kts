@@ -72,6 +72,10 @@ dependencies {
     // Logging
     implementation(libs.napier)
 
+    // Error reporting
+    implementation(libs.sentry)
+    implementation(libs.sentry.logback)
+
     // Database
     implementation(libs.exposed.core)
     implementation(libs.exposed.jdbc)

@@ -80,6 +80,7 @@ paging = "3.4.2"
 napier = "2.7.1"
 
 multiplatformMarkdownRenderer = "0.40.2"
+sentry = "7.20.0"
 webauthn4j = "0.31.0.RELEASE"
 jwtKt = "1.2.1"
 bouncycastle = "1.84"
@@ -275,6 +276,10 @@ okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 
 napier = { group = "io.github.aakira", name = "napier", version.ref = "napier" }
+
+# Sentry SDK (server-side error reporting)
+sentry = { module = "io.sentry:sentry", version.ref = "sentry" }
+sentry-logback = { module = "io.sentry:sentry-logback", version.ref = "sentry" }
 
 multiplatform-markdown-renderer = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "multiplatformMarkdownRenderer" }
 

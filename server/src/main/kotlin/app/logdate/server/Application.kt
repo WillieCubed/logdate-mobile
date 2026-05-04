@@ -71,6 +71,7 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
+import io.sentry.Sentry
 import io.swagger.v3.core.util.Yaml31
 import io.swagger.v3.oas.models.OpenAPI
 import kotlinx.coroutines.CancellationException
@@ -107,9 +108,39 @@ private val landingPageHtml: String by lazy {
     resource.readText()
 }
 
+// Boot-time hook for Sentry. With no DSN configured the SDK is a no-op, so
+// dev/test boots cleanly without ever touching the network. Once SENTRY_DSN
+// is mounted in Cloud Run, every uncaught exception in the request pipeline
+// — and every Napier.e call, since Napier surfaces through SLF4J/logback
+// which Sentry auto-instruments — flows to the configured project.
+private fun initializeSentry(profile: RuntimeProfile) {
+    val dsn = System.getenv("SENTRY_DSN").orEmpty()
+    if (dsn.isEmpty()) {
+        if (profile.isProduction) {
+            Napier.w(
+                "SENTRY_DSN is unset in production — boot continues but uncaught " +
+                    "exceptions and route errors won't be captured anywhere except " +
+                    "Cloud Logging. Provision the secret to close the gap.",
+            )
+        }
+        return
+    }
+    Sentry.init { options ->
+        options.dsn = dsn
+        options.environment = profile.name.lowercase()
+        options.release = "logdate-server@1.0.0"
+        // Sentry's default tracesSampleRate is 0.0, which means transactions
+        // never get sampled. We don't need APM right now — exceptions and
+        // breadcrumbs are enough — so leaving it at the default is correct.
+    }
+    Napier.i("Sentry initialised for ${profile.name.lowercase()}")
+}
+
 fun main() {
     val profile = RuntimeProfile.fromEnvironment()
     ProductionConfigValidator.validate(profile)
+
+    initializeSentry(profile)
 
     val isDatabaseAvailable = initializeDatabase()
 

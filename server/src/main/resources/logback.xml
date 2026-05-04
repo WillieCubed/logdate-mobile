@@ -4,8 +4,22 @@
             <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
+    <!--
+        Sentry appender: forwards WARN+ as breadcrumbs, ERROR as captured events,
+        but only after Sentry.init has run (no DSN = no-op). This is what hooks
+        Napier.e and any other ERROR-level log into the Sentry dashboard so
+        caught-and-logged exceptions actually show up there. Boot-time logs from
+        before Sentry.init runs are dropped on the floor by the appender, which
+        is fine — anything fatal at boot crashes the JVM and gets caught by
+        Sentry's uncaught-exception handler instead.
+    -->
+    <appender name="SENTRY" class="io.sentry.logback.SentryAppender">
+        <minimumEventLevel>ERROR</minimumEventLevel>
+        <minimumBreadcrumbLevel>WARN</minimumBreadcrumbLevel>
+    </appender>
     <root level="trace">
         <appender-ref ref="STDOUT"/>
+        <appender-ref ref="SENTRY"/>
     </root>
     <logger name="org.eclipse.jetty" level="INFO"/>
     <logger name="io.netty" level="INFO"/>
