@@ -9,9 +9,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
-import app.logdate.client.ui.LogDateAppRoot
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.GlobalAppUiLoadedState
+import app.logdate.navigation.LogDateNavDisplay
 import org.koin.compose.viewmodel.koinViewModel
 
 @Suppress("ktlint:standard:function-naming")
@@ -46,7 +46,7 @@ private fun MainWindowContent(
     val uiState by viewModel.uiState.collectAsState()
     val loadedState = (uiState as? GlobalAppUiLoadedState) ?: GlobalAppUiLoadedState()
 
-    LogDateAppRoot(
+    LogDateNavDisplay(
         appUiState = loadedState,
         onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
     )
