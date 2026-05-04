@@ -373,16 +373,17 @@ fun Route.authV1Routes(
                                 challenge = session.challenge,
                                 registrationResponse = request.credential.toPasskeyRegistrationResponse(),
                             )
-                        val verified = when (verifiedOutcome) {
-                            is WebAuthnPasskeyService.VerificationOutcome.Failure ->
-                                return@post call.respondApiError(
-                                    HttpStatusCode.BadRequest,
-                                    "PASSKEY_VERIFICATION_FAILED",
-                                    verifiedOutcome.error,
-                                    metrics,
-                                )
-                            is WebAuthnPasskeyService.VerificationOutcome.Success -> verifiedOutcome.data
-                        }
+                        val verified =
+                            when (verifiedOutcome) {
+                                is WebAuthnPasskeyService.VerificationOutcome.Failure ->
+                                    return@post call.respondApiError(
+                                        HttpStatusCode.BadRequest,
+                                        "PASSKEY_VERIFICATION_FAILED",
+                                        verifiedOutcome.error,
+                                        metrics,
+                                    )
+                                is WebAuthnPasskeyService.VerificationOutcome.Success -> verifiedOutcome.data
+                            }
 
                         if (
                             request.emailBinding?.source == EMAIL_BINDING_SOURCE_GOOGLE &&

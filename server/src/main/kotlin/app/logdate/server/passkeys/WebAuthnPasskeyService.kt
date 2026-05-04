@@ -217,8 +217,13 @@ class WebAuthnPasskeyService(
 
     /** Result of [verifyRegistrationOnly] — either verified data or a structured error. */
     sealed interface VerificationOutcome {
-        data class Success(val data: VerifiedRegistration) : VerificationOutcome
-        data class Failure(val error: String) : VerificationOutcome
+        data class Success(
+            val data: VerifiedRegistration,
+        ) : VerificationOutcome
+
+        data class Failure(
+            val error: String,
+        ) : VerificationOutcome
     }
 
     fun verifyAuthentication(
@@ -265,15 +270,16 @@ class WebAuthnPasskeyService(
                     credentialId = credentialId,
                     publicKey = registrationResponse.response.attestationObject.toByteArray(),
                     signCount = 0L,
-                    passkey = PasskeyInfo(
-                        id = Uuid.random(),
-                        credentialId = credentialId,
-                        nickname = relyingPartyName,
-                        deviceType = "platform",
-                        createdAt = Clock.System.now(),
-                        lastUsedAt = null,
-                        isActive = true,
-                    ),
+                    passkey =
+                        PasskeyInfo(
+                            id = Uuid.random(),
+                            credentialId = credentialId,
+                            nickname = relyingPartyName,
+                            deviceType = "platform",
+                            createdAt = Clock.System.now(),
+                            lastUsedAt = null,
+                            isActive = true,
+                        ),
                 ),
             )
         } catch (e: Exception) {
@@ -336,15 +342,16 @@ class WebAuthnPasskeyService(
                     credentialId = canonicalCredentialId,
                     publicKey = attestedCredentialDataConverter.convert(attestedCredentialData),
                     signCount = authenticatorData.signCount,
-                    passkey = PasskeyInfo(
-                        id = Uuid.random(),
-                        credentialId = canonicalCredentialId,
-                        nickname = relyingPartyName,
-                        deviceType = "platform",
-                        createdAt = Clock.System.now(),
-                        lastUsedAt = null,
-                        isActive = true,
-                    ),
+                    passkey =
+                        PasskeyInfo(
+                            id = Uuid.random(),
+                            credentialId = canonicalCredentialId,
+                            nickname = relyingPartyName,
+                            deviceType = "platform",
+                            createdAt = Clock.System.now(),
+                            lastUsedAt = null,
+                            isActive = true,
+                        ),
                 ),
             )
         } catch (e: DataConversionException) {

@@ -348,4 +348,11 @@ class AndroidSyncManager(
     override val syncStatusFlow = defaultSyncManager.syncStatusFlow
 
     override suspend fun getSyncStatus(): SyncStatus = defaultSyncManager.getSyncStatus()
+
+    override fun observeDeadLetters(): kotlinx.coroutines.flow.Flow<List<app.logdate.client.sync.metadata.SyncDeadLetterRecord>> =
+        defaultSyncManager.observeDeadLetters()
+
+    override suspend fun retryDeadLetter(id: String) = defaultSyncManager.retryDeadLetter(id)
+
+    override suspend fun discardDeadLetter(id: String) = defaultSyncManager.discardDeadLetter(id)
 }

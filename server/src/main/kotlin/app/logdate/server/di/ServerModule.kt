@@ -6,7 +6,6 @@ import app.logdate.server.atproto.AtprotoPasswordService
 import app.logdate.server.atproto.AtprotoPdsSessionService
 import app.logdate.server.atproto.AtprotoSessionRepository
 import app.logdate.server.atproto.AtprotoSessionTokenService
-import app.logdate.server.config.RuntimeProfile
 import app.logdate.server.atproto.InMemoryAtprotoPasswordCredentialRepository
 import app.logdate.server.atproto.InMemoryAtprotoSessionRepository
 import app.logdate.server.atproto.LogDatePdsBlobStore
@@ -23,6 +22,7 @@ import app.logdate.server.auth.InMemorySessionManager
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.TokenService
+import app.logdate.server.config.RuntimeProfile
 import app.logdate.server.database.AccountIdentitiesTable
 import app.logdate.server.database.AccountLinkEventsTable
 import app.logdate.server.database.AccountsTable
