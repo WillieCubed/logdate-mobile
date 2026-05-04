@@ -4,6 +4,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.library.ui.LibraryScreen
 import app.logdate.feature.library.ui.detail.MediaDetailScreen
 import kotlinx.serialization.Serializable
@@ -13,7 +14,7 @@ import kotlin.uuid.Uuid
  * Route for the Library overview screen (Navigation Compose 2).
  */
 @Serializable
-data object LibraryOverviewRoute
+data object LibraryOverviewRoute : NavKey
 
 /**
  * Navigates to the Library overview screen.
@@ -28,7 +29,7 @@ fun NavController.navigateToLibrary() {
 @Serializable
 data class MediaDetailRoute(
     val id: String,
-) {
+) : NavKey {
     constructor(id: Uuid) : this(id.toString())
 }
 

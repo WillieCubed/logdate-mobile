@@ -5,6 +5,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.core.main.homeGraph
 import app.logdate.feature.core.main.navigateHome
 import app.logdate.feature.core.navigation.BaseRoute
@@ -45,10 +46,10 @@ import app.logdate.feature.search.ui.SearchScreen
 import kotlinx.serialization.Serializable
 
 @Serializable
-internal data object SearchRoute
+internal data object SearchRoute : NavKey
 
 @Serializable
-internal data object LocationTimelineRoute
+internal data object LocationTimelineRoute : NavKey
 
 /**
  * The root composable for app-wide navigation.

@@ -80,6 +80,7 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.androidx.navigation.compose)
+            implementation(libs.nav3.runtime)
             // External dependencies
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))

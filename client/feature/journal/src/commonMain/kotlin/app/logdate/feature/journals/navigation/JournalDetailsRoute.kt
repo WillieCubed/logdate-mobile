@@ -21,7 +21,7 @@ import kotlin.uuid.Uuid
 @Serializable
 data class JournalDetailsRoute(
     val journalId: String,
-) {
+) : androidx.navigation3.runtime.NavKey {
     constructor(journalId: Uuid) : this(journalId.toString())
 }
 

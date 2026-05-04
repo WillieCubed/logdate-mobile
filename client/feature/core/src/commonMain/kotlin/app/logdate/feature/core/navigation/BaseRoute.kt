@@ -3,6 +3,7 @@ package app.logdate.feature.core.navigation
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
 /**
@@ -15,7 +16,7 @@ import kotlinx.serialization.Serializable
  * @see landingDestination
  */
 @Serializable
-data object BaseRoute
+data object BaseRoute : NavKey
 
 /**
  * Navigates to the starting route of the app.

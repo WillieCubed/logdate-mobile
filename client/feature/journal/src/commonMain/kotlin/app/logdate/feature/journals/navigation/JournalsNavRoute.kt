@@ -7,6 +7,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import kotlinx.serialization.Serializable
@@ -16,7 +17,7 @@ import kotlin.uuid.Uuid
  * Route for the journals overview screen.
  */
 @Serializable
-data object JournalsOverviewRoute
+data object JournalsOverviewRoute : NavKey
 
 /**
  * Navigates to the journals overview screen.

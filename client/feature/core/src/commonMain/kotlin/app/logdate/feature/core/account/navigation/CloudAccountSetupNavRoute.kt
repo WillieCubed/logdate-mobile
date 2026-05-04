@@ -5,6 +5,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.core.account.CloudAccountOnboardingScreen
 import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.feature.core.account.OnboardingStep
@@ -18,7 +19,7 @@ import org.koin.compose.viewmodel.koinViewModel
  * jump directly to the sign-in step instead of starting at the welcome screen.
  */
 @Serializable
-data class CloudAccountSetupRoute(val startOnSignIn: Boolean = false)
+data class CloudAccountSetupRoute(val startOnSignIn: Boolean = false) : NavKey
 
 fun NavController.navigateToCloudAccountSetup(startOnSignIn: Boolean = false) {
     navigate(CloudAccountSetupRoute(startOnSignIn = startOnSignIn))

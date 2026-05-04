@@ -8,6 +8,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.journals.ui.settings.JournalSettingsScreen
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import kotlinx.serialization.Serializable
@@ -19,7 +20,7 @@ import kotlin.uuid.Uuid
 @Serializable
 data class JournalSettingsRoute(
     val journalId: String,
-) {
+) : NavKey {
     constructor(journalId: Uuid) : this(journalId.toString())
 }
 

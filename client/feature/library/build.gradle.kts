@@ -68,6 +68,7 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.androidx.navigation.compose)
+            implementation(libs.nav3.runtime)
             // External
             implementation(libs.coil.compose)
             implementation(libs.napier)

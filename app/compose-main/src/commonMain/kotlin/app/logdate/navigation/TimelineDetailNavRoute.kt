@@ -8,6 +8,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.timeline.ui.details.TimelineDayDetailPanel
 import kotlinx.datetime.LocalDate
@@ -23,7 +24,7 @@ import org.koin.compose.viewmodel.koinViewModel
  * on iOS.
  */
 @Serializable
-data class TimelineDetailRoute(val dateIso: String)
+data class TimelineDetailRoute(val dateIso: String) : NavKey
 
 fun NavController.navigateToTimelineDay(date: LocalDate) {
     navigate(TimelineDetailRoute(date.toString()))

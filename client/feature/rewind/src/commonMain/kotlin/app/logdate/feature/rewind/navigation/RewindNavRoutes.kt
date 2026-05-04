@@ -4,6 +4,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.rewind.ui.RewindOpenCallback
 import app.logdate.feature.rewind.ui.RewindOverviewScreen
 import app.logdate.feature.rewind.ui.detail.RewindDetailScreen
@@ -18,7 +19,7 @@ import kotlin.uuid.Uuid
  * @see rewindOverviewRoute
  */
 @Serializable
-data object RewindOverviewRoute
+data object RewindOverviewRoute : NavKey
 
 /**
  * A route corresponding to the Rewind detail screen.
@@ -30,7 +31,7 @@ data object RewindOverviewRoute
 @Serializable
 data class RewindDetailRoute(
     val id: String,
-) {
+) : NavKey {
     constructor(id: Uuid) : this(id.toString())
 }
 

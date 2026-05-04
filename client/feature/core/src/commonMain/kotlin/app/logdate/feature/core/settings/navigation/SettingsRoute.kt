@@ -1,109 +1,110 @@
 package app.logdate.feature.core.settings.navigation
 
+import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class SettingsRoute(
     val settingId: String? = null,
     val selectedDetail: String? = null,
-)
+) : NavKey
 
 @Serializable
 data class DevicesRoute(
     val id: String = "devices",
-)
+) : NavKey
 
 @Serializable
-data object AccountSettingsRoute
+data object AccountSettingsRoute : NavKey
 
 @Serializable
-data object PrivacySettingsRoute
+data object PrivacySettingsRoute : NavKey
 
 @Serializable
-data object DataSettingsRoute
+data object DataSettingsRoute : NavKey
 
 @Serializable
-data object LocationSettingsRoute
+data object LocationSettingsRoute : NavKey
 
 @Serializable
-data object AdvancedSettingsRoute
+data object AdvancedSettingsRoute : NavKey
 
 @Serializable
-data object MemoriesSettingsRoute
+data object MemoriesSettingsRoute : NavKey
 
 @Serializable
-data object VoiceNotesSettingsRoute
+data object VoiceNotesSettingsRoute : NavKey
 
 @Serializable
-data object StreakSettingsRoute
+data object StreakSettingsRoute : NavKey
 
 @Serializable
-data object TimelineSettingsRoute
+data object TimelineSettingsRoute : NavKey
 
 @Serializable
-data object SyncSettingsRoute
+data object SyncSettingsRoute : NavKey
 
 @Serializable
-data object ExportSettingsRoute
+data object ExportSettingsRoute : NavKey
 
 @Serializable
-data object LibrarySettingsRoute
+data object LibrarySettingsRoute : NavKey
 
 @Serializable
-data object ResetSettingsRoute
+data object ResetSettingsRoute : NavKey
 
 @Serializable
-data object BirthdaySettingsRoute
+data object BirthdaySettingsRoute : NavKey
 
 @Serializable
-data object DayBoundarySettingsRoute
+data object DayBoundarySettingsRoute : NavKey
 
 @Serializable
-data object RecommendationSettingsRoute
+data object RecommendationSettingsRoute : NavKey
 
 @Serializable
-data object ClearDataSettingsRoute
+data object ClearDataSettingsRoute : NavKey
 
 @Serializable
-data object ResetAppSettingsRoute
+data object ResetAppSettingsRoute : NavKey
 
 @Serializable
-data object RewindSettingsRoute
+data object RewindSettingsRoute : NavKey
 
 @Serializable
-data object EventsSettingsRoute
+data object EventsSettingsRoute : NavKey
 
 @Serializable
-data object EventsCalendarRoute
+data object EventsCalendarRoute : NavKey
 
 @Serializable
-data object CalendarSyncSettingsRoute
+data object CalendarSyncSettingsRoute : NavKey
 
 @Serializable
-data object CalendarSyncCalendarsRoute
+data object CalendarSyncCalendarsRoute : NavKey
 
 @Serializable
-data object CalendarSyncActivityRoute
+data object CalendarSyncActivityRoute : NavKey
 
 @Serializable
-data object PeopleSettingsRoute
+data object PeopleSettingsRoute : NavKey
 
 @Serializable
-data object PeopleDirectoryRoute
+data object PeopleDirectoryRoute : NavKey
 
 @Serializable
-data object PeopleInboxRoute
+data object PeopleInboxRoute : NavKey
 
 @Serializable
-data class PersonDetailRoute(val personId: String) {
+data class PersonDetailRoute(val personId: String) : NavKey {
     constructor(personId: kotlin.uuid.Uuid) : this(personId.toString())
 }
 
 @Serializable
-data object LocationTrackingOptionsRoute
+data object LocationTrackingOptionsRoute : NavKey
 
 @Serializable
-data object LocationIntervalRoute
+data object LocationIntervalRoute : NavKey
 
 @Serializable
-data object LocationAdvancedRoute
+data object LocationAdvancedRoute : NavKey

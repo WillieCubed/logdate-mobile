@@ -88,6 +88,7 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.androidx.navigation.compose)
+            implementation(libs.nav3.runtime)
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.material3.adaptive.layout)
             implementation(libs.material3.adaptive.navigation)

@@ -5,12 +5,13 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
+import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.journals.ui.JournalClickCallback
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
 @Serializable
-data object HomeRoute
+data object HomeRoute : NavKey
 
 fun NavHostController.navigateHome() {
     // Ensure you can't go back

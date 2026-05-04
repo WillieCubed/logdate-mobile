@@ -11,6 +11,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.navigation
+import androidx.navigation3.runtime.NavKey
 import app.logdate.client.domain.dayboundary.HealthConnectStatus
 import app.logdate.feature.core.account.CloudAccountOnboardingScreen
 import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
@@ -38,7 +39,7 @@ import kotlinx.serialization.Serializable
 import org.koin.compose.viewmodel.koinViewModel
 import app.logdate.feature.core.account.OnboardingStep as CloudAccountEntryStep
 
-sealed interface OnboardingBaseRoute
+sealed interface OnboardingBaseRoute : NavKey
 
 /**
  * The onboarding route of the app.
