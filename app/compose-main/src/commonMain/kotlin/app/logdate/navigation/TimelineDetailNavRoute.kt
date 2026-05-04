@@ -1,9 +1,11 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
@@ -24,7 +26,9 @@ import org.koin.compose.viewmodel.koinViewModel
  * on iOS.
  */
 @Serializable
-data class TimelineDetailRoute(val dateIso: String) : NavKey
+data class TimelineDetailRoute(
+    val dateIso: String,
+) : NavKey
 
 fun NavController.navigateToTimelineDay(date: LocalDate) {
     navigate(TimelineDetailRoute(date.toString()))
