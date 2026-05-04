@@ -158,7 +158,12 @@ If you prefer to set up dependencies manually:
 
 3. **Firebase Setup**
    - Follow the [Firebase documentation](https://firebase.google.com/docs/android/setup)
-   - Add your `google-services.json` to `app/android-main/`
+   - Drop the dev `google-services.json` into `app/android-main/`. For Release
+     builds, place the production `google-services.json` in
+     `app/android-main/src/release/` — the google-services plugin picks the
+     release-specific source set automatically.
+   - For iOS, see [`docs/reference/ios-build-setup.md`](docs/reference/ios-build-setup.md)
+     for the bundle id and `GoogleService-Info-Release.plist` requirements.
 
 4. **Open in Android Studio**
    - Open the project in Android Studio
