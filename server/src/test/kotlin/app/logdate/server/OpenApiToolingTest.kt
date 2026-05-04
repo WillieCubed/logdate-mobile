@@ -93,9 +93,14 @@ class OpenApiToolingTest {
                 }
                 """.trimIndent(),
             )
+            // YAML mirrors JSON's path set except /api/v1/backups so the
+            // validator gets past the earlier path checks and fails on the
+            // backups path specifically — that's the branch this test covers.
             outputDir.resolve("openapi.yaml").writeText(
                 """
                 openapi: 3.1.0
+                /api/v1/auth/signup/google:
+                /api/v1/auth/signin/google:
                 /api/v1/ops/sync/status:
                 /api/v1/contents:
                 /api/v1/contents/{contentId}:
@@ -104,6 +109,7 @@ class OpenApiToolingTest {
                 /api/v1/associations:
                 /api/v1/media:
                 /api/v1/media/{mediaId}/binary:
+                bearerAuth:
                 """.trimIndent(),
             )
 
@@ -111,7 +117,7 @@ class OpenApiToolingTest {
                 assertFailsWith<IllegalArgumentException> {
                     invokeMain("app.logdate.server.OpenApiValidatorKt")
                 }
-            assertTrue(error.message.orEmpty().contains("/api/v1/backups/{backupId}/binary"))
+            assertTrue(error.message.orEmpty().contains("/api/v1/backups"))
         } finally {
             if (previous == null) {
                 System.clearProperty("logdate.openapi.outputDir")
@@ -154,9 +160,14 @@ class OpenApiToolingTest {
                 }
                 """.trimIndent(),
             )
+            // Includes /api/v1/backups so the validator gets past that
+            // require() and exercises the dedicated `{backupId}/binary`
+            // validation branch this test is named for.
             outputDir.resolve("openapi.yaml").writeText(
                 """
                 openapi: 3.1.0
+                /api/v1/auth/signup/google:
+                /api/v1/auth/signin/google:
                 /api/v1/ops/sync/status:
                 /api/v1/contents:
                 /api/v1/contents/{contentId}:
@@ -165,6 +176,8 @@ class OpenApiToolingTest {
                 /api/v1/associations:
                 /api/v1/media:
                 /api/v1/media/{mediaId}/binary:
+                /api/v1/backups:
+                bearerAuth:
                 """.trimIndent(),
             )
 
