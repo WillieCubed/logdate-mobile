@@ -51,14 +51,11 @@ import io.github.smiley4.ktoropenapi.OpenApi
 import io.github.smiley4.ktoropenapi.config.AuthScheme
 import io.github.smiley4.ktoropenapi.config.AuthType
 import io.github.smiley4.ktoropenapi.openApi
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.swagger.v3.core.util.Yaml31
-import io.swagger.v3.oas.models.OpenAPI
-import java.util.concurrent.atomic.AtomicReference
 import io.github.smiley4.ktorswaggerui.swaggerUI
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
@@ -74,6 +71,8 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
+import io.swagger.v3.core.util.Yaml31
+import io.swagger.v3.oas.models.OpenAPI
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -94,8 +93,16 @@ import studio.hypertext.atproto.pds.PdsSessionService
 import studio.hypertext.atproto.pds.PdsSyncService
 import java.net.URI
 import java.time.Duration
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+
+private val landingPageHtml: String by lazy {
+    val resource =
+        object {}.javaClass.classLoader.getResource("public/index.html")
+            ?: error("public/index.html missing from server resources")
+    resource.readText()
+}
 
 fun main() {
     val profile = RuntimeProfile.fromEnvironment()
@@ -267,7 +274,21 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
         }
 
         get("/") {
-            call.respondText("LogDate Server API v1.0")
+            val accept = call.request.headers[HttpHeaders.Accept].orEmpty()
+            if (accept.contains("text/html", ignoreCase = true)) {
+                call.respondText(landingPageHtml, ContentType.Text.Html)
+            } else {
+                call.respond(
+                    mapOf(
+                        "name" to "LogDate Server API",
+                        "version" to "1.0.0",
+                        "docs" to "/swagger",
+                        "openapi" to "/openapi.json",
+                        "openapi_yaml" to "/openapi.yaml",
+                        "health" to "/health",
+                    ),
+                )
+            }
         }
 
         get("/health") {
