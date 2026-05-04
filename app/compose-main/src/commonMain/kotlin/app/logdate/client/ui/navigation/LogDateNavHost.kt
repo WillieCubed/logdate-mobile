@@ -14,7 +14,8 @@ import app.logdate.feature.core.settings.navigation.BirthdaySettingsRoute
 import app.logdate.feature.core.settings.navigation.ExportSettingsRoute
 import app.logdate.feature.core.settings.navigation.SettingsRoute
 import app.logdate.feature.core.settings.navigation.settingsGraph
-import app.logdate.feature.editor.ui.EntryEditorContent
+import app.logdate.feature.editor.navigation.editorRoute
+import app.logdate.feature.editor.navigation.navigateToEditor
 import app.logdate.feature.events.navigation.eventDetailRoute
 import app.logdate.feature.journals.navigation.journalDetailsRoute
 import app.logdate.feature.journals.navigation.journalSettingsRoute
@@ -69,8 +70,7 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
         )
         homeGraph(
             onCreateNote = {
-                // Use the editor destination directly to avoid extra route plumbing.
-                navController.navigate("editor")
+                navController.navigateToEditor()
             },
             onOpenJournal = navController::navigateToJournal,
             onCreateJournal = navController::navigateToJournalCreation,
@@ -80,7 +80,9 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
             onOpenSettings = { navController.navigate(SettingsRoute()) },
             onBrowseJournals = navController::navigateToJournalsOverview,
             onOpenSearch = { navController.navigate(SearchRoute) },
-            onOpenDraft = { navController.navigate("editor") },
+            onOpenDraft = { draftId ->
+                navController.navigateToEditor(draftId = kotlin.uuid.Uuid.parse(draftId))
+            },
             onImportBackup = { navController.navigate(ExportSettingsRoute) },
             onOpenMediaDetail = { mediaId -> navController.navigate(MediaDetailRoute(mediaId)) },
             libraryContent = { modifier ->
@@ -127,17 +129,10 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
         mediaDetailRoute(
             onGoBack = { navController.popBackStack() },
         )
-        // Use a composable instead of editorDestination
-        composable("editor") {
-            EntryEditorContent(
-                onNavigateBack = {
-                    navController.popBackStack()
-                },
-                onEntrySaved = {
-                    navController.navigateHome()
-                },
-            )
-        }
+        editorRoute(
+            onNavigateBack = { navController.popBackStack() },
+            onEntrySaved = { navController.navigateHome() },
+        )
         noteDetailRoute(
             onGoBack = {
                 navController.popBackStack()
