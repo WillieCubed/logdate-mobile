@@ -330,19 +330,22 @@ class DefaultSyncManager(
             try {
                 val accessToken = getAccessToken() ?: return authError()
 
-                val uploadResult = uploadContent(accessToken)
+                // Pull first so the conflict resolver merges remote changes before we attempt
+                // to push local edits — otherwise a push that 409s drops the local op from the
+                // outbox before the puller can use it as a conflict marker.
                 val since = cursorFor(EntityType.NOTE)
                 val downloadResult =
                     downloadContent(
                         accessToken,
                         since,
                     )
+                val uploadResult = uploadContent(accessToken)
 
                 val success = uploadResult.success && downloadResult.success
                 if (success) {
                     lastErrorFlow.value = null
                 } else {
-                    lastErrorFlow.value = (uploadResult.errors + downloadResult.errors).firstOrNull()
+                    lastErrorFlow.value = (downloadResult.errors + uploadResult.errors).firstOrNull()
                 }
 
                 return SyncResult(
@@ -350,7 +353,7 @@ class DefaultSyncManager(
                     uploadedItems = uploadResult.uploadedItems,
                     downloadedItems = downloadResult.downloadedItems,
                     conflictsResolved = downloadResult.conflictsResolved,
-                    errors = uploadResult.errors + downloadResult.errors,
+                    errors = downloadResult.errors + uploadResult.errors,
                     lastSyncTime = latestSyncTime(),
                 )
             } finally {
@@ -384,19 +387,19 @@ class DefaultSyncManager(
             try {
                 val accessToken = getAccessToken() ?: return authError()
 
-                val uploadResult = uploadJournals(accessToken)
                 val since = cursorFor(EntityType.JOURNAL)
                 val downloadResult =
                     downloadJournals(
                         accessToken,
                         since,
                     )
+                val uploadResult = uploadJournals(accessToken)
 
                 val success = uploadResult.success && downloadResult.success
                 if (success) {
                     lastErrorFlow.value = null
                 } else {
-                    lastErrorFlow.value = (uploadResult.errors + downloadResult.errors).firstOrNull()
+                    lastErrorFlow.value = (downloadResult.errors + uploadResult.errors).firstOrNull()
                 }
 
                 return SyncResult(
@@ -404,7 +407,7 @@ class DefaultSyncManager(
                     uploadedItems = uploadResult.uploadedItems,
                     downloadedItems = downloadResult.downloadedItems,
                     conflictsResolved = downloadResult.conflictsResolved,
-                    errors = uploadResult.errors + downloadResult.errors,
+                    errors = downloadResult.errors + uploadResult.errors,
                     lastSyncTime = latestSyncTime(),
                 )
             } finally {
@@ -438,19 +441,19 @@ class DefaultSyncManager(
             try {
                 val accessToken = getAccessToken() ?: return authError()
 
-                val uploadResult = uploadAssociations(accessToken)
                 val since = cursorFor(EntityType.ASSOCIATION)
                 val downloadResult =
                     downloadAssociations(
                         accessToken,
                         since,
                     )
+                val uploadResult = uploadAssociations(accessToken)
 
                 val success = uploadResult.success && downloadResult.success
                 if (success) {
                     lastErrorFlow.value = null
                 } else {
-                    lastErrorFlow.value = (uploadResult.errors + downloadResult.errors).firstOrNull()
+                    lastErrorFlow.value = (downloadResult.errors + uploadResult.errors).firstOrNull()
                 }
 
                 return SyncResult(
@@ -458,7 +461,7 @@ class DefaultSyncManager(
                     uploadedItems = uploadResult.uploadedItems,
                     downloadedItems = downloadResult.downloadedItems,
                     conflictsResolved = downloadResult.conflictsResolved,
-                    errors = uploadResult.errors + downloadResult.errors,
+                    errors = downloadResult.errors + uploadResult.errors,
                     lastSyncTime = latestSyncTime(),
                 )
             } finally {
@@ -513,8 +516,8 @@ class DefaultSyncManager(
         }
 
     override suspend fun fullSync(): SyncResult {
-        val uploadResult = uploadPendingChanges()
         val downloadResult = downloadRemoteChanges()
+        val uploadResult = uploadPendingChanges()
         val draftResult = syncDrafts()
 
         return SyncResult(
@@ -522,7 +525,7 @@ class DefaultSyncManager(
             uploadedItems = uploadResult.uploadedItems + draftResult.uploadedItems,
             downloadedItems = downloadResult.downloadedItems + draftResult.downloadedItems,
             conflictsResolved = downloadResult.conflictsResolved,
-            errors = uploadResult.errors + downloadResult.errors + draftResult.errors,
+            errors = downloadResult.errors + uploadResult.errors + draftResult.errors,
             lastSyncTime = latestSyncTime(),
         )
     }
