@@ -7,6 +7,7 @@ import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.networking.NetworkState
 import app.logdate.client.networking.shouldSyncMetadata
+import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,6 +15,7 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -90,6 +92,12 @@ class ForegroundSyncManager(
     override suspend fun fullSync(): SyncResult = defaultSyncManager.fullSync()
 
     override suspend fun getSyncStatus(): SyncStatus = defaultSyncManager.getSyncStatus()
+
+    override fun observeDeadLetters(): Flow<List<SyncDeadLetterRecord>> = defaultSyncManager.observeDeadLetters()
+
+    override suspend fun retryDeadLetter(id: String) = defaultSyncManager.retryDeadLetter(id)
+
+    override suspend fun discardDeadLetter(id: String) = defaultSyncManager.discardDeadLetter(id)
 
     override val syncStatusFlow = defaultSyncManager.syncStatusFlow
 

@@ -953,6 +953,17 @@ class TrackingSyncManager : SyncManager {
         return syncStatus
     }
 
+    override fun observeDeadLetters(): kotlinx.coroutines.flow.Flow<List<app.logdate.client.sync.metadata.SyncDeadLetterRecord>> =
+        kotlinx.coroutines.flow.flowOf(emptyList())
+
+    override suspend fun retryDeadLetter(id: String) {
+        // No-op.
+    }
+
+    override suspend fun discardDeadLetter(id: String) {
+        // No-op.
+    }
+
     fun reset() {
         syncCalls = 0
         uploadPendingChangesCalls = 0
@@ -1028,19 +1039,25 @@ class InMemorySyncConflictStore : SyncConflictStore {
 
 class InMemorySyncDeadLetterStore : SyncDeadLetterStore {
     private val deadLetters = mutableMapOf<String, SyncDeadLetterRecord>()
+    private val flow = kotlinx.coroutines.flow.MutableStateFlow<List<SyncDeadLetterRecord>>(emptyList())
+
+    override fun observe(): kotlinx.coroutines.flow.Flow<List<SyncDeadLetterRecord>> = flow
 
     override suspend fun list(): List<SyncDeadLetterRecord> = deadLetters.values.toList()
 
     override suspend fun add(record: SyncDeadLetterRecord) {
         deadLetters[record.id] = record
+        flow.value = deadLetters.values.toList()
     }
 
     override suspend fun remove(id: String) {
         deadLetters.remove(id)
+        flow.value = deadLetters.values.toList()
     }
 
     override suspend fun clear() {
         deadLetters.clear()
+        flow.value = emptyList()
     }
 }
 

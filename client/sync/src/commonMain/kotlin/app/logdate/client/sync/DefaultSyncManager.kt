@@ -42,6 +42,7 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -540,6 +541,25 @@ class DefaultSyncManager(
             hasErrors = lastErrorFlow.value != null,
             lastError = lastErrorFlow.value,
         )
+    }
+
+    override fun observeDeadLetters(): Flow<List<SyncDeadLetterRecord>> = deadLetterStore.observe()
+
+    override suspend fun retryDeadLetter(id: String) {
+        val record = deadLetterStore.list().firstOrNull { it.id == id } ?: return
+        val entityType = runCatching { EntityType.valueOf(record.entityType) }.getOrNull()
+        val operation = runCatching { PendingOperation.valueOf(record.operation) }.getOrNull()
+        if (entityType == null || operation == null) {
+            Napier.w("Cannot retry dead-letter $id with type=${record.entityType} op=${record.operation}")
+            deadLetterStore.remove(id)
+            return
+        }
+        syncMetadataService.enqueuePending(record.entityId, entityType, operation)
+        deadLetterStore.remove(id)
+    }
+
+    override suspend fun discardDeadLetter(id: String) {
+        deadLetterStore.remove(id)
     }
 
     /**

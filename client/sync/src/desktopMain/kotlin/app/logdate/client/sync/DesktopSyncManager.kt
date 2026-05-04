@@ -1,5 +1,8 @@
 package app.logdate.client.sync
 
+import app.logdate.client.sync.metadata.SyncDeadLetterRecord
+import kotlinx.coroutines.flow.Flow
+
 /**
  * A platform-specific implementation of [SyncManager] for Desktop.
  *
@@ -28,6 +31,12 @@ class DesktopSyncManager(
     override suspend fun fullSync(): SyncResult = defaultSyncManager.fullSync()
 
     override suspend fun getSyncStatus(): SyncStatus = defaultSyncManager.getSyncStatus()
+
+    override fun observeDeadLetters(): Flow<List<SyncDeadLetterRecord>> = defaultSyncManager.observeDeadLetters()
+
+    override suspend fun retryDeadLetter(id: String) = defaultSyncManager.retryDeadLetter(id)
+
+    override suspend fun discardDeadLetter(id: String) = defaultSyncManager.discardDeadLetter(id)
 
     override val syncStatusFlow = defaultSyncManager.syncStatusFlow
 }

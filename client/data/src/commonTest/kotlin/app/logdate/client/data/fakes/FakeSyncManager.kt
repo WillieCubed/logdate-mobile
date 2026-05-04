@@ -92,6 +92,17 @@ class FakeSyncManager : SyncManager {
         return syncStatus
     }
 
+    override fun observeDeadLetters(): kotlinx.coroutines.flow.Flow<List<app.logdate.client.sync.metadata.SyncDeadLetterRecord>> =
+        kotlinx.coroutines.flow.flowOf(emptyList())
+
+    override suspend fun retryDeadLetter(id: String) {
+        // No-op.
+    }
+
+    override suspend fun discardDeadLetter(id: String) {
+        // No-op.
+    }
+
     /**
      * Returns whether sync was requested.
      */

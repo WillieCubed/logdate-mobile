@@ -197,6 +197,17 @@ private class MockSyncManager : SyncManager {
             hasErrors = false,
         )
 
+    override fun observeDeadLetters(): kotlinx.coroutines.flow.Flow<List<app.logdate.client.sync.metadata.SyncDeadLetterRecord>> =
+        kotlinx.coroutines.flow.flowOf(emptyList())
+
+    override suspend fun retryDeadLetter(id: String) {
+        // No-op.
+    }
+
+    override suspend fun discardDeadLetter(id: String) {
+        // No-op.
+    }
+
     override val syncStatusFlow: kotlinx.coroutines.flow.StateFlow<SyncStatus> =
         kotlinx.coroutines.flow.MutableStateFlow(
             SyncStatus(

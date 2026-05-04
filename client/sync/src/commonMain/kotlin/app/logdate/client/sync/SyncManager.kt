@@ -1,5 +1,7 @@
 package app.logdate.client.sync
 
+import app.logdate.client.sync.metadata.SyncDeadLetterRecord
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Instant
 
@@ -77,6 +79,26 @@ interface SyncManager {
      * Gets the current sync status including last sync time and pending changes count.
      */
     suspend fun getSyncStatus(): SyncStatus
+
+    /**
+     * Live snapshot of entities that exhausted their retry budget. These are the writes the
+     * UI should surface so the user can choose to retry or discard them. Always returns the
+     * current full list — implementations may emit an empty list when nothing is broken.
+     */
+    fun observeDeadLetters(): Flow<List<SyncDeadLetterRecord>>
+
+    /**
+     * Re-enqueue a dead-lettered record for another sync attempt. The record is removed from
+     * the dead-letter store regardless; the next sync pass picks up the freshly-queued
+     * pending op.
+     */
+    suspend fun retryDeadLetter(id: String)
+
+    /**
+     * Drop a dead-lettered record without re-attempting it. Use when the user decides the
+     * pending change is no longer wanted.
+     */
+    suspend fun discardDeadLetter(id: String)
 }
 
 /**
