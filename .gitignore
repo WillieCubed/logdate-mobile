@@ -41,6 +41,7 @@ tmp/
 
 # Firebase local config
 **/google-services.json
+**/GoogleService-Info*.plist
 
 # Turnkey deployment state
 .logdate/

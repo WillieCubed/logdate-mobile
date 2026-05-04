@@ -110,6 +110,7 @@
 				7555FF77242A565900829871 /* Sources */,
 				B92378962B6B1156000C7307 /* Frameworks */,
 				7555FF79242A565900829871 /* Resources */,
+				A1B2C3D4E5F6A7B8C9D0E2C1 /* Copy Firebase config (Release only) */,
 			);
 			buildRules = (
 			);
@@ -192,6 +193,22 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "if [ \"YES\" = \"$OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED\" ]; then\n  echo \"Skipping Gradle build task invocation due to OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED environment variable set to \\\"YES\\\"\"\n  exit 0\nfi\ncd \"$SRCROOT/..\"\n./gradlew :app:compose-main:embedAndSignAppleFrameworkForXcode\n";
+		};
+		A1B2C3D4E5F6A7B8C9D0E2C1 /* Copy Firebase config (Release only) */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/iosApp/Firebase/GoogleService-Info-Release.plist",
+			);
+			name = "Copy Firebase config (Release only)";
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).app/GoogleService-Info.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ \"$CONFIGURATION\" = \"Release\" ]; then\n  echo \"Copying production GoogleService-Info.plist into app bundle\"\n  cp \"$SRCROOT/iosApp/Firebase/GoogleService-Info-Release.plist\" \"$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app/GoogleService-Info.plist\"\nelse\n  echo \"Skipping Firebase plist copy for $CONFIGURATION configuration\"\n  rm -f \"$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app/GoogleService-Info.plist\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
