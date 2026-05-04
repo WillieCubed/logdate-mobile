@@ -68,12 +68,13 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import org.koin.ktor.ext.inject
@@ -420,28 +421,32 @@ internal fun startSyncMaintenance(
     val intervalMinutes = readEnv("SYNC_TOMBSTONE_PURGE_INTERVAL_MINUTES")?.toLongOrNull() ?: 60L
     val retentionDays = readEnv("SYNC_TOMBSTONE_RETENTION_DAYS")?.toLongOrNull() ?: 30L
 
-    return runBlocking(Dispatchers.Default) {
-        launch {
-            while (isActive) {
-                val start = System.currentTimeMillis()
-                var success = false
-                try {
-                    val cutoff = System.currentTimeMillis() - retentionDays * 24 * 60 * 60 * 1000
-                    syncRepository.purgeTombstonesOlderThan(cutoff)
-                    Napier.i("Purged sync tombstones older than $retentionDays days")
-                    success = true
-                } catch (e: Exception) {
-                    if (e is CancellationException) throw e
-                    Napier.e("Failed to purge sync tombstones", e)
-                } finally {
-                    metrics.recordOperation(
-                        "maintenance.tombstone_purge",
-                        System.currentTimeMillis() - start,
-                        success,
-                    )
-                }
-                delay(Duration.ofMinutes(intervalMinutes).toMillis())
+    // Detached scope so cancelling this job doesn't take the rest of the
+    // app down with it. Wrapping in runBlocking { launch { … } } here
+    // would block the main thread for the lifetime of the loop and the
+    // server would never reach engine.start() — that's exactly what kept
+    // /health off in the canonical production deploy.
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    return scope.launch {
+        while (isActive) {
+            val start = System.currentTimeMillis()
+            var success = false
+            try {
+                val cutoff = System.currentTimeMillis() - retentionDays * 24 * 60 * 60 * 1000
+                syncRepository.purgeTombstonesOlderThan(cutoff)
+                Napier.i("Purged sync tombstones older than $retentionDays days")
+                success = true
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Napier.e("Failed to purge sync tombstones", e)
+            } finally {
+                metrics.recordOperation(
+                    "maintenance.tombstone_purge",
+                    System.currentTimeMillis() - start,
+                    success,
+                )
             }
+            delay(Duration.ofMinutes(intervalMinutes).toMillis())
         }
     }
 }
