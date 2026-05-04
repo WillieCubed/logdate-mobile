@@ -16,6 +16,7 @@ import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
 import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.entitlements.EntitlementService
+import app.logdate.server.entitlements.UsageCalculator
 import app.logdate.server.entitlements.entitlementsModule
 import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
@@ -38,6 +39,7 @@ import app.logdate.server.routes.authV1Routes
 import app.logdate.server.routes.identityApiRoutes
 import app.logdate.server.routes.identityRoutes
 import app.logdate.server.routes.oauthRoutes
+import app.logdate.server.routes.quotaRoutes
 import app.logdate.server.routes.serverInfoRoutes
 import app.logdate.server.routes.syncRoutes
 import app.logdate.server.routes.xrpcRoutes
@@ -185,6 +187,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
     val logDateBackupRepository by inject<LogDateBackupRepository>()
     val blobStorage by inject<LogDateBlobStorage>()
     val entitlementEnforcer by inject<EntitlementEnforcer>()
+    val usageCalculator by inject<UsageCalculator>()
     val signingKeyService by inject<SigningKeyService>()
 
     val pdsDiscoveryService by inject<PdsDiscoveryService>()
@@ -335,6 +338,11 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
                 backupRepository = logDateBackupRepository,
                 entitlementEnforcer = entitlementEnforcer,
                 rateLimiter = syncRateLimiter,
+            )
+            quotaRoutes(
+                tokenService = tokenService,
+                entitlementService = entitlementService,
+                usageCalculator = usageCalculator,
             )
         }
     }

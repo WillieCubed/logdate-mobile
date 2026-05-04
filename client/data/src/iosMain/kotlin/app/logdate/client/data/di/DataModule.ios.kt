@@ -1,8 +1,8 @@
 package app.logdate.client.data.di
 
+import app.logdate.client.data.account.DefaultAccountIdentityRepository
 import app.logdate.client.data.account.DefaultPasskeyAccountRepository
 import app.logdate.client.data.account.PasskeyBackedAccountRepository
-import app.logdate.client.data.account.StubAccountIdentityRepository
 import app.logdate.client.data.audio.OfflineFirstAudioTagRepository
 import app.logdate.client.data.events.OfflineFirstEventRepository
 import app.logdate.client.data.journals.JournalUserDataRepository
@@ -26,7 +26,7 @@ import app.logdate.client.data.people.OfflineFirstPeopleGraphRepository
 import app.logdate.client.data.people.OfflineFirstPeopleRepository
 import app.logdate.client.data.places.OfflineFirstUserPlacesRepository
 import app.logdate.client.data.profile.OfflineFirstProfileRepository
-import app.logdate.client.data.quota.StubRemoteQuotaDataSource
+import app.logdate.client.data.quota.IosRemoteQuotaDataSource
 import app.logdate.client.data.rewind.DefaultRewindGenerationManager
 import app.logdate.client.data.rewind.OfflineFirstReflectionPromptResponseRepository
 import app.logdate.client.data.rewind.OfflineFirstRewindRepository
@@ -40,8 +40,12 @@ import app.logdate.client.data.user.OfflineFirstUserStateRepository
 import app.logdate.client.database.databaseModule
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.di.datastoreModule
+import app.logdate.client.networking.IdentityApiClient
+import app.logdate.client.networking.IdentityApiClientContract
 import app.logdate.client.networking.PasskeyApiClient
 import app.logdate.client.networking.PasskeyApiClientContract
+import app.logdate.client.networking.QuotaApiClient
+import app.logdate.client.networking.QuotaApiClientContract
 import app.logdate.client.permissions.di.permissionsModule
 import app.logdate.client.repository.account.AccountIdentityRepository
 import app.logdate.client.repository.account.AccountRepository
@@ -97,7 +101,10 @@ actual val dataModule: Module =
             }
         }
 
-        // Journals
+        // Journals — RemoteJournalDataSource is a vestigial pre-AT-Protocol abstraction.
+        // OfflineFirstJournalRepository sources real sync through SyncManager + the
+        // record-level /api/v1/sync/journals endpoints; the stub here is intentional and the
+        // field is unused at runtime.
         factory<RemoteJournalDataSource> { StubJournalDataSource }
         single<JournalUserDataRepository> { OfflineFirstJournalUserDataRepository(get()) }
         single<DraftRepository> { LocalFirstDraftRepository(get(), get()) }
@@ -190,10 +197,18 @@ actual val dataModule: Module =
 
         // Networking clients
         single<PasskeyApiClientContract> { PasskeyApiClient(get(), get()) }
+        single<IdentityApiClientContract> { IdentityApiClient(get(), get()) }
+        single<QuotaApiClientContract> { QuotaApiClient(get(), get()) }
 
         // Account
         single<AccountRepository> { PasskeyBackedAccountRepository(passkeyRepository = get()) }
-        single<AccountIdentityRepository> { StubAccountIdentityRepository() }
+        single<AccountIdentityRepository> {
+            DefaultAccountIdentityRepository(
+                apiClient = get(),
+                sessionStorage = get(),
+                plcRecoveryKeyManager = get(),
+            )
+        }
         single<PasskeyAccountRepository> {
             DefaultPasskeyAccountRepository(
                 apiClient = get(),
@@ -213,7 +228,12 @@ actual val dataModule: Module =
         single<AudioTagRepository> { OfflineFirstAudioTagRepository(audioTagDao = get()) }
 
         // Quota
-        factory<RemoteQuotaDataSource> { StubRemoteQuotaDataSource() }
+        single<RemoteQuotaDataSource> {
+            IosRemoteQuotaDataSource(
+                apiClient = get(),
+                sessionStorage = get(),
+            )
+        }
 
         // Transcription
         single<TranscriptionRepository> {
