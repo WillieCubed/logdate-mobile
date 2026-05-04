@@ -55,8 +55,12 @@ material3AdaptiveNav3 = "1.3.0-alpha10"
 # resolution fails. Retry once JetBrains pushes a stable runtime that matches the UI
 # version, then wire from `app/compose-main/build.gradle.kts` and start the migration
 # from `androidx.navigation.compose`.
-jetbrains-navigation3 = "1.1.1"
-jetbrains-lifecycleViewmodelNav3 = "2.10.0-alpha08"
+jetbrains-navigation3 = "1.0.0-alpha05"
+jetbrains-lifecycleViewmodelNav3 = "2.10.0-alpha05"
+jetbrains-material3AdaptiveNav3Mp = "1.3.0-alpha02"
+# Google-published canonical Navigation 3. -runtime is KMP since 1.0.0-alpha08 (JVM,
+# Native, Web), -ui is Android-only. iOS/desktop need a custom NavDisplay.
+nav3 = "1.1.1"
 lifecycleViewmodelNav3 = "2.11.0-alpha03"
 
 coil = "3.4.0"
@@ -194,6 +198,11 @@ androidx-lifecycle-viewmodel-navigation3 = { module = "androidx.lifecycle:lifecy
 jetbrains-navigation3-runtime = { module = "org.jetbrains.androidx.navigation3:navigation3-runtime", version.ref = "jetbrains-navigation3" }
 jetbrains-navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "jetbrains-navigation3" }
 jetbrains-lifecycle-viewmodel-navigation3 = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-navigation3", version.ref = "jetbrains-lifecycleViewmodelNav3" }
+jetbrains-material3-adaptive-navigation3-mp = { module = "org.jetbrains.compose.material3.adaptive:adaptive-navigation3", version.ref = "jetbrains-material3AdaptiveNav3Mp" }
+
+# Google's canonical Navigation 3. Use -runtime in commonMain (KMP), -ui in androidMain only.
+nav3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "nav3" }
+nav3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "nav3" }
 
 # Coroutines
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
