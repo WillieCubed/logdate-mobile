@@ -1,8 +1,8 @@
 package app.logdate.client.data.di
 
 import app.logdate.client.data.account.DefaultPasskeyAccountRepository
+import app.logdate.client.data.account.PasskeyBackedAccountRepository
 import app.logdate.client.data.account.StubAccountIdentityRepository
-import app.logdate.client.data.account.StubAccountRepository
 import app.logdate.client.data.audio.OfflineFirstAudioTagRepository
 import app.logdate.client.data.events.OfflineFirstEventRepository
 import app.logdate.client.data.journals.JournalUserDataRepository
@@ -192,7 +192,7 @@ actual val dataModule: Module =
         single<PasskeyApiClientContract> { PasskeyApiClient(get(), get()) }
 
         // Account
-        single<AccountRepository> { StubAccountRepository() }
+        single<AccountRepository> { PasskeyBackedAccountRepository(passkeyRepository = get()) }
         single<AccountIdentityRepository> { StubAccountIdentityRepository() }
         single<PasskeyAccountRepository> {
             DefaultPasskeyAccountRepository(
