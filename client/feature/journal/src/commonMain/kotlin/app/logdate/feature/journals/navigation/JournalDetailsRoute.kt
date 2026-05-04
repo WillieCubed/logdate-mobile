@@ -62,6 +62,9 @@ fun NavGraphBuilder.journalDetailsRoute(
     onGoBack: () -> Unit,
     onJournalDeleted: () -> Unit,
     onNavigateToNoteDetail: (noteId: Uuid) -> Unit,
+    onOpenEditor: (Uuid) -> Unit = {},
+    onNavigateToSettings: (journalId: Uuid) -> Unit = {},
+    onNavigateToShare: (journalId: Uuid) -> Unit = {},
 ) {
     composable<JournalDetailsRoute>(
         enterTransition = legacyJournalForwardEnterTransition,
@@ -79,6 +82,9 @@ fun NavGraphBuilder.journalDetailsRoute(
                 onGoBack = onGoBack,
                 onJournalDeleted = onJournalDeleted,
                 onNavigateToNoteDetail = onNavigateToNoteDetail,
+                onOpenEditor = onOpenEditor,
+                onNavigateToSettings = onNavigateToSettings,
+                onNavigateToShare = onNavigateToShare,
             )
         }
     }

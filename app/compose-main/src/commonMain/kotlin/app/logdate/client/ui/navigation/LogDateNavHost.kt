@@ -19,7 +19,10 @@ import app.logdate.feature.editor.navigation.navigateToEditor
 import app.logdate.feature.events.navigation.eventDetailRoute
 import app.logdate.feature.journals.navigation.journalDetailsRoute
 import app.logdate.feature.journals.navigation.journalSettingsRoute
+import app.logdate.feature.journals.navigation.JournalSettingsRoute
 import app.logdate.feature.journals.navigation.journalsOverviewRoute
+import app.logdate.feature.journals.navigation.navigateToShareJournal
+import app.logdate.feature.journals.navigation.shareJournalRoute
 import app.logdate.feature.journals.navigation.navigateToJournal
 import app.logdate.feature.journals.navigation.navigateToJournalCreation
 import app.logdate.feature.journals.navigation.navigateToJournalsOverview
@@ -32,6 +35,8 @@ import app.logdate.feature.library.navigation.mediaDetailRoute
 import app.logdate.feature.library.ui.LibraryScreen
 import app.logdate.feature.location.timeline.ui.LocationTimelineScreen
 import app.logdate.feature.onboarding.navigation.onboardingGraph
+import app.logdate.navigation.navigateToTimelineDay
+import app.logdate.navigation.timelineDetailRoute
 import app.logdate.feature.rewind.navigation.navigateToRewind
 import app.logdate.feature.rewind.navigation.rewindRoutes
 import app.logdate.feature.search.ui.SearchScreen
@@ -108,8 +113,20 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
                 onNavigateToNoteDetail = { noteId ->
                     navController.navigateToNoteDetail(noteId)
                 },
+                onOpenEditor = { journalId ->
+                    navController.navigateToEditor(journalIds = listOf(journalId))
+                },
+                onNavigateToSettings = { journalId ->
+                    navController.navigate(JournalSettingsRoute(journalId))
+                },
+                onNavigateToShare = { journalId ->
+                    navController.navigateToShareJournal(journalId)
+                },
             )
         }
+        shareJournalRoute(
+            onGoBack = { navController.popBackStack() },
+        )
         journalSettingsRoute(
             onGoBack = {
                 navController.popBackStack()
@@ -153,10 +170,19 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
         )
 
         settingsGraph(navController)
+        timelineDetailRoute(
+            onClose = { navController.popBackStack() },
+            onOpenLocations = { navController.navigate(LocationTimelineRoute) },
+            onOpenEvent = { eventId ->
+                navController.navigate(
+                    app.logdate.feature.events.navigation.EventDetailRoute(eventId),
+                )
+            },
+        )
         composable<SearchRoute> {
             SearchScreen(
                 onGoBack = { navController.popBackStack() },
-                onNavigateToDay = { /* Timeline day detail not available in common nav */ },
+                onNavigateToDay = { date -> navController.navigateToTimelineDay(date) },
                 onNavigateToJournal = { journalId -> navController.navigateToJournal(journalId) },
             )
         }
