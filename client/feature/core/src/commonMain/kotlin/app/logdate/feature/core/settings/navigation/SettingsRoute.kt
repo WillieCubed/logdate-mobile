@@ -66,3 +66,44 @@ data object ClearDataSettingsRoute
 
 @Serializable
 data object ResetAppSettingsRoute
+
+@Serializable
+data object RewindSettingsRoute
+
+@Serializable
+data object EventsSettingsRoute
+
+@Serializable
+data object EventsCalendarRoute
+
+@Serializable
+data object CalendarSyncSettingsRoute
+
+@Serializable
+data object CalendarSyncCalendarsRoute
+
+@Serializable
+data object CalendarSyncActivityRoute
+
+@Serializable
+data object PeopleSettingsRoute
+
+@Serializable
+data object PeopleDirectoryRoute
+
+@Serializable
+data object PeopleInboxRoute
+
+@Serializable
+data class PersonDetailRoute(val personId: String) {
+    constructor(personId: kotlin.uuid.Uuid) : this(personId.toString())
+}
+
+@Serializable
+data object LocationTrackingOptionsRoute
+
+@Serializable
+data object LocationIntervalRoute
+
+@Serializable
+data object LocationAdvancedRoute
