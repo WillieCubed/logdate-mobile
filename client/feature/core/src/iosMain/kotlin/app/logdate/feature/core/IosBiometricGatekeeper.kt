@@ -53,7 +53,7 @@ class IosBiometricGatekeeper : BiometricGatekeeper {
                 val ok = context.canEvaluatePolicy(LAPolicyDeviceOwnerAuthentication, errorPtr.ptr)
                 if (!ok) {
                     val error = errorPtr.value
-                    val state = mapPolicyAvailabilityError(error)
+                    val state = mapLAError(error)
                     Napier.w(
                         "LAContext cannot evaluate policy: code=${error?.code} domain=${error?.domain}",
                         tag = TAG,
@@ -75,7 +75,7 @@ class IosBiometricGatekeeper : BiometricGatekeeper {
                         "LAContext authentication failed: code=${error?.code} domain=${error?.domain}",
                         tag = TAG,
                     )
-                    mapAuthenticationError(error)
+                    mapLAError(error)
                 }
             _authState.value = state
             onResult(state)
@@ -88,24 +88,18 @@ class IosBiometricGatekeeper : BiometricGatekeeper {
         // automatically by falling back to the device passcode.
     }
 
-    private fun mapPolicyAvailabilityError(error: NSError?): AppAuthState =
+    private fun mapLAError(error: NSError?): AppAuthState =
         when (error?.code) {
-            LAErrorPasscodeNotSet, LAErrorBiometryNotAvailable -> AppAuthState.UNSUPPORTED
+            LAErrorPasscodeNotSet,
+            LAErrorBiometryNotAvailable,
+            -> AppAuthState.UNSUPPORTED
             LAErrorBiometryNotEnrolled -> AppAuthState.REQUEST_ENROLLMENT
-            null -> AppAuthState.UNKNOWN
-            else -> AppAuthState.UNKNOWN
-        }
-
-    private fun mapAuthenticationError(error: NSError?): AppAuthState =
-        when (error?.code) {
             LAErrorUserCancel,
             LAErrorAppCancel,
             LAErrorSystemCancel,
             LAErrorUserFallback,
             LAErrorAuthenticationFailed,
             -> AppAuthState.REQUIRE_PROMPT
-            LAErrorPasscodeNotSet, LAErrorBiometryNotAvailable -> AppAuthState.UNSUPPORTED
-            LAErrorBiometryNotEnrolled -> AppAuthState.REQUEST_ENROLLMENT
             else -> AppAuthState.UNKNOWN
         }
 
