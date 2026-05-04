@@ -28,10 +28,14 @@ struct iOSApp: App {
 
     private func configureCrashReporting() {
         #if canImport(FirebaseCore)
-        // FirebaseApp.configure() reads GoogleService-Info.plist from the bundle. The plist
-        // is gitignored — drop the iOS Firebase project's plist into iosApp/iosApp/ before
-        // shipping a build that needs Crashlytics. Without it, configure() logs a warning
-        // and Crashlytics stays disabled, so this is safe to call unconditionally.
+        // FirebaseApp.configure() reads GoogleService-Info.plist from the bundle and raises
+        // an uncaught NSException if the plist is absent. The plist is gitignored — drop the
+        // iOS Firebase project's plist into iosApp/iosApp/ before shipping a build that needs
+        // Crashlytics. Skip configuration entirely when the plist is missing so dev builds
+        // (and CI without secrets) launch normally.
+        guard Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil else {
+            return
+        }
         if FirebaseApp.app() == nil {
             FirebaseApp.configure()
         }
