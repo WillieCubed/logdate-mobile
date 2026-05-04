@@ -5,6 +5,8 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import app.logdate.client.permissions.rememberContactsPermissionState
+import app.logdate.feature.core.account.navigation.cloudAccountSetupRoute
+import app.logdate.feature.core.account.navigation.navigateToCloudAccountSetup
 import app.logdate.feature.core.people.ui.PeopleDirectoryScreen
 import app.logdate.feature.core.people.ui.PeopleInboxScreen
 import app.logdate.feature.core.people.ui.PeopleSettingsScreen
@@ -71,11 +73,19 @@ fun NavGraphBuilder.settingsGraph(navController: NavController) {
             onNavigateToTimeline = { navController.navigate(TimelineSettingsRoute) },
             onNavigateToSync = { navController.navigate(SyncSettingsRoute) },
             onNavigateToExport = { navController.navigate(ExportSettingsRoute) },
-            // Cloud account flow not surfaced from settings yet on iOS/desktop.
-            onNavigateToCloudAccountCreation = {},
-            onNavigateToSignIn = {},
+            onNavigateToCloudAccountCreation = {
+                navController.navigateToCloudAccountSetup(startOnSignIn = false)
+            },
+            onNavigateToSignIn = {
+                navController.navigateToCloudAccountSetup(startOnSignIn = true)
+            },
         )
     }
+    cloudAccountSetupRoute(
+        onAccountCreated = { navController.popBackStack() },
+        onSkipped = { navController.popBackStack() },
+        onBack = { navController.popBackStack() },
+    )
     composable<AccountSettingsRoute> {
         AccountSettingsScreen(
             onBack = { navController.popBackStack() },
@@ -151,6 +161,12 @@ fun NavGraphBuilder.settingsGraph(navController: NavController) {
     composable<SyncSettingsRoute> {
         SyncSettingsScreen(
             onBack = { navController.popBackStack() },
+            onNavigateToCloudAccountCreation = {
+                navController.navigateToCloudAccountSetup(startOnSignIn = false)
+            },
+            onNavigateToSignIn = {
+                navController.navigateToCloudAccountSetup(startOnSignIn = true)
+            },
         )
     }
     composable<ExportSettingsRoute> {
