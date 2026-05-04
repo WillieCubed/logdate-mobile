@@ -49,6 +49,11 @@ import io.github.smiley4.ktoropenapi.OpenApi
 import io.github.smiley4.ktoropenapi.config.AuthScheme
 import io.github.smiley4.ktoropenapi.config.AuthType
 import io.github.smiley4.ktoropenapi.openApi
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.swagger.v3.core.util.Yaml31
+import io.swagger.v3.oas.models.OpenAPI
+import java.util.concurrent.atomic.AtomicReference
 import io.github.smiley4.ktorswaggerui.swaggerUI
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -118,6 +123,7 @@ private fun buildMainServer(
 @OptIn(ExperimentalUuidApi::class)
 fun Application.module(isDatabaseAvailable: Boolean = false) {
     val profile = RuntimeProfile.fromEnvironment()
+    val openApiSpec = AtomicReference<OpenAPI?>()
     install(OpenApi) {
         security {
             securityScheme("bearerAuth") {
@@ -138,6 +144,11 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
                 description = "Local development server"
             }
         }
+        // Capture the built spec so the /openapi.yaml route below can serialize
+        // it directly. Smiley4 v5's spec("yaml") API doesn't share routes or
+        // config with the parent spec, so a parallel YAML spec would ship
+        // empty.
+        postBuild = { api, _ -> openApiSpec.set(api) }
     }
 
     // Stop any existing Koin instance to ensure clean state for tests
@@ -236,8 +247,17 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
         route("openapi.json") {
             openApi()
         }
-        route("openapi.yaml") {
-            openApi()
+        get("/openapi.yaml") {
+            val spec = openApiSpec.get()
+            if (spec == null) {
+                call.respondText(
+                    "OpenAPI spec is still building",
+                    ContentType.Text.Plain,
+                    HttpStatusCode.ServiceUnavailable,
+                )
+            } else {
+                call.respondText(Yaml31.pretty(spec), ContentType("application", "yaml"))
+            }
         }
         route("swagger") {
             swaggerUI("/openapi.json")
