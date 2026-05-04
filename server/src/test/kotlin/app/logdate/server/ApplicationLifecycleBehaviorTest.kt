@@ -1,5 +1,6 @@
 package app.logdate.server
 
+import app.logdate.server.config.profileAwareBoolEnv
 import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncPurgeResult
@@ -9,11 +10,9 @@ import io.ktor.server.application.Application
 import io.ktor.server.testing.testApplication
 import io.mockk.unmockkAll
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import kotlin.jvm.functions.Function1
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -51,13 +50,20 @@ class ApplicationLifecycleBehaviorTest {
     }
 
     @Test
-    fun `readBooleanEnv supports true yes and one and falls back to default`() {
-        assertTrue(readBooleanEnv("X", defaultValue = false) { "true" })
-        assertTrue(readBooleanEnv("X", defaultValue = false) { "YES" })
-        assertTrue(readBooleanEnv("X", defaultValue = false) { "1" })
-        assertFalse(readBooleanEnv("X", defaultValue = true) { "no" })
-        assertTrue(readBooleanEnv("MISSING", defaultValue = true) { null })
-        assertFalse(readBooleanEnv("MISSING", defaultValue = false) { null })
+    fun `profileAwareBoolEnv supports true yes and one and falls back to default`() {
+        fun call(value: String?, default: Boolean): Boolean =
+            profileAwareBoolEnv(
+                name = "X",
+                productionDefault = default,
+                devDefault = default,
+                readEnv = { name -> if (name == "X") value else null },
+            )
+        assertTrue(call("true", default = false))
+        assertTrue(call("YES", default = false))
+        assertTrue(call("1", default = false))
+        assertFalse(call("no", default = true))
+        assertTrue(call(null, default = true))
+        assertFalse(call(null, default = false))
     }
 
     @Test
@@ -71,8 +77,7 @@ class ApplicationLifecycleBehaviorTest {
 
             val job =
                 startSyncMaintenance(
-                    app = app,
-                    repository = repository,
+                    syncRepository = repository,
                     metrics = metrics,
                     readEnv = { name -> if (name == "SYNC_TOMBSTONE_PURGE_ENABLED") "false" else null },
                 )
@@ -98,8 +103,7 @@ class ApplicationLifecycleBehaviorTest {
 
             val job =
                 startSyncMaintenance(
-                    app = app,
-                    repository = repository,
+                    syncRepository = repository,
                     metrics = metrics,
                     readEnv = { name ->
                         when (name) {
@@ -148,8 +152,7 @@ class ApplicationLifecycleBehaviorTest {
 
             val job =
                 startSyncMaintenance(
-                    app = app,
-                    repository = repository,
+                    syncRepository = repository,
                     metrics = metrics,
                     readEnv = { name ->
                         when (name) {
@@ -190,8 +193,7 @@ class ApplicationLifecycleBehaviorTest {
 
             val job =
                 startSyncMaintenance(
-                    app = app,
-                    repository = repository,
+                    syncRepository = repository,
                     metrics = metrics,
                     readEnv = { name ->
                         when (name) {
@@ -209,41 +211,4 @@ class ApplicationLifecycleBehaviorTest {
             }
         }
 
-    private fun readBooleanEnv(
-        name: String,
-        defaultValue: Boolean,
-        readEnv: (String) -> String?,
-    ): Boolean {
-        val method =
-            Class
-                .forName("app.logdate.server.ApplicationKt")
-                .getDeclaredMethod(
-                    "readBooleanEnv",
-                    String::class.java,
-                    Boolean::class.javaPrimitiveType,
-                    Function1::class.java,
-                )
-        method.isAccessible = true
-        return method.invoke(null, name, defaultValue, readEnv as Function1<String, String?>) as Boolean
-    }
-
-    private fun startSyncMaintenance(
-        app: Application,
-        repository: SyncRepository,
-        metrics: SyncMetricsRegistry,
-        readEnv: (String) -> String?,
-    ): Job? {
-        val method =
-            Class
-                .forName("app.logdate.server.ApplicationKt")
-                .getDeclaredMethod(
-                    "startSyncMaintenance",
-                    Application::class.java,
-                    SyncRepository::class.java,
-                    SyncMetricsRegistry::class.java,
-                    Function1::class.java,
-                )
-        method.isAccessible = true
-        return method.invoke(null, app, repository, metrics, readEnv as Function1<String, String?>) as Job?
-    }
 }

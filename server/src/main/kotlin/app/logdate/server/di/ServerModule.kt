@@ -6,6 +6,7 @@ import app.logdate.server.atproto.AtprotoPasswordService
 import app.logdate.server.atproto.AtprotoPdsSessionService
 import app.logdate.server.atproto.AtprotoSessionRepository
 import app.logdate.server.atproto.AtprotoSessionTokenService
+import app.logdate.server.config.RuntimeProfile
 import app.logdate.server.atproto.InMemoryAtprotoPasswordCredentialRepository
 import app.logdate.server.atproto.InMemoryAtprotoSessionRepository
 import app.logdate.server.atproto.LogDatePdsBlobStore
@@ -131,50 +132,61 @@ import studio.hypertext.atproto.repo.RepoRecordStore
 
 /**
  * Initializes the database connection and tables.
- * @return true if database is available, false otherwise
+ *
+ * Flyway migrations run only when `AUTO_MIGRATE=true` (the documented production policy is to
+ * apply migrations as a separate CI step). The Exposed `createMissingTablesAndColumns`
+ * reconciliation, by contrast, runs on every boot — it's idempotent, only adds missing
+ * tables/columns, and is what fills in Exposed-defined columns that no Flyway migration owns
+ * (e.g. `deleted` / `deleted_at` on `sync_*`). Coupling the two was what let an in-memory
+ * fallback hide an empty production database for weeks.
+ *
+ * In production (`LOGDATE_ENV=production`) any DB failure is rethrown so Cloud Run's startup
+ * probe rolls the revision back. In dev/test, the legacy in-memory fallback is preserved so
+ * local iteration without a Postgres instance keeps working.
+ *
+ * @return true if Postgres is wired in, false if the dev/test in-memory fallback was taken.
  */
 fun initializeDatabase(): Boolean =
     try {
         val dataSource = DatabaseConfig.createDataSource()
-        val autoMigrate = DatabaseConfig.shouldRunMigrations()
-        if (autoMigrate) {
-            DatabaseConfig.initializeDatabase(dataSource, autoMigrate = true)
-            transaction {
-                SchemaUtils.createMissingTablesAndColumns(
-                    AccountsTable,
-                    AtprotoPasswordCredentialsTable,
-                    AtprotoSessionsTable,
-                    ContentSyncTable,
-                    JournalSyncTable,
-                    AssociationSyncTable,
-                    MediaSyncTable,
-                    BackupSyncTable,
-                    AccountIdentitiesTable,
-                    AccountLinkEventsTable,
-                    SigningKeysTable,
-                    HostedPlcOperationsTable,
-                    AtprotoRepoHeadsTable,
-                    AtprotoRepoBlocksTable,
-                    AtprotoRepoBlockLinksTable,
-                    AtprotoRepoCommitsTable,
-                    LogDateCollectionStatesTable,
-                    LogDateCollectionRecordsTable,
-                    LogDateMediaRecordsTable,
-                    LogDateBackupsTable,
-                    LogDateAtprotoBlobsTable,
-                    OAuthAuthorizationRequestsTable,
-                    OAuthAuthorizationCodesTable,
-                    OAuthRefreshTokensTable,
-                    RestoreCredentialsTable,
-                )
-            }
-        } else {
-            DatabaseConfig.initializeDatabase(dataSource, autoMigrate = false)
-            Napier.i("Database schema reconciliation skipped because AUTO_MIGRATE=false")
+        val runFlyway = DatabaseConfig.shouldRunMigrations()
+        DatabaseConfig.initializeDatabase(dataSource, autoMigrate = runFlyway)
+        transaction {
+            SchemaUtils.createMissingTablesAndColumns(
+                AccountsTable,
+                AtprotoPasswordCredentialsTable,
+                AtprotoSessionsTable,
+                ContentSyncTable,
+                JournalSyncTable,
+                AssociationSyncTable,
+                MediaSyncTable,
+                BackupSyncTable,
+                AccountIdentitiesTable,
+                AccountLinkEventsTable,
+                SigningKeysTable,
+                HostedPlcOperationsTable,
+                AtprotoRepoHeadsTable,
+                AtprotoRepoBlocksTable,
+                AtprotoRepoBlockLinksTable,
+                AtprotoRepoCommitsTable,
+                LogDateCollectionStatesTable,
+                LogDateCollectionRecordsTable,
+                LogDateMediaRecordsTable,
+                LogDateBackupsTable,
+                LogDateAtprotoBlobsTable,
+                OAuthAuthorizationRequestsTable,
+                OAuthAuthorizationCodesTable,
+                OAuthRefreshTokensTable,
+                RestoreCredentialsTable,
+            )
         }
         Napier.i("Database repositories initialized successfully")
         true
     } catch (e: Exception) {
+        if (RuntimeProfile.fromEnvironment().isProduction) {
+            Napier.e("Production database unavailable; refusing to start with in-memory fallback", e)
+            throw e
+        }
         Napier.w("Database not available, using in-memory repositories", e)
         false
     }

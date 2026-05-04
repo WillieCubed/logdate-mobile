@@ -128,7 +128,10 @@ class ApplicationTest {
                 module()
             }
 
-            client.get("/swagger").apply {
+            // SwaggerUI plugin serves the bundle from /swagger/index.html and 302s requests
+            // to bare `/swagger`. Follow the redirect so the test exercises the actual page.
+            val followingClient = createClient { followRedirects = true }
+            followingClient.get("/swagger").apply {
                 assertEquals(HttpStatusCode.OK, status)
                 val responseBody = bodyAsText()
                 assertTrue(responseBody.contains("SwaggerUIBundle"))

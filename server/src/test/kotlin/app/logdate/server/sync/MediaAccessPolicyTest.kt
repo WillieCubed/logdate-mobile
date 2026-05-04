@@ -1,5 +1,6 @@
 package app.logdate.server.sync
 
+import kotlin.Function1
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -40,7 +41,7 @@ class MediaAccessPolicyTest {
                 "readBooleanEnv",
                 String::class.java,
                 Boolean::class.javaPrimitiveType,
-                kotlin.jvm.functions.Function1::class.java,
+                Function1::class.java,
             )
         readBoolean.isAccessible = true
         val fallback =
@@ -48,7 +49,7 @@ class MediaAccessPolicyTest {
                 MediaAccessPolicy.Companion,
                 "UNSET_TEST_ENV_KEY",
                 true,
-                { _: String -> null } as kotlin.jvm.functions.Function1<String, String?>,
+                { _: String -> null } as Function1<String, String?>,
             ) as Boolean
         assertEquals(true, fallback)
 
@@ -57,21 +58,21 @@ class MediaAccessPolicyTest {
                 MediaAccessPolicy.Companion,
                 "SYNC_MEDIA_SIGNED_URLS",
                 false,
-                { _: String -> "true" } as kotlin.jvm.functions.Function1<String, String?>,
+                { _: String -> "true" } as Function1<String, String?>,
             ) as Boolean
         val fromYes =
             readBoolean.invoke(
                 MediaAccessPolicy.Companion,
                 "SYNC_MEDIA_SIGNED_URLS",
                 false,
-                { _: String -> "YES" } as kotlin.jvm.functions.Function1<String, String?>,
+                { _: String -> "YES" } as Function1<String, String?>,
             ) as Boolean
         val fromOne =
             readBoolean.invoke(
                 MediaAccessPolicy.Companion,
                 "SYNC_MEDIA_SIGNED_URLS",
                 false,
-                { _: String -> "1" } as kotlin.jvm.functions.Function1<String, String?>,
+                { _: String -> "1" } as Function1<String, String?>,
             ) as Boolean
         assertTrue(fromTrue)
         assertTrue(fromYes)
