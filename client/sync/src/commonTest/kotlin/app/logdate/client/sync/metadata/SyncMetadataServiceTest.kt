@@ -53,7 +53,7 @@ class SyncMetadataServiceTest {
             operation: PendingOperation,
         ) {
             val existing = pendingUploads[entityType]?.get(entityId)
-            val resolved = resolveOperation(existing?.operation, operation)
+            val resolved = PendingOperation.coalesce(existing?.operation, operation)
             if (resolved == null) {
                 pendingUploads[entityType]?.remove(entityId)
             } else {
@@ -108,33 +108,6 @@ class SyncMetadataServiceTest {
             val current = syncTimes[entityType]
             if (current == null || syncedAt >= current) {
                 syncTimes[entityType] = syncedAt
-            }
-        }
-
-        private fun resolveOperation(
-            existing: PendingOperation?,
-            incoming: PendingOperation,
-        ): PendingOperation? {
-            if (existing == null) return incoming
-            return when (existing) {
-                PendingOperation.CREATE ->
-                    when (incoming) {
-                        PendingOperation.UPDATE -> PendingOperation.CREATE
-                        PendingOperation.DELETE -> null
-                        PendingOperation.CREATE -> PendingOperation.CREATE
-                    }
-                PendingOperation.UPDATE ->
-                    when (incoming) {
-                        PendingOperation.DELETE -> PendingOperation.DELETE
-                        PendingOperation.CREATE -> PendingOperation.CREATE
-                        PendingOperation.UPDATE -> PendingOperation.UPDATE
-                    }
-                PendingOperation.DELETE ->
-                    when (incoming) {
-                        PendingOperation.CREATE -> PendingOperation.CREATE
-                        PendingOperation.UPDATE -> PendingOperation.CREATE
-                        PendingOperation.DELETE -> PendingOperation.DELETE
-                    }
             }
         }
     }
@@ -271,4 +244,31 @@ class SyncMetadataServiceTest {
             assertTrue(service.getPendingUploads(EntityType.NOTE).isEmpty())
             assertEquals(0, service.getPendingCount())
         }
+
+    @Test
+    fun `coalesce matrix collapses to the documented op`() {
+        // existing → incoming → expected
+        val cases =
+            listOf(
+                Triple(null, PendingOperation.CREATE, PendingOperation.CREATE),
+                Triple(null, PendingOperation.UPDATE, PendingOperation.UPDATE),
+                Triple(null, PendingOperation.DELETE, PendingOperation.DELETE),
+                Triple(PendingOperation.CREATE, PendingOperation.CREATE, PendingOperation.CREATE),
+                Triple(PendingOperation.CREATE, PendingOperation.UPDATE, PendingOperation.CREATE),
+                Triple(PendingOperation.CREATE, PendingOperation.DELETE, null),
+                Triple(PendingOperation.UPDATE, PendingOperation.CREATE, PendingOperation.CREATE),
+                Triple(PendingOperation.UPDATE, PendingOperation.UPDATE, PendingOperation.UPDATE),
+                Triple(PendingOperation.UPDATE, PendingOperation.DELETE, PendingOperation.DELETE),
+                Triple(PendingOperation.DELETE, PendingOperation.CREATE, PendingOperation.CREATE),
+                Triple(PendingOperation.DELETE, PendingOperation.UPDATE, PendingOperation.CREATE),
+                Triple(PendingOperation.DELETE, PendingOperation.DELETE, PendingOperation.DELETE),
+            )
+        cases.forEach { (existing, incoming, expected) ->
+            assertEquals(
+                expected,
+                PendingOperation.coalesce(existing, incoming),
+                "coalesce($existing, $incoming) expected $expected",
+            )
+        }
+    }
 }

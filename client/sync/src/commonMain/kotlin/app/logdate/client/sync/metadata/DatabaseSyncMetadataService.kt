@@ -60,7 +60,8 @@ class DatabaseSyncMetadataService(
         val serverOrigin = currentOrigin()
         promoteLegacyPendingIfNeeded(serverOrigin, entityType)
         val existing = dao.getPending(serverOrigin, entityType.name, entityId)
-        val resolvedOperation = resolveOperation(existing?.operation, operation)
+        val existingOp = existing?.operation?.let { PendingOperation.fromStorage(it) }
+        val resolvedOperation = PendingOperation.coalesce(existingOp, operation)
         if (resolvedOperation == null) {
             dao.deletePending(serverOrigin, entityType.name, entityId)
             return
@@ -151,34 +152,6 @@ class DatabaseSyncMetadataService(
                     lastSyncTimestamp = next,
                 ),
             )
-        }
-    }
-
-    private fun resolveOperation(
-        existingOperation: String?,
-        incoming: PendingOperation,
-    ): PendingOperation? {
-        val existing = existingOperation?.let { PendingOperation.fromStorage(it) } ?: return incoming
-
-        return when (existing) {
-            PendingOperation.CREATE ->
-                when (incoming) {
-                    PendingOperation.UPDATE -> PendingOperation.CREATE
-                    PendingOperation.DELETE -> null
-                    PendingOperation.CREATE -> PendingOperation.CREATE
-                }
-            PendingOperation.UPDATE ->
-                when (incoming) {
-                    PendingOperation.DELETE -> PendingOperation.DELETE
-                    PendingOperation.CREATE -> PendingOperation.CREATE
-                    PendingOperation.UPDATE -> PendingOperation.UPDATE
-                }
-            PendingOperation.DELETE ->
-                when (incoming) {
-                    PendingOperation.CREATE -> PendingOperation.CREATE
-                    PendingOperation.UPDATE -> PendingOperation.CREATE
-                    PendingOperation.DELETE -> PendingOperation.DELETE
-                }
         }
     }
 

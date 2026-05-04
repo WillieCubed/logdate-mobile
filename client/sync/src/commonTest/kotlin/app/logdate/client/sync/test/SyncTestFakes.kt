@@ -573,10 +573,17 @@ class FakeSyncMetadataService : SyncMetadataService {
         entityType: EntityType,
         operation: PendingOperation,
     ) {
-        pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId] = operation
-        val counts = retryCounts.getOrPut(entityType) { mutableMapOf() }
-        if (counts[entityId] == null) {
-            counts[entityId] = 0
+        val existing = pendingUploads[entityType]?.get(entityId)
+        val resolved = PendingOperation.coalesce(existing, operation)
+        if (resolved == null) {
+            pendingUploads[entityType]?.remove(entityId)
+            retryCounts[entityType]?.remove(entityId)
+        } else {
+            pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId] = resolved
+            val counts = retryCounts.getOrPut(entityType) { mutableMapOf() }
+            if (counts[entityId] == null) {
+                counts[entityId] = 0
+            }
         }
         updatePendingCount()
     }
