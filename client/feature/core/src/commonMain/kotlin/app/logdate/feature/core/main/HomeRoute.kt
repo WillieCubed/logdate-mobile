@@ -36,6 +36,7 @@ fun NavGraphBuilder.homeGraph(
     onImportBackup: () -> Unit = {},
     onOpenMediaDetail: (Uuid) -> Unit = {},
     libraryContent: @Composable (Modifier) -> Unit = {},
+    locationContent: @Composable (Modifier) -> Unit = {},
 ) {
     composable<HomeRoute> {
         HomeScreen(
@@ -50,6 +51,7 @@ fun NavGraphBuilder.homeGraph(
             onImportBackup = onImportBackup,
             onOpenMediaDetail = onOpenMediaDetail,
             libraryContent = libraryContent,
+            locationContent = locationContent,
         )
     }
 }

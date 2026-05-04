@@ -98,6 +98,12 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
                     modifier = modifier,
                 )
             },
+            locationContent = { modifier ->
+                LocationTimelineScreen(
+                    onOpenNote = { noteId -> navController.navigateToNoteDetail(noteId) },
+                    modifier = modifier,
+                )
+            },
         )
         journalsOverviewRoute(
             onOpenJournal = navController::navigateToJournal,
