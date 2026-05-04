@@ -11,17 +11,19 @@ service_name = "logdate-server"
 cloud_run_image = "us-docker.pkg.dev/cloudrun/container/hello"
 # WebAuthn rpId is set to the registrable apex `logdate.app` so passkeys work
 # across every `*.logdate.app` subdomain (primary auth happens at
-# `cloud.logdate.app`). Note: passkeys will NOT work on
-# `logdate.hypertext.studio` because it's a different apex — that domain is
-# treated as an API-only mirror for clients that already hold a JWT.
+# `cloud.logdate.app`).
 webauthn_rp_id  = "logdate.app"
 webauthn_origin = "https://cloud.logdate.app"
 
 enable_github_oidc = true
 github_repo        = "WillieCubed/logdate-mobile"
 
+# `logdate.hypertext.studio` used to live here too but it's owned by the
+# Hypertext org's main site and just redirects to LogDate — it's not a
+# Cloud Run host. Don't add it back without coordinating with the
+# hypertext.studio DNS owner.
 enable_domain_mapping = true
-domains               = ["logdate.hypertext.studio", "cloud.logdate.app"]
+domains               = ["cloud.logdate.app"]
 
 create_gcs_bucket = true
 gcs_bucket_name   = "logdate-media-logdate"
@@ -33,7 +35,7 @@ startup_cpu_boost   = true
 cloud_run_env = {
   LOGDATE_ENV     = "production"
   AUTO_MIGRATE    = "false"
-  ALLOWED_ORIGINS = "https://logdate.hypertext.studio,https://cloud.logdate.app"
+  ALLOWED_ORIGINS = "https://cloud.logdate.app"
   REQUIRE_HTTPS   = "true"
 }
 
