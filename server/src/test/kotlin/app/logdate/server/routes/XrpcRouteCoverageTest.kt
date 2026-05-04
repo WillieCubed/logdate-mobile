@@ -86,6 +86,7 @@ import kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
@@ -163,7 +164,7 @@ class XrpcRouteCoverageTest {
         assertEquals(null, putRequest.validate)
         assertEquals(null, putRequest.swapCommit)
         assertEquals(null, deleteRequest.swapCommit)
-        assertTrue(emptyResponse is EmptyPdsResponse)
+        assertNotNull(emptyResponse)
     }
 
     @Test

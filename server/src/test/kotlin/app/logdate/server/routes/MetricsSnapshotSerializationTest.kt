@@ -27,7 +27,6 @@ class MetricsSnapshotSerializationTest {
         assertEquals(1L, snapshot.errorsByCode["VALIDATION_ERROR"])
         assertEquals(1L, snapshot.rateLimitedByOperation["auth.signup.passkey.begin"])
         assertEquals(1, snapshot.operations.size)
-        assertTrue(AuthOperationMetricsSnapshot.Companion.serializer() != null)
 
         val encoded = json.encodeToString(AuthMetricsSnapshot.serializer(), snapshot)
         assertTrue(encoded.contains("VALIDATION_ERROR"))
@@ -52,6 +51,5 @@ class MetricsSnapshotSerializationTest {
 
         val encoded = json.encodeToString(SyncMetricsSnapshot.serializer(), snapshot)
         assertTrue(encoded.contains("sync.media.upload"))
-        assertTrue(SyncOperationMetricsSnapshot.Companion.serializer() != null)
     }
 }
