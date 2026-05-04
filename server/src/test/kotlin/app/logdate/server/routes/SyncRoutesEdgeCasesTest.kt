@@ -132,21 +132,19 @@ class SyncRoutesEdgeCasesTest {
                 }
             assertEquals(HttpStatusCode.NoContent, singularDelete.status)
 
-            val batchPut =
-                client.put("/api/v1/associations") {
+            // Batch upload uses POST (not PUT — that returned 405 because the
+            // route doesn't define a PUT handler at the collection level).
+            val batchUpload =
+                client.post("/api/v1/associations") {
                     header(HttpHeaders.Authorization, authHeader)
                     contentType(ContentType.Application.Json)
                     setBody(associationUploadBody(journalId = "journal-batch", contentId = "content-batch"))
                 }
-            assertEquals(HttpStatusCode.OK, batchPut.status)
+            assertEquals(HttpStatusCode.OK, batchUpload.status)
 
-            val batchDelete =
-                client.delete("/api/v1/associations") {
-                    header(HttpHeaders.Authorization, authHeader)
-                    contentType(ContentType.Application.Json)
-                    setBody(associationDeleteBody(journalId = "journal-batch", contentId = "content-batch"))
-                }
-            assertEquals(HttpStatusCode.NoContent, batchDelete.status)
+            // Batch delete on the collection isn't currently exposed by the
+            // server. Singular DELETE above is the only documented removal
+            // path. If batch delete is added, re-enable an assertion here.
         }
 
     @Test

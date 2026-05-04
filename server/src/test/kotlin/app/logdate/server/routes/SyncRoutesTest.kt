@@ -400,7 +400,7 @@ class SyncRoutesTest {
 
             // Upload associations
             val upload =
-                client.put("/api/v1/associations") {
+                client.post("/api/v1/associations") {
                     header(HttpHeaders.Authorization, authHeader)
                     contentType(ContentType.Application.Json)
                     setBody(
