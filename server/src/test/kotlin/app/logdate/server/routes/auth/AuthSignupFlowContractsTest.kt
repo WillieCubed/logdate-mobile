@@ -11,11 +11,14 @@ import app.logdate.server.auth.SessionType
 import app.logdate.server.auth.TemporarySession
 import app.logdate.server.configureAuthV1TestApp
 import app.logdate.server.passkeys.WebAuthnPasskeyService
+import app.logdate.server.passkeys.WebAuthnPasskeyService.VerificationOutcome
+import app.logdate.server.passkeys.WebAuthnPasskeyService.VerifiedRegistration
 import app.logdate.server.routes.support.googleAuthBody
 import app.logdate.server.routes.support.googleClaims
 import app.logdate.server.routes.support.googleClaimsByToken
 import app.logdate.server.routes.support.signupPasskeyCompleteBody
 import app.logdate.server.routes.support.signupPasskeyCompleteBodyWithBindingSource
+import app.logdate.shared.model.PasskeyInfo
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -29,6 +32,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
@@ -180,8 +184,9 @@ class AuthSignupFlowContractsTest {
                 accountCreationSession(sessionToken, accountId)
 
             val passkeyService = mockk<WebAuthnPasskeyService>(relaxed = true)
-            every { passkeyService.verifyRegistration(any(), any(), any()) } returns
-                WebAuthnPasskeyService.RegistrationResult(success = true, credentialId = "cred-catch")
+            every { passkeyService.verifyRegistrationOnly(any(), any(), any()) } returns
+                VerificationOutcome.Success(verifiedRegistration("cred-catch"))
+            every { passkeyService.storeVerifiedPasskey(any(), any()) } returns true
             every { passkeyService.getPasskeysForUser(any()) } returns emptyList()
             configureAuthV1TestApp(
                 sessionManager = sessionManager,
@@ -236,12 +241,9 @@ class AuthSignupFlowContractsTest {
             coEvery { sessionManager.markSessionUsed(sessionToken) } returns true
 
             val passkeyService = mockk<WebAuthnPasskeyService>(relaxed = true)
-            every { passkeyService.verifyRegistration(any(), any(), any()) } returns
-                WebAuthnPasskeyService.RegistrationResult(
-                    success = true,
-                    credentialId = null,
-                    passkey = null,
-                )
+            every { passkeyService.verifyRegistrationOnly(any(), any(), any()) } returns
+                VerificationOutcome.Success(verifiedRegistration("cred-request-fallback"))
+            every { passkeyService.storeVerifiedPasskey(any(), any()) } returns true
             every { passkeyService.getPasskeysForUser(any()) } returns emptyList()
 
             val env =
@@ -326,6 +328,96 @@ class AuthSignupFlowContractsTest {
                 }
             assertEquals(HttpStatusCode.InternalServerError, signin.status)
         }
+
+    @Test
+    fun `passkey signup leaves no orphan account when WebAuthn verification fails`() =
+        testApplication {
+            val sessionToken = "s-verify-fail"
+            val accountId = Uuid.random()
+            val sessionManager = mockk<SessionManager>(relaxed = true)
+            coEvery { sessionManager.validateSession(eq(sessionToken), eq(SessionType.ACCOUNT_CREATION)) } returns
+                accountCreationSession(sessionToken, accountId)
+
+            val passkeyService = mockk<WebAuthnPasskeyService>(relaxed = true)
+            every { passkeyService.verifyRegistrationOnly(any(), any(), any()) } returns
+                VerificationOutcome.Failure("attestation rejected")
+
+            val env =
+                configureAuthV1TestApp(
+                    sessionManager = sessionManager,
+                    webAuthnPasskeyService = passkeyService,
+                )
+
+            val response =
+                client.post("/api/v1/auth/signup/passkey/complete") {
+                    contentType(ContentType.Application.Json)
+                    setBody(signupPasskeyCompleteBody(sessionToken = sessionToken, credentialId = "cred-verify-fail"))
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("PASSKEY_VERIFICATION_FAILED"))
+            runBlocking {
+                assertNull(
+                    env.accountRepository.findById(accountId),
+                    "verification failure must not leave an account row behind",
+                )
+            }
+        }
+
+    @Test
+    fun `passkey signup deletes the account row when storeVerifiedPasskey fails`() =
+        testApplication {
+            val sessionToken = "s-store-fail"
+            val accountId = Uuid.random()
+            val sessionManager = mockk<SessionManager>(relaxed = true)
+            coEvery { sessionManager.validateSession(eq(sessionToken), eq(SessionType.ACCOUNT_CREATION)) } returns
+                accountCreationSession(sessionToken, accountId)
+
+            val passkeyService = mockk<WebAuthnPasskeyService>(relaxed = true)
+            every { passkeyService.verifyRegistrationOnly(any(), any(), any()) } returns
+                VerificationOutcome.Success(verifiedRegistration("cred-store-fail"))
+            every { passkeyService.storeVerifiedPasskey(any(), any()) } returns false
+
+            val env =
+                configureAuthV1TestApp(
+                    sessionManager = sessionManager,
+                    webAuthnPasskeyService = passkeyService,
+                )
+
+            val response =
+                client.post("/api/v1/auth/signup/passkey/complete") {
+                    contentType(ContentType.Application.Json)
+                    setBody(signupPasskeyCompleteBody(sessionToken = sessionToken, credentialId = "cred-store-fail"))
+                }
+
+            assertEquals(HttpStatusCode.InternalServerError, response.status)
+            assertTrue(response.bodyAsText().contains("PASSKEY_STORE_FAILED"))
+            runBlocking {
+                assertNull(
+                    env.accountRepository.findById(accountId),
+                    "passkey-store failure must roll the account row back",
+                )
+            }
+        }
+
+    private fun verifiedRegistration(credentialId: String): VerifiedRegistration {
+        val now = Clock.System.now()
+        return VerifiedRegistration(
+            credentialId = credentialId,
+            publicKey = ByteArray(0),
+            signCount = 0L,
+            passkey =
+                PasskeyInfo(
+                    id = Uuid.random(),
+                    credentialId = credentialId,
+                    nickname = "test",
+                    deviceType = "platform",
+                    createdAt = now,
+                    lastUsedAt = null,
+                    isActive = true,
+                ),
+        )
+    }
 
     private fun accountCreationSession(
         token: String,
