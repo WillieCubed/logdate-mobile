@@ -158,7 +158,6 @@ val appNavSavedStateConfiguration: SavedStateConfiguration =
 
                     // Journals
                     subclass(JournalsOverviewRoute::class, JournalsOverviewRoute.serializer())
-                    @Suppress("DEPRECATION")
                     subclass(JournalDetailsRoute::class, JournalDetailsRoute.serializer())
                     subclass(JournalSettingsRoute::class, JournalSettingsRoute.serializer())
                     subclass(JournalCreationRoute::class, JournalCreationRoute.serializer())

@@ -17,7 +17,6 @@ import kotlin.uuid.Uuid
 /**
  * Route for viewing a journal's details.
  */
-@Deprecated("Use Navigation 3 when possible.")
 @Serializable
 data class JournalDetailsRoute(
     val journalId: String,
