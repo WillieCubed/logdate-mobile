@@ -185,8 +185,16 @@ val appNavSavedStateConfiguration: SavedStateConfiguration =
                     subclass(TimelineDetailRoute::class, TimelineDetailRoute.serializer())
 
                     // Compose-main local routes
-                    subclass(app.logdate.client.ui.navigation.SearchRoute::class, app.logdate.client.ui.navigation.SearchRoute.serializer())
-                    subclass(app.logdate.client.ui.navigation.LocationTimelineRoute::class, app.logdate.client.ui.navigation.LocationTimelineRoute.serializer())
+                    subclass(
+                        app.logdate.client.ui.navigation.SearchRoute::class,
+                        app.logdate.client.ui.navigation.SearchRoute
+                            .serializer(),
+                    )
+                    subclass(
+                        app.logdate.client.ui.navigation.LocationTimelineRoute::class,
+                        app.logdate.client.ui.navigation.LocationTimelineRoute
+                            .serializer(),
+                    )
                 }
             }
     }

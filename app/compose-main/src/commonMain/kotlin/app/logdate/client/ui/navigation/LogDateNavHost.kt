@@ -18,31 +18,30 @@ import app.logdate.feature.core.settings.navigation.settingsGraph
 import app.logdate.feature.editor.navigation.editorRoute
 import app.logdate.feature.editor.navigation.navigateToEditor
 import app.logdate.feature.events.navigation.eventDetailRoute
+import app.logdate.feature.journals.navigation.JournalSettingsRoute
 import app.logdate.feature.journals.navigation.journalDetailsRoute
 import app.logdate.feature.journals.navigation.journalSettingsRoute
-import app.logdate.feature.journals.navigation.JournalSettingsRoute
 import app.logdate.feature.journals.navigation.journalsOverviewRoute
-import app.logdate.feature.journals.navigation.navigateToShareJournal
-import app.logdate.feature.journals.navigation.shareJournalRoute
 import app.logdate.feature.journals.navigation.navigateToJournal
 import app.logdate.feature.journals.navigation.navigateToJournalCreation
 import app.logdate.feature.journals.navigation.navigateToJournalsOverview
 import app.logdate.feature.journals.navigation.navigateToNoteDetail
+import app.logdate.feature.journals.navigation.navigateToShareJournal
 import app.logdate.feature.journals.navigation.newJournalRoute
 import app.logdate.feature.journals.navigation.noteDetailRoute
+import app.logdate.feature.journals.navigation.shareJournalRoute
 import app.logdate.feature.library.navigation.MediaDetailRoute
 import app.logdate.feature.library.navigation.libraryRoute
 import app.logdate.feature.library.navigation.mediaDetailRoute
 import app.logdate.feature.library.ui.LibraryScreen
 import app.logdate.feature.location.timeline.ui.LocationTimelineScreen
 import app.logdate.feature.onboarding.navigation.onboardingGraph
-import app.logdate.feature.postcards.navigation.navigateToPostcardsCollection
 import app.logdate.feature.postcards.navigation.postcardsRoutes
-import app.logdate.navigation.navigateToTimelineDay
-import app.logdate.navigation.timelineDetailRoute
 import app.logdate.feature.rewind.navigation.navigateToRewind
 import app.logdate.feature.rewind.navigation.rewindRoutes
 import app.logdate.feature.search.ui.SearchScreen
+import app.logdate.navigation.navigateToTimelineDay
+import app.logdate.navigation.timelineDetailRoute
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -184,7 +183,8 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
             onOpenLocations = { navController.navigate(LocationTimelineRoute) },
             onOpenEvent = { eventId ->
                 navController.navigate(
-                    app.logdate.feature.events.navigation.EventDetailRoute(eventId),
+                    app.logdate.feature.events.navigation
+                        .EventDetailRoute(eventId),
                 )
             },
         )
@@ -196,7 +196,8 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
                 onNavigateToJournal = { journalId -> navController.navigateToJournal(journalId) },
                 onNavigateToPerson = { personId ->
                     navController.navigate(
-                        app.logdate.feature.core.settings.navigation.PersonDetailRoute(personId),
+                        app.logdate.feature.core.settings.navigation
+                            .PersonDetailRoute(personId),
                     )
                 },
             )
