@@ -34,7 +34,11 @@ captures
 **/*.env.secrets
 
 **/.claude/settings.local.json
+**/.claude/scheduled_tasks.lock
 **/.claude/worktrees/
+
+# Per-platform Xcode build outputs (not the main Debug-iphoneos one tracked above)
+iosApp/build-sim/
 
 # Local debug dumps and scratch state
 tmp/
