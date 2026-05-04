@@ -48,7 +48,6 @@ import io.github.aakira.napier.Napier
 import io.github.smiley4.ktoropenapi.OpenApi
 import io.github.smiley4.ktoropenapi.config.AuthScheme
 import io.github.smiley4.ktoropenapi.config.AuthType
-import io.github.smiley4.ktoropenapi.config.OutputFormat
 import io.github.smiley4.ktoropenapi.openApi
 import io.github.smiley4.ktorswaggerui.swaggerUI
 import io.ktor.http.HttpHeaders
@@ -119,7 +118,6 @@ private fun buildMainServer(
 fun Application.module(isDatabaseAvailable: Boolean = false) {
     val profile = RuntimeProfile.fromEnvironment()
     install(OpenApi) {
-        outputFormat = OutputFormat.JSON
         security {
             securityScheme("bearerAuth") {
                 type = AuthType.HTTP
@@ -138,9 +136,6 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
                 url = "http://localhost:8080"
                 description = "Local development server"
             }
-        }
-        spec("yaml") {
-            outputFormat = OutputFormat.YAML
         }
     }
 
@@ -241,7 +236,7 @@ fun Application.module(isDatabaseAvailable: Boolean = false) {
             openApi()
         }
         route("openapi.yaml") {
-            openApi("yaml")
+            openApi()
         }
         route("swagger") {
             swaggerUI("/openapi.json")
