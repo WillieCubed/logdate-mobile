@@ -21,9 +21,9 @@ import app.logdate.client.data.notes.OfflineFirstJournalNotesRepository
 import app.logdate.client.data.notes.drafts.IosLocalEntryDraftStore
 import app.logdate.client.data.notes.drafts.LocalEntryDraftStore
 import app.logdate.client.data.notes.drafts.OfflineFirstEntryDraftRepository
+import app.logdate.client.data.people.IosDeviceContactsReader
 import app.logdate.client.data.people.OfflineFirstPeopleGraphRepository
 import app.logdate.client.data.people.OfflineFirstPeopleRepository
-import app.logdate.client.data.people.StubDeviceContactsReader
 import app.logdate.client.data.places.OfflineFirstUserPlacesRepository
 import app.logdate.client.data.profile.OfflineFirstProfileRepository
 import app.logdate.client.data.quota.StubRemoteQuotaDataSource
@@ -183,7 +183,7 @@ actual val dataModule: Module =
         single<InferredPeopleRepository> { get<OfflineFirstPeopleGraphRepository>() }
         single<PersonLinkRepository> { get<OfflineFirstPeopleGraphRepository>() }
         single<PeopleProfileRepository> { get<OfflineFirstPeopleGraphRepository>() }
-        single<DeviceContactsReader> { StubDeviceContactsReader() }
+        single<DeviceContactsReader> { IosDeviceContactsReader() }
 
         // Profile
         single<ProfileRepository> { OfflineFirstProfileRepository(get()) }
