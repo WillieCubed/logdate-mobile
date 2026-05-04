@@ -35,6 +35,8 @@ import app.logdate.feature.library.navigation.mediaDetailRoute
 import app.logdate.feature.library.ui.LibraryScreen
 import app.logdate.feature.location.timeline.ui.LocationTimelineScreen
 import app.logdate.feature.onboarding.navigation.onboardingGraph
+import app.logdate.feature.postcards.navigation.navigateToPostcardsCollection
+import app.logdate.feature.postcards.navigation.postcardsRoutes
 import app.logdate.navigation.navigateToTimelineDay
 import app.logdate.navigation.timelineDetailRoute
 import app.logdate.feature.rewind.navigation.navigateToRewind
@@ -179,6 +181,7 @@ internal fun LogDateNavHost(navController: NavHostController = rememberNavContro
                 )
             },
         )
+        postcardsRoutes(navController = navController)
         composable<SearchRoute> {
             SearchScreen(
                 onGoBack = { navController.popBackStack() },
