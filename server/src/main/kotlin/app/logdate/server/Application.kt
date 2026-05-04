@@ -347,14 +347,12 @@ internal fun Application.installNetworkEdge(
     if (parsedOrigins.isNotEmpty()) {
         install(CORS) {
             parsedOrigins.forEach { origin ->
-                val originStr =
+                val hostAndPort =
                     buildString {
-                        append(origin.scheme)
-                        append("://")
                         append(origin.host)
                         origin.port?.let { append(":").append(it) }
                     }
-                allowHost(originStr)
+                allowHost(host = hostAndPort, schemes = listOf(origin.scheme))
             }
             allowMethod(HttpMethod.Options)
             allowMethod(HttpMethod.Put)
