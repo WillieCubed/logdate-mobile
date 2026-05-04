@@ -40,6 +40,8 @@ import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.Journal
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -185,28 +187,27 @@ class DefaultSyncManager(
             }
 
             syncStateFlow.value = SyncState.Syncing
-            var totalUploaded = 0
-            val errors = mutableListOf<SyncError>()
 
             try {
                 val accessToken =
                     getAccessToken()
                         ?: return authError()
 
-                // Upload journals
-                val journalResult = uploadJournals(accessToken)
-                totalUploaded += journalResult.uploadedItems
-                errors.addAll(journalResult.errors)
-
-                // Upload content
-                val contentResult = uploadContent(accessToken)
-                totalUploaded += contentResult.uploadedItems
-                errors.addAll(contentResult.errors)
-
-                // Upload associations
-                val associationResult = uploadAssociations(accessToken)
-                totalUploaded += associationResult.uploadedItems
-                errors.addAll(associationResult.errors)
+                val (journalResult, contentResult, associationResult) =
+                    coroutineScope {
+                        val j = async { uploadJournals(accessToken) }
+                        val c = async { uploadContent(accessToken) }
+                        val a = async { uploadAssociations(accessToken) }
+                        Triple(j.await(), c.await(), a.await())
+                    }
+                val totalUploaded =
+                    journalResult.uploadedItems +
+                        contentResult.uploadedItems +
+                        associationResult.uploadedItems
+                val errors =
+                    journalResult.errors +
+                        contentResult.errors +
+                        associationResult.errors
 
                 val success = errors.isEmpty()
                 if (success) {
@@ -252,9 +253,6 @@ class DefaultSyncManager(
             }
 
             syncStateFlow.value = SyncState.Syncing
-            var totalDownloaded = 0
-            var conflictsResolved = 0
-            val errors = mutableListOf<SyncError>()
 
             try {
                 val accessToken =
@@ -265,23 +263,25 @@ class DefaultSyncManager(
                 val contentSince = cursorFor(EntityType.NOTE)
                 val associationSince = cursorFor(EntityType.ASSOCIATION)
 
-                // Download journals
-                val journalResult = downloadJournals(accessToken, journalSince)
-                totalDownloaded += journalResult.downloadedItems
-                conflictsResolved += journalResult.conflictsResolved
-                errors.addAll(journalResult.errors)
-
-                // Download content
-                val contentResult = downloadContent(accessToken, contentSince)
-                totalDownloaded += contentResult.downloadedItems
-                conflictsResolved += contentResult.conflictsResolved
-                errors.addAll(contentResult.errors)
-
-                // Download associations
-                val associationResult = downloadAssociations(accessToken, associationSince)
-                totalDownloaded += associationResult.downloadedItems
-                conflictsResolved += associationResult.conflictsResolved
-                errors.addAll(associationResult.errors)
+                val (journalResult, contentResult, associationResult) =
+                    coroutineScope {
+                        val j = async { downloadJournals(accessToken, journalSince) }
+                        val c = async { downloadContent(accessToken, contentSince) }
+                        val a = async { downloadAssociations(accessToken, associationSince) }
+                        Triple(j.await(), c.await(), a.await())
+                    }
+                val totalDownloaded =
+                    journalResult.downloadedItems +
+                        contentResult.downloadedItems +
+                        associationResult.downloadedItems
+                val conflictsResolved =
+                    journalResult.conflictsResolved +
+                        contentResult.conflictsResolved +
+                        associationResult.conflictsResolved
+                val errors =
+                    journalResult.errors +
+                        contentResult.errors +
+                        associationResult.errors
 
                 val success = errors.isEmpty()
                 if (success) {
