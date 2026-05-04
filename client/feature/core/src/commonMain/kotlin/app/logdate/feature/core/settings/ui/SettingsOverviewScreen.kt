@@ -111,7 +111,7 @@ fun SettingsOverviewScreen(
     onNavigateToProfile: () -> Unit,
     onNavigateToAccount: () -> Unit,
     onNavigateToDevices: () -> Unit,
-    onNavigateToWatch: () -> Unit,
+    onNavigateToWatch: (() -> Unit)? = null,
     onNavigateToReset: () -> Unit,
     onNavigateToLocation: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
@@ -174,7 +174,7 @@ fun SettingsOverviewContent(
     onNavigateToProfile: () -> Unit,
     onNavigateToAccount: () -> Unit,
     onNavigateToDevices: () -> Unit,
-    onNavigateToWatch: () -> Unit = {},
+    onNavigateToWatch: (() -> Unit)? = null,
     onNavigateToReset: () -> Unit,
     onNavigateToLocation: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
@@ -306,12 +306,14 @@ fun SettingsOverviewContent(
                     icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
                     onClick = onNavigateToLocation,
                 )
-                SettingsNavigationItem(
-                    title = stringResource(Res.string.watch_settings),
-                    description = stringResource(Res.string.watch_settings_description),
-                    icon = { Icon(Icons.Default.Watch, contentDescription = null) },
-                    onClick = onNavigateToWatch,
-                )
+                onNavigateToWatch?.let { navigateToWatch ->
+                    SettingsNavigationItem(
+                        title = stringResource(Res.string.watch_settings),
+                        description = stringResource(Res.string.watch_settings_description),
+                        icon = { Icon(Icons.Default.Watch, contentDescription = null) },
+                        onClick = navigateToWatch,
+                    )
+                }
                 onNavigateToNotifications?.let { navigateToNotifications ->
                     SettingsNavigationItem(
                         title = stringResource(Res.string.notifications_settings),
