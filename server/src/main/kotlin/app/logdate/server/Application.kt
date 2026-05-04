@@ -297,37 +297,24 @@ fun Application.module(
             }
         }
 
+        // Single /health route. The public payload is intentionally minimal so
+        // the open internet learns nothing about the deployment's internal
+        // state. An internal monitor presenting a valid X-LogDate-Health-Token
+        // (matching env HEALTH_INTERNAL_TOKEN) gets the same payload plus
+        // db_connected, which is the field a monitor actually needs to tell
+        // "JVM bound port 8080" apart from "actually serving requests against
+        // Postgres". A wrong token is silently treated as no token rather than
+        // 401'd — the header is purely additive, so an internal monitor with
+        // a stale token still gets a 200 (and its `db_connected:true`
+        // assertion fails, paging on token rotation). Comparison is
+        // constant-time via MessageDigest.isEqual so a brute-forcer can't time
+        // their way to the secret. See docs/observability/health-endpoint.md.
         get("/health") {
-            call.respond(
-                mapOf(
-                    "status" to "healthy",
-                    "timestamp" to
-                        kotlin.time.Clock.System
-                            .now()
-                            .toString(),
-                    "version" to "1.0.0",
-                ),
-            )
-        }
-
-        // Same shape as /health plus db_connected, which an external monitor
-        // needs to distinguish "JVM bound port 8080" from "actually serving
-        // requests against Postgres". Gated behind a shared-secret header so
-        // the public surface still gives away nothing about the deployment's
-        // internal state. If the token isn't provisioned the route refuses to
-        // answer rather than degrading to a public unauth'd endpoint, and the
-        // comparison is constant-time so a brute-forcer can't time their way
-        // to the secret.
-        get("/health/internal") {
             val provided = call.request.headers["X-LogDate-Health-Token"].orEmpty()
             val tokenMatches =
                 healthInternalToken.isNotEmpty() &&
                     provided.isNotEmpty() &&
                     MessageDigest.isEqual(healthInternalToken.toByteArray(), provided.toByteArray())
-            if (!tokenMatches) {
-                call.respond(HttpStatusCode.NotFound, mapOf("error" to "not found"))
-                return@get
-            }
             call.respond(
                 buildJsonObject {
                     put("status", "healthy")
@@ -338,7 +325,9 @@ fun Application.module(
                             .toString(),
                     )
                     put("version", "1.0.0")
-                    put("db_connected", isDatabaseAvailable)
+                    if (tokenMatches) {
+                        put("db_connected", isDatabaseAvailable)
+                    }
                 },
             )
         }

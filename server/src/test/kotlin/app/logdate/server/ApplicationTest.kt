@@ -55,10 +55,10 @@ class ApplicationTest {
         }
 
     @Test
-    fun testHealthOmitsInternalDetails() =
+    fun testHealthOmitsInternalDetailsWithoutToken() =
         testApplication {
             application {
-                module()
+                module(isDatabaseAvailable = true, healthInternalToken = "shh-secret")
             }
 
             client.get("/health").apply {
@@ -73,48 +73,49 @@ class ApplicationTest {
         }
 
     @Test
-    fun testHealthInternal404sWithoutToken() =
+    fun testHealthOmitsInternalDetailsWithWrongToken() =
         testApplication {
             application {
                 module(isDatabaseAvailable = true, healthInternalToken = "shh-secret")
             }
 
-            client.get("/health/internal").apply {
-                assertEquals(HttpStatusCode.NotFound, status)
-            }
             client
-                .get("/health/internal") {
+                .get("/health") {
                     header("X-LogDate-Health-Token", "wrong")
                 }.apply {
-                    assertEquals(HttpStatusCode.NotFound, status)
+                    assertEquals(HttpStatusCode.OK, status)
+                    val payload = json.parseToJsonElement(bodyAsText()).jsonObject
+                    assertNull(payload["db_connected"], "wrong token must not unlock internals")
                 }
         }
 
     @Test
-    fun testHealthInternal404sWhenTokenUnconfigured() =
+    fun testHealthOmitsInternalDetailsWhenTokenUnconfigured() =
         testApplication {
             application {
                 module(isDatabaseAvailable = true, healthInternalToken = "")
             }
 
-            // Even with the right "any" header, no token configured = no endpoint.
+            // No token configured = even a header-bearing caller stays public.
             client
-                .get("/health/internal") {
+                .get("/health") {
                     header("X-LogDate-Health-Token", "anything")
                 }.apply {
-                    assertEquals(HttpStatusCode.NotFound, status)
+                    assertEquals(HttpStatusCode.OK, status)
+                    val payload = json.parseToJsonElement(bodyAsText()).jsonObject
+                    assertNull(payload["db_connected"])
                 }
         }
 
     @Test
-    fun testHealthInternalReturnsDbConnectedWithCorrectToken() =
+    fun testHealthIncludesDbConnectedWithCorrectToken() =
         testApplication {
             application {
                 module(isDatabaseAvailable = true, healthInternalToken = "shh-secret")
             }
 
             client
-                .get("/health/internal") {
+                .get("/health") {
                     header("X-LogDate-Health-Token", "shh-secret")
                 }.apply {
                     assertEquals(HttpStatusCode.OK, status)
