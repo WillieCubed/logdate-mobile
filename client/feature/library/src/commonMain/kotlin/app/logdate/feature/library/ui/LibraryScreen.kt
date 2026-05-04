@@ -38,7 +38,7 @@ import kotlin.uuid.Uuid
 fun LibraryScreen(
     onOpenMediaDetail: (Uuid) -> Unit,
     onOpenSearch: () -> Unit = {},
-    onOpenPostcards: () -> Unit = {},
+    onOpenPostcards: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = koinViewModel(),
 ) {
@@ -75,7 +75,7 @@ fun LibraryScreenContent(
     columnCount: Int,
     onItemClick: (Uuid) -> Unit,
     onOpenSearch: () -> Unit = {},
-    onOpenPostcards: () -> Unit = {},
+    onOpenPostcards: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -95,23 +95,25 @@ fun LibraryScreenContent(
                     .fillMaxSize()
                     .padding(paddingValues),
         ) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                AssistChip(
-                    onClick = onOpenPostcards,
-                    label = { Text("Postcards") },
-                    trailingIcon = {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = null,
-                        )
-                    },
-                )
+            if (onOpenPostcards != null) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    AssistChip(
+                        onClick = onOpenPostcards,
+                        label = { Text("Postcards") },
+                        trailingIcon = {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = null,
+                            )
+                        },
+                    )
+                }
             }
             Box(
                 modifier =

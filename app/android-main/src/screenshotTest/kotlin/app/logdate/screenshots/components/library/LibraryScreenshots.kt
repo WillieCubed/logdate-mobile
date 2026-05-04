@@ -47,6 +47,7 @@ fun LibraryGrid_Content() {
             state = LibraryScreenshotData.gridContent,
             columnCount = 3,
             onItemClick = {},
+            onOpenPostcards = {},
         )
     }
 }
@@ -60,6 +61,7 @@ fun LibraryGrid_Content_Tablet() {
             state = LibraryScreenshotData.gridContent,
             columnCount = 5,
             onItemClick = {},
+            onOpenPostcards = {},
         )
     }
 }
