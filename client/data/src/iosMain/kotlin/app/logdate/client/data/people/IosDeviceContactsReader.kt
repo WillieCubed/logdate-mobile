@@ -4,12 +4,7 @@ package app.logdate.client.data.people
 
 import app.logdate.client.repository.knowledge.DeviceContact
 import app.logdate.client.repository.knowledge.DeviceContactsReader
-import io.github.aakira.napier.Napier
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.ObjCObjectVar
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.ptr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import platform.Contacts.CNContact
@@ -18,7 +13,6 @@ import platform.Contacts.CNContactFetchRequest
 import platform.Contacts.CNContactGivenNameKey
 import platform.Contacts.CNContactNicknameKey
 import platform.Contacts.CNContactStore
-import platform.Foundation.NSError
 
 /**
  * Reads contacts from the user's iOS address book using the Contacts framework. Permission
@@ -40,19 +34,12 @@ class IosDeviceContactsReader : DeviceContactsReader {
                 )
             val request = CNContactFetchRequest(keysToFetch = keys)
             val collected = mutableListOf<DeviceContact>()
-            memScoped {
-                val errorVar: ObjCObjectVar<NSError?> = alloc()
-                store.enumerateContactsWithFetchRequest(
-                    fetchRequest = request,
-                    error = errorVar.ptr,
-                ) { contact, _ ->
-                    if (contact != null) {
-                        contact.toDeviceContact()?.let(collected::add)
-                    }
-                }
-                val error = errorVar.value
-                if (error != null) {
-                    Napier.w("CNContactStore enumeration failed: ${error.localizedDescription}")
+            store.enumerateContactsWithFetchRequest(
+                fetchRequest = request,
+                error = null,
+            ) { contact, _ ->
+                if (contact != null) {
+                    contact.toDeviceContact()?.let(collected::add)
                 }
             }
             collected
