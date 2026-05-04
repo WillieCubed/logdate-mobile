@@ -41,7 +41,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[bio] = account.bio
                     it[lastSignInAt] = account.lastSignInAt
                     it[isActive] = account.isActive
-                    it[preferences] = account.preferences?.toString() ?: "{}"
+                    it[preferences] = account.preferences ?: "{}"
                 }
                 account
             } else {
@@ -60,7 +60,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[createdAt] = account.createdAt
                     it[lastSignInAt] = account.lastSignInAt
                     it[isActive] = account.isActive
-                    it[preferences] = account.preferences?.toString() ?: "{}"
+                    it[preferences] = account.preferences ?: "{}"
                 }
                 account
             }
