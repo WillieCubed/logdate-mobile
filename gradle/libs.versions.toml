@@ -70,6 +70,7 @@ multiplatformMarkdownRenderer = "0.40.2"
 webauthn4j = "0.31.0.RELEASE"
 jwtKt = "1.2.1"
 bouncycastle = "1.84"
+appStoreServerLibrary = "3.5.0"
 
 # MLKit
 mlkit-subject-segmentation = "16.0.0-beta1"
@@ -260,6 +261,7 @@ webauthn4j = { group = "com.webauthn4j", name = "webauthn4j-core", version.ref =
 # JWT (Kotlin Multiplatform)
 jwtKt = { group = "com.appstractive", name = "jwt-kt", version.ref = "jwtKt" }
 bouncycastle-bcprov = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
+appStoreServerLibrary = { group = "com.apple.itunes.storekit", name = "app-store-server-library", version.ref = "appStoreServerLibrary" }
 
 # Database Libraries
 exposed-core = { group = "org.jetbrains.exposed", name = "exposed-core", version.ref = "exposed" }
@@ -269,6 +271,7 @@ exposed-kotlin-datetime = { group = "org.jetbrains.exposed", name = "exposed-kot
 postgresql = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
 hikariCP = { group = "com.zaxxer", name = "HikariCP", version.ref = "hikariCP" }
 jackson-dataformat-yaml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml", version.ref = "jackson" }
+swagger-core = { module = "io.swagger.core.v3:swagger-core", version = "2.2.34" }
 flyway-core = { group = "org.flywaydb", name = "flyway-core", version.ref = "flyway" }
 flyway-database-postgresql = { group = "org.flywaydb", name = "flyway-database-postgresql", version.ref = "flyway" }
 
