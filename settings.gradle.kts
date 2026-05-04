@@ -116,4 +116,13 @@ include(":shared:model")
 include(":server")
 include(":integration:server-client-e2e")
 // Sample apps
-include(":samples:atproto-consumer")
+// :samples:atproto-consumer is intentionally excluded until step 9g of the
+// operational hardening plan publishes studio.hypertext.atproto:* to either
+// mavenLocal (locally) or Maven Central (CI). It depends on those Maven
+// coordinates rather than project deps so it acts as a real consumer of the
+// published library — but until publishing is wired, the module can't resolve
+// its own classpath, which crashes the configuration cache when CI's root
+// `./gradlew test` walks into it. Re-enable once
+// `./gradlew :shared:atproto-bom:publishToMavenLocal` (and friends) is part
+// of the build flow.
+// include(":samples:atproto-consumer")
