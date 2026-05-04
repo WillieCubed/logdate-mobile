@@ -65,16 +65,21 @@ class AppViewModel(
 
     init {
         viewModelScope.launch {
+            var isInitialEmission = true
             userStateRepository.userData.collect { userData ->
-                val previousLevel = securityLevelState.value
                 val newLevel = userData.securityLevel
                 securityLevelState.value = newLevel
 
-                if (newLevel != AppSecurityLevel.BIOMETRIC) {
-                    appLockState.value = AppLockState.Unlocked
-                } else if (previousLevel != AppSecurityLevel.BIOMETRIC) {
-                    appLockState.value = AppLockState.Locked
+                when {
+                    newLevel != AppSecurityLevel.BIOMETRIC ->
+                        appLockState.value = AppLockState.Unlocked
+                    isInitialEmission ->
+                        appLockState.value = AppLockState.Locked
+                    // Mid-session toggle to BIOMETRIC: leave the lock state alone.
+                    // The user just authenticated to enable the setting; the lock will
+                    // re-assert on next backgrounding or cold start.
                 }
+                isInitialEmission = false
             }
         }
 

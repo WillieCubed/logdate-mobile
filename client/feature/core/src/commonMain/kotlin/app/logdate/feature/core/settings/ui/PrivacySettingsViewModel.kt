@@ -8,6 +8,8 @@ import app.logdate.client.domain.account.CreatePasskeyUseCase
 import app.logdate.client.domain.account.DeletePasskeyUseCase
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.feature.core.AppAuthState
+import app.logdate.feature.core.BiometricGatekeeper
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.user.AppSecurityLevel
 import kotlinx.coroutines.flow.Flow
@@ -46,6 +48,7 @@ class PrivacySettingsViewModel(
     private val getCurrentAccountUseCase: GetCurrentAccountUseCase,
     private val createPasskeyUseCase: CreatePasskeyUseCase,
     private val deletePasskeyUseCase: DeletePasskeyUseCase,
+    private val biometricGatekeeper: BiometricGatekeeper,
     private val supportsSystemSearchVisibilityToggle: Boolean = false,
 ) : ViewModel() {
     private val _passkeyCreationState = MutableStateFlow<PasskeyCreationState>(PasskeyCreationState.Idle)
@@ -92,9 +95,24 @@ class PrivacySettingsViewModel(
         )
 
     fun setBiometricEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            userStateRepository.setBiometricEnabled(enabled)
+        if (!enabled) {
+            viewModelScope.launch {
+                userStateRepository.setBiometricEnabled(false)
+            }
+            return
         }
+        biometricGatekeeper.authenticate(
+            title = "Enable biometric lock",
+            subtitle = "Authenticate to turn on biometric lock",
+            description = "LogDate will require biometrics or your device passcode to unlock.",
+            onResult = { result ->
+                if (result == AppAuthState.AUTHENTICATED) {
+                    viewModelScope.launch {
+                        userStateRepository.setBiometricEnabled(true)
+                    }
+                }
+            },
+        )
     }
 
     fun setSystemSearchVisibilityEnabled(enabled: Boolean) {

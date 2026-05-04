@@ -27,6 +27,7 @@ interface BiometricGatekeeper {
         requireConfirmation: Boolean = false,
         requestEnrollmentIfNecessary: Boolean = true,
         description: String? = null,
+        onResult: (AppAuthState) -> Unit = {},
     )
 
     /**

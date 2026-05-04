@@ -31,23 +31,6 @@ class AndroidBiometricGatekeeper(
 
     override val authState: StateFlow<AppAuthState> = _authState
 
-    private val biometricRequestCallback =
-        object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationError(
-                errorCode: Int,
-                errString: CharSequence,
-            ) {
-                super.onAuthenticationError(errorCode, errString)
-                Napier.e("Biometric authentication error: $errorCode, $errString", tag = TAG)
-                _authState.value = AppAuthState.REQUIRE_PROMPT
-            }
-
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                super.onAuthenticationSucceeded(result)
-                _authState.value = AppAuthState.AUTHENTICATED
-            }
-        }
-
     /**
      * Authenticates the user using biometric authentication.
      *
@@ -61,9 +44,28 @@ class AndroidBiometricGatekeeper(
         requireConfirmation: Boolean,
         requestEnrollmentIfNecessary: Boolean,
         description: String?,
+        onResult: (AppAuthState) -> Unit,
     ) {
         val biometricManager = BiometricManager.from(activity)
         val executor = ContextCompat.getMainExecutor(activity)
+        val callback =
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationError(
+                    errorCode: Int,
+                    errString: CharSequence,
+                ) {
+                    super.onAuthenticationError(errorCode, errString)
+                    Napier.e("Biometric authentication error: $errorCode, $errString", tag = TAG)
+                    _authState.value = AppAuthState.REQUIRE_PROMPT
+                    onResult(AppAuthState.REQUIRE_PROMPT)
+                }
+
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    _authState.value = AppAuthState.AUTHENTICATED
+                    onResult(AppAuthState.AUTHENTICATED)
+                }
+            }
         when (
             biometricManager.canAuthenticate(
                 BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL,
@@ -71,7 +73,7 @@ class AndroidBiometricGatekeeper(
         ) {
             BiometricManager.BIOMETRIC_SUCCESS -> {
                 Napier.d("App can authenticate using biometrics.", tag = TAG)
-                BiometricPrompt(activity, executor, biometricRequestCallback).authenticate(
+                BiometricPrompt(activity, executor, callback).authenticate(
                     BiometricPrompt.PromptInfo
                         .Builder()
                         .setTitle(title)
@@ -89,14 +91,18 @@ class AndroidBiometricGatekeeper(
                 )
             }
 
-            BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE ->
+            BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> {
                 Napier.e(
                     "Biometric features are currently unavailable.",
                     tag = TAG,
                 )
+                _authState.value = AppAuthState.UNSUPPORTED
+                onResult(AppAuthState.UNSUPPORTED)
+            }
 
             BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
                 _authState.value = AppAuthState.REQUEST_ENROLLMENT
+                onResult(AppAuthState.REQUEST_ENROLLMENT)
                 if (requestEnrollmentIfNecessary) {
                     requestEnrollment()
                 }
@@ -111,10 +117,12 @@ class AndroidBiometricGatekeeper(
                     tag = TAG,
                 )
                 _authState.value = AppAuthState.UNSUPPORTED
+                onResult(AppAuthState.UNSUPPORTED)
             }
 
             BiometricManager.BIOMETRIC_STATUS_UNKNOWN -> {
                 _authState.value = AppAuthState.UNKNOWN
+                onResult(AppAuthState.UNKNOWN)
             }
         }
     }

@@ -19,6 +19,7 @@ class StubBiometricGatekeeper : BiometricGatekeeper {
         requireConfirmation: Boolean,
         requestEnrollmentIfNecessary: Boolean,
         description: String?,
+        onResult: (AppAuthState) -> Unit,
     ) {
         // no-op
     }

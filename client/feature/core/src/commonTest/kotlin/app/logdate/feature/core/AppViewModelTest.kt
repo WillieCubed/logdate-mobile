@@ -10,6 +10,7 @@ import app.logdate.client.repository.account.AccountCreationRequest
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.user.AppSecurityLevel
 import app.logdate.shared.model.user.UserData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -118,6 +119,79 @@ class AppViewModelTest {
         }
 
     @Test
+    fun `app starts locked when biometric security is already enabled`() =
+        runTest {
+            val viewModel =
+                AppViewModel(
+                    userStateRepository =
+                        FakeUserStateRepository(
+                            UserData(isOnboarded = true, securityLevel = AppSecurityLevel.BIOMETRIC),
+                        ),
+                    biometricGatekeeper = FakeBiometricGatekeeper(),
+                    networkMonitor = FakeNetworkAvailabilityMonitor(isAvailable = true),
+                    sessionStorage = FakeSessionStorage(),
+                    tryRestoreSignInUseCase = TryRestoreSignInUseCase(FakePasskeyAccountRepository()),
+                )
+
+            advanceUntilIdle()
+
+            val state = assertIs<GlobalAppUiLoadedState>(viewModel.uiState.value)
+            assertEquals(true, state.requiresUnlock)
+        }
+
+    @Test
+    fun `enabling biometric mid-session does not lock the app`() =
+        runTest {
+            val userRepo =
+                FakeUserStateRepository(
+                    UserData(isOnboarded = true, securityLevel = AppSecurityLevel.NONE),
+                )
+            val viewModel =
+                AppViewModel(
+                    userStateRepository = userRepo,
+                    biometricGatekeeper = FakeBiometricGatekeeper(),
+                    networkMonitor = FakeNetworkAvailabilityMonitor(isAvailable = true),
+                    sessionStorage = FakeSessionStorage(),
+                    tryRestoreSignInUseCase = TryRestoreSignInUseCase(FakePasskeyAccountRepository()),
+                )
+            advanceUntilIdle()
+
+            userRepo.setUserData(
+                UserData(isOnboarded = true, securityLevel = AppSecurityLevel.BIOMETRIC),
+            )
+            advanceUntilIdle()
+
+            val state = assertIs<GlobalAppUiLoadedState>(viewModel.uiState.value)
+            assertEquals(false, state.requiresUnlock)
+        }
+
+    @Test
+    fun `disabling biometric unlocks the app`() =
+        runTest {
+            val userRepo =
+                FakeUserStateRepository(
+                    UserData(isOnboarded = true, securityLevel = AppSecurityLevel.BIOMETRIC),
+                )
+            val viewModel =
+                AppViewModel(
+                    userStateRepository = userRepo,
+                    biometricGatekeeper = FakeBiometricGatekeeper(),
+                    networkMonitor = FakeNetworkAvailabilityMonitor(isAvailable = true),
+                    sessionStorage = FakeSessionStorage(),
+                    tryRestoreSignInUseCase = TryRestoreSignInUseCase(FakePasskeyAccountRepository()),
+                )
+            advanceUntilIdle()
+
+            userRepo.setUserData(
+                UserData(isOnboarded = true, securityLevel = AppSecurityLevel.NONE),
+            )
+            advanceUntilIdle()
+
+            val state = assertIs<GlobalAppUiLoadedState>(viewModel.uiState.value)
+            assertEquals(false, state.requiresUnlock)
+        }
+
+    @Test
     fun `cloud restore sign-in attempts once when launched repeatedly`() =
         runTest {
             val passkeyAccountRepository = FakePasskeyAccountRepository()
@@ -140,13 +214,21 @@ class AppViewModelTest {
     private class FakeUserStateRepository(
         initialValue: UserData,
     ) : UserStateRepository {
-        override val userData: StateFlow<UserData> = MutableStateFlow(initialValue)
+        private val _userData = MutableStateFlow(initialValue)
+        override val userData: StateFlow<UserData> = _userData
+
+        fun setUserData(value: UserData) {
+            _userData.value = value
+        }
 
         override suspend fun setBirthday(birthday: Instant) {}
 
         override suspend fun setIsOnboardingComplete(isComplete: Boolean) {}
 
-        override suspend fun setBiometricEnabled(isEnabled: Boolean) {}
+        override suspend fun setBiometricEnabled(isEnabled: Boolean) {
+            val level = if (isEnabled) AppSecurityLevel.BIOMETRIC else AppSecurityLevel.NONE
+            _userData.value = _userData.value.copy(securityLevel = level)
+        }
 
         override suspend fun addFavoriteNote(vararg noteId: String) {}
     }
@@ -161,6 +243,7 @@ class AppViewModelTest {
             requireConfirmation: Boolean,
             requestEnrollmentIfNecessary: Boolean,
             description: String?,
+            onResult: (AppAuthState) -> Unit,
         ) {
         }
 
