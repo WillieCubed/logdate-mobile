@@ -55,7 +55,7 @@ material3AdaptiveNav3 = "1.3.0-alpha10"
 # resolution fails. Retry once JetBrains pushes a stable runtime that matches the UI
 # version, then wire from `app/compose-main/build.gradle.kts` and start the migration
 # from `androidx.navigation.compose`.
-jetbrains-navigation3 = "1.0.0-alpha05"
+jetbrains-navigation3 = "1.1.0-alpha04"
 jetbrains-lifecycleViewmodelNav3 = "2.10.0-alpha05"
 jetbrains-material3AdaptiveNav3Mp = "1.3.0-alpha02"
 # Google-published canonical Navigation 3. -runtime is KMP since 1.0.0-alpha08 (JVM,
