@@ -1,31 +1,17 @@
 package app.logdate.feature.library.navigation
 
-import androidx.navigation.NavController
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.compose.composable
-import androidx.navigation.toRoute
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.library.ui.LibraryScreen
 import app.logdate.feature.library.ui.detail.MediaDetailScreen
+import app.logdate.ui.navigation.taggedEntry
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
-/**
- * Route for the Library overview screen (Navigation Compose 2).
- */
 @Serializable
 data object LibraryOverviewRoute : NavKey
 
-/**
- * Navigates to the Library overview screen.
- */
-fun NavController.navigateToLibrary() {
-    navigate(LibraryOverviewRoute)
-}
-
-/**
- * A route corresponding to the media detail screen.
- */
 @Serializable
 data class MediaDetailRoute(
     val id: String,
@@ -33,31 +19,38 @@ data class MediaDetailRoute(
     constructor(id: Uuid) : this(id.toString())
 }
 
-/**
- * Navigates to the media detail screen.
- */
-fun NavController.navigateToMediaDetail(mediaId: Uuid) {
-    navigate(MediaDetailRoute(mediaId))
+/** Pushes the Library overview onto the back stack. */
+fun NavBackStack<NavKey>.navigateToLibrary() {
+    add(LibraryOverviewRoute)
 }
 
-/**
- * Registers the Library overview route in a NavGraphBuilder.
- */
-fun NavGraphBuilder.libraryRoute(onOpenMediaDetail: (Uuid) -> Unit) {
-    composable<LibraryOverviewRoute> {
+/** Pushes the Media detail viewer onto the back stack. */
+fun NavBackStack<NavKey>.navigateToMediaDetail(mediaId: Uuid) {
+    add(MediaDetailRoute(mediaId))
+}
+
+/** Registers the Library overview entry. */
+fun EntryProviderScope<NavKey>.libraryOverviewEntry(onOpenMediaDetail: (Uuid) -> Unit) {
+    taggedEntry<LibraryOverviewRoute> {
         LibraryScreen(onOpenMediaDetail = onOpenMediaDetail)
     }
 }
 
-/**
- * Registers the media detail route in a NavGraphBuilder.
- */
-fun NavGraphBuilder.mediaDetailRoute(onGoBack: () -> Unit) {
-    composable<MediaDetailRoute> { backStackEntry ->
-        val route = backStackEntry.toRoute<MediaDetailRoute>()
+/** Registers the Media detail entry. */
+fun EntryProviderScope<NavKey>.mediaDetailEntry(onBack: () -> Unit) {
+    taggedEntry<MediaDetailRoute> { route ->
         MediaDetailScreen(
             mediaId = Uuid.parse(route.id),
-            onBack = onGoBack,
+            onBack = onBack,
         )
     }
+}
+
+/** Convenience to register both Library entries at once. */
+fun EntryProviderScope<NavKey>.libraryEntries(
+    onOpenMediaDetail: (Uuid) -> Unit,
+    onBack: () -> Unit,
+) {
+    libraryOverviewEntry(onOpenMediaDetail = onOpenMediaDetail)
+    mediaDetailEntry(onBack = onBack)
 }

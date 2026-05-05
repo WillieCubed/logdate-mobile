@@ -1,14 +1,13 @@
 package app.logdate.feature.core.account.navigation
 
 import androidx.compose.runtime.LaunchedEffect
-import androidx.navigation.NavController
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.compose.composable
-import androidx.navigation.toRoute
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.core.account.CloudAccountOnboardingScreen
 import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.feature.core.account.OnboardingStep
+import app.logdate.ui.navigation.taggedEntry
 import kotlinx.serialization.Serializable
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -19,20 +18,23 @@ import org.koin.compose.viewmodel.koinViewModel
  * jump directly to the sign-in step instead of starting at the welcome screen.
  */
 @Serializable
-data class CloudAccountSetupRoute(val startOnSignIn: Boolean = false) : NavKey
+data class CloudAccountSetupRoute(
+    val startOnSignIn: Boolean = false,
+) : NavKey
 
-fun NavController.navigateToCloudAccountSetup(startOnSignIn: Boolean = false) {
-    navigate(CloudAccountSetupRoute(startOnSignIn = startOnSignIn))
+/** Pushes the cloud account setup flow. */
+fun NavBackStack<NavKey>.navigateToCloudAccountSetup(startOnSignIn: Boolean = false) {
+    add(CloudAccountSetupRoute(startOnSignIn = startOnSignIn))
 }
 
-fun NavGraphBuilder.cloudAccountSetupRoute(
+/** Registers the cloud account setup entry. */
+fun EntryProviderScope<NavKey>.cloudAccountSetupEntry(
     onAccountCreated: () -> Unit,
     onSkipped: () -> Unit,
     onBack: () -> Unit,
 ) {
-    composable<CloudAccountSetupRoute> { entry ->
+    taggedEntry<CloudAccountSetupRoute> { route ->
         val viewModel: CloudAccountOnboardingViewModel = koinViewModel()
-        val route = entry.toRoute<CloudAccountSetupRoute>()
         LaunchedEffect(route.startOnSignIn) {
             if (route.startOnSignIn) {
                 viewModel.setInitialStep(OnboardingStep.SignIn)

@@ -1,22 +1,13 @@
-@file:OptIn(ExperimentalSharedTransitionApi::class)
-
 package app.logdate.feature.journals.navigation
 
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.navigation.NavController
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.compose.composable
-import androidx.navigation.toRoute
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.journals.ui.settings.JournalSettingsScreen
-import app.logdate.ui.LocalNavAnimatedVisibilityScope
+import app.logdate.ui.navigation.taggedEntry
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
-/**
- * Route for the journal settings screen.
- */
 @Serializable
 data class JournalSettingsRoute(
     val journalId: String,
@@ -24,41 +15,21 @@ data class JournalSettingsRoute(
     constructor(journalId: Uuid) : this(journalId.toString())
 }
 
-/**
- * Navigates to the journal settings screen.
- *
- * @param journalId The ID of the journal to configure.
- */
-fun NavController.navigateToJournalSettings(journalId: Uuid) {
-    navigate(JournalSettingsRoute(journalId))
+/** Pushes the journal settings screen. */
+fun NavBackStack<NavKey>.navigateToJournalSettings(journalId: Uuid) {
+    add(JournalSettingsRoute(journalId))
 }
 
-/**
- * Defines the journal settings route.
- *
- * @deprecated In favor of Navigation 3
- */
-fun NavGraphBuilder.journalSettingsRoute(
-    onGoBack: () -> Unit,
-    onJournalDeleted: () -> Unit = {},
+/** Registers the journal settings entry. */
+fun EntryProviderScope<NavKey>.journalSettingsEntry(
+    onBack: () -> Unit,
+    onJournalDeleted: () -> Unit,
 ) {
-    composable<JournalSettingsRoute>(
-        enterTransition = legacyJournalForwardEnterTransition,
-        exitTransition = legacyJournalForwardExitTransition,
-        popEnterTransition = legacyJournalPopEnterTransition,
-        popExitTransition = legacyJournalPopExitTransition,
-    ) { backStackEntry ->
-        val route = backStackEntry.savedStateHandle.toRoute<JournalSettingsRoute>()
-        val journalId = Uuid.parse(route.journalId)
-
-        CompositionLocalProvider(
-            LocalNavAnimatedVisibilityScope provides this,
-        ) {
-            JournalSettingsScreen(
-                journalId = journalId,
-                onGoBack = onGoBack,
-                onJournalDeleted = onJournalDeleted,
-            )
-        }
+    taggedEntry<JournalSettingsRoute> { route ->
+        JournalSettingsScreen(
+            journalId = Uuid.parse(route.journalId),
+            onGoBack = onBack,
+            onJournalDeleted = onJournalDeleted,
+        )
     }
 }

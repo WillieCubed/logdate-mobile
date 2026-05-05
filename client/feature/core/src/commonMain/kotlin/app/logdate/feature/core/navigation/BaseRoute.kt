@@ -1,33 +1,12 @@
 package app.logdate.feature.core.navigation
 
-import androidx.navigation.NavController
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.compose.composable
 import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
 /**
- * The starting route of the app.
- *
- * This route should be used as a starting destination while the client is initializing resources
- * to navigate to the actual starting destination.
- *
- * @see navigateToStart
- * @see landingDestination
+ * Initial back-stack entry pushed while the app is bootstrapping resources. `LogDateNavDisplay`
+ * registers a no-op entry for this key; the launch lifecycle replaces the entry with
+ * `OnboardingStart` or `HomeRoute` once the global UI state resolves.
  */
 @Serializable
 data object BaseRoute : NavKey
-
-/**
- * Navigates to the starting route of the app.
- */
-fun NavController.navigateToStart() = navigate(BaseRoute)
-
-/**
- * Stub destination for the base route.
- */
-fun NavGraphBuilder.landingDestination() {
-    composable<BaseRoute> {
-        // No-op
-    }
-}

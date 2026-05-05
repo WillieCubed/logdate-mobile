@@ -31,7 +31,12 @@ class PlatformSanityE2ETest {
             application { module() }
             val response = client.get("/")
             assertEquals(HttpStatusCode.OK, response.status)
-            assertEquals("LogDate Server API v1.0", response.bodyAsText())
+            // Root now returns a JSON descriptor for non-browser callers
+            // and the landing-page HTML when Accept: text/html is sent. The
+            // earlier "LogDate Server API v1.0" literal is gone — see
+            // server/src/main/kotlin/app/logdate/server/Application.kt and
+            // ApplicationTest for the per-shape coverage.
+            assertTrue(response.bodyAsText().contains("LogDate Server API"))
         }
 
     @Test

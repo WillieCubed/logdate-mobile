@@ -51,7 +51,10 @@ class ApplicationLifecycleBehaviorTest {
 
     @Test
     fun `profileAwareBoolEnv supports true yes and one and falls back to default`() {
-        fun call(value: String?, default: Boolean): Boolean =
+        fun call(
+            value: String?,
+            default: Boolean,
+        ): Boolean =
             profileAwareBoolEnv(
                 name = "X",
                 productionDefault = default,
@@ -109,7 +112,7 @@ class ApplicationLifecycleBehaviorTest {
                         when (name) {
                             "SYNC_TOMBSTONE_PURGE_ENABLED" -> "true"
                             "SYNC_TOMBSTONE_RETENTION_DAYS" -> "2"
-                            "SYNC_TOMBSTONE_PURGE_INTERVAL_HOURS" -> "1"
+                            "SYNC_TOMBSTONE_PURGE_INTERVAL_MINUTES" -> "1"
                             else -> null
                         }
                     },
@@ -119,7 +122,7 @@ class ApplicationLifecycleBehaviorTest {
             runBlocking {
                 withTimeout(2_000) { started.await() }
                 withTimeout(2_000) {
-                    while (metrics.snapshot().operations.none { it.name == "sync.maintenance.purge" }) {
+                    while (metrics.snapshot().operations.none { it.name == "maintenance.tombstone_purge" }) {
                         delay(10)
                     }
                 }
@@ -129,7 +132,7 @@ class ApplicationLifecycleBehaviorTest {
                 job.join()
             }
 
-            val op = metrics.snapshot().operations.first { it.name == "sync.maintenance.purge" }
+            val op = metrics.snapshot().operations.first { it.name == "maintenance.tombstone_purge" }
             assertTrue(op.successCount >= 1)
         }
 
@@ -158,7 +161,7 @@ class ApplicationLifecycleBehaviorTest {
                         when (name) {
                             "SYNC_TOMBSTONE_PURGE_ENABLED" -> "true"
                             "SYNC_TOMBSTONE_RETENTION_DAYS" -> "2"
-                            "SYNC_TOMBSTONE_PURGE_INTERVAL_HOURS" -> "1"
+                            "SYNC_TOMBSTONE_PURGE_INTERVAL_MINUTES" -> "1"
                             else -> null
                         }
                     },
@@ -168,7 +171,7 @@ class ApplicationLifecycleBehaviorTest {
             runBlocking {
                 withTimeout(2_000) { started.await() }
                 withTimeout(2_000) {
-                    while (metrics.snapshot().operations.none { it.name == "sync.maintenance.purge" }) {
+                    while (metrics.snapshot().operations.none { it.name == "maintenance.tombstone_purge" }) {
                         delay(10)
                     }
                 }
@@ -178,7 +181,7 @@ class ApplicationLifecycleBehaviorTest {
                 job.join()
             }
 
-            val op = metrics.snapshot().operations.first { it.name == "sync.maintenance.purge" }
+            val op = metrics.snapshot().operations.first { it.name == "maintenance.tombstone_purge" }
             assertTrue(op.errorCount >= 1)
         }
 
@@ -198,7 +201,7 @@ class ApplicationLifecycleBehaviorTest {
                     readEnv = { name ->
                         when (name) {
                             "SYNC_TOMBSTONE_PURGE_ENABLED" -> "true"
-                            "SYNC_TOMBSTONE_PURGE_INTERVAL_HOURS" -> "1"
+                            "SYNC_TOMBSTONE_PURGE_INTERVAL_MINUTES" -> "1"
                             else -> null
                         }
                     },
@@ -210,5 +213,4 @@ class ApplicationLifecycleBehaviorTest {
                 job.join()
             }
         }
-
 }

@@ -1,44 +1,32 @@
 package app.logdate.feature.journals.navigation
 
-import androidx.navigation.NavController
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.compose.composable
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.journals.ui.creation.JournalCreationScreen
+import app.logdate.ui.navigation.taggedEntry
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
-/**
- * Route for creating a new journal.
- */
 @Serializable
 data class JournalCreationRoute(
     val journalTitle: String = "",
 ) : NavKey
 
-/**
- * Navigates to the journal creation screen.
- */
-fun NavController.navigateToJournalCreation() {
-    navigate(JournalCreationRoute())
+/** Pushes the journal creation screen. */
+fun NavBackStack<NavKey>.navigateToJournalCreation() {
+    add(JournalCreationRoute())
 }
 
-/**
- * Defines the navigation graph for creating a new journal.
- */
-fun NavGraphBuilder.newJournalRoute(
-    onGoBack: () -> Unit,
-    onCreateJournal: (journalId: Uuid) -> Unit,
+/** Registers the journal creation entry. */
+fun EntryProviderScope<NavKey>.journalCreationEntry(
+    onBack: () -> Unit,
+    onJournalCreated: (Uuid) -> Unit,
 ) {
-    composable<JournalCreationRoute>(
-        enterTransition = legacyJournalForwardEnterTransition,
-        exitTransition = legacyJournalForwardExitTransition,
-        popEnterTransition = legacyJournalPopEnterTransition,
-        popExitTransition = legacyJournalPopExitTransition,
-    ) {
+    taggedEntry<JournalCreationRoute> {
         JournalCreationScreen(
-            onGoBack = onGoBack,
-            onJournalCreated = onCreateJournal,
+            onGoBack = onBack,
+            onJournalCreated = onJournalCreated,
         )
     }
 }

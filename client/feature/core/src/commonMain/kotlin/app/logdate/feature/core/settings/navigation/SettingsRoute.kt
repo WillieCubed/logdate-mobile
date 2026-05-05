@@ -96,7 +96,9 @@ data object PeopleDirectoryRoute : NavKey
 data object PeopleInboxRoute : NavKey
 
 @Serializable
-data class PersonDetailRoute(val personId: String) : NavKey {
+data class PersonDetailRoute(
+    val personId: String,
+) : NavKey {
     constructor(personId: kotlin.uuid.Uuid) : this(personId.toString())
 }
 
@@ -108,3 +110,9 @@ data object LocationIntervalRoute : NavKey
 
 @Serializable
 data object LocationAdvancedRoute : NavKey
+
+@Serializable
+data object WatchSettingsRoute : NavKey
+
+@Serializable
+data object WatchTroubleshootingRoute : NavKey

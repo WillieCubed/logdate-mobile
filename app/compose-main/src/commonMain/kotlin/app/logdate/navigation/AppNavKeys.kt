@@ -41,6 +41,8 @@ import app.logdate.feature.core.settings.navigation.StreakSettingsRoute
 import app.logdate.feature.core.settings.navigation.SyncSettingsRoute
 import app.logdate.feature.core.settings.navigation.TimelineSettingsRoute
 import app.logdate.feature.core.settings.navigation.VoiceNotesSettingsRoute
+import app.logdate.feature.core.settings.navigation.WatchSettingsRoute
+import app.logdate.feature.core.settings.navigation.WatchTroubleshootingRoute
 import app.logdate.feature.core.sync.navigation.SyncIssuesRoute
 import app.logdate.feature.editor.navigation.EntryEditorRoute
 import app.logdate.feature.events.navigation.EventDetailRoute
@@ -151,6 +153,8 @@ val appNavSavedStateConfiguration: SavedStateConfiguration =
                     subclass(PeopleDirectoryRoute::class, PeopleDirectoryRoute.serializer())
                     subclass(PeopleInboxRoute::class, PeopleInboxRoute.serializer())
                     subclass(PersonDetailRoute::class, PersonDetailRoute.serializer())
+                    subclass(WatchSettingsRoute::class, WatchSettingsRoute.serializer())
+                    subclass(WatchTroubleshootingRoute::class, WatchTroubleshootingRoute.serializer())
 
                     // Cloud account flow
                     subclass(CloudAccountSetupRoute::class, CloudAccountSetupRoute.serializer())

@@ -1,49 +1,71 @@
-@file:OptIn(ExperimentalSharedTransitionApi::class)
-
 package app.logdate.feature.journals.navigation
 
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.navigation.NavController
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.compose.composable
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
-import app.logdate.ui.LocalNavAnimatedVisibilityScope
+import app.logdate.ui.navigation.taggedEntry
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
-/**
- * Route for the journals overview screen.
- */
 @Serializable
 data object JournalsOverviewRoute : NavKey
 
-/**
- * Navigates to the journals overview screen.
- */
-fun NavController.navigateToJournalsOverview() {
-    navigate(JournalsOverviewRoute)
+/** Pushes the journals overview list. */
+fun NavBackStack<NavKey>.navigateToJournalsOverview() {
+    add(JournalsOverviewRoute)
+}
+
+/** Registers the journals overview entry. */
+fun EntryProviderScope<NavKey>.journalsOverviewEntry(
+    onOpenJournal: (Uuid) -> Unit,
+    onCreateJournal: () -> Unit,
+    onBrowseJournals: () -> Unit = {},
+) {
+    taggedEntry<JournalsOverviewRoute> {
+        JournalsOverviewScreen(
+            onOpenJournal = onOpenJournal,
+            onBrowseJournals = onBrowseJournals,
+            onCreateJournal = onCreateJournal,
+        )
+    }
 }
 
 /**
- * Defines the journals overview route.
+ * Convenience that registers every journal-related entry: overview, detail, settings,
+ * creation, share, and note viewer. Callers supply navigation lambdas; this module never
+ * has to know about the surrounding back stack shape.
  */
-fun NavGraphBuilder.journalsOverviewRoute(
-    onOpenJournal: (journalId: Uuid) -> Unit,
+fun EntryProviderScope<NavKey>.journalEntries(
+    onOpenJournal: (Uuid) -> Unit,
     onCreateJournal: () -> Unit,
-    onNavigationClick: () -> Unit = {},
+    onBack: () -> Unit,
+    onJournalDeleted: () -> Unit,
+    onOpenNote: (Uuid) -> Unit,
+    onOpenEditorForJournal: (Uuid) -> Unit,
+    onOpenJournalSettings: (Uuid) -> Unit,
+    onShareJournal: (Uuid) -> Unit,
 ) {
-    composable<JournalsOverviewRoute> {
-        CompositionLocalProvider(
-            LocalNavAnimatedVisibilityScope provides this,
-        ) {
-            JournalsOverviewScreen(
-                onOpenJournal = onOpenJournal,
-                onBrowseJournals = {},
-                onCreateJournal = onCreateJournal,
-                onNavigationClick = onNavigationClick,
-            )
-        }
-    }
+    journalsOverviewEntry(
+        onOpenJournal = onOpenJournal,
+        onCreateJournal = onCreateJournal,
+    )
+    journalDetailsEntry(
+        onBack = onBack,
+        onJournalDeleted = onJournalDeleted,
+        onOpenNote = onOpenNote,
+        onOpenEditor = onOpenEditorForJournal,
+        onOpenSettings = onOpenJournalSettings,
+        onShareJournal = onShareJournal,
+    )
+    journalCreationEntry(
+        onBack = onBack,
+        onJournalCreated = onOpenJournal,
+    )
+    journalSettingsEntry(
+        onBack = onBack,
+        onJournalDeleted = onJournalDeleted,
+    )
+    shareJournalEntry(onBack = onBack)
+    noteDetailEntry(onBack = onBack)
 }

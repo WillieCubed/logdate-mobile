@@ -1,26 +1,28 @@
 package app.logdate.feature.core.profile.navigation
 
-import androidx.navigation.NavController
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.compose.composable
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.core.profile.ui.ProfileScreen
+import app.logdate.ui.navigation.taggedEntry
 import kotlinx.serialization.Serializable
 
 @Serializable
 data object ProfileRoute : NavKey
 
-fun NavController.navigateToProfile() {
-    navigate(ProfileRoute)
+/** Pushes the profile screen. */
+fun NavBackStack<NavKey>.navigateToProfile() {
+    add(ProfileRoute)
 }
 
-fun NavGraphBuilder.profileRoute(
-    onGoBack: () -> Unit,
+/** Registers the profile entry. */
+fun EntryProviderScope<NavKey>.profileEntry(
+    onBack: () -> Unit,
     onNavigateToBirthday: () -> Unit,
 ) {
-    composable<ProfileRoute> {
+    taggedEntry<ProfileRoute> {
         ProfileScreen(
-            onBack = onGoBack,
+            onBack = onBack,
             onNavigateToBirthday = onNavigateToBirthday,
         )
     }

@@ -1,22 +1,13 @@
-@file:OptIn(ExperimentalSharedTransitionApi::class)
-
 package app.logdate.feature.journals.navigation
 
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.navigation.NavController
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.compose.composable
-import androidx.navigation.toRoute
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.journals.ui.detail.NoteViewerScreen
-import app.logdate.ui.LocalNavAnimatedVisibilityScope
+import app.logdate.ui.navigation.taggedEntry
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
-/**
- * Route for viewing a note by ID.
- */
 @Serializable
 data class NoteDetailRoute(
     val noteId: String,
@@ -24,34 +15,17 @@ data class NoteDetailRoute(
     constructor(noteId: Uuid) : this(noteId.toString())
 }
 
-/**
- * Navigation helper for opening a note by ID.
- *
- * @param noteId The ID of the note to navigate to.
- */
-fun NavController.navigateToNoteDetail(noteId: Uuid) {
-    navigate(NoteDetailRoute(noteId))
+/** Pushes the note viewer for the given note id. */
+fun NavBackStack<NavKey>.navigateToNoteDetail(noteId: Uuid) {
+    add(NoteDetailRoute(noteId))
 }
 
-/**
- * Navigation entry for note viewing.
- */
-fun NavGraphBuilder.noteDetailRoute(onGoBack: () -> Unit) {
-    composable<NoteDetailRoute>(
-        enterTransition = legacyJournalForwardEnterTransition,
-        exitTransition = legacyJournalForwardExitTransition,
-        popEnterTransition = legacyJournalPopEnterTransition,
-        popExitTransition = legacyJournalPopExitTransition,
-    ) { backStackEntry ->
-        val route = backStackEntry.toRoute<NoteDetailRoute>()
-        val noteId = Uuid.parse(route.noteId)
-        CompositionLocalProvider(
-            LocalNavAnimatedVisibilityScope provides this,
-        ) {
-            NoteViewerScreen(
-                noteId = noteId,
-                onGoBack = onGoBack,
-            )
-        }
+/** Registers the note viewer entry. */
+fun EntryProviderScope<NavKey>.noteDetailEntry(onBack: () -> Unit) {
+    taggedEntry<NoteDetailRoute> { route ->
+        NoteViewerScreen(
+            noteId = Uuid.parse(route.noteId),
+            onGoBack = onBack,
+        )
     }
 }

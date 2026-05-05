@@ -1,11 +1,10 @@
 package app.logdate.feature.journals.navigation
 
-import androidx.navigation.NavController
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.compose.composable
-import androidx.navigation.toRoute
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.journals.ui.share.ShareJournalScreen
+import app.logdate.ui.navigation.taggedEntry
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
@@ -20,16 +19,17 @@ data class ShareJournalRoute(
     constructor(journalId: Uuid) : this(journalId.toString())
 }
 
-fun NavController.navigateToShareJournal(journalId: Uuid) {
-    navigate(ShareJournalRoute(journalId))
+/** Pushes the share-journal flow for the given journal. */
+fun NavBackStack<NavKey>.navigateToShareJournal(journalId: Uuid) {
+    add(ShareJournalRoute(journalId))
 }
 
-fun NavGraphBuilder.shareJournalRoute(onGoBack: () -> Unit) {
-    composable<ShareJournalRoute> { entry ->
-        val route = entry.toRoute<ShareJournalRoute>()
+/** Registers the share-journal entry. */
+fun EntryProviderScope<NavKey>.shareJournalEntry(onBack: () -> Unit) {
+    taggedEntry<ShareJournalRoute> { route ->
         ShareJournalScreen(
             journalId = route.journalId,
-            onGoBack = onGoBack,
+            onGoBack = onBack,
         )
     }
 }

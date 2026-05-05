@@ -1,60 +1,11 @@
 package app.logdate.feature.core.main
 
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.composable
 import androidx.navigation3.runtime.NavKey
-import app.logdate.feature.journals.ui.JournalClickCallback
 import kotlinx.serialization.Serializable
-import kotlin.uuid.Uuid
-
-@Serializable
-data object HomeRoute : NavKey
-
-fun NavHostController.navigateHome() {
-    // Ensure you can't go back
-    navigate(HomeRoute) {
-        popUpTo(HomeRoute) {
-            inclusive = true
-        }
-    }
-}
 
 /**
- * Navigation graph for core top-level routes
+ * Top-level home route. The shell hosts the bottom-nav tabs (Timeline / Library / Journals
+ * / Rewind / Location) inside [HomeScreen]; the route itself carries no parameters.
  */
-fun NavGraphBuilder.homeGraph(
-    onCreateNote: () -> Unit,
-    onOpenJournal: JournalClickCallback,
-    onCreateJournal: () -> Unit,
-    onOpenRewind: (uid: Uuid) -> Unit,
-    onOpenSettings: () -> Unit,
-    onBrowseJournals: () -> Unit,
-    onOpenSearch: () -> Unit = {},
-    onOpenDraft: (draftId: String) -> Unit = {},
-    onImportBackup: () -> Unit = {},
-    onOpenMediaDetail: (Uuid) -> Unit = {},
-    onOpenSyncIssues: () -> Unit = {},
-    libraryContent: @Composable (Modifier) -> Unit = {},
-    locationContent: @Composable (Modifier) -> Unit = {},
-) {
-    composable<HomeRoute> {
-        HomeScreen(
-            onNewEntry = onCreateNote,
-            onOpenJournal = onOpenJournal,
-            onCreateJournal = onCreateJournal,
-            onBrowseJournals = onBrowseJournals,
-            onOpenRewind = onOpenRewind,
-            onOpenSettings = onOpenSettings,
-            onOpenSearch = onOpenSearch,
-            onOpenDraft = onOpenDraft,
-            onImportBackup = onImportBackup,
-            onOpenMediaDetail = onOpenMediaDetail,
-            onOpenSyncIssues = onOpenSyncIssues,
-            libraryContent = libraryContent,
-            locationContent = locationContent,
-        )
-    }
-}
+@Serializable
+data object HomeRoute : NavKey
