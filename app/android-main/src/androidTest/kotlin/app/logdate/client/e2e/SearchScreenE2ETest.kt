@@ -147,6 +147,10 @@ class SearchScreenE2ETest {
                 onNavigateToDay = {},
                 onNavigateToJournal = {},
                 onNavigateToPerson = {},
+                onNavigateToNote = {},
+                onNavigateToPostcard = {},
+                onNavigateToRewind = {},
+                onNavigateToMedia = {},
                 onGoBack = {},
             )
         }
@@ -165,6 +169,10 @@ class SearchScreenE2ETest {
                 onNavigateToDay = {},
                 onNavigateToJournal = {},
                 onNavigateToPerson = {},
+                onNavigateToNote = {},
+                onNavigateToPostcard = {},
+                onNavigateToRewind = {},
+                onNavigateToMedia = {},
                 onGoBack = {},
             )
         }
@@ -183,6 +191,10 @@ class SearchScreenE2ETest {
                 onNavigateToDay = {},
                 onNavigateToJournal = {},
                 onNavigateToPerson = {},
+                onNavigateToNote = {},
+                onNavigateToPostcard = {},
+                onNavigateToRewind = {},
+                onNavigateToMedia = {},
                 onGoBack = {},
             )
         }
@@ -203,6 +215,10 @@ class SearchScreenE2ETest {
                 onNavigateToDay = {},
                 onNavigateToJournal = {},
                 onNavigateToPerson = {},
+                onNavigateToNote = {},
+                onNavigateToPostcard = {},
+                onNavigateToRewind = {},
+                onNavigateToMedia = {},
                 onGoBack = {},
             )
         }

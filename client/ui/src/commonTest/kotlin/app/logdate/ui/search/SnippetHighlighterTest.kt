@@ -1,5 +1,7 @@
 package app.logdate.ui.search
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -80,5 +82,20 @@ class SnippetHighlighterTest {
         assertEquals(1, result.spanStyles.size)
         // Empty span — start equals end
         assertEquals(result.spanStyles[0].start, result.spanStyles[0].end)
+    }
+
+    @Test
+    fun `custom matchStyle is applied to matched terms`() {
+        val highlight =
+            SpanStyle(
+                background = Color(0xFFE8DEF8),
+                color = Color(0xFF1D1B20),
+                fontWeight = FontWeight.SemiBold,
+            )
+        val result = parseSnippetMarkers("Found [match] in text", matchStyle = highlight)
+
+        assertEquals("Found match in text", result.text)
+        assertEquals(1, result.spanStyles.size)
+        assertEquals(highlight, result.spanStyles[0].item)
     }
 }

@@ -42,6 +42,7 @@ import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.ui.search.UniversalSearchResultItem
 import app.logdate.ui.search.UniversalSearchResultUiState
+import app.logdate.ui.search.rememberSearchHighlightStyle
 import app.logdate.ui.search.toUniversalSearchResultUiState
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.datetime.LocalDate
@@ -73,6 +74,10 @@ fun SearchScreen(
     onNavigateToDay: (LocalDate) -> Unit,
     onNavigateToJournal: (Uuid) -> Unit = {},
     onNavigateToPerson: (Uuid) -> Unit = {},
+    onNavigateToNote: (Uuid) -> Unit = {},
+    onNavigateToPostcard: (Uuid) -> Unit = {},
+    onNavigateToRewind: (Uuid) -> Unit = {},
+    onNavigateToMedia: (Uuid) -> Unit = {},
     onGoBack: () -> Unit,
     initialQuery: String = "",
     modifier: Modifier = Modifier,
@@ -96,6 +101,10 @@ fun SearchScreen(
         onNavigateToDay = onNavigateToDay,
         onNavigateToJournal = onNavigateToJournal,
         onNavigateToPerson = onNavigateToPerson,
+        onNavigateToNote = onNavigateToNote,
+        onNavigateToPostcard = onNavigateToPostcard,
+        onNavigateToRewind = onNavigateToRewind,
+        onNavigateToMedia = onNavigateToMedia,
         onGoBack = onGoBack,
         modifier = modifier,
     )
@@ -116,6 +125,10 @@ fun SearchScreenContent(
     onNavigateToDay: (LocalDate) -> Unit,
     onNavigateToJournal: (Uuid) -> Unit,
     onNavigateToPerson: (Uuid) -> Unit,
+    onNavigateToNote: (Uuid) -> Unit,
+    onNavigateToPostcard: (Uuid) -> Unit,
+    onNavigateToRewind: (Uuid) -> Unit,
+    onNavigateToMedia: (Uuid) -> Unit,
     onGoBack: () -> Unit,
     initialQuery: String = "",
     queryText: String = initialQuery,
@@ -235,12 +248,13 @@ fun SearchScreenContent(
                 }
 
                 is SearchScreenState.Results -> {
+                    val highlightStyle = rememberSearchHighlightStyle()
                     val resultRows =
-                        remember(searchState.results) {
+                        remember(searchState.results, highlightStyle) {
                             searchState.results.map { result ->
                                 SearchResultRow(
                                     result = result,
-                                    uiState = result.toUniversalSearchResultUiState(),
+                                    uiState = result.toUniversalSearchResultUiState(highlightStyle),
                                 )
                             }
                         }
@@ -258,6 +272,10 @@ fun SearchScreenContent(
                                         onNavigateToDay = onNavigateToDay,
                                         onNavigateToJournal = onNavigateToJournal,
                                         onNavigateToPerson = onNavigateToPerson,
+                                        onNavigateToNote = onNavigateToNote,
+                                        onNavigateToPostcard = onNavigateToPostcard,
+                                        onNavigateToRewind = onNavigateToRewind,
+                                        onNavigateToMedia = onNavigateToMedia,
                                     )
                                 },
                             )
@@ -310,11 +328,25 @@ private fun navigateToResult(
     onNavigateToDay: (LocalDate) -> Unit,
     onNavigateToJournal: (Uuid) -> Unit,
     onNavigateToPerson: (Uuid) -> Unit,
+    onNavigateToNote: (Uuid) -> Unit,
+    onNavigateToPostcard: (Uuid) -> Unit,
+    onNavigateToRewind: (Uuid) -> Unit,
+    onNavigateToMedia: (Uuid) -> Unit,
 ) {
     when (result.contentType) {
         SearchContentType.JOURNAL -> onNavigateToJournal(result.uid)
         SearchContentType.PERSON -> onNavigateToPerson(result.uid)
-        else -> {
+        SearchContentType.TEXT_NOTE -> onNavigateToNote(result.uid)
+        SearchContentType.POSTCARD -> onNavigateToPostcard(result.uid)
+        SearchContentType.REWIND -> onNavigateToRewind(result.uid)
+        SearchContentType.MEDIA_CAPTION -> onNavigateToMedia(result.uid)
+        SearchContentType.TRANSCRIPTION,
+        SearchContentType.AMBIENT_SOUND,
+        SearchContentType.STICKER,
+        SearchContentType.PLACE,
+        -> {
+            // Until dedicated detail screens exist for these types (or TimelineDetailRoute gains an
+            // entryId parameter — Phase 2e), fall back to the containing day.
             val date =
                 result.created
                     .toLocalDateTime(TimeZone.currentSystemDefault())

@@ -3,6 +3,8 @@
 package app.logdate.ui.search
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.Book
@@ -17,12 +19,18 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.ui.common.focusableWithRing
@@ -34,13 +42,15 @@ data class UniversalSearchResultUiState(
     val supportingText: String,
     val typeLabel: String,
     val typeIcon: ImageVector,
+    val contentType: SearchContentType,
 )
 
 /**
- * Renders a single universal search result with type-specific icon and label.
+ * Renders a single universal search result.
  *
- * Handles all [SearchContentType] variants with appropriate visual treatment.
- * Search row state is precomputed before rendering to keep recomposition cheap.
+ * The leading type icon is wrapped in a tonal [Surface] colored by [SearchContentType] so users
+ * can scan results visually. Match highlighting in [UniversalSearchResultUiState.contentText] is
+ * pre-computed by the caller via [toUniversalSearchResultUiState] using the desired [SpanStyle].
  */
 @Composable
 fun UniversalSearchResultItem(
@@ -48,13 +58,14 @@ fun UniversalSearchResultItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val (containerColor, contentColor) = state.contentType.containerColors()
     ListItem(
         headlineContent = {
             Text(
                 text = state.contentText,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
             )
         },
         supportingContent = {
@@ -65,20 +76,37 @@ fun UniversalSearchResultItem(
             )
         },
         leadingContent = {
-            Icon(state.typeIcon, contentDescription = state.typeLabel)
+            Surface(
+                color = containerColor,
+                contentColor = contentColor,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.size(40.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(state.typeIcon, contentDescription = state.typeLabel)
+                }
+            }
         },
         modifier = modifier.focusableWithRing().clickable(onClick = onClick),
     )
 }
 
-fun SearchResult.toUniversalSearchResultUiState(): UniversalSearchResultUiState {
+/**
+ * Converts a [SearchResult] into a render-ready [UniversalSearchResultUiState].
+ *
+ * @param matchStyle The [SpanStyle] to apply to FTS5-matched terms inside [SearchResult.content].
+ *   Defaults to the bold-only style; pass a richer style (e.g. with `background`) at the call site
+ *   when composable theme colors are available.
+ */
+fun SearchResult.toUniversalSearchResultUiState(matchStyle: SpanStyle = DefaultMatchStyle): UniversalSearchResultUiState {
     val (icon, typeLabel) = contentType.visualInfo()
     return UniversalSearchResultUiState(
         id = "${contentType.ftsValue}_$uid",
-        contentText = parseSnippetMarkers(content),
+        contentText = parseSnippetMarkers(content, matchStyle),
         supportingText = searchSupportingText(typeLabel),
         typeLabel = typeLabel,
         typeIcon = icon,
+        contentType = contentType,
     )
 }
 
@@ -101,3 +129,38 @@ private fun SearchContentType.visualInfo(): Pair<ImageVector, String> =
         SearchContentType.AMBIENT_SOUND -> Icons.Default.GraphicEq to "Soundscape"
         SearchContentType.PERSON -> Icons.Default.Person to "Person"
     }
+
+@Composable
+private fun SearchContentType.containerColors(): Pair<Color, Color> {
+    val scheme = MaterialTheme.colorScheme
+    return when (this) {
+        SearchContentType.JOURNAL,
+        SearchContentType.REWIND,
+        SearchContentType.PERSON,
+        -> scheme.primaryContainer to scheme.onPrimaryContainer
+
+        SearchContentType.TRANSCRIPTION,
+        SearchContentType.AMBIENT_SOUND,
+        SearchContentType.PLACE,
+        -> scheme.tertiaryContainer to scheme.onTertiaryContainer
+
+        SearchContentType.MEDIA_CAPTION -> scheme.surfaceContainerHigh to scheme.onSurface
+
+        SearchContentType.TEXT_NOTE,
+        SearchContentType.STICKER,
+        SearchContentType.POSTCARD,
+        -> scheme.secondaryContainer to scheme.onSecondaryContainer
+    }
+}
+
+/**
+ * Convenience to build the M3 Expressive match-highlight style at composition time, so matched
+ * terms render with a tonal background plus bold weight instead of bold-only.
+ */
+@Composable
+fun rememberSearchHighlightStyle(): SpanStyle =
+    SpanStyle(
+        background = MaterialTheme.colorScheme.primaryContainer,
+        color = MaterialTheme.colorScheme.onPrimaryContainer,
+        fontWeight = FontWeight.SemiBold,
+    )
