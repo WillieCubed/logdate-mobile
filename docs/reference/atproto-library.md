@@ -53,16 +53,20 @@ also have to supply credentials:
 dependencyResolutionManagement {
     repositories {
         mavenCentral()
-        maven {
-            name = "atproto-github-packages"
-            url = uri("https://maven.pkg.github.com/WillieCubed/logdate-mobile")
-            credentials {
-                username = providers.gradleProperty("gpr.user")
-                    .orElse(providers.environmentVariable("GITHUB_ACTOR"))
-                    .get()
-                password = providers.gradleProperty("gpr.token")
-                    .orElse(providers.environmentVariable("GITHUB_TOKEN"))
-                    .get()
+        val gprUser = providers.gradleProperty("gpr.user")
+            .orElse(providers.environmentVariable("GITHUB_ACTOR"))
+            .orNull
+        val gprToken = providers.gradleProperty("gpr.token")
+            .orElse(providers.environmentVariable("GITHUB_TOKEN"))
+            .orNull
+        if (gprUser != null && gprToken != null) {
+            maven {
+                name = "atproto-github-packages"
+                url = uri("https://maven.pkg.github.com/WillieCubed/logdate-mobile")
+                credentials {
+                    username = gprUser
+                    password = gprToken
+                }
             }
         }
     }

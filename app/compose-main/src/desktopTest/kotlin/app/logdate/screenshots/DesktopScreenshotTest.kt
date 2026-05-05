@@ -34,11 +34,15 @@ import kotlin.test.assertTrue
 class DesktopScreenshotTest {
     @Test
     fun shared_catalog_matches_baselines() {
+        // The whole catalog is quarantined — every group churns 6-15% pixel diff between back-
+        // to-back runs, well past the 5% noise floor in compareImages. lock_screen_matches_baseline
+        // still runs as the smoke gate; per-group entries get added back to the set as the
+        // underlying scenes capture a deterministic frame.
+        if (nonDeterministicSceneGroups.containsAll(ScreenshotSceneGroup.entries)) return
         val sceneFilter = desktopScreenshotSceneFilter
         SharedScreenshotCatalog.allScenes
             .filter { scene -> sceneFilter == null || scene.id.value.contains(sceneFilter) }
             .filter { scene -> scene.group !in nonDeterministicSceneGroups }
-            .filter { scene -> nonDeterministicScenePrefixes.none(scene.id.value::startsWith) }
             .forEach { scene ->
                 scene.variants.forEach { variant ->
                     assertMatchesBaseline(scene = scene, variant = variant)
@@ -46,28 +50,8 @@ class DesktopScreenshotTest {
             }
     }
 
-    /**
-     * Every scene group in the catalog currently churns 6-15% pixel diff
-     * between back-to-back runs — way past anything the 5% noise floor
-     * can absorb. Until the rendering pipeline captures a deterministic
-     * frame for these scenes (the warm-up pass alone isn't enough), the
-     * full catalog comparison is skipped. The standalone
-     * lock_screen_matches_baseline test still runs and will catch the
-     * kind of broad regression these scenes are meant to guard against.
-     *
-     * Drop a group from this set as soon as the underlying scenes settle.
-     */
     private val nonDeterministicSceneGroups: Set<ScreenshotSceneGroup> =
         ScreenshotSceneGroup.entries.toSet()
-
-    /**
-     * Individual scene-id prefixes excluded for the same reason as the group
-     * filter above, but where the group itself is otherwise stable.
-     */
-    private val nonDeterministicScenePrefixes: List<String> =
-        listOf(
-            "memory-selection-",
-        )
 
     @Test
     fun lock_screen_matches_baseline() {
@@ -357,19 +341,9 @@ private fun compareImages(
     }
 
     val totalPixels = width * height
-    // Treat sub-5% pixel diffs as render-time noise. Empirically scenes
-    // churn 1.4-4% per re-render with the same input data — anti-aliasing,
-    // Skiko settling, async image-loader placeholders, font-cache warm-up
-    // — and the warm-up pass doesn't shake it out. The 5% floor stays
-    // well below "things humans would notice": the lock_screen test fails
-    // on a colour swap that covers the whole frame, which moves orders of
-    // magnitude more pixels.
-    //
-    // Two scene families blow past even this threshold (6-9% diffs run-to-
-    // run) and are excluded entirely in shared_catalog_matches_baselines:
-    // the ONBOARDING group and the memory-selection-* prefix. They need
-    // a deterministic capture strategy upstream before they can re-enter
-    // the gate.
+    // 5% noise floor absorbs anti-aliasing, Skiko settling, font-cache warm-up, and async
+    // image-loader placeholders that the warm-up pass doesn't fully shake out. Real visual
+    // regressions move orders of magnitude more pixels.
     val differenceFraction = differingPixels.toDouble() / totalPixels
     return if (differingPixels == 0 || differenceFraction < 0.05) {
         null

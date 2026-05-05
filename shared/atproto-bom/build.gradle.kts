@@ -78,14 +78,18 @@ publishing {
             }
         }
     }
-    val publishUrl =
-        providers.gradleProperty("atproto.publish.url").orNull
-            ?: providers.environmentVariable("ATPROTO_PUBLISH_URL").orNull
-    if (publishUrl != null) {
-        repositories {
+    repositories {
+        // Mirror AtprotoPublishedModulePlugin's two-repo setup (legacy / GH Packages and
+        // atprotoMavenCentral / Sonatype) so the BOM publishes to the same targets as the
+        // KMP modules. The convention plugin can't be applied here directly because this is
+        // a `java-platform` project and the plugin's KMP-publication assumptions wouldn't fit.
+        val legacyUrl =
+            providers.gradleProperty("atproto.publish.url").orNull
+                ?: providers.environmentVariable("ATPROTO_PUBLISH_URL").orNull
+        if (legacyUrl != null) {
             maven {
                 name = "atproto"
-                url = uri(publishUrl)
+                url = uri(legacyUrl)
                 val user =
                     providers.gradleProperty("atproto.publish.username").orNull
                         ?: providers.environmentVariable("ATPROTO_PUBLISH_USERNAME").orNull
@@ -97,6 +101,27 @@ publishing {
                         username = user
                         password = pass
                     }
+                }
+            }
+        }
+        val ossrhUser =
+            providers.gradleProperty("ossrh.username").orNull
+                ?: providers.environmentVariable("OSSRH_USERNAME").orNull
+        val ossrhPass =
+            providers.gradleProperty("ossrh.password").orNull
+                ?: providers.environmentVariable("OSSRH_PASSWORD").orNull
+        if (ossrhUser != null && ossrhPass != null) {
+            maven {
+                name = "atprotoMavenCentral"
+                url =
+                    uri(
+                        providers.gradleProperty("ossrh.publish.url").orNull
+                            ?: providers.environmentVariable("OSSRH_PUBLISH_URL").orNull
+                            ?: "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/",
+                    )
+                credentials {
+                    username = ossrhUser
+                    password = ossrhPass
                 }
             }
         }
