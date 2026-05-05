@@ -20,7 +20,9 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FilterAltOff
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
@@ -34,24 +36,30 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import app.logdate.client.domain.search.DateRangeFilter
 import app.logdate.client.domain.search.SearchFilters
 import app.logdate.client.repository.search.SearchContentType
@@ -68,6 +76,9 @@ import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.search.generated.resources.Res
 import logdate.client.feature.search.generated.resources.clear_search
 import logdate.client.feature.search.generated.resources.search
+import logdate.client.feature.search.generated.resources.search_action_actions_for
+import logdate.client.feature.search.generated.resources.search_action_copy_text
+import logdate.client.feature.search.generated.resources.search_action_open_day
 import logdate.client.feature.search.generated.resources.search_bucket_earlier
 import logdate.client.feature.search.generated.resources.search_bucket_this_month
 import logdate.client.feature.search.generated.resources.search_bucket_this_week
@@ -209,6 +220,8 @@ fun SearchScreenContent(
         rememberSaveable(saver = TextFieldState.Saver) {
             TextFieldState(initialText = initialQuery)
         }
+    var sheetTarget by remember { mutableStateOf<SearchResult?>(null) }
+    val clipboard = LocalClipboardManager.current
 
     LaunchedEffect(Unit) {
         searchBarState.animateToExpanded()
@@ -305,9 +318,29 @@ fun SearchScreenContent(
                     onNavigateToPostcard = onNavigateToPostcard,
                     onNavigateToRewind = onNavigateToRewind,
                     onNavigateToMedia = onNavigateToMedia,
+                    onLongClickResult = { result -> sheetTarget = result },
                 )
             }
         }
+    }
+
+    sheetTarget?.let { target ->
+        ResultActionsSheet(
+            result = target,
+            onDismiss = { sheetTarget = null },
+            onOpenDay = {
+                val date =
+                    target.created
+                        .toLocalDateTime(TimeZone.currentSystemDefault())
+                        .date
+                onNavigateToDay(date)
+                sheetTarget = null
+            },
+            onCopyText = {
+                clipboard.setText(AnnotatedString(target.content))
+                sheetTarget = null
+            },
+        )
     }
 }
 
@@ -330,6 +363,7 @@ private fun SearchStateContent(
     onNavigateToPostcard: (Uuid) -> Unit,
     onNavigateToRewind: (Uuid) -> Unit,
     onNavigateToMedia: (Uuid) -> Unit,
+    onLongClickResult: (SearchResult) -> Unit,
 ) {
     when (searchState) {
         is SearchScreenState.Idle -> {
@@ -425,6 +459,7 @@ private fun SearchStateContent(
                                     onNavigateToMedia = onNavigateToMedia,
                                 )
                             },
+                            onLongClick = { onLongClickResult(resultRow.result) },
                         )
                     }
                 }
@@ -437,6 +472,53 @@ private data class SearchResultRow(
     val result: SearchResult,
     val uiState: UniversalSearchResultUiState,
 )
+
+/**
+ * Bottom-sheet menu of secondary actions for a search result, opened by long-press.
+ *
+ * Keeping this scoped to actions that work on every platform (open day view, copy text). A
+ * future PR can add Share through a platform-specific intent generator.
+ */
+@Composable
+private fun ResultActionsSheet(
+    result: SearchResult,
+    onDismiss: () -> Unit,
+    onOpenDay: () -> Unit,
+    onCopyText: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(
+        sheetState = sheetState,
+        onDismissRequest = onDismiss,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.lg),
+        ) {
+            Text(
+                text = stringResource(Res.string.search_action_actions_for),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+            )
+            ListItem(
+                headlineContent = { Text(stringResource(Res.string.search_action_open_day)) },
+                leadingContent = {
+                    Icon(Icons.Default.CalendarToday, contentDescription = null)
+                },
+                modifier = Modifier.clickable { onOpenDay() },
+            )
+            if (result.content.isNotBlank()) {
+                ListItem(
+                    headlineContent = { Text(stringResource(Res.string.search_action_copy_text)) },
+                    leadingContent = {
+                        Icon(Icons.Default.ContentCopy, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable { onCopyText() },
+                )
+            }
+        }
+    }
+}
 
 /**
  * Sticky section header above each [ResultDateBucket] in the result list.

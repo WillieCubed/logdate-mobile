@@ -1,8 +1,9 @@
 @file:Suppress("ktlint:standard:function-naming")
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 
 package app.logdate.ui.search
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -58,6 +59,7 @@ fun UniversalSearchResultItem(
     state: UniversalSearchResultUiState,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
     val containerColor: Color
@@ -117,7 +119,13 @@ fun UniversalSearchResultItem(
                 }
             }
         },
-        modifier = modifier.focusableWithRing().clickable(onClick = onClick),
+        modifier =
+            modifier
+                .focusableWithRing()
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = onLongClick,
+                ),
     )
 }
 
