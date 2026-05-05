@@ -19,6 +19,7 @@ import app.logdate.shared.model.CompleteAccountCreationData
 import app.logdate.shared.model.CompleteAccountCreationRequest
 import app.logdate.shared.model.CompleteAuthenticationData
 import app.logdate.shared.model.CompleteAuthenticationRequest
+import app.logdate.shared.model.EntitlementResponse
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyAllowCredential
 import app.logdate.shared.model.PasskeyAuthenticationOptions
@@ -723,6 +724,9 @@ class DefaultPasskeyAccountRepositoryTest {
             completeAuthenticationResponse
 
         override suspend fun deleteAccount(accessToken: String): Result<Unit> = deleteAccountResponse
+
+        override suspend fun getEntitlement(accessToken: String): Result<EntitlementResponse> =
+            Result.failure(NotImplementedError("getEntitlement not exercised by these tests"))
     }
 
     /**

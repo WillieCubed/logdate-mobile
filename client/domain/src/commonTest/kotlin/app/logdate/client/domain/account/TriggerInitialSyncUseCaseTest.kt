@@ -5,9 +5,12 @@ import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncResult
 import app.logdate.client.sync.SyncStatus
+import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -119,6 +122,12 @@ class TriggerInitialSyncUseCaseTest {
                 isSyncing = false,
                 hasErrors = false,
             )
+
+        override fun observeDeadLetters(): Flow<List<SyncDeadLetterRecord>> = flowOf(emptyList())
+
+        override suspend fun retryDeadLetter(id: String) = Unit
+
+        override suspend fun discardDeadLetter(id: String) = Unit
     }
 
     private class NeverCompletingSyncManager : FakeSyncManager(SyncResult(success = true)) {
