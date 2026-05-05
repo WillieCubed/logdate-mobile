@@ -11,11 +11,6 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
-/**
- * The default light color scheme for the LogDate app.
- *
- * This should be used when dynamic color scheme is not available on Android 12+ devices.
- */
 val LightColorScheme =
     lightColorScheme(
         primary = Purple40,
@@ -23,11 +18,6 @@ val LightColorScheme =
         tertiary = Pink40,
     )
 
-/**
- * The default dark color scheme for the LogDate app.
- *
- * This should be used when dynamic color scheme is not available on Android 12+ devices.
- */
 val DarkColorScheme =
     darkColorScheme(
         primary = Purple80,

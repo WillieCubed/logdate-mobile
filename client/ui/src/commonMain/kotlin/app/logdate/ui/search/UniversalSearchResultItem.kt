@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -58,7 +59,36 @@ fun UniversalSearchResultItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val (containerColor, contentColor) = state.contentType.containerColors()
+    val scheme = MaterialTheme.colorScheme
+    val containerColor: Color
+    val contentColor: Color
+    when (state.contentType) {
+        SearchContentType.JOURNAL,
+        SearchContentType.REWIND,
+        SearchContentType.PERSON,
+        -> {
+            containerColor = scheme.primaryContainer
+            contentColor = scheme.onPrimaryContainer
+        }
+        SearchContentType.TRANSCRIPTION,
+        SearchContentType.AMBIENT_SOUND,
+        SearchContentType.PLACE,
+        -> {
+            containerColor = scheme.tertiaryContainer
+            contentColor = scheme.onTertiaryContainer
+        }
+        SearchContentType.MEDIA_CAPTION -> {
+            containerColor = scheme.surfaceContainerHigh
+            contentColor = scheme.onSurface
+        }
+        SearchContentType.TEXT_NOTE,
+        SearchContentType.STICKER,
+        SearchContentType.POSTCARD,
+        -> {
+            containerColor = scheme.secondaryContainer
+            contentColor = scheme.onSecondaryContainer
+        }
+    }
     ListItem(
         headlineContent = {
             Text(
@@ -130,37 +160,20 @@ private fun SearchContentType.visualInfo(): Pair<ImageVector, String> =
         SearchContentType.PERSON -> Icons.Default.Person to "Person"
     }
 
-@Composable
-private fun SearchContentType.containerColors(): Pair<Color, Color> {
-    val scheme = MaterialTheme.colorScheme
-    return when (this) {
-        SearchContentType.JOURNAL,
-        SearchContentType.REWIND,
-        SearchContentType.PERSON,
-        -> scheme.primaryContainer to scheme.onPrimaryContainer
-
-        SearchContentType.TRANSCRIPTION,
-        SearchContentType.AMBIENT_SOUND,
-        SearchContentType.PLACE,
-        -> scheme.tertiaryContainer to scheme.onTertiaryContainer
-
-        SearchContentType.MEDIA_CAPTION -> scheme.surfaceContainerHigh to scheme.onSurface
-
-        SearchContentType.TEXT_NOTE,
-        SearchContentType.STICKER,
-        SearchContentType.POSTCARD,
-        -> scheme.secondaryContainer to scheme.onSecondaryContainer
-    }
-}
-
 /**
- * Convenience to build the M3 Expressive match-highlight style at composition time, so matched
- * terms render with a tonal background plus bold weight instead of bold-only.
+ * Match-highlight style applied to FTS5-snippet matches. Memoized against the current color
+ * scheme so the resulting [SpanStyle] is stable as a `remember` key and snippet AnnotatedStrings
+ * are not rebuilt on every recomposition.
  */
 @Composable
-fun rememberSearchHighlightStyle(): SpanStyle =
-    SpanStyle(
-        background = MaterialTheme.colorScheme.primaryContainer,
-        color = MaterialTheme.colorScheme.onPrimaryContainer,
-        fontWeight = FontWeight.SemiBold,
-    )
+fun rememberSearchHighlightStyle(): SpanStyle {
+    val primaryContainer = MaterialTheme.colorScheme.primaryContainer
+    val onPrimaryContainer = MaterialTheme.colorScheme.onPrimaryContainer
+    return remember(primaryContainer, onPrimaryContainer) {
+        SpanStyle(
+            background = primaryContainer,
+            color = onPrimaryContainer,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}

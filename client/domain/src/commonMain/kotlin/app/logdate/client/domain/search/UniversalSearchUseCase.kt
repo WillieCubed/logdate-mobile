@@ -52,16 +52,16 @@ class UniversalSearchUseCase(
             }
 
     private fun List<SearchResult>.applyFilters(filters: SearchFilters): List<SearchResult> {
-        val typeFiltered =
-            if (filters.contentTypes != null) {
-                filter { it.contentType in filters.contentTypes }
+        val window =
+            if (filters.dateRange == DateRangeFilter.AllTime) {
+                null
             } else {
-                this
+                filters.dateRange.window(clock.now(), timeZone())
             }
-        if (filters.dateRange == DateRangeFilter.AllTime) return typeFiltered
-        val window = filters.dateRange.window(clock.now(), timeZone())
-        return typeFiltered.filter { result ->
-            result.created >= window.from && result.created < window.toExclusive
+        if (filters.contentTypes == null && window == null) return this
+        return filter { result ->
+            (filters.contentTypes == null || result.contentType in filters.contentTypes) &&
+                (window == null || (result.created >= window.from && result.created < window.toExclusive))
         }
     }
 }

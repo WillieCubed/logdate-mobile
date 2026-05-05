@@ -27,6 +27,7 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ExpandedFullScreenSearchBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -47,7 +48,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.search.DateRangeFilter
 import app.logdate.client.domain.search.SearchFilters
 import app.logdate.client.repository.search.SearchContentType
@@ -56,6 +56,7 @@ import app.logdate.ui.search.UniversalSearchResultItem
 import app.logdate.ui.search.UniversalSearchResultUiState
 import app.logdate.ui.search.rememberSearchHighlightStyle
 import app.logdate.ui.search.toUniversalSearchResultUiState
+import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -64,10 +65,27 @@ import logdate.client.feature.search.generated.resources.Res
 import logdate.client.feature.search.generated.resources.clear_search
 import logdate.client.feature.search.generated.resources.search
 import logdate.client.feature.search.generated.resources.search_entries
+import logdate.client.feature.search.generated.resources.search_filter_clear
+import logdate.client.feature.search.generated.resources.search_filter_date_all_time
+import logdate.client.feature.search.generated.resources.search_filter_date_this_month
+import logdate.client.feature.search.generated.resources.search_filter_date_this_week
+import logdate.client.feature.search.generated.resources.search_filter_date_this_year
+import logdate.client.feature.search.generated.resources.search_filter_date_today
+import logdate.client.feature.search.generated.resources.search_filter_type_journals
+import logdate.client.feature.search.generated.resources.search_filter_type_notes
+import logdate.client.feature.search.generated.resources.search_filter_type_people
+import logdate.client.feature.search.generated.resources.search_filter_type_photos
+import logdate.client.feature.search.generated.resources.search_filter_type_places
+import logdate.client.feature.search.generated.resources.search_filter_type_postcards
+import logdate.client.feature.search.generated.resources.search_filter_type_rewinds
+import logdate.client.feature.search.generated.resources.search_filter_type_soundscapes
+import logdate.client.feature.search.generated.resources.search_filter_type_stickers
+import logdate.client.feature.search.generated.resources.search_filter_type_voice_notes
 import logdate.client.feature.search.generated.resources.search_for_entries
 import logdate.client.feature.search.generated.resources.search_no_results
 import logdate.client.feature.search.generated.resources.searching_entries
 import logdate.client.ui.generated.resources.common_go_back
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
@@ -366,16 +384,21 @@ private fun FilterChipRow(
 ) {
     val anyFilterActive =
         filters.contentTypes != null || filters.dateRange != DateRangeFilter.AllTime
+    val selectedColors =
+        FilterChipDefaults.filterChipColors(
+            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
     LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         modifier = Modifier.fillMaxWidth(),
     ) {
         if (anyFilterActive) {
             item(key = "clear") {
                 AssistChip(
                     onClick = onClearFilters,
-                    label = { Text("Clear filters") },
+                    label = { Text(stringResource(Res.string.search_filter_clear)) },
                     leadingIcon = {
                         Icon(
                             Icons.Default.FilterAltOff,
@@ -386,45 +409,46 @@ private fun FilterChipRow(
                 )
             }
         }
-        items(items = DateRangeFilter.entries.toList(), key = { "date_${it.name}" }) { range ->
+        items(items = DateRangeFilter.entries, key = { "date_${it.name}" }) { range ->
             FilterChip(
                 selected = filters.dateRange == range,
                 onClick = { onSetDateRange(range) },
-                label = { Text(range.label()) },
+                label = { Text(stringResource(range.labelKey())) },
+                colors = selectedColors,
             )
         }
-        items(items = SearchContentType.entries.toList(), key = { "type_${it.ftsValue}" }) { type ->
-            val selected = filters.contentTypes?.contains(type) == true
+        items(items = SearchContentType.entries, key = { "type_${it.ftsValue}" }) { type ->
             FilterChip(
-                selected = selected,
+                selected = filters.contentTypes?.contains(type) == true,
                 onClick = { onToggleType(type) },
-                label = { Text(type.label()) },
+                label = { Text(stringResource(type.labelKey())) },
+                colors = selectedColors,
             )
         }
     }
 }
 
-private fun DateRangeFilter.label(): String =
+private fun DateRangeFilter.labelKey(): StringResource =
     when (this) {
-        DateRangeFilter.AllTime -> "All time"
-        DateRangeFilter.Today -> "Today"
-        DateRangeFilter.ThisWeek -> "This week"
-        DateRangeFilter.ThisMonth -> "This month"
-        DateRangeFilter.ThisYear -> "This year"
+        DateRangeFilter.AllTime -> Res.string.search_filter_date_all_time
+        DateRangeFilter.Today -> Res.string.search_filter_date_today
+        DateRangeFilter.ThisWeek -> Res.string.search_filter_date_this_week
+        DateRangeFilter.ThisMonth -> Res.string.search_filter_date_this_month
+        DateRangeFilter.ThisYear -> Res.string.search_filter_date_this_year
     }
 
-private fun SearchContentType.label(): String =
+private fun SearchContentType.labelKey(): StringResource =
     when (this) {
-        SearchContentType.TEXT_NOTE -> "Notes"
-        SearchContentType.TRANSCRIPTION -> "Voice notes"
-        SearchContentType.JOURNAL -> "Journals"
-        SearchContentType.MEDIA_CAPTION -> "Photos"
-        SearchContentType.PLACE -> "Places"
-        SearchContentType.REWIND -> "Rewinds"
-        SearchContentType.STICKER -> "Stickers"
-        SearchContentType.POSTCARD -> "Postcards"
-        SearchContentType.AMBIENT_SOUND -> "Soundscapes"
-        SearchContentType.PERSON -> "People"
+        SearchContentType.TEXT_NOTE -> Res.string.search_filter_type_notes
+        SearchContentType.TRANSCRIPTION -> Res.string.search_filter_type_voice_notes
+        SearchContentType.JOURNAL -> Res.string.search_filter_type_journals
+        SearchContentType.MEDIA_CAPTION -> Res.string.search_filter_type_photos
+        SearchContentType.PLACE -> Res.string.search_filter_type_places
+        SearchContentType.REWIND -> Res.string.search_filter_type_rewinds
+        SearchContentType.STICKER -> Res.string.search_filter_type_stickers
+        SearchContentType.POSTCARD -> Res.string.search_filter_type_postcards
+        SearchContentType.AMBIENT_SOUND -> Res.string.search_filter_type_soundscapes
+        SearchContentType.PERSON -> Res.string.search_filter_type_people
     }
 
 @Composable
@@ -480,8 +504,6 @@ private fun navigateToResult(
         SearchContentType.STICKER,
         SearchContentType.PLACE,
         -> {
-            // Until dedicated detail screens exist for these types (or TimelineDetailRoute gains an
-            // entryId parameter — Phase 2e), fall back to the containing day.
             val date =
                 result.created
                     .toLocalDateTime(TimeZone.currentSystemDefault())

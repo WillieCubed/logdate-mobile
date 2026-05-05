@@ -1,6 +1,7 @@
 package app.logdate.client.domain.search
 
 import app.logdate.client.repository.search.SearchContentType
+import app.logdate.util.getLocaleFirstDayOfWeek
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
@@ -50,13 +51,14 @@ data class InstantRange(
 /**
  * Resolves this filter to a concrete time window using [now] as the reference point.
  *
- * "This week" starts on Monday in line with ISO 8601, regardless of locale, so the window is
- * stable across users. [DateRangeFilter.AllTime] returns a sentinel range from
- * [Instant.DISTANT_PAST] to [Instant.DISTANT_FUTURE].
+ * "This week" starts on [firstDayOfWeek], which defaults to the platform locale's first day so
+ * search's "this week" matches every other "this week" in the app (e.g. rewinds). [AllTime]
+ * returns a sentinel range from [Instant.DISTANT_PAST] to [Instant.DISTANT_FUTURE].
  */
 fun DateRangeFilter.window(
     now: Instant,
     timeZone: TimeZone,
+    firstDayOfWeek: DayOfWeek = getLocaleFirstDayOfWeek(),
 ): InstantRange {
     if (this == DateRangeFilter.AllTime) {
         return InstantRange(Instant.DISTANT_PAST, Instant.DISTANT_FUTURE)
@@ -66,8 +68,8 @@ fun DateRangeFilter.window(
         when (this) {
             DateRangeFilter.Today -> today to today.plus(1, DateTimeUnit.DAY)
             DateRangeFilter.ThisWeek -> {
-                val mondayOffset = today.dayOfWeek.ordinal - DayOfWeek.MONDAY.ordinal
-                val startOfWeek = today.minus(mondayOffset, DateTimeUnit.DAY)
+                val offset = (today.dayOfWeek.ordinal - firstDayOfWeek.ordinal + 7) % 7
+                val startOfWeek = today.minus(offset, DateTimeUnit.DAY)
                 startOfWeek to startOfWeek.plus(7, DateTimeUnit.DAY)
             }
             DateRangeFilter.ThisMonth -> {
