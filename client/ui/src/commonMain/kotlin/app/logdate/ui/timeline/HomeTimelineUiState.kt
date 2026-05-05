@@ -205,18 +205,19 @@ val DEMO_PEOPLE =
     )
 
 sealed interface NoteUiState {
+    val noteId: Uuid
     val journals: List<JournalBadgeUiState>
 }
 
 data class TextNoteUiState(
-    val noteId: Uuid,
+    override val noteId: Uuid,
     val text: String,
     val timestamp: Instant,
     override val journals: List<JournalBadgeUiState> = emptyList(),
 ) : NoteUiState
 
 data class ImageNoteUiState(
-    val noteId: Uuid,
+    override val noteId: Uuid,
     val uri: String,
     val timestamp: Instant,
     val caption: String = "",
@@ -224,7 +225,7 @@ data class ImageNoteUiState(
 ) : NoteUiState
 
 data class AudioNoteUiState(
-    val noteId: Uuid,
+    override val noteId: Uuid,
     val uri: String,
     val timestamp: Instant,
     val duration: Long = 0, // Duration in milliseconds
@@ -232,7 +233,7 @@ data class AudioNoteUiState(
 ) : NoteUiState
 
 data class VideoNoteUiState(
-    val noteId: Uuid,
+    override val noteId: Uuid,
     val uri: String,
     val timestamp: Instant,
     val thumbnailUri: String? = null,

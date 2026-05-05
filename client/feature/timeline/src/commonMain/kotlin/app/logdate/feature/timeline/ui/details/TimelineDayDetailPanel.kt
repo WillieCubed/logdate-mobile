@@ -51,6 +51,13 @@ fun TimelineDayDetailPanel(
     onDecorate: (() -> Unit)? = null,
     onJournalClick: (Uuid) -> Unit = {},
     scrollState: LazyListState = rememberLazyListState(),
+    /**
+     * Optional UUID of an entry within this day to scroll to on first composition. Used by the
+     * search-result tap fallback (transcription, ambient sound, sticker, place) so the user lands
+     * near the entry instead of at the top of the day. Falls through to scroll-to-top when the
+     * id doesn't match any visible section.
+     */
+    scrollToEntryId: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val summary = uiState.summary
@@ -70,8 +77,16 @@ fun TimelineDayDetailPanel(
             }
         }
 
-    LaunchedEffect(uiState) {
-        scrollState.scrollToTop()
+    LaunchedEffect(uiState, scrollToEntryId) {
+        val targetIndex =
+            scrollToEntryId?.let { id ->
+                targetSectionIndex(id, uiState, resolvedVisitedLocations)
+            }
+        if (targetIndex != null) {
+            scrollState.animateScrollToItem(targetIndex)
+        } else {
+            scrollState.scrollToTop()
+        }
     }
 
     Scaffold(
@@ -153,6 +168,26 @@ fun TimelineDayDetailPanel(
             }
         }
     }
+}
+
+/**
+ * Maps an entry UUID string to the LazyColumn item index of the section that displays it.
+ *
+ * The panel's LazyColumn order is: tldr (0), people (1), notes (2), events (3 — conditional),
+ * locations (3 or 4 depending on whether events are present). The function only resolves
+ * sections whose data the panel exposes; if the entryId belongs to a content type rendered
+ * elsewhere (or not at all) it returns null and the caller falls back to scroll-to-top.
+ */
+internal fun targetSectionIndex(
+    entryId: String,
+    uiState: TimelineDayUiState,
+    visitedLocations: List<DayLocation>,
+): Int? {
+    if (uiState.notes.any { it.noteId.toString() == entryId }) return 2
+    if (visitedLocations.any { it.locationId.toString() == entryId }) {
+        return if (uiState.events.isNotEmpty()) 4 else 3
+    }
+    return null
 }
 
 @Preview

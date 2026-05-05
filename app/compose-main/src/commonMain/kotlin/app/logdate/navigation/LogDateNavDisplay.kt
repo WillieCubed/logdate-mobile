@@ -300,6 +300,7 @@ fun LogDateNavDisplay(
                                     taggedEntry<TimelineDetailRoute> { route ->
                                         TimelineDetailEntry(
                                             date = LocalDate.parse(route.dateIso),
+                                            scrollToEntryId = route.entryId,
                                             onClose = { backStack.removeLastOrNull() },
                                             onOpenLocations = { backStack.add(LocationTimelineRoute) },
                                             onOpenEvent = { backStack.add(EventDetailRoute(it)) },
@@ -335,6 +336,7 @@ private fun rememberHomeSceneStrategy(): SceneStrategy<NavKey> {
 @Composable
 private fun TimelineDetailEntry(
     date: LocalDate,
+    scrollToEntryId: String?,
     onClose: () -> Unit,
     onOpenLocations: () -> Unit,
     onOpenEvent: (eventId: String) -> Unit,
@@ -347,6 +349,7 @@ private fun TimelineDetailEntry(
     uiState.selectedDay?.let { selected ->
         app.logdate.feature.timeline.ui.details.TimelineDayDetailPanel(
             uiState = selected,
+            scrollToEntryId = scrollToEntryId,
             onExit = onClose,
             onOpenEvent = onOpenEvent,
             onOpenLocations = onOpenLocations,
