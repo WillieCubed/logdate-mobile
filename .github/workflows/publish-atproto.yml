@@ -66,43 +66,26 @@ jobs:
             echo "ATPROTO_VERSION=${VERSION}" >> "$GITHUB_ENV"
           fi
 
-      - name: Detect Maven Central availability
-        id: mc
+      - name: Publish ATProto modules
         shell: bash
         run: |
+          # Build the task list dynamically: GH Packages always, Maven Central
+          # only when all four credential/signing secrets are present. One
+          # Gradle invocation so source/javadoc/dokka/sign tasks dedupe across
+          # both targets — running them as two separate steps would re-sign
+          # every module from scratch (Sign tasks aren't @CacheableTask).
+          MODULES=(crypto syntax identity xrpc repo plc lexicon pds pds-runtime bom)
+          REPOS=(AtprotoRepository)
           if [[ -n "$OSSRH_USERNAME" && -n "$OSSRH_PASSWORD" && -n "$SIGNING_KEY" && -n "$SIGNING_PASSWORD" ]]; then
-            echo "Maven Central credentials + signing key present — will publish to OSSRH after GH Packages."
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            REPOS+=(AtprotoMavenCentralRepository)
+            echo "Publishing to GitHub Packages + Maven Central."
           else
-            echo "Maven Central credentials or signing key not fully configured — skipping OSSRH step."
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Publishing to GitHub Packages only (OSSRH or signing secrets not configured)."
           fi
-
-      - name: Publish to GitHub Packages
-        run: >
-          ./gradlew
-          :shared:atproto-crypto:publishAllPublicationsToAtprotoRepository
-          :shared:atproto-syntax:publishAllPublicationsToAtprotoRepository
-          :shared:atproto-identity:publishAllPublicationsToAtprotoRepository
-          :shared:atproto-xrpc:publishAllPublicationsToAtprotoRepository
-          :shared:atproto-repo:publishAllPublicationsToAtprotoRepository
-          :shared:atproto-plc:publishAllPublicationsToAtprotoRepository
-          :shared:atproto-lexicon:publishAllPublicationsToAtprotoRepository
-          :shared:atproto-pds:publishAllPublicationsToAtprotoRepository
-          :shared:atproto-pds-runtime:publishAllPublicationsToAtprotoRepository
-          :shared:atproto-bom:publishAllPublicationsToAtprotoRepository
-
-      - name: Publish to Maven Central
-        if: steps.mc.outputs.enabled == 'true'
-        run: >
-          ./gradlew
-          :shared:atproto-crypto:publishAllPublicationsToAtprotoMavenCentralRepository
-          :shared:atproto-syntax:publishAllPublicationsToAtprotoMavenCentralRepository
-          :shared:atproto-identity:publishAllPublicationsToAtprotoMavenCentralRepository
-          :shared:atproto-xrpc:publishAllPublicationsToAtprotoMavenCentralRepository
-          :shared:atproto-repo:publishAllPublicationsToAtprotoMavenCentralRepository
-          :shared:atproto-plc:publishAllPublicationsToAtprotoMavenCentralRepository
-          :shared:atproto-lexicon:publishAllPublicationsToAtprotoMavenCentralRepository
-          :shared:atproto-pds:publishAllPublicationsToAtprotoMavenCentralRepository
-          :shared:atproto-pds-runtime:publishAllPublicationsToAtprotoMavenCentralRepository
-          :shared:atproto-bom:publishAllPublicationsToAtprotoMavenCentralRepository
+          TASKS=()
+          for repo in "${REPOS[@]}"; do
+            for module in "${MODULES[@]}"; do
+              TASKS+=(":shared:atproto-$module:publishAllPublicationsTo$repo")
+            done
+          done
+          ./gradlew "${TASKS[@]}"
