@@ -3,12 +3,10 @@ package app.logdate.feature.journals.ui.creation
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
-import app.logdate.feature.journals.navigation.JournalCreationRoute
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,12 +23,15 @@ class JournalCreationViewModel(
     private val journalContentRepository: JournalContentRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    val routeData = savedStateHandle.toRoute<JournalCreationRoute>()
+    // Nav3 passes route args directly to the entry composable; if a journalTitle is supplied
+    // at navigation time, the calling code is expected to thread it into the ViewModel via
+    // [setInitialTitle] rather than through SavedStateHandle.
+    private val initialTitle: String = savedStateHandle.get<String>("journalTitle") ?: ""
 
     private val backingUiState =
         MutableStateFlow(
             JournalCreationUiState(
-                title = routeData.journalTitle,
+                title = initialTitle,
             ),
         )
     val uiState: StateFlow<JournalCreationUiState> = backingUiState

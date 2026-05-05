@@ -1,11 +1,8 @@
-@file:Suppress("DEPRECATION")
-
 package app.logdate.feature.journals.ui.detail
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
 import app.logdate.client.domain.search.SearchInJournalUseCase
 import app.logdate.client.domain.timeline.GetJournalMembershipUseCase
 import app.logdate.client.repository.journals.JournalContentRepository
@@ -13,7 +10,6 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.sharing.SharingLauncher
-import app.logdate.feature.journals.navigation.JournalDetailsRoute
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -67,17 +63,12 @@ class JournalDetailViewModel(
         searchQueryState.value = query
     }
 
-    // Try to initialize from route if possible
+    // Best-effort init from SavedStateHandle. The Nav3 entry passes the journal id directly
+    // to the screen, which then calls [setJournalId]; this fallback only fires if a caller
+    // populated SavedStateHandle["journalId"] manually (deep-link push, instrumentation test).
     init {
-        try {
-            val routeData = savedStateHandle.toRoute<JournalDetailsRoute>()
-            try {
-                journalIdState.value = Uuid.parse(routeData.journalId)
-            } catch (e: Exception) {
-                // Invalid UUID in route, leave as null
-            }
-        } catch (e: Exception) {
-            // No route data, leave as null
+        savedStateHandle.get<String>("journalId")?.let { raw ->
+            runCatching { Uuid.parse(raw) }.onSuccess { journalIdState.value = it }
         }
     }
 
