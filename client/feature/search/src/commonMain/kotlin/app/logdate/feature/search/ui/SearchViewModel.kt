@@ -88,8 +88,17 @@ class SearchViewModel(
             initialValue = SearchScreenState.Idle(emptyList()),
         )
 
+    /**
+     * Read-only view of the active filter set so UI can render selected chips.
+     *
+     * Uses [asStateFlow] rather than [stateIn] because [filtersState] is already a hot
+     * [MutableStateFlow] with no operator chain to share — `stateIn` would only add a coroutine
+     * and a `WhileSubscribed` window that could let `filters.value` drift from `filtersState.value`
+     * during gaps between subscribers.
+     */
     val filters: StateFlow<SearchFilters> = filtersState.asStateFlow()
 
+    /** Updates the search query text. */
     fun updateQuery(newQuery: String) {
         queryState.update { SearchQuery(newQuery) }
     }
