@@ -53,18 +53,6 @@ internal suspend fun Context.importIncomingEditorShare(
         }
     }
 
-/**
- * When the user picks a sharing shortcut from the system share sheet, the OS
- * delivers the original SEND intent with [Intent.EXTRA_SHORTCUT_ID] set to the
- * id of the chosen shortcut. For LogDate's per-journal Direct Share targets,
- * that id encodes the journal UUID via [DynamicShortcutDescriptor.ShareToJournal.ID_PREFIX].
- *
- * Returns the parsed journal UUID, or null when:
- * - No shortcut id was provided (the user shared via the generic LogDate target).
- * - The shortcut id belongs to a launcher shortcut (Continue draft / Today / Rewind),
- *   not a sharing shortcut.
- * - The id format is unrecognised (defensive against future changes).
- */
 private fun Intent.parseShareToJournalShortcutId(): Uuid? {
     val shortcutId = getStringExtra(Intent.EXTRA_SHORTCUT_ID) ?: return null
     val prefix = "${DynamicShortcutDescriptor.ShareToJournal.ID_PREFIX}:"

@@ -14,7 +14,12 @@ import android.view.MenuItem
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -59,10 +64,10 @@ import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_ID
 import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_TARGET
 import app.logdate.client.rewind.REWIND_NOTIFICATION_TARGET_DETAIL
-import app.logdate.client.sharing.SharingLauncher
 import app.logdate.client.testing.navigation.readNavigationTestDestination
 import app.logdate.client.testing.onboarding.OnboardingTestFixtureApplier
 import app.logdate.client.testing.onboarding.readOnboardingTestFixture
+import app.logdate.client.ui.navigation.LocationTimelineRoute
 import app.logdate.client.updates.ActivityResultAppUpdateFlowLauncher
 import app.logdate.client.updates.PlayInAppUpdateController
 import app.logdate.client.watch.WatchCompanionAssociationManager
@@ -77,15 +82,12 @@ import app.logdate.feature.core.export.AndroidExportLauncher
 import app.logdate.feature.core.isAppUnlocked
 import app.logdate.feature.core.restore.AndroidRestoreLauncher
 import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
-import app.logdate.feature.core.settings.updates.AppUpdateUiState
+import app.logdate.feature.editor.navigation.EntryEditorRoute
+import app.logdate.feature.events.navigation.EventDetailRoute
 import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
+import app.logdate.feature.rewind.navigation.RewindDetailRoute
 import app.logdate.navigation.LogDateNavDisplay
-import app.logdate.navigation.routes.core.EntryEditor
-import app.logdate.navigation.routes.core.EventDetailRoute
-import app.logdate.navigation.routes.core.LocationRoute
-import app.logdate.navigation.routes.core.NoteViewerRoute
-import app.logdate.navigation.routes.core.RewindDetailRoute
-import app.logdate.navigation.routes.core.TimelineDetail
+import app.logdate.navigation.TimelineDetailRoute
 import io.github.aakira.napier.Napier
 import io.github.vinceglb.filekit.core.FileKit
 import kotlinx.coroutines.delay
@@ -100,14 +102,9 @@ import app.logdate.client.location.tracking.EXTRA_NAV_SOURCE as EXTRA_LOCATION_N
 /**
  * The main app activity.
  *
- * This activity is the entry point of the app and is responsible for setting up the app's UI and
- * handling the app's lifecycle.
- *
- * On load, this activity will display a splash screen until the app's UI is ready to be displayed.
- * If the user has not onboarded yet, the app will display the onboarding flow. Otherwise, the app
- * will display the main app UI.
- *
- * This activity is also responsible for providing the app's assist content and direct actions.
+ * Bridges Android lifecycle and platform launchers (export, restore, app updates, watch
+ * association, biometric gatekeeper, multi-window editor windows, deep links, and the
+ * Android 16+ handoff API) into the shared [LogDateNavDisplay] graph.
  */
 class MainActivity : FragmentActivity() {
     private val biometricGatekeeper: BiometricGatekeeper by inject()
@@ -120,7 +117,6 @@ class MainActivity : FragmentActivity() {
     private val playInAppUpdateController: PlayInAppUpdateController by inject()
     private val watchCompanionAssociationManager: WatchCompanionAssociationManager by inject()
     private val locationTrackingManager: LocationTrackingManager by inject()
-    private val sharingLauncher: SharingLauncher by inject()
     private val profileRepository: ProfileRepository by inject()
     private val userStateRepository: UserStateRepository by inject()
     private val sessionStorage: SessionStorage by inject()
@@ -135,23 +131,15 @@ class MainActivity : FragmentActivity() {
     private var pendingNavKey by mutableStateOf<NavKey?>(null)
     private var currentNavKey by mutableStateOf<NavKey?>(null)
     private var databaseStartupState by mutableStateOf<DatabaseStartupState>(DatabaseStartupState.Ready)
-    private var appUpdateUiState by mutableStateOf(AppUpdateUiState())
     private var launchSnapshot by mutableStateOf(LaunchStageSnapshot())
     private var hasCheckedForAppUpdates by mutableStateOf(false)
-    private var postRestoreType by mutableStateOf(PostRestoreType.NONE)
     private var hasDetectedPostRestore by mutableStateOf(false)
 
-    // Register the document picker for export functionality
     private val createDocumentLauncher =
         registerForActivityResult(
             ActivityResultContracts.StartActivityForResult(),
         ) { result ->
-            val uri =
-                if (result.resultCode == RESULT_OK) {
-                    result.data?.data
-                } else {
-                    null
-                }
+            val uri = if (result.resultCode == RESULT_OK) result.data?.data else null
             androidExportLauncher.onExportDestinationSelected(uri)
         }
 
@@ -159,16 +147,10 @@ class MainActivity : FragmentActivity() {
         registerForActivityResult(
             ActivityResultContracts.StartActivityForResult(),
         ) { result ->
-            val uri =
-                if (result.resultCode == RESULT_OK) {
-                    result.data?.data
-                } else {
-                    null
-                }
+            val uri = if (result.resultCode == RESULT_OK) result.data?.data else null
             androidRestoreLauncher.onRestoreSourceSelected(uri)
         }
 
-    // Bridges Play Core's update UI back into the controller through the Activity Result API.
     private val appUpdateLauncher =
         registerForActivityResult(
             ActivityResultContracts.StartIntentSenderForResult(),
@@ -192,15 +174,12 @@ class MainActivity : FragmentActivity() {
             applyOnboardingTestFixtureFromLaunchIntent()
         }
 
-        // Set up FileKit for file operations
         FileKit.init(this)
         Napier.i("MainActivity onCreate: FileKit initialized", tag = APP_LAUNCH_TAG)
 
-        // Set up biometric gatekeeper
         (biometricGatekeeper as? AndroidBiometricGatekeeper)?.setActivity(this)
         Napier.i("MainActivity onCreate: biometric gatekeeper configured", tag = APP_LAUNCH_TAG)
 
-        // Register this activity for use by the export launcher
         activityProvider.currentActivity = this
         androidExportLauncher.setupActivityResultLauncher(createDocumentLauncher)
         androidExportLauncher.setupWorkObserver(this)
@@ -210,7 +189,6 @@ class MainActivity : FragmentActivity() {
         watchCompanionAssociationManager.attachLauncher(watchAssociationLauncher)
         Napier.i("MainActivity onCreate: export/restore/update launchers configured", tag = APP_LAUNCH_TAG)
 
-        // Set up multi-window support
         setupMultiWindowSupport()
         Napier.i("MainActivity onCreate: multi-window support configured", tag = APP_LAUNCH_TAG)
 
@@ -256,11 +234,6 @@ class MainActivity : FragmentActivity() {
                             }
                         }.collect {}
                 }
-                launch {
-                    playInAppUpdateController.uiState
-                        .onEach { state -> appUpdateUiState = state }
-                        .collect {}
-                }
             }
         }
 
@@ -287,21 +260,42 @@ class MainActivity : FragmentActivity() {
         setContent {
             val state = appUiState as? GlobalAppUiLoadedState
             if (state != null) {
-                LogDateNavDisplay(
-                    appUiState = state,
-                    onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
-                )
-                // TODO(android): port deep-link push, post-restore prompt, app-update sheet,
-                // multi-window dispatch, and adaptive scenes from the legacy
-                // MainActivityUiRoot onto the new commonMain graph.
-            } else {
-                MainActivityLoadingRoot()
+                androidx.compose.foundation.layout.Box(
+                    modifier =
+                        androidx.compose.ui.Modifier
+                            .fillMaxSize(),
+                ) {
+                    LogDateNavDisplay(
+                        appUiState = state,
+                        onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
+                        pendingNavKey = pendingNavKey,
+                        onPendingNavKeyConsumed = { pendingNavKey = null },
+                        onCurrentNavKeyChanged = { currentNavKey = it },
+                    )
+                    val updateState by playInAppUpdateController.uiState.collectAsState()
+                    app.logdate.feature.core.settings.updates.AppUpdatePrompt(
+                        uiState = updateState,
+                        onLaunchUpdate = {
+                            lifecycleScope.launch {
+                                playInAppUpdateController.checkForUpdates(AppUpdateCheckTrigger.Manual)
+                            }
+                        },
+                        onCompleteUpdate = {
+                            lifecycleScope.launch {
+                                playInAppUpdateController.completeUpdate()
+                            }
+                        },
+                        modifier =
+                            androidx.compose.ui.Modifier
+                                .align(androidx.compose.ui.Alignment.TopCenter)
+                                .windowInsetsPadding(WindowInsets.statusBars),
+                    )
+                }
             }
         }
         markLaunchStage(LaunchStage.ComposeAttached)
         Napier.i("MainActivity onCreate: Compose content attached", tag = APP_LAUNCH_TAG)
 
-        // Handle the intent if this activity was launched with one
         if (intent?.let { handleMultiWindowIntent(it) } == true) {
             return
         }
@@ -333,17 +327,14 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        // Add multi-window options to the menu
         createMultiWindowMenuOptions(menu)
         return true
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        // Handle multi-window menu selections
         if (handleMultiWindowMenuSelection(item)) {
             return true
         }
-
         return super.onOptionsItemSelected(item)
     }
 
@@ -370,23 +361,10 @@ class MainActivity : FragmentActivity() {
         locationTrackingManager.onActivityPaused()
         viewModel.onAppBackgrounded()
         if (activityProvider.currentActivity === this) {
-            // Only clear the reference if it's still pointing to this activity
             activityProvider.currentActivity = null
         }
     }
 
-    /**
-     * Runs post-restore detection exactly once per app launch.
-     *
-     * D2D transfers should now work transparently thanks to the passphrase backup
-     * store: even when the KeyStore doesn't survive, DatabasePassphraseProvider
-     * recovers the passphrase from the backup file and re-populates SecureStorage.
-     *
-     * If D2D is detected but the database STILL requires recovery (passphrase backup
-     * was also missing — possible on very old installs that predate the backup store),
-     * downgrade to cloud restore UX so the user sees the contextual empty state
-     * instead of the blocking recovery dialog.
-     */
     private fun detectPostRestoreOnce(state: GlobalAppUiLoadedState) {
         if (hasDetectedPostRestore) return
         hasDetectedPostRestore = true
@@ -404,12 +382,8 @@ class MainActivity : FragmentActivity() {
             detected = PostRestoreType.CLOUD_RESTORE
         }
 
-        postRestoreType = detected
-
         when (detected) {
-            PostRestoreType.NONE -> {
-                postRestoreDetector.markDeviceInitialized()
-            }
+            PostRestoreType.NONE -> postRestoreDetector.markDeviceInitialized()
             PostRestoreType.DEVICE_TRANSFER -> {
                 Napier.i("D2D restore: database opened successfully, writing sentinel", tag = APP_LAUNCH_TAG)
                 postRestoreDetector.markDeviceInitialized()
@@ -421,53 +395,10 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    private fun acknowledgeCloudRestore() {
-        postRestoreDetector.markDeviceInitialized()
-        postRestoreType = PostRestoreType.NONE
-    }
-
-    private fun resetEncryptedStorageAndRestart() {
-        lifecycleScope.launch {
-            Napier.w("Recovery action: user requested encrypted storage reset", tag = APP_LAUNCH_TAG)
-            databaseRecoveryController
-                .quarantineAndResetEncryptedStorage()
-                .onSuccess { backup ->
-                    Napier.w(
-                        "Recovery action: reset complete, backup preserved at ${backup.absolutePath}",
-                        tag = APP_LAUNCH_TAG,
-                    )
-                    restartApplicationProcess()
-                }.onFailure { error ->
-                    Napier.e("Recovery action: failed to reset encrypted storage", error, tag = APP_LAUNCH_TAG)
-                }
-        }
-    }
-
-    private fun restartApplicationProcess() {
-        val launchIntent =
-            packageManager.getLaunchIntentForPackage(packageName)?.apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            }
-        if (launchIntent != null) {
-            startActivity(launchIntent)
-        }
-        finishAffinity()
-        Runtime.getRuntime().exit(0)
-    }
-
-    /**
-     * Starts one automatic Play update check after the app is actually usable.
-     *
-     * This prevents the update flow from competing with onboarding or the biometric unlock gate.
-     */
     private fun maybeCheckForUpdates(state: GlobalAppUiState) {
         val loadedState = state as? GlobalAppUiLoadedState ?: return
-        if (hasCheckedForAppUpdates) {
-            return
-        }
-        if (!loadedState.isOnboarded || !loadedState.isAppUnlocked) {
-            return
-        }
+        if (hasCheckedForAppUpdates) return
+        if (!loadedState.isOnboarded || !loadedState.isAppUnlocked) return
 
         hasCheckedForAppUpdates = true
         lifecycleScope.launch {
@@ -479,33 +410,10 @@ class MainActivity : FragmentActivity() {
 
     private fun markLaunchStage(stage: LaunchStage) {
         val updatedSnapshot = launchSnapshot.markCompleted(stage)
-        if (updatedSnapshot == launchSnapshot) {
-            return
-        }
+        if (updatedSnapshot == launchSnapshot) return
         launchSnapshot = updatedSnapshot
         Napier.i("MainActivity launch stage: ${stage.analyticsName}", tag = APP_LAUNCH_TAG)
     }
-
-//    override fun onProvideAssistContent(assistContent: AssistContent) {
-//        super.onProvideAssistContent(assistContent)
-//        assistContent.apply {
-//            val assistData = assistantContextProvider.jsonData
-//            structuredData = assistData
-//            clipData = assistantContextProvider.clipData
-//        }
-//    }
-
-    // TODO: Ensure assistant can get actions
-//    override fun onGetDirectActions(
-//        cancellationSignal: CancellationSignal, callback: Consumer<MutableList<DirectAction>>
-//    ) {
-//        if (voiceInteractor == null) {
-//            super.onGetDirectActions(cancellationSignal, callback)
-//            return
-//        }
-//        callback.accept(assistantActionsProvider.supportedActions.map { it.toDirectAction() }
-//            .toMutableList())
-//    }
 }
 
 /** Resolves the optional deep-link destination from intent extras. */
@@ -515,35 +423,44 @@ private fun resolveNavKey(intent: Intent?): NavKey? {
     return when {
         intent.getStringExtra(EXTRA_NAV_SOURCE) == NAV_SOURCE_AUDIO_PLAYBACK -> {
             val noteId = intent.getStringExtra(EXTRA_NOTE_ID) ?: return null
-            runCatching { NoteViewerRoute(Uuid.parse(noteId)) }.getOrNull()
+            runCatching {
+                app.logdate.feature.journals.navigation
+                    .NoteDetailRoute(Uuid.parse(noteId))
+            }.getOrNull()
         }
 
         intent.getStringExtra(EXTRA_NAV_SOURCE) == NAV_SOURCE_ON_THIS_DAY_WIDGET -> {
             val dateStr = intent.getStringExtra(EXTRA_WIDGET_TARGET_DATE) ?: return null
-            runCatching { TimelineDetail(kotlinx.datetime.LocalDate.parse(dateStr)) }.getOrNull()
+            runCatching {
+                kotlinx.datetime.LocalDate.parse(dateStr)
+                TimelineDetailRoute(dateStr)
+            }.getOrNull()
         }
 
         intent.getStringExtra(EXTRA_LOCATION_NAV_SOURCE) == NAV_SOURCE_LOCATION_HISTORY -> {
-            LocationRoute
+            LocationTimelineRoute
         }
 
         intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_NEW_ENTRY -> {
-            EntryEditor()
+            EntryEditorRoute()
         }
 
         intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_DRAFT -> {
             val draftId = intent.getStringExtra(EXTRA_AMBIENT_PROMPT_DRAFT_ID) ?: return null
-            runCatching { EntryEditor(draftId = Uuid.parse(draftId)) }.getOrNull()
+            runCatching { EntryEditorRoute(draftId = Uuid.parse(draftId).toString()) }.getOrNull()
         }
 
         intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_MEMORY_RECALL -> {
             val dateStr = intent.getStringExtra(EXTRA_AMBIENT_PROMPT_RECALL_DATE) ?: return null
-            runCatching { TimelineDetail(kotlinx.datetime.LocalDate.parse(dateStr)) }.getOrNull()
+            runCatching {
+                kotlinx.datetime.LocalDate.parse(dateStr)
+                TimelineDetailRoute(dateStr)
+            }.getOrNull()
         }
 
         intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_EVENT_DETAIL -> {
             val eventId = intent.getStringExtra(EXTRA_AMBIENT_PROMPT_EVENT_ID) ?: return null
-            runCatching { EventDetailRoute(Uuid.parse(eventId)) }.getOrNull()
+            runCatching { EventDetailRoute(eventId) }.getOrNull()
         }
 
         intent.getStringExtra(EXTRA_REWIND_NOTIFICATION_TARGET) == REWIND_NOTIFICATION_TARGET_DETAIL -> {
@@ -558,14 +475,13 @@ private fun resolveNavKey(intent: Intent?): NavKey? {
     }
 }
 
-/** Compose preview for the Android activity root. */
 @Preview
 @Suppress("ktlint:standard:function-naming")
 @Composable
 fun AppAndroidPreview() {
-    app.logdate.navigation.LogDateNavDisplay(
+    LogDateNavDisplay(
         appUiState = GlobalAppUiLoadedState(),
-        onShowUnlockPrompt = { /* No-op for preview */ },
+        onShowUnlockPrompt = { },
     )
 }
 

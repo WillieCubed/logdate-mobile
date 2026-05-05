@@ -1,6 +1,6 @@
 package app.logdate.di
 
-import app.logdate.navigation.EditorManager
+import app.logdate.client.editor.EditorManager
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
@@ -9,6 +9,5 @@ import org.koin.dsl.module
  */
 val windowingModule =
     module {
-        // Editor manager for multi-window support
         single { EditorManager(androidContext()) }
     }

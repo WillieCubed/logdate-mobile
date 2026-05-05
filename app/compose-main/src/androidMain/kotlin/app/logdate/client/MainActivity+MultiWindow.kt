@@ -6,16 +6,14 @@ import android.content.Intent
 import android.view.Menu
 import android.view.MenuItem
 import androidx.lifecycle.lifecycleScope
+import app.logdate.client.editor.EditorManager
 import app.logdate.client.media.MediaManager
 import app.logdate.client.shortcuts.parseLauncherShortcutTargetJournalId
-import app.logdate.navigation.EditorManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
-/**
- * Initializes the multi-window feature gate without starting any background observers.
- */
+/** Initializes the multi-window feature gate without starting any background observers. */
 fun MainActivity.setupMultiWindowSupport() {
     val editorManager: EditorManager by inject()
     if (!editorManager.supportsMultiWindow()) {
@@ -23,13 +21,6 @@ fun MainActivity.setupMultiWindowSupport() {
     }
 }
 
-/**
- * Creates menu options for multi-window support.
- * This should be called from the MainActivity's onCreateOptionsMenu method.
- *
- * @param menu The menu to add items to
- * @return true if the menu was modified
- */
 fun MainActivity.createMultiWindowMenuOptions(menu: Menu): Boolean {
     val editorManager: EditorManager by inject()
 
@@ -43,13 +34,6 @@ fun MainActivity.createMultiWindowMenuOptions(menu: Menu): Boolean {
     return true
 }
 
-/**
- * Handles menu selections for multi-window support.
- * This should be called from the MainActivity's onOptionsItemSelected method.
- *
- * @param item The selected menu item
- * @return true if the item was handled
- */
 fun MainActivity.handleMultiWindowMenuSelection(item: MenuItem): Boolean {
     val editorManager: EditorManager by inject()
 
@@ -62,17 +46,10 @@ fun MainActivity.handleMultiWindowMenuSelection(item: MenuItem): Boolean {
     }
 }
 
-/**
- * Handles incoming intents for the multi-window functionality.
- * This should be called from the MainActivity's onNewIntent method.
- *
- * @param intent The new intent received
- */
 fun MainActivity.handleMultiWindowIntent(intent: Intent): Boolean {
     val editorManager: EditorManager by inject()
     val mediaManager: MediaManager by inject()
 
-    // Check for actions that should launch a new editor
     return when (intent.action) {
         Intent.ACTION_SEND,
         Intent.ACTION_SEND_MULTIPLE,
@@ -100,11 +77,8 @@ fun MainActivity.handleMultiWindowIntent(intent: Intent): Boolean {
             true
         }
 
-        else -> {
-            false
-        }
+        else -> false
     }
 }
 
-// Menu item IDs
 private const val MENU_ID_NEW_EDITOR = 1001

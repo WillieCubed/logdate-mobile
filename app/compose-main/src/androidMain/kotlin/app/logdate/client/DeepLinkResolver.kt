@@ -2,11 +2,13 @@ package app.logdate.client
 
 import android.net.Uri
 import androidx.navigation3.runtime.NavKey
-import app.logdate.navigation.routes.core.JournalDetail
-import app.logdate.navigation.routes.core.NoteViewerRoute
-import app.logdate.navigation.routes.core.PostcardViewerRoute
-import app.logdate.navigation.routes.core.RewindDetailRoute
-import app.logdate.navigation.routes.core.TimelineDetail
+import app.logdate.client.ui.navigation.LocationTimelineRoute
+import app.logdate.feature.events.navigation.EventDetailRoute
+import app.logdate.feature.journals.navigation.JournalDetailsRoute
+import app.logdate.feature.journals.navigation.NoteDetailRoute
+import app.logdate.feature.postcards.navigation.PostcardViewerRoute
+import app.logdate.feature.rewind.navigation.RewindDetailRoute
+import app.logdate.navigation.TimelineDetailRoute
 import kotlin.uuid.Uuid
 
 private const val PATH_JOURNAL = "journal"
@@ -14,6 +16,8 @@ private const val PATH_DAY = "day"
 private const val PATH_NOTE = "note"
 private const val PATH_POSTCARD = "postcard"
 private const val PATH_REWIND = "rewind"
+private const val PATH_LOCATION = "location"
+private const val PATH_EVENT = "event"
 
 internal val LOGDATE_API_BASE_URL: Uri = Uri.parse(BuildConfig.LOGDATE_API_BASE_URL)
 
@@ -30,11 +34,13 @@ fun resolveDeepLinkUri(uri: Uri): NavKey? {
     val host = uri.host ?: return null
 
     return when (host) {
-        PATH_JOURNAL -> segments.firstOrNull()?.parseUuidTo { JournalDetail(it) }
-        PATH_DAY -> segments.firstOrNull()?.parseDateTo { TimelineDetail(it) }
-        PATH_NOTE -> segments.firstOrNull()?.parseUuidTo { NoteViewerRoute(it) }
+        PATH_JOURNAL -> segments.firstOrNull()?.parseUuidTo { JournalDetailsRoute(it) }
+        PATH_DAY -> segments.firstOrNull()?.parseDateString { TimelineDetailRoute(it) }
+        PATH_NOTE -> segments.firstOrNull()?.parseUuidTo { NoteDetailRoute(it) }
         PATH_POSTCARD -> segments.firstOrNull()?.parseUuidTo { PostcardViewerRoute(it) }
         PATH_REWIND -> segments.firstOrNull()?.parseUuidTo { RewindDetailRoute(it) }
+        PATH_LOCATION -> LocationTimelineRoute
+        PATH_EVENT -> segments.firstOrNull()?.let { EventDetailRoute(it) }
         BuildConfig.LOGDATE_ORIGIN -> resolveWebPath(segments)
         else -> null
     }
@@ -43,44 +49,51 @@ fun resolveDeepLinkUri(uri: Uri): NavKey? {
 /**
  * Converts a navigation destination to its canonical logdate.app web URL.
  *
- * This is the inverse of [resolveDeepLinkUri] for web-scheme URIs.
- * Returns null for destinations with no stable addressable URL (list screens, settings, etc.).
+ * Inverse of [resolveDeepLinkUri] for web-scheme URIs. Returns null for destinations
+ * with no stable addressable URL (list screens, settings, etc.).
  */
 fun NavKey.toWebUrl(): String? =
     when (this) {
-        is JournalDetail ->
+        is JournalDetailsRoute ->
             LOGDATE_API_BASE_URL
                 .buildUpon()
                 .appendPath(PATH_JOURNAL)
-                .appendPath(id.toString())
+                .appendPath(journalId)
                 .build()
                 .toString()
-        is TimelineDetail ->
+        is TimelineDetailRoute ->
             LOGDATE_API_BASE_URL
                 .buildUpon()
                 .appendPath(PATH_DAY)
-                .appendPath(day.toString())
+                .appendPath(dateIso)
                 .build()
                 .toString()
-        is NoteViewerRoute ->
+        is NoteDetailRoute ->
             LOGDATE_API_BASE_URL
                 .buildUpon()
                 .appendPath(PATH_NOTE)
-                .appendPath(id.toString())
+                .appendPath(noteId)
                 .build()
                 .toString()
         is PostcardViewerRoute ->
             LOGDATE_API_BASE_URL
                 .buildUpon()
                 .appendPath(PATH_POSTCARD)
-                .appendPath(postcardId.toString())
+                .appendPath(postcardId)
                 .build()
                 .toString()
         is RewindDetailRoute ->
             LOGDATE_API_BASE_URL
                 .buildUpon()
                 .appendPath(PATH_REWIND)
-                .appendPath(id.toString())
+                .appendPath(id)
+                .build()
+                .toString()
+        is EventDetailRoute ->
+            LOGDATE_API_BASE_URL
+                .buildUpon()
+                .appendPath(PATH_EVENT)
+                .appendPath(eventId)
                 .build()
                 .toString()
         else -> null
@@ -88,17 +101,22 @@ fun NavKey.toWebUrl(): String? =
 
 private fun resolveWebPath(segments: List<String>): NavKey? {
     val type = segments.getOrNull(0) ?: return null
-    val value = segments.getOrNull(1) ?: return null
+    val value = segments.getOrNull(1)
     return when (type) {
-        PATH_JOURNAL -> value.parseUuidTo { JournalDetail(it) }
-        PATH_DAY -> value.parseDateTo { TimelineDetail(it) }
-        PATH_POSTCARD -> value.parseUuidTo { PostcardViewerRoute(it) }
-        PATH_REWIND -> value.parseUuidTo { RewindDetailRoute(it) }
+        PATH_JOURNAL -> value?.parseUuidTo { JournalDetailsRoute(it) }
+        PATH_DAY -> value?.parseDateString { TimelineDetailRoute(it) }
+        PATH_POSTCARD -> value?.parseUuidTo { PostcardViewerRoute(it) }
+        PATH_REWIND -> value?.parseUuidTo { RewindDetailRoute(it) }
+        PATH_LOCATION -> LocationTimelineRoute
+        PATH_EVENT -> value?.let { EventDetailRoute(it) }
         else -> null
     }
 }
 
 private inline fun <T : NavKey> String.parseUuidTo(create: (Uuid) -> T): T? = runCatching { create(Uuid.parse(this)) }.getOrNull()
 
-private inline fun <T : NavKey> String.parseDateTo(create: (kotlinx.datetime.LocalDate) -> T): T? =
-    runCatching { create(kotlinx.datetime.LocalDate.parse(this)) }.getOrNull()
+private inline fun <T : NavKey> String.parseDateString(create: (String) -> T): T? =
+    runCatching {
+        kotlinx.datetime.LocalDate.parse(this)
+        create(this)
+    }.getOrNull()
