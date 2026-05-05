@@ -38,6 +38,7 @@ import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -72,6 +73,7 @@ import logdate.client.feature.search.generated.resources.search_bucket_this_mont
 import logdate.client.feature.search.generated.resources.search_bucket_this_week
 import logdate.client.feature.search.generated.resources.search_bucket_today
 import logdate.client.feature.search.generated.resources.search_bucket_yesterday
+import logdate.client.feature.search.generated.resources.search_empty_clear_filters
 import logdate.client.feature.search.generated.resources.search_entries
 import logdate.client.feature.search.generated.resources.search_filter_clear
 import logdate.client.feature.search.generated.resources.search_filter_date_all_time
@@ -91,6 +93,8 @@ import logdate.client.feature.search.generated.resources.search_filter_type_stic
 import logdate.client.feature.search.generated.resources.search_filter_type_voice_notes
 import logdate.client.feature.search.generated.resources.search_for_entries
 import logdate.client.feature.search.generated.resources.search_no_results
+import logdate.client.feature.search.generated.resources.search_recent_clear_all
+import logdate.client.feature.search.generated.resources.search_recent_remove
 import logdate.client.feature.search.generated.resources.searching_entries
 import logdate.client.ui.generated.resources.common_go_back
 import org.jetbrains.compose.resources.StringResource
@@ -125,6 +129,8 @@ fun SearchScreen(
     val searchState by viewModel.searchState.collectAsState()
     val queryText by viewModel.queryText.collectAsState()
     val filters by viewModel.filters.collectAsState()
+    val onRemoveRecent: (String) -> Unit = viewModel::removeRecentSearch
+    val onClearAllRecents: () -> Unit = viewModel::clearRecentSearches
 
     LaunchedEffect(initialQuery) {
         if (initialQuery.isNotBlank() && queryText.isBlank()) {
@@ -142,6 +148,8 @@ fun SearchScreen(
         onToggleType = viewModel::toggleContentType,
         onSetDateRange = viewModel::setDateRange,
         onClearFilters = viewModel::clearFilters,
+        onRemoveRecent = onRemoveRecent,
+        onClearAllRecents = onClearAllRecents,
         onNavigateToDay = onNavigateToDay,
         onNavigateToJournal = onNavigateToJournal,
         onNavigateToPerson = onNavigateToPerson,
@@ -180,6 +188,8 @@ fun SearchScreenContent(
     onToggleType: (SearchContentType) -> Unit = {},
     onSetDateRange: (DateRangeFilter) -> Unit = {},
     onClearFilters: () -> Unit = {},
+    onRemoveRecent: (String) -> Unit = {},
+    onClearAllRecents: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val searchBarState = rememberSearchBarState()
@@ -270,8 +280,12 @@ fun SearchScreenContent(
                 )
                 SearchStateContent(
                     searchState = searchState,
+                    filters = filters,
                     onQueryChange = onQueryChange,
                     onCommitSearch = onCommitSearch,
+                    onClearFilters = onClearFilters,
+                    onRemoveRecent = onRemoveRecent,
+                    onClearAllRecents = onClearAllRecents,
                     onNavigateToDay = onNavigateToDay,
                     onNavigateToJournal = onNavigateToJournal,
                     onNavigateToPerson = onNavigateToPerson,
@@ -291,8 +305,12 @@ fun SearchScreenContent(
 @Composable
 private fun SearchStateContent(
     searchState: SearchScreenState,
+    filters: SearchFilters,
     onQueryChange: (String) -> Unit,
     onCommitSearch: () -> Unit,
+    onClearFilters: () -> Unit,
+    onRemoveRecent: (String) -> Unit,
+    onClearAllRecents: () -> Unit,
     onNavigateToDay: (LocalDate) -> Unit,
     onNavigateToJournal: (Uuid) -> Unit,
     onNavigateToPerson: (Uuid) -> Unit,
@@ -306,6 +324,8 @@ private fun SearchStateContent(
             RecentSearchesList(
                 recentSearches = searchState.recentSearches,
                 onSelectRecent = { query -> onQueryChange(query) },
+                onRemoveRecent = onRemoveRecent,
+                onClearAllRecents = onClearAllRecents,
             )
         }
 
@@ -323,15 +343,31 @@ private fun SearchStateContent(
         }
 
         is SearchScreenState.Empty -> {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize(),
+            val anyFilterActive =
+                filters.contentTypes != null || filters.dateRange != DateRangeFilter.AllTime
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Spacing.md, Alignment.CenterVertically),
+                modifier = Modifier.fillMaxSize().padding(Spacing.lg),
             ) {
                 Text(
                     text = stringResource(Res.string.search_no_results, searchState.query),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (anyFilterActive) {
+                    AssistChip(
+                        onClick = onClearFilters,
+                        label = { Text(stringResource(Res.string.search_empty_clear_filters)) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.FilterAltOff,
+                                contentDescription = null,
+                                modifier = Modifier.size(AssistChipDefaults.IconSize),
+                            )
+                        },
+                    )
+                }
             }
         }
 
@@ -506,6 +542,8 @@ private fun SearchContentType.labelKey(): StringResource =
 private fun RecentSearchesList(
     recentSearches: List<String>,
     onSelectRecent: (String) -> Unit,
+    onRemoveRecent: (String) -> Unit,
+    onClearAllRecents: () -> Unit,
 ) {
     if (recentSearches.isEmpty()) {
         Box(
@@ -520,11 +558,30 @@ private fun RecentSearchesList(
         }
     } else {
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
-            items(recentSearches) { query ->
+            item(key = "recents_clear_all") {
+                Box(
+                    contentAlignment = Alignment.CenterEnd,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg),
+                ) {
+                    TextButton(onClick = onClearAllRecents) {
+                        Text(stringResource(Res.string.search_recent_clear_all))
+                    }
+                }
+            }
+            items(items = recentSearches, key = { "recent_$it" }) { query ->
                 ListItem(
                     headlineContent = { Text(query) },
                     leadingContent = {
                         Icon(Icons.Default.History, contentDescription = null)
+                    },
+                    trailingContent = {
+                        IconButton(onClick = { onRemoveRecent(query) }) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription =
+                                    stringResource(Res.string.search_recent_remove),
+                            )
+                        }
                     },
                     modifier = Modifier.clickable { onSelectRecent(query) },
                 )

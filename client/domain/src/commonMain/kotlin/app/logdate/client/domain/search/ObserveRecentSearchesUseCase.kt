@@ -29,4 +29,11 @@ class ObserveRecentSearchesUseCase(
     suspend fun clear() {
         recentSearchesRepository.clearRecentSearches()
     }
+
+    /**
+     * Removes a single recent search by exact query match.
+     */
+    suspend fun remove(query: String) {
+        recentSearchesRepository.removeRecentSearch(query)
+    }
 }

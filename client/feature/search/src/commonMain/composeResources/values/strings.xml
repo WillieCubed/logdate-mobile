@@ -27,4 +27,7 @@
     <string name="search_bucket_this_week">This week</string>
     <string name="search_bucket_this_month">This month</string>
     <string name="search_bucket_earlier">Earlier</string>
+    <string name="search_recent_remove">Remove recent search</string>
+    <string name="search_recent_clear_all">Clear all</string>
+    <string name="search_empty_clear_filters">Clear filters</string>
 </resources>
