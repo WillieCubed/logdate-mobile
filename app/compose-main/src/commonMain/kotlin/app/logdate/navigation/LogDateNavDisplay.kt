@@ -19,6 +19,8 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.ui.NavDisplay
+import app.logdate.client.repository.search.SearchContentType
+import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.ui.LockableContent
 import app.logdate.client.ui.navigation.DeepLinkAction
 import app.logdate.client.ui.navigation.DeepLinkBus
@@ -73,6 +75,8 @@ import app.logdate.ui.audio.AudioPlaybackProvider
 import app.logdate.ui.navigation.taggedEntry
 import app.logdate.ui.theme.LogDateTheme
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * Multiplatform Navigation 3 root for the LogDate app.
@@ -279,13 +283,8 @@ fun LogDateNavDisplay(
                                     taggedEntry<SearchRoute> { route ->
                                         SearchScreen(
                                             onGoBack = { backStack.removeLastOrNull() },
-                                            onNavigateToDay = { date -> backStack.add(TimelineDetailRoute(date.toString())) },
-                                            onNavigateToJournal = { backStack.add(JournalDetailsRoute(it)) },
-                                            onNavigateToPerson = { backStack.add(PersonDetailRoute(it)) },
-                                            onNavigateToNote = { backStack.add(NoteDetailRoute(it)) },
-                                            onNavigateToPostcard = { backStack.add(PostcardViewerRoute(it)) },
-                                            onNavigateToRewind = { backStack.add(RewindDetailRoute(it)) },
-                                            onNavigateToMedia = { backStack.add(MediaDetailRoute(it)) },
+                                            onResultClick = { result -> backStack.add(searchResultRoute(result)) },
+                                            onResultOpenDay = { result -> backStack.add(searchResultDayRoute(result)) },
                                             initialQuery = route.query,
                                             initialTypeFtsValues = route.typeFtsValues,
                                             initialDateRangeName = route.dateRangeName,
@@ -353,4 +352,35 @@ private fun TimelineDetailEntry(
             onOpenLocations = onOpenLocations,
         )
     }
+}
+
+/**
+ * Dispatches a search-result tap to the most specific entry-detail route available, falling back
+ * to the containing day for content types without their own detail screen.
+ */
+private fun searchResultRoute(result: SearchResult): NavKey =
+    when (result.contentType) {
+        SearchContentType.JOURNAL -> JournalDetailsRoute(result.uid)
+        SearchContentType.PERSON -> PersonDetailRoute(result.uid)
+        SearchContentType.TEXT_NOTE -> NoteDetailRoute(result.uid)
+        SearchContentType.POSTCARD -> PostcardViewerRoute(result.uid)
+        SearchContentType.REWIND -> RewindDetailRoute(result.uid)
+        SearchContentType.MEDIA_CAPTION -> MediaDetailRoute(result.uid)
+        SearchContentType.TRANSCRIPTION,
+        SearchContentType.AMBIENT_SOUND,
+        SearchContentType.STICKER,
+        SearchContentType.PLACE,
+        -> searchResultDayRoute(result)
+    }
+
+/**
+ * Resolves a search result's containing day route. Used both as the fallback in
+ * [searchResultRoute] and by the long-press "Open day view" action.
+ */
+private fun searchResultDayRoute(result: SearchResult): TimelineDetailRoute {
+    val date =
+        result.created
+            .toLocalDateTime(TimeZone.currentSystemDefault())
+            .date
+    return TimelineDetailRoute(date.toString())
 }

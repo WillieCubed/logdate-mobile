@@ -70,9 +70,7 @@ import app.logdate.ui.search.rememberSearchHighlightStyle
 import app.logdate.ui.search.toUniversalSearchResultUiState
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.search.generated.resources.Res
 import logdate.client.feature.search.generated.resources.clear_search
 import logdate.client.feature.search.generated.resources.search
@@ -112,7 +110,6 @@ import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Clock
-import kotlin.uuid.Uuid
 import logdate.client.ui.generated.resources.Res as UiRes
 
 const val SEARCH_SCREEN_INPUT_ACCESSIBILITY_TAG = "search_screen_input"
@@ -125,13 +122,8 @@ const val SEARCH_SCREEN_INPUT_ACCESSIBILITY_TAG = "search_screen_input"
  */
 @Composable
 fun SearchScreen(
-    onNavigateToDay: (LocalDate) -> Unit,
-    onNavigateToJournal: (Uuid) -> Unit = {},
-    onNavigateToPerson: (Uuid) -> Unit = {},
-    onNavigateToNote: (Uuid) -> Unit = {},
-    onNavigateToPostcard: (Uuid) -> Unit = {},
-    onNavigateToRewind: (Uuid) -> Unit = {},
-    onNavigateToMedia: (Uuid) -> Unit = {},
+    onResultClick: (SearchResult) -> Unit,
+    onResultOpenDay: (SearchResult) -> Unit,
     onGoBack: () -> Unit,
     initialQuery: String = "",
     initialTypeFtsValues: List<String> = emptyList(),
@@ -173,13 +165,8 @@ fun SearchScreen(
         onClearFilters = viewModel::clearFilters,
         onRemoveRecent = onRemoveRecent,
         onClearAllRecents = onClearAllRecents,
-        onNavigateToDay = onNavigateToDay,
-        onNavigateToJournal = onNavigateToJournal,
-        onNavigateToPerson = onNavigateToPerson,
-        onNavigateToNote = onNavigateToNote,
-        onNavigateToPostcard = onNavigateToPostcard,
-        onNavigateToRewind = onNavigateToRewind,
-        onNavigateToMedia = onNavigateToMedia,
+        onResultClick = onResultClick,
+        onResultOpenDay = onResultOpenDay,
         onGoBack = onGoBack,
         modifier = modifier,
     )
@@ -197,13 +184,8 @@ fun SearchScreenContent(
     searchState: SearchScreenState,
     onQueryChange: (String) -> Unit,
     onCommitSearch: () -> Unit,
-    onNavigateToDay: (LocalDate) -> Unit,
-    onNavigateToJournal: (Uuid) -> Unit,
-    onNavigateToPerson: (Uuid) -> Unit,
-    onNavigateToNote: (Uuid) -> Unit,
-    onNavigateToPostcard: (Uuid) -> Unit,
-    onNavigateToRewind: (Uuid) -> Unit,
-    onNavigateToMedia: (Uuid) -> Unit,
+    onResultClick: (SearchResult) -> Unit,
+    onResultOpenDay: (SearchResult) -> Unit,
     onGoBack: () -> Unit,
     initialQuery: String = "",
     queryText: String = initialQuery,
@@ -311,13 +293,7 @@ fun SearchScreenContent(
                     onClearFilters = onClearFilters,
                     onRemoveRecent = onRemoveRecent,
                     onClearAllRecents = onClearAllRecents,
-                    onNavigateToDay = onNavigateToDay,
-                    onNavigateToJournal = onNavigateToJournal,
-                    onNavigateToPerson = onNavigateToPerson,
-                    onNavigateToNote = onNavigateToNote,
-                    onNavigateToPostcard = onNavigateToPostcard,
-                    onNavigateToRewind = onNavigateToRewind,
-                    onNavigateToMedia = onNavigateToMedia,
+                    onResultClick = onResultClick,
                     onLongClickResult = { result -> sheetTarget = result },
                 )
             }
@@ -329,11 +305,7 @@ fun SearchScreenContent(
             result = target,
             onDismiss = { sheetTarget = null },
             onOpenDay = {
-                val date =
-                    target.created
-                        .toLocalDateTime(TimeZone.currentSystemDefault())
-                        .date
-                onNavigateToDay(date)
+                onResultOpenDay(target)
                 sheetTarget = null
             },
             onCopyText = {
@@ -356,13 +328,7 @@ private fun SearchStateContent(
     onClearFilters: () -> Unit,
     onRemoveRecent: (String) -> Unit,
     onClearAllRecents: () -> Unit,
-    onNavigateToDay: (LocalDate) -> Unit,
-    onNavigateToJournal: (Uuid) -> Unit,
-    onNavigateToPerson: (Uuid) -> Unit,
-    onNavigateToNote: (Uuid) -> Unit,
-    onNavigateToPostcard: (Uuid) -> Unit,
-    onNavigateToRewind: (Uuid) -> Unit,
-    onNavigateToMedia: (Uuid) -> Unit,
+    onResultClick: (SearchResult) -> Unit,
     onLongClickResult: (SearchResult) -> Unit,
 ) {
     when (searchState) {
@@ -448,16 +414,7 @@ private fun SearchStateContent(
                             state = resultRow.uiState,
                             onClick = {
                                 onCommitSearch()
-                                navigateToResult(
-                                    result = resultRow.result,
-                                    onNavigateToDay = onNavigateToDay,
-                                    onNavigateToJournal = onNavigateToJournal,
-                                    onNavigateToPerson = onNavigateToPerson,
-                                    onNavigateToNote = onNavigateToNote,
-                                    onNavigateToPostcard = onNavigateToPostcard,
-                                    onNavigateToRewind = onNavigateToRewind,
-                                    onNavigateToMedia = onNavigateToMedia,
-                                )
+                                onResultClick(resultRow.result)
                             },
                             onLongClick = { onLongClickResult(resultRow.result) },
                         )
@@ -680,37 +637,6 @@ private fun RecentSearchesList(
                     modifier = Modifier.clickable { onSelectRecent(query) },
                 )
             }
-        }
-    }
-}
-
-private fun navigateToResult(
-    result: SearchResult,
-    onNavigateToDay: (LocalDate) -> Unit,
-    onNavigateToJournal: (Uuid) -> Unit,
-    onNavigateToPerson: (Uuid) -> Unit,
-    onNavigateToNote: (Uuid) -> Unit,
-    onNavigateToPostcard: (Uuid) -> Unit,
-    onNavigateToRewind: (Uuid) -> Unit,
-    onNavigateToMedia: (Uuid) -> Unit,
-) {
-    when (result.contentType) {
-        SearchContentType.JOURNAL -> onNavigateToJournal(result.uid)
-        SearchContentType.PERSON -> onNavigateToPerson(result.uid)
-        SearchContentType.TEXT_NOTE -> onNavigateToNote(result.uid)
-        SearchContentType.POSTCARD -> onNavigateToPostcard(result.uid)
-        SearchContentType.REWIND -> onNavigateToRewind(result.uid)
-        SearchContentType.MEDIA_CAPTION -> onNavigateToMedia(result.uid)
-        SearchContentType.TRANSCRIPTION,
-        SearchContentType.AMBIENT_SOUND,
-        SearchContentType.STICKER,
-        SearchContentType.PLACE,
-        -> {
-            val date =
-                result.created
-                    .toLocalDateTime(TimeZone.currentSystemDefault())
-                    .date
-            onNavigateToDay(date)
         }
     }
 }

@@ -144,13 +144,8 @@ class SearchScreenE2ETest {
                 searchState = SearchScreenState.Idle(recentSearches = emptyList()),
                 onQueryChange = {},
                 onCommitSearch = {},
-                onNavigateToDay = {},
-                onNavigateToJournal = {},
-                onNavigateToPerson = {},
-                onNavigateToNote = {},
-                onNavigateToPostcard = {},
-                onNavigateToRewind = {},
-                onNavigateToMedia = {},
+                onResultClick = {},
+                onResultOpenDay = {},
                 onGoBack = {},
             )
         }
@@ -166,13 +161,8 @@ class SearchScreenE2ETest {
                 searchState = SearchScreenState.Results(results = allResults),
                 onQueryChange = {},
                 onCommitSearch = {},
-                onNavigateToDay = {},
-                onNavigateToJournal = {},
-                onNavigateToPerson = {},
-                onNavigateToNote = {},
-                onNavigateToPostcard = {},
-                onNavigateToRewind = {},
-                onNavigateToMedia = {},
+                onResultClick = {},
+                onResultOpenDay = {},
                 onGoBack = {},
             )
         }
@@ -188,13 +178,8 @@ class SearchScreenE2ETest {
                 searchState = SearchScreenState.Results(results = allResults),
                 onQueryChange = {},
                 onCommitSearch = {},
-                onNavigateToDay = {},
-                onNavigateToJournal = {},
-                onNavigateToPerson = {},
-                onNavigateToNote = {},
-                onNavigateToPostcard = {},
-                onNavigateToRewind = {},
-                onNavigateToMedia = {},
+                onResultClick = {},
+                onResultOpenDay = {},
                 onGoBack = {},
             )
         }
@@ -212,13 +197,8 @@ class SearchScreenE2ETest {
                 searchState = SearchScreenState.Empty(query = "nonexistent"),
                 onQueryChange = {},
                 onCommitSearch = {},
-                onNavigateToDay = {},
-                onNavigateToJournal = {},
-                onNavigateToPerson = {},
-                onNavigateToNote = {},
-                onNavigateToPostcard = {},
-                onNavigateToRewind = {},
-                onNavigateToMedia = {},
+                onResultClick = {},
+                onResultOpenDay = {},
                 onGoBack = {},
             )
         }
@@ -232,9 +212,8 @@ class SearchScreenE2ETest {
         composeRule.setContent {
             MaterialTheme {
                 SearchScreen(
-                    onNavigateToDay = {},
-                    onNavigateToJournal = {},
-                    onNavigateToPerson = {},
+                    onResultClick = {},
+                    onResultOpenDay = {},
                     onGoBack = {},
                     viewModel = viewModel,
                 )
@@ -266,9 +245,8 @@ class SearchScreenE2ETest {
         composeRule.setContent {
             MaterialTheme {
                 SearchScreen(
-                    onNavigateToDay = {},
-                    onNavigateToJournal = {},
-                    onNavigateToPerson = {},
+                    onResultClick = {},
+                    onResultOpenDay = {},
                     onGoBack = {},
                     viewModel = viewModel,
                 )
