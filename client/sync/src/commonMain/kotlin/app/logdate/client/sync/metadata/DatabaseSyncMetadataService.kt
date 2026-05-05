@@ -3,19 +3,32 @@ package app.logdate.client.sync.metadata
 import app.logdate.client.database.dao.sync.SyncMetadataDao
 import app.logdate.client.database.entities.sync.PendingUploadEntity
 import app.logdate.client.database.entities.sync.SyncCursorEntity
+import app.logdate.client.datastore.SessionStorage
 import app.logdate.shared.config.LogDateConfigRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
  * Room-backed implementation of [SyncMetadataService].
- * Persists sync cursors and pending uploads to the local database.
+ *
+ * Persists sync cursors and pending uploads to the local database. Auth-gated at the choke
+ * point: writes to the pending-uploads queue are no-ops while the user has no session, and
+ * read counts surface zero in the same state. This keeps the rest of the app honest — local
+ * mutation paths still call [enqueuePending] freely, but accountless writes never produce
+ * sync signal. First sign-in walks the local DB through `BackfillLocalDataUseCase` to
+ * re-enqueue everything.
  */
 class DatabaseSyncMetadataService(
     private val dao: SyncMetadataDao,
     private val configRepository: LogDateConfigRepository,
+    private val sessionStorage: SessionStorage,
 ) : SyncMetadataService {
+    private fun isAuthenticated(): Boolean = sessionStorage.getSession() != null
+
     override suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload> {
         val serverOrigin = currentOrigin()
         promoteLegacyPendingIfNeeded(serverOrigin, entityType)
@@ -57,6 +70,9 @@ class DatabaseSyncMetadataService(
         entityType: EntityType,
         operation: PendingOperation,
     ) {
+        // Accountless writes succeed locally but never produce a sync signal. The first sign-in
+        // re-enqueues the user's local data via BackfillLocalDataUseCase, so nothing is lost.
+        if (!isAuthenticated()) return
         val serverOrigin = currentOrigin()
         promoteLegacyPendingIfNeeded(serverOrigin, entityType)
         val existing = dao.getPending(serverOrigin, entityType.name, entityId)
@@ -88,9 +104,19 @@ class DatabaseSyncMetadataService(
         enqueuePending(entityId, entityType, PendingOperation.UPDATE)
     }
 
-    override suspend fun getPendingCount(): Int = dao.getPendingCount(currentOrigin())
+    override suspend fun getPendingCount(): Int = if (isAuthenticated()) dao.getPendingCount(currentOrigin()) else 0
 
-    override fun observePendingCount(): Flow<Int> = dao.observePendingCount(currentOrigin())
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun observePendingCount(): Flow<Int> =
+        sessionStorage.getSessionFlow().flatMapLatest { session ->
+            if (session != null) dao.observePendingCount(currentOrigin()) else flowOf(0)
+        }
+
+    override suspend fun clearPending() {
+        // Origin-scoped: only clears the queue tied to the current backend, not other backends
+        // the user may have used. Cursors are intentionally preserved.
+        dao.deletePendingForOrigin(currentOrigin())
+    }
 
     override suspend fun incrementRetryCount(
         entityId: String,
