@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.navigation3.runtime.NavKey
 import app.logdate.client.ui.navigation.LocationTimelineRoute
 import app.logdate.client.ui.navigation.SearchRoute
+import app.logdate.client.ui.navigation.searchRouteFromParams
 import app.logdate.feature.events.navigation.EventDetailRoute
 import app.logdate.feature.journals.navigation.JournalDetailsRoute
 import app.logdate.feature.journals.navigation.NoteDetailRoute
@@ -53,15 +54,10 @@ fun resolveDeepLinkUri(uri: Uri): NavKey? {
 }
 
 private fun Uri.toSearchRoute(): SearchRoute =
-    SearchRoute(
-        query = getQueryParameter(SEARCH_QUERY_PARAM).orEmpty(),
-        typeFtsValues =
-            getQueryParameter(SEARCH_TYPE_PARAM)
-                ?.split(',')
-                ?.map { it.trim() }
-                ?.filter { it.isNotEmpty() }
-                ?: emptyList(),
-        dateRangeName = getQueryParameter(SEARCH_DATE_PARAM).orEmpty(),
+    searchRouteFromParams(
+        rawQuery = getQueryParameter(SEARCH_QUERY_PARAM),
+        rawTypes = getQueryParameter(SEARCH_TYPE_PARAM),
+        rawDate = getQueryParameter(SEARCH_DATE_PARAM),
     )
 
 /**
