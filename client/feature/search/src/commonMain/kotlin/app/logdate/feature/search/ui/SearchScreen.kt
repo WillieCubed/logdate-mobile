@@ -1,8 +1,9 @@
 @file:Suppress("ktlint:standard:function-naming")
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 
 package app.logdate.feature.search.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -34,6 +36,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.runtime.Composable
@@ -64,6 +67,11 @@ import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.search.generated.resources.Res
 import logdate.client.feature.search.generated.resources.clear_search
 import logdate.client.feature.search.generated.resources.search
+import logdate.client.feature.search.generated.resources.search_bucket_earlier
+import logdate.client.feature.search.generated.resources.search_bucket_this_month
+import logdate.client.feature.search.generated.resources.search_bucket_this_week
+import logdate.client.feature.search.generated.resources.search_bucket_today
+import logdate.client.feature.search.generated.resources.search_bucket_yesterday
 import logdate.client.feature.search.generated.resources.search_entries
 import logdate.client.feature.search.generated.resources.search_filter_clear
 import logdate.client.feature.search.generated.resources.search_filter_date_all_time
@@ -88,6 +96,7 @@ import logdate.client.ui.generated.resources.common_go_back
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 import logdate.client.ui.generated.resources.Res as UiRes
 
@@ -328,36 +337,48 @@ private fun SearchStateContent(
 
         is SearchScreenState.Results -> {
             val highlightStyle = rememberSearchHighlightStyle()
-            val resultRows =
+            val groupedRows =
                 remember(searchState.results, highlightStyle) {
-                    searchState.results.map { result ->
-                        SearchResultRow(
-                            result = result,
-                            uiState = result.toUniversalSearchResultUiState(highlightStyle),
-                        )
+                    bucketSearchResults(
+                        results = searchState.results,
+                        now = Clock.System.now(),
+                        timeZone = TimeZone.currentSystemDefault(),
+                    ).map { (bucket, items) ->
+                        bucket to
+                            items.map { result ->
+                                SearchResultRow(
+                                    result = result,
+                                    uiState = result.toUniversalSearchResultUiState(highlightStyle),
+                                )
+                            }
                     }
                 }
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                items(
-                    items = resultRows,
-                    key = { it.uiState.id },
-                ) { resultRow ->
-                    UniversalSearchResultItem(
-                        state = resultRow.uiState,
-                        onClick = {
-                            onCommitSearch()
-                            navigateToResult(
-                                result = resultRow.result,
-                                onNavigateToDay = onNavigateToDay,
-                                onNavigateToJournal = onNavigateToJournal,
-                                onNavigateToPerson = onNavigateToPerson,
-                                onNavigateToNote = onNavigateToNote,
-                                onNavigateToPostcard = onNavigateToPostcard,
-                                onNavigateToRewind = onNavigateToRewind,
-                                onNavigateToMedia = onNavigateToMedia,
-                            )
-                        },
-                    )
+                groupedRows.forEach { (bucket, bucketRows) ->
+                    stickyHeader(key = "header_${bucket.name}") {
+                        BucketHeader(bucket)
+                    }
+                    items(
+                        items = bucketRows,
+                        key = { it.uiState.id },
+                    ) { resultRow ->
+                        UniversalSearchResultItem(
+                            state = resultRow.uiState,
+                            onClick = {
+                                onCommitSearch()
+                                navigateToResult(
+                                    result = resultRow.result,
+                                    onNavigateToDay = onNavigateToDay,
+                                    onNavigateToJournal = onNavigateToJournal,
+                                    onNavigateToPerson = onNavigateToPerson,
+                                    onNavigateToNote = onNavigateToNote,
+                                    onNavigateToPostcard = onNavigateToPostcard,
+                                    onNavigateToRewind = onNavigateToRewind,
+                                    onNavigateToMedia = onNavigateToMedia,
+                                )
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -368,6 +389,36 @@ private data class SearchResultRow(
     val result: SearchResult,
     val uiState: UniversalSearchResultUiState,
 )
+
+/**
+ * Sticky section header above each [ResultDateBucket] in the result list.
+ *
+ * Tonal surface so it remains visible when sticky, and so successive headers don't visually
+ * blend into the rows above and below them.
+ */
+@Composable
+private fun BucketHeader(bucket: ResultDateBucket) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = stringResource(bucket.labelKey()),
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        )
+    }
+}
+
+private fun ResultDateBucket.labelKey(): StringResource =
+    when (this) {
+        ResultDateBucket.Today -> Res.string.search_bucket_today
+        ResultDateBucket.Yesterday -> Res.string.search_bucket_yesterday
+        ResultDateBucket.ThisWeek -> Res.string.search_bucket_this_week
+        ResultDateBucket.ThisMonth -> Res.string.search_bucket_this_month
+        ResultDateBucket.Earlier -> Res.string.search_bucket_earlier
+    }
 
 /**
  * Sticky filter chip row above the search results.
