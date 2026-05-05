@@ -3,6 +3,7 @@ package app.logdate.client
 import android.net.Uri
 import androidx.navigation3.runtime.NavKey
 import app.logdate.client.ui.navigation.LocationTimelineRoute
+import app.logdate.client.ui.navigation.SearchRoute
 import app.logdate.feature.events.navigation.EventDetailRoute
 import app.logdate.feature.journals.navigation.JournalDetailsRoute
 import app.logdate.feature.journals.navigation.NoteDetailRoute
@@ -18,6 +19,10 @@ private const val PATH_POSTCARD = "postcard"
 private const val PATH_REWIND = "rewind"
 private const val PATH_LOCATION = "location"
 private const val PATH_EVENT = "event"
+private const val PATH_SEARCH = "search"
+private const val SEARCH_QUERY_PARAM = "q"
+private const val SEARCH_TYPE_PARAM = "type"
+private const val SEARCH_DATE_PARAM = "date"
 
 internal val LOGDATE_API_BASE_URL: Uri = Uri.parse(BuildConfig.LOGDATE_API_BASE_URL)
 
@@ -41,10 +46,23 @@ fun resolveDeepLinkUri(uri: Uri): NavKey? {
         PATH_REWIND -> segments.firstOrNull()?.parseUuidTo { RewindDetailRoute(it) }
         PATH_LOCATION -> LocationTimelineRoute
         PATH_EVENT -> segments.firstOrNull()?.let { EventDetailRoute(it) }
+        PATH_SEARCH -> uri.toSearchRoute()
         BuildConfig.LOGDATE_ORIGIN -> resolveWebPath(segments)
         else -> null
     }
 }
+
+private fun Uri.toSearchRoute(): SearchRoute =
+    SearchRoute(
+        query = getQueryParameter(SEARCH_QUERY_PARAM).orEmpty(),
+        typeFtsValues =
+            getQueryParameter(SEARCH_TYPE_PARAM)
+                ?.split(',')
+                ?.map { it.trim() }
+                ?.filter { it.isNotEmpty() }
+                ?: emptyList(),
+        dateRangeName = getQueryParameter(SEARCH_DATE_PARAM).orEmpty(),
+    )
 
 /**
  * Converts a navigation destination to its canonical logdate.app web URL.

@@ -166,7 +166,7 @@ fun LogDateNavDisplay(
                                             onBrowseJournals = { backStack.add(JournalsOverviewRoute) },
                                             onOpenRewind = { backStack.add(RewindDetailRoute(it)) },
                                             onOpenSettings = { backStack.add(SettingsRoute()) },
-                                            onOpenSearch = { backStack.add(SearchRoute) },
+                                            onOpenSearch = { backStack.add(SearchRoute()) },
                                             onOpenDraft = { draftId ->
                                                 backStack.add(EntryEditorRoute(draftId = draftId))
                                             },
@@ -276,12 +276,19 @@ fun LogDateNavDisplay(
                                         onSaved = { backStack.removeLastOrNull() },
                                     )
                                     // Search
-                                    taggedEntry<SearchRoute> {
+                                    taggedEntry<SearchRoute> { route ->
                                         SearchScreen(
                                             onGoBack = { backStack.removeLastOrNull() },
                                             onNavigateToDay = { date -> backStack.add(TimelineDetailRoute(date.toString())) },
                                             onNavigateToJournal = { backStack.add(JournalDetailsRoute(it)) },
                                             onNavigateToPerson = { backStack.add(PersonDetailRoute(it)) },
+                                            onNavigateToNote = { backStack.add(NoteDetailRoute(it)) },
+                                            onNavigateToPostcard = { backStack.add(PostcardViewerRoute(it)) },
+                                            onNavigateToRewind = { backStack.add(RewindDetailRoute(it)) },
+                                            onNavigateToMedia = { backStack.add(MediaDetailRoute(it)) },
+                                            initialQuery = route.query,
+                                            initialTypeFtsValues = route.typeFtsValues,
+                                            initialDateRangeName = route.dateRangeName,
                                         )
                                     }
                                     // Location timeline (top-level)

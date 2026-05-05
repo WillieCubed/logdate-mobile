@@ -123,6 +123,8 @@ fun SearchScreen(
     onNavigateToMedia: (Uuid) -> Unit = {},
     onGoBack: () -> Unit,
     initialQuery: String = "",
+    initialTypeFtsValues: List<String> = emptyList(),
+    initialDateRangeName: String = "",
     modifier: Modifier = Modifier,
     viewModel: SearchViewModel = koinViewModel(),
 ) {
@@ -135,6 +137,16 @@ fun SearchScreen(
     LaunchedEffect(initialQuery) {
         if (initialQuery.isNotBlank() && queryText.isBlank()) {
             viewModel.updateQuery(initialQuery)
+        }
+    }
+    LaunchedEffect(initialTypeFtsValues, initialDateRangeName) {
+        if (filters == SearchFilters.Default) {
+            initialTypeFtsValues
+                .mapNotNull { fts -> SearchContentType.entries.firstOrNull { it.ftsValue == fts } }
+                .forEach { viewModel.toggleContentType(it) }
+            DateRangeFilter.entries
+                .firstOrNull { it.name == initialDateRangeName }
+                ?.let { viewModel.setDateRange(it) }
         }
     }
 
