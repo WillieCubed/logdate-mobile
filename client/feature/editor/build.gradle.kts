@@ -79,7 +79,6 @@ kotlin {
             // Core dependencies
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
-            implementation(libs.androidx.navigation.compose)
             implementation(libs.nav3.runtime)
             // External dependencies
             // Koin
@@ -136,7 +135,6 @@ kotlin {
 //    implementation(project(":core:media"))
 //
 //    // Compose in logdate.compose build logic
-//    implementation(libs.androidx.navigation.compose)
 //    implementation(libs.androidx.hilt.navigation.compose)
 // //    implementation(libs.androidx.compose.material3.carousel)
 // //    implementation(libs.androidx.compose.material3)

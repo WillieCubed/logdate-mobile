@@ -104,7 +104,6 @@ kotlin {
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtime.compose)
-            implementation(libs.androidx.navigation.compose)
             implementation(libs.jetbrains.navigation3.ui)
             implementation(libs.jetbrains.lifecycle.viewmodel.navigation3)
             implementation(libs.jetbrains.material3.adaptive.navigation3.mp)

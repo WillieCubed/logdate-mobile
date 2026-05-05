@@ -54,7 +54,6 @@ kotlin {
             implementation(projects.client.util)
             implementation(projects.client.feature.stickers)
             // Compose
-            implementation(libs.androidx.navigation.compose)
             implementation(libs.nav3.runtime)
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)

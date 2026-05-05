@@ -65,7 +65,6 @@ kotlin {
             implementation(libs.compose.components.resources)
             implementation(libs.compose.ui.tooling.preview)
             // Navigation
-            implementation(libs.androidx.navigation.compose)
             implementation(libs.nav3.runtime)
             // Core
             implementation(libs.kotlinx.datetime)
