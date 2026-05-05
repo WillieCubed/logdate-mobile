@@ -74,8 +74,25 @@ class AtprotoPublishedModulePlugin : Plugin<Project> {
             val publishing = extensions.getByType(PublishingExtension::class.java)
             configureRepository(publishing)
             configurePublications(publishing, dokkaHtmlJar)
+            embedLicensingInJars()
 
             configureSigning()
+        }
+    }
+
+    /**
+     * Copies the Apache 2.0 LICENSE and NOTICE into every published jar's META-INF.
+     *
+     * The license lives at `shared/atproto-licensing/{LICENSE,NOTICE}` in the monorepo so it
+     * scopes to the atproto-* modules without licensing the surrounding LogDate app code.
+     * Embedding the files in the artifact itself means consumers fetching the jar from Maven
+     * Central get the license metadata regardless of whether they also clone the source repo.
+     */
+    private fun Project.embedLicensingInJars() {
+        val licensingDir = rootProject.layout.projectDirectory.dir("shared/atproto-licensing")
+        tasks.withType(Jar::class.java).configureEach {
+            from(licensingDir.file("LICENSE")) { into("META-INF") }
+            from(licensingDir.file("NOTICE")) { into("META-INF") }
         }
     }
 

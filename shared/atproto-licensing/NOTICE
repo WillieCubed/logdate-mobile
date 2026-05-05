@@ -1,0 +1,13 @@
+studio.hypertext.atproto Kotlin Multiplatform library
+Copyright 2026 Hypertext Studio
+
+This library is published to Maven Central as the
+`studio.hypertext.atproto:*` artifact family. The source lives in the
+`shared/atproto-*` modules of the LogDate monorepo today and is scheduled
+for extraction into a dedicated repository.
+
+This product includes software developed at Hypertext Studio
+(https://hypertext.studio).
+
+It implements primitives of the AT Protocol as defined at
+https://atproto.com.

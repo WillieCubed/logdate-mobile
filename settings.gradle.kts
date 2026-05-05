@@ -109,6 +109,7 @@ include(":shared:atproto-plc")
 include(":shared:atproto-lexicon")
 include(":shared:atproto-pds")
 include(":shared:atproto-pds-runtime")
+include(":shared:atproto-bom")
 include(":shared:config")
 include(":shared:model")
 
@@ -116,13 +117,21 @@ include(":shared:model")
 include(":server")
 include(":integration:server-client-e2e")
 // Sample apps
-// :samples:atproto-consumer is intentionally excluded until step 9g of the
-// operational hardening plan publishes studio.hypertext.atproto:* to either
-// mavenLocal (locally) or Maven Central (CI). It depends on those Maven
-// coordinates rather than project deps so it acts as a real consumer of the
-// published library — but until publishing is wired, the module can't resolve
-// its own classpath, which crashes the configuration cache when CI's root
-// `./gradlew test` walks into it. Re-enable once
-// `./gradlew :shared:atproto-bom:publishToMavenLocal` (and friends) is part
-// of the build flow.
+//
+// :samples:atproto-consumer reads the studio.hypertext.atproto:* artifacts
+// from Maven coordinates (resolved through mavenLocal first, then Maven
+// Central) so it acts as a real consumer of the published library rather
+// than a project dep. To exercise it locally, publish first:
+//
+//   ./gradlew :shared:atproto-bom:publishToMavenLocal \
+//             :shared:atproto-syntax:publishToMavenLocal \
+//             :shared:atproto-identity:publishToMavenLocal \
+//             :shared:atproto-repo:publishToMavenLocal \
+//             :shared:atproto-xrpc:publishToMavenLocal \
+//             :shared:atproto-pds:publishToMavenLocal
+//   ./gradlew :samples:atproto-consumer:run
+//
+// Re-include the line below once CI also runs the publishToMavenLocal
+// step before its root `./gradlew test` — otherwise the classpath can't
+// resolve and CI breaks at configuration time.
 // include(":samples:atproto-consumer")

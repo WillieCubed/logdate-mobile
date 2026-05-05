@@ -25,6 +25,24 @@
 
 ## Maven Coordinates
 
+The recommended way to consume the library is via the BOM, which pins every
+module to a single coordinated release version:
+
+```kotlin
+dependencies {
+    implementation(platform("studio.hypertext.atproto:atproto-bom:0.1.0"))
+
+    // Pick the modules you need — versions are inferred from the BOM.
+    implementation("studio.hypertext.atproto:atproto-syntax")
+    implementation("studio.hypertext.atproto:atproto-identity")
+    implementation("studio.hypertext.atproto:atproto-repo")
+    implementation("studio.hypertext.atproto:atproto-xrpc")
+}
+```
+
+The full module set:
+
+- `studio.hypertext.atproto:atproto-bom:$version` (BOM — pin once, version-less elsewhere)
 - `studio.hypertext.atproto:atproto-crypto:$version`
 - `studio.hypertext.atproto:atproto-syntax:$version`
 - `studio.hypertext.atproto:atproto-identity:$version`
