@@ -28,6 +28,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -147,12 +151,33 @@ fun UniversalSearchResultItem(
         modifier =
             modifier
                 .focusableWithRing()
-                .combinedClickable(
+                .let { base ->
+                    if (onLongClick != null) base.onSecondaryButtonClick(onLongClick) else base
+                }.combinedClickable(
                     onClick = onClick,
                     onLongClick = onLongClick,
                 ),
     )
 }
+
+/**
+ * Fires [action] when the user clicks with a secondary pointer button (right-click on a mouse,
+ * stylus secondary button). Pairs with `combinedClickable(onLongClick = ...)` so touch users get
+ * the same affordance via long-press while desktop / pointer users get the conventional context-
+ * menu gesture per Android Adaptive desktop guidelines.
+ */
+private fun Modifier.onSecondaryButtonClick(action: () -> Unit): Modifier =
+    pointerInput(action) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
+                    action()
+                    event.changes.forEach { it.consume() }
+                }
+            }
+        }
+    }
 
 /**
  * Converts a [SearchResult] into a render-ready [UniversalSearchResultUiState].

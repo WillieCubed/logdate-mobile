@@ -374,7 +374,8 @@ private fun searchResultRoute(result: SearchResult): NavKey =
     }
 
 /**
- * Resolves a search result's containing day route. Used both as the fallback in
+ * Resolves a search result's containing day route, threading the entry's UUID so the timeline
+ * panel can scroll to the matching entry when that hook lands. Used both as the fallback in
  * [searchResultRoute] and by the long-press "Open day view" action.
  */
 private fun searchResultDayRoute(result: SearchResult): TimelineDetailRoute {
@@ -382,5 +383,5 @@ private fun searchResultDayRoute(result: SearchResult): TimelineDetailRoute {
         result.created
             .toLocalDateTime(TimeZone.currentSystemDefault())
             .date
-    return TimelineDetailRoute(date.toString())
+    return TimelineDetailRoute(date.toString(), entryId = result.uid.toString())
 }
