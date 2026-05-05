@@ -171,26 +171,82 @@ current server surface:
 
 ## Remote Publish Flow
 
-Set the repository and signing inputs, then publish from the module you want.
-
-Example:
+The current target is **GitHub Packages on this repository** (interim until
+Maven Central onboarding completes — see "Migrating to Maven Central" below).
+Maintainers cut a release purely by tagging:
 
 ```bash
-ATPROTO_PUBLISH_URL=<repository-url> \
-ATPROTO_PUBLISH_USERNAME=<repository-username> \
-ATPROTO_PUBLISH_PASSWORD=<repository-password> \
-SIGNING_KEY=<armored-signing-key> \
-SIGNING_PASSWORD=<signing-passphrase> \
+git tag -a atproto-v0.1.0 -m "Initial public release"
+git push origin atproto-v0.1.0
+```
+
+`.github/workflows/publish-atproto.yml` fires on the tag, derives
+`ATPROTO_VERSION` from the tag name (`atproto-v0.1.0` → `0.1.0`), and runs
+`publishAllPublicationsToAtprotoRepository` for every `shared/atproto-*`
+module plus the BOM. The workflow uses:
+
+- `ATPROTO_PUBLISH_URL`: `https://maven.pkg.github.com/${{ github.repository }}`
+- `ATPROTO_PUBLISH_USERNAME`: `${{ github.actor }}` (the user who pushed the tag)
+- `ATPROTO_PUBLISH_PASSWORD`: `${{ secrets.GITHUB_TOKEN }}` (auto-injected; needs `permissions: { packages: write }`)
+
+There are no manual secrets to configure — the GH Packages target is
+zero-config because the runner's token already has package-publish rights
+on this repo.
+
+Artifacts land at
+`https://maven.pkg.github.com/<owner>/<repo>/studio/hypertext/atproto/<module>/<version>/...`
+within ~1 minute of the tag push. Successful publishes show under the
+repo's **Packages** sidebar.
+
+### Manual or local publishes against a remote
+
+If you need to publish from a workstation (e.g. testing a snapshot version
+under a different `ATPROTO_VERSION`), set the same env vars yourself:
+
+```bash
+ATPROTO_PUBLISH_URL=https://maven.pkg.github.com/WillieCubed/logdate-mobile \
+ATPROTO_PUBLISH_USERNAME=<your-github-username> \
+ATPROTO_PUBLISH_PASSWORD=<personal-access-token-with-write:packages> \
+ATPROTO_VERSION=0.1.0-SNAPSHOT \
   ./gradlew :shared:atproto-syntax:publishAllPublicationsToAtprotoRepository
 ```
+
+Generate the PAT at <https://github.com/settings/tokens/new> with the
+`write:packages` scope (no other scopes needed for publishing). The token
+must belong to a user with push access to the repo.
 
 You can replace `publishAllPublicationsToAtprotoRepository` with a narrower
 publication task if you only need one target variant.
 
-For the full hosted release flow, the repo also ships
-[`publish-atproto.yml`](/Users/williecubed/Projects/TheHypertextStudio/logdate-android/.github/workflows/publish-atproto.yml).
-It publishes every ATProto module on `atproto-v*` tags or manual dispatch after
-validating the Maven repository and signing secrets.
+### What's not signed yet
+
+GitHub Packages doesn't require GPG-signed artifacts, so the convention
+plugin's signing path stays gated on `SIGNING_KEY`/`SIGNING_PASSWORD` being
+set — both are unset in the workflow today, so artifacts publish unsigned.
+Maven Central does require signatures; restoring them is part of the
+migration step below, not a separate effort.
+
+### Migrating to Maven Central
+
+The convention plugin is repo-URL-agnostic, so swapping targets is
+config-only:
+
+1. Complete Sonatype OSSRH onboarding for the `studio.hypertext` namespace
+   (DNS TXT verification on `hypertext.studio` — ~24h propagation).
+2. Generate a GPG keypair, upload the public key to a keyserver, and store
+   `SIGNING_KEY` (ASCII-armored secret key) and `SIGNING_PASSWORD` as
+   repo-scoped GH Actions secrets.
+3. Add `OSSRH_USERNAME` and `OSSRH_PASSWORD` repo secrets.
+4. In `publish-atproto.yml`, swap the three `ATPROTO_PUBLISH_*` env values
+   to point at the OSSRH staging URL and credentials, and add the four
+   signing env vars back. Drop `permissions: { packages: write }`.
+5. Cut the next tag — the same `publishAllPublicationsToAtprotoRepository`
+   tasks publish unchanged.
+
+Existing GH Packages consumers can stay on the old artifacts; new releases
+land on Maven Central with no coordinate change (`studio.hypertext.atproto:*`
+is already the published group). Adjusting the consumer-side repo URL is
+the only break for them.
 
 ## Standalone Consumer Verification
 

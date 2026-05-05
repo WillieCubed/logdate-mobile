@@ -40,6 +40,53 @@ dependencies {
 }
 ```
 
+### Where the artifacts live (interim)
+
+While Maven Central onboarding is in progress, releases publish to the
+**GitHub Packages Maven repository on this repo**. Add the repo to your
+`settings.gradle.kts` (or top-level `build.gradle.kts`) — and crucially,
+GitHub Packages requires authentication even for public packages, so you
+also have to supply credentials:
+
+```kotlin
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+        maven {
+            name = "atproto-github-packages"
+            url = uri("https://maven.pkg.github.com/WillieCubed/logdate-mobile")
+            credentials {
+                username = providers.gradleProperty("gpr.user")
+                    .orElse(providers.environmentVariable("GITHUB_ACTOR"))
+                    .get()
+                password = providers.gradleProperty("gpr.token")
+                    .orElse(providers.environmentVariable("GITHUB_TOKEN"))
+                    .get()
+            }
+        }
+    }
+}
+```
+
+Set the credentials however suits your environment:
+
+- **Local development**: put them in `~/.gradle/gradle.properties` so they
+  don't land in any project repo:
+  ```properties
+  gpr.user=<your-github-username>
+  gpr.token=<personal-access-token-with-read:packages>
+  ```
+  Generate the PAT at <https://github.com/settings/tokens/new> with the
+  `read:packages` scope (read-only is enough to consume).
+- **CI**: use the auto-injected `GITHUB_TOKEN` if your workflow runs in
+  this org or a fork; otherwise create a repo secret with a PAT scoped to
+  `read:packages` and pass it as `GITHUB_TOKEN`.
+
+This auth step is the price of using GitHub Packages — public artifacts
+on Maven Central will resolve without credentials. The migration path is
+on the maintainers' side and won't change the artifact coordinates.
+
 The full module set:
 
 - `studio.hypertext.atproto:atproto-bom:$version` (BOM — pin once, version-less elsewhere)
