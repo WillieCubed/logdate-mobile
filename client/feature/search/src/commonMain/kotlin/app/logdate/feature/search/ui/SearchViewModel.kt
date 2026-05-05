@@ -14,6 +14,7 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -87,19 +88,8 @@ class SearchViewModel(
             initialValue = SearchScreenState.Idle(emptyList()),
         )
 
-    /**
-     * Read-only view of the active filter set so UI can render selected chips.
-     */
-    val filters: StateFlow<SearchFilters> =
-        filtersState.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = SearchFilters.Default,
-        )
+    val filters: StateFlow<SearchFilters> = filtersState.asStateFlow()
 
-    /**
-     * Updates the search query text.
-     */
     fun updateQuery(newQuery: String) {
         queryState.update { SearchQuery(newQuery) }
     }
