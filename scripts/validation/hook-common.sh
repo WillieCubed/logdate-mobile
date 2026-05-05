@@ -70,9 +70,12 @@ modules_from_files() {
 
     while IFS= read -r file; do
         [[ -z "$file" ]] && continue
-        # Skip files in included builds (e.g. build-logic/) — they are not subprojects
+        # Skip files in included builds (e.g. build-logic/, samples/atproto-consumer/) —
+        # they are not subprojects of the main build, so :module:ktlintFormat tasks don't
+        # exist for them.
         case "$file" in
             build-logic/*) continue ;;
+            samples/atproto-consumer/*) continue ;;
         esac
         dir="$(dirname "$file")"
         while [[ "$dir" != "." && "$dir" != "/" ]]; do

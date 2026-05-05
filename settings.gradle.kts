@@ -118,20 +118,27 @@ include(":server")
 include(":integration:server-client-e2e")
 // Sample apps
 //
-// :samples:atproto-consumer reads the studio.hypertext.atproto:* artifacts
-// from Maven coordinates (resolved through mavenLocal first, then Maven
-// Central) so it acts as a real consumer of the published library rather
-// than a project dep. To exercise it locally, publish first:
+// samples/atproto-consumer is wired as a *composite-build* (includeBuild)
+// rather than a subproject. The sample reads `studio.hypertext.atproto:*`
+// artifacts from Maven coordinates (mavenLocal first, then GH Packages /
+// Maven Central) so it acts as a real consumer of the published library.
+// As a subproject, the root `./gradlew test` would walk into it and try
+// to resolve those coordinates at configuration time — which fails until
+// publishing has happened, breaking CI. As an includedBuild it has its
+// own settings + own task graph, isolated from root aggregate tasks.
 //
-//   ./gradlew :shared:atproto-bom:publishToMavenLocal \
-//             :shared:atproto-syntax:publishToMavenLocal \
-//             :shared:atproto-identity:publishToMavenLocal \
-//             :shared:atproto-repo:publishToMavenLocal \
-//             :shared:atproto-xrpc:publishToMavenLocal \
-//             :shared:atproto-pds:publishToMavenLocal
-//   ./gradlew :samples:atproto-consumer:run
+// To run the sample after publishing locally:
 //
-// Re-include the line below once CI also runs the publishToMavenLocal
-// step before its root `./gradlew test` — otherwise the classpath can't
-// resolve and CI breaks at configuration time.
-// include(":samples:atproto-consumer")
+//   ./gradlew \
+//     :shared:atproto-bom:publishToMavenLocal \
+//     :shared:atproto-syntax:publishToMavenLocal \
+//     :shared:atproto-identity:publishToMavenLocal \
+//     :shared:atproto-repo:publishToMavenLocal \
+//     :shared:atproto-xrpc:publishToMavenLocal \
+//     :shared:atproto-pds:publishToMavenLocal
+//   ./gradlew -p samples/atproto-consumer run
+//
+// (or `./gradlew :atproto-consumer:run` from anywhere — the included
+// build exposes its tasks under the root project name from its own
+// settings.gradle.kts, which is `atproto-consumer`.)
+includeBuild("samples/atproto-consumer")
