@@ -80,6 +80,9 @@
                 <data android:host="postcard" />
                 <data android:host="day" />
                 <data android:host="note" />
+                <data android:host="event" />
+                <data android:host="location" />
+                <data android:host="search" />
             </intent-filter>
 
             <intent-filter>
