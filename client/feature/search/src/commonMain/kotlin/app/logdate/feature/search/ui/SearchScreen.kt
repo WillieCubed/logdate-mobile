@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -61,6 +62,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.search.DateRangeFilter
 import app.logdate.client.domain.search.SearchFilters
 import app.logdate.client.repository.search.SearchContentType
@@ -413,23 +415,36 @@ private fun SearchStateContent(
                             }
                     }
                 }
-            LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                groupedRows.forEach { (bucket, bucketRows) ->
-                    stickyHeader(key = "header_${bucket.name}") {
-                        BucketHeader(bucket)
-                    }
-                    items(
-                        items = bucketRows,
-                        key = { it.uiState.id },
-                    ) { resultRow ->
-                        UniversalSearchResultItem(
-                            state = resultRow.uiState,
-                            onClick = {
-                                onCommitSearch()
-                                onResultClick(resultRow.result)
-                            },
-                            onLongClick = { onLongClickResult(resultRow.result) },
-                        )
+            // Cap reading width on tablets / desktop / unfolded foldables so result rows stay
+            // scannable instead of stretching to a 1200dp line. Phones at compact width fall
+            // under the cap and use the full screen.
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                LazyColumn(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 720.dp),
+                ) {
+                    groupedRows.forEach { (bucket, bucketRows) ->
+                        stickyHeader(key = "header_${bucket.name}") {
+                            BucketHeader(bucket)
+                        }
+                        items(
+                            items = bucketRows,
+                            key = { it.uiState.id },
+                        ) { resultRow ->
+                            UniversalSearchResultItem(
+                                state = resultRow.uiState,
+                                onClick = {
+                                    onCommitSearch()
+                                    onResultClick(resultRow.result)
+                                },
+                                onLongClick = { onLongClickResult(resultRow.result) },
+                            )
+                        }
                     }
                 }
             }
