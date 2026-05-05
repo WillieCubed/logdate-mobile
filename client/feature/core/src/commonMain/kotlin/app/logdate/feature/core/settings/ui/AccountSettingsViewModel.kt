@@ -16,6 +16,7 @@ import app.logdate.client.repository.account.AccountIdentityRepository
 import app.logdate.client.repository.account.AccountIdentityStatus
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.user.UserData
 import io.github.aakira.napier.Napier
@@ -80,6 +81,7 @@ class AccountSettingsViewModel(
     private val accountIdentityRepository: AccountIdentityRepository,
     private val passkeyAccountRepository: PasskeyAccountRepository,
     private val sessionStorage: SessionStorage,
+    private val syncMetadataService: SyncMetadataService,
     private val preferencesDataSource: LogdatePreferencesDataSource,
     private val observeUserIdentityUseCase: ObserveUserIdentityUseCase,
     observeStreakUseCase: ObserveStreakUseCase,
@@ -228,6 +230,10 @@ class AccountSettingsViewModel(
                 Napier.i("Signing out user")
                 passkeyAccountRepository.signOut()
                 preferencesDataSource.setBackgroundSyncEnabled(false)
+                // Drop the pending-uploads queue tied to this account. Without a session there's
+                // nowhere for those items to go, and re-signing into the same or a different
+                // account triggers a fresh BackfillLocalDataUseCase pass over local data.
+                syncMetadataService.clearPending()
                 Napier.i("Session cleared successfully")
             } catch (e: Exception) {
                 Napier.e("Failed to sign out", e)

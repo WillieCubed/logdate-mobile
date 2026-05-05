@@ -90,6 +90,11 @@ class SyncMetadataServiceTest {
             _pendingCount.value = pendingUploads.values.sumOf { it.size }
         }
 
+        override suspend fun clearPending() {
+            pendingUploads.clear()
+            _pendingCount.value = 0
+        }
+
         // Test helper
         fun addPending(
             entityId: String,

@@ -37,6 +37,7 @@ import app.logdate.feature.core.settings.ui.TimelineSettingsViewModel
 import app.logdate.feature.core.settings.ui.VoiceNotesSettingsViewModel
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import app.logdate.feature.core.sync.SyncIssuesViewModel
+import app.logdate.feature.core.sync.SyncPresentationViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.workmanager.dsl.workerOf
 import org.koin.core.module.Module
@@ -145,6 +146,7 @@ actual val coreFeatureModule: Module =
         viewModel { PeopleInboxViewModel(get()) }
         viewModel { PersonDetailViewModel(get(), get()) }
         viewModel { SyncIssuesViewModel(get()) }
+        viewModel { SyncPresentationViewModel(syncManager = get(), sessionStorage = get()) }
     }
 
 // TODO: Fix this obvious code smell

@@ -2,6 +2,7 @@
 
 package app.logdate.ui.timeline
 
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
@@ -17,6 +18,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import app.logdate.ui.sync.SyncIndicatorChip
+import app.logdate.ui.sync.SyncPresentation
 import logdate.client.ui.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -31,6 +35,8 @@ fun TimelineTopAppBar(
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit = {},
     onHistoryClick: () -> Unit = {},
+    syncPresentation: SyncPresentation = SyncPresentation.Hidden,
+    onSyncChipClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     TopAppBar(
@@ -41,6 +47,14 @@ fun TimelineTopAppBar(
             )
         },
         actions = {
+            // Sync chip leads the action group when sync has something to say (syncing,
+            // pending, network error). Composes nothing for Hidden / banner-promotion states.
+            SyncIndicatorChip(
+                presentation = syncPresentation,
+                onClick = onSyncChipClick,
+                modifier = Modifier.padding(end = 4.dp),
+            )
+
             val historyLabel = stringResource(Res.string.location_history)
             val searchLabel = stringResource(Res.string.search)
             val settingsLabel = stringResource(Res.string.settings)

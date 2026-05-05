@@ -549,6 +549,11 @@ class ArchiveRoundTripTest {
             pending[entityType]!![entityId] = existing.copy(retryCount = existing.retryCount + 1)
         }
 
+        override suspend fun clearPending() {
+            pending.clear()
+            pendingCountFlow.value = 0
+        }
+
         private fun updateCount() {
             pendingCountFlow.value = pending.values.sumOf { it.size }
         }

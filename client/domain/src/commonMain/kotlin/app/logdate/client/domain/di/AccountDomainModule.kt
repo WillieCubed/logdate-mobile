@@ -1,6 +1,8 @@
 package app.logdate.client.domain.di
 
 import app.logdate.client.domain.account.AuthenticateWithPasskeyUseCase
+import app.logdate.client.domain.account.BackfillLocalDataUseCase
+import app.logdate.client.domain.account.BackfilledAccountTracker
 import app.logdate.client.domain.account.CheckUsernameAvailabilityUseCase
 import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
 import app.logdate.client.domain.account.CreatePasskeyUseCase
@@ -10,6 +12,7 @@ import app.logdate.client.domain.account.GetAccountSetupDataUseCase
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
 import app.logdate.client.domain.account.GetCurrentEntitlementUseCase
 import app.logdate.client.domain.account.HasLogDateCloudAccountUseCase
+import app.logdate.client.domain.account.PreferencesBackfilledAccountTracker
 import app.logdate.client.domain.account.TriggerInitialSyncUseCase
 import app.logdate.client.domain.account.TryRestoreSignInUseCase
 import app.logdate.client.domain.user.GetUserIdUseCase
@@ -34,6 +37,15 @@ val accountDomainModule: Module =
         factory { AuthenticateWithPasskeyUseCase(get()) }
         factory { TryRestoreSignInUseCase(get()) }
         factory { TriggerInitialSyncUseCase(syncManager = get()) }
+        factory<BackfilledAccountTracker> { PreferencesBackfilledAccountTracker(preferences = get()) }
+        factory {
+            BackfillLocalDataUseCase(
+                journalRepository = get(),
+                journalNotesRepository = get(),
+                syncMetadataService = get(),
+                tracker = get(),
+            )
+        }
         factory { GetCurrentEntitlementUseCase(sessionStorage = get(), apiClient = get()) }
 
         // User ID - depends on account

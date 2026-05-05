@@ -36,6 +36,7 @@ import app.logdate.feature.core.settings.ui.VoiceNotesSettingsViewModel
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import app.logdate.feature.core.settings.updates.UnsupportedAppUpdateController
 import app.logdate.feature.core.sync.SyncIssuesViewModel
+import app.logdate.feature.core.sync.SyncPresentationViewModel
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -134,4 +135,5 @@ actual val coreFeatureModule: Module =
         viewModel { PeopleInboxViewModel(get()) }
         viewModel { PersonDetailViewModel(get(), get()) }
         viewModel { SyncIssuesViewModel(get()) }
+        viewModel { SyncPresentationViewModel(syncManager = get(), sessionStorage = get()) }
     }

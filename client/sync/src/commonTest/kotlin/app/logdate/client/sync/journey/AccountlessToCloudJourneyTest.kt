@@ -18,6 +18,7 @@ import app.logdate.client.sync.test.fakeSessionStorage
 import app.logdate.client.sync.test.fakeSyncMetadataService
 import app.logdate.client.sync.test.testDefaultSyncManager
 import app.logdate.shared.model.Journal
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -25,22 +26,27 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
- * Invariant: data created while signed-out drains to the cloud once a session appears.
+ * Invariant: data created while signed-out drains to the cloud after first sign-in.
  *
- * The server can't distinguish a backlog upload from any other upload, so the launch-critical
- * question is client-side: when the local DB has N pending items created accountless and a session
- * is saved, does `SyncManager.fullSync()` pick them up and push them? This test seeds a backlog,
- * flips the fakes from unauthenticated to authenticated, and verifies every queued entity reaches
- * the fake `CloudApiClient`.
+ * Post-gating, the metadata layer refuses to enqueue while there is no session — accountless
+ * writes are local-only. The product still promises that signing in for the first time will
+ * back up everything the user has, so onboarding walks the local DB and re-enqueues every
+ * record (the production code path lives in `BackfillLocalDataUseCase` in `client/domain`,
+ * which is unit-tested separately to avoid a cross-module dependency in this journey test).
+ *
+ * This test exercises the equivalent flow end-to-end: seeds local repos while signed-out,
+ * verifies nothing enqueued, signs in, replays the backfill walk inline, and asserts every
+ * entity reaches the fake `CloudApiClient`.
  */
 class AccountlessToCloudJourneyTest {
     @Test
-    fun backlog_created_accountless_drains_after_first_session() =
+    fun backlog_created_accountless_drains_after_first_sign_in_via_backfill() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val sessionStorage = fakeSessionStorage(authenticated = false)
             val accountRepository = fakeAccountRepository(authenticated = false)
-            val syncMetadataService = fakeSyncMetadataService()
+            // Auth-gated metadata service: enqueue is a no-op until sessionStorage holds a session.
+            val syncMetadataService = fakeSyncMetadataService(sessionStorage)
             val notesRepository = fakeJournalNotesRepository()
             val journalRepository = fakeJournalRepository()
 
@@ -70,31 +76,27 @@ class AccountlessToCloudJourneyTest {
                         lastUpdated = Clock.System.now(),
                     ).also { journalRepository.create(it) }
                 }
-            val associationKeys =
-                (1..4).map { AssociationPendingKey(journalId = Uuid.random(), contentId = Uuid.random()) }
-
-            notes.forEach { note ->
-                syncMetadataService.enqueuePending(
-                    entityId = note.uid.toString(),
-                    entityType = EntityType.NOTE,
-                    operation = PendingOperation.CREATE,
-                )
-            }
-            journals.forEach { journal ->
-                syncMetadataService.enqueuePending(
-                    entityId = journal.id.toString(),
-                    entityType = EntityType.JOURNAL,
-                    operation = PendingOperation.CREATE,
-                )
-            }
-            associationKeys.forEach { key ->
-                syncMetadataService.enqueuePending(
-                    entityId = key.toPendingId(),
-                    entityType = EntityType.ASSOCIATION,
-                    operation = PendingOperation.CREATE,
-                )
+            val associations =
+                (0 until 4).map { i ->
+                    val journalId = journals[i % journals.size].id
+                    val noteId = notes[i % notes.size].uid
+                    journalId to noteId
+                }
+            associations.forEach { (journalId, noteId) ->
+                notesRepository.addTestAssociation(journalId, noteId)
             }
 
+            // Sanity: nothing should be enqueued yet — accountless writes don't produce sync signal.
+            assertTrue(
+                syncMetadataService.getPendingUploads(EntityType.NOTE).isEmpty(),
+                "Notes must not enqueue while signed-out",
+            )
+            assertTrue(
+                syncMetadataService.getPendingUploads(EntityType.JOURNAL).isEmpty(),
+                "Journals must not enqueue while signed-out",
+            )
+
+            // First sign-in.
             sessionStorage.saveSession(
                 UserSession(
                     accessToken = "drained-access-token",
@@ -103,6 +105,31 @@ class AccountlessToCloudJourneyTest {
                 ),
             )
             accountRepository.setAuthenticated(true)
+
+            // Replay the backfill walk: same logic the production BackfillLocalDataUseCase runs.
+            // Lives in client/domain and is unit-tested there; inlined here to avoid a
+            // cross-module test dependency.
+            journalRepository.allJournalsObserved.first().forEach { j ->
+                syncMetadataService.enqueuePending(
+                    entityId = j.id.toString(),
+                    entityType = EntityType.JOURNAL,
+                    operation = PendingOperation.CREATE,
+                )
+            }
+            notesRepository.allNotesObserved.first().forEach { n ->
+                syncMetadataService.enqueuePending(
+                    entityId = n.uid.toString(),
+                    entityType = EntityType.NOTE,
+                    operation = PendingOperation.CREATE,
+                )
+            }
+            notesRepository.getAllJournalNoteLinks().forEach { (journalId, contentId) ->
+                syncMetadataService.enqueuePending(
+                    entityId = AssociationPendingKey(journalId, contentId).toPendingId(),
+                    entityType = EntityType.ASSOCIATION,
+                    operation = PendingOperation.CREATE,
+                )
+            }
 
             val result = syncManager.fullSync()
 

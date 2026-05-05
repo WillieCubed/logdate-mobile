@@ -36,6 +36,11 @@ class LogdatePreferencesDataSource(
         val BACKGROUND_SYNC_ENABLED = booleanPreferencesKey("background_sync_enabled")
         val SYSTEM_SEARCH_VISIBILITY_ENABLED = booleanPreferencesKey("system_search_visibility_enabled")
 
+        // Account IDs that have already had their local data backfilled into the sync queue
+        // after first sign-in. Idempotency guard so a re-sign-in into the same account doesn't
+        // re-enqueue everything; signing into a different account does trigger a fresh pass.
+        val BACKFILLED_ACCOUNT_IDS = stringSetPreferencesKey("backfilled_account_ids")
+
         // Feature flags
         val LIBRARY_ENABLED = booleanPreferencesKey("library_enabled")
         val EVENTS_ENABLED = booleanPreferencesKey("events_enabled")
@@ -302,6 +307,21 @@ class LogdatePreferencesDataSource(
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
                 this[BACKGROUND_SYNC_ENABLED] = enabled
+            }
+        }
+    }
+
+    /**
+     * Returns the set of account IDs that have already received a one-time local-data backfill
+     * into the sync queue. See [BACKFILLED_ACCOUNT_IDS] for the why.
+     */
+    suspend fun getBackfilledAccountIds(): Set<String> = userPreferences.data.first()[BACKFILLED_ACCOUNT_IDS] ?: emptySet()
+
+    suspend fun markAccountBackfilled(accountId: String) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                val current = this[BACKFILLED_ACCOUNT_IDS] ?: emptySet()
+                this[BACKFILLED_ACCOUNT_IDS] = current + accountId
             }
         }
     }

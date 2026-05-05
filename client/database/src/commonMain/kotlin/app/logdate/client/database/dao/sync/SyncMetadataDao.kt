@@ -67,6 +67,9 @@ interface SyncMetadataDao {
     @Query("DELETE FROM pending_uploads")
     suspend fun deleteAllPending()
 
+    @Query("DELETE FROM pending_uploads WHERE serverOrigin = :serverOrigin")
+    suspend fun deletePendingForOrigin(serverOrigin: String)
+
     @Query("SELECT COUNT(*) FROM pending_uploads WHERE serverOrigin = :serverOrigin")
     suspend fun getPendingCount(serverOrigin: String): Int
 

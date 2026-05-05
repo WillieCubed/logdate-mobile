@@ -362,6 +362,7 @@ dependencies {
     screenshotTestImplementation(projects.client.billing)
     screenshotTestImplementation(projects.client.theme)
     screenshotTestImplementation(projects.shared.model)
+    screenshotTestImplementation(projects.app.composeMain)
     screenshotTestImplementation(libs.kotlinx.datetime)
     screenshotTestImplementation(libs.androidx.navigation3.runtime)
 }

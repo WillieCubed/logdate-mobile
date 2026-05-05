@@ -106,6 +106,38 @@ fun fakeSessionStorage(authenticated: Boolean = true): FakeSessionStorage =
 
 fun fakeSyncMetadataService(): FakeSyncMetadataService = FakeSyncMetadataService()
 
+/**
+ * Variant that mirrors production gating: enqueue is a no-op while [sessionStorage] reports no
+ * session. Counts also surface zero in that state. Use this when a test exercises the
+ * "accountless writes don't enqueue" invariant.
+ */
+fun fakeSyncMetadataService(sessionStorage: SessionStorage): FakeSyncMetadataService = FakeSyncMetadataService(sessionStorage)
+
+/**
+ * SessionStorage that always reports an active session. Default for fakes that don't care
+ * about auth-gated behavior — keeps the gating logic uniform without nullable plumbing.
+ */
+private object AlwaysAuthenticatedSessionStorage : SessionStorage {
+    private val flow =
+        MutableStateFlow<UserSession?>(
+            UserSession(accessToken = "fake", refreshToken = "fake", accountId = "fake"),
+        )
+
+    override fun getSession(): UserSession? = flow.value
+
+    override fun getSessionFlow(): Flow<UserSession?> = flow
+
+    override suspend fun hasValidSession(): Boolean = true
+
+    override fun saveSession(session: UserSession) {
+        flow.value = session
+    }
+
+    override fun clearSession() {
+        flow.value = null
+    }
+}
+
 fun fakeJournalNotesRepository(): FakeJournalNotesRepository = FakeJournalNotesRepository()
 
 fun fakeJournalNotesRepository(vararg notes: String): FakeJournalNotesRepository =
@@ -534,11 +566,15 @@ class FakeSessionStorage : SessionStorage {
 /**
  * Fake SyncMetadataService for testing.
  */
-class FakeSyncMetadataService : SyncMetadataService {
+class FakeSyncMetadataService(
+    private val sessionStorage: SessionStorage = AlwaysAuthenticatedSessionStorage,
+) : SyncMetadataService {
     private val pendingUploads = mutableMapOf<EntityType, MutableMap<String, PendingOperation>>()
     private val retryCounts = mutableMapOf<EntityType, MutableMap<String, Int>>()
     private val syncTimes = mutableMapOf<EntityType, Instant>()
     private val pendingCountFlow = MutableStateFlow(0)
+
+    private fun isAuthenticated(): Boolean = sessionStorage.getSession() != null
 
     override suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload> =
         pendingUploads[entityType]
@@ -573,6 +609,7 @@ class FakeSyncMetadataService : SyncMetadataService {
         entityType: EntityType,
         operation: PendingOperation,
     ) {
+        if (!isAuthenticated()) return
         val existing = pendingUploads[entityType]?.get(entityId)
         val resolved = PendingOperation.coalesce(existing, operation)
         if (resolved == null) {
@@ -596,9 +633,15 @@ class FakeSyncMetadataService : SyncMetadataService {
         updatePendingCount()
     }
 
-    override suspend fun getPendingCount(): Int = pendingUploads.values.sumOf { it.size }
+    override suspend fun getPendingCount(): Int = if (isAuthenticated()) pendingUploads.values.sumOf { it.size } else 0
 
     override fun observePendingCount(): Flow<Int> = pendingCountFlow
+
+    override suspend fun clearPending() {
+        pendingUploads.clear()
+        retryCounts.clear()
+        pendingCountFlow.value = 0
+    }
 
     override suspend fun incrementRetryCount(
         entityId: String,
@@ -645,6 +688,7 @@ class FakeSyncMetadataService : SyncMetadataService {
 class FakeJournalNotesRepository : SyncableJournalNotesRepository {
     private val notes = mutableListOf<JournalNote>()
     private val notesStateFlow = MutableStateFlow<List<JournalNote>>(emptyList())
+    private val associations = mutableListOf<Pair<Uuid, Uuid>>()
 
     override val allNotesObserved: Flow<List<JournalNote>> = notesStateFlow.asStateFlow()
 
@@ -696,7 +740,14 @@ class FakeJournalNotesRepository : SyncableJournalNotesRepository {
 
     override suspend fun getNoteById(noteId: Uuid): JournalNote? = notes.find { it.uid == noteId }
 
-    override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
+    override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = associations.toList()
+
+    fun addTestAssociation(
+        journalId: Uuid,
+        contentId: Uuid,
+    ) {
+        associations += journalId to contentId
+    }
 
     override suspend fun createFromSync(note: JournalNote) {
         create(note)

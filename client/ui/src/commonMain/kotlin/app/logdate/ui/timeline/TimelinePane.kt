@@ -8,10 +8,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -32,6 +34,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import app.logdate.ui.sync.SyncAction
+import app.logdate.ui.sync.SyncErrorBanner
+import app.logdate.ui.sync.SyncPresentation
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.newstuff.EndOfTimelineUiState
 import app.logdate.ui.timeline.newstuff.TimelineList
@@ -72,6 +78,8 @@ fun TimelinePane(
     onImportBackup: () -> Unit = {},
     onHistoryClick: () -> Unit = {},
     birthday: Instant? = null,
+    syncPresentation: SyncPresentation = SyncPresentation.Hidden,
+    onSyncAction: (SyncAction) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
@@ -97,42 +105,59 @@ fun TimelinePane(
                 onSearchClick = onSearchClick,
                 onSettingsClick = onProfileClick,
                 onHistoryClick = onHistoryClick,
+                syncPresentation = syncPresentation,
+                onSyncChipClick = { onSyncAction(SyncAction.Retry) },
             )
         },
     ) { paddingValues ->
-        Box(
+        Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .padding(paddingValues),
         ) {
-            TimelineList(
-                uiState.items,
-                endOfTimelineState,
-                onOpenDay,
-                Modifier.consumeWindowInsets(paddingValues),
-                uiState.loadingState,
-                uiState.isLoadingMore,
-                uiState.hasMoreOlderContent,
-                uiState.appendError,
-                onLoadMoreOlder,
-                timelineSuggestion,
-                onStartWriting,
-                onOpenDraft,
-                onOpenDay,
-                onShareMemory,
-                onVisibleAudioNoteIdsChanged,
-                onImportBackup,
-                listState,
-            )
-
-            ScrollToTopButton(
-                listState = listState,
+            // Error-tier sync banner sits *inside* the Scaffold body, below the TopAppBar.
+            // It inherits content insets and never collides with the system status bar — the
+            // load-bearing fix for the original Pixel 8 collision bug. On medium/expanded
+            // windows the banner caps at 560dp wide so it doesn't span the entire content
+            // pane; on compact phones it fills width minus margins.
+            SyncErrorBanner(
+                presentation = syncPresentation,
+                onAction = onSyncAction,
                 modifier =
                     Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = Spacing.lg),
+                        .fillMaxWidth()
+                        .widthIn(max = 560.dp),
             )
+            Box(modifier = Modifier.fillMaxWidth()) {
+                TimelineList(
+                    uiState.items,
+                    endOfTimelineState,
+                    onOpenDay,
+                    Modifier.consumeWindowInsets(paddingValues),
+                    uiState.loadingState,
+                    uiState.isLoadingMore,
+                    uiState.hasMoreOlderContent,
+                    uiState.appendError,
+                    onLoadMoreOlder,
+                    timelineSuggestion,
+                    onStartWriting,
+                    onOpenDraft,
+                    onOpenDay,
+                    onShareMemory,
+                    onVisibleAudioNoteIdsChanged,
+                    onImportBackup,
+                    listState,
+                )
+
+                ScrollToTopButton(
+                    listState = listState,
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = Spacing.lg),
+                )
+            }
         }
     }
 }

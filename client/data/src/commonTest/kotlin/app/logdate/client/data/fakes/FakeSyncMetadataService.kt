@@ -74,6 +74,11 @@ class FakeSyncMetadataService : SyncMetadataService {
             existing.copy(retryCount = existing.retryCount + 1)
     }
 
+    override suspend fun clearPending() {
+        pendingUploads.clear()
+        _pendingCount.value = 0
+    }
+
     private fun updatePendingCount() {
         _pendingCount.value = pendingUploads.values.sumOf { it.size }
     }
