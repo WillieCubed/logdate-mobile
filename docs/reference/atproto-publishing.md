@@ -66,19 +66,41 @@ Supported overrides:
 | --- | --- | --- | --- |
 | Group | `atproto.group` | `ATPROTO_GROUP` | `studio.hypertext.atproto` |
 | Version | `atproto.version` | `ATPROTO_VERSION` | `0.1.0` |
-| Repository URL | `atproto.publish.url` | `ATPROTO_PUBLISH_URL` | none |
-| Repository username | `atproto.publish.username` | `ATPROTO_PUBLISH_USERNAME` | none |
-| Repository password | `atproto.publish.password` | `ATPROTO_PUBLISH_PASSWORD` | none |
+| Repository URL (legacy / GH Packages) | `atproto.publish.url` | `ATPROTO_PUBLISH_URL` | none |
+| Repository username (legacy / GH Packages) | `atproto.publish.username` | `ATPROTO_PUBLISH_USERNAME` | none |
+| Repository password (legacy / GH Packages) | `atproto.publish.password` | `ATPROTO_PUBLISH_PASSWORD` | none |
+| Maven Central username | `ossrh.username` | `OSSRH_USERNAME` | none |
+| Maven Central password | `ossrh.password` | `OSSRH_PASSWORD` | none |
+| Maven Central URL override | `ossrh.publish.url` | `OSSRH_PUBLISH_URL` | `https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/` |
 | Signing key ID | `signingKeyId` | `SIGNING_KEY_ID` | optional |
 | Signing key | `signingKey` | `SIGNING_KEY` | none |
 | Signing password | `signingPassword` | `SIGNING_PASSWORD` | none |
 
-If no repository URL is configured, the plugin does not register a remote
-publish repository at all.
+The plugin registers up to two named remote Maven repositories, each
+independently gated:
+
+- `atproto` — the legacy single-target slot, currently pointed at GitHub
+  Packages by `publish-atproto.yml`. Skipped entirely when
+  `ATPROTO_PUBLISH_URL` is unset (publishToMavenLocal still works).
+- `atprotoMavenCentral` — Sonatype OSSRH staging endpoint, registered only
+  when both `OSSRH_USERNAME` and `OSSRH_PASSWORD` are present. URL defaults
+  to `https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/`
+  but is overridable via `OSSRH_PUBLISH_URL` in case Sonatype migrates the
+  staging host or the namespace moves to the central-publishing portal.
+
+Each repo gets its own Gradle task: `publishAllPublicationsToAtprotoRepository`
+and `publishAllPublicationsToAtprotoMavenCentralRepository`. They're
+independent — a single CI run can publish to either or both depending on
+which credential sets are configured.
 
 If no signing key and signing password are configured, the plugin does not
 enable signing. This is intentional so local development can publish unsigned
-artifacts to `mavenLocal()` with zero release credentials.
+artifacts to `mavenLocal()` with zero release credentials. **Maven Central
+rejects unsigned uploads**, so publishing to `atprotoMavenCentral` without
+`SIGNING_KEY` + `SIGNING_PASSWORD` will produce artifacts that fail
+Sonatype's staging-validation step. The CI workflow gates the MC publish
+on signing being present so that misconfiguration is caught before an
+upload starts.
 
 ## Published Artifacts
 
@@ -226,27 +248,54 @@ set — both are unset in the workflow today, so artifacts publish unsigned.
 Maven Central does require signatures; restoring them is part of the
 migration step below, not a separate effort.
 
-### Migrating to Maven Central
+### Adding the Maven Central target
 
-The convention plugin is repo-URL-agnostic, so swapping targets is
-config-only:
+The Maven Central wiring is already in place — both the convention plugin
+and `publish-atproto.yml` have the slots — and only switches on once the
+following repo-scoped GH Actions secrets are configured:
 
-1. Complete Sonatype OSSRH onboarding for the `studio.hypertext` namespace
-   (DNS TXT verification on `hypertext.studio` — ~24h propagation).
-2. Generate a GPG keypair, upload the public key to a keyserver, and store
-   `SIGNING_KEY` (ASCII-armored secret key) and `SIGNING_PASSWORD` as
-   repo-scoped GH Actions secrets.
-3. Add `OSSRH_USERNAME` and `OSSRH_PASSWORD` repo secrets.
-4. In `publish-atproto.yml`, swap the three `ATPROTO_PUBLISH_*` env values
-   to point at the OSSRH staging URL and credentials, and add the four
-   signing env vars back. Drop `permissions: { packages: write }`.
-5. Cut the next tag — the same `publishAllPublicationsToAtprotoRepository`
-   tasks publish unchanged.
+| Secret | Purpose |
+| --- | --- |
+| `OSSRH_USERNAME` | Sonatype OSSRH portal username (or token name for the new central-publishing portal) |
+| `OSSRH_PASSWORD` | Sonatype OSSRH password (or token secret) |
+| `OSSRH_PUBLISH_URL` *(optional)* | Override the default `https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/` if the namespace migrates to a different host |
+| `SIGNING_KEY_ID` *(optional)* | Short ID of the GPG key, only useful when multiple keys live in the keyring |
+| `SIGNING_KEY` | ASCII-armored GPG **secret** key (`gpg --armor --export-secret-keys <id>`) |
+| `SIGNING_PASSWORD` | Passphrase for the secret key |
 
-Existing GH Packages consumers can stay on the old artifacts; new releases
-land on Maven Central with no coordinate change (`studio.hypertext.atproto:*`
-is already the published group). Adjusting the consumer-side repo URL is
-the only break for them.
+When *all four* of `OSSRH_USERNAME`, `OSSRH_PASSWORD`, `SIGNING_KEY`, and
+`SIGNING_PASSWORD` are present, the workflow runs an additional
+`publishAllPublicationsToAtprotoMavenCentralRepository` step after the GH
+Packages publish. Missing any of them skips the MC step silently — GH
+Packages still publishes — so partial onboarding doesn't break the
+existing release flow.
+
+One-time prerequisites before flipping these on:
+
+1. Register `studio.hypertext` (or your final namespace) at
+   <https://central.sonatype.com>. New namespaces require DNS TXT
+   verification on the registrable domain (`hypertext.studio`), which
+   typically takes a few hours to a day.
+2. Generate a GPG keypair locally
+   (`gpg --full-generate-key` → RSA 4096), upload the **public** key to a
+   keyserver (`gpg --send-keys <id>`), then export the **secret** key for
+   `SIGNING_KEY` (`gpg --armor --export-secret-keys <id> | pbcopy`).
+3. Set the secrets above.
+4. Cut the next `atproto-v*` tag. The workflow publishes to GH Packages
+   first, then Maven Central; if the OSSRH push fails, GH Packages is
+   already done so consumers using the interim repo aren't affected.
+
+After artifacts land in Sonatype's staging area, you'll need to **close +
+release** the staging repository in the Sonatype web UI (or wire
+`io.github.gradle-nexus.publish-plugin` for full automation — not done
+here yet because the manual close step is also a useful sanity check
+before an artifact becomes immutable on Central).
+
+Maven Central downloads don't require authentication, so consumers will
+drop the `dependencyResolutionManagement` credentials block from
+`docs/reference/atproto-library.md` once the same coordinates are
+available there. Group/artifact IDs (`studio.hypertext.atproto:*`) are
+identical across both targets — no coordinate migration needed.
 
 ## Standalone Consumer Verification
 

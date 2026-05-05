@@ -6,7 +6,7 @@ import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.XmlProvider
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository
-import org.gradle.api.credentials.PasswordCredentials
+import org.gradle.api.artifacts.repositories.PasswordCredentials
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
 import org.gradle.api.tasks.bundling.Jar
@@ -100,12 +100,33 @@ class AtprotoPublishedModulePlugin : Plugin<Project> {
     }
 
     /**
-     * Adds the optional remote `atproto` Maven repository when a publish URL is configured.
+     * Registers up to two named remote Maven repositories, each independently gated on its own
+     * credential set being present. Either or both can be active in a single Gradle invocation;
+     * neither is required for `publishToMavenLocal` flows.
      *
-     * The repository is omitted entirely when no URL override is present, which keeps local builds
-     * and `publishToMavenLocal` flows working without release credentials.
+     * 1. `atproto` — the legacy single-target slot, currently pointed at GitHub Packages by the
+     *    publish workflow. Honours `atproto.publish.url` / `ATPROTO_PUBLISH_URL` and the matching
+     *    username/password pair. Skipped when no URL is configured.
+     * 2. `atprotoMavenCentral` — Sonatype OSSRH staging endpoint, pinned to
+     *    `https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/` (Sonatype's standard
+     *    publish URL for new namespaces). Honours `ossrh.username` / `OSSRH_USERNAME` and
+     *    `ossrh.password` / `OSSRH_PASSWORD`. Skipped when either credential is missing — Sonatype
+     *    rejects unauthenticated uploads, so a partial config is always a misconfiguration.
+     *    Override the URL via `ossrh.publish.url` / `OSSRH_PUBLISH_URL` if Sonatype later moves
+     *    the staging host or the namespace migrates to the central-publishing portal.
+     *
+     * Maven Central additionally requires GPG-signed artifacts; signing is wired separately in
+     * [configureSigning] and is similarly gated on `SIGNING_KEY` + `SIGNING_PASSWORD`. Pushing to
+     * `atprotoMavenCentral` without those env vars set will produce unsigned artifacts that
+     * Sonatype rejects at the staging-validation step — caller's job to wire signing alongside
+     * the OSSRH credentials.
      */
     private fun Project.configureRepository(publishing: PublishingExtension) {
+        configureLegacyRepository(publishing)
+        configureMavenCentralRepository(publishing)
+    }
+
+    private fun Project.configureLegacyRepository(publishing: PublishingExtension) {
         val publishUrl = propertyOrEnv("atproto.publish.url", "ATPROTO_PUBLISH_URL") ?: return
         val username = propertyOrEnv("atproto.publish.username", "ATPROTO_PUBLISH_USERNAME")
         val password = propertyOrEnv("atproto.publish.password", "ATPROTO_PUBLISH_PASSWORD")
@@ -126,6 +147,32 @@ class AtprotoPublishedModulePlugin : Plugin<Project> {
                             },
                         )
                     }
+                }
+            },
+        )
+    }
+
+    private fun Project.configureMavenCentralRepository(publishing: PublishingExtension) {
+        val username = propertyOrEnv("ossrh.username", "OSSRH_USERNAME") ?: return
+        val password = propertyOrEnv("ossrh.password", "OSSRH_PASSWORD") ?: return
+        val publishUrl =
+            propertyOrEnv("ossrh.publish.url", "OSSRH_PUBLISH_URL")
+                ?: "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+
+        publishing.repositories.maven(
+            object : Action<MavenArtifactRepository> {
+                override fun execute(repository: MavenArtifactRepository) {
+                    repository.name = "atprotoMavenCentral"
+                    repository.url = uri(publishUrl)
+                    repository.credentials(
+                        PasswordCredentials::class.java,
+                        object : Action<PasswordCredentials> {
+                            override fun execute(credentials: PasswordCredentials) {
+                                credentials.username = username
+                                credentials.password = password
+                            }
+                        },
+                    )
                 }
             },
         )
