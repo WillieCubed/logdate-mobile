@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".githooks/block-rogue-configs.sh",
+            "command": ".claude/hooks/block-rogue-configs.sh",
             "statusMessage": "Checking protected config files..."
           }
         ]
@@ -16,12 +16,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".githooks/block-rogue-configs.sh",
+            "command": ".claude/hooks/block-rogue-configs.sh",
             "statusMessage": "Checking protected config files..."
           },
           {
             "type": "command",
-            "command": ".githooks/commit-message-checklist.sh",
+            "command": ".claude/hooks/commit-message-checklist.sh",
             "statusMessage": "Validating commit message..."
           }
         ]
