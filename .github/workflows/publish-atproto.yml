@@ -21,14 +21,25 @@ jobs:
       packages: write
 
     env:
-      # Interim publishing target: GitHub Packages on this repo. Maven
-      # Central is the longer-term home but is blocked on Sonatype OSSRH
-      # onboarding (DNS verification + GPG keypair). Until that lands, the
-      # convention plugin is pointed at the GH Packages Maven repo using
-      # the auto-injected GITHUB_TOKEN — no extra secrets needed.
+      # Default target: GitHub Packages on this repo. Tag-driven release
+      # always lands here so we have somewhere to ship today without any
+      # operator setup.
       ATPROTO_PUBLISH_URL: https://maven.pkg.github.com/${{ github.repository }}
       ATPROTO_PUBLISH_USERNAME: ${{ github.actor }}
       ATPROTO_PUBLISH_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+      # Optional Maven Central target. The Sonatype OSSRH staging repo is
+      # only used when ALL of OSSRH_USERNAME, OSSRH_PASSWORD, SIGNING_KEY,
+      # and SIGNING_PASSWORD are configured as repo secrets. Maven Central
+      # rejects unsigned uploads, so we don't even attempt the push without
+      # the GPG key in place. Leaving any of these unset means the MC step
+      # is skipped — GH Packages still publishes normally.
+      OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+      OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+      OSSRH_PUBLISH_URL: ${{ secrets.OSSRH_PUBLISH_URL }}
+      SIGNING_KEY_ID: ${{ secrets.SIGNING_KEY_ID }}
+      SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+      SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +66,19 @@ jobs:
             echo "ATPROTO_VERSION=${VERSION}" >> "$GITHUB_ENV"
           fi
 
-      - name: Publish ATProto modules
+      - name: Detect Maven Central availability
+        id: mc
+        shell: bash
+        run: |
+          if [[ -n "$OSSRH_USERNAME" && -n "$OSSRH_PASSWORD" && -n "$SIGNING_KEY" && -n "$SIGNING_PASSWORD" ]]; then
+            echo "Maven Central credentials + signing key present — will publish to OSSRH after GH Packages."
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Maven Central credentials or signing key not fully configured — skipping OSSRH step."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to GitHub Packages
         run: >
           ./gradlew
           :shared:atproto-crypto:publishAllPublicationsToAtprotoRepository
@@ -68,3 +91,18 @@ jobs:
           :shared:atproto-pds:publishAllPublicationsToAtprotoRepository
           :shared:atproto-pds-runtime:publishAllPublicationsToAtprotoRepository
           :shared:atproto-bom:publishAllPublicationsToAtprotoRepository
+
+      - name: Publish to Maven Central
+        if: steps.mc.outputs.enabled == 'true'
+        run: >
+          ./gradlew
+          :shared:atproto-crypto:publishAllPublicationsToAtprotoMavenCentralRepository
+          :shared:atproto-syntax:publishAllPublicationsToAtprotoMavenCentralRepository
+          :shared:atproto-identity:publishAllPublicationsToAtprotoMavenCentralRepository
+          :shared:atproto-xrpc:publishAllPublicationsToAtprotoMavenCentralRepository
+          :shared:atproto-repo:publishAllPublicationsToAtprotoMavenCentralRepository
+          :shared:atproto-plc:publishAllPublicationsToAtprotoMavenCentralRepository
+          :shared:atproto-lexicon:publishAllPublicationsToAtprotoMavenCentralRepository
+          :shared:atproto-pds:publishAllPublicationsToAtprotoMavenCentralRepository
+          :shared:atproto-pds-runtime:publishAllPublicationsToAtprotoMavenCentralRepository
+          :shared:atproto-bom:publishAllPublicationsToAtprotoMavenCentralRepository
