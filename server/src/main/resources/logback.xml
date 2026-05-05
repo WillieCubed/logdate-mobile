@@ -17,7 +17,13 @@
         <minimumEventLevel>ERROR</minimumEventLevel>
         <minimumBreadcrumbLevel>WARN</minimumBreadcrumbLevel>
     </appender>
-    <root level="trace">
+    <!--
+        Root level is INFO so production doesn't pay for Netty/Hikari/webauthn4j
+        TRACE chatter going to stdout (Cloud Run ingest is metered) and through
+        the Sentry appender's filter pipeline. Per-subsystem overrides below
+        narrow further. Bump back to DEBUG/TRACE only when debugging locally.
+    -->
+    <root level="INFO">
         <appender-ref ref="STDOUT"/>
         <appender-ref ref="SENTRY"/>
     </root>

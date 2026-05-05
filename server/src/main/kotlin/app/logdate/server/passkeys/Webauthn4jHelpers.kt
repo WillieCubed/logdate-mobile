@@ -28,20 +28,13 @@ internal fun credentialRecord(
 ): CredentialRecord =
     CredentialRecordImpl(
         attestationStatement,
-        // uvInitialized =
         null,
-        // backupEligible =
         null,
-        // backupState =
         null,
         signCount,
         attestedCredentialData,
-        // authenticatorExtensions =
         null,
-        // clientData =
         null,
-        // clientExtensions =
         null,
-        // transports =
         null,
     )

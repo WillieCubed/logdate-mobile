@@ -83,6 +83,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.modules.SerializersModule
@@ -101,27 +102,36 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+private const val HEALTH_TOKEN_HEADER = "X-LogDate-Health-Token"
+private const val HEALTH_TOKEN_ENV = "HEALTH_INTERNAL_TOKEN"
+
 private val landingPageHtml: String by lazy {
     val resource =
-        object {}.javaClass.classLoader.getResource("public/index.html")
+        Application::class.java.classLoader.getResource("public/index.html")
             ?: error("public/index.html missing from server resources")
     resource.readText()
 }
 
-// Boot-time hook for Sentry. With no DSN configured the SDK is a no-op, so
-// dev/test boots cleanly without ever touching the network. Once SENTRY_DSN
-// is mounted in Cloud Run, every uncaught exception in the request pipeline
-// — and every Napier.e call, since Napier surfaces through SLF4J/logback
-// which Sentry auto-instruments — flows to the configured project.
-private fun initializeSentry(profile: RuntimeProfile) {
-    val dsn = System.getenv("SENTRY_DSN").orEmpty()
+private val rootDescriptorJson: JsonObject by lazy {
+    buildJsonObject {
+        put("name", "LogDate Server API")
+        put("version", "1.0.0")
+        put("docs", "/swagger")
+        put("openapi", "/openapi.json")
+        put("openapi_yaml", "/openapi.yaml")
+        put("health", "/health")
+    }
+}
+
+// See docs/observability/sentry.md for the full integration story.
+private fun initializeSentry(
+    profile: RuntimeProfile,
+    readEnv: (String) -> String? = System::getenv,
+) {
+    val dsn = readEnv("SENTRY_DSN").orEmpty()
     if (dsn.isEmpty()) {
         if (profile.isProduction) {
-            Napier.w(
-                "SENTRY_DSN is unset in production — boot continues but uncaught " +
-                    "exceptions and route errors won't be captured anywhere except " +
-                    "Cloud Logging. Provision the secret to close the gap.",
-            )
+            Napier.w("SENTRY_DSN unset in production — uncaught exceptions and route errors won't reach Sentry.")
         }
         return
     }
@@ -129,9 +139,6 @@ private fun initializeSentry(profile: RuntimeProfile) {
         options.dsn = dsn
         options.environment = profile.name.lowercase()
         options.release = "logdate-server@1.0.0"
-        // Sentry's default tracesSampleRate is 0.0, which means transactions
-        // never get sampled. We don't need APM right now — exceptions and
-        // breadcrumbs are enough — so leaving it at the default is correct.
     }
     Napier.i("Sentry initialised for ${profile.name.lowercase()}")
 }
@@ -166,9 +173,12 @@ private fun buildMainServer(
 @OptIn(ExperimentalUuidApi::class)
 fun Application.module(
     isDatabaseAvailable: Boolean = false,
-    healthInternalToken: String = System.getenv("HEALTH_INTERNAL_TOKEN").orEmpty(),
+    healthInternalToken: String = System.getenv(HEALTH_TOKEN_ENV).orEmpty(),
 ) {
     val profile = RuntimeProfile.fromEnvironment()
+    // Captured once at module init so the per-request token check doesn't allocate a new
+    // ByteArray on every probe.
+    val healthInternalTokenBytes = healthInternalToken.toByteArray()
     val openApiSpec = AtomicReference<OpenAPI?>()
     install(OpenApi) {
         security {
@@ -315,37 +325,19 @@ fun Application.module(
             if (accept.contains("text/html", ignoreCase = true)) {
                 call.respondText(landingPageHtml, ContentType.Text.Html)
             } else {
-                call.respond(
-                    mapOf(
-                        "name" to "LogDate Server API",
-                        "version" to "1.0.0",
-                        "docs" to "/swagger",
-                        "openapi" to "/openapi.json",
-                        "openapi_yaml" to "/openapi.yaml",
-                        "health" to "/health",
-                    ),
-                )
+                call.respond(rootDescriptorJson)
             }
         }
 
-        // Single /health route. The public payload is intentionally minimal so
-        // the open internet learns nothing about the deployment's internal
-        // state. An internal monitor presenting a valid X-LogDate-Health-Token
-        // (matching env HEALTH_INTERNAL_TOKEN) gets the same payload plus
-        // db_connected, which is the field a monitor actually needs to tell
-        // "JVM bound port 8080" apart from "actually serving requests against
-        // Postgres". A wrong token is silently treated as no token rather than
-        // 401'd — the header is purely additive, so an internal monitor with
-        // a stale token still gets a 200 (and its `db_connected:true`
-        // assertion fails, paging on token rotation). Comparison is
-        // constant-time via MessageDigest.isEqual so a brute-forcer can't time
-        // their way to the secret. See docs/observability/health-endpoint.md.
+        // Single /health route — public payload by default, db_connected unlocked when the
+        // X-LogDate-Health-Token header matches HEALTH_INTERNAL_TOKEN. See
+        // docs/observability/health-endpoint.md for the design rationale.
         get("/health") {
-            val provided = call.request.headers["X-LogDate-Health-Token"].orEmpty()
+            val provided = call.request.headers[HEALTH_TOKEN_HEADER]
             val tokenMatches =
-                healthInternalToken.isNotEmpty() &&
-                    provided.isNotEmpty() &&
-                    MessageDigest.isEqual(healthInternalToken.toByteArray(), provided.toByteArray())
+                provided != null &&
+                    healthInternalTokenBytes.isNotEmpty() &&
+                    MessageDigest.isEqual(healthInternalTokenBytes, provided.toByteArray())
             call.respond(
                 buildJsonObject {
                     put("status", "healthy")

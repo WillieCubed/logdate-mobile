@@ -81,19 +81,22 @@ class AtprotoPublishedModulePlugin : Plugin<Project> {
     }
 
     /**
-     * Copies the Apache 2.0 LICENSE and NOTICE into every published jar's META-INF.
+     * Copies the Apache 2.0 LICENSE and NOTICE into the binary jar's META-INF.
      *
-     * The license lives at `shared/atproto-licensing/{LICENSE,NOTICE}` in the monorepo so it
-     * scopes to the atproto-* modules without licensing the surrounding LogDate app code.
-     * Embedding the files in the artifact itself means consumers fetching the jar from Maven
-     * Central get the license metadata regardless of whether they also clone the source repo.
+     * Scoped to publishable binary jars only — `archiveClassifier == ""` skips sources, javadoc,
+     * dokka html, and per-target klib bundles. Apache 2.0 only mandates the notice in the
+     * binary distribution; embedding it in sources/docs jars is noise and breaks build-cache
+     * hits on otherwise-deterministic auxiliary artifacts.
      */
     private fun Project.embedLicensingInJars() {
         val licensingDir = rootProject.layout.projectDirectory.dir("shared/atproto-licensing")
-        tasks.withType(Jar::class.java).configureEach {
-            from(licensingDir.file("LICENSE")) { into("META-INF") }
-            from(licensingDir.file("NOTICE")) { into("META-INF") }
-        }
+        tasks
+            .withType(Jar::class.java)
+            .matching { it.archiveClassifier.getOrElse("").isEmpty() }
+            .configureEach {
+                from(licensingDir.file("LICENSE")) { into("META-INF") }
+                from(licensingDir.file("NOTICE")) { into("META-INF") }
+            }
     }
 
     /**

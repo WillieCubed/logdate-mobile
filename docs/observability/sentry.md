@@ -91,20 +91,11 @@ If neither fires, the most likely causes:
 
 ## Soft warning when unset in production
 
-If `SENTRY_DSN` is empty in a production runtime, `initializeSentry` in
-`Application.kt` logs a Napier.w line:
-
-```
-SENTRY_DSN is unset in production — boot continues but uncaught exceptions
-and route errors won't be captured anywhere except Cloud Logging.
-Provision the secret to close the gap.
-```
-
-Boot still proceeds. Sentry being unconfigured isn't fatal — losing it
-loses observability depth, not the server itself. The whole point of the
-fail-fast story in `ProductionConfigValidator` is to refuse to start when
-*security* is broken (placeholder secrets, missing JWT key); Sentry isn't
-in that category.
+If `SENTRY_DSN` is empty in a production runtime, `initializeSentry` logs a
+Napier.w warning at boot ("SENTRY_DSN unset in production — …") and the
+server continues without Sentry. Losing observability depth isn't a
+security failure the way a missing JWT secret is, so
+`ProductionConfigValidator` doesn't fail-fast on it.
 
 ## Rotating the DSN
 
@@ -123,20 +114,3 @@ gcloud run services update "$SERVICE" \
 
 The old key continues working until you destroy it in the Sentry
 dashboard, so there's no overlap window during which events are dropped.
-
-## Future direction
-
-- **Tracing/APM** — `tracesSampleRate` is left at the default `0.0`. If
-  the team starts caring about per-request performance breakdowns,
-  bumping it to `0.05` or `0.1` plus enabling the Ktor integration
-  (`io.sentry:sentry-ktor`) gives transaction traces. Not done today
-  because errors and breadcrumbs are sufficient and APM data is the
-  expensive part of a Sentry plan.
-- **PII scrubbing** — Sentry's default scrubbers cover the obvious
-  stuff (Authorization headers, cookies). If we ever start surfacing
-  passkey credential data or DIDs in error contexts, configure
-  `sendDefaultPii = false` and explicit scrubbers for those fields.
-- **Release tracking** — `release` is hardcoded to
-  `logdate-server@1.0.0`. Once we cut versioned releases, source it from
-  the Cloud Run revision name or a `LOGDATE_RELEASE` env var so Sentry
-  groups regressions correctly across deploys.
