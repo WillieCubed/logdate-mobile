@@ -4,8 +4,10 @@ package app.logdate.feature.core.main
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material3.FloatingActionButton
@@ -25,6 +27,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -44,6 +47,7 @@ import app.logdate.client.domain.timeline.TimelinePlaceVisit
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.feature.core.sync.SyncIssuesBanner
+import app.logdate.feature.core.sync.SyncPresentationViewModel
 import app.logdate.feature.journals.ui.JournalClickCallback
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
 import app.logdate.feature.rewind.ui.RewindOverviewScreen
@@ -52,6 +56,8 @@ import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.profiles.toUiState
+import app.logdate.ui.sync.SyncAction
+import app.logdate.ui.sync.SyncErrorBanner
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.HomeTimelineUiState
 import app.logdate.ui.timeline.ImageNoteUiState
@@ -104,11 +110,14 @@ fun HomeScreen(
     onImportBackup: () -> Unit = {},
     onOpenMediaDetail: (Uuid) -> Unit = {},
     onOpenSyncIssues: () -> Unit = {},
+    onOpenDay: (LocalDate) -> Unit = {},
     locationContent: @Composable (Modifier) -> Unit = {},
     libraryContent: @Composable (Modifier) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = koinViewModel(),
+    syncPresentationViewModel: SyncPresentationViewModel = koinViewModel(),
 ) {
+    val syncPresentation by syncPresentationViewModel.presentation.collectAsStateWithLifecycle()
     var currentDestination: HomeRouteDestination by rememberSaveable {
         mutableStateOf(HomeRouteDestination.Timeline)
     }
@@ -137,92 +146,126 @@ fun HomeScreen(
         },
         modifier = modifier,
     ) { innerPadding ->
-        NavigationSuiteScaffold(
-            containerColor = Color.Transparent,
-            navigationSuiteColors =
-                NavigationSuiteDefaults.colors(
-                    navigationRailContainerColor = Color.Transparent,
-                    navigationBarContainerColor = Color.Transparent,
-                ),
-            navigationSuiteItems = {
-                HomeRouteDestination.visibleEntries.forEach { destination ->
-                    item(
-                        selected = destination == currentDestination,
-                        onClick = { currentDestination = destination },
-                        icon = {
-                            Icon(
-                                imageVector =
-                                    if (destination == currentDestination) {
-                                        destination.selectedIcon
-                                    } else {
-                                        destination.unselectedIcon
-                                    },
-                                contentDescription = destination.label,
+        // Action-required sync states (auth lapsed, quota exceeded, conflicts) need to surface
+        // on every home tab — the auth banner can't only render on Timeline. The Timeline tab
+        // itself still renders the banner inside TimelinePane (which is also used standalone in
+        // the desktop pane), so we suppress the home-level banner there to avoid duplication.
+        val showHomeLevelSyncBanner = currentDestination != HomeRouteDestination.Timeline
+        Column(modifier = Modifier.padding(innerPadding)) {
+            if (showHomeLevelSyncBanner) {
+                SyncErrorBanner(
+                    presentation = syncPresentation,
+                    onAction = { action ->
+                        when (action) {
+                            SyncAction.SignIn,
+                            SyncAction.ManageStorage,
+                            -> onOpenSettings()
+                            SyncAction.ReviewConflicts -> onOpenSyncIssues()
+                            SyncAction.Retry -> Unit
+                        }
+                    },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 560.dp),
+                )
+            }
+            NavigationSuiteScaffold(
+                containerColor = Color.Transparent,
+                navigationSuiteColors =
+                    NavigationSuiteDefaults.colors(
+                        navigationRailContainerColor = Color.Transparent,
+                        navigationBarContainerColor = Color.Transparent,
+                    ),
+                navigationSuiteItems = {
+                    HomeRouteDestination.visibleEntries.forEach { destination ->
+                        item(
+                            selected = destination == currentDestination,
+                            onClick = { currentDestination = destination },
+                            icon = {
+                                Icon(
+                                    imageVector =
+                                        if (destination == currentDestination) {
+                                            destination.selectedIcon
+                                        } else {
+                                            destination.unselectedIcon
+                                        },
+                                    contentDescription = destination.label,
+                                )
+                            },
+                            label = { Text(destination.label) },
+                        )
+                    }
+                },
+            ) {
+                when (currentDestination) {
+                    HomeRouteDestination.Timeline -> {
+                        val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+                        Column(
+                            modifier =
+                                Modifier
+                                    .applyScreenStyles()
+                                    .safeDrawingPadding(),
+                        ) {
+                            SyncIssuesBanner(onOpenSyncIssues = onOpenSyncIssues)
+                            TimelinePane(
+                                uiState =
+                                    TimelineUiState(
+                                        items = uiState.items,
+                                        loadingState = uiState.loadingState,
+                                        isLoadingMore = uiState.isLoadingMore,
+                                        hasMoreOlderContent = uiState.hasMoreOlderContent,
+                                        appendError = uiState.appendError,
+                                    ),
+                                onNewEntry = onNewEntry,
+                                onOpenDay = onOpenDay,
+                                onLoadMoreOlder = viewModel::loadMoreOlder,
+                                onProfileClick = onOpenSettings,
+                                onSearchClick = onOpenSearch,
+                                onOpenDraft = onOpenDraft,
+                                onImportBackup = onImportBackup,
+                                timelineSuggestion = uiState.timelineSuggestion,
+                                syncPresentation = syncPresentation,
+                                onSyncAction = { action ->
+                                    when (action) {
+                                        app.logdate.ui.sync.SyncAction.SignIn,
+                                        app.logdate.ui.sync.SyncAction.ManageStorage,
+                                        app.logdate.ui.sync.SyncAction.ReviewConflicts,
+                                        -> onOpenSettings()
+                                        app.logdate.ui.sync.SyncAction.Retry -> Unit
+                                    }
+                                },
                             )
-                        },
-                        label = { Text(destination.label) },
-                    )
-                }
-            },
-            modifier = Modifier.padding(innerPadding),
-        ) {
-            when (currentDestination) {
-                HomeRouteDestination.Timeline -> {
-                    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-                    Column(
-                        modifier =
+                        }
+                    }
+
+                    HomeRouteDestination.LocationHistory -> {
+                        locationContent(
                             Modifier
                                 .applyScreenStyles()
                                 .safeDrawingPadding(),
-                    ) {
-                        SyncIssuesBanner(onOpenSyncIssues = onOpenSyncIssues)
-                        TimelinePane(
-                            uiState =
-                                TimelineUiState(
-                                    items = uiState.items,
-                                    loadingState = uiState.loadingState,
-                                    isLoadingMore = uiState.isLoadingMore,
-                                    hasMoreOlderContent = uiState.hasMoreOlderContent,
-                                    appendError = uiState.appendError,
-                                ),
-                            onNewEntry = onNewEntry,
-                            onOpenDay = { date -> viewModel.selectDay(date) },
-                            onLoadMoreOlder = viewModel::loadMoreOlder,
-                            onProfileClick = onOpenSettings,
-                            onSearchClick = onOpenSearch,
-                            onOpenDraft = onOpenDraft,
-                            onImportBackup = onImportBackup,
-                            timelineSuggestion = uiState.timelineSuggestion,
                         )
                     }
-                }
 
-                HomeRouteDestination.LocationHistory -> {
-                    locationContent(
-                        Modifier
-                            .applyScreenStyles()
-                            .safeDrawingPadding(),
-                    )
-                }
+                    HomeRouteDestination.Journals -> {
+                        JournalsOverviewScreen(
+                            onOpenJournal = onOpenJournal,
+                            onBrowseJournals = onBrowseJournals,
+                            onCreateJournal = onCreateJournal,
+                            modifier = Modifier.applyScreenStyles(),
+                        )
+                    }
 
-                HomeRouteDestination.Journals -> {
-                    JournalsOverviewScreen(
-                        onOpenJournal = onOpenJournal,
-                        onBrowseJournals = onBrowseJournals,
-                        onCreateJournal = onCreateJournal,
-                        modifier = Modifier.applyScreenStyles(),
-                    )
-                }
+                    HomeRouteDestination.Library -> {
+                        libraryContent(Modifier.applyScreenStyles())
+                    }
 
-                HomeRouteDestination.Library -> {
-                    libraryContent(Modifier.applyScreenStyles())
-                }
-
-                HomeRouteDestination.Rewind -> {
-                    RewindOverviewScreen(
-                        onOpenRewind = onOpenRewind,
-                        modifier = Modifier.applyScreenStyles(),
-                    )
+                    HomeRouteDestination.Rewind -> {
+                        RewindOverviewScreen(
+                            onOpenRewind = onOpenRewind,
+                            modifier = Modifier.applyScreenStyles(),
+                        )
+                    }
                 }
             }
         }
