@@ -198,6 +198,12 @@ resolve_test_tasks_for_modules() {
 
     for module in "$@"; do
         [[ -z "$module" ]] && continue
+        # Modules with no test sources (BOMs, version catalogs, etc) are
+        # skipped here so they don't end up in UNRESOLVED_TEST_MODULES and
+        # block the push.
+        case "$module" in
+            :shared:atproto-bom) continue ;;
+        esac
         if resolved_task="$(resolve_test_task_for_module "$module" "$coverage_mode")"; then
             RESOLVED_TEST_TASKS+=("$resolved_task")
         else
