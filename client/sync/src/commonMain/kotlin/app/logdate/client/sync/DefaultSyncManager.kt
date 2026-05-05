@@ -110,19 +110,43 @@ class DefaultSyncManager(
             combine(syncStateFlow, lastErrorFlow) { state, error -> state to error }
                 .collect { publishStatus() }
         }
+        // Republish whenever the session changes — sign-in flips isEnabled true, sign-out flips
+        // it false, and the UI needs to react without waiting for the next sync transition.
+        syncScope.launch {
+            sessionStorage.getSessionFlow().collect { publishStatus() }
+        }
+        // One-shot migration: users running pre-gating builds may have accumulated pending
+        // uploads while signed-out. Now that the metadata service refuses such writes and the
+        // UI hides queue state without an account, those orphan rows would persist invisibly.
+        // Clear them on first launch with this build.
+        syncScope.launch { clearOrphanQueueIfUnauthenticated() }
+    }
+
+    private suspend fun clearOrphanQueueIfUnauthenticated() {
+        // While unauthenticated, no row in pending_uploads should exist post-gating. If any do,
+        // they came from a pre-gating build and would otherwise sit invisibly. clearPending is
+        // an unconditional DB delete, so this is safe even on a clean install.
+        if (sessionStorage.getSession() != null) return
+        runCatching { syncMetadataService.clearPending() }
+            .onFailure { Napier.w("Failed to clear orphan pending queue", it) }
     }
 
     /**
      * Snapshot the combined state into [syncStatusFlow]. Reads pending-uploads from metadata
      * on every publish; falls back to zero if metadata is unavailable (shouldn't happen in
      * practice, but we'd rather show an over-optimistic banner than crash the collector).
+     *
+     * `isEnabled` here is the *effective* state the UI cares about: a queue can only matter
+     * when there's a session to drain it to. Without a session, we report disabled regardless
+     * of the local preference.
      */
     private suspend fun publishStatus() {
+        val authenticated = sessionStorage.getSession() != null
         val pendingCount =
             runCatching { syncMetadataService.getPendingCount() }.getOrDefault(0)
         _syncStatusFlow.value =
             SyncStatus(
-                isEnabled = isEnabled,
+                isEnabled = authenticated && isEnabled,
                 lastSyncTime = latestSyncTime(),
                 pendingUploads = pendingCount,
                 isSyncing = syncStateFlow.value is SyncState.Syncing,
@@ -482,27 +506,52 @@ class DefaultSyncManager(
                         success = false,
                         errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "No access token")),
                     )
-                val lastSync = syncMetadataService.getLastSyncTime(EntityType.DRAFT) ?: Instant.fromEpochMilliseconds(0)
 
-                // Download remote draft changes
-                val changesResult =
-                    cloudDraftDataSource.getDraftChanges(
-                        accessToken = accessToken,
-                        since = lastSync,
-                    )
-                val downloaded = changesResult.getOrNull()?.changes?.size ?: 0
+                // Server caps /drafts/changes at 100 per response with no hasMore in the
+                // contract today; if the response is full we keep paging by max(lastUpdated).
+                // Without this loop, a fresh device with > 100 drafts would only ever pull the
+                // first page and silently lose the rest until manual edits forced the cursor
+                // forward. Mirrors the journals / content pagination loop above.
+                var cursor = syncMetadataService.getLastSyncTime(EntityType.DRAFT) ?: Instant.fromEpochMilliseconds(0)
+                var totalDownloaded = 0
+                var success = true
 
-                if (changesResult.isSuccess) {
+                while (true) {
+                    val changesResult =
+                        cloudDraftDataSource.getDraftChanges(
+                            accessToken = accessToken,
+                            since = cursor,
+                        )
+                    if (changesResult.isFailure) {
+                        success = false
+                        break
+                    }
                     val result = changesResult.getOrThrow()
-                    syncMetadataService.updateLastSyncTime(
-                        EntityType.DRAFT,
-                        result.lastSyncTimestamp,
-                    )
+                    totalDownloaded += result.changes.size
+
+                    if (result.changes.isEmpty() && result.deletions.isEmpty()) {
+                        break
+                    }
+
+                    syncMetadataService.updateLastSyncTime(EntityType.DRAFT, result.lastSyncTimestamp)
+
+                    if (result.lastSyncTimestamp <= cursor) {
+                        Napier.w(
+                            "Draft sync pagination cursor did not advance (since=$cursor, last=${result.lastSyncTimestamp})",
+                        )
+                        break
+                    }
+
+                    cursor = result.lastSyncTimestamp
+
+                    if (!result.hasMore) {
+                        break
+                    }
                 }
 
                 SyncResult(
-                    success = changesResult.isSuccess,
-                    downloadedItems = downloaded,
+                    success = success,
+                    downloadedItems = totalDownloaded,
                     lastSyncTime = Clock.System.now(),
                 )
             } catch (e: Exception) {
@@ -533,8 +582,9 @@ class DefaultSyncManager(
 
     override suspend fun getSyncStatus(): SyncStatus {
         val pendingCount = syncMetadataService.getPendingCount()
+        val authenticated = sessionStorage.getSession() != null
         return SyncStatus(
-            isEnabled = isEnabled,
+            isEnabled = authenticated && isEnabled,
             lastSyncTime = latestSyncTime(),
             pendingUploads = pendingCount,
             isSyncing = syncStateFlow.value is SyncState.Syncing,
