@@ -8,8 +8,16 @@
 # - Domain logdate.app verified in Google Search Console
 #
 # Usage:
-#   ./scripts/setup-gcp-deploy.sh                    # Interactive, auto-detects everything
-#   SKIP_CONFIRM=true ./scripts/setup-gcp-deploy.sh  # Non-interactive
+#   ./scripts/setup-gcp-deploy.sh                                # Interactive, auto-detects everything
+#   SKIP_CONFIRM=true ./scripts/setup-gcp-deploy.sh              # Non-interactive
+#   ENVIRONMENT=staging ./scripts/setup-gcp-deploy.sh            # Bootstrap a specific env's tfvars
+#   GCP_PROJECT_ID=logdate-prod-2 ./scripts/setup-gcp-deploy.sh  # Override the target project
+#   WORKLOAD_POOL_NAME=custom-pool ./scripts/setup-gcp-deploy.sh # Override fixed infra names
+#
+# Re-running against a fresh project: each GCP project has its own namespace
+# for Workload Identity pools and service accounts, so the default names below
+# don't need to be suffixed per-environment. They're just defaults — set
+# WORKLOAD_POOL_NAME / WORKLOAD_PROVIDER_NAME / GH_DEPLOY_SA_NAME to override.
 #
 # Configuration priority (highest to lowest):
 #   1. Environment variables passed at runtime
@@ -93,10 +101,13 @@ ARTIFACT_REGISTRY_REPO="${ARTIFACT_REGISTRY_REPO:-logdate}"
 # GitHub repo (may be sourced or auto-detected below)
 GITHUB_REPO="${GITHUB_REPO:-}"
 
-# Fixed infrastructure names (not typically changed)
-POOL_NAME="logdate-github-pool"
-PROVIDER_NAME="github-provider"
-SERVICE_ACCOUNT_NAME="github-deploy"
+# Fixed infrastructure names. Each GCP project has its own namespace for
+# Workload Identity pools and service accounts, so these defaults are safe
+# to reuse across projects. Override via env vars if you want per-project
+# distinct names.
+POOL_NAME="${WORKLOAD_POOL_NAME:-logdate-github-pool}"
+PROVIDER_NAME="${WORKLOAD_PROVIDER_NAME:-github-provider}"
+SERVICE_ACCOUNT_NAME="${GH_DEPLOY_SA_NAME:-github-deploy}"
 
 # Colors for output
 RED='\033[0;31m'
