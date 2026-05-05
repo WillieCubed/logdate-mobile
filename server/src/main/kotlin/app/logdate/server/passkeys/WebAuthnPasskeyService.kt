@@ -9,10 +9,11 @@ import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyRegistrationResponse
 import app.logdate.shared.model.PasskeyUser
 import com.webauthn4j.WebAuthnManager
-import com.webauthn4j.authenticator.AuthenticatorImpl
 import com.webauthn4j.converter.AttestedCredentialDataConverter
 import com.webauthn4j.converter.exception.DataConversionException
 import com.webauthn4j.converter.util.ObjectConverter
+import com.webauthn4j.credential.CredentialRecord
+import com.webauthn4j.credential.CredentialRecordImpl
 import com.webauthn4j.data.AuthenticationParameters
 import com.webauthn4j.data.AuthenticationRequest
 import com.webauthn4j.data.RegistrationParameters
@@ -320,7 +321,8 @@ class WebAuthnPasskeyService(
                     .build()
 
             val registrationRequest = RegistrationRequest(attestationObjectBytes, clientDataJsonBytes)
-            val registrationParameters = RegistrationParameters(serverProperty, true, true)
+            // null pubKeyCredParams keeps the previous "all COSE algorithms allowed" behaviour.
+            val registrationParameters = RegistrationParameters(serverProperty, null, true, true)
             val registrationData = webAuthnManager.verify(registrationRequest, registrationParameters)
             val attestationObject =
                 registrationData.attestationObject
@@ -410,11 +412,22 @@ class WebAuthnPasskeyService(
                     ?: return AuthenticationResult(success = false, error = "Credential not found")
 
             val attestedCredentialData = attestedCredentialDataConverter.convert(storedData.publicKey)
-            val authenticator =
-                AuthenticatorImpl(
-                    attestedCredentialData,
+            // CredentialRecordImpl supersedes AuthenticatorImpl in webauthn4j 0.31. The trailing
+            // nulls are the WebAuthn L2/L3 fields (uvInitialized, backupEligible, backupState,
+            // authenticatorExtensions, clientData, clientExtensions, transports) — we don't track
+            // any of them server-side today, so passing null preserves the prior shape.
+            val authenticator: CredentialRecord =
+                CredentialRecordImpl(
                     NoneAttestationStatement(),
+                    null,
+                    null,
+                    null,
                     storedData.signCount,
+                    attestedCredentialData,
+                    null,
+                    null,
+                    null,
+                    null,
                 )
 
             val authenticatorDataBytes =

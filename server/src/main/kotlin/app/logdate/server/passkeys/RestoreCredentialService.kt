@@ -8,10 +8,11 @@ import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyRegistrationResponse
 import app.logdate.shared.model.PasskeyUser
 import com.webauthn4j.WebAuthnManager
-import com.webauthn4j.authenticator.AuthenticatorImpl
 import com.webauthn4j.converter.AttestedCredentialDataConverter
 import com.webauthn4j.converter.exception.DataConversionException
 import com.webauthn4j.converter.util.ObjectConverter
+import com.webauthn4j.credential.CredentialRecord
+import com.webauthn4j.credential.CredentialRecordImpl
 import com.webauthn4j.data.AuthenticationParameters
 import com.webauthn4j.data.AuthenticationRequest
 import com.webauthn4j.data.RegistrationParameters
@@ -206,7 +207,7 @@ class RestoreCredentialService(
             val registrationData =
                 webAuthnManager.verify(
                     RegistrationRequest(attestationObjectBytes, clientDataJsonBytes),
-                    RegistrationParameters(serverProperty, true, true),
+                    RegistrationParameters(serverProperty, null, true, true),
                 )
             val attestedCredentialData =
                 registrationData.attestationObject
@@ -283,7 +284,19 @@ class RestoreCredentialService(
                 } ?: return AuthenticationResult(success = false, error = "Restore credential not found")
 
             val attestedCredentialData = attestedCredentialDataConverter.convert(stored.publicKey)
-            val authenticator = AuthenticatorImpl(attestedCredentialData, NoneAttestationStatement(), stored.signCount)
+            val authenticator: CredentialRecord =
+                CredentialRecordImpl(
+                    NoneAttestationStatement(),
+                    null,
+                    null,
+                    null,
+                    stored.signCount,
+                    attestedCredentialData,
+                    null,
+                    null,
+                    null,
+                    null,
+                )
 
             val authenticatorDataBytes =
                 decodeBase64Url(authenticationResponse.response.authenticatorData)
