@@ -153,6 +153,12 @@ fun UniversalSearchResultItem(
                 .focusableWithRing()
                 .let { base ->
                     if (onLongClick != null) base.onSecondaryButtonClick(onLongClick) else base
+                }.let { base ->
+                    if (state.contentText.text.isNotBlank()) {
+                        base.dragSearchResultText(state.contentText.text)
+                    } else {
+                        base
+                    }
                 }.combinedClickable(
                     onClick = onClick,
                     onLongClick = onLongClick,
