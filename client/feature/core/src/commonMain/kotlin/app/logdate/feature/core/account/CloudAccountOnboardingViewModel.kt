@@ -3,6 +3,7 @@ package app.logdate.feature.core.account
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.account.AuthenticateWithPasskeyUseCase
+import app.logdate.client.domain.account.BackfillLocalDataUseCase
 import app.logdate.client.domain.account.CheckUsernameAvailabilityUseCase
 import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
 import app.logdate.client.domain.account.TriggerInitialSyncUseCase
@@ -27,6 +28,7 @@ class CloudAccountOnboardingViewModel(
     private val checkUsernameAvailabilityUseCase: CheckUsernameAvailabilityUseCase,
     private val authenticateWithPasskeyUseCase: AuthenticateWithPasskeyUseCase,
     private val triggerInitialSyncUseCase: TriggerInitialSyncUseCase,
+    private val backfillLocalDataUseCase: BackfillLocalDataUseCase,
     private val passkeyManager: PasskeyManager,
     private val profileRepository: ProfileRepository,
     private val serverConfigurationCoordinator: ServerConfigurationCoordinator,
@@ -194,6 +196,13 @@ class CloudAccountOnboardingViewModel(
      * host navigates away mid-sync and the user never sees the sync progress state.
      */
     private suspend fun performInitialSync(markCompletedBy: SyncCompletion) {
+        // First-sign-in for an account ID re-enqueues local data into the sync queue, since
+        // accountless writes don't enqueue. Idempotent: same account never backfills twice.
+        // Logged inside the use case; failures don't block the sync attempt — the worst case
+        // is that fullSync uploads a partial set on this run and the rest on a later run.
+        _uiState.value.createdAccount?.id?.toString()?.let { accountId ->
+            backfillLocalDataUseCase(accountId)
+        }
         val syncResult = triggerInitialSyncUseCase()
         val status =
             when (syncResult) {
@@ -511,6 +520,10 @@ class CloudAccountOnboardingViewModel(
                 "Failed to create passkey. Please check your device security settings."
             CreatePasskeyAccountUseCase.CreateAccountError.NetworkError ->
                 "Network error. Please check your connection and try again."
+            CreatePasskeyAccountUseCase.CreateAccountError.RateLimited ->
+                "Too many attempts. Please wait a moment before trying again."
+            CreatePasskeyAccountUseCase.CreateAccountError.ServerError ->
+                "Something went wrong on our end. Please try again in a few minutes."
             is CreatePasskeyAccountUseCase.CreateAccountError.Unknown ->
                 "An unexpected error occurred: ${error.message}"
         }

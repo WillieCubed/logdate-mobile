@@ -135,12 +135,18 @@ private fun initializeSentry(
         }
         return
     }
+    // Sentry's release tag should change every deploy so the dashboard can
+    // attribute regressions to a specific commit. Set RELEASE_VERSION at
+    // deploy time (e.g. `logdate-server@<short-sha>` from the deploy workflow);
+    // otherwise we record an explicit "unknown" so the gap shows up rather
+    // than every deploy collapsing into one synthetic 1.0.0 version.
+    val release = readEnv("RELEASE_VERSION")?.trim().takeUnless { it.isNullOrEmpty() } ?: "logdate-server@unknown"
     Sentry.init { options ->
         options.dsn = dsn
         options.environment = profile.name.lowercase()
-        options.release = "logdate-server@1.0.0"
+        options.release = release
     }
-    Napier.i("Sentry initialised for ${profile.name.lowercase()}")
+    Napier.i("Sentry initialised for ${profile.name.lowercase()} (release=$release)")
 }
 
 fun main() {
