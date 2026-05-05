@@ -657,6 +657,7 @@ class DefaultPasskeyAccountRepositoryTest {
 
         var refreshTokenResponse: Result<String> = Result.success("new_access_token")
         var deletePasskeyResponse: Result<Unit> = Result.success(Unit)
+        var deleteAccountResponse: Result<Unit> = Result.success(Unit)
         var getAccountInfoResponse: Result<LogDateAccount> = Result.success(testAccount)
         var getAccountInfoResponses: List<Result<LogDateAccount>>? = null
         var deletePasskeyResponses: List<Result<Unit>>? = null
@@ -720,6 +721,8 @@ class DefaultPasskeyAccountRepositoryTest {
 
         override suspend fun completeRestoreSignIn(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData> =
             completeAuthenticationResponse
+
+        override suspend fun deleteAccount(accessToken: String): Result<Unit> = deleteAccountResponse
     }
 
     /**

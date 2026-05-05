@@ -101,6 +101,19 @@ interface PasskeyApiClientContract {
      * Complete restore sign-in. Verifies the restore credential and returns tokens.
      */
     suspend fun completeRestoreSignIn(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData>
+
+    /**
+     * Delete the authenticated account, including all sync data, media blobs, and backup blobs.
+     *
+     * Returns success on `204 No Content`. The caller should clear all local state immediately
+     * after success — every other authenticated request will start returning 401 because the
+     * server-side account no longer exists.
+     *
+     * Returns a `PasskeyApiException` with code `DELETION_UNAVAILABLE` (HTTP 503) when the
+     * server hasn't been configured with an `AccountDeletionService`. Surface that as
+     * "Account deletion is temporarily unavailable" rather than a generic error.
+     */
+    suspend fun deleteAccount(accessToken: String): Result<Unit>
 }
 
 /**
@@ -364,6 +377,25 @@ class PasskeyApiClient(
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to delete passkey", e))
         }
 
+    override suspend fun deleteAccount(accessToken: String): Result<Unit> =
+        try {
+            val baseUrl = getBaseUrl()
+            val response =
+                httpClient.delete("$baseUrl$AUTH_PATH/me") {
+                    header("Authorization", "Bearer $accessToken")
+                }
+
+            if (response.status.value in 200..299) {
+                Result.success(Unit)
+            } else {
+                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+            }
+        } catch (e: Exception) {
+            Napier.w("Failed to delete account", e)
+            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to delete account", e))
+        }
+
     override suspend fun beginRestoreKeyRegistration(accessToken: String): Result<PasskeyRegistrationOptions> =
         try {
             val baseUrl = getBaseUrl()
@@ -489,6 +521,15 @@ object PasskeyApiErrorCodes {
     const val INVALID_REFRESH_TOKEN = "INVALID_REFRESH_TOKEN"
     const val PASSKEY_NOT_FOUND = "PASSKEY_NOT_FOUND"
     const val PASSKEY_DELETION_FAILED = "PASSKEY_DELETION_FAILED"
+
+    // Codes the server emits that the client can usefully distinguish.
+    const val RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED"
+    const val ACCOUNT_LINK_CONFLICT = "ACCOUNT_LINK_CONFLICT"
+    const val EMAIL_BINDING_INVALID = "EMAIL_BINDING_INVALID"
+    const val GOOGLE_AUTH_NOT_CONFIGURED = "GOOGLE_AUTH_NOT_CONFIGURED"
+    const val GOOGLE_TOKEN_INVALID = "GOOGLE_TOKEN_INVALID"
+    const val DELETION_UNAVAILABLE = "DELETION_UNAVAILABLE"
+    const val SERVER_ERROR = "SERVER_ERROR"
 }
 
 @Serializable

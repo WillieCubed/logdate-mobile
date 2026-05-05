@@ -1,5 +1,7 @@
 package app.logdate.client.domain.account
 
+import app.logdate.client.networking.PasskeyApiErrorCodes
+import app.logdate.client.networking.PasskeyApiException
 import app.logdate.client.repository.account.AccountCreationRequest
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.shared.model.LogDateAccount
@@ -35,6 +37,12 @@ class CreatePasskeyAccountUseCase(
         data object PasskeyFailed : CreateAccountError()
 
         data object NetworkError : CreateAccountError()
+
+        /** Server-side rate limit hit (default: 5 signups/hour/IP). User should wait. */
+        data object RateLimited : CreateAccountError()
+
+        /** Server returned a 5xx; not user-fixable. Distinct from NetworkError so the UI can offer a different copy. */
+        data object ServerError : CreateAccountError()
 
         data class Unknown(
             val message: String,
@@ -111,20 +119,30 @@ class CreatePasskeyAccountUseCase(
         return null
     }
 
-    private fun mapExceptionToError(exception: Throwable?): CreateAccountError =
-        when {
+    private fun mapExceptionToError(exception: Throwable?): CreateAccountError {
+        // Prefer the server's structured error code over substring-matching message text.
+        // PasskeyApiException carries the {code, message} envelope from the server response;
+        // older substring matching is a fallback for OS-level passkey errors that surface as
+        // plain Throwable.message.
+        if (exception is PasskeyApiException) {
+            return when (exception.errorCode) {
+                PasskeyApiErrorCodes.USERNAME_TAKEN -> CreateAccountError.UsernameTaken
+                PasskeyApiErrorCodes.VALIDATION_ERROR -> CreateAccountError.UsernameInvalid
+                PasskeyApiErrorCodes.PASSKEY_VERIFICATION_FAILED -> CreateAccountError.PasskeyFailed
+                PasskeyApiErrorCodes.RATE_LIMIT_EXCEEDED -> CreateAccountError.RateLimited
+                PasskeyApiErrorCodes.NETWORK_ERROR -> CreateAccountError.NetworkError
+                PasskeyApiErrorCodes.SERVER_ERROR -> CreateAccountError.ServerError
+                else -> CreateAccountError.Unknown(exception.message ?: exception.errorCode)
+            }
+        }
+        return when {
             exception?.message?.contains("USER_CANCELLED", ignoreCase = true) == true ->
                 CreateAccountError.PasskeyCancelled
             exception?.message?.contains("NOT_SUPPORTED", ignoreCase = true) == true ->
                 CreateAccountError.PasskeyNotSupported
-            exception?.message?.contains("USERNAME_TAKEN", ignoreCase = true) == true ->
-                CreateAccountError.UsernameTaken
-            exception?.message?.contains("VALIDATION_ERROR", ignoreCase = true) == true ->
-                CreateAccountError.UsernameInvalid
-            exception?.message?.contains("NETWORK_ERROR", ignoreCase = true) == true ->
-                CreateAccountError.NetworkError
             exception?.message?.contains("PASSKEY", ignoreCase = true) == true ->
                 CreateAccountError.PasskeyFailed
             else -> CreateAccountError.Unknown(exception?.message ?: "Unknown error")
         }
+    }
 }

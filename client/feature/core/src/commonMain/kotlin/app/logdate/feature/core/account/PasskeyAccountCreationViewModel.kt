@@ -207,6 +207,10 @@ class PasskeyAccountCreationViewModel(
                 "Failed to create passkey. Please check your device security settings."
             CreatePasskeyAccountUseCase.CreateAccountError.NetworkError ->
                 "Network error. Please check your connection and try again."
+            CreatePasskeyAccountUseCase.CreateAccountError.RateLimited ->
+                "Too many sign-up attempts. Please wait a few minutes and try again."
+            CreatePasskeyAccountUseCase.CreateAccountError.ServerError ->
+                "LogDate is having trouble right now. Please try again in a few minutes."
             is CreatePasskeyAccountUseCase.CreateAccountError.Unknown ->
                 "An unexpected error occurred: ${error.message}"
         }
