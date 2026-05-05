@@ -12,13 +12,10 @@ import com.webauthn4j.WebAuthnManager
 import com.webauthn4j.converter.AttestedCredentialDataConverter
 import com.webauthn4j.converter.exception.DataConversionException
 import com.webauthn4j.converter.util.ObjectConverter
-import com.webauthn4j.credential.CredentialRecord
-import com.webauthn4j.credential.CredentialRecordImpl
 import com.webauthn4j.data.AuthenticationParameters
 import com.webauthn4j.data.AuthenticationRequest
 import com.webauthn4j.data.RegistrationParameters
 import com.webauthn4j.data.RegistrationRequest
-import com.webauthn4j.data.attestation.statement.NoneAttestationStatement
 import com.webauthn4j.data.client.Origin
 import com.webauthn4j.data.client.challenge.DefaultChallenge
 import com.webauthn4j.server.ServerProperty
@@ -412,23 +409,7 @@ class WebAuthnPasskeyService(
                     ?: return AuthenticationResult(success = false, error = "Credential not found")
 
             val attestedCredentialData = attestedCredentialDataConverter.convert(storedData.publicKey)
-            // CredentialRecordImpl supersedes AuthenticatorImpl in webauthn4j 0.31. The trailing
-            // nulls are the WebAuthn L2/L3 fields (uvInitialized, backupEligible, backupState,
-            // authenticatorExtensions, clientData, clientExtensions, transports) — we don't track
-            // any of them server-side today, so passing null preserves the prior shape.
-            val authenticator: CredentialRecord =
-                CredentialRecordImpl(
-                    NoneAttestationStatement(),
-                    null,
-                    null,
-                    null,
-                    storedData.signCount,
-                    attestedCredentialData,
-                    null,
-                    null,
-                    null,
-                    null,
-                )
+            val authenticator = credentialRecord(attestedCredentialData, storedData.signCount)
 
             val authenticatorDataBytes =
                 decodeBase64Url(authenticationResponse.response.authenticatorData)

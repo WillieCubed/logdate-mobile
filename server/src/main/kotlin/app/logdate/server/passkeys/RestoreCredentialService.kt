@@ -11,13 +11,10 @@ import com.webauthn4j.WebAuthnManager
 import com.webauthn4j.converter.AttestedCredentialDataConverter
 import com.webauthn4j.converter.exception.DataConversionException
 import com.webauthn4j.converter.util.ObjectConverter
-import com.webauthn4j.credential.CredentialRecord
-import com.webauthn4j.credential.CredentialRecordImpl
 import com.webauthn4j.data.AuthenticationParameters
 import com.webauthn4j.data.AuthenticationRequest
 import com.webauthn4j.data.RegistrationParameters
 import com.webauthn4j.data.RegistrationRequest
-import com.webauthn4j.data.attestation.statement.NoneAttestationStatement
 import com.webauthn4j.data.client.Origin
 import com.webauthn4j.data.client.challenge.DefaultChallenge
 import com.webauthn4j.server.ServerProperty
@@ -284,19 +281,7 @@ class RestoreCredentialService(
                 } ?: return AuthenticationResult(success = false, error = "Restore credential not found")
 
             val attestedCredentialData = attestedCredentialDataConverter.convert(stored.publicKey)
-            val authenticator: CredentialRecord =
-                CredentialRecordImpl(
-                    NoneAttestationStatement(),
-                    null,
-                    null,
-                    null,
-                    stored.signCount,
-                    attestedCredentialData,
-                    null,
-                    null,
-                    null,
-                    null,
-                )
+            val authenticator = credentialRecord(attestedCredentialData, stored.signCount)
 
             val authenticatorDataBytes =
                 decodeBase64Url(authenticationResponse.response.authenticatorData)
