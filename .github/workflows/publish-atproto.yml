@@ -72,3 +72,4 @@ jobs:
           :shared:atproto-lexicon:publishAllPublicationsToAtprotoRepository
           :shared:atproto-pds:publishAllPublicationsToAtprotoRepository
           :shared:atproto-pds-runtime:publishAllPublicationsToAtprotoRepository
+          :shared:atproto-bom:publishAllPublicationsToAtprotoRepository
