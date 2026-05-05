@@ -15,15 +15,20 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
+      # `contents: read` for actions/checkout, `packages: write` so the
+      # GITHUB_TOKEN can publish to https://maven.pkg.github.com.
       contents: read
+      packages: write
 
     env:
-      ATPROTO_PUBLISH_URL: ${{ secrets.ATPROTO_PUBLISH_URL }}
-      ATPROTO_PUBLISH_USERNAME: ${{ secrets.ATPROTO_PUBLISH_USERNAME }}
-      ATPROTO_PUBLISH_PASSWORD: ${{ secrets.ATPROTO_PUBLISH_PASSWORD }}
-      SIGNING_KEY_ID: ${{ secrets.SIGNING_KEY_ID }}
-      SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
-      SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+      # Interim publishing target: GitHub Packages on this repo. Maven
+      # Central is the longer-term home but is blocked on Sonatype OSSRH
+      # onboarding (DNS verification + GPG keypair). Until that lands, the
+      # convention plugin is pointed at the GH Packages Maven repo using
+      # the auto-injected GITHUB_TOKEN — no extra secrets needed.
+      ATPROTO_PUBLISH_URL: https://maven.pkg.github.com/${{ github.repository }}
+      ATPROTO_PUBLISH_USERNAME: ${{ github.actor }}
+      ATPROTO_PUBLISH_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -49,16 +54,6 @@ jobs:
           if [[ -n "${VERSION}" ]]; then
             echo "ATPROTO_VERSION=${VERSION}" >> "$GITHUB_ENV"
           fi
-
-      - name: Validate publish credentials
-        shell: bash
-        run: |
-          for name in ATPROTO_PUBLISH_URL ATPROTO_PUBLISH_USERNAME ATPROTO_PUBLISH_PASSWORD SIGNING_KEY SIGNING_PASSWORD; do
-            if [[ -z "${!name}" ]]; then
-              echo "$name must be configured to publish the ATProto artifacts."
-              exit 1
-            fi
-          done
 
       - name: Publish ATProto modules
         run: >
