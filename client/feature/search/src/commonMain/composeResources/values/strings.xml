@@ -33,4 +33,5 @@
     <string name="search_action_open_day">Open day view</string>
     <string name="search_action_copy_text">Copy text</string>
     <string name="search_action_actions_for">Actions</string>
+    <string name="search_action_share">Share</string>
 </resources>

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FilterAltOff
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ExpandedFullScreenSearchBar
@@ -77,6 +78,7 @@ import logdate.client.feature.search.generated.resources.search
 import logdate.client.feature.search.generated.resources.search_action_actions_for
 import logdate.client.feature.search.generated.resources.search_action_copy_text
 import logdate.client.feature.search.generated.resources.search_action_open_day
+import logdate.client.feature.search.generated.resources.search_action_share
 import logdate.client.feature.search.generated.resources.search_bucket_earlier
 import logdate.client.feature.search.generated.resources.search_bucket_this_month
 import logdate.client.feature.search.generated.resources.search_bucket_this_week
@@ -125,6 +127,7 @@ fun SearchScreen(
     onResultClick: (SearchResult) -> Unit,
     onResultOpenDay: (SearchResult) -> Unit,
     onGoBack: () -> Unit,
+    onShareResult: ((SearchResult) -> Unit)? = null,
     initialQuery: String = "",
     initialTypeFtsValues: List<String> = emptyList(),
     initialDateRangeName: String = "",
@@ -167,6 +170,7 @@ fun SearchScreen(
         onClearAllRecents = onClearAllRecents,
         onResultClick = onResultClick,
         onResultOpenDay = onResultOpenDay,
+        onShareResult = onShareResult,
         onGoBack = onGoBack,
         modifier = modifier,
     )
@@ -195,6 +199,7 @@ fun SearchScreenContent(
     onClearFilters: () -> Unit = {},
     onRemoveRecent: (String) -> Unit = {},
     onClearAllRecents: () -> Unit = {},
+    onShareResult: ((SearchResult) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val searchBarState = rememberSearchBarState()
@@ -312,6 +317,13 @@ fun SearchScreenContent(
                 clipboard.setText(AnnotatedString(target.content))
                 sheetTarget = null
             },
+            onShare =
+                onShareResult?.let {
+                    {
+                        it(target)
+                        sheetTarget = null
+                    }
+                },
         )
     }
 }
@@ -431,10 +443,9 @@ private data class SearchResultRow(
 )
 
 /**
- * Bottom-sheet menu of secondary actions for a search result, opened by long-press.
- *
- * Keeping this scoped to actions that work on every platform (open day view, copy text). A
- * future PR can add Share through a platform-specific intent generator.
+ * Bottom-sheet menu of secondary actions for a search result, opened by long-press or right-
+ * click. Share is gated on the host wiring up [onShare] (Android wires up an `ACTION_SEND`
+ * intent in [`MainActivity`]; other platforms omit it).
  */
 @Composable
 private fun ResultActionsSheet(
@@ -442,6 +453,7 @@ private fun ResultActionsSheet(
     onDismiss: () -> Unit,
     onOpenDay: () -> Unit,
     onCopyText: () -> Unit,
+    onShare: (() -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState()
     ModalBottomSheet(
@@ -471,6 +483,15 @@ private fun ResultActionsSheet(
                         Icon(Icons.Default.ContentCopy, contentDescription = null)
                     },
                     modifier = Modifier.clickable { onCopyText() },
+                )
+            }
+            if (onShare != null) {
+                ListItem(
+                    headlineContent = { Text(stringResource(Res.string.search_action_share)) },
+                    leadingContent = {
+                        Icon(Icons.Default.Share, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable { onShare() },
                 )
             }
         }

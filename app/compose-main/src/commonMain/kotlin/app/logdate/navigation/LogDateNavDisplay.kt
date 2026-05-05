@@ -98,6 +98,7 @@ fun LogDateNavDisplay(
     pendingNavKey: NavKey? = null,
     onPendingNavKeyConsumed: () -> Unit = {},
     onCurrentNavKeyChanged: (NavKey?) -> Unit = {},
+    onShareSearchResult: ((SearchResult) -> Unit)? = null,
     sceneStrategy: SceneStrategy<NavKey> = rememberHomeSceneStrategy(),
 ) {
     val backStack = rememberNavBackStack(appNavSavedStateConfiguration, BaseRoute)
@@ -285,6 +286,7 @@ fun LogDateNavDisplay(
                                             onGoBack = { backStack.removeLastOrNull() },
                                             onResultClick = { result -> backStack.add(searchResultRoute(result)) },
                                             onResultOpenDay = { result -> backStack.add(searchResultDayRoute(result)) },
+                                            onShareResult = onShareSearchResult,
                                             initialQuery = route.query,
                                             initialTypeFtsValues = route.typeFtsValues,
                                             initialDateRangeName = route.dateRangeName,
