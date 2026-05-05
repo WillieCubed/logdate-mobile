@@ -14,6 +14,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
@@ -160,6 +168,19 @@ fun LogDateNavDisplay(
                             backStack = backStack,
                             onBack = { backStack.removeLastOrNull() },
                             sceneStrategies = listOf(sceneStrategy),
+                            modifier =
+                                Modifier.onPreviewKeyEvent { event ->
+                                    if (event.type == KeyEventType.KeyDown &&
+                                        (event.isMetaPressed || event.isCtrlPressed) &&
+                                        event.key == Key.F &&
+                                        backStack.lastOrNull() != SearchRoute()
+                                    ) {
+                                        backStack.add(SearchRoute())
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                },
                             entryProvider =
                                 entryProvider {
                                     taggedEntry<BaseRoute> { /* loading placeholder */ }
