@@ -4,20 +4,29 @@
 package app.logdate.feature.search.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FilterAltOff
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ExpandedFullScreenSearchBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -38,6 +47,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import app.logdate.client.domain.search.DateRangeFilter
+import app.logdate.client.domain.search.SearchFilters
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.ui.search.UniversalSearchResultItem
@@ -85,6 +97,7 @@ fun SearchScreen(
 ) {
     val searchState by viewModel.searchState.collectAsState()
     val queryText by viewModel.queryText.collectAsState()
+    val filters by viewModel.filters.collectAsState()
 
     LaunchedEffect(initialQuery) {
         if (initialQuery.isNotBlank() && queryText.isBlank()) {
@@ -96,8 +109,12 @@ fun SearchScreen(
         searchState = searchState,
         queryText = queryText,
         initialQuery = initialQuery,
+        filters = filters,
         onQueryChange = viewModel::updateQuery,
         onCommitSearch = viewModel::commitSearch,
+        onToggleType = viewModel::toggleContentType,
+        onSetDateRange = viewModel::setDateRange,
+        onClearFilters = viewModel::clearFilters,
         onNavigateToDay = onNavigateToDay,
         onNavigateToJournal = onNavigateToJournal,
         onNavigateToPerson = onNavigateToPerson,
@@ -132,6 +149,10 @@ fun SearchScreenContent(
     onGoBack: () -> Unit,
     initialQuery: String = "",
     queryText: String = initialQuery,
+    filters: SearchFilters = SearchFilters.Default,
+    onToggleType: (SearchContentType) -> Unit = {},
+    onSetDateRange: (DateRangeFilter) -> Unit = {},
+    onClearFilters: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val searchBarState = rememberSearchBarState()
@@ -213,74 +234,112 @@ fun SearchScreenContent(
                 )
             },
         ) {
-            when (searchState) {
-                is SearchScreenState.Idle -> {
-                    RecentSearchesList(
-                        recentSearches = searchState.recentSearches,
-                        onSelectRecent = { query -> onQueryChange(query) },
-                    )
-                }
+            Column(modifier = Modifier.fillMaxSize()) {
+                FilterChipRow(
+                    filters = filters,
+                    onToggleType = onToggleType,
+                    onSetDateRange = onSetDateRange,
+                    onClearFilters = onClearFilters,
+                )
+                SearchStateContent(
+                    searchState = searchState,
+                    onQueryChange = onQueryChange,
+                    onCommitSearch = onCommitSearch,
+                    onNavigateToDay = onNavigateToDay,
+                    onNavigateToJournal = onNavigateToJournal,
+                    onNavigateToPerson = onNavigateToPerson,
+                    onNavigateToNote = onNavigateToNote,
+                    onNavigateToPostcard = onNavigateToPostcard,
+                    onNavigateToRewind = onNavigateToRewind,
+                    onNavigateToMedia = onNavigateToMedia,
+                )
+            }
+        }
+    }
+}
 
-                is SearchScreenState.Searching -> {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
-                        Text(
-                            text = stringResource(Res.string.searching_entries),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+/**
+ * Renders the body of the search screen below the SearchBar / FilterChipRow.
+ */
+@Composable
+private fun SearchStateContent(
+    searchState: SearchScreenState,
+    onQueryChange: (String) -> Unit,
+    onCommitSearch: () -> Unit,
+    onNavigateToDay: (LocalDate) -> Unit,
+    onNavigateToJournal: (Uuid) -> Unit,
+    onNavigateToPerson: (Uuid) -> Unit,
+    onNavigateToNote: (Uuid) -> Unit,
+    onNavigateToPostcard: (Uuid) -> Unit,
+    onNavigateToRewind: (Uuid) -> Unit,
+    onNavigateToMedia: (Uuid) -> Unit,
+) {
+    when (searchState) {
+        is SearchScreenState.Idle -> {
+            RecentSearchesList(
+                recentSearches = searchState.recentSearches,
+                onSelectRecent = { query -> onQueryChange(query) },
+            )
+        }
+
+        is SearchScreenState.Searching -> {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                Text(
+                    text = stringResource(Res.string.searching_entries),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        is SearchScreenState.Empty -> {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                Text(
+                    text = stringResource(Res.string.search_no_results, searchState.query),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        is SearchScreenState.Results -> {
+            val highlightStyle = rememberSearchHighlightStyle()
+            val resultRows =
+                remember(searchState.results, highlightStyle) {
+                    searchState.results.map { result ->
+                        SearchResultRow(
+                            result = result,
+                            uiState = result.toUniversalSearchResultUiState(highlightStyle),
                         )
                     }
                 }
-
-                is SearchScreenState.Empty -> {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
-                        Text(
-                            text = stringResource(Res.string.search_no_results, searchState.query),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-
-                is SearchScreenState.Results -> {
-                    val highlightStyle = rememberSearchHighlightStyle()
-                    val resultRows =
-                        remember(searchState.results, highlightStyle) {
-                            searchState.results.map { result ->
-                                SearchResultRow(
-                                    result = result,
-                                    uiState = result.toUniversalSearchResultUiState(highlightStyle),
-                                )
-                            }
-                        }
-                    LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                        items(
-                            items = resultRows,
-                            key = { it.uiState.id },
-                        ) { resultRow ->
-                            UniversalSearchResultItem(
-                                state = resultRow.uiState,
-                                onClick = {
-                                    onCommitSearch()
-                                    navigateToResult(
-                                        result = resultRow.result,
-                                        onNavigateToDay = onNavigateToDay,
-                                        onNavigateToJournal = onNavigateToJournal,
-                                        onNavigateToPerson = onNavigateToPerson,
-                                        onNavigateToNote = onNavigateToNote,
-                                        onNavigateToPostcard = onNavigateToPostcard,
-                                        onNavigateToRewind = onNavigateToRewind,
-                                        onNavigateToMedia = onNavigateToMedia,
-                                    )
-                                },
+            LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                items(
+                    items = resultRows,
+                    key = { it.uiState.id },
+                ) { resultRow ->
+                    UniversalSearchResultItem(
+                        state = resultRow.uiState,
+                        onClick = {
+                            onCommitSearch()
+                            navigateToResult(
+                                result = resultRow.result,
+                                onNavigateToDay = onNavigateToDay,
+                                onNavigateToJournal = onNavigateToJournal,
+                                onNavigateToPerson = onNavigateToPerson,
+                                onNavigateToNote = onNavigateToNote,
+                                onNavigateToPostcard = onNavigateToPostcard,
+                                onNavigateToRewind = onNavigateToRewind,
+                                onNavigateToMedia = onNavigateToMedia,
                             )
-                        }
-                    }
+                        },
+                    )
                 }
             }
         }
@@ -291,6 +350,82 @@ private data class SearchResultRow(
     val result: SearchResult,
     val uiState: UniversalSearchResultUiState,
 )
+
+/**
+ * Sticky filter chip row above the search results.
+ *
+ * Date-range chips are single-select; type chips are multi-select. A "Clear filters"
+ * [AssistChip] only appears when at least one filter is active.
+ */
+@Composable
+private fun FilterChipRow(
+    filters: SearchFilters,
+    onToggleType: (SearchContentType) -> Unit,
+    onSetDateRange: (DateRangeFilter) -> Unit,
+    onClearFilters: () -> Unit,
+) {
+    val anyFilterActive =
+        filters.contentTypes != null || filters.dateRange != DateRangeFilter.AllTime
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        if (anyFilterActive) {
+            item(key = "clear") {
+                AssistChip(
+                    onClick = onClearFilters,
+                    label = { Text("Clear filters") },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.FilterAltOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(AssistChipDefaults.IconSize),
+                        )
+                    },
+                )
+            }
+        }
+        items(items = DateRangeFilter.entries.toList(), key = { "date_${it.name}" }) { range ->
+            FilterChip(
+                selected = filters.dateRange == range,
+                onClick = { onSetDateRange(range) },
+                label = { Text(range.label()) },
+            )
+        }
+        items(items = SearchContentType.entries.toList(), key = { "type_${it.ftsValue}" }) { type ->
+            val selected = filters.contentTypes?.contains(type) == true
+            FilterChip(
+                selected = selected,
+                onClick = { onToggleType(type) },
+                label = { Text(type.label()) },
+            )
+        }
+    }
+}
+
+private fun DateRangeFilter.label(): String =
+    when (this) {
+        DateRangeFilter.AllTime -> "All time"
+        DateRangeFilter.Today -> "Today"
+        DateRangeFilter.ThisWeek -> "This week"
+        DateRangeFilter.ThisMonth -> "This month"
+        DateRangeFilter.ThisYear -> "This year"
+    }
+
+private fun SearchContentType.label(): String =
+    when (this) {
+        SearchContentType.TEXT_NOTE -> "Notes"
+        SearchContentType.TRANSCRIPTION -> "Voice notes"
+        SearchContentType.JOURNAL -> "Journals"
+        SearchContentType.MEDIA_CAPTION -> "Photos"
+        SearchContentType.PLACE -> "Places"
+        SearchContentType.REWIND -> "Rewinds"
+        SearchContentType.STICKER -> "Stickers"
+        SearchContentType.POSTCARD -> "Postcards"
+        SearchContentType.AMBIENT_SOUND -> "Soundscapes"
+        SearchContentType.PERSON -> "People"
+    }
 
 @Composable
 private fun RecentSearchesList(

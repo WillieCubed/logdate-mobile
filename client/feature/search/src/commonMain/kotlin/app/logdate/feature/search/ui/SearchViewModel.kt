@@ -2,9 +2,12 @@ package app.logdate.feature.search.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.domain.search.DateRangeFilter
 import app.logdate.client.domain.search.ObserveRecentSearchesUseCase
+import app.logdate.client.domain.search.SearchFilters
 import app.logdate.client.domain.search.SearchQuery
 import app.logdate.client.domain.search.UniversalSearchUseCase
+import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -24,15 +27,16 @@ import kotlinx.coroutines.launch
 /**
  * ViewModel for the universal search screen.
  *
- * Manages search query state, recent searches, and ranked results across
- * all indexed content types.
+ * Manages search query state, recent searches, filter state (content types + date range), and
+ * ranked results across all indexed content types.
  */
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class SearchViewModel(
-    universalSearchUseCase: UniversalSearchUseCase,
+    private val universalSearchUseCase: UniversalSearchUseCase,
     private val observeRecentSearchesUseCase: ObserveRecentSearchesUseCase,
 ) : ViewModel() {
     private val queryState = MutableStateFlow(SearchQuery.Empty)
+    private val filtersState = MutableStateFlow(SearchFilters.Default)
     private val searchDebounceMs = 150L
 
     private val settledQueryState: StateFlow<SearchQuery> =
@@ -42,12 +46,12 @@ class SearchViewModel(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SearchQuery.Empty)
 
     private val latestResultsState: StateFlow<SearchResultSnapshot> =
-        settledQueryState
-            .flatMapLatest { settledQuery ->
+        combine(settledQueryState, filtersState) { query, filters -> query to filters }
+            .flatMapLatest { (settledQuery, filters) ->
                 if (settledQuery.isBlank) {
                     flowOf(SearchResultSnapshot(settledQuery, emptyList()))
                 } else {
-                    universalSearchUseCase(flowOf(settledQuery)).map { results ->
+                    universalSearchUseCase(flowOf(settledQuery), filters).map { results ->
                         SearchResultSnapshot(settledQuery, results)
                     }
                 }
@@ -84,10 +88,46 @@ class SearchViewModel(
         )
 
     /**
+     * Read-only view of the active filter set so UI can render selected chips.
+     */
+    val filters: StateFlow<SearchFilters> =
+        filtersState.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = SearchFilters.Default,
+        )
+
+    /**
      * Updates the search query text.
      */
     fun updateQuery(newQuery: String) {
         queryState.update { SearchQuery(newQuery) }
+    }
+
+    /**
+     * Toggles a content-type filter chip. The empty selection (all 10 types unselected) is
+     * normalized to `null` so the search use case treats it as "no type restriction".
+     */
+    fun toggleContentType(type: SearchContentType) {
+        filtersState.update { current ->
+            val active = current.contentTypes ?: emptySet()
+            val next = if (type in active) active - type else active + type
+            current.copy(contentTypes = next.takeIf { it.isNotEmpty() })
+        }
+    }
+
+    /**
+     * Sets the date-range filter (single-select).
+     */
+    fun setDateRange(range: DateRangeFilter) {
+        filtersState.update { it.copy(dateRange = range) }
+    }
+
+    /**
+     * Resets type and date filters to the defaults.
+     */
+    fun clearFilters() {
+        filtersState.update { SearchFilters.Default }
     }
 
     /**
