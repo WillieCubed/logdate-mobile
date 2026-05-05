@@ -37,12 +37,30 @@ import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.ui.common.focusableWithRing
 import app.logdate.util.toReadableDateTimeShort
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.search_type_label_journal
+import logdate.client.ui.generated.resources.search_type_label_note
+import logdate.client.ui.generated.resources.search_type_label_person
+import logdate.client.ui.generated.resources.search_type_label_photo
+import logdate.client.ui.generated.resources.search_type_label_place
+import logdate.client.ui.generated.resources.search_type_label_postcard
+import logdate.client.ui.generated.resources.search_type_label_rewind
+import logdate.client.ui.generated.resources.search_type_label_soundscape
+import logdate.client.ui.generated.resources.search_type_label_sticker
+import logdate.client.ui.generated.resources.search_type_label_voice_note
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
 data class UniversalSearchResultUiState(
     val id: String,
     val contentText: AnnotatedString,
-    val supportingText: String,
-    val typeLabel: String,
+    /**
+     * Pre-formatted "date" portion of the supporting line. Null for content types that don't
+     * surface a date (currently only [SearchContentType.PERSON]); the row then shows just the
+     * type label.
+     */
+    val createdReadable: String?,
+    val typeLabelKey: StringResource,
     val typeIcon: ImageVector,
     val contentType: SearchContentType,
 )
@@ -61,6 +79,13 @@ fun UniversalSearchResultItem(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
 ) {
+    val typeLabel = stringResource(state.typeLabelKey)
+    val supportingText =
+        if (state.createdReadable != null) {
+            "${state.createdReadable} · $typeLabel"
+        } else {
+            typeLabel
+        }
     val scheme = MaterialTheme.colorScheme
     val containerColor: Color
     val contentColor: Color
@@ -102,7 +127,7 @@ fun UniversalSearchResultItem(
         },
         supportingContent = {
             Text(
-                text = state.supportingText,
+                text = supportingText,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -115,7 +140,7 @@ fun UniversalSearchResultItem(
                 modifier = Modifier.size(40.dp),
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(state.typeIcon, contentDescription = state.typeLabel)
+                    Icon(state.typeIcon, contentDescription = typeLabel)
                 }
             }
         },
@@ -137,35 +162,33 @@ fun UniversalSearchResultItem(
  *   when composable theme colors are available.
  */
 fun SearchResult.toUniversalSearchResultUiState(matchStyle: SpanStyle = DefaultMatchStyle): UniversalSearchResultUiState {
-    val (icon, typeLabel) = contentType.visualInfo()
+    val (icon, labelKey) = contentType.visualInfo()
     return UniversalSearchResultUiState(
         id = "${contentType.ftsValue}_$uid",
         contentText = parseSnippetMarkers(content, matchStyle),
-        supportingText = searchSupportingText(typeLabel),
-        typeLabel = typeLabel,
+        createdReadable =
+            when (contentType) {
+                SearchContentType.PERSON -> null
+                else -> created.toReadableDateTimeShort()
+            },
+        typeLabelKey = labelKey,
         typeIcon = icon,
         contentType = contentType,
     )
 }
 
-private fun SearchResult.searchSupportingText(typeLabel: String): String =
-    when (contentType) {
-        SearchContentType.PERSON -> typeLabel
-        else -> "${created.toReadableDateTimeShort()} · $typeLabel"
-    }
-
-private fun SearchContentType.visualInfo(): Pair<ImageVector, String> =
+private fun SearchContentType.visualInfo(): Pair<ImageVector, StringResource> =
     when (this) {
-        SearchContentType.TEXT_NOTE -> Icons.AutoMirrored.Default.Notes to "Note"
-        SearchContentType.TRANSCRIPTION -> Icons.Default.Mic to "Voice note"
-        SearchContentType.JOURNAL -> Icons.Default.Book to "Journal"
-        SearchContentType.MEDIA_CAPTION -> Icons.Default.Image to "Photo"
-        SearchContentType.PLACE -> Icons.Default.LocationOn to "Place"
-        SearchContentType.REWIND -> Icons.Default.Replay to "Rewind"
-        SearchContentType.STICKER -> Icons.Default.Star to "Sticker"
-        SearchContentType.POSTCARD -> Icons.Default.Mail to "Postcard"
-        SearchContentType.AMBIENT_SOUND -> Icons.Default.GraphicEq to "Soundscape"
-        SearchContentType.PERSON -> Icons.Default.Person to "Person"
+        SearchContentType.TEXT_NOTE -> Icons.AutoMirrored.Default.Notes to Res.string.search_type_label_note
+        SearchContentType.TRANSCRIPTION -> Icons.Default.Mic to Res.string.search_type_label_voice_note
+        SearchContentType.JOURNAL -> Icons.Default.Book to Res.string.search_type_label_journal
+        SearchContentType.MEDIA_CAPTION -> Icons.Default.Image to Res.string.search_type_label_photo
+        SearchContentType.PLACE -> Icons.Default.LocationOn to Res.string.search_type_label_place
+        SearchContentType.REWIND -> Icons.Default.Replay to Res.string.search_type_label_rewind
+        SearchContentType.STICKER -> Icons.Default.Star to Res.string.search_type_label_sticker
+        SearchContentType.POSTCARD -> Icons.Default.Mail to Res.string.search_type_label_postcard
+        SearchContentType.AMBIENT_SOUND -> Icons.Default.GraphicEq to Res.string.search_type_label_soundscape
+        SearchContentType.PERSON -> Icons.Default.Person to Res.string.search_type_label_person
     }
 
 /**

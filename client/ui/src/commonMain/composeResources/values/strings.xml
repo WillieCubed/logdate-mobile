@@ -60,4 +60,18 @@
     <string name="simple_container_item_2">Simple container item 2</string>
     <string name="text_10_places">10 places</string>
     <string name="text_2_people">2 people</string>
+
+    <!-- Search result row type labels (singular). Used as Icon contentDescription and in the
+         row's "date · type" supporting line. Plural forms used in filter chips live in the
+         search feature module's strings.xml. -->
+    <string name="search_type_label_note">Note</string>
+    <string name="search_type_label_voice_note">Voice note</string>
+    <string name="search_type_label_journal">Journal</string>
+    <string name="search_type_label_photo">Photo</string>
+    <string name="search_type_label_place">Place</string>
+    <string name="search_type_label_rewind">Rewind</string>
+    <string name="search_type_label_sticker">Sticker</string>
+    <string name="search_type_label_postcard">Postcard</string>
+    <string name="search_type_label_soundscape">Soundscape</string>
+    <string name="search_type_label_person">Person</string>
 </resources>
