@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposePanel
 import androidx.compose.ui.unit.dp
 import app.logdate.client.ui.LockableContent
-import app.logdate.screenshots.shared.ScreenshotSceneGroup
 import app.logdate.screenshots.shared.ScreenshotSceneVariant
 import app.logdate.screenshots.shared.SharedScreenshotCatalog
 import app.logdate.screenshots.shared.SharedScreenshotSceneId
@@ -34,15 +33,10 @@ import kotlin.test.assertTrue
 class DesktopScreenshotTest {
     @Test
     fun shared_catalog_matches_baselines() {
-        // The whole catalog is quarantined — every group churns 6-15% pixel diff between back-
-        // to-back runs, well past the 5% noise floor in compareImages. lock_screen_matches_baseline
-        // still runs as the smoke gate; per-group entries get added back to the set as the
-        // underlying scenes capture a deterministic frame.
-        if (nonDeterministicSceneGroups.containsAll(ScreenshotSceneGroup.entries)) return
         val sceneFilter = desktopScreenshotSceneFilter
         SharedScreenshotCatalog.allScenes
             .filter { scene -> sceneFilter == null || scene.id.value.contains(sceneFilter) }
-            .filter { scene -> scene.group !in nonDeterministicSceneGroups }
+            .filter { scene -> nonDeterministicScenePrefixes.none(scene.id.value::startsWith) }
             .forEach { scene ->
                 scene.variants.forEach { variant ->
                     assertMatchesBaseline(scene = scene, variant = variant)
@@ -50,8 +44,17 @@ class DesktopScreenshotTest {
             }
     }
 
-    private val nonDeterministicSceneGroups: Set<ScreenshotSceneGroup> =
-        ScreenshotSceneGroup.entries.toSet()
+    /** Scene-id prefixes whose rendering still drifts run-to-run even with the strict-stability
+     *  capture loop. memory-selection-* renders its grid via LazyVerticalStaggeredGrid, whose
+     *  measurement reflows items between captures even when input data is fixed (the diff
+     *  artifact in build/reports/desktopScreenshotTest/diff/ shows each thumbnail rendered
+     *  twice at slightly offset positions). Replacing the staggered grid with a non-lazy
+     *  FlowRow + verticalScroll would fix it but is invasive product code; quarantining the
+     *  family until that lands. */
+    private val nonDeterministicScenePrefixes: List<String> =
+        listOf(
+            "memory-selection-",
+        )
 
     @Test
     fun lock_screen_matches_baseline() {
@@ -302,10 +305,28 @@ private fun capturePanel(
     return image
 }
 
+/**
+ * Used by the render loop to decide when the panel has *fully settled* between two consecutive
+ * frames — a strict bit-exact comparison. The lenient [compareImages] tolerance is meant for the
+ * baseline assertion (where antialiasing/font-cache jitter is acceptable noise), not for
+ * stability detection: if "is the render stable?" treats frames within 5% as the same, the loop
+ * can declare stability mid-animation and capture a frame that drifts run-to-run, producing
+ * the very flakiness the tolerance was supposed to absorb.
+ */
 private fun imagesMatch(
     first: BufferedImage,
     second: BufferedImage,
-): Boolean = compareImages(expected = first, actual = second) == null
+): Boolean {
+    if (first.width != second.width || first.height != second.height) return false
+    val width = first.width
+    val height = first.height
+    for (y in 0 until height) {
+        for (x in 0 until width) {
+            if (first.getRGB(x, y) != second.getRGB(x, y)) return false
+        }
+    }
+    return true
+}
 
 private fun compareImages(
     expected: BufferedImage,
