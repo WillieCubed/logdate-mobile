@@ -2,10 +2,8 @@ package app.logdate.server.routes
 
 import app.logdate.server.auth.AuthMetricsRegistry
 import app.logdate.server.auth.AuthMetricsSnapshot
-import app.logdate.server.auth.AuthOperationMetricsSnapshot
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncMetricsSnapshot
-import app.logdate.server.sync.SyncOperationMetricsSnapshot
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals

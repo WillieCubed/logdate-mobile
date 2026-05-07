@@ -8,8 +8,7 @@ import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSUserDomainMask
 
-actual fun createDataStore(): DataStore<Preferences> =
-    createDataStore { documentDirectory() + "/" + DATA_STORE_FILE_NAME }
+actual fun createDataStore(): DataStore<Preferences> = createDataStore { documentDirectory() + "/" + DATA_STORE_FILE_NAME }
 
 private fun documentDirectory(): String {
     val documentDirectory =

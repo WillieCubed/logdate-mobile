@@ -13,7 +13,6 @@ import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
-import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async

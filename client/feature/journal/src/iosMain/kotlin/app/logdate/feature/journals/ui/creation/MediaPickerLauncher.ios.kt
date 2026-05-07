@@ -174,6 +174,7 @@ private fun copyToImports(
 
 private fun topPresentedViewController(): UIViewController? {
     val app = UIApplication.sharedApplication
+
     @Suppress("DEPRECATION")
     val window =
         app.keyWindow

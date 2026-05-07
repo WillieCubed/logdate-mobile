@@ -24,7 +24,6 @@ import platform.AVFoundation.AVCaptureDevicePositionBack
 import platform.AVFoundation.AVCaptureDevicePositionFront
 import platform.AVFoundation.AVCaptureFileOutput
 import platform.AVFoundation.AVCaptureFileOutputRecordingDelegateProtocol
-import platform.AVFoundation.AVCaptureInput
 import platform.AVFoundation.AVCaptureMovieFileOutput
 import platform.AVFoundation.AVCapturePhoto
 import platform.AVFoundation.AVCapturePhotoCaptureDelegateProtocol
@@ -211,6 +210,7 @@ class IosCameraCaptureManager : CameraCaptureManager {
     private fun ensureVideoInputForFacing(facing: CameraFacing) {
         val targetPosition =
             if (facing == CameraFacing.FRONT) AVCaptureDevicePositionFront else AVCaptureDevicePositionBack
+
         @Suppress("UNCHECKED_CAST")
         val devices = AVCaptureDevice.devicesWithMediaType(AVMediaTypeVideo) as List<AVCaptureDevice>
         val device = devices.firstOrNull { it.position == targetPosition } ?: devices.firstOrNull()
