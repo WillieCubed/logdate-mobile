@@ -3,7 +3,9 @@ package app.logdate.client
 import android.net.Uri
 import androidx.navigation3.runtime.NavKey
 import app.logdate.client.ui.navigation.LocationTimelineRoute
+import app.logdate.client.ui.navigation.LogdateHostClass
 import app.logdate.client.ui.navigation.SearchRoute
+import app.logdate.client.ui.navigation.classifyLogdateHost
 import app.logdate.client.ui.navigation.searchRouteFromParams
 import app.logdate.feature.events.navigation.EventDetailRoute
 import app.logdate.feature.journals.navigation.JournalDetailsRoute
@@ -14,6 +16,7 @@ import app.logdate.navigation.TimelineDetailRoute
 import kotlin.uuid.Uuid
 
 private const val PATH_JOURNAL = "journal"
+private const val PATH_JOURNAL_SHORT = "j"
 private const val PATH_DAY = "day"
 private const val PATH_NOTE = "note"
 private const val PATH_POSTCARD = "postcard"
@@ -30,16 +33,35 @@ internal val LOGDATE_API_BASE_URL: Uri = Uri.parse(BuildConfig.LOGDATE_API_BASE_
 /**
  * Resolves a deep link URI to the corresponding navigation route.
  *
- * Supports both app-scheme URIs (`logdate://journal/{id}`) and
- * web URIs (`https://logdate.app/journal/{id}`).
+ * Supports:
+ *   - app-scheme URIs (`logdate://journal/{id}`,
+ *     `studio.hypertext.logdate://journal/{id}`),
+ *   - apex web URIs (`https://logdate.app/{type}/{id}`),
+ *   - tenant subdomain web URIs (`https://{handle}.logdate.app/{type}/{id}`).
  *
- * Returns null if the URI doesn't match any known pattern.
+ * Returns null if the URI doesn't match any known pattern, including any
+ * traffic on a reserved subdomain (`app.logdate.app`, `api.logdate.app`,
+ * etc.) and the apex marketing root.
  */
 fun resolveDeepLinkUri(uri: Uri): NavKey? {
     val segments = uri.pathSegments ?: return null
     val host = uri.host ?: return null
 
-    return when (host) {
+    return when (classifyLogdateHost(host, BuildConfig.LOGDATE_ORIGIN)) {
+        is LogdateHostClass.Apex,
+        is LogdateHostClass.TenantClaimed,
+        -> resolveWebPath(segments)
+
+        LogdateHostClass.Other -> resolveCustomSchemeHost(host, segments, uri)
+    }
+}
+
+private fun resolveCustomSchemeHost(
+    host: String,
+    segments: List<String>,
+    uri: Uri,
+): NavKey? =
+    when (host) {
         PATH_JOURNAL -> segments.firstOrNull()?.parseUuidTo { JournalDetailsRoute(it) }
         PATH_DAY -> segments.firstOrNull()?.parseDateString { TimelineDetailRoute(it) }
         PATH_NOTE -> segments.firstOrNull()?.parseUuidTo { NoteDetailRoute(it) }
@@ -48,10 +70,8 @@ fun resolveDeepLinkUri(uri: Uri): NavKey? {
         PATH_LOCATION -> LocationTimelineRoute
         PATH_EVENT -> segments.firstOrNull()?.let { EventDetailRoute(it) }
         PATH_SEARCH -> uri.toSearchRoute()
-        BuildConfig.LOGDATE_ORIGIN -> resolveWebPath(segments)
         else -> null
     }
-}
 
 private fun Uri.toSearchRoute(): SearchRoute =
     searchRouteFromParams(
@@ -65,6 +85,12 @@ private fun Uri.toSearchRoute(): SearchRoute =
  *
  * Inverse of [resolveDeepLinkUri] for web-scheme URIs. Returns null for destinations
  * with no stable addressable URL (list screens, settings, etc.).
+ *
+ * Currently emits the apex shape (`https://logdate.app/<type>/<id>`); the
+ * web proxy 308s those to the canonical tenant subdomain when cloud knows
+ * the share's owner. Once the share-sheet has the user's handle threaded
+ * through (see logdate-web/docs/deep-linking.md item N-4), this should
+ * emit the canonical shape directly.
  */
 fun NavKey.toWebUrl(): String? =
     when (this) {
@@ -117,7 +143,8 @@ private fun resolveWebPath(segments: List<String>): NavKey? {
     val type = segments.getOrNull(0) ?: return null
     val value = segments.getOrNull(1)
     return when (type) {
-        PATH_JOURNAL -> value?.parseUuidTo { JournalDetailsRoute(it) }
+        PATH_JOURNAL, PATH_JOURNAL_SHORT -> value?.parseUuidTo { JournalDetailsRoute(it) }
+        PATH_NOTE -> value?.parseUuidTo { NoteDetailRoute(it) }
         PATH_DAY -> value?.parseDateString { TimelineDetailRoute(it) }
         PATH_POSTCARD -> value?.parseUuidTo { PostcardViewerRoute(it) }
         PATH_REWIND -> value?.parseUuidTo { RewindDetailRoute(it) }

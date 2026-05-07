@@ -56,8 +56,16 @@
 		<dict>
 			<key>CFBundleURLName</key>
 			<string>studio.hypertext.LogDate</string>
+			<!--
+				Reverse-DNS `studio.hypertext.logdate` is the modern,
+				hijack-resistant scheme; `logdate` stays during the
+				transition window so older builds of LogDate Web (and
+				cached scheme links) keep working. Web side is tracked
+				in logdate-web/docs/deep-linking.md (item N-5).
+			-->
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>studio.hypertext.logdate</string>
 				<string>logdate</string>
 			</array>
 		</dict>

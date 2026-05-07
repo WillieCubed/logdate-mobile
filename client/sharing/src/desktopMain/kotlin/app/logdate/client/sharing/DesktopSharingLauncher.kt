@@ -88,7 +88,7 @@ class DesktopSharingLauncher(
                     journalRepository.observeJournalById(journalId).firstOrNull()
                         ?: throw IllegalArgumentException("Journal with ID $journalId does not exist")
 
-                val url = "https://logdate.app/j/${journal.id}"
+                val url = journalShareUrl(journal.id)
 
                 if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
                     Desktop.getDesktop().browse(URI(url))

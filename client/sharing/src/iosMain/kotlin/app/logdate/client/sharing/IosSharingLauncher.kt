@@ -23,7 +23,6 @@ import platform.CoreImage.CIContext
 import platform.CoreImage.CIFilter
 import platform.CoreImage.createCGImage
 import platform.CoreImage.filterWithName
-import platform.Foundation.NSData
 import platform.Foundation.NSDate
 import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSFileManager
@@ -36,9 +35,9 @@ import platform.Foundation.dataUsingEncoding
 import platform.Foundation.dateWithTimeIntervalSinceNow
 import platform.Foundation.setValue
 import platform.UIKit.NSFontAttributeName
-import platform.UIKit.drawAtPoint
 import platform.UIKit.NSForegroundColorAttributeName
 import platform.UIKit.UIActivityViewController
+import platform.UIKit.UIApplication
 import platform.UIKit.UIColor
 import platform.UIKit.UIFont
 import platform.UIKit.UIGraphicsBeginImageContextWithOptions
@@ -48,9 +47,9 @@ import platform.UIKit.UIImage
 import platform.UIKit.UIImageJPEGRepresentation
 import platform.UIKit.UIPasteboard
 import platform.UIKit.UIRectFill
-import platform.UIKit.UIApplication
 import platform.UIKit.UIViewController
 import platform.UIKit.UIWindow
+import platform.UIKit.drawAtPoint
 import platform.UIKit.popoverPresentationController
 import kotlin.uuid.Uuid
 
@@ -205,8 +204,10 @@ class IosSharingLauncher(
     }
 
     override fun getUriFromMedia(uid: String): String {
-        if (uid.startsWith("file://") || uid.startsWith("https://") ||
-            uid.startsWith("photo://") || uid.startsWith("http://")
+        if (uid.startsWith("file://") ||
+            uid.startsWith("https://") ||
+            uid.startsWith("photo://") ||
+            uid.startsWith("http://")
         ) {
             return uid
         }
@@ -268,7 +269,7 @@ class IosSharingLauncher(
         }
     }
 
-    private fun journalDeepLink(journalId: Uuid): String = "https://logdate.app/journal/$journalId"
+    private fun journalDeepLink(journalId: Uuid): String = journalShareUrl(journalId)
 
     private fun renderJournalStoryCard(
         title: String,
@@ -315,6 +316,7 @@ class IosSharingLauncher(
 
 private fun topPresentedViewController(): UIViewController? {
     val app = UIApplication.sharedApplication
+
     @Suppress("DEPRECATION")
     val window =
         app.keyWindow

@@ -7,7 +7,9 @@
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>webcredentials:logdate.app</string>
+		<string>webcredentials:*.logdate.app</string>
 		<string>applinks:logdate.app</string>
+		<string>applinks:*.logdate.app</string>
 	</array>
 	<key>com.apple.developer.healthkit</key>
 	<true/>

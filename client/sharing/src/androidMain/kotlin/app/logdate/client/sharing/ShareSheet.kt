@@ -31,7 +31,7 @@ internal fun Context.shareJournalLink(
     previewImage: Uri? = null,
     qrCodeImage: Uri? = null,
 ) {
-    val url = "https://logdate.app/j/${journal.id}"
+    val url = journalShareUrl(journal.id)
     val mediaUris = listOfNotNull(previewImage)
     shareContent(
         request =
@@ -51,7 +51,7 @@ internal fun Context.shareJournalQrCode(
     journal: Journal,
     qrCodeImage: Uri,
 ) {
-    val url = "https://logdate.app/j/${journal.id}"
+    val url = journalShareUrl(journal.id)
     shareContent(
         request =
             ShareContentRequest(

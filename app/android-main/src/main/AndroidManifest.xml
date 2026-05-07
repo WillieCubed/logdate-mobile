@@ -60,11 +60,23 @@
                 <data android:scheme="http" />
                 <data android:scheme="https" />
 
+                <!--
+                    Apex (logdate.app) carries legacy share URLs and the
+                    marketing site; web 308s legacy share paths to the
+                    canonical subdomain so iOS/Android can still claim them
+                    here. Wildcard `*.logdate.app` claims the per-handle
+                    portals (`<handle>.logdate.app/journal/<id>` etc.).
+                    The web's AASA + assetlinks contracts mirror this
+                    coverage; see logdate-web/docs/deep-linking.md.
+                -->
                 <data android:host="logdate.app" />
+                <data android:host="*.logdate.app" />
                 <data android:pathPrefix="/journal" />
+                <data android:pathPrefix="/note" />
                 <data android:pathPrefix="/rewind" />
                 <data android:pathPrefix="/postcard" />
                 <data android:pathPrefix="/day" />
+                <data android:pathPrefix="/j" />
             </intent-filter>
 
             <intent-filter>
@@ -74,6 +86,32 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data android:scheme="logdate" />
+
+                <data android:host="journal" />
+                <data android:host="rewind" />
+                <data android:host="postcard" />
+                <data android:host="day" />
+                <data android:host="note" />
+                <data android:host="event" />
+                <data android:host="location" />
+                <data android:host="search" />
+            </intent-filter>
+
+            <!--
+                Reverse-DNS in-app scheme — the modern recommendation over
+                generic `logdate://`, which any other app on the device
+                can register and hijack. The legacy `logdate://` filter
+                above stays during the transition window so older builds
+                of LogDate Web (and any cached scheme links in user
+                clipboards) keep working.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="studio.hypertext.logdate" />
 
                 <data android:host="journal" />
                 <data android:host="rewind" />
