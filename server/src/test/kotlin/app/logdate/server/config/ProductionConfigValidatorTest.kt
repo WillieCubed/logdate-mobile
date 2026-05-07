@@ -77,7 +77,7 @@ class ProductionConfigValidatorTest {
             assertFailsWith<InsecureProductionConfigException> {
                 ProductionConfigValidator.validate(
                     profile = RuntimeProfile.PRODUCTION,
-                    readEnv = envOf("DATABASE_PASSWORD" to VALID_DB_PASSWORD),
+                    readEnv = secureEnvOf("DATABASE_PASSWORD" to VALID_DB_PASSWORD),
                 )
             }
         assertTrue(failure.message!!.contains("JWT_SECRET is required"))
@@ -90,7 +90,7 @@ class ProductionConfigValidatorTest {
                 ProductionConfigValidator.validate(
                     profile = RuntimeProfile.PRODUCTION,
                     readEnv =
-                        envOf(
+                        secureEnvOf(
                             "JWT_SECRET" to "too-short",
                             "DATABASE_PASSWORD" to VALID_DB_PASSWORD,
                         ),
@@ -107,7 +107,7 @@ class ProductionConfigValidatorTest {
                 ProductionConfigValidator.validate(
                     profile = RuntimeProfile.PRODUCTION,
                     readEnv =
-                        envOf(
+                        secureEnvOf(
                             "JWT_SECRET" to placeholder,
                             "DATABASE_PASSWORD" to VALID_DB_PASSWORD,
                         ),
@@ -122,7 +122,7 @@ class ProductionConfigValidatorTest {
             assertFailsWith<InsecureProductionConfigException> {
                 ProductionConfigValidator.validate(
                     profile = RuntimeProfile.PRODUCTION,
-                    readEnv = envOf("JWT_SECRET" to VALID_JWT_SECRET),
+                    readEnv = secureEnvOf("JWT_SECRET" to VALID_JWT_SECRET),
                 )
             }
         assertTrue(failure.message!!.contains("DATABASE_PASSWORD is required"))
@@ -133,7 +133,7 @@ class ProductionConfigValidatorTest {
         ProductionConfigValidator.validate(
             profile = RuntimeProfile.PRODUCTION,
             readEnv =
-                envOf(
+                secureEnvOf(
                     "JWT_SECRET" to VALID_JWT_SECRET,
                     "DATABASE_URL" to "jdbc:postgresql://user:pass@host:5432/db",
                 ),
@@ -147,7 +147,7 @@ class ProductionConfigValidatorTest {
                 ProductionConfigValidator.validate(
                     profile = RuntimeProfile.PRODUCTION,
                     readEnv =
-                        envOf(
+                        secureEnvOf(
                             "JWT_SECRET" to VALID_JWT_SECRET,
                             "DATABASE_PASSWORD" to "logdate",
                         ),
@@ -161,7 +161,7 @@ class ProductionConfigValidatorTest {
         ProductionConfigValidator.validate(
             profile = RuntimeProfile.PRODUCTION,
             readEnv =
-                envOf(
+                secureEnvOf(
                     "JWT_SECRET" to VALID_JWT_SECRET,
                     "DATABASE_PASSWORD" to VALID_DB_PASSWORD,
                 ),
@@ -180,12 +180,120 @@ class ProductionConfigValidatorTest {
         val message = failure.message!!
         assertTrue(message.contains("JWT_SECRET is required"))
         assertTrue(message.contains("DATABASE_PASSWORD is required"))
+        assertTrue(message.contains("WEBAUTHN_RP_ID is required"))
+        assertTrue(message.contains("WEBAUTHN_ORIGIN is required"))
+    }
+
+    @Test
+    fun `production requires WEBAUTHN_RP_ID`() {
+        val failure =
+            assertFailsWith<InsecureProductionConfigException> {
+                ProductionConfigValidator.validate(
+                    profile = RuntimeProfile.PRODUCTION,
+                    readEnv =
+                        envOf(
+                            "JWT_SECRET" to VALID_JWT_SECRET,
+                            "DATABASE_PASSWORD" to VALID_DB_PASSWORD,
+                            "WEBAUTHN_ORIGIN" to "https://cloud.logdate.app",
+                        ),
+                )
+            }
+        assertTrue(failure.message!!.contains("WEBAUTHN_RP_ID is required"))
+    }
+
+    @Test
+    fun `production requires WEBAUTHN_ORIGIN`() {
+        val failure =
+            assertFailsWith<InsecureProductionConfigException> {
+                ProductionConfigValidator.validate(
+                    profile = RuntimeProfile.PRODUCTION,
+                    readEnv =
+                        envOf(
+                            "JWT_SECRET" to VALID_JWT_SECRET,
+                            "DATABASE_PASSWORD" to VALID_DB_PASSWORD,
+                            "WEBAUTHN_RP_ID" to "logdate.app",
+                        ),
+                )
+            }
+        assertTrue(failure.message!!.contains("WEBAUTHN_ORIGIN is required"))
+    }
+
+    @Test
+    fun `production rejects http WEBAUTHN_ORIGIN`() {
+        val failure =
+            assertFailsWith<InsecureProductionConfigException> {
+                ProductionConfigValidator.validate(
+                    profile = RuntimeProfile.PRODUCTION,
+                    readEnv =
+                        envOf(
+                            "JWT_SECRET" to VALID_JWT_SECRET,
+                            "DATABASE_PASSWORD" to VALID_DB_PASSWORD,
+                            "WEBAUTHN_RP_ID" to "logdate.app",
+                            "WEBAUTHN_ORIGIN" to "http://cloud.logdate.app",
+                        ),
+                )
+            }
+        assertTrue(failure.message!!.contains("https://"))
+    }
+
+    @Test
+    fun `production rejects RP ID that is not the apex of origin`() {
+        val failure =
+            assertFailsWith<InsecureProductionConfigException> {
+                ProductionConfigValidator.validate(
+                    profile = RuntimeProfile.PRODUCTION,
+                    readEnv =
+                        envOf(
+                            "JWT_SECRET" to VALID_JWT_SECRET,
+                            "DATABASE_PASSWORD" to VALID_DB_PASSWORD,
+                            "WEBAUTHN_RP_ID" to "logdate.app",
+                            "WEBAUTHN_ORIGIN" to "https://other-domain.example",
+                        ),
+                )
+            }
+        assertTrue(failure.message!!.contains("registrable apex"))
+    }
+
+    @Test
+    fun `production accepts RP ID equal to origin host (staging pattern)`() {
+        ProductionConfigValidator.validate(
+            profile = RuntimeProfile.PRODUCTION,
+            readEnv =
+                envOf(
+                    "JWT_SECRET" to VALID_JWT_SECRET,
+                    "DATABASE_PASSWORD" to VALID_DB_PASSWORD,
+                    "WEBAUTHN_RP_ID" to "cloud-staging.logdate.app",
+                    "WEBAUTHN_ORIGIN" to "https://cloud-staging.logdate.app",
+                ),
+        )
+    }
+
+    @Test
+    fun `production accepts RP ID as parent suffix of origin host (production pattern)`() {
+        ProductionConfigValidator.validate(
+            profile = RuntimeProfile.PRODUCTION,
+            readEnv =
+                envOf(
+                    "JWT_SECRET" to VALID_JWT_SECRET,
+                    "DATABASE_PASSWORD" to VALID_DB_PASSWORD,
+                    "WEBAUTHN_RP_ID" to "logdate.app",
+                    "WEBAUTHN_ORIGIN" to "https://cloud.logdate.app",
+                ),
+        )
     }
 
     private fun envOf(vararg pairs: Pair<String, String>): (String) -> String? {
         val map = pairs.toMap()
         return { name -> map[name] }
     }
+
+    /** Pre-populated with valid WebAuthn config so secret-focused tests don't get cross-checked. */
+    private fun secureEnvOf(vararg pairs: Pair<String, String>): (String) -> String? =
+        envOf(
+            "WEBAUTHN_RP_ID" to "logdate.app",
+            "WEBAUTHN_ORIGIN" to "https://cloud.logdate.app",
+            *pairs,
+        )
 
     companion object {
         private const val VALID_JWT_SECRET = "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789+/=abc"
