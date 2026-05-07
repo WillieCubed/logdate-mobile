@@ -546,6 +546,10 @@ generate_password_secret() {
     openssl rand -hex 24 | tr -d '\n'
 }
 
+generate_health_token() {
+    openssl rand -hex 32 | tr -d '\n'
+}
+
 secret_latest_value() {
     local secret_id="$1"
     gcloud secrets versions access latest --secret "$secret_id" --project="$PROJECT_ID" 2>/dev/null || true
@@ -614,6 +618,7 @@ bootstrap_runtime_secrets() {
     ensure_secret_value "logdate-jwt-secret" generate_base64_secret >/dev/null
     ensure_secret_value "logdate-server-encryption-key" generate_base64_secret >/dev/null
     ensure_literal_secret_value "logdate-server-encryption-key-id" "${SERVICE_NAME}-v1" >/dev/null
+    ensure_secret_value "logdate-health-internal-token" generate_health_token >/dev/null
     ensure_cloud_sql_user "$db_pw"
 }
 
@@ -669,7 +674,7 @@ ${github_repo_line}  "artifact_registry_repo": "${ARTIFACT_REGISTRY_REPO}",
   "cloud_sql_database_name": "${CLOUD_SQL_DATABASE_NAME}",
   "cloud_sql_user_name": "${CLOUD_SQL_USER_NAME}",
   "create_secrets": true,
-  "secret_ids": ["logdate-google-oidc-client-ids"],
+  "secret_ids": ["logdate-google-oidc-client-ids", "logdate-sentry-dsn"],
   "webauthn_rp_id": ${webauthn_rp_id_json},
   "webauthn_origin": ${webauthn_origin_json},
   "cloud_run_env": {
@@ -688,7 +693,8 @@ ${github_repo_line}  "artifact_registry_repo": "${ARTIFACT_REGISTRY_REPO}",
     "DATABASE_PASSWORD": { "secret_id": "logdate-db-password" },
     "JWT_SECRET": { "secret_id": "logdate-jwt-secret" },
     "SERVER_ENCRYPTION_KEY": { "secret_id": "logdate-server-encryption-key" },
-    "SERVER_ENCRYPTION_KEY_ID": { "secret_id": "logdate-server-encryption-key-id" }
+    "SERVER_ENCRYPTION_KEY_ID": { "secret_id": "logdate-server-encryption-key-id" },
+    "HEALTH_INTERNAL_TOKEN": { "secret_id": "logdate-health-internal-token" }
   }
 }
 EOF

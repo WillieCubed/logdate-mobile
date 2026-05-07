@@ -39,6 +39,12 @@ cloud_run_secret_env = {
   DATABASE_USER     = { secret_id = "logdate-db-user" }
   DATABASE_PASSWORD = { secret_id = "logdate-db-password" }
   JWT_SECRET        = { secret_id = "logdate-jwt-secret" }
+  # Mount these only AFTER the matching secret has at least one version.
+  # Cloud Run fails the revision if it tries to mount an empty container.
+  # Provisioning steps: docs/observability/sentry.md and
+  # docs/observability/health-endpoint.md.
+  #   SENTRY_DSN              = { secret_id = "logdate-sentry-dsn" }
+  #   HEALTH_INTERNAL_TOKEN   = { secret_id = "logdate-health-internal-token" }
   # Opt-in only — populate the secret container then add an entry here:
   #   GOOGLE_OIDC_CLIENT_IDS = { secret_id = "logdate-google-oidc-client-ids" }
   #   REDIS_URL              = { secret_id = "logdate-redis-url" }
@@ -47,6 +53,8 @@ cloud_run_secret_env = {
 secret_ids = [
   "logdate-google-oidc-client-ids",
   "logdate-redis-url",
+  "logdate-sentry-dsn",
+  "logdate-health-internal-token",
 ]
 
 create_secrets = true
