@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  ExportOptions.plist consumed by:
+    xcodebuild -exportArchive -exportOptionsPlist iosApp/Configuration/ExportOptions.plist
+
+  The publish-ios-app-store.yml workflow substitutes __PROVISIONING_PROFILE__
+  with the UUID of the installed App Store provisioning profile at runtime
+  (set by scripts/install-ios-signing.sh into LOGDATE_IOS_PROVISIONING_PROFILE_UUID).
+  Don't replace the placeholder by hand here — operators rotating profiles only
+  need to update the GitHub Secret IOS_PROVISIONING_PROFILE_BASE64.
+-->
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>app-store-connect</string>
+
+    <key>teamID</key>
+    <string>39AB9DY3K8</string>
+
+    <key>signingStyle</key>
+    <string>manual</string>
+
+    <key>signingCertificate</key>
+    <string>Apple Distribution</string>
+
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>studio.hypertext.LogDate</key>
+        <string>__PROVISIONING_PROFILE__</string>
+    </dict>
+
+    <!-- Stripping bitcode is now mandatory; Apple removed bitcode support
+         in Xcode 14. uploadBitcode=false documents the intent. -->
+    <key>uploadBitcode</key>
+    <false/>
+
+    <!-- Symbols are required for App Store Connect crash symbolication.
+         Without them, Crashlytics still works but App Store Connect's
+         built-in crash analytics is symbol-less. -->
+    <key>uploadSymbols</key>
+    <true/>
+
+    <!-- destination=export prevents xcodebuild from auto-uploading to
+         App Store Connect during -exportArchive. The publish workflow
+         does the upload explicitly via xcrun altool so we control
+         retries and the API-key-based auth path. -->
+    <key>destination</key>
+    <string>export</string>
+
+    <!-- Compile bitcode is irrelevant on App Store builds since the
+         App Store doesn't accept bitcode anymore, but Apple's tooling
+         still warns when this isn't pinned. -->
+    <key>compileBitcode</key>
+    <false/>
+
+    <!-- Strip Swift symbols from the .ipa. Reduces archive size and is
+         the App Store's expected default. dSYMs are kept separately. -->
+    <key>stripSwiftSymbols</key>
+    <true/>
+</dict>
+</plist>

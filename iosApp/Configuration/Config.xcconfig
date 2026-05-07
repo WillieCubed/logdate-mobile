@@ -1,3 +1,10 @@
+// Version.xcconfig is generated on every release run by
+// scripts/resolve-ios-app-version.sh; it sets MARKETING_VERSION and
+// CURRENT_PROJECT_VERSION deterministically from the SHA + ios-v* tag.
+// The `?` suffix makes the include optional so local Xcode opens
+// cleanly before the version script has been run.
+#include? "Version.xcconfig"
+
 TEAM_ID=
 BUNDLE_ID=studio.hypertext.LogDate
 APP_NAME=LogDate
