@@ -161,9 +161,8 @@ fun A05_SearchWithResults() {
             searchState = SearchScreenState.Results(query = "train", results = auditSearchResults),
             onQueryChange = {},
             onCommitSearch = {},
-            onNavigateToDay = {},
-            onNavigateToJournal = {},
-            onNavigateToPerson = {},
+            onResultClick = {},
+            onResultOpenDay = {},
             onGoBack = {},
             queryText = "train",
         )
