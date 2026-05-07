@@ -155,8 +155,12 @@ class DefaultPasskeyAccountRepository(
             _isAuthenticated.value = true
 
             // Attempt to create a restore key for seamless re-authentication after device restore.
-            // This is non-fatal — if E2EE backup is unavailable, we silently skip.
-            createRestoreKey()
+            // Logged at WARN on failure so operators see the broken-recovery path; non-fatal
+            // for account creation itself. UI surfaces should observe a future
+            // restoreKeyStatus signal and prompt the user to retry from settings.
+            createRestoreKey().onFailure { error ->
+                Napier.w("Account created but restore key registration failed — user has no recovery path", error)
+            }
 
             Napier.i("Account created successfully for user: ${completeData.account.username}")
             Result.success(completeData.account)
@@ -385,12 +389,15 @@ class DefaultPasskeyAccountRepository(
     }
 
     override suspend fun createRestoreKey(): Result<Unit> {
-        val session = sessionStorage.getSession() ?: return Result.failure(Exception("No active session"))
+        if (sessionStorage.getSession() == null) {
+            return Result.failure(Exception("No active session"))
+        }
         return try {
-            val optionsResult = apiClient.beginRestoreKeyRegistration(session.accessToken)
+            val optionsResult = withFreshAccessToken { accessToken -> apiClient.beginRestoreKeyRegistration(accessToken) }
             if (optionsResult.isFailure) {
-                Napier.w("Could not begin restore key registration — server may not support it", optionsResult.exceptionOrNull())
-                return Result.success(Unit)
+                val cause = optionsResult.exceptionOrNull()
+                Napier.w("Restore key registration failed: server rejected /auth/restore/register/begin", cause)
+                return Result.failure(cause ?: Exception("Restore key begin failed"))
             }
             val options = optionsResult.getOrThrow()
 
@@ -398,29 +405,68 @@ class DefaultPasskeyAccountRepository(
             if (credentialResult.isFailure) {
                 val error = credentialResult.exceptionOrNull()
                 if (error is RestoreCredentialError.BackupUnavailable) {
+                    // True silent-success: this device doesn't support cloud restore credentials at
+                    // all (e.g. iOS without iCloud Keychain, Android without backup configured).
+                    // The user is not at risk of losing their account because there was nothing
+                    // to register in the first place.
                     Napier.i("Restore key skipped — device does not support E2EE backup")
                     return Result.success(Unit)
                 }
-                Napier.w("Restore key creation failed (non-fatal)", error)
-                return Result.success(Unit)
+                // Anything else is a real failure: device supports restore credentials but the OS
+                // refused to mint one (user cancellation, biometric setup missing, transient
+                // platform error). Propagate so the caller can prompt the user to retry instead
+                // of leaving the account without a recovery path.
+                Napier.w("Restore key registration failed: device refused credential creation", error)
+                return Result.failure(error ?: Exception("Restore credential creation failed"))
             }
 
             val completeResult =
-                apiClient.completeRestoreKeyRegistration(
-                    accessToken = session.accessToken,
-                    credentialJson = credentialResult.getOrThrow(),
-                    challenge = options.challenge,
-                )
+                withFreshAccessToken { accessToken ->
+                    apiClient.completeRestoreKeyRegistration(
+                        accessToken = accessToken,
+                        credentialJson = credentialResult.getOrThrow(),
+                        challenge = options.challenge,
+                    )
+                }
             if (completeResult.isFailure) {
-                Napier.w("Could not register restore key with server (non-fatal)", completeResult.exceptionOrNull())
-            } else {
-                Napier.i("Restore key registered successfully")
+                val cause = completeResult.exceptionOrNull()
+                Napier.w("Restore key registration failed: server rejected /auth/restore/register/complete", cause)
+                return Result.failure(cause ?: Exception("Restore key complete failed"))
             }
+            Napier.i("Restore key registered successfully")
             Result.success(Unit)
         } catch (e: Exception) {
-            Napier.w("Restore key creation encountered an unexpected error (non-fatal)", e)
-            Result.success(Unit)
+            Napier.w("Restore key creation encountered an unexpected error", e)
+            Result.failure(e)
         }
+    }
+
+    /**
+     * Run [block] with a valid access token, transparently refreshing on first failure.
+     *
+     * Used everywhere we make an authenticated request. Without this, every authenticated call
+     * site would have to inline the same "fail → refreshAuthentication → retry once" structure,
+     * and missing it (e.g. updateAccountProfile, restore-key registration) silently surfaces a
+     * generic error to users when the access token has expired in the background.
+     *
+     * Refreshes opportunistically on any failure, not just 401, to match the existing inline
+     * pattern in [getAccountInfo] / [deletePasskey]. The cost is one extra refresh attempt when
+     * a non-auth failure happens; the benefit is symmetry with the existing pattern and no need
+     * to introspect server error shapes.
+     */
+    private suspend fun <T> withFreshAccessToken(block: suspend (accessToken: String) -> Result<T>): Result<T> {
+        val session =
+            sessionStorage.getSession()
+                ?: return Result.failure(IllegalStateException("No active session"))
+
+        val first = block(session.accessToken)
+        if (first.isSuccess) return first
+
+        val refreshResult = refreshAuthentication()
+        if (refreshResult.isFailure) return first
+
+        val updatedSession = sessionStorage.getSession() ?: return first
+        return block(updatedSession.accessToken)
     }
 
     override suspend fun signInWithRestoreKey(): Result<LogDateAccount> {
@@ -483,7 +529,9 @@ class DefaultPasskeyAccountRepository(
 
             // Re-register a restore credential for this device so future restores work.
             // The old credential was consumed server-side; this issues a fresh one.
-            createRestoreKey()
+            createRestoreKey().onFailure { error ->
+                Napier.w("Restore sign-in succeeded but re-registering restore key failed — next restore won't work", error)
+            }
 
             Napier.i("Restore sign-in successful for user: ${completeData.account.username}")
             Result.success(completeData.account)
