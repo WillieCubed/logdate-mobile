@@ -16,6 +16,7 @@ import platform.Foundation.NSString
 import platform.Foundation.NSURL
 import platform.Foundation.NSUserDomainMask
 import platform.Foundation.create
+import platform.Foundation.writeToFile
 import platform.UIKit.NSFontAttributeName
 import platform.UIKit.NSForegroundColorAttributeName
 import platform.UIKit.UIColor
@@ -24,7 +25,6 @@ import platform.UIKit.UIGraphicsBeginImageContextWithOptions
 import platform.UIKit.UIGraphicsEndImageContext
 import platform.UIKit.UIGraphicsGetImageFromCurrentImageContext
 import platform.UIKit.UIImage
-import platform.Foundation.writeToFile
 import platform.UIKit.UIImagePNGRepresentation
 import platform.UIKit.UIRectFill
 import platform.UIKit.drawAtPoint
