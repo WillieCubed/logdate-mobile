@@ -59,7 +59,7 @@ class WebAuthnPasskeyServiceBehaviorContractTest {
             )
 
         assertNotNull(result.passkey)
-        assertEquals("cred-getter", result.passkey?.credentialId)
+        assertEquals("cred-getter", result.passkey.credentialId)
     }
 
     @Test

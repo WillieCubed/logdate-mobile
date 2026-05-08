@@ -184,7 +184,13 @@ class GoogleIdTokenVerifierTest {
         override fun <T : Any?> send(
             request: HttpRequest,
             responseBodyHandler: HttpResponse.BodyHandler<T>,
-        ): HttpResponse<T> = handler(request) as HttpResponse<T>
+        ): HttpResponse<T> {
+            // The stub only ever supplies HttpResponse<String>; the cast is necessary
+            // because HttpClient.send is generic at the call-site but our handler is
+            // String-specialized. Verifier callers always request String bodies.
+            @Suppress("UNCHECKED_CAST")
+            return handler(request) as HttpResponse<T>
+        }
 
         override fun <T : Any?> sendAsync(
             request: HttpRequest,

@@ -81,6 +81,6 @@ class EncryptionKeyringTest {
         assertEquals("default", keyring.getActiveKey().keyId)
 
         assertEquals("noop", NoOpKeyring.getActiveKey().keyId)
-        assertEquals("noop", NoOpKeyring.getKey("any")?.keyId)
+        assertEquals("noop", NoOpKeyring.getKey("any").keyId)
     }
 }

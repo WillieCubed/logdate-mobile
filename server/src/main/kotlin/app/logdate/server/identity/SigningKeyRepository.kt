@@ -19,7 +19,7 @@ data class StoredSigningKey(
 
 @OptIn(ExperimentalUuidApi::class)
 interface SigningKeyRepository {
-    suspend fun save(key: StoredSigningKey): StoredSigningKey
+    suspend fun save(signingKey: StoredSigningKey): StoredSigningKey
 
     suspend fun findActiveByAccountId(accountId: Uuid): StoredSigningKey?
 
@@ -30,9 +30,9 @@ interface SigningKeyRepository {
 class InMemorySigningKeyRepository : SigningKeyRepository {
     private val keysById = linkedMapOf<Uuid, StoredSigningKey>()
 
-    override suspend fun save(key: StoredSigningKey): StoredSigningKey {
-        keysById[key.id] = key
-        return key
+    override suspend fun save(signingKey: StoredSigningKey): StoredSigningKey {
+        keysById[signingKey.id] = signingKey
+        return signingKey
     }
 
     override suspend fun findActiveByAccountId(accountId: Uuid): StoredSigningKey? =

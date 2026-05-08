@@ -2,6 +2,7 @@ package app.logdate.server.crypto
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class EncryptionPolicyTest {
@@ -62,8 +63,8 @@ class EncryptionPolicyTest {
         val plaintext = "plaintext data".toByteArray()
         val decision = policy.evaluate(plaintext)
 
-        assertTrue(decision is PolicyDecision.Reject)
-        assertTrue((decision as PolicyDecision.Reject).reason.contains("E2EE required"))
+        assertIs<PolicyDecision.Reject>(decision)
+        assertTrue(decision.reason.contains("E2EE required"))
     }
 
     @Test

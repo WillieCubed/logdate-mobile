@@ -9,7 +9,7 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import io.mockk.verify
-import java.net.URL
+import java.net.URI
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
@@ -128,7 +128,7 @@ class GcsMediaStorageTest {
                 any<TimeUnit>(),
                 any<Storage.SignUrlOption>(),
             )
-        } returns URL("https://example.test/signed")
+        } returns URI("https://example.test/signed").toURL()
         val sut = GcsMediaStorage(bucketName = "bucket-a", storage = storage)
 
         assertEquals("https://example.test/signed", sut.getSignedDownloadUrl("users/u/media/m/f.jpg", 2))
