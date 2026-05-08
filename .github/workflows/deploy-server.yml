@@ -248,14 +248,42 @@ jobs:
             --region "${REGION}" \
             --validate-passkey-fk
 
-      - name: Deploy to Cloud Run
+      - name: Deploy new revision (no traffic)
+        id: deploy-revision
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:${{ env.DEPLOY_SHA }} \
             --platform managed \
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
+            --no-traffic \
+            --tag candidate-${{ env.DEPLOY_SHA }} \
             $SERVICE_ACCOUNT_FLAG
+
+          REVISION_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --platform managed --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} \
+            --format='value(status.traffic[?tag=candidate-${{ env.DEPLOY_SHA }}].url)' || true)
+          # Cloud Run sometimes lags a couple of seconds publishing the
+          # tagged revision URL into status; fall back to the deterministic
+          # tag URL so the smoke step always has somewhere to hit.
+          if [[ -z "$REVISION_URL" ]]; then
+            REVISION_URL="https://candidate-${{ env.DEPLOY_SHA }}---$(echo ${{ env.SERVICE_NAME }} | tr A-Z a-z)-$(gcloud run services describe ${{ env.SERVICE_NAME }} --platform managed --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format='value(metadata.labels[cloud.googleapis.com/location])' || echo "")-${{ env.PROJECT_ID }}.a.run.app"
+          fi
+          echo "REVISION_URL=$REVISION_URL" >> "$GITHUB_ENV"
+
+      - name: Smoke test new revision
+        # On smoke failure the script exits non-zero and we never run the
+        # promote step, so the previous revision keeps serving 100%.
+        run: |
+          ./scripts/smoke-test-revision.sh "$REVISION_URL"
+
+      - name: Promote new revision to 100% traffic
+        run: |
+          gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
+            --platform managed \
+            --region ${{ env.REGION }} \
+            --project ${{ env.PROJECT_ID }} \
+            --to-tags candidate-${{ env.DEPLOY_SHA }}=100
 
       - name: Verify deployment
         run: |
