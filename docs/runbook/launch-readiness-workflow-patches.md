@@ -6,58 +6,6 @@ remove its section in the same commit.
 
 ---
 
-## P0-7 — Wire `:integration:server-client-e2e:test` into CI
-
-**File:** `.github/workflows/ci.yml`
-
-Add a new job (run in parallel with `unit-tests`):
-
-```yaml
-  e2e-tests:
-    name: Server / client e2e
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: logdate
-          POSTGRES_PASSWORD: logdate
-          POSTGRES_DB: logdate
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: gradle/actions/setup-gradle@v3
-      - name: Run e2e tests
-        env:
-          DATABASE_URL: jdbc:postgresql://localhost:5432/logdate
-          DATABASE_USER: logdate
-          DATABASE_PASSWORD: logdate
-        run: ./gradlew :integration:server-client-e2e:test --no-daemon
-      - name: Upload test reports
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-test-reports
-          path: integration/server-client-e2e/build/reports/tests
-```
-
-The harness (`ServerClientE2ETestHarness`) brings up an in-process Ktor
-server with a freshly migrated schema and exercises the real
-`PasskeyApiClient` and `LogDateCloudApiClient` against it, so this job
-catches signup/sync regressions that unit tests miss.
-
----
-
 ## P2-1 — Traffic-split rollback on the server deploy
 
 **File:** `.github/workflows/deploy-server.yml`
