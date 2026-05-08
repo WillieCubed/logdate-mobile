@@ -1,12 +1,8 @@
 # Launch readiness — GitHub Actions workflow patches
 
-The repo's `.githooks/block-rogue-configs.sh` blocks direct agent edits to
-`.github/workflows/*`. The patches below are proposed alongside the rest of
-the launch-readiness work and need to be applied by hand (or via a
-sanctioned git commit). Each patch is keyed back to a P0/P1/P2 item from
-`/Users/williecubed/.claude/plans/i-need-you-to-lively-frog.md`.
-
-Apply order doesn't matter; each patch is independent.
+Outstanding patches to the deploy/CI workflows, kept as a worklist. Each
+section is independent; apply order doesn't matter. When a patch lands,
+remove its section in the same commit.
 
 ---
 
