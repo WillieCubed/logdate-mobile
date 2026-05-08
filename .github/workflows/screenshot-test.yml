@@ -15,7 +15,7 @@ jobs:
   android-wear-screenshots:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           lfs: true
 
@@ -24,22 +24,22 @@ jobs:
           android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64 }}
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Validate Android and Wear screenshots
-        run: ./gradlew validateAndroidScreenshots
+        run: ./gradlew validateAndroidScreenshots --continue
 
       - name: Upload Android and Wear screenshot reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-wear-screenshot-report
           path: |
@@ -50,27 +50,27 @@ jobs:
   desktop-screenshots:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           lfs: true
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Validate Desktop screenshots
-        run: ./gradlew validateDesktopScreenshots
+        run: ./gradlew validateDesktopScreenshots --continue
 
       - name: Upload Desktop screenshot reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: desktop-screenshot-report
           path: app/compose-main/build/reports/desktopScreenshotTest/
@@ -79,7 +79,7 @@ jobs:
   ios-screenshot-validation:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           lfs: true
 
@@ -89,22 +89,22 @@ jobs:
           ios-google-service-info-plist-base64: ${{ secrets.LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Validate iOS screenshot lane
-        run: ./gradlew validateIosScreenshots
+        run: ./gradlew validateIosScreenshots --continue
 
       - name: Upload iOS screenshot reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-screenshot-report
           path: app/compose-main/build/reports/tests/
