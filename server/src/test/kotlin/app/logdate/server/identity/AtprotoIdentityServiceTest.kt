@@ -49,8 +49,9 @@ class AtprotoIdentityServiceTest {
             assertEquals("alice.logdate.app", ensured.handle)
             assertTrue(ensured.did?.startsWith("did:plc:") == true)
             assertTrue(ensured.signingKeyPublic?.startsWith("z") == true)
-            assertEquals(ensured.did, accountRepository.findByDid(ensured.did!!)?.did)
-            assertEquals(ensured.handle, accountRepository.findByHandle(ensured.handle!!)?.handle)
+            val ensuredHandle = assertNotNull(ensured.handle)
+            assertEquals(ensured.did, accountRepository.findByDid(ensured.did)?.did)
+            assertEquals(ensuredHandle, accountRepository.findByHandle(ensuredHandle)?.handle)
         }
 
     @Test
