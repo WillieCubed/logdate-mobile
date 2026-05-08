@@ -39,6 +39,18 @@ The workflow materializes the keychain, provisioning profile, and Firebase
 plist at runtime. The keychain is per-job and lives in `$RUNNER_TEMP`, which
 GitHub deletes when the job ends.
 
+## Safety Switch
+
+Both publish paths are guarded by repository variables, mirroring the Android
+side:
+
+- `LOGDATE_IOS_INTERNAL_PUBLISH_ENABLED`
+- `LOGDATE_IOS_PRODUCTION_PUBLISH_ENABLED`
+
+If a variable is not set to `true`, that publish path is skipped. This keeps
+`main` shippable before the App Store Connect and signing secrets exist and
+lets the TestFlight and App Store paths roll out independently.
+
 ## Required GitHub Environment
 
 The production-track job declares `environment: ios-production`. Create that
@@ -71,6 +83,13 @@ gh secret set IOS_DISTRIBUTION_CERT_PASSWORD              # prompts for value
 gh secret set APP_STORE_CONNECT_API_KEY_ID                # prompts for value
 gh secret set APP_STORE_CONNECT_API_ISSUER_ID             # prompts for value
 gh secret set APP_STORE_CONNECT_API_KEY_P8 < AuthKey_*.p8
+```
+
+Once the secrets are uploaded, flip on the publish gates:
+
+```bash
+gh variable set LOGDATE_IOS_INTERNAL_PUBLISH_ENABLED --body true
+gh variable set LOGDATE_IOS_PRODUCTION_PUBLISH_ENABLED --body true
 ```
 
 ## Versioning Model
