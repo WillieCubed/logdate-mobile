@@ -29,7 +29,8 @@ print_usage() {
 setup-play-publishing-secrets.sh
 
 Interactive helper for Google Play publishing setup. It can:
-  - help locate the Play service-account JSON, Android release keystore, and google-services.json
+  - help locate the Play service-account JSON and Android release keystore
+  - delegate Firebase config (google-services.json) to scripts/sync-firebase-configs.sh
   - collect the required keystore passwords and alias
   - upload the resulting values to GitHub Actions secrets via `gh secret set`
   - optionally enable internal and production publish paths independently
@@ -204,17 +205,6 @@ main() {
     )"
     validate_json_file "$play_json" '"type"[[:space:]]*:[[:space:]]*"service_account"'
 
-    local google_services_json
-    google_services_json="$(
-        pick_file \
-            "google-services.json" \
-            "\\( -name 'google-services.json' \\)" \
-            "$REPO_ROOT/app/android-main" \
-            "$HOME/Downloads" \
-            "$HOME/Documents"
-    )"
-    validate_json_file "$google_services_json" '"project_info"'
-
     local keystore_path
     keystore_path="$(
         pick_file \
@@ -239,11 +229,13 @@ main() {
 
     log_phase "Upload GitHub Actions secrets"
     upload_secret_from_file "ANDROID_PUBLISHER_CREDENTIALS" "$play_json"
-    upload_secret_from_file "LOGDATE_ANDROID_GOOGLE_SERVICES_JSON" "$google_services_json"
     upload_secret_from_body "LOGDATE_RELEASE_STORE_BASE64" "$(base64 < "$keystore_path" | tr -d '\n')"
     upload_secret_from_body "LOGDATE_RELEASE_STORE_PASSWORD" "$store_password"
     upload_secret_from_body "LOGDATE_RELEASE_KEY_ALIAS" "$key_alias"
     upload_secret_from_body "LOGDATE_RELEASE_KEY_PASSWORD" "$key_password"
+
+    log_info "Firebase google-services.json upload is handled by scripts/sync-firebase-configs.sh"
+    log_info "Run: ./scripts/sync-firebase-configs.sh android-all"
 
     local enable_internal="$ENABLE_INTERNAL"
     if [[ -z "$enable_internal" ]]; then
