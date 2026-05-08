@@ -593,7 +593,7 @@ class LogDateCloudApiClient(
         try {
             val baseUrl = getBaseUrl()
             val response =
-                httpClient.put("$baseUrl/associations") {
+                httpClient.post("$baseUrl/associations") {
                     headers.append("Authorization", "Bearer $accessToken")
                     contentType(ContentType.Application.Json)
                     setBody(associations)
