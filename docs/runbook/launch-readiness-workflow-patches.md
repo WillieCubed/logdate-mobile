@@ -193,37 +193,6 @@ errors still get captured but you can't tell which build introduced them.
 
 ---
 
-## Tag-namespace hygiene — scope `deploy-server.yml`
-
-**File:** `.github/workflows/deploy-server.yml`
-
-Today the deploy workflow triggers on **any** tag push:
-
-```yaml
-on:
-  push:
-    tags:
-      - '*'
-```
-
-That means pushing `ios-v1.0.0`, `android-v1.0.0`, or `atproto-v1.0.0`
-also fires a Cloud Run production deploy — almost certainly not the
-intent. Tighten the trigger:
-
-```yaml
-on:
-  push:
-    tags:
-      - 'server-v*'    # scope future tags to a server-prefixed pattern
-      - 'v*'           # keep the existing semver convention
-```
-
-If you want to be even stricter, drop the `'v*'` line and make
-operators always use `server-v<X.Y.Z>` going forward. Backwards
-compatibility decision is yours.
-
----
-
 ## How to apply
 
 These patches are decoupled from the rest of the launch-readiness work

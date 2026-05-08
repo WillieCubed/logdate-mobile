@@ -7,7 +7,7 @@ on:
     branches: [main]
   push:
     tags:
-      - '*'
+      - 'server-v*'
   workflow_dispatch:
     inputs:
       environment:
