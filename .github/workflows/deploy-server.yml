@@ -258,6 +258,7 @@ jobs:
             --project ${{ env.PROJECT_ID }} \
             --no-traffic \
             --tag candidate-${{ env.DEPLOY_SHA }} \
+            --set-env-vars "RELEASE_VERSION=logdate-server@${{ env.DEPLOY_SHA }}" \
             $SERVICE_ACCOUNT_FLAG
 
           REVISION_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
