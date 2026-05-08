@@ -6,18 +6,53 @@ secret value; only the placeholders + how-to instructions live here.
 
 The workflows that consume these secrets:
 
-- `.github/workflows/publish-android-play.yml` (existing)
+- `.github/workflows/ci.yml` (Android Firebase config — required to compile)
+- `.github/workflows/screenshot-test.yml` (Android + iOS Firebase)
+- `.github/workflows/publish-android-play.yml`
 - `.github/workflows/publish-ios-app-store.yml` (new — see
   `docs/runbook/launch-readiness-workflow-patches.md`)
 
 ---
 
-## GitHub Secrets — Android (existing)
+## Firebase config secrets (Android + iOS)
+
+The composite action `.github/actions/setup-firebase-configs` materializes
+these onto the runner before the build. The operator-side CLI
+`scripts/sync-firebase-configs.sh` handles upload — drop the file on disk,
+run one command.
+
+| Secret | Source file | Rotation |
+|---|---|---|
+| `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64` | `app/android-main/google-services.json` (debug Firebase project) | When Firebase debug project config changes. |
+| `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_RELEASE_BASE64` | `app/android-main/src/release/google-services.json` (release Firebase project) | When Firebase release project config changes. |
+| `LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64` | `iosApp/iosApp/GoogleService-Info.plist` (single iOS Firebase project) | When Firebase iOS project config changes. |
+
+**Upload from local disk** (one-shot, idempotent — re-running rotates):
+
+```bash
+./scripts/sync-firebase-configs.sh android-debug    # debug only
+./scripts/sync-firebase-configs.sh android-release  # release only
+./scripts/sync-firebase-configs.sh ios              # iOS only
+./scripts/sync-firebase-configs.sh all              # everything
+```
+
+Each upload is validated before transmission (`jq` for JSON, `plutil`
+for plist) so garbage never reaches GitHub. Requires `gh` authenticated
+against the repo.
+
+> **Note on the previous secret name:** an earlier iteration referenced
+> `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON` (raw, unencoded). It's been
+> replaced by the two `_BASE64`-suffixed entries above. If your local
+> notes still reference the old name, update them — the workflows no
+> longer read it.
+
+---
+
+## GitHub Secrets — Android publish (existing)
 
 | Secret | What it is | Rotation |
 |---|---|---|
 | `ANDROID_PUBLISHER_CREDENTIALS` | JSON service-account key with `Android Publisher` role on the Play Console project. | When the service-account key is regenerated in Google Cloud Console. |
-| `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON` | Raw `app/android-main/google-services.json` content (Firebase). | When Firebase project config changes. |
 | `LOGDATE_RELEASE_STORE_BASE64` | Base64 of the Android release keystore (`logdate-release.jks`). | Never (a new keystore = a new app on Play). |
 | `LOGDATE_RELEASE_STORE_PASSWORD` | Password for the keystore. | When rotated alongside the keystore. |
 | `LOGDATE_RELEASE_KEY_ALIAS` | Key alias inside the keystore. | When rotated alongside the keystore. |

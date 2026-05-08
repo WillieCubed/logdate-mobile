@@ -21,7 +21,6 @@ jobs:
     env:
       PLAY_TRACK: internal
       ANDROID_PUBLISHER_CREDENTIALS: ${{ secrets.ANDROID_PUBLISHER_CREDENTIALS }}
-      LOGDATE_ANDROID_GOOGLE_SERVICES_JSON: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON }}
       LOGDATE_RELEASE_STORE_BASE64: ${{ secrets.LOGDATE_RELEASE_STORE_BASE64 }}
       LOGDATE_RELEASE_STORE_PASSWORD: ${{ secrets.LOGDATE_RELEASE_STORE_PASSWORD }}
       LOGDATE_RELEASE_KEY_ALIAS: ${{ secrets.LOGDATE_RELEASE_KEY_ALIAS }}
@@ -31,6 +30,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - uses: ./.github/actions/setup-firebase-configs
+        with:
+          android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_RELEASE_BASE64 }}
+          android-flavor: release
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -78,9 +82,7 @@ jobs:
           if [[ -n "${{ steps.prepare.outputs.keystore_path }}" ]]; then
             rm -f "${{ steps.prepare.outputs.keystore_path }}"
           fi
-          if [[ -n "${{ steps.prepare.outputs.google_services_path }}" ]]; then
-            rm -f "${{ steps.prepare.outputs.google_services_path }}"
-          fi
+          rm -f app/android-main/src/release/google-services.json
 
   publish-production:
     if: ${{ vars.LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/android-v') }}

@@ -35,7 +35,6 @@ write_env() {
 
 prepare_internal() {
     require_env "ANDROID_PUBLISHER_CREDENTIALS"
-    require_env "LOGDATE_ANDROID_GOOGLE_SERVICES_JSON"
     require_env "LOGDATE_RELEASE_STORE_BASE64"
     require_env "LOGDATE_RELEASE_STORE_PASSWORD"
     require_env "LOGDATE_RELEASE_KEY_ALIAS"
@@ -45,18 +44,15 @@ prepare_internal() {
     release_dir="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/logdate-play"
     mkdir -p "$release_dir"
 
-    local keystore_path google_services_path
+    local keystore_path
     keystore_path="${release_dir}/logdate-release.jks"
-    google_services_path="app/android-main/google-services.json"
 
     printf '%s' "$LOGDATE_RELEASE_STORE_BASE64" | base64 --decode > "$keystore_path"
-    printf '%s' "$LOGDATE_ANDROID_GOOGLE_SERVICES_JSON" > "$google_services_path"
-    chmod 600 "$keystore_path" "$google_services_path"
+    chmod 600 "$keystore_path"
 
     write_env "LOGDATE_RELEASE_STORE_FILE" "$keystore_path"
     write_output "release_dir" "$release_dir"
     write_output "keystore_path" "$keystore_path"
-    write_output "google_services_path" "$google_services_path"
 }
 
 prepare_production() {

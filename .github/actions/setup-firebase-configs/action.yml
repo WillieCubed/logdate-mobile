@@ -1,0 +1,78 @@
+name: Set up Firebase configs
+description: |
+  Materialize google-services.json (Android) and GoogleService-Info.plist (iOS)
+  from base64-encoded GitHub Actions secrets, in the locations the build
+  expects. Intended to run after actions/checkout in any workflow that
+  compiles Android or iOS targets. Android takes one of `debug` or `release`
+  per workflow run — build flavor and Firebase project are tied 1:1.
+
+inputs:
+  android-google-services-json-base64:
+    description: |
+      Base64 of the active build flavor's google-services.json. Pass
+      secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64 for CI,
+      screenshot tests, lint, and any non-publish workflow. Pass
+      secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_RELEASE_BASE64 only
+      from the Play publish workflow.
+    required: false
+  android-flavor:
+    description: |
+      Build flavor for the Android secret — `debug` or `release`. Determines
+      where the materialized file lands: debug → app/android-main/google-services.json,
+      release → app/android-main/src/release/google-services.json.
+    required: false
+    default: debug
+  ios-google-service-info-plist-base64:
+    description: |
+      Base64 of iosApp/iosApp/GoogleService-Info.plist. Optional —
+      iOS build degrades gracefully without it (iOSApp.swift nil-guards
+      FirebaseApp.configure).
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Validate android-flavor
+      if: ${{ inputs.android-google-services-json-base64 != '' }}
+      shell: bash
+      env:
+        FLAVOR: ${{ inputs.android-flavor }}
+      run: |
+        case "$FLAVOR" in
+          debug|release) ;;
+          *) echo "::error::android-flavor must be 'debug' or 'release', got '$FLAVOR'"; exit 1 ;;
+        esac
+
+    - name: Materialize Android google-services.json
+      if: ${{ inputs.android-google-services-json-base64 != '' }}
+      shell: bash
+      env:
+        GOOGLE_SERVICES_JSON_B64: ${{ inputs.android-google-services-json-base64 }}
+        FLAVOR: ${{ inputs.android-flavor }}
+      run: |
+        set -euo pipefail
+        if [[ "$FLAVOR" == "release" ]]; then
+          target="app/android-main/src/release/google-services.json"
+          mkdir -p "$(dirname "$target")"
+        else
+          target="app/android-main/google-services.json"
+        fi
+        printf '%s' "$GOOGLE_SERVICES_JSON_B64" | base64 --decode > "$target"
+        if ! jq -e '.project_info.project_id' "$target" >/dev/null; then
+          echo "::error::$target is not valid Firebase JSON. Re-upload the matching"
+          echo "::error::secret with: ./scripts/sync-firebase-configs.sh android-$FLAVOR"
+          exit 1
+        fi
+        echo "Materialized $target ($FLAVOR flavor)"
+
+    - name: Materialize iOS GoogleService-Info.plist
+      if: ${{ inputs.ios-google-service-info-plist-base64 != '' && runner.os == 'macOS' }}
+      shell: bash
+      env:
+        PLIST_B64: ${{ inputs.ios-google-service-info-plist-base64 }}
+      run: |
+        set -euo pipefail
+        target="iosApp/iosApp/GoogleService-Info.plist"
+        printf '%s' "$PLIST_B64" | base64 --decode > "$target"
+        plutil -lint "$target"
+        echo "Materialized $target"
