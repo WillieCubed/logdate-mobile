@@ -236,6 +236,18 @@ jobs:
             type=registry,ref=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:buildcache,mode=max
             type=gha,mode=max
 
+      - name: Run database migrations
+        # Production runs with AUTO_MIGRATE=false so the server boot path
+        # never applies migrations on its own. Run Flyway here, against
+        # Cloud SQL via the auth proxy, before rolling out the new revision —
+        # so the new code never sees an old schema and a failed migration
+        # aborts the deploy before any traffic touches the new image.
+        run: |
+          ./scripts/run-migrations.sh \
+            --project-id "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --validate-passkey-fk
+
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \

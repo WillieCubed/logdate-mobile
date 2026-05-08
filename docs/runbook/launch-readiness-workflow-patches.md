@@ -6,43 +6,6 @@ remove its section in the same commit.
 
 ---
 
-## P0-3 — Run Flyway migrations before Cloud Run rollout
-
-`scripts/run-migrations.sh` exists and is the single entry point. It runs
-the Flyway Docker image against Cloud SQL via the auth proxy, reads the
-DB user/password from Secret Manager, and (with `--validate-passkey-fk`)
-finalizes the V18→V19 orphan-passkey constraint idempotently.
-
-**File:** `.github/workflows/deploy-server.yml`
-
-Insert this step between **Build and push Docker image** and **Deploy to Cloud Run**:
-
-```yaml
-      - name: Run database migrations
-        # Production runs with AUTO_MIGRATE=false so the server boot path
-        # never applies migrations on its own. We run Flyway here, against
-        # Cloud SQL via the auth proxy, *before* rolling out the new
-        # revision — that guarantees the new code never sees an old schema
-        # and that a failed migration aborts the deploy before any traffic
-        # touches the new image.
-        run: |
-          ./scripts/run-migrations.sh \
-            --project-id "${PROJECT_ID}" \
-            --region "${REGION}" \
-            --validate-passkey-fk
-```
-
-Notes:
-- The script auto-downloads `cloud-sql-proxy` v2.13.2 if not on PATH.
-- It uses `docker run flyway/flyway:12.4.0` with `--network host`, so the
-  GitHub-hosted runner already has everything needed.
-- `--validate-passkey-fk` is a no-op once the constraint has been validated
-  once; safe to leave on every deploy.
-- A migration failure aborts the workflow before the Cloud Run rollout —
-  no traffic touches a new image with an old schema.
-
----
-
 ## P0-7 — Wire `:integration:server-client-e2e:test` into CI
 
 **File:** `.github/workflows/ci.yml`
