@@ -86,6 +86,7 @@ jobs:
 
   publish-production:
     if: ${{ vars.LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/android-v') }}
+    environment: android-production
     runs-on: ubuntu-latest
     permissions:
       contents: write

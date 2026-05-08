@@ -193,29 +193,6 @@ errors still get captured but you can't tell which build introduced them.
 
 ---
 
-## P2-7 — Require manual approval before Android production promotion
-
-**File:** `.github/workflows/publish-android-play.yml`
-
-The `production` job (the one gated on `android-v*` tag push) needs an
-`environment:` declaration so a repo reviewer must approve before it runs:
-
-```yaml
-  publish-production:
-    name: Promote to production track
-    needs: publish-internal
-    if: startsWith(github.ref, 'refs/tags/android-v')
-    environment: android-production   # ← add this line
-    runs-on: ubuntu-latest
-    # ... existing steps unchanged ...
-```
-
-Then in **Settings → Environments → android-production**, add required
-reviewers (the Android leads). Without this, `git push origin android-v1.0.0`
-auto-promotes the latest internal-track build with no human gate.
-
----
-
 ## Tag-namespace hygiene — scope `deploy-server.yml`
 
 **File:** `.github/workflows/deploy-server.yml`
