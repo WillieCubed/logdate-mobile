@@ -23,25 +23,7 @@ import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.TokenService
 import app.logdate.server.config.RuntimeProfile
-import app.logdate.server.database.AccountIdentitiesTable
-import app.logdate.server.database.AccountLinkEventsTable
-import app.logdate.server.database.AccountsTable
-import app.logdate.server.database.AtprotoPasswordCredentialsTable
-import app.logdate.server.database.AtprotoRepoBlockLinksTable
-import app.logdate.server.database.AtprotoRepoBlocksTable
-import app.logdate.server.database.AtprotoRepoCommitsTable
-import app.logdate.server.database.AtprotoRepoHeadsTable
-import app.logdate.server.database.AtprotoSessionsTable
 import app.logdate.server.database.DatabaseConfig
-import app.logdate.server.database.HostedPlcOperationsTable
-import app.logdate.server.database.LogDateAtprotoBlobsTable
-import app.logdate.server.database.LogDateBackupsTable
-import app.logdate.server.database.LogDateCollectionRecordsTable
-import app.logdate.server.database.LogDateCollectionStatesTable
-import app.logdate.server.database.LogDateMediaRecordsTable
-import app.logdate.server.database.OAuthAuthorizationCodesTable
-import app.logdate.server.database.OAuthAuthorizationRequestsTable
-import app.logdate.server.database.OAuthRefreshTokensTable
 import app.logdate.server.database.PostgreSQLAccountIdentityRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
 import app.logdate.server.database.PostgreSQLAtprotoPasswordCredentialRepository
@@ -57,8 +39,6 @@ import app.logdate.server.database.PostgreSQLRepoBlockStore
 import app.logdate.server.database.PostgreSQLRestoreCredentialRepository
 import app.logdate.server.database.PostgreSQLSessionManager
 import app.logdate.server.database.PostgreSQLSigningKeyRepository
-import app.logdate.server.database.RestoreCredentialsTable
-import app.logdate.server.database.SigningKeysTable
 import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.HostedPlcOperationRepository
@@ -97,21 +77,14 @@ import app.logdate.server.passkeys.RestoreCredentialRepository
 import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnConfig
 import app.logdate.server.passkeys.WebAuthnPasskeyService
-import app.logdate.server.sync.AssociationSyncTable
-import app.logdate.server.sync.BackupSyncTable
-import app.logdate.server.sync.ContentSyncTable
 import app.logdate.server.sync.DbSyncRepository
 import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.InMemorySyncRepository
-import app.logdate.server.sync.JournalSyncTable
-import app.logdate.server.sync.MediaSyncTable
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncRepository
 import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
-import org.jetbrains.exposed.v1.jdbc.SchemaUtils
-import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.koin.dsl.bind
 import org.koin.dsl.module
 import studio.hypertext.atproto.pds.DescribeServerResponse
@@ -151,35 +124,6 @@ fun initializeDatabase(): Boolean =
         val dataSource = DatabaseConfig.createDataSource()
         val runFlyway = DatabaseConfig.shouldRunMigrations()
         DatabaseConfig.initializeDatabase(dataSource, autoMigrate = runFlyway)
-        transaction {
-            SchemaUtils.createMissingTablesAndColumns(
-                AccountsTable,
-                AtprotoPasswordCredentialsTable,
-                AtprotoSessionsTable,
-                ContentSyncTable,
-                JournalSyncTable,
-                AssociationSyncTable,
-                MediaSyncTable,
-                BackupSyncTable,
-                AccountIdentitiesTable,
-                AccountLinkEventsTable,
-                SigningKeysTable,
-                HostedPlcOperationsTable,
-                AtprotoRepoHeadsTable,
-                AtprotoRepoBlocksTable,
-                AtprotoRepoBlockLinksTable,
-                AtprotoRepoCommitsTable,
-                LogDateCollectionStatesTable,
-                LogDateCollectionRecordsTable,
-                LogDateMediaRecordsTable,
-                LogDateBackupsTable,
-                LogDateAtprotoBlobsTable,
-                OAuthAuthorizationRequestsTable,
-                OAuthAuthorizationCodesTable,
-                OAuthRefreshTokensTable,
-                RestoreCredentialsTable,
-            )
-        }
         Napier.i("Database repositories initialized successfully")
         true
     } catch (e: Exception) {

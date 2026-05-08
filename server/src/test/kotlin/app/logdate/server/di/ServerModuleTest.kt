@@ -41,8 +41,6 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkAll
 import org.jetbrains.exposed.v1.jdbc.Database
-import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
-import org.jetbrains.exposed.v1.jdbc.SchemaUtils
 import org.koin.core.context.stopKoin
 import org.koin.core.logger.EmptyLogger
 import org.koin.dsl.koinApplication
@@ -116,38 +114,15 @@ class ServerModuleTest {
     }
 
     @Test
-    fun `initializeDatabase schema lambda is invocable`() {
-        mockkObject(SchemaUtils)
-        every {
-            SchemaUtils.createMissingTablesAndColumns(
-                *anyVararg(),
-            )
-        } returns Unit
-
-        val method =
-            Class
-                .forName("app.logdate.server.di.ServerModuleKt")
-                .getDeclaredMethod("initializeDatabase\$lambda\$0", JdbcTransaction::class.java)
-        method.isAccessible = true
-        method.invoke(null, mockk<JdbcTransaction>(relaxed = true))
-    }
-
-    @Test
     fun `initializeDatabase returns true when datasource and schema creation succeed`() {
         val dataSource = mockk<DataSource>()
         val database = mockk<Database>()
 
         mockkObject(DatabaseConfig)
-        mockkObject(SchemaUtils)
 
         every { DatabaseConfig.createDataSource() } returns dataSource
         every { DatabaseConfig.shouldRunMigrations() } returns true
         every { DatabaseConfig.initializeDatabase(dataSource, true, any(), any()) } returns database
-        every {
-            SchemaUtils.createMissingTablesAndColumns(
-                *anyVararg(),
-            )
-        } returns Unit
 
         Database.connect(
             url = "jdbc:h2:mem:servermodule_test;DB_CLOSE_DELAY=-1",
