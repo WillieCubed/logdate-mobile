@@ -172,13 +172,15 @@ jobs:
             echo "Using repository deployment variables because $TFVARS_FILE is not present."
           fi
 
-          echo "TFVARS_FILE=$TFVARS_FILE" >> "$GITHUB_ENV"
-          echo "PROJECT_ID=$PROJECT_ID" >> "$GITHUB_ENV"
-          echo "REGION=$REGION" >> "$GITHUB_ENV"
-          echo "SERVICE_NAME=$SERVICE_NAME" >> "$GITHUB_ENV"
-          echo "DOMAIN=$DOMAIN" >> "$GITHUB_ENV"
-          echo "ARTIFACT_REGISTRY_REPO=$ARTIFACT_REGISTRY_REPO" >> "$GITHUB_ENV"
-          echo "RUNTIME_SERVICE_ACCOUNT=$RUNTIME_SERVICE_ACCOUNT_EMAIL" >> "$GITHUB_ENV"
+          {
+            echo "TFVARS_FILE=$TFVARS_FILE"
+            echo "PROJECT_ID=$PROJECT_ID"
+            echo "REGION=$REGION"
+            echo "SERVICE_NAME=$SERVICE_NAME"
+            echo "DOMAIN=$DOMAIN"
+            echo "ARTIFACT_REGISTRY_REPO=$ARTIFACT_REGISTRY_REPO"
+            echo "RUNTIME_SERVICE_ACCOUNT=$RUNTIME_SERVICE_ACCOUNT_EMAIL"
+          } >> "$GITHUB_ENV"
 
       - name: Validate deployment configuration
         run: |
@@ -248,27 +250,36 @@ jobs:
             --region "${REGION}" \
             --validate-passkey-fk
 
+      - name: Configure candidate tag
+        run: |
+          echo "CANDIDATE_TAG=c-${DEPLOY_SHA:0:12}" >> "$GITHUB_ENV"
+
       - name: Deploy new revision (no traffic)
         id: deploy-revision
         run: |
+          service_account_args=()
+          if [[ -n "${RUNTIME_SERVICE_ACCOUNT}" ]]; then
+            service_account_args=(--service-account "${RUNTIME_SERVICE_ACCOUNT}")
+          fi
+
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:${{ env.DEPLOY_SHA }} \
             --platform managed \
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
             --no-traffic \
-            --tag candidate-${{ env.DEPLOY_SHA }} \
+            --tag "$CANDIDATE_TAG" \
             --set-env-vars "RELEASE_VERSION=logdate-server@${{ env.DEPLOY_SHA }}" \
-            $SERVICE_ACCOUNT_FLAG
+            "${service_account_args[@]}"
 
           REVISION_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
             --platform managed --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} \
-            --format='value(status.traffic[?tag=candidate-${{ env.DEPLOY_SHA }}].url)' || true)
+            --format="value(status.traffic[?tag=${CANDIDATE_TAG}].url)" || true)
           # Cloud Run sometimes lags a couple of seconds publishing the
           # tagged revision URL into status; fall back to the deterministic
           # tag URL so the smoke step always has somewhere to hit.
           if [[ -z "$REVISION_URL" ]]; then
-            REVISION_URL="https://candidate-${{ env.DEPLOY_SHA }}---$(echo ${{ env.SERVICE_NAME }} | tr A-Z a-z)-$(gcloud run services describe ${{ env.SERVICE_NAME }} --platform managed --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format='value(metadata.labels[cloud.googleapis.com/location])' || echo "")-${{ env.PROJECT_ID }}.a.run.app"
+            REVISION_URL="https://${CANDIDATE_TAG}---$(echo ${{ env.SERVICE_NAME }} | tr '[:upper:]' '[:lower:]')-$(gcloud run services describe ${{ env.SERVICE_NAME }} --platform managed --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format='value(metadata.labels[cloud.googleapis.com/location])' || echo "")-${{ env.PROJECT_ID }}.a.run.app"
           fi
           echo "REVISION_URL=$REVISION_URL" >> "$GITHUB_ENV"
 
@@ -284,7 +295,7 @@ jobs:
             --platform managed \
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
-            --to-tags candidate-${{ env.DEPLOY_SHA }}=100
+            --to-tags "$CANDIDATE_TAG=100"
 
       - name: Verify deployment
         run: |
