@@ -67,35 +67,49 @@
             Remove location tracking components merged from client:location.
             These services/receivers are not used on Wear OS and add unnecessary
             manifest entries, boot receivers, and foreground service registrations.
+
+            TODO(wear-location-cleanup): Implement Wear-safe location component
+            classes, or split client:location so its phone-only manifest entries
+            are not inherited by Wear. These removals keep lint honest for this
+            cleanup batch without pretending Wear has real location tracking.
         -->
         <service
             android:name="app.logdate.client.location.tracking.DetailedLocationTrackingService"
+            tools:ignore="MissingClass"
             tools:node="remove" />
         <receiver
             android:name="app.logdate.client.location.tracking.OptimizedBackgroundLocationReceiver"
+            tools:ignore="MissingClass"
             tools:node="remove" />
         <receiver
             android:name="app.logdate.client.location.tracking.LocationTrackingBootReceiver"
+            tools:ignore="MissingClass"
             tools:node="remove" />
         <service
             android:name="app.logdate.client.location.tracking.ActivityAwareLocationService"
+            tools:ignore="MissingClass"
             tools:node="remove" />
         <receiver
             android:name="app.logdate.client.location.tracking.ActivityTransitionReceiver"
+            tools:ignore="MissingClass"
             tools:node="remove" />
 
         <!-- Remove Google Places SDK activities (not used on Wear OS) -->
         <activity
             android:name="com.google.android.libraries.places.widget.AutocompleteActivity"
+            tools:ignore="MissingClass"
             tools:node="remove" />
         <activity
             android:name="com.google.android.libraries.places.widget.BasicPlaceAutocompleteActivity"
+            tools:ignore="MissingClass"
             tools:node="remove" />
         <activity
             android:name="com.google.android.libraries.places.widget.PlaceAutocompleteActivity"
+            tools:ignore="MissingClass"
             tools:node="remove" />
         <activity
             android:name="com.google.android.libraries.places.widget.internal.photoviewer.PlacesLightboxActivity"
+            tools:ignore="MissingClass"
             tools:node="remove" />
 
         <!-- Audio Recording Service -->

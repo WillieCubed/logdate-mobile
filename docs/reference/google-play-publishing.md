@@ -45,8 +45,8 @@ for approval — which is the desired behavior, not a bug.
 | Purpose | Secret name | Required for | Notes |
 | --- | --- | --- | --- |
 | Play Developer API credentials | `ANDROID_PUBLISHER_CREDENTIALS` | Internal + production | Raw service-account JSON content. |
-| Firebase debug config | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64` | Internal | Base64 of `app/android-main/google-services.json`. Materialized by [`setup-firebase-configs`](../../.github/actions/setup-firebase-configs/action.yml) with `android-flavor: debug` (default). |
-| Firebase release config | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_RELEASE_BASE64` | Production | Base64 of `app/android-main/src/release/google-services.json`. Materialized by [`setup-firebase-configs`](../../.github/actions/setup-firebase-configs/action.yml) with `android-flavor: release`. |
+| Firebase debug config | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64` | CI, screenshot tests, local debug parity | Base64 of `app/android-main/google-services.json`. Materialized by [`setup-firebase-configs`](../../.github/actions/setup-firebase-configs/action.yml) with `android-flavor: debug` (default). |
+| Firebase release config | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_RELEASE_BASE64` | Internal + production Play publishing | Base64 of `app/android-main/src/release/google-services.json`. Materialized by [`setup-firebase-configs`](../../.github/actions/setup-firebase-configs/action.yml) with `android-flavor: release`. |
 | Release keystore file | `LOGDATE_RELEASE_STORE_BASE64` | Internal | Base64-encoded `.jks` or `.keystore` file content. |
 | Release keystore password | `LOGDATE_RELEASE_STORE_PASSWORD` | Internal | Passed into the existing Android release signing config. |
 | Release key alias | `LOGDATE_RELEASE_KEY_ALIAS` | Internal | Passed into the existing Android release signing config. |
@@ -132,7 +132,9 @@ The workflow has two publish paths:
 - Triggers on every push to `main`
 - Also supports manual `workflow_dispatch`
 - Requires `LOGDATE_PLAY_INTERNAL_PUBLISH_ENABLED=true`
-- Materializes the **debug** Firebase config (matches the build flavor)
+- Materializes the **release** Firebase config because Gradle Play Publisher
+  builds the signed `release` bundle even when publishing to the internal
+  track
 - Publishes with:
 
   ```bash

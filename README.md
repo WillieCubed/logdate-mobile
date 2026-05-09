@@ -164,6 +164,8 @@ If you prefer to set up dependencies manually:
      release-specific source set automatically.
    - For iOS, see [`docs/reference/ios-build-setup.md`](docs/reference/ios-build-setup.md)
      for the bundle id and `GoogleService-Info-Release.plist` requirements.
+   - For staging/production server and app configuration rules, see
+     [`docs/runbook/staging-production-configuration.md`](docs/runbook/staging-production-configuration.md).
 
 4. **Open in Android Studio**
    - Open the project in Android Studio

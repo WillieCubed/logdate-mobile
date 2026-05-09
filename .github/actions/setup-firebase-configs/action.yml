@@ -24,9 +24,9 @@ inputs:
     default: debug
   ios-google-service-info-plist-base64:
     description: |
-      Base64 of iosApp/iosApp/GoogleService-Info.plist. Optional —
-      iOS build degrades gracefully without it (iOSApp.swift nil-guards
-      FirebaseApp.configure).
+      Base64 of iosApp/iosApp/Firebase/GoogleService-Info-Release.plist.
+      Optional — iOS build degrades gracefully without it
+      (iOSApp.swift nil-guards FirebaseApp.configure).
     required: false
 
 runs:
@@ -57,7 +57,9 @@ runs:
         else
           target="app/android-main/google-services.json"
         fi
-        printf '%s' "$GOOGLE_SERVICES_JSON_B64" | base64 --decode > "$target"
+        if ! printf '%s' "$GOOGLE_SERVICES_JSON_B64" | base64 --decode > "$target" 2>/dev/null; then
+          printf '%s' "$GOOGLE_SERVICES_JSON_B64" | base64 -D > "$target"
+        fi
         if ! jq -e '.project_info.project_id' "$target" >/dev/null; then
           echo "::error::$target is not valid Firebase JSON. Re-upload the matching"
           echo "::error::secret with: ./scripts/sync-firebase-configs.sh android-$FLAVOR"
@@ -72,7 +74,10 @@ runs:
         PLIST_B64: ${{ inputs.ios-google-service-info-plist-base64 }}
       run: |
         set -euo pipefail
-        target="iosApp/iosApp/GoogleService-Info.plist"
-        printf '%s' "$PLIST_B64" | base64 --decode > "$target"
+        target="iosApp/iosApp/Firebase/GoogleService-Info-Release.plist"
+        mkdir -p "$(dirname "$target")"
+        if ! printf '%s' "$PLIST_B64" | base64 --decode > "$target" 2>/dev/null; then
+          printf '%s' "$PLIST_B64" | base64 -D > "$target"
+        fi
         plutil -lint "$target"
         echo "Materialized $target"

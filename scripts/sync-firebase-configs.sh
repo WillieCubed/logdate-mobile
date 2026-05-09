@@ -8,7 +8,7 @@
 # Usage:
 #   ./scripts/sync-firebase-configs.sh android-debug    # debug Firebase project
 #   ./scripts/sync-firebase-configs.sh android-release  # release Firebase project
-#   ./scripts/sync-firebase-configs.sh ios              # iOS Firebase project
+#   ./scripts/sync-firebase-configs.sh ios              # iOS release Firebase project
 #   ./scripts/sync-firebase-configs.sh android-all      # both Android flavors
 #   ./scripts/sync-firebase-configs.sh all              # everything
 #
@@ -24,7 +24,7 @@ ANDROID_DEBUG_PATH="app/android-main/google-services.json"
 ANDROID_DEBUG_SECRET="LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64"
 ANDROID_RELEASE_PATH="app/android-main/src/release/google-services.json"
 ANDROID_RELEASE_SECRET="LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_RELEASE_BASE64"
-IOS_PATH="iosApp/iosApp/GoogleService-Info.plist"
+IOS_PATH="iosApp/iosApp/Firebase/GoogleService-Info-Release.plist"
 IOS_SECRET="LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64"
 
 log_error() {

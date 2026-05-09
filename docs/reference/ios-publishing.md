@@ -33,7 +33,7 @@ the Xcode project lives in [`iosApp/`](../../iosApp/).
 | App Store Connect API key ID | `APP_STORE_CONNECT_API_KEY_ID` | Internal + production | 10-character key identifier from App Store Connect → Users and Access → Keys. |
 | App Store Connect API issuer ID | `APP_STORE_CONNECT_API_ISSUER_ID` | Internal + production | UUID at the top of the same Keys page. |
 | App Store Connect API private key | `APP_STORE_CONNECT_API_KEY_P8` | Internal + production | Raw `.p8` private key content (one-time download). |
-| Firebase iOS configuration | `LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64` | Internal + production | Base64 of `iosApp/iosApp/GoogleService-Info.plist`. Materialized by the [`setup-firebase-configs`](../../.github/actions/setup-firebase-configs/action.yml) composite action. |
+| Firebase iOS configuration | `LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64` | Internal + production | Base64 of `iosApp/iosApp/Firebase/GoogleService-Info-Release.plist`. Materialized by the [`setup-firebase-configs`](../../.github/actions/setup-firebase-configs/action.yml) composite action. |
 
 The workflow materializes the keychain, provisioning profile, and Firebase
 plist at runtime. The keychain is per-job and lives in `$RUNNER_TEMP`, which
@@ -64,7 +64,7 @@ approval — which is the desired behavior, not a bug.
 Three scripts cooperate to prepare a clean publish:
 
 ```bash
-./scripts/sync-firebase-configs.sh ios          # uploads GoogleService-Info.plist as base64 secret
+./scripts/sync-firebase-configs.sh ios          # uploads the release GoogleService-Info.plist as a base64 secret
 ./scripts/install-ios-signing.sh                # CI-only — decodes cert + profile into a per-run keychain
 ./scripts/resolve-ios-app-version.sh            # CI-only — emits MARKETING_VERSION + CURRENT_PROJECT_VERSION
 ./scripts/submit-ios-for-review.sh              # CI-only — submits an uploaded build to App Store review
