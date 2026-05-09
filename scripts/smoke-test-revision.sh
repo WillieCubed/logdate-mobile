@@ -23,6 +23,15 @@ fi
 URL="${1%/}"
 PROBE_USERNAME="smoketest_$(date +%s)_$$"
 
+health_status_is_healthy() {
+    local body="$1"
+    if command -v jq >/dev/null 2>&1; then
+        printf '%s' "$body" | jq -e '.status == "healthy"' >/dev/null
+        return
+    fi
+    [[ "$body" =~ \"status\"[[:space:]]*:[[:space:]]*\"healthy\" ]]
+}
+
 probe_health() {
     local response
     response="$(curl --silent --show-error --max-time 10 \
@@ -34,8 +43,8 @@ probe_health() {
         echo "[FAIL] /health returned $status (body: $body)" >&2
         return 1
     fi
-    if [[ "$body" != *'"status":"healthy"'* ]]; then
-        echo "[FAIL] /health body missing status:healthy ($body)" >&2
+    if ! health_status_is_healthy "$body"; then
+        echo "[FAIL] /health body missing status=healthy ($body)" >&2
         return 1
     fi
     echo "[OK] /health"
