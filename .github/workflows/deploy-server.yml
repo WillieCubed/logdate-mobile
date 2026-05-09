@@ -272,14 +272,26 @@ jobs:
             --set-env-vars "RELEASE_VERSION=logdate-server@${{ env.DEPLOY_SHA }}" \
             "${service_account_args[@]}"
 
-          REVISION_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
-            --platform managed --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} \
-            --format="value(status.traffic[?tag=${CANDIDATE_TAG}].url)" || true)
-          # Cloud Run sometimes lags a couple of seconds publishing the
-          # tagged revision URL into status; fall back to the deterministic
-          # tag URL so the smoke step always has somewhere to hit.
+          # Cloud Run can lag a few seconds before publishing the tagged
+          # revision URL into service status. Poll rather than fabricating a
+          # URL because the generated service hash is not derivable from the
+          # service name, region, and project.
+          REVISION_URL=""
+          for _ in $(seq 1 30); do
+            REVISION_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+              --platform managed --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} \
+              --format="value(status.traffic[?tag=${CANDIDATE_TAG}].url)" || true)
+            if [[ -n "$REVISION_URL" ]]; then
+              break
+            fi
+            sleep 2
+          done
           if [[ -z "$REVISION_URL" ]]; then
-            REVISION_URL="https://${CANDIDATE_TAG}---$(echo ${{ env.SERVICE_NAME }} | tr '[:upper:]' '[:lower:]')-$(gcloud run services describe ${{ env.SERVICE_NAME }} --platform managed --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format='value(metadata.labels[cloud.googleapis.com/location])' || echo "")-${{ env.PROJECT_ID }}.a.run.app"
+            echo "Timed out waiting for candidate revision URL for tag ${CANDIDATE_TAG}."
+            gcloud run services describe ${{ env.SERVICE_NAME }} \
+              --platform managed --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} \
+              --format="yaml(status.traffic)"
+            exit 1
           fi
           echo "REVISION_URL=$REVISION_URL" >> "$GITHUB_ENV"
 
