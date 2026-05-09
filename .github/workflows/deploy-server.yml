@@ -278,9 +278,12 @@ jobs:
           # service name, region, and project.
           REVISION_URL=""
           for _ in $(seq 1 30); do
-            REVISION_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
-              --platform managed --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} \
-              --format="value(status.traffic[?tag=${CANDIDATE_TAG}].url)" || true)
+            REVISION_URL=$(
+              gcloud run services describe ${{ env.SERVICE_NAME }} \
+                --platform managed --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} \
+                --format=json |
+                jq -r --arg tag "$CANDIDATE_TAG" '.status.traffic[]? | select(.tag == $tag) | .url // empty'
+            )
             if [[ -n "$REVISION_URL" ]]; then
               break
             fi
