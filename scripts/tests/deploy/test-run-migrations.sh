@@ -3,44 +3,12 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-cd "$REPO_ROOT"
+source "$(git rev-parse --show-toplevel)/scripts/tests/lib/assertions.sh"
+enter_repo_root
 
 SCRIPT="scripts/run-migrations.sh"
 DEFAULT_PROXY_VERSION="v2.21.3"
 DEFAULT_PROXY_URL="https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/${DEFAULT_PROXY_VERSION}/cloud-sql-proxy.linux.amd64"
-
-pass_count=0
-
-assert_contains() {
-    local needle="$1"
-    local text="$2"
-    if ! echo "$text" | grep -Fq -- "$needle"; then
-        echo "FAIL: expected text to contain '$needle'"
-        exit 1
-    fi
-    pass_count=$((pass_count + 1))
-}
-
-assert_not_contains() {
-    local needle="$1"
-    local text="$2"
-    if echo "$text" | grep -Fq -- "$needle"; then
-        echo "FAIL: expected text to not contain '$needle'"
-        exit 1
-    fi
-    pass_count=$((pass_count + 1))
-}
-
-assert_exit_code() {
-    local expected="$1"
-    local actual="$2"
-    if [[ "$expected" != "$actual" ]]; then
-        echo "FAIL: expected exit $expected, got $actual"
-        exit 1
-    fi
-    pass_count=$((pass_count + 1))
-}
 
 script_contents="$(cat "$SCRIPT")"
 
@@ -78,10 +46,8 @@ assert_contains "ERROR: PROXY_PORT must be an integer from 1 to 65535." "$invali
 
 status="$(curl -I -sS -o /dev/null -w '%{http_code}' "$DEFAULT_PROXY_URL")"
 if [[ "$status" != "200" ]]; then
-    echo "FAIL: expected Cloud SQL Auth Proxy URL to return 200, got $status"
-    echo "$DEFAULT_PROXY_URL"
-    exit 1
+    fail "expected Cloud SQL Auth Proxy URL to return 200, got $status ($DEFAULT_PROXY_URL)"
 fi
-pass_count=$((pass_count + 1))
+pass
 
-echo "PASS: $pass_count run-migrations checks"
+print_pass_summary "run-migrations"

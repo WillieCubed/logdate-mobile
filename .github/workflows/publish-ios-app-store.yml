@@ -1,4 +1,5 @@
 name: Publish iOS
+run-name: Publish iOS ${{ github.ref_name }} by ${{ github.actor }}
 
 on:
   push:
@@ -11,6 +12,9 @@ on:
         type: choice
         default: testflight
         options: [testflight, app-store]
+
+permissions:
+  contents: read
 
 concurrency:
   group: publish-ios-${{ github.ref }}
@@ -30,11 +34,13 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out repository
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/setup-firebase-configs
+      - name: Materialize iOS Firebase config
+        uses: ./.github/actions/setup-firebase-configs
         with:
           ios-google-service-info-plist-base64: ${{ secrets.LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
 
@@ -61,8 +67,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Cache Gradle
+      - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Build Compose Multiplatform iOS framework (release)
         run: ./gradlew :app:compose-main:linkPodReleaseFrameworkIosArm64
@@ -91,8 +99,9 @@ jobs:
           API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
-          printf '%s' "$API_KEY_P8" > ~/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8
-          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8
+          key_path="$HOME/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8"
+          printf '%s' "$API_KEY_P8" > "$key_path"
+          chmod 600 "$key_path"
           xcrun altool --upload-app \
             --type ios \
             --file build/export/iosApp.ipa \
@@ -120,11 +129,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out repository
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/setup-firebase-configs
+      - name: Materialize iOS Firebase config
+        uses: ./.github/actions/setup-firebase-configs
         with:
           ios-google-service-info-plist-base64: ${{ secrets.LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
 
@@ -151,8 +162,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Cache Gradle
+      - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref_type != 'tag' }}
 
       - name: Build Compose Multiplatform iOS framework (release)
         run: ./gradlew :app:compose-main:linkPodReleaseFrameworkIosArm64
@@ -181,8 +194,9 @@ jobs:
           API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
-          printf '%s' "$API_KEY_P8" > ~/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8
-          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8
+          key_path="$HOME/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8"
+          printf '%s' "$API_KEY_P8" > "$key_path"
+          chmod 600 "$key_path"
           xcrun altool --upload-app \
             --type ios \
             --file build/export/iosApp.ipa \

@@ -61,7 +61,11 @@ Terraform lives in `infra/terraform`.
 - `SYNC_MEDIA_SIGNED_URL_TTL_HOURS`: signed URL TTL in hours (1-24)
 
 ## GitHub Actions (fallback and emergency)
-The workflow in `.github/workflows/deploy-server.yml` is the emergency path.
+The server deployment workflows are:
+
+- `.github/workflows/deploy-server-staging.yml` for staging rollouts after CI.
+- `.github/workflows/deploy-server-production.yml` for production `server-v*` tag rollouts.
+- `.github/workflows/deploy-server-cloud-run.yml` for the shared Cloud Run rollout implementation.
 
 The workflow reads `infra/terraform/<env>.tfvars` for project/service metadata
 when those files exist. Bootstrap-managed instances can instead use repository variables for

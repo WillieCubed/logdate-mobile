@@ -1,0 +1,83 @@
+name: Deploy Server Production
+run-name: Deploy production server from ${{ github.ref_name }}
+
+on:
+  push:
+    tags:
+      - 'server-v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  actions: read
+
+env:
+  DEPLOY_SHA: ${{ github.sha }}
+
+concurrency:
+  group: deploy-server-production-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-staging:
+    name: Verify staging before production
+    if: startsWith(github.ref, 'refs/tags/server-v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out production tag
+        uses: actions/checkout@v6
+
+      - name: Confirm this commit deployed to staging
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          staging_run_id="$(
+            gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy-server-staging.yml/runs?head_sha=${DEPLOY_SHA}&status=success&per_page=20" \
+              --jq '.workflow_runs[] | select(.conclusion == "success") | .id' |
+              head -n 1
+          )"
+          if [[ -z "$staging_run_id" ]]; then
+            echo "::error::No successful Deploy Server Staging run found for ${DEPLOY_SHA}."
+            echo "::error::Push this commit through main and wait for staging to deploy before tagging production."
+            exit 1
+          fi
+          echo "Found successful staging deploy run: $staging_run_id"
+
+      - name: Verify staging health includes database connectivity
+        env:
+          HEALTH_TOKEN: ${{ secrets.HEALTH_INTERNAL_TOKEN_STAGING }}
+        run: |
+          if [[ -z "$HEALTH_TOKEN" ]]; then
+            echo "::error::HEALTH_INTERNAL_TOKEN_STAGING repo secret is unset; cannot gate production deploys without it."
+            exit 1
+          fi
+          response=$(curl -sS -f --max-time 10 \
+            -H "X-LogDate-Health-Token: $HEALTH_TOKEN" \
+            https://cloud-staging.logdate.app/health)
+          echo "$response"
+          echo "$response" | jq -e '.db_connected == true' >/dev/null
+
+      - name: Set up Python with pip cache
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: scripts/passkey-verify/requirements.txt
+
+      - name: Run passkey simulator against staging
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --quiet -r scripts/passkey-verify/requirements.txt
+          .venv/bin/python scripts/passkey-verify/sim.py --base https://cloud-staging.logdate.app
+
+  deploy:
+    name: Deploy production revision
+    needs: [verify-staging]
+    if: startsWith(github.ref, 'refs/tags/server-v') && needs.verify-staging.result == 'success'
+    uses: ./.github/workflows/deploy-server-cloud-run.yml
+    with:
+      environment: production
+      deploy-sha: ${{ github.sha }}
+    secrets: inherit

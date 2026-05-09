@@ -3,31 +3,10 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-cd "$REPO_ROOT"
+source "$(git rev-parse --show-toplevel)/scripts/tests/lib/assertions.sh"
+enter_repo_root
 
 SCRIPT="scripts/smoke-test-revision.sh"
-pass_count=0
-
-assert_contains() {
-    local needle="$1"
-    local text="$2"
-    if ! echo "$text" | grep -Fq -- "$needle"; then
-        echo "FAIL: expected text to contain '$needle'"
-        exit 1
-    fi
-    pass_count=$((pass_count + 1))
-}
-
-assert_exit_code() {
-    local expected="$1"
-    local actual="$2"
-    if [[ "$expected" != "$actual" ]]; then
-        echo "FAIL: expected exit $expected, got $actual"
-        exit 1
-    fi
-    pass_count=$((pass_count + 1))
-}
 
 script_contents="$(cat "$SCRIPT")"
 assert_contains "health_status_is_healthy" "$script_contents"
@@ -103,4 +82,4 @@ assert_exit_code 1 "$failure_status"
 assert_contains "status=healthy" "$failure_output"
 assert_contains "Smoke test FAILED" "$failure_output"
 
-echo "PASS: $pass_count smoke-test-revision checks"
+print_pass_summary "smoke-test-revision"

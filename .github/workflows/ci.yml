@@ -1,4 +1,5 @@
 name: CI
+run-name: CI for ${{ github.ref_name }} by ${{ github.actor }}
 
 on:
   push:
@@ -6,9 +7,14 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions:
+  contents: read
+
 jobs:
   test:
+    name: Unit tests and coverage
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     services:
       postgres:
@@ -36,9 +42,11 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out repository
+        uses: actions/checkout@v6
 
-      - uses: ./.github/actions/setup-firebase-configs
+      - name: Materialize Firebase config
+        uses: ./.github/actions/setup-firebase-configs
         with:
           android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64 }}
 
@@ -48,7 +56,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Gradle
+      - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
@@ -74,6 +82,7 @@ jobs:
   e2e-tests:
     name: Server / client e2e
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:16-alpine
@@ -89,12 +98,17 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-java@v5
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v6
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - name: Run e2e tests
         env:
           DATABASE_URL: jdbc:postgresql://localhost:5432/logdate
@@ -109,11 +123,15 @@ jobs:
           path: integration/server-client-e2e/build/reports/tests
 
   lint:
+    name: Static analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out repository
+        uses: actions/checkout@v6
 
-      - uses: ./.github/actions/setup-firebase-configs
+      - name: Materialize Firebase config
+        uses: ./.github/actions/setup-firebase-configs
         with:
           android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64 }}
 
@@ -123,21 +141,25 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Gradle
+      - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Check hardcoded Compose literals
         run: ./scripts/check_hardcoded_compose_literals.sh
 
       - name: Run lint
         run: ./gradlew lint
-        continue-on-error: true
 
   build:
+    name: Server artifact
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [test]
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out repository
+        uses: actions/checkout@v6
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -145,8 +167,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Gradle
+      - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Build server
         run: ./gradlew :server:build -x test

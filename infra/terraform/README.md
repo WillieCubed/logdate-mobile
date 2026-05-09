@@ -45,8 +45,8 @@ What it does:
 - stores instance state in `.logdate/deploy/<project-id>/`
 
 If `gh` is authenticated and has repo admin access, bootstrap also writes the GitHub deploy
-secrets and repository variables used by `.github/workflows/deploy-server.yml`, so CI can keep
-shipping image-only deploys without a committed `*.tfvars` file.
+secrets and repository variables used by the server deploy workflows, so CI can keep shipping
+image-only deploys without a committed `*.tfvars` file.
 
 ## Environment configuration
 This repo treats `*.tfvars` as the shared source of truth for both Terraform and

@@ -1,4 +1,5 @@
 name: Screenshot Tests
+run-name: Screenshot tests for ${{ github.ref_name }} by ${{ github.actor }}
 
 on:
   pull_request:
@@ -10,16 +11,28 @@ on:
       - 'client/feature/**'
       - 'client/ui/**'
       - 'client/theme/**'
+      - '.github/workflows/screenshot-test.yml'
+      - 'build-logic/**'
+      - 'gradle/**'
+      - '*.gradle.kts'
+      - 'gradle.properties'
+
+permissions:
+  contents: read
 
 jobs:
   android-wear-screenshots:
+    name: Android and Wear screenshots
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out repository
+        uses: actions/checkout@v6
         with:
           lfs: true
 
-      - uses: ./.github/actions/setup-firebase-configs
+      - name: Materialize Android Firebase config
+        uses: ./.github/actions/setup-firebase-configs
         with:
           android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64 }}
 
@@ -29,7 +42,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Gradle
+      - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
@@ -48,9 +61,12 @@ jobs:
           retention-days: 14
 
   desktop-screenshots:
+    name: Desktop screenshots
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out repository
+        uses: actions/checkout@v6
         with:
           lfs: true
 
@@ -60,7 +76,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Gradle
+      - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
@@ -77,13 +93,17 @@ jobs:
           retention-days: 14
 
   ios-screenshot-validation:
+    name: iOS screenshot lane
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out repository
+        uses: actions/checkout@v6
         with:
           lfs: true
 
-      - uses: ./.github/actions/setup-firebase-configs
+      - name: Materialize mobile Firebase configs
+        uses: ./.github/actions/setup-firebase-configs
         with:
           android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64 }}
           ios-google-service-info-plist-base64: ${{ secrets.LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
@@ -94,7 +114,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Gradle
+      - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}

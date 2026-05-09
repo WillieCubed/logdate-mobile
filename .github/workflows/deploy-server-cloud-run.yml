@@ -1,99 +1,31 @@
-name: Deploy Server
+name: Deploy Server Cloud Run
+run-name: Deploy ${{ inputs.environment }} server from ${{ inputs.deploy-sha }}
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
-    branches: [main]
-  push:
-    tags:
-      - 'server-v*'
-  workflow_dispatch:
+  workflow_call:
     inputs:
       environment:
-        description: 'Deployment environment'
+        description: Deployment environment configured in GitHub Environments and Terraform tfvars.
         required: true
-        default: 'staging'
-        type: choice
-        options:
-          - staging
-          - production
+        type: string
+      deploy-sha:
+        description: Commit SHA to deploy.
+        required: true
+        type: string
 
-env:
-  DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
-
-concurrency:
-  group: deploy-server-${{ github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
-  # Pre-tag smoke gate: a tag push (which would otherwise deploy straight to
-  # prod) first has to prove the same code is healthy in staging. Hits
-  # cloud-staging.logdate.app/health with the staging health token to confirm
-  # the database is actually reachable, then runs the end-to-end passkey
-  # simulator so we catch broken signup/signin before they reach prod. Skipped
-  # for workflow_run (auto-deploy of main to staging — there's nothing to gate
-  # against yet) and workflow_dispatch (operator override).
-  smoke:
-    name: Pre-tag staging smoke test
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Verify staging /health includes db_connected
-        env:
-          HEALTH_TOKEN: ${{ secrets.HEALTH_INTERNAL_TOKEN_STAGING }}
-        run: |
-          if [[ -z "$HEALTH_TOKEN" ]]; then
-            echo "::error::HEALTH_INTERNAL_TOKEN_STAGING repo secret is unset; cannot gate prod tag deploys without it."
-            exit 1
-          fi
-          response=$(curl -sS -f --max-time 10 \
-            -H "X-LogDate-Health-Token: $HEALTH_TOKEN" \
-            https://cloud-staging.logdate.app/health)
-          echo "$response"
-          # jq -e exits non-zero if the expression is false/null.
-          echo "$response" | jq -e '.db_connected == true' >/dev/null
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
-
-      - name: Run end-to-end passkey simulator against staging
-        run: |
-          python -m venv .venv
-          .venv/bin/pip install --quiet fido2 requests
-          .venv/bin/python scripts/passkey-verify/sim.py --base https://cloud-staging.logdate.app
-
   deploy:
-    needs: [smoke]
+    name: Deploy ${{ inputs.environment }} revision
     runs-on: ubuntu-latest
-    if: >-
-      ${{
-        always() && (
-          (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
-          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && needs.smoke.result == 'success') ||
-          (github.event_name == 'workflow_dispatch' && (
-            inputs.environment == 'staging' ||
-            (inputs.environment == 'production' && startsWith(github.ref, 'refs/tags/'))
-          ))
-        )
-      }}
-    environment: >-
-      ${{
-        github.event_name == 'workflow_dispatch' && inputs.environment ||
-        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) && 'production' ||
-        'staging'
-      }}
+    timeout-minutes: 30
+    environment: ${{ inputs.environment }}
     env:
-      ENVIRONMENT: >-
-        ${{
-          github.event_name == 'workflow_dispatch' && inputs.environment ||
-          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) && 'production' ||
-          'staging'
-        }}
+      DEPLOY_SHA: ${{ inputs.deploy-sha }}
+      ENVIRONMENT: ${{ inputs.environment }}
       REPO_PROJECT_ID: ${{ vars.LOGDATE_PROJECT_ID }}
       REPO_REGION: ${{ vars.LOGDATE_REGION }}
       REPO_SERVICE_NAME: ${{ vars.LOGDATE_SERVICE_NAME }}
@@ -102,19 +34,16 @@ jobs:
       REPO_RUNTIME_SERVICE_ACCOUNT: ${{ vars.LOGDATE_RUNTIME_SERVICE_ACCOUNT }}
       REPO_DEPLOY_SOURCE: ${{ vars.LOGDATE_DEPLOY_SOURCE }}
 
-    permissions:
-      contents: read
-      id-token: write
-
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out deployment commit
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.DEPLOY_SHA }}
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v4
 
-      - name: Load environment config
+      - name: Load deployment configuration
         run: |
           TF_DIR="infra/terraform"
           TFVARS_FILE="${TF_DIR}/${ENVIRONMENT}.tfvars"
@@ -129,11 +58,6 @@ jobs:
             echo "Using repository deployment variables because LOGDATE_DEPLOY_SOURCE=repo_vars."
           elif [[ -f "$TFVARS_FILE" ]]; then
             terraform -chdir="$TF_DIR" init -backend=false -input=false
-            # `terraform -chdir=X -var-file=Y` resolves Y relative to X. The workflow-level
-            # $TFVARS_FILE is a path from the workspace root, so pass the basename here so
-            # it isn't double-prefixed (which produced the
-            # "Failed to read variables file" error and turned every var into the literal
-            # string "::error::Terraform exited with code 1.").
             TFVARS_BASENAME="$(basename "$TFVARS_FILE")"
 
             tf_value() {
@@ -188,7 +112,6 @@ jobs:
             echo "SERVICE_NAME, PROJECT_ID, and REGION must be set in infra/terraform/${ENVIRONMENT}.tfvars or repository variables."
             exit 1
           fi
-          # Catch the case where Terraform's actionlint wrapper turned an error into the variable value.
           if [[ "${PROJECT_ID}" == *"Terraform exited with code"* || "${REGION}" == *"Terraform exited with code"* ]]; then
             echo "SERVICE_NAME, PROJECT_ID, and REGION must be set in infra/terraform/${ENVIRONMENT}.tfvars or repository variables."
             exit 1
@@ -210,16 +133,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Configure Docker for Artifact Registry
-        run: |
-          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
-
-      - name: Configure runtime service account
-        run: |
-          if [[ -n "${RUNTIME_SERVICE_ACCOUNT}" ]]; then
-            echo "SERVICE_ACCOUNT_FLAG=--service-account ${RUNTIME_SERVICE_ACCOUNT}" >> "$GITHUB_ENV"
-          else
-            echo "SERVICE_ACCOUNT_FLAG=" >> "$GITHUB_ENV"
-          fi
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v7
@@ -233,17 +147,12 @@ jobs:
             ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:latest
           cache-from: |
             type=registry,ref=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:buildcache
-            type=gha
+            type=gha,scope=${{ env.SERVICE_NAME }}-image
           cache-to: |
             type=registry,ref=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:buildcache,mode=max
-            type=gha,mode=max
+            type=gha,mode=max,scope=${{ env.SERVICE_NAME }}-image
 
       - name: Run database migrations
-        # Production runs with AUTO_MIGRATE=false so the server boot path
-        # never applies migrations on its own. Run Flyway here, against
-        # Cloud SQL via the auth proxy, before rolling out the new revision —
-        # so the new code never sees an old schema and a failed migration
-        # aborts the deploy before any traffic touches the new image.
         run: |
           ./scripts/run-migrations.sh \
             --project-id "${PROJECT_ID}" \
@@ -251,11 +160,9 @@ jobs:
             --validate-passkey-fk
 
       - name: Configure candidate tag
-        run: |
-          echo "CANDIDATE_TAG=c-${DEPLOY_SHA:0:12}" >> "$GITHUB_ENV"
+        run: echo "CANDIDATE_TAG=c-${DEPLOY_SHA:0:12}" >> "$GITHUB_ENV"
 
-      - name: Deploy new revision (no traffic)
-        id: deploy-revision
+      - name: Deploy candidate revision without traffic
         run: |
           service_account_args=()
           if [[ -n "${RUNTIME_SERVICE_ACCOUNT}" ]]; then
@@ -272,10 +179,6 @@ jobs:
             --set-env-vars "RELEASE_VERSION=logdate-server@${{ env.DEPLOY_SHA }}" \
             "${service_account_args[@]}"
 
-          # Cloud Run can lag a few seconds before publishing the tagged
-          # revision URL into service status. Poll rather than fabricating a
-          # URL because the generated service hash is not derivable from the
-          # service name, region, and project.
           REVISION_URL=""
           for _ in $(seq 1 30); do
             REVISION_URL=$(
@@ -298,13 +201,10 @@ jobs:
           fi
           echo "REVISION_URL=$REVISION_URL" >> "$GITHUB_ENV"
 
-      - name: Smoke test new revision
-        # On smoke failure the script exits non-zero and we never run the
-        # promote step, so the previous revision keeps serving 100%.
-        run: |
-          ./scripts/smoke-test-revision.sh "$REVISION_URL"
+      - name: Smoke test candidate revision
+        run: ./scripts/smoke-test-revision.sh "$REVISION_URL"
 
-      - name: Promote new revision to 100% traffic
+      - name: Promote candidate to 100 percent traffic
         run: |
           gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
             --platform managed \
@@ -312,7 +212,7 @@ jobs:
             --project ${{ env.PROJECT_ID }} \
             --to-tags "$CANDIDATE_TAG=100"
 
-      - name: Verify deployment
+      - name: Verify deployed service
         run: |
           wait_for_health() {
             local url="$1"
@@ -340,17 +240,14 @@ jobs:
             echo "Custom Domain: https://${{ env.DOMAIN }}"
           fi
 
-          # Health check on Cloud Run URL
           echo "Checking health on Cloud Run URL..."
           wait_for_health "$SERVICE_URL" 30 2 || exit 1
 
-          # Check custom domain (may fail initially while SSL provisions)
           if [[ -n "${DOMAIN}" ]]; then
             echo "Checking custom domain (may take 15-30 min for SSL)..."
             if wait_for_health "https://${{ env.DOMAIN }}" 10 3; then
-              echo "Custom domain is working!"
+              echo "Custom domain is working."
             else
-              echo "Custom domain not yet responding - SSL may still be provisioning"
-              echo "This is expected for new domain mappings. Check again in 15-30 minutes."
+              echo "Custom domain not yet responding; SSL may still be provisioning."
             fi
           fi

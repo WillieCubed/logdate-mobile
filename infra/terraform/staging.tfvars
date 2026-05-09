@@ -2,7 +2,7 @@ project_id      = "logdate-dev"
 region          = "us-central1"
 service_name    = "logdate-server-staging"
 # Placeholder image only used for the initial terraform apply. Real images get
-# pushed by the CI Deploy Server workflow (in repo_vars mode for this env).
+# pushed by the Deploy Server Staging workflow (in repo_vars mode for this env).
 cloud_run_image = "us-central1-docker.pkg.dev/logdate-dev/logdate/logdate-server:latest"
 # WebAuthn rpId is intentionally bound to the staging subdomain rather than the
 # registrable apex `logdate.app`. Production uses the apex so passkeys work
