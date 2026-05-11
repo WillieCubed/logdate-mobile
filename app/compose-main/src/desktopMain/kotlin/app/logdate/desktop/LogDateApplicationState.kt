@@ -32,6 +32,16 @@ class LogDateApplicationState {
     }
 
     /**
+     * Closes a single window, performing the window's cleanup. Returns true when the window
+     * actually closed; false when [LogDateWindowState.exit] vetoed the close.
+     */
+    fun closeWindow(window: LogDateWindowState): Boolean {
+        if (!window.exit()) return false
+        _windows.remove(window)
+        return true
+    }
+
+    /**
      * Closes all windows, performing cleanup as needed, and exits the application.
      */
     fun exit() {

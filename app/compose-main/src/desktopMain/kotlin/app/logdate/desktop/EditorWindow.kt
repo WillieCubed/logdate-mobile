@@ -7,19 +7,43 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.rememberWindowState
 import app.logdate.feature.editor.ui.EntryEditorContent
+import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
+import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import org.koin.compose.viewmodel.koinViewModel
+
+private const val DEFAULT_ENTRY_TITLE = "New Entry"
+
+/**
+ * Soft cap on the derived window title so a long first sentence does not blow
+ * out the OS title bar. Chosen to comfortably fit on a 1024dp main window's
+ * title bar with room for the platform window controls on either side.
+ */
+private const val TITLE_PREVIEW_CHARS = 48
 
 /**
  * A window that allows the user to edit a journal entry.
+ *
+ * Supports a fullscreen, immersive journaling mode toggled with F11 (or
+ * Cmd+Shift+F on macOS hosts that map F11 to system controls).
  */
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -28,26 +52,53 @@ internal fun EntryEditorWindow(
     state: EntryEditorWindowState = rememberEntryEditorWindowState(appState),
     viewModel: EntryEditorViewModel = koinViewModel(),
 ) {
-    // TODO: Support fullscreen, immersive journaling experience
+    val windowState = rememberWindowState()
+    val editorState by viewModel.editorState.collectAsState()
+
+    LaunchedEffect(state.isFullscreen) {
+        windowState.placement = if (state.isFullscreen) WindowPlacement.Fullscreen else WindowPlacement.Floating
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.editorState
+            .map { it.blocks }
+            .distinctUntilChanged()
+            .map { it.deriveWindowTitle() }
+            .distinctUntilChanged()
+            .collect { derived -> state.updateTitle(derived) }
+    }
+
     Window(
-        onCloseRequest = state::exit,
+        onCloseRequest = {
+            if (editorState.canExitWithoutSaving) {
+                appState.closeWindow(state)
+            } else {
+                // Persist the in-progress entry. The viewModel emits onEntrySaved
+                // when the save completes, which routes back through closeWindow.
+                viewModel.saveEntry(editorState)
+            }
+        },
         title = state.title,
+        state = windowState,
+        onKeyEvent = { event ->
+            if (event.type == KeyEventType.KeyDown && event.key == Key.F11) {
+                state.toggleFullscreen()
+                true
+            } else {
+                false
+            }
+        },
     ) {
         SharedTransitionLayout {
             CompositionLocalProvider(
                 LocalSharedTransitionScope provides this,
             ) {
-                // TODO: Implement logic to automatically update title
                 AnimatedVisibility(true) {
                     CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
                         EntryEditorContent(
                             viewModel = viewModel,
-                            onNavigateBack = {
-                                state.exit()
-                            },
-                            onEntrySaved = {
-                                state.exit()
-                            },
+                            onNavigateBack = { appState.closeWindow(state) },
+                            onEntrySaved = { appState.closeWindow(state) },
                         )
                     }
                 }
@@ -64,17 +115,37 @@ internal fun rememberEntryEditorWindowState(appState: LogDateApplicationState): 
 
 class EntryEditorWindowState(
     appState: LogDateApplicationState,
-    initialTitle: String = "New Entry",
+    initialTitle: String = DEFAULT_ENTRY_TITLE,
 ) : LogDateWindowState {
     var title: String by mutableStateOf(initialTitle)
+        private set
+
+    var isFullscreen: Boolean by mutableStateOf(false)
         private set
 
     fun updateTitle(newTitle: String) {
         title = newTitle
     }
 
-    override fun exit(): Boolean {
-        // TODO: Implement cleanup
-        return true
+    fun toggleFullscreen() {
+        isFullscreen = !isFullscreen
     }
+
+    override fun exit(): Boolean = true
+}
+
+private fun List<EntryBlockUiState>.deriveWindowTitle(): String {
+    val firstLine =
+        asSequence()
+            .filterIsInstance<TextBlockUiState>()
+            .map { it.content.trim() }
+            .firstOrNull { it.isNotBlank() }
+            ?.lineSequence()
+            ?.firstOrNull { it.isNotBlank() }
+            ?.trim()
+            .orEmpty()
+
+    if (firstLine.isEmpty()) return DEFAULT_ENTRY_TITLE
+    if (firstLine.length <= TITLE_PREVIEW_CHARS) return firstLine
+    return firstLine.take(TITLE_PREVIEW_CHARS).trimEnd() + "…"
 }
