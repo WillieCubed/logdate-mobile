@@ -81,6 +81,7 @@ import app.logdate.navigation.scenes.supportsDualPaneHomeScene
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.audio.AudioPlaybackProvider
 import app.logdate.ui.navigation.taggedEntry
+import app.logdate.ui.platform.iosEdgeSwipeBack
 import app.logdate.ui.theme.LogDateTheme
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -169,18 +170,22 @@ fun LogDateNavDisplay(
                             onBack = { backStack.removeLastOrNull() },
                             sceneStrategies = listOf(sceneStrategy),
                             modifier =
-                                Modifier.onPreviewKeyEvent { event ->
-                                    if (event.type == KeyEventType.KeyDown &&
-                                        (event.isMetaPressed || event.isCtrlPressed) &&
-                                        event.key == Key.F &&
-                                        backStack.lastOrNull() != SearchRoute()
-                                    ) {
-                                        backStack.add(SearchRoute())
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                },
+                                Modifier
+                                    .iosEdgeSwipeBack(
+                                        enabled = backStack.size > 1,
+                                        onBack = { backStack.removeLastOrNull() },
+                                    ).onPreviewKeyEvent { event ->
+                                        if (event.type == KeyEventType.KeyDown &&
+                                            (event.isMetaPressed || event.isCtrlPressed) &&
+                                            event.key == Key.F &&
+                                            backStack.lastOrNull() != SearchRoute()
+                                        ) {
+                                            backStack.add(SearchRoute())
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    },
                             entryProvider =
                                 entryProvider {
                                     taggedEntry<BaseRoute> { /* loading placeholder */ }
