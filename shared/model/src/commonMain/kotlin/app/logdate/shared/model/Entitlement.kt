@@ -11,11 +11,20 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class EntitlementResponse(
+    /** Stable public plan identifier, such as `free` or `cloud-standard`. */
     val planId: String,
+    /** Coarse plan tier used by UI copy and broad capability decisions. */
     val tier: EntitlementTierWire,
+    /** Billing/subscription state that determines whether paid features are active. */
     val status: EntitlementStatusWire,
+    /** Maximum synced media storage in bytes, or null for unlimited deployments. */
     val storageBytesLimit: Long?,
+    /** Maximum retained backup snapshots, or null for unlimited deployments. */
     val backupCountLimit: Int?,
+    /** Maximum Cloud transcription seconds per month, or null for unlimited deployments. */
+    val transcriptionSecondsPerMonthLimit: Long? = null,
+    /** Client-safe feature flags used to reveal premium controls before calling gated endpoints. */
+    val features: Map<String, Boolean> = emptyMap(),
 )
 
 @Serializable
