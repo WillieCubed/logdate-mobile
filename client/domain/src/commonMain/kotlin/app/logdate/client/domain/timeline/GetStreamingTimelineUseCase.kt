@@ -1,8 +1,12 @@
 package app.logdate.client.domain.timeline
 
+import app.logdate.client.repository.events.EventRepository
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.shared.model.Event
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.map
@@ -38,6 +42,7 @@ class GetStreamingTimelineUseCase(
     private val notesRepository: JournalNotesRepository,
     private val getTimelineDayUseCase: GetTimelineDayUseCase,
     private val groupNotesByDayBoundsUseCase: GroupNotesByDayBoundsUseCase,
+    private val eventRepository: EventRepository,
 ) {
     /**
      * Gets streaming timeline based on the request type
@@ -54,8 +59,9 @@ class GetStreamingTimelineUseCase(
     ): Flow<Timeline> =
         notesRepository
             .observeRecentNotes(pageSize)
-            .transformLatest { recentNotes ->
-                val basicTimeline = createBasicTimeline(recentNotes, sortOrder)
+            .combine(eventRepository.observeAllEvents()) { recentNotes, events -> recentNotes to events }
+            .transformLatest { (recentNotes, events) ->
+                val basicTimeline = createBasicTimeline(recentNotes, sortOrder, events)
                 emit(basicTimeline)
 
                 if (basicTimeline.days.isEmpty()) {
@@ -69,6 +75,7 @@ class GetStreamingTimelineUseCase(
                             recentDates = recentDates,
                             allNotes = allNotes,
                             fallbackNotes = recentNotes,
+                            events = events,
                             sortOrder = sortOrder,
                         )
                     },
@@ -80,28 +87,30 @@ class GetStreamingTimelineUseCase(
         end: Instant,
         sortOrder: TimelineSortOrder,
     ): Flow<Timeline> =
-        notesRepository
-            .observeNotesInRange(start, end)
-            .map { notesInRange ->
-                val notesByDay = groupNotesByDayBoundsUseCase(notesInRange)
+        combine(
+            notesRepository.observeNotesInRange(start, end),
+            eventRepository.observeEventsForDateRange(start, end),
+        ) { notesInRange, events ->
+            val notesByDay = groupNotesByDayBoundsUseCase(notesInRange)
 
-                val timelineDays =
-                    notesByDay.map { (date, entries) ->
-                        getTimelineDayUseCase(date, entries)
-                    }
+            val timelineDays =
+                notesByDay.map { (date, entries) ->
+                    getTimelineDayUseCase(date, entries, events.overlapping(entries))
+                }
 
-                val sortedDays =
-                    when (sortOrder) {
-                        TimelineSortOrder.CHRONOLOGICAL -> timelineDays.sortedBy { it.date }
-                        TimelineSortOrder.REVERSE_CHRONOLOGICAL -> timelineDays.sortedByDescending { it.date }
-                    }
+            val sortedDays =
+                when (sortOrder) {
+                    TimelineSortOrder.CHRONOLOGICAL -> timelineDays.sortedBy { it.date }
+                    TimelineSortOrder.REVERSE_CHRONOLOGICAL -> timelineDays.sortedByDescending { it.date }
+                }
 
-                Timeline(sortedDays)
-            }
+            Timeline(sortedDays)
+        }
 
     private fun createBasicTimeline(
-        notes: List<app.logdate.client.repository.journals.JournalNote>,
+        notes: List<JournalNote>,
         sortOrder: TimelineSortOrder,
+        events: List<Event>,
     ): Timeline {
         val notesByDay =
             notes.groupBy { note ->
@@ -117,7 +126,7 @@ class GetStreamingTimelineUseCase(
                     tldr = "", // Empty - UI will show loading placeholder via isLoadingSummary
                     date = date,
                     people = emptyList(),
-                    events = emptyList(),
+                    events = events.overlapping(entries),
                     placesVisited = places,
                     moments = inferMomentsHeuristically(date, entries, places),
                     parts = extractDayParts(entries),
@@ -130,8 +139,9 @@ class GetStreamingTimelineUseCase(
 
     private suspend fun createEnrichedTimeline(
         recentDates: Set<kotlinx.datetime.LocalDate>,
-        allNotes: List<app.logdate.client.repository.journals.JournalNote>,
-        fallbackNotes: List<app.logdate.client.repository.journals.JournalNote>,
+        allNotes: List<JournalNote>,
+        fallbackNotes: List<JournalNote>,
+        events: List<Event>,
         sortOrder: TimelineSortOrder,
     ): Timeline {
         val recentNotesByDay =
@@ -154,9 +164,9 @@ class GetStreamingTimelineUseCase(
                 val entries = allNotesByDay[date] ?: recentNotesByDay[date]
                 entries?.let { dayEntries ->
                     if (allNotesByDay.containsKey(date)) {
-                        getTimelineDayUseCase(date, dayEntries)
+                        getTimelineDayUseCase(date, dayEntries, events.overlapping(dayEntries))
                     } else {
-                        createBasicTimeline(dayEntries, sortOrder).days.firstOrNull()
+                        createBasicTimeline(dayEntries, sortOrder, events).days.firstOrNull()
                     }
                 }
             }
@@ -172,4 +182,13 @@ class GetStreamingTimelineUseCase(
             TimelineSortOrder.CHRONOLOGICAL -> days.sortedBy { it.date }
             TimelineSortOrder.REVERSE_CHRONOLOGICAL -> days.sortedByDescending { it.date }
         }
+}
+
+private fun List<Event>.overlapping(entries: List<JournalNote>): List<Event> {
+    if (entries.isEmpty()) return emptyList()
+    val dayStart = entries.minOf { it.creationTimestamp }
+    val dayEnd = entries.maxOf { it.creationTimestamp }
+    return filter { event ->
+        event.startTime < dayEnd && (event.endTime ?: event.startTime) >= dayStart
+    }
 }

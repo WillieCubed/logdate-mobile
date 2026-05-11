@@ -1,7 +1,9 @@
 package app.logdate.client.domain.timeline
 
+import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.shared.model.Event
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -22,6 +24,7 @@ data class TimelinePage(
 class GetTimelinePageUseCase(
     private val notesRepository: JournalNotesRepository,
     private val groupNotesByDayBoundsUseCase: GroupNotesByDayBoundsUseCase,
+    private val eventRepository: EventRepository,
 ) {
     suspend operator fun invoke(request: TimelinePageRequest = TimelinePageRequest()): TimelinePage {
         val candidateNotes =
@@ -38,13 +41,14 @@ class GetTimelinePageUseCase(
 
         val pageDates = candidateNotes.map(JournalNote::timelineDate).toSet()
         val allNotesForDates = pageDates.flatMap { notesRepository.getNotesForDay(it) }
+        val allEvents = eventRepository.observeAllEvents().first()
         val notesByDay = groupNotesByDayBoundsUseCase(allNotesForDates)
         val timelineDays =
             notesByDay.mapNotNull { (_, entries) ->
                 if (entries.isEmpty()) {
                     null
                 } else {
-                    createBasicTimeline(entries, request.sortOrder).days.firstOrNull()
+                    createBasicTimeline(entries, request.sortOrder, allEvents).days.firstOrNull()
                 }
             }
 
@@ -70,6 +74,7 @@ class GetTimelinePageUseCase(
 private fun createBasicTimeline(
     notes: List<JournalNote>,
     sortOrder: TimelineSortOrder,
+    events: List<Event>,
 ): Timeline {
     val notesByDay = notes.groupBy(JournalNote::timelineDate)
 
@@ -82,7 +87,7 @@ private fun createBasicTimeline(
                 tldr = "",
                 date = date,
                 people = emptyList(),
-                events = emptyList(),
+                events = events.overlapping(entries),
                 placesVisited = places,
                 moments = inferMomentsHeuristically(date, entries, places),
                 parts = extractDayParts(entries),
@@ -103,3 +108,12 @@ private fun applySorting(
     }
 
 private fun JournalNote.timelineDate() = creationTimestamp.toLocalDateTime(TimeZone.currentSystemDefault()).date
+
+private fun List<Event>.overlapping(entries: List<JournalNote>): List<Event> {
+    if (entries.isEmpty()) return emptyList()
+    val dayStart = entries.minOf { it.creationTimestamp }
+    val dayEnd = entries.maxOf { it.creationTimestamp }
+    return filter { event ->
+        event.startTime < dayEnd && (event.endTime ?: event.startTime) >= dayStart
+    }
+}

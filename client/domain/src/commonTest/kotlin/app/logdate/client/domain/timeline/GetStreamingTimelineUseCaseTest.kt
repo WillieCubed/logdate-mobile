@@ -19,11 +19,13 @@ import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.networking.NetworkState
+import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
+import app.logdate.shared.model.Event
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
@@ -61,6 +63,7 @@ class GetStreamingTimelineUseCaseTest {
                 notesRepository = mockNotesRepository,
                 getTimelineDayUseCase = getTimelineDayUseCase,
                 groupNotesByDayBoundsUseCase = calendarDateGrouper(),
+                eventRepository = StreamingNoOpEventRepository,
             )
     }
 
@@ -543,7 +546,13 @@ class GetStreamingTimelineUseCaseTest {
 
                     override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
                 }
-            val reactiveUseCase = GetStreamingTimelineUseCase(reactiveRepository, buildTimelineDayUseCase(), calendarDateGrouper())
+            val reactiveUseCase =
+                GetStreamingTimelineUseCase(
+                    reactiveRepository,
+                    buildTimelineDayUseCase(),
+                    calendarDateGrouper(),
+                    StreamingNoOpEventRepository,
+                )
 
             // When - collect the initial and updated day counts deterministically
             val dayCounts =
@@ -750,5 +759,40 @@ class GetStreamingTimelineUseCaseTest {
             fileName: String,
             mimeType: String,
         ): String = "file:///tmp/$fileName"
+    }
+
+    private object StreamingNoOpEventRepository : EventRepository {
+        override fun observeAllEvents(): Flow<List<Event>> = flowOf(emptyList())
+
+        override fun observeEvent(eventId: Uuid): Flow<Event?> = flowOf(null)
+
+        override fun observeEventsForDateRange(
+            start: Instant,
+            end: Instant,
+        ): Flow<List<Event>> = flowOf(emptyList())
+
+        override suspend fun getEventById(eventId: Uuid): Event? = null
+
+        override suspend fun findByExternalCalendarId(externalId: String): Event? = null
+
+        override suspend fun createEvent(event: Event): Result<Unit> = Result.success(Unit)
+
+        override suspend fun updateEvent(event: Event): Result<Unit> = Result.success(Unit)
+
+        override suspend fun deleteEvent(eventId: Uuid): Result<Unit> = Result.success(Unit)
+
+        override fun observeEventsForNote(noteId: Uuid): Flow<List<Event>> = flowOf(emptyList())
+
+        override fun observeNotesForEvent(eventId: Uuid): Flow<List<Uuid>> = flowOf(emptyList())
+
+        override suspend fun linkNoteToEvent(
+            eventId: Uuid,
+            noteId: Uuid,
+        ): Result<Unit> = Result.success(Unit)
+
+        override suspend fun unlinkNoteFromEvent(
+            eventId: Uuid,
+            noteId: Uuid,
+        ): Result<Unit> = Result.success(Unit)
     }
 }

@@ -1,7 +1,9 @@
 package app.logdate.client.domain.timeline
 
+import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.shared.model.Event
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -30,7 +32,7 @@ class GetTimelinePageUseCaseTest {
                 )
 
             val result =
-                GetTimelinePageUseCase(repository, calendarDateGrouper())(
+                GetTimelinePageUseCase(repository, calendarDateGrouper(), PageNoOpEventRepository)(
                     TimelinePageRequest(
                         pageSize = 3,
                     ),
@@ -59,7 +61,7 @@ class GetTimelinePageUseCaseTest {
                             textNote("Jan 1", "2025-01-01T18:00:00Z"),
                         ),
                 )
-            val useCase = GetTimelinePageUseCase(repository, calendarDateGrouper())
+            val useCase = GetTimelinePageUseCase(repository, calendarDateGrouper(), PageNoOpEventRepository)
 
             val firstPage = useCase(TimelinePageRequest(pageSize = 3))
             val secondPage =
@@ -91,7 +93,7 @@ class GetTimelinePageUseCaseTest {
                             textNote("Only day early", "2025-01-03T15:00:00Z"),
                         ),
                 )
-            val useCase = GetTimelinePageUseCase(repository, calendarDateGrouper())
+            val useCase = GetTimelinePageUseCase(repository, calendarDateGrouper(), PageNoOpEventRepository)
 
             val firstPage = useCase(TimelinePageRequest(pageSize = 1))
             val secondPage =
@@ -161,4 +163,39 @@ class GetTimelinePageUseCaseTest {
 
         override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
     }
+}
+
+private object PageNoOpEventRepository : EventRepository {
+    override fun observeAllEvents(): Flow<List<Event>> = flowOf(emptyList())
+
+    override fun observeEvent(eventId: Uuid): Flow<Event?> = flowOf(null)
+
+    override fun observeEventsForDateRange(
+        start: Instant,
+        end: Instant,
+    ): Flow<List<Event>> = flowOf(emptyList())
+
+    override suspend fun getEventById(eventId: Uuid): Event? = null
+
+    override suspend fun findByExternalCalendarId(externalId: String): Event? = null
+
+    override suspend fun createEvent(event: Event): Result<Unit> = Result.success(Unit)
+
+    override suspend fun updateEvent(event: Event): Result<Unit> = Result.success(Unit)
+
+    override suspend fun deleteEvent(eventId: Uuid): Result<Unit> = Result.success(Unit)
+
+    override fun observeEventsForNote(noteId: Uuid): Flow<List<Event>> = flowOf(emptyList())
+
+    override fun observeNotesForEvent(eventId: Uuid): Flow<List<Uuid>> = flowOf(emptyList())
+
+    override suspend fun linkNoteToEvent(
+        eventId: Uuid,
+        noteId: Uuid,
+    ): Result<Unit> = Result.success(Unit)
+
+    override suspend fun unlinkNoteFromEvent(
+        eventId: Uuid,
+        noteId: Uuid,
+    ): Result<Unit> = Result.success(Unit)
 }
