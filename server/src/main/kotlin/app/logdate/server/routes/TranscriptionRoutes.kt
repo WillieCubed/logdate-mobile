@@ -6,6 +6,8 @@ import app.logdate.server.entitlements.EntitlementFeature
 import app.logdate.server.entitlements.EntitlementService
 import app.logdate.server.entitlements.EntitlementStatus
 import app.logdate.server.entitlements.EntitlementTier
+import app.logdate.server.ratelimit.RateLimitPolicy
+import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.transcription.CloudTranscriptionSessionProvider
 import app.logdate.server.transcription.CloudTranscriptionSessionUnavailableException
 import app.logdate.server.transcription.DisabledCloudTranscriptionSessionProvider
@@ -13,6 +15,7 @@ import app.logdate.shared.model.transcription.CloudTranscriptionClientSecret
 import app.logdate.shared.model.transcription.CloudTranscriptionMode
 import app.logdate.shared.model.transcription.CloudTranscriptionSessionRequest
 import app.logdate.shared.model.transcription.CloudTranscriptionSessionResponse
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
@@ -35,6 +38,7 @@ fun Route.transcriptionRoutes(
     entitlementService: EntitlementService,
     sessionIdFactory: () -> String = { UUID.randomUUID().toString() },
     sessionProvider: CloudTranscriptionSessionProvider = DisabledCloudTranscriptionSessionProvider(),
+    rateLimiter: SlidingWindowRateLimiter = SlidingWindowRateLimiter(),
 ) {
     route("/transcription") {
         post("/sessions") {
@@ -44,6 +48,16 @@ fun Route.transcriptionRoutes(
                         HttpStatusCode.Unauthorized,
                         mapOf("error" to "missing or invalid Authorization header"),
                     )
+            val rateLimitKey = "transcription.sessions.$accountId"
+            if (!rateLimiter.allow(rateLimitKey, CLOUD_TRANSCRIPTION_SESSION_LIMIT)) {
+                val retryAfter = rateLimiter.retryAfterSeconds(rateLimitKey, CLOUD_TRANSCRIPTION_SESSION_LIMIT)
+                call.response.headers.append(HttpHeaders.RetryAfter, retryAfter.toString())
+                call.respond(
+                    HttpStatusCode.TooManyRequests,
+                    mapOf("error" to "cloud transcription session rate limit exceeded"),
+                )
+                return@post
+            }
             val entitlement = entitlementService.resolve(accountId)
             val request = call.receive<CloudTranscriptionSessionRequest>()
             val requiredFeature =
@@ -120,3 +134,14 @@ private fun EntitlementStatus.allowsCloudTranscription(): Boolean =
         -> true
         EntitlementStatus.CANCELLED -> false
     }
+
+/**
+ * Per-account ceiling on cloud transcription session creation. Keeps a runaway
+ * client (or an entitled abuser) from racking up provider cost between monthly
+ * quota refresh windows.
+ */
+internal val CLOUD_TRANSCRIPTION_SESSION_LIMIT =
+    RateLimitPolicy(
+        maxRequests = 30,
+        windowSeconds = 60 * 60,
+    )

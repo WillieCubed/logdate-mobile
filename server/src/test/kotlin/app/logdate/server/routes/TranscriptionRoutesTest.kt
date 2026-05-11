@@ -7,6 +7,7 @@ import app.logdate.server.entitlements.EntitlementLimits
 import app.logdate.server.entitlements.EntitlementService
 import app.logdate.server.entitlements.EntitlementStatus
 import app.logdate.server.entitlements.EntitlementTier
+import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.transcription.CloudTranscriptionSessionLease
 import app.logdate.server.transcription.CloudTranscriptionSessionProvider
 import app.logdate.server.transcription.CloudTranscriptionSessionUnavailableException
@@ -144,6 +145,31 @@ class TranscriptionRoutesTest {
         }
 
     @Test
+    fun `creating transcription session rejects callers over the per-account rate limit`() =
+        testApplication {
+            val rateLimiter = SlidingWindowRateLimiter()
+            val key = "transcription.sessions.$accountId"
+            repeat(CLOUD_TRANSCRIPTION_SESSION_LIMIT.maxRequests) {
+                rateLimiter.allow(key, CLOUD_TRANSCRIPTION_SESSION_LIMIT)
+            }
+            configureTranscriptionRoutes(
+                entitlement = realtimeEntitlement(),
+                rateLimiter = rateLimiter,
+            )
+
+            val response =
+                client.post("/api/v1/transcription/sessions") {
+                    header(HttpHeaders.Authorization, authHeader())
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"noteId":"note-1","mode":"REALTIME"}""")
+                }
+
+            assertEquals(HttpStatusCode.TooManyRequests, response.status)
+            val retryAfter = response.headers[HttpHeaders.RetryAfter]?.toIntOrNull() ?: 0
+            assertEquals(true, retryAfter > 0)
+        }
+
+    @Test
     fun `creating transcription session fails closed when cloud provider is unavailable`() =
         testApplication {
             configureTranscriptionRoutes(
@@ -167,6 +193,7 @@ class TranscriptionRoutesTest {
     private fun TestApplicationBuilder.configureTranscriptionRoutes(
         entitlement: Entitlement,
         provider: CloudTranscriptionSessionProvider = StaticCloudTranscriptionSessionProvider(),
+        rateLimiter: SlidingWindowRateLimiter = SlidingWindowRateLimiter(),
     ) {
         application {
             install(ContentNegotiation) {
@@ -179,6 +206,7 @@ class TranscriptionRoutesTest {
                         entitlementService = StaticEntitlementService(entitlement),
                         sessionIdFactory = { "session-fixed" },
                         sessionProvider = provider,
+                        rateLimiter = rateLimiter,
                     )
                 }
             }
