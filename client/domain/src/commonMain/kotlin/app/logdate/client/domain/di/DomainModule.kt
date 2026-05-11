@@ -1,6 +1,7 @@
 package app.logdate.client.domain.di
 
 import app.logdate.client.datastore.LogdatePreferencesDataSource
+import app.logdate.client.domain.account.GetCurrentEntitlementUseCase
 import app.logdate.client.domain.app.GetAppInfoUseCase
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
 import app.logdate.client.domain.dayboundary.DefaultDayBoundarySettingsRepository
@@ -69,6 +70,7 @@ import app.logdate.client.domain.recommendation.PlaceFamiliarityRepository
 import app.logdate.client.domain.restore.PreviewArchiveUseCase
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.domain.rewind.DeleteRewindUseCase
+import app.logdate.client.domain.rewind.EntitlementRewindAIAvailability
 import app.logdate.client.domain.rewind.GenerateAnnualRewindUseCase
 import app.logdate.client.domain.rewind.GenerateBasicRewindUseCase
 import app.logdate.client.domain.rewind.GenerateRewindTitleUseCase
@@ -96,6 +98,7 @@ import app.logdate.client.domain.timeline.GetTimelineUseCase
 import app.logdate.client.domain.timeline.GroupNotesByDayBoundsUseCase
 import app.logdate.client.domain.timeline.InferMomentsUseCase
 import app.logdate.client.domain.timeline.SummarizeJournalEntriesUseCase
+import app.logdate.client.intelligence.availability.RewindAIAvailability
 import app.logdate.client.intelligence.events.EventNamingExtractor
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -167,12 +170,16 @@ val domainModule: Module =
         factory { DeleteRewindUseCase(get()) }
         factory { MarkRewindViewedUseCase(get()) }
         factory { GenerateAnnualRewindUseCase(get(), get(), get(), get()) }
+        factory<RewindAIAvailability> {
+            val getEntitlement: GetCurrentEntitlementUseCase = get()
+            EntitlementRewindAIAvailability(getEntitlement::invoke)
+        }
 
         // Media indexing
         factory { IndexMediaForPeriodUseCase(get(), get()) }
 
         // Create the GenerateBasicRewindUseCase with all its dependencies
-        factory { GenerateBasicRewindUseCase(get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+        factory { GenerateBasicRewindUseCase(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 
         // Timeline
         factory { GetJournalMembershipUseCase(get()) }
@@ -180,7 +187,7 @@ val domainModule: Module =
         factory { GroupNotesByDayBoundsUseCase(get(), get()) }
         factory { GetTimelineUseCase(get(), get(), get(), get()) }
         factory { GetStreamingTimelineUseCase(get(), get(), get(), get()) }
-        factory { GetTimelinePageUseCase(get(), get(), get()) }
+        factory { GetTimelinePageUseCase(get(), get(), get(), get<GetTimelineDayUseCase>()) }
         factory { InferMomentsUseCase(get(), get()) }
         factory { GetTimelineDayUseCase(get(), get(), get(), get()) }
         factory { SummarizeJournalEntriesUseCase(get()) }

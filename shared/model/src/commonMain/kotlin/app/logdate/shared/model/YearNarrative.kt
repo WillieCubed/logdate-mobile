@@ -35,6 +35,13 @@ data class YearNarrative(
      * Year-level noticings drawn from patterns across the full year.
      */
     val reflectionPrompts: List<ReflectionPrompt> = emptyList(),
+    /**
+     * Where this narrative came from — full LLM or pure local heuristics.
+     *
+     * Defaults to [NarrativeOrigin.LLM] for backward compatibility with cached responses
+     * written before this field existed.
+     */
+    val origin: NarrativeOrigin = NarrativeOrigin.LLM,
 )
 
 /**

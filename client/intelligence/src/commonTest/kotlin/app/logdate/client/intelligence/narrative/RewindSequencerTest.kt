@@ -1,10 +1,14 @@
 package app.logdate.client.intelligence.narrative
 
+import app.logdate.client.intelligence.curation.CurationResult
+import app.logdate.client.intelligence.curation.MediaCandidate
+import app.logdate.client.intelligence.curation.MediaSignals
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.shared.model.RewindContent
 import app.logdate.shared.model.StoryBeat
 import app.logdate.shared.model.WeekNarrative
+import app.logdate.shared.model.WeekStatsSnapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -15,23 +19,22 @@ import kotlin.uuid.Uuid
 
 class RewindSequencerTest {
     private val sequencer = RewindSequencer()
+    private val emptyStats = WeekStatsSnapshot(photoCount = 0, textNoteCount = 0, distinctLocations = 0, distinctPeople = 0)
 
     @Test
     fun sequence_createsOpeningContext() {
-        val narrative =
-            WeekNarrative(
-                themes = listOf("vacation"),
-                emotionalTone = "excited",
-                storyBeats = emptyList(),
-                overallNarrative = "You explored the coast. It was wonderful.",
-            )
+        val narrative = narrativeOf(overallNarrative = "You explored the coast. It was wonderful.")
 
         val result =
             sequencer.sequence(
                 narrative = narrative,
+                curation = CurationResult.EMPTY,
                 textEntries = emptyList(),
-                media = emptyList(),
                 people = emptyList(),
+                weather = null,
+                locationPath = emptyList(),
+                stats = emptyStats,
+                activities = emptyList(),
             )
 
         assertTrue(result.isNotEmpty())
@@ -41,20 +44,18 @@ class RewindSequencerTest {
 
     @Test
     fun sequence_createsResolution() {
-        val narrative =
-            WeekNarrative(
-                themes = listOf("vacation"),
-                emotionalTone = "excited",
-                storyBeats = emptyList(),
-                overallNarrative = "You explored the coast. It was wonderful.",
-            )
+        val narrative = narrativeOf(overallNarrative = "You explored the coast. It was wonderful.")
 
         val result =
             sequencer.sequence(
                 narrative = narrative,
+                curation = CurationResult.EMPTY,
                 textEntries = emptyList(),
-                media = emptyList(),
                 people = emptyList(),
+                weather = null,
+                locationPath = emptyList(),
+                stats = emptyStats,
+                activities = emptyList(),
             )
 
         assertTrue(result.isNotEmpty())
@@ -73,9 +74,7 @@ class RewindSequencerTest {
             )
 
         val narrative =
-            WeekNarrative(
-                themes = listOf("exploration"),
-                emotionalTone = "triumphant",
+            narrativeOf(
                 storyBeats =
                     listOf(
                         StoryBeat(
@@ -91,9 +90,13 @@ class RewindSequencerTest {
         val result =
             sequencer.sequence(
                 narrative = narrative,
+                curation = CurationResult.EMPTY,
                 textEntries = listOf(textEntry),
-                media = emptyList(),
                 people = emptyList(),
+                weather = null,
+                locationPath = emptyList(),
+                stats = emptyStats,
+                activities = emptyList(),
             )
 
         // Should have: opening context + text evidence + resolution
@@ -124,20 +127,14 @@ class RewindSequencerTest {
             )
 
         val narrative =
-            WeekNarrative(
-                themes = listOf("vacation"),
-                emotionalTone = "joyful",
+            narrativeOf(
                 storyBeats =
                     listOf(
                         StoryBeat(
                             moment = "Beach memories",
                             context = "Captured the moment",
                             emotionalWeight = "happy",
-                            evidenceIds =
-                                listOf(
-                                    imageMedia.uid.toString(),
-                                    videoMedia.uid.toString(),
-                                ),
+                            evidenceIds = listOf(imageMedia.uid.toString(), videoMedia.uid.toString()),
                         ),
                     ),
                 overallNarrative = "You captured beautiful beach moments.",
@@ -146,12 +143,15 @@ class RewindSequencerTest {
         val result =
             sequencer.sequence(
                 narrative = narrative,
+                curation = curationOf(listOf(imageMedia, videoMedia), narrative.storyBeats),
                 textEntries = emptyList(),
-                media = listOf(imageMedia, videoMedia),
                 people = emptyList(),
+                weather = null,
+                locationPath = emptyList(),
+                stats = emptyStats,
+                activities = emptyList(),
             )
 
-        // Find image and video panels
         val imagePanel = assertIs<RewindContent.Image>(result.find { it is RewindContent.Image })
         val videoPanel = assertIs<RewindContent.Video>(result.find { it is RewindContent.Video })
 
@@ -178,9 +178,7 @@ class RewindSequencerTest {
             )
 
         val narrative =
-            WeekNarrative(
-                themes = listOf("vacation", "food"),
-                emotionalTone = "delightful",
+            narrativeOf(
                 storyBeats =
                     listOf(
                         StoryBeat(
@@ -202,12 +200,15 @@ class RewindSequencerTest {
         val result =
             sequencer.sequence(
                 narrative = narrative,
+                curation = CurationResult.EMPTY,
                 textEntries = listOf(textEntry1, textEntry2),
-                media = emptyList(),
                 people = emptyList(),
+                weather = null,
+                locationPath = emptyList(),
+                stats = emptyStats,
+                activities = emptyList(),
             )
 
-        // Should have transitions between beats
         val transitions = result.filterIsInstance<RewindContent.Transition>()
         assertTrue(transitions.isNotEmpty(), "Should have at least one transition between beats")
     }
@@ -237,9 +238,7 @@ class RewindSequencerTest {
             )
 
         val narrative =
-            WeekNarrative(
-                themes = listOf("eventful"),
-                emotionalTone = "busy",
+            narrativeOf(
                 storyBeats =
                     entries.mapIndexed { index, entry ->
                         StoryBeat(
@@ -255,16 +254,18 @@ class RewindSequencerTest {
         val result =
             sequencer.sequence(
                 narrative = narrative,
+                curation = CurationResult.EMPTY,
                 textEntries = entries,
-                media = emptyList(),
                 people = emptyList(),
+                weather = null,
+                locationPath = emptyList(),
+                stats = emptyStats,
+                activities = emptyList(),
             )
 
-        // Should have all three text entries
         val textPanels = result.filterIsInstance<RewindContent.TextNote>()
         assertEquals(3, textPanels.size)
 
-        // Should have transitions between beats (2 transitions for 3 beats)
         val transitions = result.filterIsInstance<RewindContent.Transition>()
         assertEquals(2, transitions.size)
     }
@@ -272,9 +273,7 @@ class RewindSequencerTest {
     @Test
     fun sequence_handlesBeatWithNoEvidence() {
         val narrative =
-            WeekNarrative(
-                themes = listOf("quiet"),
-                emotionalTone = "peaceful",
+            narrativeOf(
                 storyBeats =
                     listOf(
                         StoryBeat(
@@ -290,14 +289,16 @@ class RewindSequencerTest {
         val result =
             sequencer.sequence(
                 narrative = narrative,
+                curation = CurationResult.EMPTY,
                 textEntries = emptyList(),
-                media = emptyList(),
                 people = emptyList(),
+                weather = null,
+                locationPath = emptyList(),
+                stats = emptyStats,
+                activities = emptyList(),
             )
 
-        // Should create a narrative context panel for the beat even without evidence
         val narrativeContexts = result.filterIsInstance<RewindContent.NarrativeContext>()
-        // Opening + beat placeholder + resolution = at least 3
         assertTrue(narrativeContexts.size >= 3)
     }
 
@@ -320,20 +321,14 @@ class RewindSequencerTest {
             )
 
         val narrative =
-            WeekNarrative(
-                themes = listOf("reflection"),
-                emotionalTone = "thoughtful",
+            narrativeOf(
                 storyBeats =
                     listOf(
                         StoryBeat(
                             moment = "Day of reflection",
                             context = "Deep thinking",
                             emotionalWeight = "contemplative",
-                            evidenceIds =
-                                listOf(
-                                    laterEntry.uid.toString(),
-                                    earlierEntry.uid.toString(),
-                                ),
+                            evidenceIds = listOf(laterEntry.uid.toString(), earlierEntry.uid.toString()),
                         ),
                     ),
                 overallNarrative = "A thoughtful day.",
@@ -342,40 +337,85 @@ class RewindSequencerTest {
         val result =
             sequencer.sequence(
                 narrative = narrative,
+                curation = CurationResult.EMPTY,
                 textEntries = listOf(laterEntry, earlierEntry),
-                media = emptyList(),
                 people = emptyList(),
+                weather = null,
+                locationPath = emptyList(),
+                stats = emptyStats,
+                activities = emptyList(),
             )
 
         val textPanels = result.filterIsInstance<RewindContent.TextNote>()
         assertEquals(2, textPanels.size)
 
-        // Earlier entry should come first
         assertEquals("Morning thoughts", textPanels[0].content)
         assertEquals("Evening reflection", textPanels[1].content)
     }
 
     @Test
     fun sequence_withEmptyNarrative_createsMinimalStructure() {
-        val narrative =
-            WeekNarrative(
-                themes = emptyList(),
-                emotionalTone = "uneventful",
-                storyBeats = emptyList(),
-                overallNarrative = "Not much happened.",
-            )
+        val narrative = narrativeOf(overallNarrative = "Not much happened.")
 
         val result =
             sequencer.sequence(
                 narrative = narrative,
+                curation = CurationResult.EMPTY,
                 textEntries = emptyList(),
-                media = emptyList(),
                 people = emptyList(),
+                weather = null,
+                locationPath = emptyList(),
+                stats = emptyStats,
+                activities = emptyList(),
             )
 
-        // Should still have opening and resolution
         assertTrue(result.size >= 2)
         assertTrue(result.first() is RewindContent.NarrativeContext)
         assertTrue(result.last() is RewindContent.NarrativeContext)
+    }
+
+    /** Builds a minimal [WeekNarrative] for tests, defaulting the unused fields. */
+    private fun narrativeOf(
+        storyBeats: List<StoryBeat> = emptyList(),
+        overallNarrative: String = "A week.",
+    ): WeekNarrative =
+        WeekNarrative(
+            themes = emptyList(),
+            emotionalTone = "neutral",
+            storyBeats = storyBeats,
+            overallNarrative = overallNarrative,
+        )
+
+    /**
+     * Test fixture that mirrors what the curator would produce: every media item cited by
+     * any beat lands in that beat's bucket; everything else becomes a free agent.
+     */
+    private fun curationOf(
+        media: List<IndexedMedia>,
+        beats: List<StoryBeat>,
+    ): CurationResult {
+        val perBeat = mutableMapOf<Int, MutableList<MediaCandidate>>()
+        val freeAgents = mutableListOf<MediaCandidate>()
+        media.forEach { m ->
+            val beatIdx = beats.indexOfFirst { m.uid.toString() in it.evidenceIds }
+            val candidate =
+                MediaCandidate(
+                    media = m,
+                    signals = MediaSignals(),
+                    isLLMCited = beatIdx >= 0,
+                    assignedBeatIndex = if (beatIdx >= 0) beatIdx else null,
+                )
+            if (beatIdx >= 0) {
+                perBeat.getOrPut(beatIdx) { mutableListOf() }.add(candidate)
+            } else {
+                freeAgents.add(candidate)
+            }
+        }
+        return CurationResult(
+            perBeat = perBeat.mapValues { it.value.toList() },
+            freeAgents = freeAgents,
+            rejected = emptyList(),
+            sigByMediaUid = media.associate { it.uid to 50f },
+        )
     }
 }

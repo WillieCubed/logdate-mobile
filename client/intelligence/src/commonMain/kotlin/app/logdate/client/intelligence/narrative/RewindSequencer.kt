@@ -1,125 +1,169 @@
 package app.logdate.client.intelligence.narrative
 
+import app.logdate.client.intelligence.curation.CurationResult
+import app.logdate.client.intelligence.curation.MediaCandidate
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.media.IndexedMedia
+import app.logdate.shared.model.ActivityType
+import app.logdate.shared.model.MapPoint
+import app.logdate.shared.model.NarrativeOrigin
 import app.logdate.shared.model.Person
 import app.logdate.shared.model.RewindContent
+import app.logdate.shared.model.StoryBeat
+import app.logdate.shared.model.TopListItem
+import app.logdate.shared.model.TopListKind
+import app.logdate.shared.model.WeatherContext
 import app.logdate.shared.model.WeekNarrative
+import app.logdate.shared.model.WeekStatsSnapshot
 import io.github.aakira.napier.Napier
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * Sequences Rewind content into a narrative-driven story flow.
+ * Sequences a Rewind into a narrative-driven story.
  *
- * Unlike formulaic sequencers (opening→peak→closing), this arranges content
- * to TELL the specific story of each week based on AI-generated narrative understanding.
+ * The sequencer's job is composition only — selection is done by
+ * [app.logdate.client.intelligence.curation.RewindMediaCurator] upstream. Every emitted
+ * panel is one of three things: an LLM-cited piece of evidence, a top-up significance
+ * pick, or a structural panel (opening / transition / map / weather / personality / top
+ * lists / resolution).
  *
- * Process:
- * 1. Opening: Narrative context panel that sets the scene ("You explored the coast...")
- * 2. Story Beats: For each beat, gather evidence and create supporting panels
- * 3. Transitions: Connect beats with narrative transitions ("But evenings shifted...")
- * 4. Resolution: Close with reflection on what the week meant
+ * Opening / resolution behavior is keyed off [WeekNarrative.origin]: LLM origins get an
+ * AI-written narrative opening / resolution, [NarrativeOrigin.LOCAL_HEURISTIC] gets a
+ * structural [RewindContent.PersonalityCard] opening and skips the resolution sentence
+ * that would feel hollow without a real LLM behind it.
  */
 class RewindSequencer {
     /**
-     * Sequences content into a narrative-driven story.
+     * Composes the panel list for a Rewind.
      *
-     * @param narrative AI-generated understanding of the week's story
-     * @param textEntries All text entries from the week
-     * @param media All media items from the week
-     * @param people People mentioned during the week
-     * @return Ordered list of RewindContent panels that tell the story
+     * @param narrative The (LLM- or locally-generated) understanding of the week.
+     * @param curation Pre-curated media. The sequencer consumes [CurationResult.perBeat]
+     *   for in-beat panels and [CurationResult.freeAgents] for structural decorations.
+     * @param textEntries All text journal entries from the period — used to attach text
+     *   quotes cited by story beats' `evidenceIds`.
+     * @param people People extracted from the period — used to build a [TopListKind.PEOPLE]
+     *   card when the count is high enough.
+     * @param weather Atmospheric context for the period, or null when unavailable.
+     * @param locationPath Downsampled location path; rendered as a [RewindContent.MapPanel]
+     *   when there are enough points to read as movement.
+     * @param stats Counts that populate the [RewindContent.PersonalityCard].
+     * @param activities Activity classification for the period, used to choose the
+     *   personality card's dominant-activity headline.
      */
     fun sequence(
         narrative: WeekNarrative,
+        curation: CurationResult,
         textEntries: List<JournalNote.Text>,
-        media: List<IndexedMedia>,
-        people: List<Person> = emptyList(),
+        people: List<Person>,
+        weather: WeatherContext?,
+        locationPath: List<MapPoint>,
+        stats: WeekStatsSnapshot,
+        activities: List<ActivityType>,
     ): List<RewindContent> {
-        Napier.d("Sequencing narrative with ${narrative.storyBeats.size} beats")
+        Napier.d("Sequencing narrative (${narrative.origin}) with ${narrative.storyBeats.size} beats")
 
-        // Derive timestamp boundaries from actual content
-        val allTimestamps = textEntries.map { it.creationTimestamp } + media.map { it.timestamp }
-        val earliestTimestamp = allTimestamps.minOrNull() ?: Instant.DISTANT_PAST
-        val latestTimestamp = allTimestamps.maxOrNull() ?: Instant.DISTANT_FUTURE
+        val allTimestamps =
+            textEntries.map { it.creationTimestamp } +
+                curation.perBeat.values
+                    .flatten()
+                    .map { it.media.timestamp } +
+                curation.freeAgents.map { it.media.timestamp }
+        val earliest = allTimestamps.minOrNull() ?: Instant.DISTANT_PAST
+        val latest = allTimestamps.maxOrNull() ?: Instant.DISTANT_FUTURE
 
         val panels = mutableListOf<RewindContent>()
 
-        // 1. Opening: Narrative context that sets the scene
-        panels.add(createOpeningContext(narrative, earliestTimestamp))
+        // 1. Opening — narrative when an LLM was involved, personality card when not.
+        panels.add(createOpening(narrative, stats, activities, earliest))
 
-        // 2. Story beats with evidence and transitions
+        // 2. Story beats. Transitions between, evidence and curated media inside.
         narrative.storyBeats.forEachIndexed { index, beat ->
-            // Add transition before beat (except first beat)
             if (index > 0) {
                 val transition = createTransition(beat, narrative.storyBeats[index - 1])
                 transition?.let { panels.add(it) }
             }
-
-            // Add panels for this story beat
-            val beatPanels = createBeatPanels(beat, textEntries, media)
-            panels.addAll(beatPanels)
+            panels.addAll(createBeatPanels(beat, index, textEntries, curation))
         }
 
-        // 3. Resolution: Close with the overall narrative
-        panels.add(createResolution(narrative, latestTimestamp))
+        // 3. Structural decorations from the free-agent pool — map, weather, top lists.
+        //    These appear after the last story beat and before the resolution, so the
+        //    "Wrapped" insight peak lands near the end where attention is highest.
+        if (locationPath.size >= MIN_MAP_POINTS && spansMeaningfulDistance(locationPath)) {
+            panels.add(
+                RewindContent.MapPanel(
+                    timestamp = latest,
+                    sourceId = Uuid.random(),
+                    locationPath = locationPath,
+                ),
+            )
+        }
+        weather?.let {
+            panels.add(
+                RewindContent.WeatherPanel(
+                    timestamp = latest,
+                    sourceId = Uuid.random(),
+                    weather = it,
+                ),
+            )
+        }
+        topListsFor(narrative, people, curation)
+            .forEach { panels.add(it.copy(timestamp = latest, sourceId = Uuid.random())) }
+
+        // 4. Closing — LLM-origin only. Local-origin Rewinds end on the top-list peak.
+        if (narrative.origin != NarrativeOrigin.LOCAL_HEURISTIC) {
+            panels.add(createResolution(narrative, latest))
+        }
 
         Napier.d("Generated ${panels.size} panels from narrative")
         return panels
     }
 
     /**
-     * Creates opening narrative context panel.
-     *
-     * Sets the scene for the week's story.
+     * First panel of the Rewind. Narrative opening for LLM origins, structural
+     * personality card for local-heuristic origins.
      */
-    private fun createOpeningContext(
+    private fun createOpening(
         narrative: WeekNarrative,
-        earliestTimestamp: Instant,
-    ): RewindContent.NarrativeContext {
-        // Extract first sentence from overall narrative as opening
-        val sentences = narrative.overallNarrative.split(". ")
-        val openingText =
-            if (sentences.size > 1) {
-                sentences.first() + "."
-            } else {
-                narrative.overallNarrative
+        stats: WeekStatsSnapshot,
+        activities: List<ActivityType>,
+        earliest: Instant,
+    ): RewindContent =
+        when (narrative.origin) {
+            NarrativeOrigin.LLM, NarrativeOrigin.QUOTES_ONLY_LLM -> {
+                val sentences = narrative.overallNarrative.split(". ")
+                val openingText = if (sentences.size > 1) sentences.first() + "." else narrative.overallNarrative
+                RewindContent.NarrativeContext(
+                    timestamp = earliest,
+                    sourceId = Uuid.random(),
+                    contextText = openingText,
+                    backgroundImage = null,
+                )
             }
+            NarrativeOrigin.LOCAL_HEURISTIC ->
+                RewindContent.PersonalityCard(
+                    timestamp = earliest,
+                    sourceId = Uuid.random(),
+                    stats = stats,
+                    dominantActivity = activities.firstOrNull() ?: ActivityType.MIXED,
+                )
+        }
 
-        return RewindContent.NarrativeContext(
-            timestamp = earliestTimestamp,
-            sourceId = Uuid.random(),
-            contextText = openingText,
-            backgroundImage = null,
-        )
-    }
-
-    /**
-     * Creates transition panel between story beats.
-     *
-     * Explains thematic shifts and connects narrative moments.
-     */
     private fun createTransition(
-        currentBeat: app.logdate.shared.model.StoryBeat,
-        previousBeat: app.logdate.shared.model.StoryBeat,
+        currentBeat: StoryBeat,
+        previousBeat: StoryBeat,
     ): RewindContent.Transition? {
-        // Generate transition based on emotional weight shift
         val transitionText =
             when {
-                // Positive to negative shift
                 previousBeat.emotionalWeight.contains("joyful", ignoreCase = true) &&
                     currentBeat.emotionalWeight.contains("melancholy", ignoreCase = true) ->
                     "But then things shifted"
 
-                // Negative to positive shift
                 previousBeat.emotionalWeight.contains("exhausted", ignoreCase = true) &&
                     currentBeat.emotionalWeight.contains("triumphant", ignoreCase = true) ->
                     "Then came a breakthrough"
 
-                // Continuing theme
                 else -> {
-                    // Use context to create transition
                     val connector =
                         when {
                             currentBeat.context.contains("meanwhile", ignoreCase = true) -> "Meanwhile"
@@ -138,21 +182,20 @@ class RewindSequencer {
     }
 
     /**
-     * Creates panels for a specific story beat.
-     *
-     * Gathers evidence (text quotes, photos, videos) that support this beat.
+     * Builds the panel block for one story beat. Pulls cited text quotes plus the
+     * curator's pre-selected media for this beat index, stamps significance scores onto
+     * media panels, and sorts chronologically within the block.
      */
     private fun createBeatPanels(
-        beat: app.logdate.shared.model.StoryBeat,
+        beat: StoryBeat,
+        beatIndex: Int,
         textEntries: List<JournalNote.Text>,
-        media: List<IndexedMedia>,
+        curation: CurationResult,
     ): List<RewindContent> {
         val panels = mutableListOf<RewindContent>()
-
-        // Find evidence for this beat
         val evidenceIds = beat.evidenceIds.toSet()
 
-        // Add text evidence
+        // Text evidence — pull cited entries.
         textEntries
             .filter { it.uid.toString() in evidenceIds }
             .forEach { entry ->
@@ -165,36 +208,38 @@ class RewindSequencer {
                 )
             }
 
-        // Add media evidence
-        media
-            .filter { it.uid.toString() in evidenceIds }
-            .forEach { mediaItem ->
-                when (mediaItem) {
-                    is IndexedMedia.Image -> {
-                        panels.add(
-                            RewindContent.Image(
-                                timestamp = mediaItem.timestamp,
-                                sourceId = mediaItem.uid,
-                                uri = mediaItem.uri,
-                                caption = mediaItem.caption,
-                            ),
-                        )
-                    }
-                    is IndexedMedia.Video -> {
-                        panels.add(
-                            RewindContent.Video(
-                                timestamp = mediaItem.timestamp,
-                                sourceId = mediaItem.uid,
-                                uri = mediaItem.uri,
-                                caption = mediaItem.caption,
-                                duration = mediaItem.duration,
-                            ),
-                        )
-                    }
-                }
+        // Media panels — drawn from the curator's per-beat selection, with the
+        // significance score stamped on from the curation result.
+        val beatMedia: List<MediaCandidate> = curation.perBeat[beatIndex].orEmpty()
+        beatMedia.forEach { c ->
+            val score = curation.sigByMediaUid[c.media.uid]
+            when (val m = c.media) {
+                is IndexedMedia.Image ->
+                    panels.add(
+                        RewindContent.Image(
+                            timestamp = m.timestamp,
+                            sourceId = m.uid,
+                            uri = m.uri,
+                            caption = m.caption,
+                            significanceScore = score,
+                        ),
+                    )
+                is IndexedMedia.Video ->
+                    panels.add(
+                        RewindContent.Video(
+                            timestamp = m.timestamp,
+                            sourceId = m.uid,
+                            uri = m.uri,
+                            caption = m.caption,
+                            duration = m.duration,
+                            significanceScore = score,
+                        ),
+                    )
             }
+        }
 
-        // If no evidence found, create a narrative context panel for the beat
+        // When the beat has no evidence in the period's content, fall back to a context
+        // panel so the beat still shows up in the story.
         if (panels.isEmpty()) {
             Napier.w("No evidence found for beat: ${beat.moment}")
             panels.add(
@@ -207,32 +252,85 @@ class RewindSequencer {
             )
         }
 
-        // Sort panels chronologically within the beat
         return panels.sortedBy { it.timestamp }
     }
 
     /**
-     * Creates resolution panel that closes the week's story.
+     * Builds the optional top-N list panels.
+     *
+     * - PEOPLE list when there are at least two recurring people.
+     * - QUOTES list when the narrative carries at least two highlighted quotes (the
+     *   detail screen also shows these inline as Wrapped-style spotlight cards).
+     * - PLACES is deferred until the location module surfaces per-place tallies.
      */
+    private fun topListsFor(
+        narrative: WeekNarrative,
+        people: List<Person>,
+        @Suppress("UNUSED_PARAMETER") curation: CurationResult,
+    ): List<RewindContent.TopList> {
+        val out = mutableListOf<RewindContent.TopList>()
+
+        if (people.size >= 2) {
+            out.add(
+                RewindContent.TopList(
+                    timestamp = Instant.DISTANT_PAST,
+                    sourceId = Uuid.random(),
+                    kind = TopListKind.PEOPLE,
+                    items = people.take(5).map { TopListItem(label = it.name) },
+                ),
+            )
+        }
+
+        if (narrative.highlightedQuotes.size >= 2) {
+            out.add(
+                RewindContent.TopList(
+                    timestamp = Instant.DISTANT_PAST,
+                    sourceId = Uuid.random(),
+                    kind = TopListKind.QUOTES,
+                    items =
+                        narrative.highlightedQuotes.take(4).map {
+                            TopListItem(label = it.text, subtitle = it.whyItHits)
+                        },
+                ),
+            )
+        }
+        return out
+    }
+
     private fun createResolution(
         narrative: WeekNarrative,
         latestTimestamp: Instant,
     ): RewindContent.NarrativeContext {
-        // Use last sentence(s) from overall narrative as resolution
         val sentences = narrative.overallNarrative.split(". ")
         val resolutionText =
             if (sentences.size > 1) {
                 sentences.drop(1).joinToString(". ")
             } else {
-                // If only one sentence, use emotional tone as resolution
                 "A ${narrative.emotionalTone} week."
             }
-
         return RewindContent.NarrativeContext(
             timestamp = latestTimestamp,
             sourceId = Uuid.random(),
             contextText = resolutionText,
             backgroundImage = null,
         )
+    }
+
+    /**
+     * Map panel threshold check — must span at least ~1km. Uses a coarse diagonal of the
+     * lat/lon bounding box to decide; the renderer doesn't need precise distance.
+     */
+    private fun spansMeaningfulDistance(path: List<MapPoint>): Boolean {
+        if (path.size < 2) return false
+        val lats = path.map { it.latitude }
+        val lons = path.map { it.longitude }
+        val latSpan = (lats.max() - lats.min())
+        val lonSpan = (lons.max() - lons.min())
+        // 0.009 degrees ≈ 1km at the equator. Diagonal good-enough heuristic.
+        return latSpan + lonSpan > 0.009
+    }
+
+    private companion object {
+        private const val MIN_MAP_POINTS = 3
     }
 }

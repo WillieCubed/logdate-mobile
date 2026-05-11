@@ -3,6 +3,10 @@ package app.logdate.client.domain.rewind
 import app.logdate.client.domain.media.IndexMediaForPeriodUseCase
 import app.logdate.client.domain.notes.FetchNotesForDayUseCase
 import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.curation.CurationConfig
+import app.logdate.client.intelligence.curation.CurationResult
+import app.logdate.client.intelligence.curation.MediaCandidate
+import app.logdate.client.intelligence.curation.RewindMediaCurator
 import app.logdate.client.intelligence.entity.people.PeopleExtractor
 import app.logdate.client.intelligence.narrative.RewindSequencer
 import app.logdate.client.intelligence.narrative.WeekNarrativeSynthesizer
@@ -22,6 +26,7 @@ import app.logdate.shared.model.RewindContent
 import app.logdate.shared.model.RewindGenerationRequest
 import app.logdate.shared.model.RewindMetadata
 import app.logdate.shared.model.WeekNarrative
+import app.logdate.shared.model.WeekStatsSnapshot
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.firstOrNull
@@ -58,6 +63,7 @@ class GenerateBasicRewindUseCase(
     private val generateRewindTitle: GenerateRewindTitleUseCase,
     private val narrativeSynthesizer: WeekNarrativeSynthesizer,
     private val rewindSequencer: RewindSequencer,
+    private val rewindMediaCurator: RewindMediaCurator,
     private val peopleExtractor: PeopleExtractor,
     private val locationHistoryRepository: LocationHistoryRepository,
 ) {
@@ -232,6 +238,27 @@ class GenerateBasicRewindUseCase(
                     useCached = true,
                 )
 
+            // Curate media before sequencing — strips screenshots / doc scans / burst
+            // duplicates and assigns each survivor to a story-beat window when one fits.
+            // Runs in both the AI-success and fallback paths so even a Rewind without
+            // narrative still benefits from photo curation.
+            val narrative = (narrativeResult as? AIResult.Success)?.value
+            val curation =
+                rewindMediaCurator.curate(
+                    allMedia = mediaItems,
+                    narrative = narrative,
+                    textEntries = allTextEntries,
+                    people = people,
+                    locationHistory = locationHistory,
+                    periodStart = startTime,
+                    periodEnd = endTime,
+                    config = CurationConfig(),
+                )
+
+            val activities = narrative?.themes?.let { deriveActivitiesFromThemes(it) } ?: listOf(ActivityType.MIXED)
+            val mapPoints = downsampleToMapPoints(locationHistory)
+            val stats = buildWeekStats(allTextEntries, curation, locationHistory, people)
+
             // Sequence content into narrative-driven panels
             val narrativeContent =
                 when (narrativeResult) {
@@ -239,25 +266,22 @@ class GenerateBasicRewindUseCase(
                         Napier.d("Using AI narrative with ${narrativeResult.value.storyBeats.size} story beats")
                         rewindSequencer.sequence(
                             narrative = narrativeResult.value,
+                            curation = curation,
                             textEntries = allTextEntries,
-                            media = mediaItems,
                             people = people,
+                            weather = narrativeResult.value.weatherContext,
+                            locationPath = mapPoints,
+                            stats = stats,
+                            activities = activities,
                         )
                     }
                     is AIResult.Unavailable -> {
-                        Napier.w("Narrative synthesis unavailable, falling back to chronological content")
-                        // Fallback: chronological content if narrative synthesis fails
-                        val fallbackContent = mutableListOf<RewindContent>()
-                        fallbackContent.addAll(allTextEntries.map { it.toRewindContent() })
-                        fallbackContent.addAll(mediaItems.map { it.toRewindContent() })
-                        fallbackContent.sortedBy { it.timestamp }
+                        Napier.w("Narrative synthesis unavailable, building curated chronological fallback")
+                        buildCuratedFallback(allTextEntries, curation)
                     }
                     is AIResult.Error -> {
-                        Napier.w("Narrative synthesis failed, falling back to chronological content")
-                        val fallbackContent = mutableListOf<RewindContent>()
-                        fallbackContent.addAll(allTextEntries.map { it.toRewindContent() })
-                        fallbackContent.addAll(mediaItems.map { it.toRewindContent() })
-                        fallbackContent.sortedBy { it.timestamp }
+                        Napier.w("Narrative synthesis failed, building curated chronological fallback")
+                        buildCuratedFallback(allTextEntries, curation)
                     }
                 }
 
@@ -267,7 +291,6 @@ class GenerateBasicRewindUseCase(
             val titleInfo = generateRewindTitle(startTime, endTime)
 
             // Build intelligence metadata from collected data
-            val narrative = (narrativeResult as? AIResult.Success)?.value
             val metadata =
                 buildMetadata(
                     narrative = narrative,
@@ -412,6 +435,77 @@ class GenerateBasicRewindUseCase(
     private fun deriveActivities(themes: List<String>): List<ActivityType> = deriveActivitiesFromThemes(themes)
 
     /**
+     * Summarizes the period as headline counts for the personality card. Photo count is
+     * the curated total (post-filter), not the device-side raw count — what the user
+     * sees in their Rewind is what gets summarized.
+     */
+    private fun buildWeekStats(
+        textEntries: List<JournalNote.Text>,
+        curation: CurationResult,
+        locationHistory: List<LocationHistoryItem>,
+        people: List<app.logdate.shared.model.Person>,
+    ): WeekStatsSnapshot {
+        val curatedMediaCount =
+            curation.perBeat.values.sumOf { it.size } + curation.freeAgents.size
+        val distinctLocations =
+            locationHistory
+                .map { "${it.location.latitude.toInt()},${it.location.longitude.toInt()}" }
+                .distinct()
+                .size
+        return WeekStatsSnapshot(
+            photoCount = curatedMediaCount,
+            textNoteCount = textEntries.size,
+            distinctLocations = distinctLocations,
+            distinctPeople = people.size,
+        )
+    }
+
+    /**
+     * Builds the fallback panel list when narrative synthesis was unavailable.
+     *
+     * Still chronological — but only curated media (screenshots / doc scans / burst
+     * duplicates already dropped). A real local-heuristic narrative replaces this once
+     * the strategy pattern lands; until then this is the floor a Rewind drops to when AI
+     * is offline or off-plan.
+     */
+    private fun buildCuratedFallback(
+        textEntries: List<JournalNote.Text>,
+        curation: CurationResult,
+    ): List<RewindContent> {
+        val out = mutableListOf<RewindContent>()
+        out.addAll(textEntries.map { it.toRewindContent() })
+        val curatedCandidates: List<MediaCandidate> =
+            curation.perBeat.values.flatten() + curation.freeAgents
+        curatedCandidates.forEach { c ->
+            val score = curation.sigByMediaUid[c.media.uid]
+            when (val m = c.media) {
+                is IndexedMedia.Image ->
+                    out.add(
+                        RewindContent.Image(
+                            timestamp = m.timestamp,
+                            sourceId = m.uid,
+                            uri = m.uri,
+                            caption = m.caption,
+                            significanceScore = score,
+                        ),
+                    )
+                is IndexedMedia.Video ->
+                    out.add(
+                        RewindContent.Video(
+                            timestamp = m.timestamp,
+                            sourceId = m.uid,
+                            uri = m.uri,
+                            caption = m.caption,
+                            duration = m.duration,
+                            significanceScore = score,
+                        ),
+                    )
+            }
+        }
+        return out.sortedBy { it.timestamp }
+    }
+
+    /**
      * Waits for an existing rewind generation to complete.
      *
      * @param startTime Start of the time period
@@ -530,29 +624,4 @@ private fun JournalNote.toRewindContent(): RewindContent =
                 content = content,
             )
         else -> throw IllegalArgumentException("Unsupported note type: $this")
-    }
-
-/**
- * Extension function to convert an IndexedMedia to RewindContent.
- *
- * TODO: Consider replacing with a proper mapper class that handles all conversions
- * between domain models and persistence models in a centralized way.
- */
-private fun IndexedMedia.toRewindContent(): RewindContent =
-    when (this) {
-        is IndexedMedia.Image ->
-            RewindContent.Image(
-                timestamp = timestamp,
-                sourceId = uid,
-                uri = uri,
-                caption = caption,
-            )
-        is IndexedMedia.Video ->
-            RewindContent.Video(
-                timestamp = timestamp,
-                sourceId = uid,
-                uri = uri,
-                caption = caption,
-                duration = duration,
-            )
     }

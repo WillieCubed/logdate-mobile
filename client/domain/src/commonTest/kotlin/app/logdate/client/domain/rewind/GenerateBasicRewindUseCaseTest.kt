@@ -6,6 +6,12 @@ import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.cache.GenerativeAICacheEntry
 import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
+import app.logdate.client.intelligence.curation.BeatBucketer
+import app.logdate.client.intelligence.curation.DiversitySelector
+import app.logdate.client.intelligence.curation.NoSignalsExtractor
+import app.logdate.client.intelligence.curation.PhotoHardFilter
+import app.logdate.client.intelligence.curation.RewindMediaCurator
+import app.logdate.client.intelligence.curation.SignificanceScorer
 import app.logdate.client.intelligence.entity.people.PeopleExtractor
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
@@ -143,6 +149,14 @@ class GenerateBasicRewindUseCaseTest {
                 networkAvailabilityMonitor = networkMonitor,
                 dataUsagePolicy = dataUsagePolicy,
             )
+        val curator =
+            RewindMediaCurator(
+                signalExtractor = NoSignalsExtractor(),
+                hardFilter = PhotoHardFilter(),
+                scorer = SignificanceScorer(),
+                bucketer = BeatBucketer(),
+                selector = DiversitySelector(),
+            )
         return GenerateBasicRewindUseCase(
             rewindRepository = rewindRepository,
             generationManager = generationManager,
@@ -152,6 +166,7 @@ class GenerateBasicRewindUseCaseTest {
             generateRewindTitle = GenerateRewindTitleUseCase(),
             narrativeSynthesizer = narrativeSynthesizer,
             rewindSequencer = RewindSequencer(),
+            rewindMediaCurator = curator,
             peopleExtractor = peopleExtractor,
             locationHistoryRepository = FakeLocationHistoryRepository(),
         )

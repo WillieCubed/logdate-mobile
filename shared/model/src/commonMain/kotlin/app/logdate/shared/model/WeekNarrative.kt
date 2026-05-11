@@ -88,6 +88,14 @@ data class WeekNarrative(
      * the narrative on it.
      */
     val weatherContext: WeatherContext? = null,
+    /**
+     * Where this narrative came from — full LLM, quotes-only LLM, or pure local heuristics.
+     *
+     * Defaults to [NarrativeOrigin.LLM] for backward compatibility with cached responses
+     * written before this field existed. Downstream renderers may use this to choose
+     * between an AI-written opening / resolution and a structural stats panel.
+     */
+    val origin: NarrativeOrigin = NarrativeOrigin.LLM,
 )
 
 /**
