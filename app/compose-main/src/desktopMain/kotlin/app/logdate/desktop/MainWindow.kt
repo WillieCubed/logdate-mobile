@@ -8,8 +8,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyShortcut
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
 import app.logdate.feature.core.AppViewModel
@@ -45,6 +48,24 @@ internal fun MainWindow(
         state = windowState,
         title = "LogDate",
     ) {
+        // Intercept Cmd+Q (and the platform equivalent) so it routes through the
+        // same save-aware exit cascade as closing the main window — bypassing the
+        // JVM's default Quit handler would skip every editor's save-before-close.
+        MenuBar {
+            Menu(text = "File", mnemonic = 'F') {
+                Item(
+                    text = "Close Window",
+                    shortcut = KeyShortcut(Key.W, meta = true),
+                    onClick = { appState.closeWindow(state) },
+                )
+                Separator()
+                Item(
+                    text = "Quit LogDate",
+                    shortcut = KeyShortcut(Key.Q, meta = true),
+                    onClick = appState::exit,
+                )
+            }
+        }
         MainWindowContent(
             onOpenEditor = onOpenEditor,
         )

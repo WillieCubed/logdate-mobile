@@ -15,8 +15,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.KeyShortcut
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.rememberWindowState
@@ -99,6 +101,24 @@ internal fun EntryEditorWindow(
             }
         },
     ) {
+        // The editor's File menu binds Cmd+W to its save-aware close so a stray
+        // OS-level Close shortcut still hits handleClose, and Cmd+Q goes through
+        // the application-wide cascade so dirty editors save before exit.
+        MenuBar {
+            Menu(text = "File", mnemonic = 'F') {
+                Item(
+                    text = "Close Window",
+                    shortcut = KeyShortcut(Key.W, meta = true),
+                    onClick = handleClose,
+                )
+                Separator()
+                Item(
+                    text = "Quit LogDate",
+                    shortcut = KeyShortcut(Key.Q, meta = true),
+                    onClick = appState::exit,
+                )
+            }
+        }
         SharedTransitionLayout {
             CompositionLocalProvider(
                 LocalSharedTransitionScope provides this,
