@@ -61,6 +61,7 @@ import app.logdate.ui.audio.TranscriptionProvider
 import app.logdate.ui.audio.TranscriptionState
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.location.PlaceUiState
+import app.logdate.ui.platform.LocalPlatformHaptics
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.profiles.toUiState
 import app.logdate.ui.sync.SyncAction
@@ -131,6 +132,8 @@ fun HomeScreen(
     }
     val snackbarHostState = remember { SnackbarHostState() }
 
+    val haptics = LocalPlatformHaptics.current
+
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -189,7 +192,12 @@ fun HomeScreen(
                     HomeRouteDestination.visibleEntries.forEach { destination ->
                         item(
                             selected = destination == currentDestination,
-                            onClick = { currentDestination = destination },
+                            onClick = {
+                                if (destination != currentDestination) {
+                                    haptics.selection()
+                                }
+                                currentDestination = destination
+                            },
                             icon = {
                                 Icon(
                                     imageVector =

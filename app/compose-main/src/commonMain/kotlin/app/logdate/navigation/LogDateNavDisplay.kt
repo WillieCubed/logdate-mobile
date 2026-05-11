@@ -81,6 +81,8 @@ import app.logdate.navigation.scenes.supportsDualPaneHomeScene
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.audio.AudioPlaybackProvider
 import app.logdate.ui.navigation.taggedEntry
+import app.logdate.ui.platform.LocalPlatformHaptics
+import app.logdate.ui.platform.createPlatformHapticsController
 import app.logdate.ui.platform.iosEdgeSwipeBack
 import app.logdate.ui.theme.LogDateTheme
 import kotlinx.datetime.LocalDate
@@ -156,9 +158,13 @@ fun LogDateNavDisplay(
         }
     }
 
+    val haptics = remember { createPlatformHapticsController() }
     LogDateTheme {
         SharedTransitionLayout {
-            CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+            CompositionLocalProvider(
+                LocalSharedTransitionScope provides this,
+                LocalPlatformHaptics provides haptics,
+            ) {
                 LockableContent(
                     isLocked = appUiState.requiresUnlock,
                     displayName = appUiState.displayName,
