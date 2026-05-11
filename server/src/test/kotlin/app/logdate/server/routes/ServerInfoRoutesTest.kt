@@ -72,6 +72,11 @@ class ServerInfoRoutesTest {
                     .contains(ServerCapability.MANAGED_QUOTA)
                     .not(),
             )
+            assertTrue(
+                payload.data.capabilities
+                    .contains(ServerCapability.CLOUD_TRANSCRIPTION)
+                    .not(),
+            )
         }
 
     @Test
@@ -108,5 +113,6 @@ class ServerInfoRoutesTest {
             assertEquals(DeploymentKind.FIRST_PARTY, payload.data.deploymentKind)
             assertTrue(payload.data.capabilities.contains(ServerCapability.BILLING_SUBSCRIPTIONS))
             assertTrue(payload.data.capabilities.contains(ServerCapability.MANAGED_QUOTA))
+            assertTrue(payload.data.capabilities.contains(ServerCapability.CLOUD_TRANSCRIPTION))
         }
 }

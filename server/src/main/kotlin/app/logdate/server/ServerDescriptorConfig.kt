@@ -28,6 +28,7 @@ data class ServerDescriptorConfig(
                 if (deploymentKind == DeploymentKind.FIRST_PARTY) {
                     add(ServerCapability.BILLING_SUBSCRIPTIONS)
                     add(ServerCapability.MANAGED_QUOTA)
+                    add(ServerCapability.CLOUD_TRANSCRIPTION)
                 }
             }
 

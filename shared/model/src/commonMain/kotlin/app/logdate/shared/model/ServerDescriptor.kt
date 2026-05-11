@@ -17,6 +17,7 @@ enum class ServerCapability {
     ATPROTO_OAUTH,
     BILLING_SUBSCRIPTIONS,
     MANAGED_QUOTA,
+    CLOUD_TRANSCRIPTION,
 }
 
 @Serializable
