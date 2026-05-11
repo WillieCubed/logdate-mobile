@@ -7,6 +7,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.data.storage.StorageSpaceChecker
 import app.logdate.wear.health.NoteHealthAnnotator
+import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.recording.WearAudioRecordingManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
@@ -28,6 +29,7 @@ class AudioRecordingViewModel(
     private val notesRepository: JournalNotesRepository,
     private val storageChecker: StorageSpaceChecker,
     private val noteHealthAnnotator: NoteHealthAnnotator,
+    private val locationCaptureCoordinator: WearLocationCaptureCoordinator,
 ) : AndroidViewModel(application) {
     companion object {
         // Estimate size of 1-minute audio recording (AAC format, 128kbps)
@@ -127,6 +129,7 @@ class AudioRecordingViewModel(
                 if (audioPath != null) {
                     // Create and save the audio note
                     val now = Clock.System.now()
+                    val noteLocation = locationCaptureCoordinator.captureForJournalEntry()
                     val audioNote =
                         JournalNote.Audio(
                             mediaRef = audioPath!!,
@@ -134,6 +137,7 @@ class AudioRecordingViewModel(
                             creationTimestamp = now,
                             lastUpdated = now,
                             durationMs = _uiState.value.durationMs,
+                            location = noteLocation,
                         )
 
                     // Save to repository

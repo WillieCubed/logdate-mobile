@@ -3,6 +3,9 @@ package app.logdate.wear.presentation.mood
 import app.cash.turbine.test
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.NoteCoordinates
+import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.sync.WearDataLayerClient
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -25,6 +28,7 @@ class MoodCheckInViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var notesRepository: JournalNotesRepository
     private lateinit var dataLayerClient: WearDataLayerClient
+    private lateinit var locationCaptureCoordinator: WearLocationCaptureCoordinator
     private lateinit var viewModel: MoodCheckInViewModel
 
     @Before
@@ -32,9 +36,11 @@ class MoodCheckInViewModelTest {
         Dispatchers.setMain(testDispatcher)
         notesRepository = mockk(relaxed = true)
         dataLayerClient = mockk(relaxed = true)
+        locationCaptureCoordinator = mockk(relaxed = true)
         coEvery { notesRepository.create(any()) } returns Uuid.random()
         coEvery { dataLayerClient.isPhoneConnected(any()) } returns false
-        viewModel = MoodCheckInViewModel(notesRepository, dataLayerClient)
+        coEvery { locationCaptureCoordinator.captureForJournalEntry() } returns null
+        viewModel = MoodCheckInViewModel(notesRepository, dataLayerClient, locationCaptureCoordinator)
     }
 
     @After
@@ -74,6 +80,32 @@ class MoodCheckInViewModelTest {
                 notesRepository.create(
                     match { note ->
                         note is JournalNote.Text && note.content.startsWith("#mood:great")
+                    },
+                )
+            }
+        }
+
+    @Test
+    fun `skipVoiceAttachment attaches current watch location to mood note`() =
+        runTest {
+            val capturedLocation =
+                NoteLocation(
+                    coordinates =
+                        NoteCoordinates(
+                            latitude = 37.7749,
+                            longitude = -122.4194,
+                            altitude = 14.0,
+                        ),
+                )
+            coEvery { locationCaptureCoordinator.captureForJournalEntry() } returns capturedLocation
+
+            viewModel.selectMood(MoodOption.GREAT)
+            viewModel.skipVoiceAttachment()
+
+            coVerify {
+                notesRepository.create(
+                    match { note ->
+                        note is JournalNote.Text && note.location == capturedLocation
                     },
                 )
             }
@@ -129,7 +161,9 @@ class MoodCheckInViewModelTest {
                 val dlc: WearDataLayerClient = mockk(relaxed = true)
                 coEvery { repo.create(any()) } returns Uuid.random()
                 coEvery { dlc.isPhoneConnected(any()) } returns false
-                val vm = MoodCheckInViewModel(repo, dlc)
+                val locationCoordinator: WearLocationCaptureCoordinator = mockk(relaxed = true)
+                coEvery { locationCoordinator.captureForJournalEntry() } returns null
+                val vm = MoodCheckInViewModel(repo, dlc, locationCoordinator)
 
                 vm.selectMood(mood)
                 vm.skipVoiceAttachment()

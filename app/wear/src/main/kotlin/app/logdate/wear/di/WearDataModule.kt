@@ -3,15 +3,21 @@ package app.logdate.wear.di
 import app.logdate.client.data.journals.LocalFirstDraftRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
 import app.logdate.client.data.journals.RemoteJournalDataSource
+import app.logdate.client.data.location.OfflineFirstLocationHistoryRepository
 import app.logdate.client.data.notes.EmptyNotePlaceResolver
 import app.logdate.client.data.notes.NotePlaceResolver
 import app.logdate.client.data.notes.OfflineFirstJournalNotesRepository
+import app.logdate.client.data.rewind.OfflineFirstRewindRepository
 import app.logdate.client.database.databaseModule
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.di.datastoreModule
+import app.logdate.client.location.di.locationModule
+import app.logdate.client.permissions.di.permissionsModule
 import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.location.LocationHistoryRepository
+import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.datalayer.AssociationDataMapper
 import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
@@ -27,6 +33,7 @@ import app.logdate.wear.health.HealthServicesWearHealthSensorManager
 import app.logdate.wear.health.NoteHealthAnnotator
 import app.logdate.wear.health.StubWearHealthSensorManager
 import app.logdate.wear.health.WearHealthSensorManager
+import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.sync.GoogleWearDataLayerClient
 import app.logdate.wear.sync.NoteDataMapper
 import app.logdate.wear.sync.WearDataLayerClient
@@ -49,6 +56,8 @@ val wearDataModule =
         includes(datastoreModule)
         includes(configModule)
         includes(conflictResolverModule)
+        includes(permissionsModule)
+        includes(locationModule)
 
         // JSON serialization
         single {
@@ -100,6 +109,13 @@ val wearDataModule =
 
         // Draft storage
         single<DraftRepository> { LocalFirstDraftRepository(get(), get()) }
+
+        // Location stack required for standalone Wear journaling and activity tracking.
+        single<LocationHistoryRepository> { OfflineFirstLocationHistoryRepository(get()) }
+        single { WearLocationCaptureCoordinator(get(), get()) }
+
+        // Rewinds are cached locally so the watch can browse content synced from phone.
+        single<RewindRepository> { OfflineFirstRewindRepository(get()) }
 
         // Journals
         single<JournalRepository> {

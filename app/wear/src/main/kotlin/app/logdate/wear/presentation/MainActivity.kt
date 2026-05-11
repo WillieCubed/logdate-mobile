@@ -12,13 +12,22 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.wear.location.WearLocationCaptureCoordinator
+import app.logdate.wear.presentation.audio.AudioRecordingScreen
+import app.logdate.wear.presentation.camera.WearRemoteCameraScreen
+import app.logdate.wear.presentation.camera.WearRemoteCameraViewModel
+import app.logdate.wear.presentation.health.HealthDashboardScreen
+import app.logdate.wear.presentation.health.HealthDashboardViewModel
 import app.logdate.wear.presentation.home.WearHomeScreen
 import app.logdate.wear.presentation.mood.MoodCheckInScreen
+import app.logdate.wear.presentation.navigation.WearAudioRecordingRoute
+import app.logdate.wear.presentation.navigation.WearHealthDashboardRoute
 import app.logdate.wear.presentation.navigation.WearHomeRoute
 import app.logdate.wear.presentation.navigation.WearMoodCheckInRoute
 import app.logdate.wear.presentation.navigation.WearOnboardingRoute
 import app.logdate.wear.presentation.navigation.WearQuickRecordRoute
 import app.logdate.wear.presentation.navigation.WearQuickTextRoute
+import app.logdate.wear.presentation.navigation.WearRemoteCameraRoute
 import app.logdate.wear.presentation.navigation.WearRewindListRoute
 import app.logdate.wear.presentation.navigation.WearRewindPlaybackRoute
 import app.logdate.wear.presentation.navigation.WearSettingsRoute
@@ -39,24 +48,26 @@ import app.logdate.wear.presentation.timeline.WearTimelineViewModel
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
+private const val TILE_ROUTE_EXTRA = "tile_route"
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         setTheme(android.R.style.Theme_DeviceDefault)
         setContent {
-            WearApp()
+            WearApp(initialRouteName = intent?.getStringExtra(TILE_ROUTE_EXTRA))
         }
     }
 }
 
 @Composable
-fun WearApp() {
+fun WearApp(initialRouteName: String? = null) {
     LogDateTheme {
         val context = LocalContext.current
         val startRoute: NavKey =
             if (isOnboardingComplete(context)) {
-                WearHomeRoute
+                initialRouteName.toWearRoute() ?: WearHomeRoute
             } else {
                 WearOnboardingRoute
             }
@@ -99,6 +110,9 @@ fun WearApp() {
                     entry<WearQuickRecordRoute> {
                         WearRecordingScreen(onNavigateBack = navigateBack)
                     }
+                    entry<WearAudioRecordingRoute> {
+                        AudioRecordingScreen(onNavigateBack = navigateBack)
+                    }
                     entry<WearMoodCheckInRoute> {
                         MoodCheckInScreen(
                             onNavigateBack = navigateBack,
@@ -110,8 +124,10 @@ fun WearApp() {
                     }
                     entry<WearQuickTextRoute> {
                         val notesRepository = koinInject<JournalNotesRepository>()
+                        val locationCaptureCoordinator = koinInject<WearLocationCaptureCoordinator>()
                         QuickTextLauncher(
                             notesRepository = notesRepository,
+                            locationCaptureCoordinator = locationCaptureCoordinator,
                             onDone = navigateBack,
                         )
                     }
@@ -126,9 +142,12 @@ fun WearApp() {
                             viewModel = timelineViewModel,
                         )
                     }
-                    entry<WearTimelineDayDetailRoute> {
+                    entry<WearTimelineDayDetailRoute> { route ->
                         val timelineViewModel = koinViewModel<WearTimelineViewModel>()
-                        WearDayDetailScreen(viewModel = timelineViewModel)
+                        WearDayDetailScreen(
+                            date = route.date,
+                            viewModel = timelineViewModel,
+                        )
                     }
                     entry<WearRewindListRoute> {
                         val rewindViewModel = koinViewModel<WearRewindViewModel>()
@@ -147,6 +166,15 @@ fun WearApp() {
                             onExit = navigateBack,
                         )
                     }
+                    entry<WearHealthDashboardRoute> {
+                        HealthDashboardScreen(viewModel = koinViewModel<HealthDashboardViewModel>())
+                    }
+                    entry<WearRemoteCameraRoute> {
+                        WearRemoteCameraScreen(
+                            viewModel = koinViewModel<WearRemoteCameraViewModel>(),
+                            onNavigateBack = navigateBack,
+                        )
+                    }
                     entry<WearSettingsRoute> {
                         WearSettingsScreen(onNavigateBack = navigateBack)
                     }
@@ -154,3 +182,17 @@ fun WearApp() {
         )
     }
 }
+
+private fun String?.toWearRoute(): NavKey? =
+    when (this) {
+        "quick_record" -> WearQuickRecordRoute
+        "voice_note" -> WearAudioRecordingRoute
+        "mood" -> WearMoodCheckInRoute
+        "quick_text" -> WearQuickTextRoute
+        "timeline" -> WearTimelineRoute
+        "rewind" -> WearRewindListRoute
+        "health" -> WearHealthDashboardRoute
+        "remote_camera" -> WearRemoteCameraRoute
+        "settings" -> WearSettingsRoute
+        else -> null
+    }

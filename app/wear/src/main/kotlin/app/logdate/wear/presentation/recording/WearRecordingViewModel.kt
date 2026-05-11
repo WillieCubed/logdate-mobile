@@ -6,6 +6,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.data.storage.StorageSpaceChecker
 import app.logdate.wear.health.NoteHealthAnnotator
+import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.presentation.common.SaveFeedback
 import app.logdate.wear.recording.WearAudioRecordingManager
 import app.logdate.wear.sync.WearDataLayerClient
@@ -53,6 +54,7 @@ class WearRecordingViewModel(
     private val storageChecker: StorageSpaceChecker,
     private val noteHealthAnnotator: NoteHealthAnnotator,
     private val dataLayerClient: WearDataLayerClient,
+    private val locationCaptureCoordinator: WearLocationCaptureCoordinator,
     private val clock: Clock = Clock.System,
 ) : ViewModel() {
     companion object {
@@ -253,6 +255,7 @@ class WearRecordingViewModel(
                 _uiState.update { it.copy(phase = RecordingPhase.SAVING) }
 
                 val now = clock.now()
+                val noteLocation = locationCaptureCoordinator.captureForJournalEntry()
                 val audioNote =
                     JournalNote.Audio(
                         mediaRef = filePath,
@@ -260,6 +263,7 @@ class WearRecordingViewModel(
                         creationTimestamp = now,
                         lastUpdated = now,
                         durationMs = accumulatedDurationMs,
+                        location = noteLocation,
                     )
                 notesRepository.create(audioNote)
                 noteHealthAnnotator.annotate(audioNote.uid)

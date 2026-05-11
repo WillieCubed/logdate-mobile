@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PhonelinkOff
@@ -33,11 +34,11 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.CircularProgressIndicator
+import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
-import androidx.wear.compose.material3.TextButton
 import app.logdate.wear.R
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
@@ -150,17 +151,36 @@ private fun PermissionsPage(onNext: () -> Unit) {
             ) == PackageManager.PERMISSION_GRANTED,
         )
     }
+    var locationGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+            ) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ) == PackageManager.PERMISSION_GRANTED,
+        )
+    }
 
     val permissionLauncher =
         rememberLauncherForActivityResult(
-            ActivityResultContracts.RequestPermission(),
-        ) { granted ->
-            micGranted = granted
+            ActivityResultContracts.RequestMultiplePermissions(),
+        ) { grants ->
+            micGranted = grants[Manifest.permission.RECORD_AUDIO] == true || micGranted
+            locationGranted =
+                grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true ||
+                locationGranted
         }
 
-    // Auto-advance after permission is granted
-    LaunchedEffect(micGranted) {
-        if (micGranted) {
+    // Auto-advance once mic and location are both granted. If the user only
+    // grants the mic (location is optional but strongly encouraged), they can
+    // continue manually via the "Maybe later" button below; geotagging can be
+    // enabled afterwards from Settings.
+    LaunchedEffect(micGranted, locationGranted) {
+        if (micGranted && locationGranted) {
             delay(PERMISSION_GRANTED_DELAY_MS)
             onNext()
         }
@@ -208,7 +228,32 @@ private fun PermissionsPage(onNext: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            if (micGranted) {
+            item {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    modifier =
+                        Modifier
+                            .size(32.dp)
+                            .padding(top = 4.dp),
+                    tint =
+                        if (locationGranted) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                )
+            }
+            item {
+                Text(
+                    text = stringResource(R.string.wear_onboarding_permissions_location),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (micGranted && locationGranted) {
                 item {
                     Icon(
                         imageVector = Icons.Default.Check,
@@ -232,7 +277,15 @@ private fun PermissionsPage(onNext: () -> Unit) {
             } else {
                 item {
                     Button(
-                        onClick = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
+                        onClick = {
+                            permissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.RECORD_AUDIO,
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                                ),
+                            )
+                        },
                         label = { Text(stringResource(R.string.wear_onboarding_permissions_allow)) },
                         modifier =
                             Modifier
@@ -240,11 +293,16 @@ private fun PermissionsPage(onNext: () -> Unit) {
                                 .padding(top = 8.dp),
                     )
                 }
-                item {
-                    TextButton(
-                        onClick = onNext,
-                    ) {
-                        Text(stringResource(R.string.wear_onboarding_permissions_skip))
+                if (micGranted) {
+                    item {
+                        FilledTonalButton(
+                            onClick = onNext,
+                            label = { Text(stringResource(R.string.wear_onboarding_permissions_skip)) },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
+                        )
                     }
                 }
             }

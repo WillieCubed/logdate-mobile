@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -40,7 +41,13 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
 @Composable
-fun WearDayDetailScreen(viewModel: WearTimelineViewModel) {
+fun WearDayDetailScreen(
+    date: LocalDate,
+    viewModel: WearTimelineViewModel,
+) {
+    LaunchedEffect(date) {
+        viewModel.selectDay(date)
+    }
     val detail by viewModel.selectedDayState.collectAsState()
     val playbackState by viewModel.playbackState.collectAsState()
     val outputState by viewModel.audioOutputState.collectAsState()

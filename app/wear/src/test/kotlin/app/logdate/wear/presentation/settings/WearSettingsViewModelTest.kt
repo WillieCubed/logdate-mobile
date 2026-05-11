@@ -1,6 +1,12 @@
 package app.logdate.wear.presentation.settings
 
 import app.cash.turbine.test
+import app.logdate.client.location.settings.LocationCaptureMode
+import app.logdate.client.location.settings.LocationTrackingSettings
+import app.logdate.client.location.settings.LocationTrackingSettingsRepository
+import app.logdate.client.location.tracking.LocationTrackingManager
+import app.logdate.client.permissions.PermissionManager
+import app.logdate.client.permissions.PermissionType
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncResult
 import app.logdate.client.sync.SyncStatus
@@ -8,6 +14,7 @@ import app.logdate.wear.sync.WearDataLayerClient
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -28,12 +35,18 @@ class WearSettingsViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var syncManager: SyncManager
     private lateinit var dataLayerClient: WearDataLayerClient
+    private lateinit var locationSettingsRepository: LocationTrackingSettingsRepository
+    private lateinit var permissionManager: PermissionManager
+    private lateinit var locationTrackingManager: LocationTrackingManager
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         syncManager = mockk(relaxed = true)
         dataLayerClient = mockk(relaxed = true)
+        locationSettingsRepository = mockk(relaxed = true)
+        permissionManager = mockk(relaxed = true)
+        locationTrackingManager = mockk(relaxed = true)
         coEvery { syncManager.getSyncStatus() } returns
             SyncStatus(
                 isEnabled = false,
@@ -43,6 +56,9 @@ class WearSettingsViewModelTest {
                 hasErrors = false,
             )
         coEvery { dataLayerClient.getConnectedPhoneName() } returns null
+        coEvery { locationSettingsRepository.getSettings() } returns LocationTrackingSettings()
+        coEvery { locationSettingsRepository.setBackgroundTrackingEnabled(any()) } returns Unit
+        coEvery { locationSettingsRepository.setCaptureMode(any()) } returns Unit
     }
 
     @After
@@ -50,7 +66,14 @@ class WearSettingsViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel(): WearSettingsViewModel = WearSettingsViewModel(syncManager, dataLayerClient)
+    private fun createViewModel(): WearSettingsViewModel =
+        WearSettingsViewModel(
+            syncManager,
+            dataLayerClient,
+            locationSettingsRepository,
+            permissionManager,
+            locationTrackingManager,
+        )
 
     @Test
     fun `initial state is disconnected with no sync info`() =
@@ -64,8 +87,69 @@ class WearSettingsViewModelTest {
                 assertEquals(0, state.pendingCount)
                 assertFalse(state.hasErrors)
                 assertFalse(state.isSyncingNow)
+                assertTrue(state.autoTagJournalEntries)
+                assertFalse(state.backgroundLocationEnabled)
+                assertEquals(LocationCaptureMode.PASSIVE, state.locationCaptureMode)
                 viewModel.stopPolling()
             }
+        }
+
+    @Test
+    fun `initial state reflects location settings and foreground permission`() =
+        runTest {
+            coEvery { locationSettingsRepository.getSettings() } returns
+                LocationTrackingSettings(
+                    backgroundTrackingEnabled = true,
+                    captureMode = LocationCaptureMode.ACTIVE,
+                    autoTrackForJournalEntries = true,
+                )
+            coEvery { permissionManager.isPermissionGranted(PermissionType.LOCATION) } returns true
+
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                val state = expectMostRecentItem()
+                assertTrue(state.locationPermissionGranted)
+                assertTrue(state.backgroundLocationEnabled)
+                assertEquals(LocationCaptureMode.ACTIVE, state.locationCaptureMode)
+                assertTrue(state.autoTagJournalEntries)
+                viewModel.stopPolling()
+            }
+        }
+
+    @Test
+    fun `setBackgroundLocationEnabled persists setting and reapplies tracking`() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.setBackgroundLocationEnabled(true)
+
+            coVerify { locationSettingsRepository.setBackgroundTrackingEnabled(true) }
+            verify { locationTrackingManager.startTracking() }
+            viewModel.stopPolling()
+        }
+
+    @Test
+    fun `setLocationCaptureMode persists mode and reapplies tracking`() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.setLocationCaptureMode(LocationCaptureMode.ACTIVE)
+
+            coVerify { locationSettingsRepository.setCaptureMode(LocationCaptureMode.ACTIVE) }
+            verify { locationTrackingManager.startTracking() }
+            viewModel.stopPolling()
+        }
+
+    @Test
+    fun `openLocationPermissions opens app permission settings`() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.openLocationPermissions()
+
+            verify { permissionManager.openPermissionSettings() }
+            viewModel.stopPolling()
         }
 
     @Test

@@ -3,9 +3,12 @@ package app.logdate.wear.presentation.recording
 import androidx.lifecycle.viewModelScope
 import app.cash.turbine.test
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.NoteCoordinates
+import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.data.storage.StorageSpaceChecker
 import app.logdate.wear.health.NoteHealthAnnotator
+import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.recording.WearAudioRecordingManager
 import app.logdate.wear.sync.WearDataLayerClient
 import io.mockk.coEvery
@@ -42,6 +45,7 @@ class WearRecordingViewModelTest {
     private lateinit var storageChecker: StorageSpaceChecker
     private lateinit var noteHealthAnnotator: NoteHealthAnnotator
     private lateinit var dataLayerClient: WearDataLayerClient
+    private lateinit var locationCaptureCoordinator: WearLocationCaptureCoordinator
     private lateinit var testClock: TestClock
 
     private val audioLevelFlow = MutableStateFlow(0f)
@@ -58,9 +62,11 @@ class WearRecordingViewModelTest {
         storageChecker = mockk(relaxed = true)
         noteHealthAnnotator = mockk(relaxed = true)
         dataLayerClient = mockk(relaxed = true)
+        locationCaptureCoordinator = mockk(relaxed = true)
         testClock = TestClock()
 
         coEvery { dataLayerClient.isPhoneConnected(any()) } returns false
+        coEvery { locationCaptureCoordinator.captureForJournalEntry() } returns null
 
         every { recordingManager.getAudioLevelFlow() } returns audioLevelFlow
         coEvery { notesRepository.create(any<JournalNote>()) } returns Uuid.random()
@@ -77,7 +83,15 @@ class WearRecordingViewModelTest {
     }
 
     private fun createViewModel(): WearRecordingViewModel =
-        WearRecordingViewModel(recordingManager, notesRepository, storageChecker, noteHealthAnnotator, dataLayerClient, testClock)
+        WearRecordingViewModel(
+            recordingManager,
+            notesRepository,
+            storageChecker,
+            noteHealthAnnotator,
+            dataLayerClient,
+            locationCaptureCoordinator,
+            testClock,
+        )
 
     /**
      * Cancel the ViewModel's coroutine scope to stop the sample() timer and auto-stop timer.
@@ -460,6 +474,38 @@ class WearRecordingViewModelTest {
                 notesRepository.create(
                     match { note ->
                         note is JournalNote.Audio && note.mediaRef == "/fake/audio.aac"
+                    },
+                )
+            }
+        }
+
+    @Test
+    fun `save attaches current watch location to audio note`() =
+        runTest {
+            val capturedLocation =
+                NoteLocation(
+                    coordinates =
+                        NoteCoordinates(
+                            latitude = 37.7749,
+                            longitude = -122.4194,
+                            altitude = 14.0,
+                        ),
+                )
+            coEvery { locationCaptureCoordinator.captureForJournalEntry() } returns capturedLocation
+            val viewModel = createViewModel()
+            viewModel.onTouchDown()
+            advanceTimeBy(200)
+            testClock.advanceBy(2000)
+            viewModel.onTouchUp()
+            advanceTimeBy(200)
+
+            viewModel.save()
+            advanceTimeBy(2000)
+
+            coVerify {
+                notesRepository.create(
+                    match { note ->
+                        note is JournalNote.Audio && note.location == capturedLocation
                     },
                 )
             }

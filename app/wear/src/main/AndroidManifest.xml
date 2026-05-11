@@ -13,11 +13,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <!--
-        Remove location permissions merged from client:location (transitive via client:data).
-        Location tracking is not used on Wear OS.
+        Wear inherits ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION from
+        :client:location for on-demand geotagging at journal-entry save time.
+        The watch flow does not run a foreground tracking service, register
+        boot or activity-transition receivers, or sample location in the
+        background, so opt out of those merged permissions to keep the Play
+        Store sensitive-permissions surface aligned with the actual feature.
     -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" tools:node="remove" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" tools:node="remove" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" tools:node="remove" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" tools:node="remove" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" tools:node="remove" />
@@ -41,7 +43,7 @@
 
         <!--
             Remove auto-initializers merged from transitive dependencies.
-            Google Maps, WorkManager, and Emoji2 are not used on Wear OS
+            Google Maps and Emoji2 are not used on Wear OS
             but their ContentProviders run before Application.onCreate(), adding
             500-1500ms of startup latency on constrained Wear hardware.
         -->
@@ -51,66 +53,12 @@
             android:authorities="${applicationId}.androidx-startup"
             android:exported="false"
             tools:node="merge">
-            <!-- Remove WorkManager (uses its own SQLite DB on main thread) -->
-            <meta-data
-                android:name="androidx.work.WorkManagerInitializer"
-                android:value="androidx.startup"
-                tools:node="remove" />
             <!-- Remove Emoji2 font download -->
             <meta-data
                 android:name="androidx.emoji2.text.EmojiCompatInitializer"
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
-
-        <!--
-            Remove location tracking components merged from client:location.
-            These services/receivers are not used on Wear OS and add unnecessary
-            manifest entries, boot receivers, and foreground service registrations.
-
-            TODO(wear-location-cleanup): Implement Wear-safe location component
-            classes, or split client:location so its phone-only manifest entries
-            are not inherited by Wear. These removals keep lint honest for this
-            cleanup batch without pretending Wear has real location tracking.
-        -->
-        <service
-            android:name="app.logdate.client.location.tracking.DetailedLocationTrackingService"
-            tools:ignore="MissingClass"
-            tools:node="remove" />
-        <receiver
-            android:name="app.logdate.client.location.tracking.OptimizedBackgroundLocationReceiver"
-            tools:ignore="MissingClass"
-            tools:node="remove" />
-        <receiver
-            android:name="app.logdate.client.location.tracking.LocationTrackingBootReceiver"
-            tools:ignore="MissingClass"
-            tools:node="remove" />
-        <service
-            android:name="app.logdate.client.location.tracking.ActivityAwareLocationService"
-            tools:ignore="MissingClass"
-            tools:node="remove" />
-        <receiver
-            android:name="app.logdate.client.location.tracking.ActivityTransitionReceiver"
-            tools:ignore="MissingClass"
-            tools:node="remove" />
-
-        <!-- Remove Google Places SDK activities (not used on Wear OS) -->
-        <activity
-            android:name="com.google.android.libraries.places.widget.AutocompleteActivity"
-            tools:ignore="MissingClass"
-            tools:node="remove" />
-        <activity
-            android:name="com.google.android.libraries.places.widget.BasicPlaceAutocompleteActivity"
-            tools:ignore="MissingClass"
-            tools:node="remove" />
-        <activity
-            android:name="com.google.android.libraries.places.widget.PlaceAutocompleteActivity"
-            tools:ignore="MissingClass"
-            tools:node="remove" />
-        <activity
-            android:name="com.google.android.libraries.places.widget.internal.photoviewer.PlacesLightboxActivity"
-            tools:ignore="MissingClass"
-            tools:node="remove" />
 
         <!-- Audio Recording Service -->
         <service

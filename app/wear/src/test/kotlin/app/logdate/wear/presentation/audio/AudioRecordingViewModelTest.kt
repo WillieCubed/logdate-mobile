@@ -4,8 +4,11 @@ import android.app.Application
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.NoteCoordinates
+import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.wear.data.storage.StorageSpaceChecker
 import app.logdate.wear.health.NoteHealthAnnotator
+import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.recording.WearAudioRecordingManager
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -40,6 +43,7 @@ class AudioRecordingViewModelTest {
     private lateinit var notesRepository: JournalNotesRepository
     private lateinit var storageChecker: StorageSpaceChecker
     private lateinit var noteHealthAnnotator: NoteHealthAnnotator
+    private lateinit var locationCaptureCoordinator: WearLocationCaptureCoordinator
 
     private val audioLevelFlow = MutableStateFlow(0f)
 
@@ -55,9 +59,11 @@ class AudioRecordingViewModelTest {
         notesRepository = mockk(relaxed = true)
         storageChecker = mockk(relaxed = true)
         noteHealthAnnotator = mockk(relaxed = true)
+        locationCaptureCoordinator = mockk(relaxed = true)
 
         every { recordingManager.getAudioLevelFlow() } returns audioLevelFlow
         coEvery { notesRepository.create(any<JournalNote>()) } returns Uuid.random()
+        coEvery { locationCaptureCoordinator.captureForJournalEntry() } returns null
         coEvery { storageChecker.getAvailableStorageSpace() } returns plentyOfStorage
         coEvery { recordingManager.startRecording() } returns true
         coEvery { recordingManager.pauseRecording() } returns true
@@ -71,7 +77,14 @@ class AudioRecordingViewModelTest {
     }
 
     private fun createViewModel(): AudioRecordingViewModel =
-        AudioRecordingViewModel(application, recordingManager, notesRepository, storageChecker, noteHealthAnnotator)
+        AudioRecordingViewModel(
+            application,
+            recordingManager,
+            notesRepository,
+            storageChecker,
+            noteHealthAnnotator,
+            locationCaptureCoordinator,
+        )
 
     private fun AudioRecordingViewModel.cancelScope() {
         viewModelScope.cancel()
@@ -232,6 +245,36 @@ class AudioRecordingViewModelTest {
                 notesRepository.create(
                     match { note ->
                         note is JournalNote.Audio && note.mediaRef == "/fake/audio.m4a"
+                    },
+                )
+            }
+            viewModel.cancelScope()
+        }
+
+    @Test
+    fun `stopRecording attaches current watch location to audio note`() =
+        runTest {
+            val capturedLocation =
+                NoteLocation(
+                    coordinates =
+                        NoteCoordinates(
+                            latitude = 37.7749,
+                            longitude = -122.4194,
+                            altitude = 14.0,
+                        ),
+                )
+            coEvery { locationCaptureCoordinator.captureForJournalEntry() } returns capturedLocation
+            val viewModel = createViewModel()
+            viewModel.startRecording()
+            advanceTimeBy(200)
+
+            viewModel.stopRecording()
+            advanceTimeBy(200)
+
+            coVerify {
+                notesRepository.create(
+                    match { note ->
+                        note is JournalNote.Audio && note.location == capturedLocation
                     },
                 )
             }

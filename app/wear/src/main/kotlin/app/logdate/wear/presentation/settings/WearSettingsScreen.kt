@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PhonelinkOff
 import androidx.compose.material.icons.filled.Sync
@@ -33,6 +34,7 @@ import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
+import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.wear.R
 import app.logdate.wear.notification.WearPromptScheduler
 import org.koin.compose.viewmodel.koinViewModel
@@ -87,6 +89,9 @@ fun WearSettingsScreen(
             updatePromptSchedule(context, morningPromptEnabled || enabled)
         },
         onSyncNow = viewModel::syncNow,
+        onBackgroundLocationChanged = viewModel::setBackgroundLocationEnabled,
+        onLocationCaptureModeChanged = viewModel::setLocationCaptureMode,
+        onOpenLocationPermissions = viewModel::openLocationPermissions,
     )
 }
 
@@ -110,6 +115,9 @@ internal fun WearSettingsContent(
     eveningPromptEnabled: Boolean = true,
     onEveningPromptChanged: (Boolean) -> Unit = {},
     onSyncNow: () -> Unit = {},
+    onBackgroundLocationChanged: (Boolean) -> Unit = {},
+    onLocationCaptureModeChanged: (LocationCaptureMode) -> Unit = {},
+    onOpenLocationPermissions: () -> Unit = {},
 ) {
     val listState = rememberScalingLazyListState()
 
@@ -268,6 +276,99 @@ internal fun WearSettingsContent(
                         )
                     },
                     label = { Text(label) },
+                )
+            }
+
+            item(key = "location_header") {
+                Text(
+                    text = stringResource(R.string.wear_settings_location),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp, bottom = 4.dp),
+                )
+            }
+
+            item(key = "location_permission") {
+                val label =
+                    if (settingsState.locationPermissionGranted) {
+                        stringResource(R.string.wear_settings_location_permission_granted)
+                    } else {
+                        stringResource(R.string.wear_settings_location_permission_required)
+                    }
+                Button(
+                    onClick = onOpenLocationPermissions,
+                    modifier = Modifier.fillMaxWidth(),
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint =
+                                if (settingsState.locationPermissionGranted) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.error
+                                },
+                            modifier = Modifier.size(20.dp),
+                        )
+                    },
+                    label = { Text(label) },
+                )
+            }
+
+            item(key = "location_autotag") {
+                Text(
+                    text =
+                        if (settingsState.autoTagJournalEntries) {
+                            stringResource(R.string.wear_settings_location_autotag_on)
+                        } else {
+                            stringResource(R.string.wear_settings_location_autotag_off)
+                        },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                )
+            }
+
+            item(key = "background_location") {
+                SwitchButton(
+                    checked = settingsState.backgroundLocationEnabled,
+                    onCheckedChange = onBackgroundLocationChanged,
+                    label = {
+                        Text(stringResource(R.string.wear_settings_background_location))
+                    },
+                    secondaryLabel = {
+                        Text(stringResource(R.string.wear_settings_background_location_detail))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            item(key = "active_location_mode") {
+                val activeMode = settingsState.locationCaptureMode == LocationCaptureMode.ACTIVE
+                SwitchButton(
+                    checked = activeMode,
+                    onCheckedChange = { enabled ->
+                        onLocationCaptureModeChanged(
+                            if (enabled) {
+                                LocationCaptureMode.ACTIVE
+                            } else {
+                                LocationCaptureMode.PASSIVE
+                            },
+                        )
+                    },
+                    label = {
+                        Text(stringResource(R.string.wear_settings_activity_aware_location))
+                    },
+                    secondaryLabel = {
+                        Text(stringResource(R.string.wear_settings_activity_aware_location_detail))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
 

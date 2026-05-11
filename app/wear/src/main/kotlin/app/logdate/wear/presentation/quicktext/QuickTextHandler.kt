@@ -12,6 +12,7 @@ import androidx.compose.ui.res.stringResource
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.R
+import app.logdate.wear.location.WearLocationCaptureCoordinator
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -25,6 +26,7 @@ import kotlin.uuid.Uuid
 @Composable
 fun QuickTextLauncher(
     notesRepository: JournalNotesRepository,
+    locationCaptureCoordinator: WearLocationCaptureCoordinator,
     onDone: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -42,22 +44,29 @@ fun QuickTextLauncher(
                     scope.launch(Dispatchers.IO) {
                         try {
                             val now = Clock.System.now()
+                            val noteLocation = locationCaptureCoordinator.captureForJournalEntry()
                             val note =
                                 JournalNote.Text(
                                     content = spokenText,
                                     uid = Uuid.random(),
                                     creationTimestamp = now,
                                     lastUpdated = now,
+                                    location = noteLocation,
                                 )
                             notesRepository.create(note)
                             Napier.d("Quick text note saved: ${spokenText.take(30)}...")
                         } catch (e: Exception) {
                             Napier.e("Failed to save quick text note", e)
+                        } finally {
+                            onDone()
                         }
                     }
+                } else {
+                    onDone()
                 }
+            } else {
+                onDone()
             }
-            onDone()
         }
 
     val prompt = stringResource(R.string.wear_quick_text_prompt)

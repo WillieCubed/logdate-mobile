@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.presentation.common.SaveFeedback
 import app.logdate.wear.sync.WearDataLayerClient
 import io.github.aakira.napier.Napier
@@ -54,6 +55,7 @@ sealed interface MoodCheckInEvent {
 class MoodCheckInViewModel(
     private val notesRepository: JournalNotesRepository,
     private val dataLayerClient: WearDataLayerClient,
+    private val locationCaptureCoordinator: WearLocationCaptureCoordinator,
 ) : ViewModel() {
     companion object {
         private const val SAVED_DISPLAY_MS = 800L
@@ -82,12 +84,14 @@ class MoodCheckInViewModel(
 
             try {
                 val now = Clock.System.now()
+                val noteLocation = locationCaptureCoordinator.captureForJournalEntry()
                 val note =
                     JournalNote.Text(
                         content = "#mood:${mood.tag} Feeling ${mood.label.lowercase()}",
                         uid = Uuid.random(),
                         creationTimestamp = now,
                         lastUpdated = now,
+                        location = noteLocation,
                     )
                 notesRepository.create(note)
 

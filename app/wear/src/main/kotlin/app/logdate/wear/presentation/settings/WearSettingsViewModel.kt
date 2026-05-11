@@ -2,6 +2,11 @@ package app.logdate.wear.presentation.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.location.settings.LocationCaptureMode
+import app.logdate.client.location.settings.LocationTrackingSettingsRepository
+import app.logdate.client.location.tracking.LocationTrackingManager
+import app.logdate.client.permissions.PermissionManager
+import app.logdate.client.permissions.PermissionType
 import app.logdate.client.sync.SyncManager
 import app.logdate.wear.sync.WearDataLayerClient
 import io.github.aakira.napier.Napier
@@ -24,6 +29,9 @@ import kotlin.time.Instant
 class WearSettingsViewModel(
     private val syncManager: SyncManager,
     private val dataLayerClient: WearDataLayerClient,
+    private val locationSettingsRepository: LocationTrackingSettingsRepository,
+    private val permissionManager: PermissionManager,
+    private val locationTrackingManager: LocationTrackingManager,
 ) : ViewModel() {
     companion object {
         private const val POLL_INTERVAL_MS = 5_000L
@@ -68,10 +76,39 @@ class WearSettingsViewModel(
         }
     }
 
+    fun setBackgroundLocationEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                locationSettingsRepository.setBackgroundTrackingEnabled(enabled)
+                locationTrackingManager.startTracking()
+                refreshStatus()
+            } catch (e: Exception) {
+                Napier.w("Failed to update Wear background location setting", e)
+            }
+        }
+    }
+
+    fun setLocationCaptureMode(mode: LocationCaptureMode) {
+        viewModelScope.launch {
+            try {
+                locationSettingsRepository.setCaptureMode(mode)
+                locationTrackingManager.startTracking()
+                refreshStatus()
+            } catch (e: Exception) {
+                Napier.w("Failed to update Wear location capture mode", e)
+            }
+        }
+    }
+
+    fun openLocationPermissions() {
+        permissionManager.openPermissionSettings()
+    }
+
     private suspend fun refreshStatus() {
         try {
             val phoneName = dataLayerClient.getConnectedPhoneName()
             val syncStatus = syncManager.getSyncStatus()
+            val locationSettings = locationSettingsRepository.getSettings()
 
             _uiState.update {
                 it.copy(
@@ -80,6 +117,10 @@ class WearSettingsViewModel(
                     lastSyncTime = syncStatus.lastSyncTime,
                     pendingCount = syncStatus.pendingUploads,
                     hasErrors = syncStatus.hasErrors,
+                    locationPermissionGranted = permissionManager.isPermissionGranted(PermissionType.LOCATION),
+                    autoTagJournalEntries = locationSettings.autoTrackForJournalEntries,
+                    backgroundLocationEnabled = locationSettings.backgroundTrackingEnabled,
+                    locationCaptureMode = locationSettings.captureMode,
                 )
             }
         } catch (e: Exception) {
@@ -95,4 +136,8 @@ data class WearSettingsUiState(
     val pendingCount: Int = 0,
     val hasErrors: Boolean = false,
     val isSyncingNow: Boolean = false,
+    val locationPermissionGranted: Boolean = false,
+    val autoTagJournalEntries: Boolean = true,
+    val backgroundLocationEnabled: Boolean = false,
+    val locationCaptureMode: LocationCaptureMode = LocationCaptureMode.PASSIVE,
 )

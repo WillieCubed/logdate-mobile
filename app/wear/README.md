@@ -90,13 +90,13 @@ After the emulator boots:
 | **Home Hub** | Greeting, entry count, capture chips, navigation | App launch |
 | **Haptic Feedback** | Distinct vibration patterns for every interaction | Automatic |
 
-### Planned (not yet implemented)
+### Implemented Platform Capabilities
 
-- Timeline browser (day-by-day entry viewing)
-- Phone sync via Data Layer API
-- Health Services integration (heart rate, steps, sleep)
-- Tiles and complications
-- On-device transcription
+- Timeline browser with day-by-day entry viewing
+- Phone sync via the Wear Data Layer API
+- Health Services integration with graceful fallback when unavailable
+- Tiles and complications for quick capture and daily summaries
+- Watch-owned location capture for standalone geotagged journal entries
 
 ## Architecture
 
@@ -110,9 +110,9 @@ app/wear/src/main/kotlin/app/logdate/wear/
 │   └── WearHapticEngine.kt          Centralized haptic patterns
 ├── recording/
 │   ├── WearAudioRecordingService.kt Foreground service for mic recording
-│   ├── WearAudioRecordingManager.kt Manages MediaRecorder lifecycle
-│   ├── StubAudioPlaybackManager.kt  No-op (playback not yet on watch)
-│   └── WearStubTranscriptionRepository.kt  No-op (transcription not yet on watch)
+│   └── WearAudioRecordingManager.kt Manages MediaRecorder lifecycle
+├── location/
+│   └── WearLocationCaptureCoordinator.kt  Journal-entry geotagging policy
 ├── data/storage/
 │   └── StorageSpaceChecker.kt       Pre-recording space validation
 ├── presentation/
@@ -125,9 +125,13 @@ app/wear/src/main/kotlin/app/logdate/wear/
 │   ├── mood/                        Emoji picker + ViewModel
 │   └── quicktext/                   System STT handler
 ├── complication/
-│   └── MainComplicationService.kt   Day-of-week complication (placeholder)
+│   ├── EntryCountComplicationService.kt  Today's journal entry count
+│   ├── MoodComplicationService.kt        Today's mood shortcut
+│   ├── QuickCaptureComplicationService.kt Voice-note shortcut
+│   └── StreakComplicationService.kt      Journaling streak
 └── tile/
-    └── MainTileService.kt           Placeholder tile
+    ├── QuickCaptureTileService.kt   Voice, mood, and text capture shortcuts
+    └── TodaySummaryTileService.kt   Daily summary and timeline shortcut
 ```
 
 ### Data layer
