@@ -38,10 +38,19 @@ class LogDateApplicationState {
     var shouldExitApplication: Boolean by mutableStateOf(false)
         private set
 
+    /**
+     * True while the main-window close request is fanning out through the editor windows. Used so
+     * the last editor to actually close (after persisting its draft) can trip
+     * [shouldExitApplication] without the application state needing to know which save finished
+     * last.
+     */
+    private var exitCascadeInFlight: Boolean by mutableStateOf(false)
+
     fun openJournal(journalId: String) {
     }
 
     fun openNoteEditor() {
+        if (exitCascadeInFlight || shouldExitApplication) return
         _editorWindows.add(EntryEditorWindowState(this))
     }
 
@@ -49,16 +58,18 @@ class LogDateApplicationState {
     }
 
     /**
-     * Closes a single window. Returns true when the window actually closed; false when
+     * Closes a single window. Returns true when the window actually closed (or, for the main
+     * window, when an orderly application exit was kicked off); false when
      * [LogDateWindowState.exit] vetoed the close.
      *
-     * Closing the main window also closes every editor window and signals app exit. Editors are
-     * removed programmatically, so an unsaved editor's pending content is not auto-saved by this
-     * path — users get save-on-close semantics only when they dismiss the editor window directly.
+     * Closing the main window asks every editor window to close itself. Each editor saves its
+     * dirty draft through its own save flow, and the application exits once the last editor has
+     * finished closing. If an editor's save fails, the application stays alive with the editor's
+     * error visible so the user can intervene.
      */
     fun closeWindow(window: LogDateWindowState): Boolean =
         when (window) {
-            mainWindow -> closeApplication()
+            mainWindow -> beginApplicationExit()
             is EntryEditorWindowState -> closeEditor(window)
             else -> false
         }
@@ -67,19 +78,29 @@ class LogDateApplicationState {
      * Closes all windows, performing cleanup as needed, and exits the application.
      */
     fun exit() {
-        closeApplication()
+        beginApplicationExit()
     }
 
     private fun closeEditor(editor: EntryEditorWindowState): Boolean {
         if (!editor.exit()) return false
         _editorWindows.remove(editor)
+        if (exitCascadeInFlight && _editorWindows.isEmpty()) {
+            shouldExitApplication = true
+        }
         return true
     }
 
-    private fun closeApplication(): Boolean {
+    private fun beginApplicationExit(): Boolean {
         if (!mainWindow.exit()) return false
-        _editorWindows.clear()
-        shouldExitApplication = true
+        if (_editorWindows.isEmpty()) {
+            shouldExitApplication = true
+            return true
+        }
+        // Fan out the close request to each editor; the last one to finish trips the exit flag.
+        exitCascadeInFlight = true
+        for (editor in _editorWindows) {
+            editor.requestClose()
+        }
         return true
     }
 }

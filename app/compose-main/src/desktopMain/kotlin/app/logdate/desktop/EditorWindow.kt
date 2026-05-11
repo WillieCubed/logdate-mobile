@@ -68,16 +68,26 @@ internal fun EntryEditorWindow(
             .collect { derived -> state.updateTitle(derived) }
     }
 
+    // Shared close handler: if the entry has no unsaved work, dispose the window; otherwise kick
+    // off the viewModel save so the existing onEntrySaved hook can close once persistence
+    // completes. Guarded against re-entry while a save is already in flight.
+    val handleClose: () -> Unit = {
+        when {
+            editorState.canExitWithoutSaving -> appState.closeWindow(state)
+            !editorState.isSaving -> viewModel.saveEntry(editorState)
+            else -> Unit
+        }
+    }
+
+    // When the application-level exit cascade requests this editor close, run the same flow.
+    LaunchedEffect(state.closeRequested) {
+        if (state.closeRequested) {
+            handleClose()
+        }
+    }
+
     Window(
-        onCloseRequest = {
-            if (editorState.canExitWithoutSaving) {
-                appState.closeWindow(state)
-            } else {
-                // Persist the in-progress entry. The viewModel emits onEntrySaved
-                // when the save completes, which routes back through closeWindow.
-                viewModel.saveEntry(editorState)
-            }
-        },
+        onCloseRequest = handleClose,
         title = state.title,
         state = windowState,
         onKeyEvent = { event ->
@@ -123,12 +133,24 @@ class EntryEditorWindowState(
     var isFullscreen: Boolean by mutableStateOf(false)
         private set
 
+    /**
+     * One-shot signal that this editor should run its save-or-close flow. Flipped to true by
+     * [LogDateApplicationState.exit] / [LogDateApplicationState.closeWindow] when closing the
+     * main window so each editor saves its dirty draft before the app exits.
+     */
+    var closeRequested: Boolean by mutableStateOf(false)
+        private set
+
     fun updateTitle(newTitle: String) {
         title = newTitle
     }
 
     fun toggleFullscreen() {
         isFullscreen = !isFullscreen
+    }
+
+    fun requestClose() {
+        closeRequested = true
     }
 
     override fun exit(): Boolean = true
