@@ -87,10 +87,10 @@ fun Route.transcriptionRoutes(
                     inputFormat = lease.inputFormat,
                     realtimeUrl = lease.realtimeUrl,
                     clientSecret =
-                        lease.clientSecretValue?.let { secret ->
+                        lease.clientSecretValue?.takeIf { lease.clientSecretExpiresAtEpochSeconds != null }?.let { secret ->
                             CloudTranscriptionClientSecret(
                                 value = secret,
-                                expiresAtEpochSeconds = lease.clientSecretExpiresAtEpochSeconds ?: 0,
+                                expiresAtEpochSeconds = requireNotNull(lease.clientSecretExpiresAtEpochSeconds),
                             )
                         },
                     modelId = lease.modelId,

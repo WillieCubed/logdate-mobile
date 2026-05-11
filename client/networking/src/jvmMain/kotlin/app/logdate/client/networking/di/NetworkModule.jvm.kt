@@ -1,5 +1,7 @@
 package app.logdate.client.networking.di
 
+import app.logdate.client.networking.CloudTranscriptionApiClient
+import app.logdate.client.networking.CloudTranscriptionApiClientContract
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.DefaultDataUsagePolicy
 import app.logdate.client.networking.DefaultServerDiscoveryClient
@@ -19,4 +21,5 @@ actual val networkingModule: Module =
         single<DataUsagePolicy> { DefaultDataUsagePolicy(get()) }
         single<ServerHealthChecker> { DefaultServerHealthChecker(get()) }
         single<ServerDiscoveryClient> { DefaultServerDiscoveryClient(get()) }
+        single<CloudTranscriptionApiClientContract> { CloudTranscriptionApiClient(get(), get()) }
     }

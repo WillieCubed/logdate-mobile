@@ -9,10 +9,18 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class CloudTranscriptionSessionRequest(
+    /** Audio note that will receive the resulting transcript. */
     val noteId: String,
+    /** BCP-47 language tag requested by the client. */
     val language: String = "en-US",
+    /** Whether the session is for live capture or a second-pass refinement. */
     val mode: CloudTranscriptionMode = CloudTranscriptionMode.REALTIME,
-)
+) {
+    init {
+        require(noteId.isNotBlank()) { "noteId must not be blank" }
+        require(language.isNotBlank()) { "language must not be blank" }
+    }
+}
 
 /**
  * Cloud transcription modes supported by the public API contract.
@@ -30,15 +38,25 @@ enum class CloudTranscriptionMode {
  */
 @Serializable
 data class CloudTranscriptionSessionResponse(
+    /** LogDate-owned session id used for client correlation and diagnostics. */
     val sessionId: String,
+    /** Audio note this session was created for. */
     val noteId: String,
+    /** Language accepted for this session. */
     val language: String,
+    /** Live or refinement mode reserved by the server. */
     val mode: CloudTranscriptionMode,
+    /** LogDate Cloud stream path retained for server-side proxy implementations. */
     val streamPath: String,
+    /** PCM format the client should send to the realtime recognizer. */
     val inputFormat: CloudAudioInputFormat = CloudAudioInputFormat.PCM16_MONO_24KHZ,
+    /** Stable public provider label; downstream ASR vendors remain server-controlled. */
     val provider: String = "logdate-cloud",
+    /** Realtime socket URL when the server returns a direct ephemeral provider lease. */
     val realtimeUrl: String? = null,
+    /** Short-lived credential scoped to this realtime transcription session. */
     val clientSecret: CloudTranscriptionClientSecret? = null,
+    /** Model selected by LogDate Cloud for diagnostics and transcript metadata. */
     val modelId: String? = null,
 )
 
