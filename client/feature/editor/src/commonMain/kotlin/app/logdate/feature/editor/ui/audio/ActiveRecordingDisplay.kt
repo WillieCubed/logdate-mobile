@@ -5,11 +5,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -53,44 +55,53 @@ fun ActiveRecordingDisplay(
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
     transcriptionText: String? = null,
+    transcriptionIsFinal: Boolean = false,
+    transcriptionIsRefining: Boolean = false,
     isPaused: Boolean = false,
 ) {
     Column(
         modifier = modifier,
     ) {
-        // 1. Transcription text area (scrollable, takes remaining space)
         val scrollState = rememberScrollState()
         LaunchedEffect(transcriptionText) {
             scrollState.animateScrollTo(scrollState.maxValue)
         }
-        Surface(
+        Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(8.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            shape = RoundedCornerShape(12.dp),
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            RecordingTranscriptStatus(
+                isPaused = isPaused,
+                isFinal = transcriptionIsFinal,
+                isRefining = transcriptionIsRefining,
+                hasTranscript = !transcriptionText.isNullOrBlank(),
+            )
+
             Box(
                 modifier =
                     Modifier
-                        .fillMaxSize()
-                        .padding(16.dp)
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .heightIn(min = 160.dp)
                         .verticalScroll(scrollState),
             ) {
-                Text(
-                    text =
-                        transcriptionText.takeUnless { it.isNullOrBlank() }
-                            ?: stringResource(Res.string.listening),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color =
-                        if (transcriptionText.isNullOrBlank()) {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                )
+                val text = transcriptionText.takeUnless { it.isNullOrBlank() }
+                if (text == null) {
+                    Text(
+                        text = stringResource(Res.string.listening),
+                        style = MaterialTheme.typography.displaySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    )
+                } else {
+                    LiveTranscriptText(
+                        text = text,
+                        isRefining = transcriptionIsRefining,
+                    )
+                }
             }
         }
 
@@ -182,6 +193,78 @@ fun ActiveRecordingDisplay(
                     }
                 }
             }
+        }
+    }
+}
+
+@Suppress("ktlint:standard:function-naming")
+@Composable
+private fun RecordingTranscriptStatus(
+    isPaused: Boolean,
+    isFinal: Boolean,
+    isRefining: Boolean,
+    hasTranscript: Boolean,
+) {
+    val label =
+        when {
+            isPaused -> "Paused"
+            isRefining -> "Improving transcript"
+            isFinal -> "Transcript ready"
+            hasTranscript -> "Live on-device"
+            else -> "Listening"
+        }
+    val indicatorColor =
+        when {
+            isPaused -> MaterialTheme.colorScheme.outline
+            isFinal -> MaterialTheme.colorScheme.primary
+            else -> MaterialTheme.colorScheme.error
+        }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(9.dp)
+                    .clip(CircleShape)
+                    .background(indicatorColor),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Suppress("ktlint:standard:function-naming")
+@Composable
+private fun LiveTranscriptText(
+    text: String,
+    isRefining: Boolean,
+) {
+    val paragraphs = text.split(Regex("\\n\\s*\\n")).map { it.trim() }.filter { it.isNotBlank() }
+    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        paragraphs.forEachIndexed { index, paragraph ->
+            val isLatest = index == paragraphs.lastIndex
+            Text(
+                text = paragraph,
+                style =
+                    if (isLatest && !isRefining) {
+                        MaterialTheme.typography.headlineMedium
+                    } else {
+                        MaterialTheme.typography.headlineSmall
+                    },
+                color =
+                    if (isLatest && isRefining) {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+            )
         }
     }
 }

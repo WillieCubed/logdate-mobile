@@ -35,6 +35,7 @@ import app.logdate.client.awareness.daylight.DaylightClassifier
 import app.logdate.client.domain.events.LinkNoteToEventUseCase
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.HomeRecommendation
+import app.logdate.client.domain.timeline.GetJournalMembershipUseCase
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
 import app.logdate.client.domain.timeline.GetTimelinePageUseCase
 import app.logdate.client.domain.timeline.Moment
@@ -46,12 +47,18 @@ import app.logdate.client.domain.timeline.TimelinePageRequest
 import app.logdate.client.domain.timeline.TimelinePlaceVisit
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.transcription.TranscriptionData
+import app.logdate.client.repository.transcription.TranscriptionRepository
+import app.logdate.client.repository.transcription.TranscriptionStatus
 import app.logdate.feature.core.sync.SyncIssuesBanner
 import app.logdate.feature.core.sync.SyncPresentationViewModel
 import app.logdate.feature.journals.ui.JournalClickCallback
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
 import app.logdate.feature.rewind.ui.RewindOverviewScreen
+import app.logdate.shared.model.Journal
 import app.logdate.shared.model.Person
+import app.logdate.ui.audio.TranscriptionProvider
+import app.logdate.ui.audio.TranscriptionState
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.profiles.PersonUiState
@@ -61,6 +68,7 @@ import app.logdate.ui.sync.SyncErrorBanner
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.HomeTimelineUiState
 import app.logdate.ui.timeline.ImageNoteUiState
+import app.logdate.ui.timeline.JournalBadgeUiState
 import app.logdate.ui.timeline.MediaObjectUiState
 import app.logdate.ui.timeline.MomentAudioUiState
 import app.logdate.ui.timeline.MomentMediaUiState
@@ -208,34 +216,38 @@ fun HomeScreen(
                                     .safeDrawingPadding(),
                         ) {
                             SyncIssuesBanner(onOpenSyncIssues = onOpenSyncIssues)
-                            TimelinePane(
-                                uiState =
-                                    TimelineUiState(
-                                        items = uiState.items,
-                                        loadingState = uiState.loadingState,
-                                        isLoadingMore = uiState.isLoadingMore,
-                                        hasMoreOlderContent = uiState.hasMoreOlderContent,
-                                        appendError = uiState.appendError,
-                                    ),
-                                onNewEntry = onNewEntry,
-                                onOpenDay = onOpenDay,
-                                onLoadMoreOlder = viewModel::loadMoreOlder,
-                                onProfileClick = onOpenSettings,
-                                onSearchClick = onOpenSearch,
-                                onOpenDraft = onOpenDraft,
-                                onImportBackup = onImportBackup,
-                                timelineSuggestion = uiState.timelineSuggestion,
-                                syncPresentation = syncPresentation,
-                                onSyncAction = { action ->
-                                    when (action) {
-                                        app.logdate.ui.sync.SyncAction.SignIn,
-                                        app.logdate.ui.sync.SyncAction.ManageStorage,
-                                        app.logdate.ui.sync.SyncAction.ReviewConflicts,
-                                        -> onOpenSettings()
-                                        app.logdate.ui.sync.SyncAction.Retry -> Unit
-                                    }
-                                },
-                            )
+                            val transcriptionState by viewModel.transcriptionState.collectAsStateWithLifecycle()
+                            TranscriptionProvider(transcriptionState) {
+                                TimelinePane(
+                                    uiState =
+                                        TimelineUiState(
+                                            items = uiState.items,
+                                            loadingState = uiState.loadingState,
+                                            isLoadingMore = uiState.isLoadingMore,
+                                            hasMoreOlderContent = uiState.hasMoreOlderContent,
+                                            appendError = uiState.appendError,
+                                        ),
+                                    onNewEntry = onNewEntry,
+                                    onOpenDay = onOpenDay,
+                                    onVisibleAudioNoteIdsChanged = viewModel::updateVisibleAudioNoteIds,
+                                    onLoadMoreOlder = viewModel::loadMoreOlder,
+                                    onProfileClick = onOpenSettings,
+                                    onSearchClick = onOpenSearch,
+                                    onOpenDraft = onOpenDraft,
+                                    onImportBackup = onImportBackup,
+                                    timelineSuggestion = uiState.timelineSuggestion,
+                                    syncPresentation = syncPresentation,
+                                    onSyncAction = { action ->
+                                        when (action) {
+                                            app.logdate.ui.sync.SyncAction.SignIn,
+                                            app.logdate.ui.sync.SyncAction.ManageStorage,
+                                            -> onOpenSettings()
+                                            app.logdate.ui.sync.SyncAction.ReviewConflicts -> onOpenSyncIssues()
+                                            app.logdate.ui.sync.SyncAction.Retry -> Unit
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
 
@@ -288,6 +300,8 @@ class HomeViewModel(
     private val notesRepository: JournalNotesRepository,
     private val getHomeRecommendation: GetHomeRecommendationUseCase,
     private val linkNoteToEvent: LinkNoteToEventUseCase,
+    private val getJournalMembership: GetJournalMembershipUseCase,
+    private val transcriptionRepository: TranscriptionRepository,
 ) : ViewModel() {
     companion object {
         private const val RECENT_TIMELINE_PAGE_SIZE = 50
@@ -300,6 +314,8 @@ class HomeViewModel(
         notesRepository: JournalNotesRepository,
         getHomeRecommendation: GetHomeRecommendationUseCase,
         linkNoteToEvent: LinkNoteToEventUseCase,
+        getJournalMembership: GetJournalMembershipUseCase,
+        transcriptionRepository: TranscriptionRepository,
     ) : this(
         recentTimelineFlow =
             getStreamingTimelineUseCase(
@@ -311,6 +327,8 @@ class HomeViewModel(
         notesRepository = notesRepository,
         getHomeRecommendation = getHomeRecommendation,
         linkNoteToEvent = linkNoteToEvent,
+        getJournalMembership = getJournalMembership,
+        transcriptionRepository = transcriptionRepository,
     )
 
     private val selectedDayFlow = MutableStateFlow<LocalDate?>(null)
@@ -318,6 +336,46 @@ class HomeViewModel(
     private val isLoadingMore = MutableStateFlow(false)
     private val appendError = MutableStateFlow<String?>(null)
     private val hasLoadedRecentTimeline = MutableStateFlow(false)
+    private val visibleAudioNoteIds = MutableStateFlow<Set<Uuid>>(emptySet())
+    private val transcriptionCache = MutableStateFlow<Map<Uuid, TranscriptionData?>>(emptyMap())
+    private val autoRequestedNoteIds = mutableSetOf<Uuid>()
+
+    val transcriptionState: StateFlow<TranscriptionState> =
+        transcriptionCache
+            .map { cache ->
+                TranscriptionState(
+                    requestTranscription = ::requestTranscription,
+                    getTranscriptionText = { noteId ->
+                        cache[noteId]
+                            ?.text
+                            ?.trim()
+                            ?.takeIf(String::isNotEmpty)
+                    },
+                    isTranscriptionInProgress = { noteId ->
+                        cache[noteId]?.status in setOf(TranscriptionStatus.PENDING, TranscriptionStatus.IN_PROGRESS)
+                    },
+                    getTranscriptionError = { noteId ->
+                        cache[noteId]
+                            ?.takeIf { it.status == TranscriptionStatus.FAILED }
+                            ?.errorMessage
+                    },
+                )
+            }.stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                TranscriptionState(requestTranscription = ::requestTranscription),
+            )
+
+    init {
+        viewModelScope.launch {
+            visibleAudioNoteIds
+                .flatMapLatest(::observeVisibleTranscriptions)
+                .onEach { transcriptions ->
+                    transcriptionCache.value = transcriptions
+                    requestMissingVisibleTranscriptions(transcriptions)
+                }.collect {}
+        }
+    }
 
     private val recentTimelineState: StateFlow<Timeline> =
         recentTimelineFlow
@@ -339,8 +397,11 @@ class HomeViewModel(
 
     private val timelineItems: StateFlow<List<TimelineDayUiState>> =
         timelineFeedDays
-            .map { timelineDays ->
-                timelineDays.map { timelineDay -> timelineDay.toUiState() }
+            .flatMapLatest { timelineDays ->
+                val noteIds = timelineDays.flatMap { day -> day.entries.map(JournalNote::uid) }.toSet()
+                getJournalMembership(noteIds).map { membershipMap ->
+                    timelineDays.map { timelineDay -> timelineDay.toUiState(membershipMap = membershipMap) }
+                }
             }.stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5_000),
@@ -375,10 +436,24 @@ class HomeViewModel(
         ) { selectedDayDate, selectedNotes, timelineDays ->
             val day = selectedDayDate ?: return@combine null
             val timelineDay = timelineDays.find { timelineEntry -> timelineEntry.date == day } ?: return@combine null
+            val notes = if (selectedNotes.isEmpty()) timelineDay.entries else selectedNotes
 
-            timelineDay.toUiState(
-                overrideNotes = if (selectedNotes.isEmpty()) timelineDay.entries else selectedNotes,
+            SelectedTimelineDayData(
+                timelineDay = timelineDay,
+                notes = notes,
             )
+        }.flatMapLatest { selectedData ->
+            if (selectedData == null) {
+                flowOf(null)
+            } else {
+                val noteIds = selectedData.notes.map(JournalNote::uid).toSet()
+                getJournalMembership(noteIds).map { membershipMap ->
+                    selectedData.timelineDay.toUiState(
+                        overrideNotes = selectedData.notes,
+                        membershipMap = membershipMap,
+                    )
+                }
+            }
         }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5_000),
@@ -496,6 +571,10 @@ class HomeViewModel(
         }
     }
 
+    fun updateVisibleAudioNoteIds(noteIds: Set<Uuid>) {
+        visibleAudioNoteIds.value = noteIds
+    }
+
     fun loadMoreOlder() {
         if (isLoadingMore.value) {
             return
@@ -541,8 +620,11 @@ class HomeViewModel(
             longitude = longitude,
         )
 
-    private fun TimelineDay.toUiState(overrideNotes: List<JournalNote> = entries): TimelineDayUiState {
-        val noteUiStates = overrideNotes.toUiState()
+    private fun TimelineDay.toUiState(
+        overrideNotes: List<JournalNote> = entries,
+        membershipMap: Map<Uuid, List<Journal>> = emptyMap(),
+    ): TimelineDayUiState {
+        val noteUiStates = overrideNotes.toUiState(membershipMap)
         val placeUiStates = placesVisited.map { place -> place.toUiState() }
         val peopleUiStates = people.map(Person::toUiState)
         val momentUiStates = moments.toMomentUiStates(peopleUiStates)
@@ -597,20 +679,29 @@ class HomeViewModel(
         )
     }
 
-    private fun List<JournalNote>.toUiState(): List<app.logdate.ui.timeline.NoteUiState> =
+    private fun List<JournalNote>.toUiState(
+        membershipMap: Map<Uuid, List<Journal>> = emptyMap(),
+    ): List<app.logdate.ui.timeline.NoteUiState> =
         sortedByDescending { note -> note.creationTimestamp }.map { note ->
+            val noteJournals =
+                membershipMap[note.uid]
+                    .orEmpty()
+                    .map { JournalBadgeUiState(journalId = it.id, title = it.title) }
             when (note) {
                 is JournalNote.Text ->
                     TextNoteUiState(
                         noteId = note.uid,
                         text = note.content,
                         timestamp = note.creationTimestamp,
+                        journals = noteJournals,
                     )
                 is JournalNote.Image ->
                     ImageNoteUiState(
                         noteId = note.uid,
                         uri = note.mediaRef,
                         timestamp = note.creationTimestamp,
+                        caption = note.caption,
+                        journals = noteJournals,
                     )
                 is JournalNote.Audio ->
                     AudioNoteUiState(
@@ -618,15 +709,60 @@ class HomeViewModel(
                         uri = note.mediaRef,
                         timestamp = note.creationTimestamp,
                         duration = note.durationMs,
+                        journals = noteJournals,
                     )
                 is JournalNote.Video ->
                     VideoNoteUiState(
                         noteId = note.uid,
                         uri = note.mediaRef,
                         timestamp = note.creationTimestamp,
+                        caption = note.caption,
+                        journals = noteJournals,
                     )
             }
         }
+
+    private fun observeVisibleTranscriptions(noteIds: Set<Uuid>): Flow<Map<Uuid, TranscriptionData?>> {
+        val sortedIds = noteIds.sorted()
+        if (sortedIds.isEmpty()) {
+            return flowOf(emptyMap())
+        }
+
+        return combine(
+            sortedIds.map { noteId ->
+                transcriptionRepository.observeTranscription(noteId).map { transcription ->
+                    noteId to transcription
+                }
+            },
+        ) { notePairs ->
+            notePairs.toMap()
+        }
+    }
+
+    private fun requestTranscription(noteId: Uuid) {
+        viewModelScope.launch {
+            transcriptionRepository.requestTranscription(noteId)
+        }
+    }
+
+    private fun requestMissingVisibleTranscriptions(transcriptions: Map<Uuid, TranscriptionData?>) {
+        val noteIdsToRequest =
+            autoRequestableTimelineTranscriptionIds(
+                visibleNoteIds = visibleAudioNoteIds.value,
+                transcriptions = transcriptions,
+                alreadyRequestedNoteIds = autoRequestedNoteIds,
+            )
+
+        noteIdsToRequest.forEach { noteId ->
+            autoRequestedNoteIds.add(noteId)
+            viewModelScope.launch {
+                val queued = transcriptionRepository.requestTranscription(noteId)
+                if (!queued) {
+                    autoRequestedNoteIds.remove(noteId)
+                }
+            }
+        }
+    }
 
     private fun HomeRecommendation.toTimelineSuggestionBlock(): TimelineSuggestionBlock? =
         when (this) {
@@ -658,6 +794,25 @@ class HomeViewModel(
         }
 }
 
+private fun autoRequestableTimelineTranscriptionIds(
+    visibleNoteIds: Set<Uuid>,
+    transcriptions: Map<Uuid, TranscriptionData?>,
+    alreadyRequestedNoteIds: Set<Uuid>,
+): Set<Uuid> =
+    visibleNoteIds
+        .filterNot { noteId -> noteId in alreadyRequestedNoteIds }
+        .filter { noteId ->
+            when (transcriptions[noteId]?.status) {
+                null,
+                TranscriptionStatus.FAILED,
+                -> true
+                TranscriptionStatus.COMPLETED,
+                TranscriptionStatus.IN_PROGRESS,
+                TranscriptionStatus.PENDING,
+                -> false
+            }
+        }.toSet()
+
 private fun mergeTimelineDays(
     existing: List<TimelineDay>,
     incoming: List<TimelineDay>,
@@ -681,6 +836,11 @@ private data class HomeTimelineVisualState(
     val selection: TimelineDaySelection,
     val selectedDay: TimelineDayUiState?,
     val suggestion: TimelineSuggestionBlock?,
+)
+
+private data class SelectedTimelineDayData(
+    val timelineDay: TimelineDay,
+    val notes: List<JournalNote>,
 )
 
 private data class HomeTimelineLoadingState(

@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import app.logdate.client.database.entities.TranscriptionEntity
+import app.logdate.client.database.entities.TranscriptionSegmentEntity
 import app.logdate.client.database.entities.TranscriptionStatus
 import kotlinx.coroutines.flow.Flow
 import kotlin.uuid.Uuid
@@ -24,6 +25,12 @@ interface TranscriptionDao {
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTranscription(transcription: TranscriptionEntity): Long
+
+    /**
+     * Inserts timestamped transcript segments for search and playback seeking.
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSegments(segments: List<TranscriptionSegmentEntity>)
 
     /**
      * Updates an existing transcription.
@@ -51,6 +58,12 @@ interface TranscriptionDao {
      */
     @Query("SELECT * FROM transcriptions WHERE noteId = :noteId LIMIT 1")
     suspend fun getTranscriptionByNoteId(noteId: Uuid): TranscriptionEntity?
+
+    /**
+     * Returns timestamped transcript segments for a note in playback order.
+     */
+    @Query("SELECT * FROM transcription_segments WHERE noteId = :noteId ORDER BY startMs, segmentId")
+    suspend fun getSegmentsByNoteId(noteId: Uuid): List<TranscriptionSegmentEntity>
 
     /**
      * Observes a transcription by the note ID it's associated with.
@@ -160,4 +173,25 @@ interface TranscriptionDao {
      */
     @Query("DELETE FROM transcriptions WHERE noteId = :noteId")
     suspend fun deleteTranscriptionByNoteId(noteId: Uuid): Int
+
+    /**
+     * Removes timestamped transcript segments for a note.
+     */
+    @Query("DELETE FROM transcription_segments WHERE noteId = :noteId")
+    suspend fun deleteSegmentsByNoteId(noteId: Uuid): Int
+
+    /**
+     * Replaces all timestamped segments for [noteId] in one transaction so the
+     * JSON transcript document and segment index do not drift during refinement.
+     */
+    @Transaction
+    suspend fun replaceSegmentsForNote(
+        noteId: Uuid,
+        segments: List<TranscriptionSegmentEntity>,
+    ) {
+        deleteSegmentsByNoteId(noteId)
+        if (segments.isNotEmpty()) {
+            insertSegments(segments)
+        }
+    }
 }

@@ -3,16 +3,23 @@ package app.logdate.client.data.transcription
 import app.logdate.client.database.dao.AudioNoteDao
 import app.logdate.client.database.dao.TranscriptionDao
 import app.logdate.client.database.entities.TranscriptionEntity
+import app.logdate.client.database.entities.TranscriptionSegmentEntity
 import app.logdate.client.media.audio.transcription.TranscriptionManager
+import app.logdate.client.repository.transcription.TranscriptDocument
+import app.logdate.client.repository.transcription.TranscriptSegment
+import app.logdate.client.repository.transcription.TranscriptSource
 import app.logdate.client.repository.transcription.TranscriptionData
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.transcription.TranscriptionStatus
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
-import app.logdate.client.database.entities.TranscriptionStatus as DbTranscriptionStatus
+
+private typealias DbTranscriptionStatus = app.logdate.client.database.entities.TranscriptionStatus
 
 /**
  * Implementation of [TranscriptionRepository] that stores transcriptions in the local database.
@@ -22,6 +29,12 @@ class OfflineFirstTranscriptionRepository(
     private val audioNoteDao: AudioNoteDao,
     private val transcriptionManager: TranscriptionManager,
 ) : TranscriptionRepository {
+    private val transcriptJson =
+        Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = true
+        }
+
     override suspend fun requestTranscription(noteId: Uuid): Boolean {
         Napier.d("Requesting transcription for note $noteId")
 
@@ -145,6 +158,10 @@ class OfflineFirstTranscriptionRepository(
                             lastUpdated = now,
                         ),
                     )
+                    transcriptionDao.replaceSegmentsForNote(
+                        noteId = noteId,
+                        segments = text.toLegacySegmentEntities(noteId),
+                    )
                     return true
                 }
 
@@ -158,9 +175,69 @@ class OfflineFirstTranscriptionRepository(
                     lastUpdated = now,
                 ),
             )
+            transcriptionDao.replaceSegmentsForNote(
+                noteId = noteId,
+                segments = text.toLegacySegmentEntities(noteId),
+            )
             true
         } catch (e: Exception) {
             Napier.e("Failed to update transcription", e)
+            false
+        }
+    }
+
+    override suspend fun updateTranscriptDocument(
+        noteId: Uuid,
+        document: TranscriptDocument,
+        status: TranscriptionStatus,
+        errorMessage: String?,
+    ): Boolean {
+        Napier.d("Updating structured transcription for note $noteId to status $status")
+
+        val dbStatus = status.toDbStatus()
+        val documentJson = transcriptJson.encodeToString(document)
+        val transcription =
+            transcriptionDao.getTranscriptionByNoteId(noteId)
+                ?: run {
+                    val now = Clock.System.now()
+                    transcriptionDao.insertTranscription(
+                        TranscriptionEntity(
+                            noteId = noteId,
+                            text = document.plainText,
+                            documentJson = documentJson,
+                            language = document.language,
+                            source = document.primarySourceName(),
+                            revision = document.revision,
+                            isCloudEnhanced = document.isCloudEnhanced,
+                            speakerCount = document.speakers.size,
+                            status = dbStatus,
+                            errorMessage = errorMessage,
+                            created = now,
+                            lastUpdated = now,
+                        ),
+                    )
+                    return true
+                }
+
+        val now = Clock.System.now()
+        return try {
+            transcriptionDao.updateTranscription(
+                transcription.copy(
+                    text = document.plainText,
+                    documentJson = documentJson,
+                    language = document.language,
+                    source = document.primarySourceName(),
+                    revision = document.revision,
+                    isCloudEnhanced = document.isCloudEnhanced,
+                    speakerCount = document.speakers.size,
+                    status = dbStatus,
+                    errorMessage = errorMessage,
+                    lastUpdated = now,
+                ),
+            )
+            true
+        } catch (e: Exception) {
+            Napier.e("Failed to update structured transcription", e)
             false
         }
     }
@@ -184,6 +261,7 @@ class OfflineFirstTranscriptionRepository(
         TranscriptionData(
             noteId = noteId,
             text = text,
+            transcriptDocument = decodeTranscriptDocument(documentJson),
             status =
                 when (status) {
                     DbTranscriptionStatus.PENDING -> TranscriptionStatus.PENDING
@@ -191,9 +269,80 @@ class OfflineFirstTranscriptionRepository(
                     DbTranscriptionStatus.COMPLETED -> TranscriptionStatus.COMPLETED
                     DbTranscriptionStatus.FAILED -> TranscriptionStatus.FAILED
                 },
+            language = language,
+            source = source?.let { decodeTranscriptSource(it) },
+            modelId = modelId,
+            revision = revision,
+            isCloudEnhanced = isCloudEnhanced,
+            speakerCount = speakerCount,
             errorMessage = errorMessage,
             created = created,
             lastUpdated = lastUpdated,
             id = id,
         )
+
+    private fun TranscriptionStatus.toDbStatus(): DbTranscriptionStatus =
+        when (this) {
+            TranscriptionStatus.PENDING -> DbTranscriptionStatus.PENDING
+            TranscriptionStatus.IN_PROGRESS -> DbTranscriptionStatus.IN_PROGRESS
+            TranscriptionStatus.COMPLETED -> DbTranscriptionStatus.COMPLETED
+            TranscriptionStatus.FAILED -> DbTranscriptionStatus.FAILED
+        }
+
+    private fun decodeTranscriptDocument(documentJson: String?): TranscriptDocument? =
+        documentJson?.let {
+            try {
+                transcriptJson.decodeFromString<TranscriptDocument>(it)
+            } catch (e: Exception) {
+                Napier.e("Failed to decode structured transcription document", e)
+                null
+            }
+        }
+
+    private fun decodeTranscriptSource(source: String): TranscriptSource? =
+        try {
+            TranscriptSource.valueOf(source)
+        } catch (e: IllegalArgumentException) {
+            Napier.w("Unknown transcript source: $source", e)
+            null
+        }
+
+    private fun TranscriptDocument.primarySourceName(): String? = segments.maxByOrNull { it.source.ordinal }?.source?.name
+
+    private fun String?.toLegacySegmentEntities(noteId: Uuid): List<TranscriptionSegmentEntity> =
+        takeUnless { it.isNullOrBlank() }
+            ?.let { TranscriptDocument.fromPlainText(it).toSegmentEntities(noteId) }
+            .orEmpty()
+
+    private fun TranscriptDocument.toSegmentEntities(noteId: Uuid): List<TranscriptionSegmentEntity> =
+        segments.map { segment ->
+            segment.toEntity(
+                noteId = noteId,
+                revision = revision,
+            )
+        }
+
+    private fun TranscriptSegment.toEntity(
+        noteId: Uuid,
+        revision: Int,
+    ): TranscriptionSegmentEntity =
+        TranscriptionSegmentEntity(
+            noteId = noteId,
+            segmentId = segmentId,
+            text = text,
+            startMs = startMs,
+            endMs = endMs,
+            speakerId = speakerId,
+            confidence = confidence,
+            source = source.name,
+            isFinal = isFinal,
+            revision = revision,
+        )
+
+    private val TranscriptDocument.isCloudEnhanced: Boolean
+        get() =
+            segments.any {
+                it.source == TranscriptSource.CLOUD_LIVE ||
+                    it.source == TranscriptSource.CLOUD_REFINEMENT
+            }
 }

@@ -119,6 +119,8 @@ actual val coreFeatureModule: Module =
                 notesRepository = get(),
                 getHomeRecommendation = get(),
                 linkNoteToEvent = get(),
+                getJournalMembership = get(),
+                transcriptionRepository = get(),
             )
         }
         viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }

@@ -15,6 +15,7 @@ import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.domain.recommendation.RecallMode
 import app.logdate.client.domain.recommendation.WidgetContentType
 import app.logdate.client.domain.timeline.GetDayBoundsUseCase
+import app.logdate.client.domain.timeline.GetJournalMembershipUseCase
 import app.logdate.client.domain.timeline.GetTimelinePageUseCase
 import app.logdate.client.domain.timeline.GroupNotesByDayBoundsUseCase
 import app.logdate.client.domain.timeline.Timeline
@@ -30,11 +31,18 @@ import app.logdate.client.location.places.StubReverseGeocodingProvider
 import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
+import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.places.UserPlacesRepository
+import app.logdate.client.repository.transcription.TranscriptionData
+import app.logdate.client.repository.transcription.TranscriptionRepository
+import app.logdate.client.repository.transcription.TranscriptionStatus
 import app.logdate.shared.model.Event
+import app.logdate.shared.model.Journal
 import app.logdate.shared.model.Place
+import app.logdate.ui.timeline.ImageNoteUiState
+import app.logdate.ui.timeline.VideoNoteUiState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -60,6 +68,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -83,7 +92,7 @@ class HomeViewModelTest {
     @Test
     fun `loadMoreOlder appends older days and reaches end of history`() =
         runTest {
-            val notesRepository = ReactiveJournalNotesRepository(notes = generateSequentialDayNotes(dayCount = 55))
+            val notesRepository = FakeJournalNotesRepository(notes = generateSequentialDayNotes(dayCount = 55))
             val viewModel = createViewModel(notesRepository)
             val collectionJob = launch { viewModel.uiState.collect() }
 
@@ -104,7 +113,7 @@ class HomeViewModelTest {
     @Test
     fun `loadMoreOlder does not duplicate the boundary day when recent window cuts through it`() =
         runTest {
-            val notesRepository = ReactiveJournalNotesRepository(notes = generateBoundarySplitNotes())
+            val notesRepository = FakeJournalNotesRepository(notes = generateBoundarySplitNotes())
             val viewModel = createViewModel(notesRepository)
             val boundaryDay = LocalDate(2025, 1, 20)
             val collectionJob = launch { viewModel.uiState.collect() }
@@ -142,7 +151,134 @@ class HomeViewModelTest {
             collectionJob.cancel()
         }
 
-    private suspend fun createViewModel(notesRepository: ReactiveJournalNotesRepository): HomeViewModel {
+    @Test
+    fun `timeline note mapping preserves media captions and journal badges on the live Home path`() =
+        runTest {
+            val journalId = Uuid.random()
+            val imageId = Uuid.random()
+            val videoId = Uuid.random()
+            val now = Instant.parse("2026-03-31T18:00:00Z")
+            val notesRepository =
+                FakeJournalNotesRepository(
+                    notes =
+                        listOf(
+                            JournalNote.Image(
+                                uid = imageId,
+                                mediaRef = "file://image.jpg",
+                                caption = "Sunset walk",
+                                creationTimestamp = now,
+                                lastUpdated = now,
+                            ),
+                            JournalNote.Video(
+                                uid = videoId,
+                                mediaRef = "file://video.mp4",
+                                caption = "Birthday toast",
+                                creationTimestamp = now - 1.days,
+                                lastUpdated = now - 1.days,
+                            ),
+                        ),
+                )
+            val viewModel =
+                createViewModel(
+                    notesRepository = notesRepository,
+                    journalContentRepository =
+                        FakeJournalContentRepository(
+                            mapOf(
+                                imageId to listOf(Journal(id = journalId, title = "Travel")),
+                                videoId to listOf(Journal(id = journalId, title = "Travel")),
+                            ),
+                        ),
+                )
+            val collectionJob = launch { viewModel.uiState.collect() }
+
+            advanceUntilIdle()
+
+            val imageNote =
+                viewModel.uiState.value
+                    .items[0]
+                    .notes
+                    .single()
+            val image = assertIs<ImageNoteUiState>(imageNote)
+            assertEquals("Sunset walk", image.caption)
+            assertEquals(
+                "Travel",
+                image.journals
+                    .single()
+                    .title,
+            )
+
+            val videoNote =
+                viewModel.uiState.value
+                    .items[1]
+                    .notes
+                    .single()
+            val video = assertIs<VideoNoteUiState>(videoNote)
+            assertEquals("Birthday toast", video.caption)
+            assertEquals(
+                "Travel",
+                video.journals
+                    .single()
+                    .title,
+            )
+            collectionJob.cancel()
+        }
+
+    @Test
+    fun `live Home transcription state exposes completed transcriptions and queues missing visible audio`() =
+        runTest {
+            val audioId = Uuid.random()
+            val now = Instant.parse("2026-03-31T18:00:00Z")
+            val transcriptionRepository =
+                FakeTranscriptionRepository(
+                    initial =
+                        mapOf(
+                            audioId to
+                                TranscriptionData(
+                                    noteId = audioId,
+                                    text = "Remember the launch checklist",
+                                    status = TranscriptionStatus.COMPLETED,
+                                    created = now,
+                                    lastUpdated = now,
+                                    id = Uuid.random(),
+                                ),
+                        ),
+                )
+            val viewModel =
+                createViewModel(
+                    notesRepository =
+                        FakeJournalNotesRepository(
+                            notes =
+                                listOf(
+                                    JournalNote.Audio(
+                                        uid = audioId,
+                                        mediaRef = "file://voice.m4a",
+                                        durationMs = 12_000,
+                                        creationTimestamp = now,
+                                        lastUpdated = now,
+                                    ),
+                                ),
+                        ),
+                    transcriptionRepository = transcriptionRepository,
+                )
+            val collectionJob = launch { viewModel.transcriptionState.collect() }
+
+            viewModel.updateVisibleAudioNoteIds(setOf(audioId))
+            advanceUntilIdle()
+
+            assertEquals("Remember the launch checklist", viewModel.transcriptionState.value.getTranscriptionText(audioId))
+            assertFalse(viewModel.transcriptionState.value.isTranscriptionInProgress(audioId))
+            assertTrue(transcriptionRepository.requestedNoteIds.isEmpty())
+            collectionJob.cancel()
+        }
+
+    private suspend fun createViewModel(notesRepository: FakeJournalNotesRepository): HomeViewModel =
+        createViewModel(notesRepository = notesRepository, journalContentRepository = FakeJournalContentRepository())
+
+    private suspend fun createViewModel(
+        notesRepository: FakeJournalNotesRepository,
+        journalContentRepository: JournalContentRepository = FakeJournalContentRepository(),
+        transcriptionRepository: TranscriptionRepository = FakeTranscriptionRepository(),
+    ): HomeViewModel {
         val dayBoundarySettingsRepository = FakeDayBoundarySettingsRepository()
         val pageUseCase =
             GetTimelinePageUseCase(
@@ -155,6 +291,7 @@ class HomeViewModelTest {
                         ),
                     dayBoundarySettingsRepository = dayBoundarySettingsRepository,
                 ),
+                NoOpEventRepository,
             )
         val recentTimelineFlow =
             MutableStateFlow(
@@ -190,6 +327,8 @@ class HomeViewModelTest {
             notesRepository = notesRepository,
             getHomeRecommendation = getHomeRecommendation,
             linkNoteToEvent = LinkNoteToEventUseCase(NoOpEventRepository),
+            getJournalMembership = GetJournalMembershipUseCase(journalContentRepository),
+            transcriptionRepository = transcriptionRepository,
         )
     }
 
@@ -232,7 +371,7 @@ class HomeViewModelTest {
             lastUpdated = timestamp,
         )
 
-    private class ReactiveJournalNotesRepository(
+    private class FakeJournalNotesRepository(
         notes: List<JournalNote>,
     ) : JournalNotesRepository {
         private val notesFlow = MutableStateFlow(notes.sortedByDescending(JournalNote::creationTimestamp))
@@ -329,6 +468,61 @@ class HomeViewModelTest {
         override suspend fun deletePlace(placeId: String): Result<Unit> = Result.success(Unit)
 
         override suspend fun searchPlaces(query: String): List<Place> = emptyList()
+    }
+
+    private class FakeJournalContentRepository(
+        private val membership: Map<Uuid, List<Journal>> = emptyMap(),
+    ) : JournalContentRepository {
+        override fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>> = flowOf(emptyList())
+
+        override fun observeJournalsForContent(contentId: Uuid): Flow<List<Journal>> = flowOf(membership[contentId].orEmpty())
+
+        override fun observeJournalsForContents(contentIds: Set<Uuid>): Flow<Map<Uuid, List<Journal>>> =
+            flowOf(contentIds.associateWith { id -> membership[id].orEmpty() })
+
+        override suspend fun addContentToJournal(
+            contentId: Uuid,
+            journalId: Uuid,
+        ) = Unit
+
+        override suspend fun removeContentFromJournal(
+            contentId: Uuid,
+            journalId: Uuid,
+        ) = Unit
+
+        override suspend fun addContentToJournals(
+            contentId: Uuid,
+            journalIds: List<Uuid>,
+        ) = Unit
+
+        override suspend fun removeContentFromAllJournals(contentId: Uuid) = Unit
+    }
+
+    private class FakeTranscriptionRepository(
+        initial: Map<Uuid, TranscriptionData?> = emptyMap(),
+    ) : TranscriptionRepository {
+        private val transcriptions = initial.mapValues { MutableStateFlow(it.value) }
+        val requestedNoteIds = mutableListOf<Uuid>()
+
+        override suspend fun requestTranscription(noteId: Uuid): Boolean {
+            requestedNoteIds += noteId
+            return true
+        }
+
+        override suspend fun getTranscription(noteId: Uuid): TranscriptionData? = transcriptions[noteId]?.value
+
+        override fun observeTranscription(noteId: Uuid): Flow<TranscriptionData?> = transcriptions[noteId] ?: MutableStateFlow(null)
+
+        override suspend fun getPendingTranscriptions(): List<TranscriptionData> = emptyList()
+
+        override suspend fun updateTranscription(
+            noteId: Uuid,
+            text: String?,
+            status: TranscriptionStatus,
+            errorMessage: String?,
+        ): Boolean = true
+
+        override suspend fun deleteTranscription(noteId: Uuid): Boolean = true
     }
 
     private class FakeMemoriesSettingsRepository : MemoriesSettingsRepository {

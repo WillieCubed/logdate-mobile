@@ -65,6 +65,7 @@ import app.logdate.client.database.entities.StickerEntity
 import app.logdate.client.database.entities.StorageMetadataEntity
 import app.logdate.client.database.entities.TextNoteEntity
 import app.logdate.client.database.entities.TranscriptionEntity
+import app.logdate.client.database.entities.TranscriptionSegmentEntity
 import app.logdate.client.database.entities.UserDeviceEntity
 import app.logdate.client.database.entities.UserPlaceEntity
 import app.logdate.client.database.entities.VideoNoteEntity
@@ -121,6 +122,8 @@ import app.logdate.client.database.migrations.MIGRATION_39_40
 import app.logdate.client.database.migrations.MIGRATION_3_4
 import app.logdate.client.database.migrations.MIGRATION_40_41
 import app.logdate.client.database.migrations.MIGRATION_41_42
+import app.logdate.client.database.migrations.MIGRATION_42_43
+import app.logdate.client.database.migrations.MIGRATION_43_44
 import app.logdate.client.database.migrations.MIGRATION_4_5
 import app.logdate.client.database.migrations.MIGRATION_5_6
 import app.logdate.client.database.migrations.MIGRATION_6_7
@@ -165,6 +168,7 @@ import kotlinx.coroutines.CoroutineDispatcher
         PendingUploadEntity::class,
         // Others
         TranscriptionEntity::class,
+        TranscriptionSegmentEntity::class,
         PlaceEntity::class,
         UserPlaceEntity::class,
         MediaCaptionEntity::class,
@@ -188,7 +192,7 @@ import kotlinx.coroutines.CoroutineDispatcher
         PersonLinkEntity::class,
         PersonResolutionDecisionEntity::class,
     ],
-    version = 42,
+    version = 44,
     exportSchema = true,
 )
 @TypeConverters(
@@ -347,6 +351,8 @@ fun getRoomDatabase(
                 MIGRATION_39_40,
                 MIGRATION_40_41,
                 MIGRATION_41_42,
+                MIGRATION_42_43,
+                MIGRATION_43_44,
             ).addCallback(FtsTableCallback)
             .fallbackToDestructiveMigration(destroyTablesOnUpgrade)
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)

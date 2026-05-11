@@ -42,6 +42,17 @@ data class TranscriptionEntity(
      */
     val text: String?,
     /**
+     * Serialized structured transcript document. Kept nullable so legacy rows
+     * and plain-text-only updates remain valid.
+     */
+    val documentJson: String? = null,
+    val language: String? = null,
+    val source: String? = null,
+    val modelId: String? = null,
+    val revision: Int = 0,
+    val isCloudEnhanced: Boolean = false,
+    val speakerCount: Int = 0,
+    /**
      * The status of the transcription process.
      */
     val status: TranscriptionStatus,

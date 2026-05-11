@@ -17,9 +17,20 @@ data class TranscriptionData(
      */
     val text: String?,
     /**
+     * Structured transcript document containing timed segments and source
+     * metadata. Legacy rows may have only [text] until they are backfilled.
+     */
+    val transcriptDocument: TranscriptDocument? = null,
+    /**
      * The status of the transcription process.
      */
     val status: TranscriptionStatus,
+    val language: String? = transcriptDocument?.language,
+    val source: TranscriptSource? = transcriptDocument?.segments?.maxByOrNull { it.source.ordinal }?.source,
+    val modelId: String? = null,
+    val revision: Int = transcriptDocument?.revision ?: 0,
+    val isCloudEnhanced: Boolean = false,
+    val speakerCount: Int = transcriptDocument?.speakers?.size ?: 0,
     /**
      * Error message if the transcription failed.
      */

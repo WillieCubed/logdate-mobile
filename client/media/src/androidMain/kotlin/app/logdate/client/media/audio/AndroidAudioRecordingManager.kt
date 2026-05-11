@@ -9,8 +9,11 @@ import app.logdate.client.media.audio.tagging.AudioTaggingResult
 import app.logdate.client.media.audio.tagging.AudioTaggingService
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
+import app.logdate.client.media.audio.transcription.toTranscriptDocument
 import app.logdate.client.repository.audio.AudioTag
 import app.logdate.client.repository.audio.AudioTagRepository
+import app.logdate.client.repository.transcription.TranscriptDocumentStatus
+import app.logdate.client.repository.transcription.TranscriptSource
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.transcription.TranscriptionStatus
 import io.github.aakira.napier.Napier
@@ -219,11 +222,34 @@ class AndroidAudioRecordingManager(
                 TranscriptionStatus.IN_PROGRESS
             }
         try {
-            transcriptionRepository.updateTranscription(
-                noteId = noteId,
-                text = result.text,
-                status = status,
-            )
+            val timedTranscript = result.timedTranscript
+            if (timedTranscript != null) {
+                transcriptionRepository.updateTranscriptDocument(
+                    noteId = noteId,
+                    document =
+                        timedTranscript.toTranscriptDocument(
+                            status =
+                                if (status == TranscriptionStatus.COMPLETED) {
+                                    TranscriptDocumentStatus.FINAL
+                                } else {
+                                    TranscriptDocumentStatus.REFINING
+                                },
+                            source =
+                                if (result.isRefining) {
+                                    TranscriptSource.LOCAL_REFINEMENT
+                                } else {
+                                    TranscriptSource.LOCAL_LIVE
+                                },
+                        ),
+                    status = status,
+                )
+            } else {
+                transcriptionRepository.updateTranscription(
+                    noteId = noteId,
+                    text = result.text,
+                    status = status,
+                )
+            }
         } catch (e: Exception) {
             Napier.e("Failed to persist refined transcript for $noteId", e)
         }

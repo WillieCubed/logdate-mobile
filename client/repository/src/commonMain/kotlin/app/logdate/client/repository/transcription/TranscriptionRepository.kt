@@ -64,6 +64,24 @@ interface TranscriptionRepository {
     ): Boolean
 
     /**
+     * Updates the structured transcript document for an audio note. Implementations
+     * that have not yet adopted document persistence can safely fall back to the
+     * document's plain text.
+     */
+    suspend fun updateTranscriptDocument(
+        noteId: Uuid,
+        document: TranscriptDocument,
+        status: TranscriptionStatus,
+        errorMessage: String? = null,
+    ): Boolean =
+        updateTranscription(
+            noteId = noteId,
+            text = document.plainText.takeUnless { it.isBlank() },
+            status = status,
+            errorMessage = errorMessage,
+        )
+
+    /**
      * Deletes the transcription for an audio note.
      *
      * @param noteId The ID of the audio note.

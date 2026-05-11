@@ -369,14 +369,26 @@ private fun TimelineDetailEntry(
             .koinViewModel()
     LaunchedEffect(date) { viewModel.selectDay(date) }
     val uiState by viewModel.uiState.collectAsState()
+    val transcriptionState by viewModel.transcriptionState.collectAsState()
     uiState.selectedDay?.let { selected ->
-        app.logdate.feature.timeline.ui.details.TimelineDayDetailPanel(
-            uiState = selected,
-            scrollToEntryId = scrollToEntryId,
-            onExit = onClose,
-            onOpenEvent = onOpenEvent,
-            onOpenLocations = onOpenLocations,
-        )
+        LaunchedEffect(selected) {
+            viewModel.updateVisibleAudioNoteIds(
+                selected.notes
+                    .filterIsInstance<app.logdate.ui.timeline.AudioNoteUiState>()
+                    .map { note -> note.noteId }
+                    .toSet(),
+            )
+        }
+        app.logdate.ui.audio.TranscriptionProvider(transcriptionState) {
+            app.logdate.feature.timeline.ui.details.TimelineDayDetailPanel(
+                uiState = selected,
+                scrollToEntryId = scrollToEntryId,
+                onExit = onClose,
+                onOpenEvent = onOpenEvent,
+                onAttachNoteToEvent = viewModel::attachNoteToEvent,
+                onOpenLocations = onOpenLocations,
+            )
+        }
     }
 }
 

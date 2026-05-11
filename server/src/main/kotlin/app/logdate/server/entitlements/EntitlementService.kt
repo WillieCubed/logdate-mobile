@@ -36,7 +36,16 @@ data class Entitlement(
     val status: EntitlementStatus,
     val limits: EntitlementLimits,
     val features: Map<String, Boolean> = emptyMap(),
-)
+) {
+    fun hasFeature(feature: EntitlementFeature): Boolean = features[feature.key] == true
+}
+
+enum class EntitlementFeature(
+    val key: String,
+) {
+    CLOUD_TRANSCRIPTION_REALTIME("cloud_transcription_realtime"),
+    CLOUD_TRANSCRIPT_REFINEMENT("cloud_transcript_refinement"),
+}
 
 enum class EntitlementTier { FREE, STANDARD, PRO, UNLIMITED }
 
@@ -67,4 +76,5 @@ enum class EntitlementStatus {
 data class EntitlementLimits(
     val storageBytes: Long?,
     val backupCount: Int?,
+    val transcriptionSecondsPerMonth: Long? = null,
 )
