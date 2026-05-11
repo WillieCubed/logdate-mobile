@@ -107,7 +107,7 @@ internal fun EntryEditorWindow(
                     CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
                         EntryEditorContent(
                             viewModel = viewModel,
-                            onNavigateBack = { appState.closeWindow(state) },
+                            onNavigateBack = handleClose,
                             onEntrySaved = { appState.closeWindow(state) },
                         )
                     }
