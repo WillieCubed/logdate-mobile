@@ -66,9 +66,11 @@ fun LogDateTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
+    val baseScheme = rememberColorScheme(dynamicColor, darkTheme)
+    val platformSemantics = rememberPlatformSemanticColors(darkTheme)
     MaterialExpressiveTheme(
-        colorScheme = rememberColorScheme(dynamicColor, darkTheme),
-        typography = Typography,
+        colorScheme = baseScheme.applyPlatformSemantics(platformSemantics),
+        typography = platformTypography(),
         content = content,
     )
 }
