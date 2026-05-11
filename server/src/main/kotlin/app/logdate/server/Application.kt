@@ -42,9 +42,11 @@ import app.logdate.server.routes.oauthRoutes
 import app.logdate.server.routes.quotaRoutes
 import app.logdate.server.routes.serverInfoRoutes
 import app.logdate.server.routes.syncRoutes
+import app.logdate.server.routes.transcriptionRoutes
 import app.logdate.server.routes.xrpcRoutes
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncRepository
+import app.logdate.server.transcription.cloudTranscriptionSessionProviderFromEnvironment
 import app.logdate.util.UuidSerializer
 import io.github.aakira.napier.Napier
 import io.github.smiley4.ktoropenapi.OpenApi
@@ -52,6 +54,7 @@ import io.github.smiley4.ktoropenapi.config.AuthScheme
 import io.github.smiley4.ktoropenapi.config.AuthType
 import io.github.smiley4.ktoropenapi.openApi
 import io.github.smiley4.ktorswaggerui.swaggerUI
+import io.ktor.client.HttpClient
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -249,6 +252,7 @@ fun Application.module(
     val entitlementEnforcer by inject<EntitlementEnforcer>()
     val usageCalculator by inject<UsageCalculator>()
     val signingKeyService by inject<SigningKeyService>()
+    val httpClient by inject<HttpClient>()
 
     val pdsDiscoveryService by inject<PdsDiscoveryService>()
     val pdsRepoService by inject<PdsRepoService>()
@@ -421,6 +425,11 @@ fun Application.module(
                 tokenService = tokenService,
                 entitlementService = entitlementService,
                 usageCalculator = usageCalculator,
+            )
+            transcriptionRoutes(
+                tokenService = tokenService,
+                entitlementService = entitlementService,
+                sessionProvider = cloudTranscriptionSessionProviderFromEnvironment(httpClient),
             )
         }
     }
