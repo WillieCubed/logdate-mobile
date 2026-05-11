@@ -41,6 +41,9 @@
     <string name="youve_reached_the_end">You&apos;ve reached the end</string>
     <string name="journey_days_count">You&apos;ve been on this journey for %1$d days.</string>
     <string name="add_your_birthday_in_settings_to_see_something_special_here">Add your birthday in settings to see something special here.</string>
+    <string name="timeline_empty_title">Start your timeline</string>
+    <string name="timeline_empty_message">Capture a note, photo, or voice memo and LogDate will shape it into your timeline.</string>
+    <string name="timeline_empty_action">Create Entry</string>
 
     <!-- Post-restore screens -->
     <string name="post_restore_welcome_back">Welcome back</string>

@@ -100,6 +100,9 @@ import logdate.client.ui.generated.resources.post_restore_import_message
 import logdate.client.ui.generated.resources.post_restore_start_fresh
 import logdate.client.ui.generated.resources.post_restore_welcome_back
 import logdate.client.ui.generated.resources.suggestion_draft_fallback
+import logdate.client.ui.generated.resources.timeline_empty_action
+import logdate.client.ui.generated.resources.timeline_empty_message
+import logdate.client.ui.generated.resources.timeline_empty_title
 import logdate.client.ui.generated.resources.youve_reached_the_end
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.absoluteValue
@@ -285,6 +288,11 @@ fun TimelineList(
                     if (isPostCloudRestore) {
                         PostRestoreEmptyState(
                             onImportBackup = onImportBackup,
+                            onStartWriting = onStartWriting,
+                            modifier = Modifier.padding(Spacing.lg),
+                        )
+                    } else {
+                        TimelineEmptyState(
                             onStartWriting = onStartWriting,
                             modifier = Modifier.padding(Spacing.lg),
                         )
@@ -1496,6 +1504,33 @@ private fun LocalDate.shortMonthLabel(): String =
         kotlinx.datetime.Month.NOVEMBER -> "NOV"
         else -> "DEC"
     }
+
+@Composable
+private fun TimelineEmptyState(
+    onStartWriting: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(vertical = Spacing.xl),
+    ) {
+        Text(
+            text = stringResource(Res.string.timeline_empty_title),
+            style = MaterialTheme.typography.headlineMedium,
+        )
+        Text(
+            text = stringResource(Res.string.timeline_empty_message),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FilledTonalButton(onClick = onStartWriting) {
+            Text(stringResource(Res.string.timeline_empty_action))
+        }
+    }
+}
 
 @Composable
 private fun PostRestoreEmptyState(
