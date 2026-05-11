@@ -160,7 +160,10 @@ fun TimelineSuggestionBlock(
 
     Column(
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        modifier = modifier.widthIn(min = 360.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .widthIn(max = 560.dp),
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),

@@ -16,8 +16,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.sync.SyncIndicatorChip
 import app.logdate.ui.sync.SyncPresentation
@@ -61,10 +60,7 @@ fun TimelineTopAppBar(
 
             IconButton(
                 onClick = onHistoryClick,
-                modifier =
-                    Modifier.semantics {
-                        contentDescription = "$historyLabel|$BENCHMARK_TAG_HISTORY"
-                    },
+                modifier = Modifier.testTag(BENCHMARK_TAG_HISTORY),
             ) {
                 Icon(
                     imageVector = Icons.Default.History,
@@ -73,10 +69,7 @@ fun TimelineTopAppBar(
             }
             IconButton(
                 onClick = onSearchClick,
-                modifier =
-                    Modifier.semantics {
-                        contentDescription = "$searchLabel|$BENCHMARK_TAG_SEARCH"
-                    },
+                modifier = Modifier.testTag(BENCHMARK_TAG_SEARCH),
             ) {
                 Icon(
                     imageVector = Icons.Default.Search,
@@ -85,10 +78,7 @@ fun TimelineTopAppBar(
             }
             IconButton(
                 onClick = onSettingsClick,
-                modifier =
-                    Modifier.semantics {
-                        contentDescription = "$settingsLabel|$BENCHMARK_TAG_SETTINGS"
-                    },
+                modifier = Modifier.testTag(BENCHMARK_TAG_SETTINGS),
             ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
