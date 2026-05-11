@@ -74,8 +74,6 @@
                 <data android:pathPrefix="/journal" />
                 <data android:pathPrefix="/note" />
                 <data android:pathPrefix="/rewind" />
-                <data android:pathPrefix="/postcard" />
-                <data android:pathPrefix="/day" />
                 <data android:pathPrefix="/j" />
             </intent-filter>
 
