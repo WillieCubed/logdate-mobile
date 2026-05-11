@@ -25,6 +25,12 @@ import platform.AVFoundation.AVCaptureDevice
 import platform.AVFoundation.AVMediaTypeVideo
 import platform.AVFoundation.authorizationStatusForMediaType
 import platform.AVFoundation.requestAccessForMediaType
+import platform.Contacts.CNAuthorizationStatusAuthorized
+import platform.Contacts.CNAuthorizationStatusDenied
+import platform.Contacts.CNAuthorizationStatusNotDetermined
+import platform.Contacts.CNAuthorizationStatusRestricted
+import platform.Contacts.CNContactStore
+import platform.Contacts.CNEntityType
 import platform.CoreLocation.CLLocationManager
 import platform.CoreLocation.CLLocationManagerDelegateProtocol
 import platform.CoreLocation.kCLAuthorizationStatusAuthorizedAlways
@@ -37,12 +43,6 @@ import platform.CoreMotion.CMAuthorizationStatusDenied
 import platform.CoreMotion.CMAuthorizationStatusNotDetermined
 import platform.CoreMotion.CMAuthorizationStatusRestricted
 import platform.CoreMotion.CMMotionActivityManager
-import platform.Contacts.CNAuthorizationStatusAuthorized
-import platform.Contacts.CNAuthorizationStatusDenied
-import platform.Contacts.CNAuthorizationStatusNotDetermined
-import platform.Contacts.CNAuthorizationStatusRestricted
-import platform.Contacts.CNContactStore
-import platform.Contacts.CNEntityType
 import platform.EventKit.EKAuthorizationStatusAuthorized
 import platform.EventKit.EKAuthorizationStatusDenied
 import platform.EventKit.EKAuthorizationStatusNotDetermined

@@ -17,10 +17,11 @@ class IosMediaCleaner : MediaCleaner {
     private val fileManager = NSFileManager.defaultManager
 
     override suspend fun delete(path: String) {
-        val absolutePath = path.toFilesystemPath() ?: run {
-            Napier.d("MediaCleaner: ignoring non-filesystem path: $path")
-            return
-        }
+        val absolutePath =
+            path.toFilesystemPath() ?: run {
+                Napier.d("MediaCleaner: ignoring non-filesystem path: $path")
+                return
+            }
         if (!fileManager.fileExistsAtPath(absolutePath)) return
         val ok = fileManager.removeItemAtPath(absolutePath, error = null)
         if (!ok) {

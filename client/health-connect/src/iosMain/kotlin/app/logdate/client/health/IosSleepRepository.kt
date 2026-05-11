@@ -26,6 +26,7 @@ import platform.HealthKit.HKSampleQuery
 import platform.HealthKit.HKSampleSortIdentifierStartDate
 import platform.HealthKit.predicateForSamplesWithStartDate
 import kotlin.coroutines.resume
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
@@ -94,7 +95,7 @@ class IosSleepRepository(
         days: Int,
         useEnd: Boolean,
     ): TimeOfDay? {
-        val now = kotlin.time.Clock.System.now()
+        val now = Clock.System.now()
         val start = now - days.days
         val sessions = getSleepSessions(start, now)
         if (sessions.isEmpty()) return null
@@ -221,4 +222,3 @@ private fun Long.toStageType(): SleepStageType =
         5L -> SleepStageType.REM
         else -> SleepStageType.UNKNOWN
     }
-

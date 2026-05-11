@@ -52,7 +52,11 @@ class IosPasskeyManager : PasskeyManager {
     private var pendingAuthentication: CompletableDeferred<Result<String>>? = null
     private val controllers = mutableSetOf<ASAuthorizationController>()
     private val delegate = AuthorizationDelegate()
-    private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
+    private val json =
+        Json {
+            encodeDefaults = true
+            ignoreUnknownKeys = true
+        }
 
     override suspend fun getCapabilities(): PasskeyCapabilities =
         PasskeyCapabilities(
@@ -100,8 +104,7 @@ class IosPasskeyManager : PasskeyManager {
                 controller.performRequests()
             }
             deferred.await()
-        }
-            .onFailure { pendingRegistration = null }
+        }.onFailure { pendingRegistration = null }
             .getOrElse {
                 Result.failure(PasskeyException("Registration failed", PasskeyErrorCodes.UNKNOWN_ERROR, it))
             }
@@ -138,8 +141,7 @@ class IosPasskeyManager : PasskeyManager {
                 controller.performRequests()
             }
             deferred.await()
-        }
-            .onFailure { pendingAuthentication = null }
+        }.onFailure { pendingAuthentication = null }
             .getOrElse {
                 Result.failure(PasskeyException("Authentication failed", PasskeyErrorCodes.UNKNOWN_ERROR, it))
             }
@@ -220,6 +222,7 @@ class IosPasskeyManager : PasskeyManager {
 
         override fun presentationAnchorForAuthorizationController(controller: ASAuthorizationController): UIWindow {
             val app = UIApplication.sharedApplication
+
             @Suppress("DEPRECATION")
             val window =
                 app.keyWindow

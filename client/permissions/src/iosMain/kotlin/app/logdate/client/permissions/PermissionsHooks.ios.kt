@@ -75,8 +75,8 @@ actual fun rememberHealthConnectPermissionState(): HealthConnectPermissionState 
     LaunchedEffect(refreshNonce) {
         hasPermission =
             healthAvailable &&
-                sleepType != null &&
-                healthStore.authorizationStatusForType(sleepType) == HKAuthorizationStatusSharingAuthorized
+            sleepType != null &&
+            healthStore.authorizationStatusForType(sleepType) == HKAuthorizationStatusSharingAuthorized
     }
 
     return HealthConnectPermissionState(

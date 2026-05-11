@@ -39,7 +39,7 @@ private const val MANAGE_SUBSCRIPTIONS_URL = "https://apps.apple.com/account/sub
 class IosSubscriptionBiller : SubscriptionBiller {
     private val _isSubscribed = MutableStateFlow(false)
     private val _availablePlans = MutableStateFlow(LogDateBackupPlanOption.entries.toList())
-    private val _loadedProducts = MutableStateFlow<Map<String, SKProduct>>(emptyMap())
+    private val loadedProducts = MutableStateFlow<Map<String, SKProduct>>(emptyMap())
 
     override val isSubscribed: Flow<Boolean> = _isSubscribed.asStateFlow()
     override val availablePlans: Flow<List<LogDateBackupPlanOption>> = _availablePlans.asStateFlow()
@@ -58,7 +58,7 @@ class IosSubscriptionBiller : SubscriptionBiller {
             return
         }
         val product =
-            _loadedProducts.value[plan.sku]
+            loadedProducts.value[plan.sku]
                 ?: error(
                     "StoreKit product '${plan.sku}' not loaded — verify the SKU exists in " +
                         "App Store Connect and the device's Apple ID has access to the bundle.",
@@ -99,7 +99,7 @@ class IosSubscriptionBiller : SubscriptionBiller {
         ) {
             @Suppress("UNCHECKED_CAST")
             val products = (didReceiveResponse.products as? List<SKProduct>).orEmpty()
-            _loadedProducts.value = products.associateBy { it.productIdentifier }
+            loadedProducts.value = products.associateBy { it.productIdentifier }
             val invalid = didReceiveResponse.invalidProductIdentifiers
             if (invalid.isNotEmpty()) {
                 Napier.w("StoreKit reported invalid product IDs: $invalid")
