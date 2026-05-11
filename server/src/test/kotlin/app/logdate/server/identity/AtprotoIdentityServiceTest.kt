@@ -928,6 +928,7 @@ class AtprotoIdentityServiceTest {
 
         assertEquals("a", method.invoke(service, "alpha", 0))
         assertEquals("user", method.invoke(service, "!!!", 5))
+        assertEquals("user", method.invoke(service, "app", 63))
     }
 
     @Test

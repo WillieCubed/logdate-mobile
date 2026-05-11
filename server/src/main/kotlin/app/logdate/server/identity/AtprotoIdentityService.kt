@@ -522,7 +522,8 @@ class AtprotoIdentityService(
                 .replace(invalidLabelCharacterRegex, "-")
                 .trim('-')
                 .ifBlank { DEFAULT_HANDLE_LABEL }
-        return sanitized.take(maxLength.coerceAtLeast(1)).trim('-').ifBlank { DEFAULT_HANDLE_LABEL }
+        val label = sanitized.take(maxLength.coerceAtLeast(1)).trim('-').ifBlank { DEFAULT_HANDLE_LABEL }
+        return if (label in RESERVED_HANDLE_LABELS) DEFAULT_HANDLE_LABEL else label
     }
 
     private fun canonicalizeHandle(handle: String): String? {
@@ -565,6 +566,19 @@ class AtprotoIdentityService(
         private const val MAX_HANDLE_LABEL_LENGTH = 63
         private const val HANDLE_COLLISION_SUFFIX_LENGTH = 8
         private val invalidLabelCharacterRegex = Regex("[^a-z0-9-]+")
+        private val RESERVED_HANDLE_LABELS =
+            setOf(
+                "www",
+                "app",
+                "cloud",
+                "api",
+                "studio",
+                "admin",
+                "mail",
+                "blog",
+                "docs",
+                "status",
+            )
     }
 }
 

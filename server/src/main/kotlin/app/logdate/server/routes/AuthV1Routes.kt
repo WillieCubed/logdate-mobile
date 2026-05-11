@@ -69,6 +69,19 @@ private const val USERNAME_MIN_LENGTH = 3
 private const val USERNAME_MAX_LENGTH = 50
 private const val DISPLAY_NAME_MAX_LENGTH = 100
 private val USERNAME_REGEX = Regex("^[a-zA-Z0-9_]+$")
+private val RESERVED_USERNAME_LABELS =
+    setOf(
+        "www",
+        "app",
+        "cloud",
+        "api",
+        "studio",
+        "admin",
+        "mail",
+        "blog",
+        "docs",
+        "status",
+    )
 private const val EMAIL_BINDING_SOURCE_GOOGLE = "google_id_token"
 private val SIGNUP_RATE_LIMIT = AuthRateLimitPolicy(maxRequests = 5, windowSeconds = 60 * 60)
 private val SIGNIN_RATE_LIMIT = AuthRateLimitPolicy(maxRequests = 10, windowSeconds = 60)
@@ -1204,6 +1217,12 @@ fun Route.authV1Routes(
                             status = EntitlementStatusWire.SELF_HOST,
                             storageBytesLimit = null,
                             backupCountLimit = null,
+                            transcriptionSecondsPerMonthLimit = null,
+                            features =
+                                mapOf(
+                                    "cloud_transcription_realtime" to true,
+                                    "cloud_transcript_refinement" to true,
+                                ),
                         ),
                     )
                 val resolved =
@@ -1216,6 +1235,8 @@ fun Route.authV1Routes(
                         status = resolved.status.toWire(),
                         storageBytesLimit = resolved.limits.storageBytes,
                         backupCountLimit = resolved.limits.backupCount,
+                        transcriptionSecondsPerMonthLimit = resolved.limits.transcriptionSecondsPerMonth,
+                        features = resolved.features,
                     ),
                 )
             } catch (e: Exception) {
@@ -1482,6 +1503,10 @@ private fun validateUsername(username: String): String? {
 
     if (!USERNAME_REGEX.matches(username)) {
         return "Username can only contain letters, numbers, and underscores"
+    }
+
+    if (username.lowercase() in RESERVED_USERNAME_LABELS) {
+        return "Username is reserved"
     }
 
     return null
