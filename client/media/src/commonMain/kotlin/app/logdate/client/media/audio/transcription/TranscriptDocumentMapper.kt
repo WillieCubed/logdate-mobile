@@ -6,6 +6,12 @@ import app.logdate.client.repository.transcription.TranscriptSegment
 import app.logdate.client.repository.transcription.TranscriptSource
 import app.logdate.client.repository.transcription.TranscriptWord
 
+/**
+ * Converts engine-level timed output into the repository's durable transcript document.
+ *
+ * The mapper gives every utterance a stable positional segment id so later local/cloud refinement
+ * passes can replace matching utterances without losing timestamps or search indexability.
+ */
 fun TimedTranscript.toTranscriptDocument(
     status: TranscriptDocumentStatus,
     source: TranscriptSource,

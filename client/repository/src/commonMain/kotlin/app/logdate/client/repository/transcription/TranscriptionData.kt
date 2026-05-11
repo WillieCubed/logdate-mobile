@@ -25,11 +25,29 @@ data class TranscriptionData(
      * The status of the transcription process.
      */
     val status: TranscriptionStatus,
+    /**
+     * BCP-47 language tag associated with the transcript when known.
+     */
     val language: String? = transcriptDocument?.language,
+    /**
+     * Highest-authority source represented by the current transcript document.
+     */
     val source: TranscriptSource? = transcriptDocument?.segments?.maxByOrNull { it.source.ordinal }?.source,
+    /**
+     * Recognition model that produced the current transcript when reported by the engine.
+     */
     val modelId: String? = null,
+    /**
+     * Durable document revision used to reconcile local, cloud, and synced transcript updates.
+     */
     val revision: Int = transcriptDocument?.revision ?: 0,
+    /**
+     * True when a LogDate Cloud pass has improved or produced this transcript.
+     */
     val isCloudEnhanced: Boolean = false,
+    /**
+     * Number of detected or assigned speakers represented by this transcript.
+     */
     val speakerCount: Int = transcriptDocument?.speakers?.size ?: 0,
     /**
      * Error message if the transcription failed.

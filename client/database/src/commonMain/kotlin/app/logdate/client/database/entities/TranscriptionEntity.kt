@@ -46,11 +46,29 @@ data class TranscriptionEntity(
      * and plain-text-only updates remain valid.
      */
     val documentJson: String? = null,
+    /**
+     * BCP-47 language tag associated with the transcript when known.
+     */
     val language: String? = null,
+    /**
+     * Serialized source name for the highest-authority transcript pass.
+     */
     val source: String? = null,
+    /**
+     * Recognition model that produced the current transcript when reported by the engine.
+     */
     val modelId: String? = null,
+    /**
+     * Durable transcript document revision.
+     */
     val revision: Int = 0,
+    /**
+     * True when a LogDate Cloud pass has improved or produced this transcript.
+     */
     val isCloudEnhanced: Boolean = false,
+    /**
+     * Number of detected or assigned speakers represented by this transcript.
+     */
     val speakerCount: Int = 0,
     /**
      * The status of the transcription process.
