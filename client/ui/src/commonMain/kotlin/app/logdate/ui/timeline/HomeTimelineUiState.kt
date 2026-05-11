@@ -26,11 +26,11 @@ data class HomeTimelineUiState(
 data class TimelineDayUiState(
     val summary: String,
     val supportingSummary: String? = null,
-    val date: LocalDate = LocalDate.now(), // TODO: Don't use default value here
+    val date: LocalDate = LocalDate.now(),
     val people: List<PersonUiState> = emptyList(),
     val events: List<DayEventUiState> = emptyList(),
     val placesVisited: List<PlaceUiState> = emptyList(),
-    val mediaUris: List<MediaObjectUiState> = emptyList(), // TODO: Actually include media
+    val mediaUris: List<MediaObjectUiState> = emptyList(),
     val notes: List<NoteUiState> = emptyList(),
     val layout: TimelineDayCardLayout = TimelineDayCardLayout.STORY_LED,
     val recap: TimelineDayRecapUiState = TimelineDayRecapUiState(),

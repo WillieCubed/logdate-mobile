@@ -47,7 +47,7 @@ fun TimelineDayDetailPanel(
     onAttachNoteToEvent: (noteId: String, eventId: String) -> Unit = { _, _ -> },
     visitedLocations: List<DayLocation> = listOf(),
     onOpenLocations: (() -> Unit)? = null,
-    onOpenRewind: () -> Unit = {},
+    onOpenRewind: (() -> Unit)? = null,
     onDecorate: (() -> Unit)? = null,
     onJournalClick: (Uuid) -> Unit = {},
     scrollState: LazyListState = rememberLazyListState(),
@@ -109,10 +109,10 @@ fun TimelineDayDetailPanel(
                             Icon(Icons.Default.Brush, contentDescription = "Decorate")
                         }
                     }
-                    IconButton(onClick = {
-                        onOpenRewind()
-                    }) {
-                        Icon(Icons.Default.History, contentDescription = stringResource(Res.string.rewind))
+                    if (onOpenRewind != null) {
+                        IconButton(onClick = onOpenRewind) {
+                            Icon(Icons.Default.History, contentDescription = stringResource(Res.string.rewind))
+                        }
                     }
                 },
             )
@@ -125,27 +125,31 @@ fun TimelineDayDetailPanel(
             contentPadding = contentPadding + PaddingValues(vertical = Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
-            item(
-                contentType = "tldr",
-            ) {
-                TldrSection(summary)
+            if (summary.isNotBlank()) {
+                item(
+                    contentType = "tldr",
+                ) {
+                    TldrSection(summary)
+                }
             }
-            item(
-                contentType = "people",
-            ) {
-                PeopleEncounteredSection(
-                    people = people,
-                )
+            if (people.isNotEmpty()) {
+                item(
+                    contentType = "people",
+                ) {
+                    PeopleEncounteredSection(
+                        people = people,
+                    )
+                }
             }
-            item(
-                contentType = "notes",
-            ) {
-                // We already logged this info earlier, don't need redundant logging
-
-                NotesListSection(
-                    notes = uiState.notes,
-                    onJournalClick = onJournalClick,
-                )
+            if (uiState.notes.isNotEmpty()) {
+                item(
+                    contentType = "notes",
+                ) {
+                    NotesListSection(
+                        notes = uiState.notes,
+                        onJournalClick = onJournalClick,
+                    )
+                }
             }
             if (uiState.events.isNotEmpty()) {
                 item(contentType = "events") {
@@ -183,9 +187,18 @@ internal fun targetSectionIndex(
     uiState: TimelineDayUiState,
     visitedLocations: List<DayLocation>,
 ): Int? {
-    if (uiState.notes.any { it.noteId.toString() == entryId }) return 2
-    if (visitedLocations.any { it.locationId.toString() == entryId }) {
-        return if (uiState.events.isNotEmpty()) 4 else 3
+    val sections =
+        buildList {
+            if (uiState.summary.isNotBlank()) add("tldr")
+            if (uiState.people.isNotEmpty()) add("people")
+            if (uiState.notes.isNotEmpty()) add("notes")
+            if (uiState.events.isNotEmpty()) add("events")
+            if (visitedLocations.isNotEmpty()) add("locations")
+        }
+
+    if (uiState.notes.any { it.noteId.toString() == entryId }) return sections.indexOf("notes").takeIf { it >= 0 }
+    if (visitedLocations.any { it.locationId == entryId }) {
+        return sections.indexOf("locations").takeIf { it >= 0 }
     }
     return null
 }

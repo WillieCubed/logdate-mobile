@@ -247,11 +247,21 @@ fun createSemanticTimelineDayUiState(
     isLoadingSummary: Boolean = false,
     isLoadingPeople: Boolean = false,
 ): TimelineDayUiState {
+    val sortedNotes = notes.sortedByDescending { note -> note.timestamp() }
+    val visualMedia =
+        sortedNotes
+            .visualNotes()
+            .map { visual ->
+                MediaObjectUiState(
+                    uid = visual.uri,
+                    uri = visual.uri,
+                )
+            }
     val dayPresentation =
         when {
             isBirthday -> DayPresentation.STACKED
             moments.size >= STACKED_MOMENT_THRESHOLD -> DayPresentation.STACKED
-            notes.size >= STACKED_NOTE_THRESHOLD -> DayPresentation.STACKED
+            sortedNotes.size >= STACKED_NOTE_THRESHOLD -> DayPresentation.STACKED
             else -> DayPresentation.FLOWING
         }
 
@@ -262,7 +272,8 @@ fun createSemanticTimelineDayUiState(
         people = people,
         events = events,
         placesVisited = placesVisited,
-        notes = notes,
+        mediaUris = visualMedia,
+        notes = sortedNotes,
         moments = moments,
         dayPresentation = dayPresentation,
         isLoadingSummary = isLoadingSummary,

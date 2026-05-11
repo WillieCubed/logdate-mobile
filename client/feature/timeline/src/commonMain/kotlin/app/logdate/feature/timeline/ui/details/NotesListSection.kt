@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -18,6 +19,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.common.noteDragSource
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.AudioNoteUiState
@@ -117,7 +119,10 @@ private fun ImageNoteSnippet(uiState: ImageNoteUiState) {
                     model = uiState.uri,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(AspectRatios.TRADITIONAL),
                 )
                 if (uiState.caption.isNotBlank()) {
                     Box(
@@ -166,7 +171,10 @@ private fun VideoNoteSnippet(uiState: VideoNoteUiState) {
                     model = uiState.thumbnailUri ?: uiState.uri,
                     contentDescription = stringResource(Res.string.video_recording),
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(AspectRatios.WIDESCREEN),
                 )
                 if (uiState.caption.isNotBlank()) {
                     Box(

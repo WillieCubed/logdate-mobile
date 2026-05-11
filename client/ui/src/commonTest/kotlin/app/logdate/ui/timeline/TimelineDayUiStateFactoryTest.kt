@@ -97,4 +97,33 @@ class TimelineDayUiStateFactoryTest {
         assertIs<TimelineTextSnippetSectionUiState>(state.heroSection)
         assertNull(state.supportingSummary)
     }
+
+    @Test
+    fun `createSemanticTimelineDayUiState exposes visual notes as media objects`() {
+        val state =
+            createSemanticTimelineDayUiState(
+                summary = "A day with photos and video.",
+                date = LocalDate(2025, 1, 18),
+                moments = emptyList(),
+                notes =
+                    listOf(
+                        ImageNoteUiState(
+                            noteId = Uuid.random(),
+                            uri = "file://photo.jpg",
+                            timestamp = Instant.parse("2025-01-18T18:00:00Z"),
+                        ),
+                        VideoNoteUiState(
+                            noteId = Uuid.random(),
+                            uri = "file://video.mp4",
+                            thumbnailUri = "file://video-thumb.jpg",
+                            timestamp = Instant.parse("2025-01-18T19:00:00Z"),
+                        ),
+                    ),
+            )
+
+        assertEquals(
+            listOf("file://video-thumb.jpg", "file://photo.jpg"),
+            state.mediaUris.map(MediaObjectUiState::uri),
+        )
+    }
 }

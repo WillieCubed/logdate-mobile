@@ -104,18 +104,14 @@ class TimelineViewModel(
     /**
      * Sets the selected day for timeline detail view.
      *
-     * @param date The date to select, or LocalDate.fromEpochDays(0) to clear selection
+     * @param date The date to select.
      */
     fun setSelectedDay(date: LocalDate) {
-        // TODO: Using epoch day 0 (1970-01-01) as a sentinel value could be problematic
-        // if that's actually a valid date in the timeline. Consider using a more explicit
-        // approach for selection/deselection.
-        selectedItemUiState.value =
-            if (date.toEpochDays() == 0L) {
-                TimelineDaySelection.NotSelected
-            } else {
-                TimelineDaySelection.DateSelected(date)
-            }
+        selectedItemUiState.value = TimelineDaySelection.DateSelected(date)
+    }
+
+    fun clearSelectedDay() {
+        selectedItemUiState.value = TimelineDaySelection.NotSelected
     }
 
     private val snackbarMessageState = MutableStateFlow<String?>(null)
@@ -191,22 +187,6 @@ class TimelineViewModel(
     fun deleteItem(uid: Uuid) {
         viewModelScope.launch {
             removeNoteUseCase(uid)
-            // TODO: Use UI to notify user of deletion
-        }
-    }
-
-    /**
-     * Shows a snackbar message when the user clicks "Add to memories"
-     */
-    fun showAddToMemoriesSnackbar(memoryId: String) {
-        snackbarMessageState.value = "Adding to memories coming soon!"
-
-        // Automatically clear the snackbar after a few seconds
-        viewModelScope.launch {
-            kotlinx.coroutines.delay(3000)
-            if (snackbarMessageState.value == "Adding to memories coming soon!") {
-                snackbarMessageState.value = null
-            }
         }
     }
 
