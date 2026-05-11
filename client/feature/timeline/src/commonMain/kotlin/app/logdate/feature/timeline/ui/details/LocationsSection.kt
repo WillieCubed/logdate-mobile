@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.timeline.generated.resources.*
 import logdate.client.feature.timeline.generated.resources.Res
@@ -58,7 +59,7 @@ internal fun LocationsSection(
                 ) {
                     Text(stringResource(Res.string.locations_visited), style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "$locationsVisited places visited",
+                        stringResource(Res.string.places_visited_count, locationsVisited),
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
@@ -76,7 +77,7 @@ internal fun LocationsSection(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .aspectRatio(4 / 3f),
+                    .aspectRatio(AspectRatios.TRADITIONAL),
         ) {
             TimelineLocationsMap(
                 locations = locations,

@@ -40,9 +40,9 @@ internal fun PeopleEncounteredSection(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 items(people) { person ->
-                    if (person.photoUri != null) {
-                        // TODO: Fix this !!
-                        PersonIcon(person.photoUri!!, person.name)
+                    val photoUri = person.photoUri
+                    if (photoUri != null) {
+                        PersonIcon(photoUri, person.name)
                     } else {
                         PersonIcon(person.name)
                     }
@@ -55,7 +55,6 @@ internal fun PeopleEncounteredSection(
             exit = fadeOut(),
         ) {
             Text(stringResource(Res.string.no_people_encountered), style = MaterialTheme.typography.labelSmall)
-            // TODO: Add CTA to add people
         }
     }
 }

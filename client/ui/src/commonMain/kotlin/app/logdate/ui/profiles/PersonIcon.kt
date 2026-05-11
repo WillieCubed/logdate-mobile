@@ -42,8 +42,12 @@ import org.jetbrains.compose.resources.stringResource
 fun PersonIcon(name: String) {
     val initials by remember(name) {
         derivedStateOf {
-            // TODO: Validate initializing logic
-            name.split(" ").mapNotNull { it.firstOrNull() }.joinToString("")
+            name
+                .split(" ")
+                .mapNotNull { part -> part.firstOrNull() }
+                .take(2)
+                .joinToString("")
+                .uppercase()
         }
     }
     val tooltipScope = rememberCoroutineScope()
@@ -97,10 +101,7 @@ fun PersonIcon(
             .Builder(LocalPlatformContext.current)
             .data(photoUri)
             .apply {
-                // TODO: Add placeholder
                 crossfade(true)
-//                    placeholder(R.drawable.ic_image_placeholder)
-//                    error(R.drawable.ic_image_error)
             }.build()
     Box(
         modifier =

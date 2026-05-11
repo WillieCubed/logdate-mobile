@@ -73,7 +73,6 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.androidx.paging.common)
-            // TODO: Figure out why this dependency isn't actually in common code
 //            implementation(libs.androidx.paging.compose)
             implementation(libs.material3.adaptive.navigation)
             // External dependencies

@@ -25,8 +25,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import logdate.client.feature.timeline.generated.resources.Res
+import logdate.client.feature.timeline.generated.resources.additional_places_count
 import logdate.client.feature.timeline.generated.resources.locations_visited
-import logdate.client.feature.timeline.generated.resources.places
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -89,7 +89,11 @@ internal fun TimelineLocationsStaticPreview(
                     }
                     if (locations.size > supportingLocations.size + 1) {
                         Text(
-                            text = stringResource(Res.string.places),
+                            text =
+                                stringResource(
+                                    Res.string.additional_places_count,
+                                    locations.size - supportingLocations.size - 1,
+                                ),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -108,7 +112,7 @@ private fun LocationSummaryPill(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.84f),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
     ) {
         Row(
@@ -133,7 +137,7 @@ private fun IconBadge(modifier: Modifier = Modifier) {
     Box(
         modifier =
             modifier
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f), RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f), RoundedCornerShape(8.dp))
                 .padding(horizontal = 10.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {

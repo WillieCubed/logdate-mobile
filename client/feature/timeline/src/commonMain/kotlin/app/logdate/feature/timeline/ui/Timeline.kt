@@ -112,11 +112,6 @@ internal fun Timeline(
             onNewEntry = onNewEntry,
             onOpenInNewWindow = onOpenInNewWindow,
         )
-        item {
-            // TODO: Fetch origin date from user data
-            // TODO: Display birthday if there are items before date of first onboarding, "journey begins"
-            TimelineOriginItem(originDate = TEST_ORIGIN_DATE)
-        }
     }
 }
 
@@ -176,16 +171,6 @@ private fun EntryDropdownMenu(
                 Icon(imageVector = Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null)
             },
         )
-        // TODO: Re-enable edit functionality when editing is implemented
-//        DropdownMenuItem(
-//            text = {
-//                Text("Edit")
-//            },
-//            onClick = onEdit,
-//            leadingIcon = {
-//                Icon(imageVector = Icons.Default.Edit, contentDescription = null)
-//            },
-//        )
         DropdownMenuItem(
             text = {
                 Text(stringResource(UiRes.string.common_delete))

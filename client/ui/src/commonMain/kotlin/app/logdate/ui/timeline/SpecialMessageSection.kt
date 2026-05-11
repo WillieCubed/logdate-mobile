@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.theme.Spacing
 import coil3.compose.AsyncImage
 
@@ -96,16 +97,14 @@ internal fun SpecialMessagePreviewCarousel(
     Box(
         modifier =
             Modifier
-                .aspectRatio(4 / 5f)
+                .aspectRatio(AspectRatios.RATIO_3_4)
                 .clip(MaterialTheme.shapes.medium)
                 .background(MaterialTheme.colorScheme.tertiaryContainer),
     ) {
-        // TODO: Maybe turn into interactive-ish carousel, support animations/video
         AsyncImage(
             mediaUris.firstOrNull(),
             contentDescription = null,
         )
-        // TODO: Probably move button up to container
         OutlinedIconButton(
             onClick = onDismiss,
             modifier = Modifier.offset(x = Spacing.sm, y = Spacing.sm),

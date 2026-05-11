@@ -23,6 +23,8 @@
     <string name="metadata_notes_count">%1$d notes</string>
     <string name="metadata_people_count">%1$d people</string>
     <string name="metadata_places_count">%1$d places</string>
+    <string name="additional_places_count">+%1$d more places</string>
+    <string name="places_visited_count">%1$d places visited</string>
 
     <!-- Audio recording labels -->
     <string name="audio_recording">Audio Recording</string>
