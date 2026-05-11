@@ -93,12 +93,12 @@ val wearDataModule =
             )
         }
 
-        // Health sensor manager: uses Health Services if available, stub otherwise
+        // Health sensor manager: use Health Services when available, then degrade gracefully.
         single<WearHealthSensorManager> {
             try {
                 HealthServicesWearHealthSensorManager(get())
             } catch (e: Exception) {
-                Napier.w("Health Services not available, using stub", e)
+                Napier.w("Health Services not available; health capture disabled for this device", e)
                 StubWearHealthSensorManager()
             }
         }
