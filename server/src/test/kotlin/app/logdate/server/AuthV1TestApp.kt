@@ -15,8 +15,10 @@ import app.logdate.server.auth.GoogleIdTokenClaims
 import app.logdate.server.auth.GoogleIdTokenVerifier
 import app.logdate.server.auth.InMemoryAccountIdentityRepository
 import app.logdate.server.auth.InMemoryAccountRepository
+import app.logdate.server.auth.InMemoryRefreshTokenRevocationRepository
 import app.logdate.server.auth.InMemorySessionManager
 import app.logdate.server.auth.JwtTokenService
+import app.logdate.server.auth.RefreshTokenRevocationRepository
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
@@ -84,6 +86,7 @@ data class AuthV1TestEnvironment(
 @OptIn(ExperimentalUuidApi::class)
 fun TestApplicationBuilder.configureAuthV1TestApp(
     tokenService: JwtTokenService = JwtTokenService("auth-v1-test-secret"),
+    refreshTokenRevocationRepository: RefreshTokenRevocationRepository = InMemoryRefreshTokenRevocationRepository(),
     accountRepository: AccountRepository = InMemoryAccountRepository(),
     identityRepository: AccountIdentityRepository = InMemoryAccountIdentityRepository(),
     sessionManager: SessionManager = InMemorySessionManager(),
@@ -225,6 +228,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                     restoreCredentialService = restoreCredentialService,
                     atprotoIdentityService = atprotoIdentityService,
                     tokenService = tokenService,
+                    refreshTokenRevocationRepository = refreshTokenRevocationRepository,
                     googleIdTokenVerifier = verifier,
                     metrics = metrics,
                 )

@@ -3,6 +3,7 @@ package app.logdate.server.routes
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.FakeGoogleIdTokenVerifier
 import app.logdate.server.configureAuthV1TestApp
+import app.logdate.server.routes.support.addPasskeyCompleteBody
 import app.logdate.server.routes.support.googleAuthBody
 import app.logdate.server.routes.support.googleClaims
 import app.logdate.server.routes.support.googleClaimsByToken
@@ -402,6 +403,7 @@ class AuthV1RoutesTest {
         testApplication {
             configureAuthV1TestApp()
             val credentialId = "test-credential-id-delete"
+            val secondCredentialId = "test-credential-id-keep"
 
             val beginResponse =
                 client.post("/api/v1/auth/signup/passkey/begin") {
@@ -442,6 +444,29 @@ class AuthV1RoutesTest {
                     ?.content
             assertNotNull(accessToken)
 
+            val addBegin =
+                client.post("/api/v1/auth/me/passkeys/begin") {
+                    header("Authorization", "Bearer $accessToken")
+                }
+            assertEquals(HttpStatusCode.OK, addBegin.status)
+            val addChallenge =
+                json
+                    .parseToJsonElement(addBegin.bodyAsText())
+                    .jsonObject
+                    .get("data")
+                    ?.jsonObject
+                    ?.get("challenge")
+                    ?.jsonPrimitive
+                    ?.content
+            assertNotNull(addChallenge)
+            val addComplete =
+                client.post("/api/v1/auth/me/passkeys/complete") {
+                    header("Authorization", "Bearer $accessToken")
+                    contentType(ContentType.Application.Json)
+                    setBody(addPasskeyCompleteBody(challenge = addChallenge, credentialId = secondCredentialId))
+                }
+            assertEquals(HttpStatusCode.Created, addComplete.status)
+
             val firstDelete =
                 client.delete("/api/v1/auth/me/passkeys/$credentialId") {
                     header("Authorization", "Bearer $accessToken")
@@ -469,4 +494,136 @@ class AuthV1RoutesTest {
                     ?.content,
             )
         }
+
+    @Test
+    fun `logout revokes refresh token and refresh rejects it afterward`() =
+        testApplication {
+            configureAuthV1TestApp()
+            val auth = createPasskeyAccount("logout_user", "Logout User", "cred-logout")
+
+            val refreshBeforeLogout =
+                client.post("/api/v1/auth/token/refresh") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"refreshToken":"${auth.refreshToken}"}""")
+                }
+            assertEquals(HttpStatusCode.OK, refreshBeforeLogout.status)
+
+            val logout =
+                client.post("/api/v1/auth/logout") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"refreshToken":"${auth.refreshToken}"}""")
+                }
+            assertEquals(HttpStatusCode.OK, logout.status)
+
+            val refreshAfterLogout =
+                client.post("/api/v1/auth/token/refresh") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"refreshToken":"${auth.refreshToken}"}""")
+                }
+            assertEquals(HttpStatusCode.Unauthorized, refreshAfterLogout.status)
+            assertTrue(refreshAfterLogout.bodyAsText().contains("REFRESH_TOKEN_REVOKED"))
+        }
+
+    @Test
+    fun `current account can list add and delete passkeys but not delete the last factor`() =
+        testApplication {
+            configureAuthV1TestApp()
+            val auth = createPasskeyAccount("passkey_manage_user", "Passkey Manage User", "cred-primary")
+            val secondaryCredentialId = "Y3JlZC1zZWNvbmRhcnk"
+
+            val initialList =
+                client.get("/api/v1/auth/me/passkeys") {
+                    header("Authorization", "Bearer ${auth.accessToken}")
+                }
+            assertEquals(HttpStatusCode.OK, initialList.status)
+            assertTrue(initialList.bodyAsText().contains("cred-primary"))
+
+            val lastDelete =
+                client.delete("/api/v1/auth/me/passkeys/cred-primary") {
+                    header("Authorization", "Bearer ${auth.accessToken}")
+                }
+            assertEquals(HttpStatusCode.Conflict, lastDelete.status)
+            assertTrue(lastDelete.bodyAsText().contains("LAST_SIGNIN_FACTOR"))
+
+            val beginAdd =
+                client.post("/api/v1/auth/me/passkeys/begin") {
+                    header("Authorization", "Bearer ${auth.accessToken}")
+                }
+            assertEquals(HttpStatusCode.OK, beginAdd.status)
+            val beginPayload = json.parseToJsonElement(beginAdd.bodyAsText()).jsonObject
+            val challenge =
+                beginPayload["data"]
+                    ?.jsonObject
+                    ?.get("challenge")
+                    ?.jsonPrimitive
+                    ?.content
+            assertNotNull(challenge)
+
+            val completeAdd =
+                client.post("/api/v1/auth/me/passkeys/complete") {
+                    header("Authorization", "Bearer ${auth.accessToken}")
+                    contentType(ContentType.Application.Json)
+                    setBody(addPasskeyCompleteBody(challenge = challenge, credentialId = secondaryCredentialId))
+                }
+            assertEquals(HttpStatusCode.Created, completeAdd.status)
+            assertTrue(completeAdd.bodyAsText().contains(secondaryCredentialId))
+
+            val deletePrimary =
+                client.delete("/api/v1/auth/me/passkeys/cred-primary") {
+                    header("Authorization", "Bearer ${auth.accessToken}")
+                }
+            assertEquals(HttpStatusCode.NoContent, deletePrimary.status)
+
+            val finalList =
+                client.get("/api/v1/auth/me/passkeys") {
+                    header("Authorization", "Bearer ${auth.accessToken}")
+                }
+            assertEquals(HttpStatusCode.OK, finalList.status)
+            assertTrue(!finalList.bodyAsText().contains("cred-primary"))
+            assertTrue(finalList.bodyAsText().contains(secondaryCredentialId))
+        }
+
+    private data class AuthTokens(
+        val accessToken: String,
+        val refreshToken: String,
+    )
+
+    private suspend fun io.ktor.server.testing.ApplicationTestBuilder.createPasskeyAccount(
+        username: String,
+        displayName: String,
+        credentialId: String,
+    ): AuthTokens {
+        val beginResponse =
+            client.post("/api/v1/auth/signup/passkey/begin") {
+                contentType(ContentType.Application.Json)
+                setBody(signupPasskeyBeginBody(username = username, displayName = displayName))
+            }
+        assertEquals(HttpStatusCode.OK, beginResponse.status)
+        val beginPayload = json.parseToJsonElement(beginResponse.bodyAsText()).jsonObject
+        val sessionToken =
+            beginPayload["data"]
+                ?.jsonObject
+                ?.get("sessionToken")
+                ?.jsonPrimitive
+                ?.content
+        assertNotNull(sessionToken)
+
+        val completeResponse =
+            client.post("/api/v1/auth/signup/passkey/complete") {
+                contentType(ContentType.Application.Json)
+                setBody(signupPasskeyCompleteBody(sessionToken = sessionToken, credentialId = credentialId))
+            }
+        assertEquals(HttpStatusCode.Created, completeResponse.status)
+        val completePayload = json.parseToJsonElement(completeResponse.bodyAsText()).jsonObject
+        val tokens =
+            completePayload["data"]
+                ?.jsonObject
+                ?.get("tokens")
+                ?.jsonObject
+        assertNotNull(tokens)
+        return AuthTokens(
+            accessToken = tokens["accessToken"]!!.jsonPrimitive.content,
+            refreshToken = tokens["refreshToken"]!!.jsonPrimitive.content,
+        )
+    }
 }

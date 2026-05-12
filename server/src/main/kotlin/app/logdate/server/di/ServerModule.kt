@@ -18,8 +18,10 @@ import app.logdate.server.auth.GoogleIdTokenVerifier
 import app.logdate.server.auth.HttpGoogleIdTokenVerifier
 import app.logdate.server.auth.InMemoryAccountIdentityRepository
 import app.logdate.server.auth.InMemoryAccountRepository
+import app.logdate.server.auth.InMemoryRefreshTokenRevocationRepository
 import app.logdate.server.auth.InMemorySessionManager
 import app.logdate.server.auth.JwtTokenService
+import app.logdate.server.auth.RefreshTokenRevocationRepository
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.TokenService
 import app.logdate.server.config.RuntimeProfile
@@ -35,7 +37,9 @@ import app.logdate.server.database.PostgreSQLLogDateCollectionsMetadataStore
 import app.logdate.server.database.PostgreSQLLogDateMediaRepository
 import app.logdate.server.database.PostgreSQLOAuthRuntimeStateRepository
 import app.logdate.server.database.PostgreSQLPasskeyRepository
+import app.logdate.server.database.PostgreSQLRefreshTokenRevocationRepository
 import app.logdate.server.database.PostgreSQLRepoBlockStore
+import app.logdate.server.database.PostgreSQLResourceRouteRepository
 import app.logdate.server.database.PostgreSQLRestoreCredentialRepository
 import app.logdate.server.database.PostgreSQLSessionManager
 import app.logdate.server.database.PostgreSQLSigningKeyRepository
@@ -54,6 +58,7 @@ import app.logdate.server.logdate.InMemoryLogDateBackupRepository
 import app.logdate.server.logdate.InMemoryLogDateBlobStorage
 import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
 import app.logdate.server.logdate.InMemoryLogDateMediaRepository
+import app.logdate.server.logdate.InMemoryResourceRouteRepository
 import app.logdate.server.logdate.LogDateAtprotoBlobRepository
 import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateBlobStorage
@@ -61,6 +66,7 @@ import app.logdate.server.logdate.LogDateCollectionsMetadataStore
 import app.logdate.server.logdate.LogDateMediaBlobRepository
 import app.logdate.server.logdate.LogDateMediaRepository
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
+import app.logdate.server.logdate.ResourceRouteRepository
 import app.logdate.server.oauth.InMemoryOAuthRuntimeStateRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
@@ -182,6 +188,10 @@ fun serverModule(isDatabaseAvailable: Boolean) =
 
         single<SessionManager> {
             if (isDatabaseAvailable) PostgreSQLSessionManager() else InMemorySessionManager()
+        }
+
+        single<RefreshTokenRevocationRepository> {
+            if (isDatabaseAvailable) PostgreSQLRefreshTokenRevocationRepository() else InMemoryRefreshTokenRevocationRepository()
         }
 
         single { WebAuthnConfig.fromEnvironment(serverOrigin = get<AtprotoIdentityConfig>().pdsServiceEndpoint) }
@@ -315,6 +325,14 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 PostgreSQLLogDateAtprotoBlobRepository()
             } else {
                 InMemoryLogDateAtprotoBlobRepository()
+            }
+        }
+
+        single<ResourceRouteRepository> {
+            if (isDatabaseAvailable) {
+                PostgreSQLResourceRouteRepository()
+            } else {
+                InMemoryResourceRouteRepository()
             }
         }
 

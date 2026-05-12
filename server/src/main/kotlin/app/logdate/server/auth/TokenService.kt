@@ -3,8 +3,8 @@ package app.logdate.server.auth
 /**
  * Service for generating and validating JWT tokens for LogDate Cloud authentication.
  *
- * This interface abstracts token operations to allow for different implementations,
- * including production JWT implementations and testing stubs.
+ * This interface abstracts token operations to allow production JWT and in-memory
+ * test implementations.
  */
 interface TokenService {
     /**

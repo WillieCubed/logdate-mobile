@@ -1,6 +1,6 @@
 package app.logdate.server.routes
 
-import app.logdate.server.auth.StubTokenService
+import app.logdate.server.auth.InMemoryTokenService
 import app.logdate.server.crypto.PayloadPrefixes
 import app.logdate.server.logdate.asLogDateBackupRepository
 import app.logdate.server.logdate.asLogDateCollectionsRepository
@@ -43,7 +43,7 @@ class SyncRoutesMediaEncryptionTest {
     fun `media upload encrypts at rest and download returns plaintext`() =
         testApplication {
             val repository = InMemorySyncRepository()
-            val tokenService = StubTokenService()
+            val tokenService = InMemoryTokenService()
             val metrics = SyncMetricsRegistry()
 
             application {
@@ -103,7 +103,7 @@ class SyncRoutesMediaEncryptionTest {
     fun `client encrypted media round trips without server decryption`() =
         testApplication {
             val repository = InMemorySyncRepository()
-            val tokenService = StubTokenService()
+            val tokenService = InMemoryTokenService()
             val metrics = SyncMetricsRegistry()
 
             application {

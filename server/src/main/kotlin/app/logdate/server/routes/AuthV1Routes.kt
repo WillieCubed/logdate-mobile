@@ -13,6 +13,7 @@ import app.logdate.server.auth.AuthMetricsRegistry
 import app.logdate.server.auth.GoogleIdTokenClaims
 import app.logdate.server.auth.GoogleIdTokenVerifier
 import app.logdate.server.auth.IdentityProvider
+import app.logdate.server.auth.RefreshTokenRevocationRepository
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.SessionType
 import app.logdate.server.auth.TokenService
@@ -206,6 +207,11 @@ data class RefreshTokenRequestV1(
 )
 
 @Serializable
+data class LogoutRequestV1(
+    val refreshToken: String,
+)
+
+@Serializable
 data class RefreshTokenDataV1(
     val accessToken: String,
 )
@@ -250,6 +256,24 @@ data class RestoreRegisterCompleteRequest(
     val challenge: String,
 )
 
+@Serializable
+data class AddPasskeyCompleteRequest(
+    val challenge: String,
+    val credential: PasskeyCredentialResponse,
+)
+
+@Serializable
+data class PasskeyListResponse(
+    val success: Boolean,
+    val data: List<app.logdate.shared.model.PasskeyInfo>,
+)
+
+@Serializable
+data class PasskeyResponse(
+    val success: Boolean,
+    val data: app.logdate.shared.model.PasskeyInfo,
+)
+
 private data class GoogleResolution(
     val account: Account,
     val identity: AccountIdentity,
@@ -264,6 +288,7 @@ fun Route.authV1Routes(
     restoreCredentialService: RestoreCredentialService,
     atprotoIdentityService: AtprotoIdentityService,
     tokenService: TokenService,
+    refreshTokenRevocationRepository: RefreshTokenRevocationRepository,
     googleIdTokenVerifier: GoogleIdTokenVerifier,
     metrics: AuthMetricsRegistry,
     accountDeletionService: AccountDeletionService? = null,
@@ -991,6 +1016,14 @@ fun Route.authV1Routes(
                             metrics,
                         )
                     }
+                    if (refreshTokenRevocationRepository.isRevoked(request.refreshToken)) {
+                        return@post call.respondApiError(
+                            HttpStatusCode.Unauthorized,
+                            "REFRESH_TOKEN_REVOKED",
+                            "Refresh token has been revoked",
+                            metrics,
+                        )
+                    }
                     val accountId = tokenService.validateRefreshToken(request.refreshToken)
                     if (accountId == null) {
                         return@post call.respondApiError(
@@ -1013,6 +1046,25 @@ fun Route.authV1Routes(
                 } finally {
                     metrics.recordOperation(METRIC_AUTH_TOKEN_REFRESH, System.currentTimeMillis() - start, success)
                 }
+            }
+        }
+
+        post("/logout") {
+            try {
+                val request = call.receive<LogoutRequestV1>()
+                if (request.refreshToken.isBlank()) {
+                    return@post call.respondApiError(
+                        HttpStatusCode.BadRequest,
+                        "INVALID_REFRESH_TOKEN",
+                        "Refresh token is required",
+                        metrics,
+                    )
+                }
+                refreshTokenRevocationRepository.revoke(request.refreshToken)
+                call.respond(HttpStatusCode.OK, mapOf("ok" to true))
+            } catch (e: Exception) {
+                Napier.e("Failed to log out", e)
+                call.respondForRequestException(e, "Failed to log out", metrics)
             }
         }
 
@@ -1142,6 +1194,95 @@ fun Route.authV1Routes(
             }
         }
 
+        get("/me/passkeys") {
+            try {
+                val account =
+                    resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
+                        ?: return@get
+                call.respond(
+                    HttpStatusCode.OK,
+                    PasskeyListResponse(
+                        success = true,
+                        data = webAuthnService.getPasskeysForUser(account.id),
+                    ),
+                )
+            } catch (e: Exception) {
+                Napier.e("Failed to list passkeys", e)
+                call.respondForRequestException(e, "Failed to list passkeys", metrics)
+            }
+        }
+
+        post("/me/passkeys/begin") {
+            try {
+                val account =
+                    resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
+                        ?: return@post
+                val options =
+                    webAuthnService.generateRegistrationOptions(
+                        userId = account.id,
+                        username = account.username,
+                        displayName = account.displayName,
+                    )
+                call.respond(HttpStatusCode.OK, RestoreRegisterBeginResponse(success = true, data = options))
+            } catch (e: Exception) {
+                Napier.e("Failed to begin passkey registration", e)
+                call.respondForRequestException(e, "Failed to begin passkey registration", metrics)
+            }
+        }
+
+        post("/me/passkeys/complete") {
+            try {
+                val account =
+                    resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
+                        ?: return@post
+                val request = call.receive<AddPasskeyCompleteRequest>()
+                val verified =
+                    when (
+                        val outcome =
+                            webAuthnService.verifyRegistrationOnly(
+                                userId = account.id,
+                                challenge = request.challenge,
+                                registrationResponse = request.credential.toPasskeyRegistrationResponse(),
+                            )
+                    ) {
+                        is WebAuthnPasskeyService.VerificationOutcome.Failure ->
+                            return@post call.respondApiError(
+                                HttpStatusCode.BadRequest,
+                                "PASSKEY_VERIFICATION_FAILED",
+                                outcome.error,
+                                metrics,
+                            )
+                        is WebAuthnPasskeyService.VerificationOutcome.Success -> outcome.data
+                    }
+
+                if (!webAuthnService.storeVerifiedPasskey(account.id, verified)) {
+                    return@post call.respondApiError(
+                        HttpStatusCode.InternalServerError,
+                        "PASSKEY_STORE_FAILED",
+                        "Failed to store passkey",
+                        metrics,
+                    )
+                }
+
+                identityRepository.save(
+                    AccountIdentity(
+                        id = Uuid.random(),
+                        accountId = account.id,
+                        provider = IdentityProvider.PASSKEY,
+                        providerSubject = verified.credentialId,
+                        email = account.email,
+                        emailVerified = account.emailVerified,
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+
+                call.respond(HttpStatusCode.Created, PasskeyResponse(success = true, data = verified.passkey))
+            } catch (e: Exception) {
+                Napier.e("Failed to complete passkey registration", e)
+                call.respondForRequestException(e, "Failed to complete passkey registration", metrics)
+            }
+        }
+
         delete("/me/passkeys/{credentialId}") {
             try {
                 val account =
@@ -1159,6 +1300,22 @@ fun Route.authV1Routes(
 
                 if (!webAuthnService.credentialBelongsToUser(credentialId, account.id)) {
                     return@delete call.respondApiError(HttpStatusCode.NotFound, "PASSKEY_NOT_FOUND", "Passkey not found", metrics)
+                }
+                val activePasskeys = webAuthnService.getPasskeysForUser(account.id)
+                if (activePasskeys.none { it.credentialId == credentialId }) {
+                    return@delete call.respond(HttpStatusCode.NoContent)
+                }
+                val hasOtherSignInProvider =
+                    identityRepository
+                        .findByAccountId(account.id)
+                        .any { it.provider != IdentityProvider.PASSKEY }
+                if (activePasskeys.size <= 1 && !hasOtherSignInProvider) {
+                    return@delete call.respondApiError(
+                        HttpStatusCode.Conflict,
+                        "LAST_SIGNIN_FACTOR",
+                        "Cannot delete the last sign-in factor",
+                        metrics,
+                    )
                 }
                 webAuthnService.deletePasskey(credentialId, account.id)
                 call.respond(HttpStatusCode.NoContent)

@@ -5,12 +5,9 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
 /**
- * Stub implementation of TokenService for development and testing.
- *
- * This implementation generates simple tokens without actual JWT signing.
- * Should be replaced with proper JWT implementation in production.
+ * Deterministic [TokenService] for local tests and in-memory server fixtures.
  */
-class StubTokenService(
+class InMemoryTokenService(
     private val issuer: String = "logdate.app",
 ) : TokenService {
     // Token expiration times
@@ -27,7 +24,7 @@ class StubTokenService(
 
         // Simple token format: type.accountId.expiresAt.hash
         val tokenData = "access.$accountId.${expiresAt.epochSeconds}"
-        return "stub_${tokenData.hashCode().toString(16)}_$tokenData"
+        return "memory_${tokenData.hashCode().toString(16)}_$tokenData"
     }
 
     override fun generateRefreshToken(
@@ -38,7 +35,7 @@ class StubTokenService(
         val expiresAt = now + refreshTokenExpiration
 
         val tokenData = "refresh.$accountId.${expiresAt.epochSeconds}"
-        return "stub_${tokenData.hashCode().toString(16)}_$tokenData"
+        return "memory_${tokenData.hashCode().toString(16)}_$tokenData"
     }
 
     override fun generateSessionToken(sessionId: String): String {
@@ -46,7 +43,7 @@ class StubTokenService(
         val expiresAt = now + sessionTokenExpiration
 
         val tokenData = "session.$sessionId.${expiresAt.epochSeconds}"
-        return "stub_${tokenData.hashCode().toString(16)}_$tokenData"
+        return "memory_${tokenData.hashCode().toString(16)}_$tokenData"
     }
 
     override fun validateAccessToken(token: String): String? = validateToken(token, "access")
@@ -63,9 +60,9 @@ class StubTokenService(
         token: String,
         expectedType: String,
     ): String? {
-        if (!token.startsWith("stub_")) return null
+        if (!token.startsWith("memory_")) return null
 
-        val tokenData = token.substringAfter("stub_").substringAfter("_")
+        val tokenData = token.substringAfter("memory_").substringAfter("_")
         val parts = tokenData.split(".")
 
         if (parts.size != 3) return null

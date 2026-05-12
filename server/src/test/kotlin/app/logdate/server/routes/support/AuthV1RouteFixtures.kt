@@ -77,6 +77,25 @@ fun signinPasskeyCompleteBody(
     }
     """.trimIndent()
 
+fun addPasskeyCompleteBody(
+    challenge: String,
+    credentialId: String,
+): String =
+    """
+    {
+      "challenge": "$challenge",
+      "credential": {
+        "id": "$credentialId",
+        "rawId": "test-raw-id",
+        "response": {
+          "clientDataJSON": "test-client-data",
+          "attestationObject": "test-attestation"
+        },
+        "type": "public-key"
+      }
+    }
+    """.trimIndent()
+
 fun signupPasskeyCompleteBodyWithBindingSource(
     sessionToken: String,
     credentialId: String,

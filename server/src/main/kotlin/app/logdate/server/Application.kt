@@ -40,6 +40,7 @@ import app.logdate.server.routes.identityApiRoutes
 import app.logdate.server.routes.identityRoutes
 import app.logdate.server.routes.oauthRoutes
 import app.logdate.server.routes.quotaRoutes
+import app.logdate.server.routes.resourceRoutes
 import app.logdate.server.routes.serverInfoRoutes
 import app.logdate.server.routes.syncRoutes
 import app.logdate.server.routes.transcriptionRoutes
@@ -239,6 +240,7 @@ fun Application.module(
     val restoreCredentialService by inject<RestoreCredentialService>()
     val atprotoIdentityService by inject<AtprotoIdentityService>()
     val tokenService by inject<TokenService>()
+    val refreshTokenRevocationRepository by inject<app.logdate.server.auth.RefreshTokenRevocationRepository>()
     val googleIdTokenVerifier by inject<GoogleIdTokenVerifier>()
     val authMetrics by inject<AuthMetricsRegistry>()
     val accountDeletionService by inject<AccountDeletionService>()
@@ -246,6 +248,7 @@ fun Application.module(
     val syncRepository by inject<SyncRepository>()
     val syncMetrics by inject<SyncMetricsRegistry>()
     val logDateCollectionsRepository by inject<RepoBackedLogDateCollectionsRepository>()
+    val resourceRouteRepository by inject<app.logdate.server.logdate.ResourceRouteRepository>()
     val logDateMediaBlobRepository by inject<CompositeLogDateMediaBlobRepository>()
     val logDateBackupRepository by inject<LogDateBackupRepository>()
     val blobStorage by inject<LogDateBlobStorage>()
@@ -400,6 +403,7 @@ fun Application.module(
                 restoreCredentialService = restoreCredentialService,
                 atprotoIdentityService = atprotoIdentityService,
                 tokenService = tokenService,
+                refreshTokenRevocationRepository = refreshTokenRevocationRepository,
                 googleIdTokenVerifier = googleIdTokenVerifier,
                 metrics = authMetrics,
                 accountDeletionService = accountDeletionService,
@@ -425,6 +429,11 @@ fun Application.module(
                 tokenService = tokenService,
                 entitlementService = entitlementService,
                 usageCalculator = usageCalculator,
+            )
+            resourceRoutes(
+                accountRepository = accountRepository,
+                collectionsRepository = logDateCollectionsRepository,
+                resourceRouteRepository = resourceRouteRepository,
             )
             transcriptionRoutes(
                 tokenService = tokenService,

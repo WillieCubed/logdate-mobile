@@ -187,8 +187,8 @@ class InMemoryAuthComponentsTest {
         }
 
     @Test
-    fun `stub token service validates token types and expiration parsing`() {
-        val service = StubTokenService()
+    fun `in-memory token service validates token types and expiration parsing`() {
+        val service = InMemoryTokenService()
 
         val access = service.generateAccessToken("acc-1")
         val refresh = service.generateRefreshToken("acc-1")
@@ -199,8 +199,8 @@ class InMemoryAuthComponentsTest {
         assertEquals("session-1", service.validateSessionToken(session))
 
         assertNull(service.validateAccessToken(""))
-        assertNull(service.validateAccessToken("stub_bad"))
-        assertNull(service.validateAccessToken("stub_hash_access.acc.not_a_number"))
+        assertNull(service.validateAccessToken("memory_bad"))
+        assertNull(service.validateAccessToken("memory_hash_access.acc.not_a_number"))
         assertNull(service.validateRefreshToken(access))
     }
 }
