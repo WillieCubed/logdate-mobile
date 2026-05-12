@@ -10,8 +10,7 @@ import androidx.compose.runtime.Composable
  * The actual implementation lives per platform:
  * - Android: uses `ActivityResultContracts.PickVisualMedia` and reports the resulting `content://`
  *   URI as a string.
- * - iOS / desktop: no-op stubs that never invoke the callback (these targets don't have a cover
- *   image picker UI yet — they fall back to the manually pasted URI in the editor).
+ * - iOS / desktop: use platform image pickers and report the selected asset/file identifier.
  *
  * The lambda is stable across recompositions, so callers can assign it to a button's `onClick`
  * without worrying about identity changes.
