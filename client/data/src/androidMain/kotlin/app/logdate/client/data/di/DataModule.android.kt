@@ -26,7 +26,7 @@ import app.logdate.client.data.people.OfflineFirstPeopleGraphRepository
 import app.logdate.client.data.people.OfflineFirstPeopleRepository
 import app.logdate.client.data.places.OfflineFirstUserPlacesRepository
 import app.logdate.client.data.profile.OfflineFirstProfileRepository
-import app.logdate.client.data.quota.StubRemoteQuotaDataSource
+import app.logdate.client.data.quota.AndroidRemoteQuotaDataSource
 import app.logdate.client.data.rewind.DefaultRewindGenerationManager
 import app.logdate.client.data.rewind.OfflineFirstReflectionPromptResponseRepository
 import app.logdate.client.data.rewind.OfflineFirstRewindRepository
@@ -40,12 +40,15 @@ import app.logdate.client.data.transcription.OfflineFirstTranscriptionRepository
 import app.logdate.client.data.user.DefaultUserDeviceRepository
 import app.logdate.client.data.user.OfflineFirstUserStateRepository
 import app.logdate.client.database.databaseModule
+import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.di.datastoreModule
 import app.logdate.client.networking.IdentityApiClient
 import app.logdate.client.networking.IdentityApiClientContract
 import app.logdate.client.networking.PasskeyApiClient
 import app.logdate.client.networking.PasskeyApiClientContract
+import app.logdate.client.networking.QuotaApiClient
+import app.logdate.client.networking.QuotaApiClientContract
 import app.logdate.client.networking.httpClient
 import app.logdate.client.permissions.di.permissionsModule
 import app.logdate.client.repository.account.AccountIdentityRepository
@@ -201,14 +204,19 @@ actual val dataModule: Module =
         // Networking
         single<PasskeyApiClientContract> { PasskeyApiClient(httpClient, get(), get()) }
         single<IdentityApiClientContract> { IdentityApiClient(httpClient, get(), get()) }
+        single<QuotaApiClientContract> { QuotaApiClient(httpClient, get(), get()) }
 
         // Account
-        single<AccountRepository> { DefaultAccountRepository(get()) { null } } // TODO: Implement proper token provider
+        single<AccountRepository> {
+            DefaultAccountRepository(get()) {
+                get<SessionStorage>().getSession()?.accessToken
+            }
+        }
         single<PasskeyAccountRepository> { DefaultPasskeyAccountRepository(get(), get(), get(), get(), get(), get()) }
         single<AccountIdentityRepository> { DefaultAccountIdentityRepository(get(), get(), get(), get()) }
 
         // Quota
-        factory<RemoteQuotaDataSource> { StubRemoteQuotaDataSource() }
+        factory<RemoteQuotaDataSource> { AndroidRemoteQuotaDataSource(get(), get()) }
 
         // Transcription
         single<TranscriptionRepository> {
