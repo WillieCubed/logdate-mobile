@@ -3,10 +3,6 @@
 package app.logdate.ui.timeline
 
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -74,7 +70,7 @@ fun TimelineTopAppBar(
                 modifier = Modifier.testTag(BENCHMARK_TAG_HISTORY),
             ) {
                 Icon(
-                    imageVector = Icons.Default.History,
+                    painter = PlatformIcons.history(),
                     contentDescription = historyLabel,
                 )
             }
@@ -83,7 +79,7 @@ fun TimelineTopAppBar(
                 modifier = Modifier.testTag(BENCHMARK_TAG_SEARCH),
             ) {
                 Icon(
-                    imageVector = Icons.Default.Search,
+                    painter = PlatformIcons.search(),
                     contentDescription = searchLabel,
                 )
             }
@@ -92,7 +88,7 @@ fun TimelineTopAppBar(
                 modifier = Modifier.testTag(BENCHMARK_TAG_SETTINGS),
             ) {
                 Icon(
-                    imageVector = Icons.Default.Settings,
+                    painter = PlatformIcons.settings(),
                     contentDescription = settingsLabel,
                 )
             }

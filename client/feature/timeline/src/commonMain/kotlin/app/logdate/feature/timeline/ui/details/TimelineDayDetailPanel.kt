@@ -8,10 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Brush
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.ui.common.plus
 import app.logdate.ui.common.scrollToTop
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.TimelineDayUiState
@@ -96,7 +93,7 @@ fun TimelineDayDetailPanel(
                 title = { Text(timestamp.toReadableDateShort()) },
                 navigationIcon = {
                     IconButton(onClick = onExit) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(Res.string.close))
+                        Icon(painter = PlatformIcons.back(), contentDescription = stringResource(Res.string.close))
                     }
                 },
                 colors =
@@ -106,12 +103,12 @@ fun TimelineDayDetailPanel(
                 actions = {
                     if (onDecorate != null) {
                         IconButton(onClick = onDecorate) {
-                            Icon(Icons.Default.Brush, contentDescription = "Decorate")
+                            Icon(painter = PlatformIcons.brush(), contentDescription = "Decorate")
                         }
                     }
                     if (onOpenRewind != null) {
                         IconButton(onClick = onOpenRewind) {
-                            Icon(Icons.Default.History, contentDescription = stringResource(Res.string.rewind))
+                            Icon(painter = PlatformIcons.history(), contentDescription = stringResource(Res.string.rewind))
                         }
                     }
                 },
