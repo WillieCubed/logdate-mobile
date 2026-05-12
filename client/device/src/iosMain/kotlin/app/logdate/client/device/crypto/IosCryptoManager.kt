@@ -1,19 +1,28 @@
 package app.logdate.client.device.crypto
 
+import dev.whyoleg.cryptography.CryptographyProvider
+import dev.whyoleg.cryptography.DelicateCryptographyApi
+import dev.whyoleg.cryptography.algorithms.AES
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.refTo
 import kotlinx.cinterop.usePinned
+import kotlinx.coroutines.runBlocking
+import okio.Buffer
 import okio.Sink
 import okio.Source
+import okio.Timeout
+import okio.buffer
 import platform.CoreCrypto.CCHmac
 import platform.CoreCrypto.kCCHmacAlgSHA256
 import platform.Security.SecRandomCopyBytes
 import platform.Security.kSecRandomDefault
 
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, DelicateCryptographyApi::class)
 class IosCryptoManager : CryptoManager {
+    private val aesGcm = CryptographyProvider.Default.get(AES.GCM)
+
     override suspend fun generateRecoveryPhrase(): List<String> {
         // Generate 128 bits of entropy
         val entropy = ByteArray(16)
@@ -40,16 +49,22 @@ class IosCryptoManager : CryptoManager {
         sink: Sink,
         key: ByteArray,
         iv: ByteArray,
-    ): Sink {
-        TODO("Not needed for initial implementation - used for backup streaming")
-    }
+    ): Sink = IosAesGcmEncryptingSink(sink, key, iv)
 
     override fun decryptSource(
         source: Source,
         key: ByteArray,
         iv: ByteArray,
     ): Source {
-        TODO("Not needed for initial implementation - used for backup streaming")
+        val bufferedSource = source.buffer()
+        val ciphertext =
+            try {
+                bufferedSource.readByteArray()
+            } finally {
+                bufferedSource.close()
+            }
+        val plaintext = aesGcmDecrypt(key, iv, ByteArray(0), ciphertext)
+        return Buffer().write(plaintext)
     }
 
     override fun generateRandomBytes(size: Int): ByteArray {
@@ -93,7 +108,9 @@ class IosCryptoManager : CryptoManager {
         aad: ByteArray,
         plaintext: ByteArray,
     ): ByteArray {
-        error("AES-GCM encryption is not available on iOS yet.")
+        val importedKey = runBlocking { aesGcm.keyDecoder().decodeFromByteArray(AES.Key.Format.RAW, key) }
+        val cipher = importedKey.cipher()
+        return runBlocking { cipher.encryptWithIv(iv = iv, plaintext = plaintext, associatedData = aad) }
     }
 
     /**
@@ -105,7 +122,9 @@ class IosCryptoManager : CryptoManager {
         aad: ByteArray,
         ciphertext: ByteArray,
     ): ByteArray {
-        error("AES-GCM decryption is not available on iOS yet.")
+        val importedKey = runBlocking { aesGcm.keyDecoder().decodeFromByteArray(AES.Key.Format.RAW, key) }
+        val cipher = importedKey.cipher()
+        return runBlocking { cipher.decryptWithIv(iv = iv, ciphertext = ciphertext, associatedData = aad) }
     }
 
     /**
@@ -180,5 +199,40 @@ class IosCryptoManager : CryptoManager {
         }
 
         return result
+    }
+
+    private inner class IosAesGcmEncryptingSink(
+        private val sink: Sink,
+        private val key: ByteArray,
+        private val iv: ByteArray,
+    ) : Sink {
+        private val plaintext = Buffer()
+        private var closed = false
+
+        override fun write(
+            source: Buffer,
+            byteCount: Long,
+        ) {
+            check(!closed) { "Sink is closed." }
+            plaintext.write(source, byteCount)
+        }
+
+        override fun flush() {
+            check(!closed) { "Sink is closed." }
+        }
+
+        override fun timeout(): Timeout = sink.timeout()
+
+        override fun close() {
+            if (closed) return
+            closed = true
+            val ciphertext = aesGcmEncrypt(key, iv, ByteArray(0), plaintext.readByteArray())
+            val bufferedSink = sink.buffer()
+            try {
+                bufferedSink.write(ciphertext)
+            } finally {
+                bufferedSink.close()
+            }
+        }
     }
 }

@@ -1,7 +1,10 @@
 package app.logdate.client.device.crypto
 
+import okio.CipherSink
+import okio.CipherSource
 import okio.Sink
 import okio.Source
+import okio.buffer
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.Mac
@@ -36,7 +39,12 @@ class AndroidCryptoManager : CryptoManager {
         key: ByteArray,
         iv: ByteArray,
     ): Sink {
-        TODO("Not needed for initial implementation - used for backup streaming")
+        require(key.size == 32) { "Key must be 32 bytes for AES-256" }
+        require(iv.size == 12) { "IV must be 12 bytes for GCM" }
+
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, iv))
+        return CipherSink(sink.buffer(), cipher)
     }
 
     override fun decryptSource(
@@ -44,7 +52,12 @@ class AndroidCryptoManager : CryptoManager {
         key: ByteArray,
         iv: ByteArray,
     ): Source {
-        TODO("Not needed for initial implementation - used for backup streaming")
+        require(key.size == 32) { "Key must be 32 bytes for AES-256" }
+        require(iv.size == 12) { "IV must be 12 bytes for GCM" }
+
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, iv))
+        return CipherSource(source.buffer(), cipher)
     }
 
     override fun generateRandomBytes(size: Int): ByteArray {
