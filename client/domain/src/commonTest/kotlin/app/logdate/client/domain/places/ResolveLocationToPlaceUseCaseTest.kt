@@ -2,7 +2,7 @@ package app.logdate.client.domain.places
 
 import app.logdate.client.location.places.ExternalPlacesProvider
 import app.logdate.client.location.places.PlaceSuggestion
-import app.logdate.client.location.places.StubReverseGeocodingProvider
+import app.logdate.client.location.places.UnavailableReverseGeocodingProvider
 import app.logdate.client.repository.places.UserPlacesRepository
 import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.Location
@@ -37,7 +37,7 @@ class ResolveLocationToPlaceUseCaseTest {
                 ResolveLocationToPlaceUseCase(
                     userPlacesRepository = ThrowingUserPlacesRepository(),
                     externalPlacesProvider = FakeExternalPlacesProvider(listOf(externalSuggestion)),
-                    reverseGeocodingProvider = StubReverseGeocodingProvider(),
+                    reverseGeocodingProvider = UnavailableReverseGeocodingProvider(),
                 )
 
             val result = useCase(location)
@@ -59,7 +59,7 @@ class ResolveLocationToPlaceUseCaseTest {
                 ResolveLocationToPlaceUseCase(
                     userPlacesRepository = ThrowingUserPlacesRepository(),
                     externalPlacesProvider = ThrowingExternalPlacesProvider(),
-                    reverseGeocodingProvider = StubReverseGeocodingProvider(),
+                    reverseGeocodingProvider = UnavailableReverseGeocodingProvider(),
                 )
 
             val result = useCase(location)

@@ -1,4 +1,4 @@
-package app.logdate.client.location.places
+package app.logdate.client.domain.recommendation
 
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.shared.model.AltitudeUnit
@@ -8,25 +8,23 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
-object StubLocationProvider : ClientLocationProvider {
-    // Mock location: Apple Park, Cupertino, CA (Apple's headquarters)
-    private val mockLocation =
+object TestLocationProvider : ClientLocationProvider {
+    private val location =
         Location(
             latitude = 37.3349,
             longitude = -122.0090,
             altitude = LocationAltitude(100.0, AltitudeUnit.FEET),
         )
 
-    private val _currentLocation = MutableStateFlow(mockLocation)
-    override val currentLocation: SharedFlow<Location>
-        get() = _currentLocation.asSharedFlow()
+    private val locationFlow = MutableStateFlow(location)
+
+    override val currentLocation: SharedFlow<Location> = locationFlow.asSharedFlow()
 
     override fun hasLocationPermission(): Boolean = true
 
-    override suspend fun getCurrentLocation(): Location = mockLocation
+    override suspend fun getCurrentLocation(): Location = location
 
     override suspend fun refreshLocation() {
-        // Emit the same mock location to simulate a refresh
-        _currentLocation.value = mockLocation
+        locationFlow.value = location
     }
 }

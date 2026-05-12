@@ -38,6 +38,16 @@
     <string name="location_background_tracking_description">Adds location context to entries and timeline</string>
     <string name="location_advanced">Advanced</string>
     <string name="location_advanced_description">Experiments and server-assisted tracking</string>
+    <string name="location_default_location">Default location</string>
+    <string name="location_default_location_description">Used on devices without location services.</string>
+    <string name="location_default_location_latitude">Latitude</string>
+    <string name="location_default_location_longitude">Longitude</string>
+    <string name="location_default_location_altitude">Altitude</string>
+    <string name="location_default_location_invalid_latitude">Enter a latitude from -90 to 90.</string>
+    <string name="location_default_location_invalid_longitude">Enter a longitude from -180 to 180.</string>
+    <string name="location_default_location_invalid_altitude">Enter altitude as a number, or leave it blank.</string>
+    <string name="location_default_location_save">Save default location</string>
+    <string name="location_default_location_clear">Clear default location</string>
     <string name="location_server_assist">Optional server nudges</string>
     <string name="location_server_assist_description">Allow server nudges for background capture</string>
 

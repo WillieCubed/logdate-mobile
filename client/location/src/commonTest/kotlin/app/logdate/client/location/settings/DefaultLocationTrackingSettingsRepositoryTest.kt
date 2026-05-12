@@ -1,6 +1,9 @@
 package app.logdate.client.location.settings
 
 import app.logdate.client.datastore.KeyValueStorage
+import app.logdate.shared.model.AltitudeUnit
+import app.logdate.shared.model.Location
+import app.logdate.shared.model.LocationAltitude
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -52,6 +55,53 @@ class DefaultLocationTrackingSettingsRepositoryTest {
             assertTrue(settings.serverAssistEnabled)
             assertFalse(settings.autoTrackForJournalEntries)
             assertFalse(settings.autoTrackForTimelineReview)
+        }
+
+    @Test
+    fun `default location is absent until configured`() =
+        runTest {
+            val repository = DefaultLocationTrackingSettingsRepository(InMemoryKeyValueStorage())
+
+            val settings = repository.getSettings()
+
+            assertEquals(null, settings.defaultLocation)
+        }
+
+    @Test
+    fun `setDefaultLocation persists fallback coordinates`() =
+        runTest {
+            val repository = DefaultLocationTrackingSettingsRepository(InMemoryKeyValueStorage())
+            val location =
+                DefaultLocation.fromLocation(
+                    Location(
+                        latitude = 40.7128,
+                        longitude = -74.0060,
+                        altitude = LocationAltitude(33.0, AltitudeUnit.FEET),
+                    ),
+                )
+
+            repository.setDefaultLocation(location)
+
+            assertEquals(location, repository.getSettings().defaultLocation)
+        }
+
+    @Test
+    fun `setDefaultLocation clears fallback coordinates`() =
+        runTest {
+            val repository = DefaultLocationTrackingSettingsRepository(InMemoryKeyValueStorage())
+            repository.setDefaultLocation(
+                DefaultLocation.fromLocation(
+                    Location(
+                        latitude = 40.7128,
+                        longitude = -74.0060,
+                        altitude = LocationAltitude(0.0, AltitudeUnit.METERS),
+                    ),
+                ),
+            )
+
+            repository.setDefaultLocation(null)
+
+            assertEquals(null, repository.getSettings().defaultLocation)
         }
 
     @Test

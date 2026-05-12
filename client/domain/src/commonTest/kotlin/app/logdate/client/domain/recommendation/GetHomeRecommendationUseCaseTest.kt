@@ -6,9 +6,8 @@ import app.logdate.client.domain.notes.HasNotesForTodayUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.places.PlaceResolutionCache
 import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
-import app.logdate.client.location.places.StubExternalPlacesProvider
-import app.logdate.client.location.places.StubLocationProvider
-import app.logdate.client.location.places.StubReverseGeocodingProvider
+import app.logdate.client.location.places.UnavailableExternalPlacesProvider
+import app.logdate.client.location.places.UnavailableReverseGeocodingProvider
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
@@ -43,8 +42,8 @@ class GetHomeRecommendationUseCaseTest {
         val resolveLocationToPlaceUseCase =
             ResolveLocationToPlaceUseCase(
                 userPlacesRepository = EmptyUserPlacesRepository(),
-                externalPlacesProvider = StubExternalPlacesProvider(),
-                reverseGeocodingProvider = StubReverseGeocodingProvider(),
+                externalPlacesProvider = UnavailableExternalPlacesProvider(),
+                reverseGeocodingProvider = UnavailableReverseGeocodingProvider(),
             )
         useCase =
             GetHomeRecommendationUseCase(
@@ -53,7 +52,7 @@ class GetHomeRecommendationUseCaseTest {
                 getMemoryRecall = GetMemoryRecallUseCase(mockNotesRepository),
                 observeUpcomingEvents = ObserveUpcomingEventsUseCase(StubEventRepository),
                 eventRepository = StubEventRepository,
-                clientLocationProvider = StubLocationProvider,
+                clientLocationProvider = TestLocationProvider,
                 placeResolutionCache = PlaceResolutionCache(resolveLocationToPlaceUseCase),
                 memoriesSettingsRepository = DefaultMemoriesSettingsRepository(MockKeyValueStorage()),
             )

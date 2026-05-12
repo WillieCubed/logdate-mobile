@@ -4,6 +4,7 @@ package app.logdate.feature.core.settings.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.location.settings.DefaultLocation
 import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
@@ -160,6 +161,18 @@ class LocationSettingsViewModel(
             } catch (e: Exception) {
                 Napier.e("Failed to update server assist", e)
                 errorMessageState.value = "Failed to update server assist: ${e.message}"
+            }
+        }
+    }
+
+    fun setDefaultLocation(location: DefaultLocation?) {
+        viewModelScope.launch {
+            try {
+                settingsRepository.setDefaultLocation(location)
+                Napier.i("Default fallback location configured: ${location != null}")
+            } catch (e: Exception) {
+                Napier.e("Failed to update default fallback location", e)
+                errorMessageState.value = "Failed to update default location: ${e.message}"
             }
         }
     }

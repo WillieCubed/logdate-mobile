@@ -33,6 +33,6 @@ data class GeocodedAddress(
  *
  * @see AndroidReverseGeocodingProvider
  */
-class StubReverseGeocodingProvider : ReverseGeocodingProvider {
+class UnavailableReverseGeocodingProvider : ReverseGeocodingProvider {
     override suspend fun reverseGeocode(location: Location): GeocodedAddress? = null
 }

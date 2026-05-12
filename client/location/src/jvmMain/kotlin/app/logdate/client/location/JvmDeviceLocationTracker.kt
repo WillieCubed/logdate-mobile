@@ -19,8 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Desktop-specific implementation of DeviceLocationTracker.
  *
  * Desktop platforms generally have limited location capabilities,
- * so this implementation primarily works with the DesktopLocationProvider
- * which may provide simulated location data.
+ * so this implementation delegates availability to [DesktopLocationProvider].
  */
 class JvmDeviceLocationTracker(
     private val locationProvider: DesktopLocationProvider,

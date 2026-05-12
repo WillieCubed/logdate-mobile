@@ -1,52 +1,69 @@
 package app.logdate.client.location
 
-import app.logdate.shared.model.AltitudeUnit
+import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.shared.model.Location
-import app.logdate.shared.model.LocationAltitude
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.launch
 
 /**
- * Desktop implementation of ClientLocationProvider.
+ * Desktop [ClientLocationProvider].
  *
- * Stub implementation that returns a fixed location for desktop platforms
- * where GPS is typically not available.
+ * Desktop builds do not have a trustworthy OS location provider wired today, so this class
+ * never fabricates coordinates. Location-dependent features use the user-configured default
+ * location from settings, or receive an explicit unsupported error from one-shot requests when no
+ * default is configured.
+ *
+ * @param settingsRepository Repository that stores the optional user-configured default location.
+ * @param scope Application-level scope used to observe settings changes for the lifetime of the
+ *   desktop location provider.
  */
 class DesktopLocationProvider(
-    private val permissionManager: app.logdate.client.permissions.PermissionManager,
+    private val settingsRepository: LocationTrackingSettingsRepository,
+    private val scope: CoroutineScope,
 ) : ClientLocationProvider {
     private val locationFlowState = MutableSharedFlow<Location>(replay = 1)
-    override val currentLocation: SharedFlow<Location> = locationFlowState.asSharedFlow()
-
-    // San Francisco default location
-    private val defaultLocation =
-        Location(
-            latitude = 37.7749,
-            longitude = -122.4194,
-            altitude = LocationAltitude(52.0, AltitudeUnit.METERS),
-        )
+    private val defaultLocationState = MutableStateFlow<Location?>(null)
 
     init {
-        // Emit the default location immediately
-        try {
-            locationFlowState.tryEmit(defaultLocation)
-        } catch (e: Exception) {
-            Napier.w("Failed to emit default location: ${e.message}")
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            try {
+                settingsRepository
+                    .observeSettings()
+                    .catch { error -> Napier.w("Desktop location settings updates stopped", error) }
+                    .collect { settings ->
+                        val location = settings.defaultLocation?.toLocation()
+                        defaultLocationState.value = location
+                        if (location != null) {
+                            locationFlowState.emit(location)
+                        }
+                    }
+            } catch (error: Exception) {
+                Napier.w("Desktop location settings updates could not start", error)
+            }
         }
     }
 
-    override fun hasLocationPermission(): Boolean =
-        permissionManager.isPermissionGranted(app.logdate.client.permissions.PermissionType.LOCATION)
+    override val currentLocation: SharedFlow<Location> = locationFlowState.asSharedFlow()
 
-    override suspend fun getCurrentLocation(): Location = defaultLocation
+    /**
+     * Desktop has no runtime location permission prompt. For interface compatibility, this returns
+     * whether a user-configured default location is available.
+     */
+    override fun hasLocationPermission(): Boolean = defaultLocationState.value != null
 
-    override suspend fun refreshLocation() {
-        Napier.d("Refreshing location on desktop (simulated)")
-        // Simulate a brief delay for realism
-        delay(500)
-        locationFlowState.emit(defaultLocation)
-    }
+    override suspend fun getCurrentLocation(): Location =
+        settingsRepository
+            .getSettings()
+            .defaultLocation
+            ?.toLocation()
+            ?: throw UnsupportedOperationException("Configure a default location before using location features on this desktop build.")
+
+    override suspend fun refreshLocation() = locationFlowState.emit(getCurrentLocation())
 }
