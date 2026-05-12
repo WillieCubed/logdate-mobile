@@ -788,7 +788,11 @@ object SharedScreenshotCatalog {
                 )
             },
             sharedScene(SharedScreenshotSceneId.PastRewinds, ScreenshotSceneGroup.REWIND, desktopOnlyVariants) {
-                PastRewindsScreen(onGoBack = {})
+                PastRewindsScreen(
+                    onGoBack = {},
+                    rewinds = pastRewindSamples,
+                    onOpenRewind = {},
+                )
             },
             sharedScene(SharedScreenshotSceneId.RewindSettings, ScreenshotSceneGroup.REWIND, desktopOnlyVariants) {
                 RewindSettingsContent(

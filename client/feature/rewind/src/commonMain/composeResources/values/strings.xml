@@ -47,6 +47,7 @@
     <string name="delete_rewind_dialog_confirm">Delete</string>
     <string name="delete_rewind_dialog_cancel">Keep it</string>
     <string name="past_rewind">Past rewind</string>
+    <string name="past_rewinds_empty">No past rewinds yet. Your weekly stories will show up here once they\'re generated.</string>
     <string name="more_rewinds_below">More rewinds below</string>
     <string name="youve_reviewed_all_your_weekly_rewinds">You&apos;ve reviewed all your weekly rewinds</string>
 
