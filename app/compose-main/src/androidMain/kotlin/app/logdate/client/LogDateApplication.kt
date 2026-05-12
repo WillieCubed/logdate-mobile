@@ -84,6 +84,7 @@ class LogdateApplication :
         runCatching {
             val rewindScheduler = RewindGenerationScheduler(this)
             rewindScheduler.schedulePeriodicGeneration()
+            rewindScheduler.scheduleAnnualGeneration()
             rewindScheduler.enqueueImmediateCheck()
         }.onFailure { error ->
             Napier.w("Failed to initialize rewind generation scheduling", error)
