@@ -1,8 +1,10 @@
 package app.logdate.client.sharing.di
 
 import app.logdate.client.sharing.DesktopSharingLauncher
+import app.logdate.client.sharing.NoOpRewindPanelCardRenderer
 import app.logdate.client.sharing.NoOpRewindQuoteCardRenderer
 import app.logdate.client.sharing.NoOpRewindStatsSummaryRenderer
+import app.logdate.client.sharing.RewindPanelCardRenderer
 import app.logdate.client.sharing.RewindQuoteCardRenderer
 import app.logdate.client.sharing.RewindStatsSummaryRenderer
 import app.logdate.client.sharing.SharingLauncher
@@ -21,4 +23,5 @@ actual val sharingModule: Module =
         }
         single<RewindQuoteCardRenderer> { NoOpRewindQuoteCardRenderer }
         single<RewindStatsSummaryRenderer> { NoOpRewindStatsSummaryRenderer }
+        single<RewindPanelCardRenderer> { NoOpRewindPanelCardRenderer }
     }
