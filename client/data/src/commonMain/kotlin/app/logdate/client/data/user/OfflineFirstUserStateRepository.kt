@@ -25,6 +25,6 @@ class OfflineFirstUserStateRepository(
     }
 
     override suspend fun addFavoriteNote(vararg noteId: String) {
-        TODO("Not yet implemented")
+        localDataSource.addFavoriteNotes(noteId.toSet())
     }
 }
