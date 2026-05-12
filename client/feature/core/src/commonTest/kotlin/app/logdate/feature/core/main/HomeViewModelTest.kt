@@ -19,15 +19,16 @@ import app.logdate.client.domain.timeline.GetJournalMembershipUseCase
 import app.logdate.client.domain.timeline.GetTimelinePageUseCase
 import app.logdate.client.domain.timeline.GroupNotesByDayBoundsUseCase
 import app.logdate.client.domain.timeline.Timeline
+import app.logdate.client.domain.timeline.TimelineDay
+import app.logdate.client.domain.timeline.TimelineDayBuilder
 import app.logdate.client.domain.timeline.TimelinePageRequest
 import app.logdate.client.health.HealthDataAvailability
 import app.logdate.client.health.LocalFirstHealthRepository
 import app.logdate.client.health.model.DayBounds
 import app.logdate.client.health.model.SleepSession
 import app.logdate.client.health.model.TimeOfDay
-import app.logdate.client.location.places.StubExternalPlacesProvider
-import app.logdate.client.location.places.StubLocationProvider
-import app.logdate.client.location.places.StubReverseGeocodingProvider
+import app.logdate.client.location.places.UnavailableExternalPlacesProvider
+import app.logdate.client.location.places.UnavailableReverseGeocodingProvider
 import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
@@ -292,6 +293,16 @@ class HomeViewModelTest {
                     dayBoundarySettingsRepository = dayBoundarySettingsRepository,
                 ),
                 NoOpEventRepository,
+                TimelineDayBuilder { date, entries, events ->
+                    TimelineDay(
+                        start = entries.minOf { it.creationTimestamp },
+                        end = entries.maxOf { it.creationTimestamp },
+                        tldr = "Test summary",
+                        date = date,
+                        events = events,
+                        entries = entries.sortedByDescending { it.creationTimestamp },
+                    )
+                },
             )
         val recentTimelineFlow =
             MutableStateFlow(
@@ -309,13 +320,13 @@ class HomeViewModelTest {
                 getMemoryRecall = GetMemoryRecallUseCase(notesRepository),
                 observeUpcomingEvents = ObserveUpcomingEventsUseCase(NoOpEventRepository),
                 eventRepository = NoOpEventRepository,
-                clientLocationProvider = StubLocationProvider,
+                clientLocationProvider = TestLocationProvider,
                 placeResolutionCache =
                     PlaceResolutionCache(
                         ResolveLocationToPlaceUseCase(
                             userPlacesRepository = EmptyUserPlacesRepository(),
-                            externalPlacesProvider = StubExternalPlacesProvider(),
-                            reverseGeocodingProvider = StubReverseGeocodingProvider(),
+                            externalPlacesProvider = UnavailableExternalPlacesProvider(),
+                            reverseGeocodingProvider = UnavailableReverseGeocodingProvider(),
                         ),
                     ),
                 memoriesSettingsRepository = FakeMemoriesSettingsRepository(),
