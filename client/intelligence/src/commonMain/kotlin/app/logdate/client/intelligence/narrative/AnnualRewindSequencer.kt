@@ -1,5 +1,6 @@
 package app.logdate.client.intelligence.narrative
 
+import app.logdate.shared.model.NarrativeOrigin
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
 import app.logdate.shared.model.YearNarrative
@@ -26,19 +27,27 @@ class AnnualRewindSequencer {
         weeklyRewinds: List<Rewind>,
         year: Int,
     ): List<RewindContent> {
-        Napier.d("Sequencing annual rewind for $year: ${narrative.chapters.size} chapters, ${weeklyRewinds.size} weekly rewinds")
+        Napier.d(
+            "Sequencing annual rewind for $year (${narrative.origin}): " +
+                "${narrative.chapters.size} chapters, ${weeklyRewinds.size} weekly rewinds",
+        )
         val panels = mutableListOf<RewindContent>()
         val now = weeklyRewinds.lastOrNull()?.endDate ?: Instant.DISTANT_PAST
         val earliest = weeklyRewinds.firstOrNull()?.startDate ?: Instant.DISTANT_PAST
+        val isLocal = narrative.origin == NarrativeOrigin.LOCAL_HEURISTIC
 
-        // 1. Year title — the overall narrative in one sweep.
-        panels.add(
-            RewindContent.NarrativeContext(
-                timestamp = earliest,
-                sourceId = Uuid.random(),
-                contextText = narrative.overallNarrative,
-            ),
-        )
+        // 1. Year title — the overall narrative in one sweep. LLM-origin only; for
+        // local-origin Rewinds the prose is templated and feels canned, so we lead
+        // with the themes card instead.
+        if (!isLocal) {
+            panels.add(
+                RewindContent.NarrativeContext(
+                    timestamp = earliest,
+                    sourceId = Uuid.random(),
+                    contextText = narrative.overallNarrative,
+                ),
+            )
+        }
 
         // 2. Year themes — what the year was ABOUT.
         if (narrative.yearThemes.isNotEmpty()) {
@@ -109,20 +118,24 @@ class AnnualRewindSequencer {
             )
         }
 
-        // 7. Closing — the narrative's last sentence as a bookend.
-        val closingSentences =
-            narrative.overallNarrative
-                .split(". ")
-                .takeLast(1)
-                .joinToString(". ")
-        if (closingSentences.isNotBlank() && closingSentences != narrative.overallNarrative) {
-            panels.add(
-                RewindContent.NarrativeContext(
-                    timestamp = now,
-                    sourceId = Uuid.random(),
-                    contextText = closingSentences,
-                ),
-            )
+        // 7. Closing — the narrative's last sentence as a bookend. LLM-origin only:
+        // the local narrative's overallNarrative is one templated sentence and would
+        // repeat itself here.
+        if (!isLocal) {
+            val closingSentences =
+                narrative.overallNarrative
+                    .split(". ")
+                    .takeLast(1)
+                    .joinToString(". ")
+            if (closingSentences.isNotBlank() && closingSentences != narrative.overallNarrative) {
+                panels.add(
+                    RewindContent.NarrativeContext(
+                        timestamp = now,
+                        sourceId = Uuid.random(),
+                        contextText = closingSentences,
+                    ),
+                )
+            }
         }
 
         Napier.d("Generated ${panels.size} panels for annual rewind")
