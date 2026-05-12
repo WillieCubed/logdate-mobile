@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Desktop stub implementation of [CameraCaptureManager].
+ * Desktop capability fallback of [CameraCaptureManager].
  * Camera capture is not yet implemented on Desktop.
  */
 class DesktopCameraCaptureManager : CameraCaptureManager {

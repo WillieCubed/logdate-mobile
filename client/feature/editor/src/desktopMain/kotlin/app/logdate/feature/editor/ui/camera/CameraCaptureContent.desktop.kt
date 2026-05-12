@@ -23,7 +23,7 @@ import logdate.client.feature.editor.generated.resources.camera_not_available_on
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * Desktop stub implementation of camera capture content.
+ * Desktop capability fallback of camera capture content.
  * Camera capture is not yet implemented on Desktop.
  */
 @Suppress("ktlint:standard:function-naming")

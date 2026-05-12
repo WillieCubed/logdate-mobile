@@ -10,5 +10,5 @@ actual fun LiveCameraPreview(
     cameraType: CameraType,
     modifier: Modifier,
 ) {
-    TODO("Camera preview not currently supported on desktop")
+    CameraUnavailablePanel(modifier = modifier)
 }

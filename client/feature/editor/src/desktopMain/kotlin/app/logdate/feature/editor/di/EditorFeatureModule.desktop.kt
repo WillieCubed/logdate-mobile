@@ -16,7 +16,7 @@ import java.io.File
  */
 actual val platformEditorModule: Module =
     module {
-        // Provide Desktop stub implementation of CameraCaptureManager
+        // Provide Desktop capability fallback of CameraCaptureManager
         factory<CameraCaptureManager> {
             DesktopCameraCaptureManager()
         }
