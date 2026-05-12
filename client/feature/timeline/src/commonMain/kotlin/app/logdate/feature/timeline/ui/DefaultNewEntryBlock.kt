@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -19,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.timeline.generated.resources.*
 import logdate.client.feature.timeline.generated.resources.Res
@@ -60,7 +59,7 @@ internal fun DefaultNewEntryBlock(
                 modifier = Modifier.padding(Spacing.lg),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                Icon(Icons.Default.Add, null, modifier = Modifier.padding(end = Spacing.sm))
+                Icon(painter = PlatformIcons.add(), contentDescription = null, modifier = Modifier.padding(end = Spacing.sm))
                 Text(stringResource(Res.string.add_new_entry))
             }
         }

@@ -12,9 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.feature.editor.audio.AudioContextProcessor
 import app.logdate.feature.editor.ui.formatMediaDuration
+import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.generating_transcription
 import org.jetbrains.compose.resources.stringResource
@@ -277,11 +275,11 @@ fun AudioPlaybackComponent(
                         )
                     } else {
                         Icon(
-                            imageVector =
+                            painter =
                                 if (playbackState.isPlaying) {
-                                    Icons.Rounded.Pause
+                                    PlatformIcons.pause()
                                 } else {
-                                    Icons.Rounded.PlayArrow
+                                    PlatformIcons.play()
                                 },
                             contentDescription =
                                 if (playbackState.isPlaying) {

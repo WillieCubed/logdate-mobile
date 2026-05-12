@@ -11,12 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Drafts
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.DropdownMenu
@@ -38,6 +34,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.AutoSaveStatus
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
 import logdate.client.feature.editor.generated.resources.Res
@@ -85,7 +82,7 @@ fun NoteEditorToolbar(
             onClick = { onBack() },
         ) {
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                painter = PlatformIcons.back(),
                 contentDescription = stringResource(UiRes.string.common_back),
             )
         }
@@ -126,7 +123,7 @@ fun NoteEditorToolbar(
                             },
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Drafts,
+                                painter = PlatformIcons.drafts(),
                                 contentDescription = stringResource(Res.string.load_drafts),
                             )
                         }
@@ -143,14 +140,14 @@ fun NoteEditorToolbar(
                             },
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Save,
+                        painter = PlatformIcons.save(),
                         contentDescription = stringResource(Res.string.save_entry),
                     )
                 }
 
                 FilledTonalIconButton(onClick = { showMenu = true }) {
                     Icon(
-                        imageVector = Icons.Default.MoreVert,
+                        painter = PlatformIcons.more(),
                         contentDescription = stringResource(Res.string.more_options),
                     )
 

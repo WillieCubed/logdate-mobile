@@ -13,12 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AudioFile
-import androidx.compose.material.icons.rounded.Camera
-import androidx.compose.material.icons.rounded.Image
-import androidx.compose.material.icons.rounded.TextFields
-import androidx.compose.material.icons.rounded.VideoFile
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -31,7 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.LocalAnimatedVisibilityScope
 import app.logdate.feature.editor.ui.LocalSharedTransitionScope
@@ -40,6 +34,7 @@ import app.logdate.feature.editor.ui.editor.BlockType
 import app.logdate.feature.editor.ui.layout.ExpandableContentToolbar
 import app.logdate.feature.editor.ui.layout.OverscrollDetector
 import app.logdate.feature.editor.ui.layout.rememberOverscrollDetector
+import app.logdate.ui.platform.PlatformIcons
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
@@ -148,7 +143,7 @@ fun EditorContentFooter(
             expanded = expanded,
         ) {
             BlockTypeButton(
-                icon = Icons.Rounded.TextFields,
+                icon = PlatformIcons.text(),
                 contentDescription = stringResource(Res.string.editor_action_add_text),
                 modifier = textBounds,
                 onClick = {
@@ -158,28 +153,28 @@ fun EditorContentFooter(
             )
 
             BlockTypeButton(
-                icon = Icons.Rounded.Image,
+                icon = PlatformIcons.library(),
                 contentDescription = stringResource(Res.string.editor_action_add_image),
                 modifier = imageBounds,
                 onClick = { onAddBlock(BlockType.IMAGE, imageId) },
             )
 
             BlockTypeButton(
-                icon = Icons.Rounded.AudioFile,
+                icon = PlatformIcons.audioFile(),
                 contentDescription = stringResource(Res.string.editor_action_add_audio),
                 modifier = audioBounds,
                 onClick = { onAddBlock(BlockType.AUDIO, audioId) },
             )
 
             BlockTypeButton(
-                icon = Icons.Rounded.VideoFile,
+                icon = PlatformIcons.videoFile(),
                 contentDescription = stringResource(Res.string.editor_action_add_video),
                 modifier = videoBounds,
                 onClick = { onAddBlock(BlockType.VIDEO, videoId) },
             )
 
             BlockTypeButton(
-                icon = Icons.Rounded.Camera,
+                icon = PlatformIcons.camera(),
                 contentDescription = stringResource(Res.string.take_photo),
                 modifier = cameraBounds,
                 onClick = { onAddBlock(BlockType.CAMERA, cameraId) },
@@ -193,7 +188,7 @@ fun EditorContentFooter(
 @Suppress("ktlint:standard:function-naming")
 @Composable
 private fun BlockTypeButton(
-    icon: ImageVector,
+    icon: Painter,
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -211,7 +206,7 @@ private fun BlockTypeButton(
                 .size(40.dp),
     ) {
         Icon(
-            imageVector = icon,
+            painter = icon,
             contentDescription = contentDescription,
             tint = MaterialTheme.colorScheme.onPrimaryContainer,
         )

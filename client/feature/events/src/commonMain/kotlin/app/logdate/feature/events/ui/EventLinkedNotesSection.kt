@@ -12,11 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.GraphicEq
-import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
@@ -82,7 +78,7 @@ internal fun EventLinkedNotesSection(
         }
 
         FilledTonalButton(onClick = onAddCapture) {
-            Icon(Icons.Filled.Add, contentDescription = null)
+            Icon(painter = PlatformIcons.add(), contentDescription = null)
             Text(text = "Attach a capture", modifier = Modifier.padding(start = Spacing.sm))
         }
     }
@@ -117,7 +113,7 @@ private fun LinkedNoteCard(
                 )
             }
             IconButton(onClick = onUnlink) {
-                Icon(Icons.Filled.Close, contentDescription = "Detach")
+                Icon(painter = PlatformIcons.close(), contentDescription = "Detach")
             }
         }
     }
@@ -145,7 +141,7 @@ private fun NotePreview(note: JournalNote) {
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.PlayCircle,
+                    painter = PlatformIcons.playCircle(),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -160,7 +156,7 @@ private fun NotePreview(note: JournalNote) {
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.GraphicEq,
+                    painter = PlatformIcons.audioFile(),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

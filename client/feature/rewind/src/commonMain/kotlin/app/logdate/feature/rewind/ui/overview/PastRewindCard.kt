@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -18,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.RewindOpenCallback
+import app.logdate.ui.platform.PlatformIcons
 
 /**
  * One row in the rewind overview history list.
@@ -85,9 +84,9 @@ private fun MilestoneRewindCard(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
             Icon(
-                imageVector =
+                painter =
                     when (milestone.kind) {
-                        MilestoneKindUiState.LOCATION_CHANGE -> Icons.Filled.Place
+                        MilestoneKindUiState.LOCATION_CHANGE -> PlatformIcons.location()
                     },
                 contentDescription = null,
             )

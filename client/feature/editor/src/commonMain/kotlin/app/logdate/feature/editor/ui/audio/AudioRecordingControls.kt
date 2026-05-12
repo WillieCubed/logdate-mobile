@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -27,6 +24,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.logdate.feature.editor.ui.editor.RecordingState
+import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.record
 import logdate.client.feature.editor.generated.resources.start_recording
@@ -129,7 +127,7 @@ fun AudioRecordingControls(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Mic,
+                        painter = PlatformIcons.mic(),
                         contentDescription = null,
                         modifier = Modifier.size(40.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
@@ -172,7 +170,7 @@ fun AudioRecordingControls(
                         .testTag("audio_record_stop_button"),
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Stop,
+                    painter = PlatformIcons.stop(),
                     contentDescription = stringResource(Res.string.stop_recording),
                     modifier = Modifier.size(24.dp),
                 )
@@ -196,7 +194,7 @@ fun AudioRecordingControls(
                         .testTag("audio_record_start_button"),
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Mic,
+                    painter = PlatformIcons.mic(),
                     contentDescription = stringResource(Res.string.start_recording),
                     modifier = Modifier.size(24.dp),
                 )

@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -28,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.library.ui.components.MediaThumbnailGrid
 import app.logdate.ui.common.adaptivePanelShape
+import app.logdate.ui.platform.PlatformIcons
 import kotlin.uuid.Uuid
 
 /**
@@ -134,7 +133,7 @@ private fun LibraryEmptyState(
             modifier = Modifier.size(80.dp),
         ) {
             Icon(
-                imageVector = Icons.Outlined.CameraAlt,
+                painter = PlatformIcons.camera(),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier =

@@ -18,11 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Forward10
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Replay10
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +38,7 @@ import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
 import app.logdate.feature.editor.ui.audio.waveform.BezierAudioWaveform
 import app.logdate.feature.editor.ui.formatMediaDuration
+import app.logdate.ui.platform.PlatformIcons
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
@@ -200,7 +196,7 @@ fun ElevatedAudioCard(
                     ) {
                         IconButton(onClick = onSkipBack) {
                             Icon(
-                                imageVector = Icons.Rounded.Replay10,
+                                painter = PlatformIcons.replay10(),
                                 contentDescription = stringResource(Res.string.skip_back_10_seconds),
                                 tint = Color(palette.accentColor),
                             )
@@ -220,7 +216,7 @@ fun ElevatedAudioCard(
                                 modifier = Modifier.fillMaxSize(),
                             ) {
                                 Icon(
-                                    imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                    painter = if (isPlaying) PlatformIcons.pause() else PlatformIcons.play(),
                                     contentDescription = if (isPlaying) "Pause" else "Play",
                                     tint = Color.White,
                                     modifier = Modifier.size(36.dp),
@@ -232,7 +228,7 @@ fun ElevatedAudioCard(
 
                         IconButton(onClick = onSkipForward) {
                             Icon(
-                                imageVector = Icons.Rounded.Forward10,
+                                painter = PlatformIcons.forward10(),
                                 contentDescription = stringResource(Res.string.skip_forward_10_seconds),
                                 tint = Color(palette.accentColor),
                             )

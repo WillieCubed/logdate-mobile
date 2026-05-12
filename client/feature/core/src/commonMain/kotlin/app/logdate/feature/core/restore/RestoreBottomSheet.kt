@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -36,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.export.ExportStats
 import app.logdate.client.domain.restore.ArchivePreview
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
 import logdate.client.feature.core.generated.resources.Res
@@ -175,7 +174,7 @@ private fun RestoreConfirmContent(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = Icons.Rounded.Info,
+                painter = PlatformIcons.info(),
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -300,7 +299,7 @@ private fun RestorePreviewContent(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = Icons.Rounded.Info,
+                painter = PlatformIcons.info(),
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,

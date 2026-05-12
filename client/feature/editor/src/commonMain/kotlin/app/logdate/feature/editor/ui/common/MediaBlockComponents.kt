@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +17,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.add_a_caption
 import org.jetbrains.compose.resources.stringResource
@@ -41,7 +40,7 @@ fun DeleteMediaButton(
                 ),
     ) {
         Icon(
-            imageVector = Icons.Default.Delete,
+            painter = PlatformIcons.delete(),
             contentDescription = contentDescription,
             tint = MaterialTheme.colorScheme.inverseOnSurface,
         )

@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,6 +19,7 @@ import app.logdate.feature.editor.ui.common.DeleteMediaButton
 import app.logdate.feature.editor.ui.common.MediaOverlayCaptionArea
 import app.logdate.feature.editor.ui.editor.CameraBlockUiState
 import app.logdate.feature.editor.ui.formatMediaDuration
+import app.logdate.ui.platform.PlatformIcons
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
@@ -122,7 +121,7 @@ private fun CapturedMediaContent(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
-                            imageVector = Icons.Default.PlayArrow,
+                            painter = PlatformIcons.play(),
                             contentDescription = stringResource(Res.string.play_video),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

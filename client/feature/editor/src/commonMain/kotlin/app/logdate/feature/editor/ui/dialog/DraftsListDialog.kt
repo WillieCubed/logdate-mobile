@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.ui.common.SwipeToAction
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import logdate.client.feature.editor.generated.resources.Res
@@ -223,7 +223,7 @@ private fun SwipeToDeleteDraftItem(
                 horizontalArrangement = Arrangement.Center,
             ) {
                 Icon(
-                    imageVector = Icons.Default.Delete,
+                    painter = PlatformIcons.delete(),
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
                 )

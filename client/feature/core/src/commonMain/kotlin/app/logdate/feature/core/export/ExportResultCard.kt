@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -22,16 +20,24 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.export.ExportStats
 import app.logdate.feature.core.common.DataStatsGrid
 import app.logdate.feature.core.common.OperationFailureCard
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.action_browse
 import logdate.client.feature.core.generated.resources.export_complete_description
+import logdate.client.feature.core.generated.resources.export_complete_stats_summary
 import logdate.client.feature.core.generated.resources.export_complete_title
 import logdate.client.feature.core.generated.resources.export_failed_title
 import logdate.client.ui.generated.resources.common_done
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
 
+/**
+ * Confirmation card shown after an export archive is saved.
+ *
+ * The saved archive name is intentionally rendered as first-class content so
+ * users can verify the file they just created before opening or dismissing it.
+ */
 @Composable
 internal fun ExportSuccessCard(
     fileName: String,
@@ -45,7 +51,7 @@ internal fun ExportSuccessCard(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(
-            imageVector = Icons.Rounded.CheckCircle,
+            painter = PlatformIcons.checkCircle(),
             contentDescription = null,
             modifier = Modifier.size(40.dp),
             tint = MaterialTheme.colorScheme.primary,
@@ -68,7 +74,31 @@ internal fun ExportSuccessCard(
             textAlign = TextAlign.Center,
         )
 
+        Spacer(modifier = Modifier.height(Spacing.md))
+
+        Text(
+            text = fileName,
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+        )
+
         stats?.let {
+            Spacer(modifier = Modifier.height(Spacing.sm))
+
+            Text(
+                text =
+                    stringResource(
+                        Res.string.export_complete_stats_summary,
+                        it.journalCount,
+                        it.noteCount,
+                        it.draftCount,
+                        it.mediaCount,
+                    ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+
             Spacer(modifier = Modifier.height(Spacing.lg))
 
             DataStatsGrid(

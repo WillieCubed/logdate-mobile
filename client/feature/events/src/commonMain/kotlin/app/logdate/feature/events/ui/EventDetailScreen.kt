@@ -17,9 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -48,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.shared.model.Place
 import app.logdate.shared.model.displayLabel
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeRangeShort
 import org.koin.compose.viewmodel.koinViewModel
@@ -83,13 +81,13 @@ fun EventDetailScreen(
                 title = { Text("Event") },
                 navigationIcon = {
                     IconButton(onClick = onGoBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(painter = PlatformIcons.back(), contentDescription = "Back")
                     }
                 },
                 actions = {
                     if (uiState is EventDetailUiState.Loaded) {
                         IconButton(onClick = { viewModel.delete(onGoBack) }) {
-                            Icon(Icons.Filled.Delete, contentDescription = "Delete event")
+                            Icon(painter = PlatformIcons.delete(), contentDescription = "Delete event")
                         }
                     }
                 },

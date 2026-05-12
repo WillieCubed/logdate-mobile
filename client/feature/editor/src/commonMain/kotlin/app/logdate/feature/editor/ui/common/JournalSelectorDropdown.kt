@@ -26,10 +26,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -55,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.layout.LocalEditorIsCompact
 import app.logdate.shared.model.Journal
 import app.logdate.ui.content.JournalContentCover
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
@@ -305,7 +302,7 @@ private fun SelectorContent(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                Icons.AutoMirrored.Filled.MenuBook,
+                painter = PlatformIcons.journal(),
                 contentDescription = null,
                 tint =
                     if (selectedCount > 0) {
@@ -431,7 +428,7 @@ private fun SelectorIndicators(selectedCount: Int) {
         }
 
         Icon(
-            Icons.Default.ExpandMore,
+            painter = PlatformIcons.expandMore(),
             contentDescription = stringResource(Res.string.expand),
             tint =
                 if (selectedCount > 0) {
@@ -589,7 +586,7 @@ private fun JournalItem(
                 exit = journalItemCheckmarkExitTransition(),
             ) {
                 Icon(
-                    Icons.Default.Check,
+                    painter = PlatformIcons.check(),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                 )

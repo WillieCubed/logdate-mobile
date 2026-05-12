@@ -17,11 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CameraAlt
-import androidx.compose.material.icons.rounded.Image
-import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.TextFields
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -41,6 +36,7 @@ import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.layout.LocalEditorIsCompact
+import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.capture
 import logdate.client.feature.editor.generated.resources.capture_photo_or_video
@@ -217,7 +213,7 @@ private fun TextEntrySurface(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.TextFields,
+                    painter = PlatformIcons.text(),
                     contentDescription = stringResource(Res.string.start_text_entry),
                     modifier = Modifier.size(48.dp),
                     tint = MaterialTheme.colorScheme.primary,
@@ -261,7 +257,7 @@ private fun AudioRecordingSurface(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = Icons.Rounded.Mic,
+                            painter = PlatformIcons.mic(),
                             contentDescription = stringResource(Res.string.record_audio),
                             tint = MaterialTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.size(24.dp),
@@ -301,7 +297,7 @@ private fun CameraCaptureSurface(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.CameraAlt,
+                    painter = PlatformIcons.camera(),
                     contentDescription = stringResource(Res.string.capture_photo_or_video),
                     modifier = Modifier.size(48.dp),
                     tint = MaterialTheme.colorScheme.onTertiaryContainer,
@@ -345,7 +341,7 @@ private fun PhotoSurface(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Image,
+                    painter = PlatformIcons.library(),
                     contentDescription = stringResource(Res.string.editor_action_add_photo_gallery),
                     modifier = Modifier.size(48.dp),
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,

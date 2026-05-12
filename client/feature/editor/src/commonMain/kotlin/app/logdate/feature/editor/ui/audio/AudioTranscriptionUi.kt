@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Error
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -26,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.client.media.audio.transcription.TranscriptionFailure
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.convert_to_text
@@ -222,7 +220,7 @@ private fun TranscriptionErrorUi(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = Icons.Rounded.Error,
+                painter = PlatformIcons.error(),
                 contentDescription = stringResource(Res.string.error),
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(16.dp),
@@ -243,7 +241,7 @@ private fun TranscriptionErrorUi(
                 modifier = Modifier.size(32.dp),
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Refresh,
+                    painter = PlatformIcons.refresh(),
                     contentDescription = stringResource(UiRes.string.common_try_again),
                     tint = MaterialTheme.colorScheme.primary,
                 )

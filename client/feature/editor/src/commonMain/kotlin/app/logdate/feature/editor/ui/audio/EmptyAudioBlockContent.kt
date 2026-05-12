@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -28,6 +26,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.record_audio
 import logdate.client.feature.editor.generated.resources.tap_to_start_recording
@@ -106,7 +105,7 @@ fun EmptyAudioBlockContent(modifier: Modifier = Modifier) {
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Mic,
+                        painter = PlatformIcons.mic(),
                         contentDescription = stringResource(Res.string.record_audio),
                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.size(30.dp),

@@ -29,8 +29,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -61,6 +59,7 @@ import app.logdate.feature.editor.audio.AudioLabelResolver
 import app.logdate.feature.editor.audio.formatAudioLabel
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.formatMediaDuration
+import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.no_audio_recorded_yet
 import logdate.client.feature.editor.generated.resources.search_transcript
@@ -362,7 +361,7 @@ private fun ExpandedAudioContent(
                     modifier = Modifier.size(32.dp),
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.DeleteOutline,
+                        painter = PlatformIcons.delete(),
                         contentDescription = stringResource(UiRes.string.common_delete),
                         tint = MaterialTheme.colorScheme.error,
                     )

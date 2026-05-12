@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
@@ -106,7 +105,7 @@ internal fun MediaCarouselItem(
         ) {
             Icon(
                 modifier = Modifier.size(24.dp),
-                imageVector = Icons.Default.Delete,
+                painter = PlatformIcons.delete(),
                 contentDescription = stringResource(UiRes.string.common_delete),
                 tint = MaterialTheme.colorScheme.inverseOnSurface,
             )

@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -24,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.timeline.generated.resources.Res
 import logdate.client.feature.timeline.generated.resources.additional_places_count
 import logdate.client.feature.timeline.generated.resources.locations_visited
@@ -142,7 +141,7 @@ private fun IconBadge(modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = Icons.Default.LocationOn,
+            painter = PlatformIcons.location(),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
         )

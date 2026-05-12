@@ -26,12 +26,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Reply
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.IosShare
-import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -56,6 +50,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindPanelUiState
+import app.logdate.ui.platform.PlatformIcons
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import logdate.client.feature.rewind.generated.resources.*
@@ -339,7 +334,7 @@ fun RewindStoryView(
                         },
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Reply,
+                            painter = PlatformIcons.reply(),
                             contentDescription =
                                 stringResource(
                                     if (activePanel.existingResponse != null) {
@@ -361,7 +356,7 @@ fun RewindStoryView(
                         },
                     ) {
                         Icon(
-                            imageVector = Icons.Default.PhotoLibrary,
+                            painter = PlatformIcons.photoLibrary(),
                             contentDescription = stringResource(Res.string.share_rewind_stats),
                             tint = Color.White,
                         )
@@ -376,7 +371,7 @@ fun RewindStoryView(
                         },
                     ) {
                         Icon(
-                            imageVector = Icons.Default.IosShare,
+                            painter = PlatformIcons.share(),
                             contentDescription = stringResource(Res.string.share_rewind_panel),
                             tint = Color.White,
                         )
@@ -391,7 +386,7 @@ fun RewindStoryView(
                         },
                     ) {
                         Icon(
-                            imageVector = Icons.Default.DeleteOutline,
+                            painter = PlatformIcons.delete(),
                             contentDescription = stringResource(Res.string.delete_rewind),
                             tint = Color.White,
                         )
@@ -400,7 +395,7 @@ fun RewindStoryView(
 
                 IconButton(onClick = onExit) {
                     Icon(
-                        imageVector = Icons.Default.Close,
+                        painter = PlatformIcons.close(),
                         contentDescription = stringResource(Res.string.close_rewind),
                         tint = Color.White,
                     )

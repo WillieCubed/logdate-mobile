@@ -19,15 +19,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.FilterAltOff
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ExpandedFullScreenSearchBar
@@ -67,6 +58,7 @@ import app.logdate.client.domain.search.DateRangeFilter
 import app.logdate.client.domain.search.SearchFilters
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.search.UniversalSearchResultItem
 import app.logdate.ui.search.UniversalSearchResultUiState
 import app.logdate.ui.search.rememberSearchHighlightStyle
@@ -241,7 +233,7 @@ fun SearchScreenContent(
                     placeholder = { Text(stringResource(Res.string.search_entries)) },
                     leadingIcon = {
                         Icon(
-                            Icons.Default.Search,
+                            painter = PlatformIcons.search(),
                             contentDescription = stringResource(Res.string.search),
                         )
                     },
@@ -267,7 +259,7 @@ fun SearchScreenContent(
                     leadingIcon = {
                         IconButton(onClick = onGoBack) {
                             Icon(
-                                Icons.AutoMirrored.Default.ArrowBack,
+                                painter = PlatformIcons.back(),
                                 contentDescription = stringResource(UiRes.string.common_go_back),
                             )
                         }
@@ -276,7 +268,7 @@ fun SearchScreenContent(
                         if (textFieldState.text.isNotEmpty()) {
                             IconButton(onClick = { textFieldState.clearText() }) {
                                 Icon(
-                                    Icons.Default.Close,
+                                    painter = PlatformIcons.close(),
                                     contentDescription = stringResource(Res.string.clear_search),
                                 )
                             }
@@ -387,7 +379,7 @@ private fun SearchStateContent(
                         label = { Text(stringResource(Res.string.search_empty_clear_filters)) },
                         leadingIcon = {
                             Icon(
-                                Icons.Default.FilterAltOff,
+                                painter = PlatformIcons.filterOff(),
                                 contentDescription = null,
                                 modifier = Modifier.size(AssistChipDefaults.IconSize),
                             )
@@ -487,7 +479,7 @@ private fun ResultActionsSheet(
             ListItem(
                 headlineContent = { Text(stringResource(Res.string.search_action_open_day)) },
                 leadingContent = {
-                    Icon(Icons.Default.CalendarToday, contentDescription = null)
+                    Icon(painter = PlatformIcons.calendar(), contentDescription = null)
                 },
                 modifier = Modifier.clickable { onOpenDay() },
             )
@@ -495,7 +487,7 @@ private fun ResultActionsSheet(
                 ListItem(
                     headlineContent = { Text(stringResource(Res.string.search_action_copy_text)) },
                     leadingContent = {
-                        Icon(Icons.Default.ContentCopy, contentDescription = null)
+                        Icon(painter = PlatformIcons.copy(), contentDescription = null)
                     },
                     modifier = Modifier.clickable { onCopyText() },
                 )
@@ -504,7 +496,7 @@ private fun ResultActionsSheet(
                 ListItem(
                     headlineContent = { Text(stringResource(Res.string.search_action_share)) },
                     leadingContent = {
-                        Icon(Icons.Default.Share, contentDescription = null)
+                        Icon(painter = PlatformIcons.share(), contentDescription = null)
                     },
                     modifier = Modifier.clickable { onShare() },
                 )
@@ -575,7 +567,7 @@ private fun FilterChipRow(
                     label = { Text(stringResource(Res.string.search_filter_clear)) },
                     leadingIcon = {
                         Icon(
-                            Icons.Default.FilterAltOff,
+                            painter = PlatformIcons.filterOff(),
                             contentDescription = null,
                             modifier = Modifier.size(AssistChipDefaults.IconSize),
                         )
@@ -659,12 +651,12 @@ private fun RecentSearchesList(
                 ListItem(
                     headlineContent = { Text(query) },
                     leadingContent = {
-                        Icon(Icons.Default.History, contentDescription = null)
+                        Icon(painter = PlatformIcons.history(), contentDescription = null)
                     },
                     trailingContent = {
                         IconButton(onClick = { onRemoveRecent(query) }) {
                             Icon(
-                                Icons.Default.Close,
+                                painter = PlatformIcons.close(),
                                 contentDescription =
                                     stringResource(Res.string.search_recent_remove),
                             )

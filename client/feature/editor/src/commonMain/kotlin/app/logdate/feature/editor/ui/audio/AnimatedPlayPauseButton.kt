@@ -11,8 +11,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonColors
@@ -27,6 +25,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.PlaybackState
 import app.logdate.feature.editor.ui.editor.RecordingState
+import app.logdate.ui.platform.PlatformIcons
 
 /**
  * A button that animates between play/pause/record icons and state-appropriate shapes.
@@ -144,7 +143,7 @@ fun AnimatedPlayPauseButton(
                     label = "MicIconAnimation",
                 ) { _ ->
                     Icon(
-                        imageVector = Icons.Rounded.Mic,
+                        painter = PlatformIcons.mic(),
                         contentDescription = null, // Handled by button semantics
                         modifier = Modifier.size(iconSize),
                     )

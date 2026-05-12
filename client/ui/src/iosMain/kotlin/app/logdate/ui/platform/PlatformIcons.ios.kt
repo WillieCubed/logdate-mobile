@@ -4,26 +4,55 @@ package app.logdate.ui.platform
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.Note
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Drafts
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.FilterAltOff
+import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PeopleAlt
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlayCircleFilled
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.SyncProblem
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Today
+import androidx.compose.material.icons.filled.VideoFile
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -126,4 +155,66 @@ actual object PlatformIcons {
     @Composable actual fun timeline(): Painter = rememberSfSymbol("calendar.day.timeline.left", Icons.Filled.Today)
 
     @Composable actual fun location(): Painter = rememberSfSymbol("location.fill", Icons.Filled.LocationOn)
+
+    @Composable actual fun drafts(): Painter = rememberSfSymbol("doc.text", Icons.Filled.Drafts)
+
+    @Composable actual fun save(): Painter = rememberSfSymbol("checkmark", Icons.Filled.Save)
+
+    @Composable actual fun text(): Painter = rememberSfSymbol("textformat", Icons.Filled.TextFields)
+
+    @Composable actual fun audioFile(): Painter = rememberSfSymbol("waveform", Icons.Filled.AudioFile)
+
+    @Composable actual fun videoFile(): Painter = rememberSfSymbol("film", Icons.Filled.VideoFile)
+
+    @Composable actual fun camera(): Painter = rememberSfSymbol("camera.fill", Icons.Filled.Camera)
+
+    @Composable actual fun mic(): Painter = rememberSfSymbol("mic.fill", Icons.Filled.Mic)
+
+    @Composable actual fun photoLibrary(): Painter = rememberSfSymbol("photo.on.rectangle", Icons.Filled.PhotoLibrary)
+
+    @Composable actual fun addPhoto(): Painter = rememberSfSymbol("photo.badge.plus", Icons.Outlined.AddPhotoAlternate)
+
+    @Composable actual fun expandMore(): Painter = rememberSfSymbol("chevron.down", Icons.Filled.ExpandMore)
+
+    @Composable actual fun locationOff(): Painter = rememberSfSymbol("location.slash", Icons.Filled.LocationOff)
+
+    @Composable actual fun stop(): Painter = rememberSfSymbol("stop.fill", Icons.Filled.Stop)
+
+    @Composable actual fun forward10(): Painter = rememberSfSymbol("goforward.10", Icons.Filled.Forward10)
+
+    @Composable actual fun replay10(): Painter = rememberSfSymbol("gobackward.10", Icons.Filled.Replay10)
+
+    @Composable actual fun refresh(): Painter = rememberSfSymbol("arrow.clockwise", Icons.Filled.Refresh)
+
+    @Composable actual fun error(): Painter = rememberSfSymbol("exclamationmark.triangle.fill", Icons.Filled.Error)
+
+    @Composable actual fun forward(): Painter = rememberSfSymbol("chevron.right", Icons.AutoMirrored.Filled.ArrowForward)
+
+    @Composable actual fun playCircle(): Painter = rememberSfSymbol("play.circle.fill", Icons.Filled.PlayCircleFilled)
+
+    @Composable actual fun openInNew(): Painter = rememberSfSymbol("arrow.up.right.square", Icons.AutoMirrored.Filled.OpenInNew)
+
+    @Composable actual fun people(): Painter = rememberSfSymbol("person.2.fill", Icons.Filled.PeopleAlt)
+
+    @Composable actual fun note(): Painter = rememberSfSymbol("note.text", Icons.AutoMirrored.Filled.Note)
+
+    @Composable actual fun video(): Painter = rememberSfSymbol("video.fill", Icons.Filled.Videocam)
+
+    @Composable actual fun calendar(): Painter = rememberSfSymbol("calendar", Icons.Filled.CalendarMonth)
+
+    @Composable actual fun reply(): Painter = rememberSfSymbol("arrowshape.turn.up.left.fill", Icons.AutoMirrored.Filled.Reply)
+
+    @Composable actual fun filterOff(): Painter = rememberSfSymbol("line.3.horizontal.decrease.circle.slash", Icons.Filled.FilterAltOff)
+
+    @Composable actual fun copy(): Painter = rememberSfSymbol("doc.on.doc", Icons.Filled.ContentCopy)
+
+    @Composable actual fun syncProblem(): Painter =
+        rememberSfSymbol(
+            "exclamationmark.arrow.triangle.2.circlepath",
+            Icons.Filled.SyncProblem,
+        )
+
+    @Composable actual fun chevronRight(): Painter = rememberSfSymbol("chevron.right", Icons.AutoMirrored.Filled.KeyboardArrowRight)
+
+    @Composable actual fun checkCircle(): Painter = rememberSfSymbol("checkmark.circle.fill", Icons.Filled.CheckCircle)
 }

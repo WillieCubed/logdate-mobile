@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import coil3.compose.AsyncImage
 
@@ -81,7 +80,7 @@ private fun EmptyCoverState() {
         modifier = Modifier.padding(Spacing.lg),
     ) {
         Icon(
-            imageVector = Icons.Outlined.Image,
+            painter = PlatformIcons.library(),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )

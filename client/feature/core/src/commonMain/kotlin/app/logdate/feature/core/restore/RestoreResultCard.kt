@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -27,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.restore.IntegrityCategory
 import app.logdate.feature.core.common.DataStatsGrid
 import app.logdate.feature.core.common.OperationFailureCard
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
 import logdate.client.feature.core.generated.resources.Res
@@ -55,7 +53,7 @@ internal fun RestoreSuccessCard(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(
-            imageVector = Icons.Rounded.CheckCircle,
+            painter = PlatformIcons.checkCircle(),
             contentDescription = null,
             modifier = Modifier.size(40.dp),
             tint = MaterialTheme.colorScheme.primary,
@@ -187,7 +185,7 @@ private fun RestoreWarningsSection(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Warning,
+                    painter = PlatformIcons.error(),
                     contentDescription = null,
                     modifier = Modifier.size(20.dp),
                     tint = MaterialTheme.colorScheme.onTertiaryContainer,

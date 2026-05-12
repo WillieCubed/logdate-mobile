@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -26,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
@@ -108,7 +107,7 @@ fun LibraryScreenContent(
                         label = { Text("Postcards") },
                         trailingIcon = {
                             Icon(
-                                Icons.AutoMirrored.Filled.ArrowForward,
+                                painter = PlatformIcons.forward(),
                                 contentDescription = null,
                             )
                         },

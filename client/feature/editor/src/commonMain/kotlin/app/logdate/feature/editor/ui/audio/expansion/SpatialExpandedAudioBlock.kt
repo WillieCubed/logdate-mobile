@@ -14,9 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +30,7 @@ import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
 import app.logdate.feature.editor.ui.audio.waveform.BezierAudioWaveform
 import app.logdate.feature.editor.ui.formatMediaDuration
+import app.logdate.ui.platform.PlatformIcons
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
@@ -116,7 +114,7 @@ fun SpatialExpandedAudioBlock(
                     // Play/pause button
                     IconButton(onClick = onPlayPause) {
                         Icon(
-                            imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            painter = if (isPlaying) PlatformIcons.pause() else PlatformIcons.play(),
                             contentDescription = if (isPlaying) "Pause" else "Play",
                             tint = Color(palette.accentColor),
                             modifier = Modifier.size(32.dp),

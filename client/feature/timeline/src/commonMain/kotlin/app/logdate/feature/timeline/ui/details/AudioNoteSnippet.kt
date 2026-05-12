@@ -9,10 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -34,6 +30,7 @@ import app.logdate.ui.audio.AudioPlaybackDisplayInfo
 import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.audio.LocalTranscriptionState
 import app.logdate.ui.common.noteDragSource
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.util.toReadableDateTimeShort
@@ -142,7 +139,7 @@ fun AudioNoteSnippet(
                         modifier = Modifier.size(40.dp),
                     ) {
                         Icon(
-                            imageVector = if (isThisPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            painter = if (isThisPlaying) PlatformIcons.pause() else PlatformIcons.play(),
                             contentDescription = if (isThisPlaying) "Pause" else "Play",
                             modifier = Modifier.size(24.dp),
                         )
@@ -179,7 +176,7 @@ fun AudioNoteSnippet(
                             modifier = Modifier.size(32.dp),
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.Stop,
+                                painter = PlatformIcons.stop(),
                                 contentDescription = stringResource(Res.string.stop),
                                 modifier = Modifier.size(20.dp),
                             )

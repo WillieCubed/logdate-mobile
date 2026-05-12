@@ -17,13 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Note
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.PeopleAlt
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -42,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.ui.common.noteDragSource
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.TimelineLine
 import app.logdate.util.toReadableDateShort
@@ -168,7 +162,7 @@ private fun EntryDropdownMenu(
                 onOpenInNewWindow()
             },
             leadingIcon = {
-                Icon(imageVector = Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null)
+                Icon(painter = PlatformIcons.openInNew(), contentDescription = null)
             },
         )
         DropdownMenuItem(
@@ -177,7 +171,7 @@ private fun EntryDropdownMenu(
             },
             onClick = onDelete,
             leadingIcon = {
-                Icon(imageVector = Icons.Default.Delete, contentDescription = null)
+                Icon(painter = PlatformIcons.delete(), contentDescription = null)
             },
         )
     }
@@ -206,7 +200,7 @@ private fun TimelineItemMetadataBlock(
                         metadata.peopleSeen,
                     ),
                 icon = {
-                    Icon(imageVector = Icons.Outlined.PeopleAlt, contentDescription = stringResource(Res.string.people))
+                    Icon(painter = PlatformIcons.people(), contentDescription = stringResource(Res.string.people))
                 },
             )
         }
@@ -218,7 +212,7 @@ private fun TimelineItemMetadataBlock(
                         metadata.placesVisited,
                     ),
                 icon = {
-                    Icon(imageVector = Icons.Default.LocationOn, contentDescription = stringResource(Res.string.places))
+                    Icon(painter = PlatformIcons.location(), contentDescription = stringResource(Res.string.places))
                 },
             )
         }
@@ -231,7 +225,7 @@ private fun TimelineItemMetadataBlock(
                     ),
                 icon = {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Default.Note,
+                        painter = PlatformIcons.note(),
                         contentDescription = stringResource(Res.string.notes),
                     )
                 },
@@ -325,7 +319,7 @@ private fun TimelineContentItem(
                         },
                     )
                     IconButton(onClick = { showOptions = true }) {
-                        Icon(imageVector = Icons.Default.MoreVert, contentDescription = stringResource(Res.string.more))
+                        Icon(painter = PlatformIcons.more(), contentDescription = stringResource(Res.string.more))
                     }
                 }
             }

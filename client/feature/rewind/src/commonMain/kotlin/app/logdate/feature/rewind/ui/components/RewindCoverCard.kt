@@ -10,11 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CameraAlt
-import androidx.compose.material.icons.outlined.EditNote
-import androidx.compose.material.icons.outlined.People
-import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.overview.RewindPreviewUiState
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.formatDateLocalized
 import app.logdate.util.toReadableDateShort
@@ -177,22 +173,22 @@ private fun RewindStatChipsRow(
     ) {
         if (rewind.entryCount > 0) {
             RewindStatChip(label = "${rewind.entryCount}", color = chipColor) {
-                Icon(Icons.Outlined.EditNote, contentDescription = null, modifier = Modifier.size(14.dp))
+                Icon(painter = PlatformIcons.note(), contentDescription = null, modifier = Modifier.size(14.dp))
             }
         }
         if (rewind.photoCount > 0) {
             RewindStatChip(label = "${rewind.photoCount}", color = chipColor) {
-                Icon(Icons.Outlined.CameraAlt, contentDescription = null, modifier = Modifier.size(14.dp))
+                Icon(painter = PlatformIcons.camera(), contentDescription = null, modifier = Modifier.size(14.dp))
             }
         }
         if (rewind.peopleCount > 0) {
             RewindStatChip(label = "${rewind.peopleCount}", color = chipColor) {
-                Icon(Icons.Outlined.People, contentDescription = null, modifier = Modifier.size(14.dp))
+                Icon(painter = PlatformIcons.people(), contentDescription = null, modifier = Modifier.size(14.dp))
             }
         }
         if (rewind.primaryLocation != null) {
             RewindStatChip(label = rewind.primaryLocation, color = chipColor) {
-                Icon(Icons.Outlined.Place, contentDescription = null, modifier = Modifier.size(14.dp))
+                Icon(painter = PlatformIcons.location(), contentDescription = null, modifier = Modifier.size(14.dp))
             }
         }
     }

@@ -54,4 +54,62 @@ expect object PlatformIcons {
     @Composable fun timeline(): Painter
 
     @Composable fun location(): Painter
+
+    @Composable fun drafts(): Painter
+
+    @Composable fun save(): Painter
+
+    @Composable fun text(): Painter
+
+    @Composable fun audioFile(): Painter
+
+    @Composable fun videoFile(): Painter
+
+    @Composable fun camera(): Painter
+
+    @Composable fun mic(): Painter
+
+    @Composable fun photoLibrary(): Painter
+
+    @Composable fun addPhoto(): Painter
+
+    @Composable fun expandMore(): Painter
+
+    @Composable fun locationOff(): Painter
+
+    @Composable fun stop(): Painter
+
+    @Composable fun forward10(): Painter
+
+    @Composable fun replay10(): Painter
+
+    @Composable fun refresh(): Painter
+
+    @Composable fun error(): Painter
+
+    @Composable fun forward(): Painter
+
+    @Composable fun playCircle(): Painter
+
+    @Composable fun openInNew(): Painter
+
+    @Composable fun people(): Painter
+
+    @Composable fun note(): Painter
+
+    @Composable fun video(): Painter
+
+    @Composable fun calendar(): Painter
+
+    @Composable fun reply(): Painter
+
+    @Composable fun filterOff(): Painter
+
+    @Composable fun copy(): Painter
+
+    @Composable fun syncProblem(): Painter
+
+    @Composable fun chevronRight(): Painter
+
+    @Composable fun checkCircle(): Painter
 }

@@ -18,9 +18,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AddPhotoAlternate
-import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -36,6 +33,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.client.media.MediaObject
+import app.logdate.ui.platform.PlatformIcons
 import coil3.compose.AsyncImage
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.allow_access
@@ -168,7 +166,7 @@ internal fun ImagePickerBrowser(
                     ImagePickerMessageCard(
                         icon = {
                             Icon(
-                                imageVector = Icons.Outlined.PhotoLibrary,
+                                painter = PlatformIcons.photoLibrary(),
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(28.dp),
@@ -204,7 +202,7 @@ internal fun ImagePickerBrowser(
                     ImagePickerMessageCard(
                         icon = {
                             Icon(
-                                imageVector = Icons.Outlined.AddPhotoAlternate,
+                                painter = PlatformIcons.addPhoto(),
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(28.dp),
@@ -220,7 +218,7 @@ internal fun ImagePickerBrowser(
                     ImagePickerMessageCard(
                         icon = {
                             Icon(
-                                imageVector = Icons.Outlined.PhotoLibrary,
+                                painter = PlatformIcons.photoLibrary(),
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(28.dp),
@@ -288,7 +286,7 @@ private fun ImagePickerHeader(
 
         OutlinedButton(onClick = onBrowseLibrary) {
             Icon(
-                imageVector = Icons.Outlined.AddPhotoAlternate,
+                painter = PlatformIcons.addPhoto(),
                 contentDescription = null,
                 modifier = Modifier.padding(end = 8.dp),
             )

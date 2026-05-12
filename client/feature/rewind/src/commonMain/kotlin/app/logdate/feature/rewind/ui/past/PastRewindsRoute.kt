@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -17,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.rewind.generated.resources.*
 import logdate.client.feature.rewind.generated.resources.Res
 import logdate.client.ui.generated.resources.common_back
@@ -37,7 +36,7 @@ fun PastRewindsScreen(onGoBack: () -> Unit) {
                 title = { Text(stringResource(Res.string.past_rewind)) },
                 navigationIcon = {
                     IconButton(onClick = { onGoBack() }) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
+                        Icon(painter = PlatformIcons.back(), contentDescription = stringResource(UiRes.string.common_back))
                     }
                 },
             )

@@ -24,10 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Forward10
-import androidx.compose.material.icons.rounded.Replay10
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,6 +51,7 @@ import app.logdate.feature.editor.audio.model.AudioSegment
 import app.logdate.feature.editor.ui.audio.AnimatedPlayPauseButton
 import app.logdate.feature.editor.ui.audio.waveform.BezierAudioWaveform
 import app.logdate.feature.editor.ui.formatMediaDuration
+import app.logdate.ui.platform.PlatformIcons
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.number
@@ -145,7 +142,7 @@ fun ImmersiveAudioScreen(
                     .padding(16.dp),
         ) {
             Icon(
-                imageVector = Icons.Rounded.Close,
+                painter = PlatformIcons.close(),
                 contentDescription = stringResource(Res.string.close),
                 tint = onBackgroundColor.copy(alpha = 0.8f),
             )
@@ -278,7 +275,7 @@ fun ImmersiveAudioScreen(
                             modifier = Modifier.size(48.dp),
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.Replay10,
+                                painter = PlatformIcons.replay10(),
                                 contentDescription = stringResource(Res.string.skip_back_10_seconds),
                                 modifier = Modifier.size(28.dp),
                             )
@@ -306,7 +303,7 @@ fun ImmersiveAudioScreen(
                             modifier = Modifier.size(48.dp),
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.Forward10,
+                                painter = PlatformIcons.forward10(),
                                 contentDescription = stringResource(Res.string.skip_forward_10_seconds),
                                 modifier = Modifier.size(28.dp),
                             )

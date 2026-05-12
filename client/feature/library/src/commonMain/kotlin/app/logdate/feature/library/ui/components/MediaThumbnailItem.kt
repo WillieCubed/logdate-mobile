@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayCircleFilled
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -41,6 +39,7 @@ import app.logdate.ui.common.ContextMenuItem
 import app.logdate.ui.common.focusableWithRing
 import app.logdate.ui.common.noteDragSource
 import app.logdate.ui.common.transitions.TransitionKeys
+import app.logdate.ui.platform.PlatformIcons
 import coil3.compose.AsyncImage
 import kotlin.uuid.Uuid
 
@@ -121,7 +120,7 @@ fun MediaThumbnailItem(
             )
             if (item.isVideo) {
                 Icon(
-                    imageVector = Icons.Filled.PlayCircleFilled,
+                    painter = PlatformIcons.playCircle(),
                     contentDescription = "Video",
                     tint = Color.White,
                     modifier =

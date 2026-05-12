@@ -23,8 +23,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -62,6 +60,8 @@ import app.logdate.feature.rewind.ui.overview.RewindHistoryUiState
 import app.logdate.feature.rewind.ui.overview.RewindOverviewScreenUiState
 import app.logdate.feature.rewind.ui.overview.RewindPreviewUiState
 import app.logdate.ui.common.AspectRatios
+import app.logdate.ui.platform.PlatformIcons
+import app.logdate.ui.platform.rememberLogDateHaptics
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.getLocaleFirstDayOfWeek
 import kotlinx.coroutines.delay
@@ -527,7 +527,7 @@ fun NextCardIndicator(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
+                    painter = PlatformIcons.expandMore(),
                     contentDescription = stringResource(Res.string.more_rewinds_below),
                 )
             }
