@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalSharedTransitionApi::class)
+@file:OptIn(ExperimentalSharedTransitionApi::class, FlowPreview::class)
 
 package app.logdate.desktop
 
@@ -13,11 +13,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.KeyShortcut
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
@@ -28,11 +31,15 @@ import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import org.koin.compose.viewmodel.koinViewModel
 
 private const val DEFAULT_ENTRY_TITLE = "New Entry"
+private val DEFAULT_EDITOR_WINDOW_SIZE = DpSize(880.dp, 640.dp)
+private const val EDITOR_PERSIST_DEBOUNCE_MS = 300L
 
 /**
  * Soft cap on the derived window title so a long first sentence does not blow
@@ -54,11 +61,30 @@ internal fun EntryEditorWindow(
     state: EntryEditorWindowState = rememberEntryEditorWindowState(appState),
     viewModel: EntryEditorViewModel = koinViewModel(),
 ) {
-    val windowState = rememberWindowState()
+    val preferences = remember { DesktopWindowPreferences() }
+    val windowState =
+        rememberWindowState(
+            size = preferences.readEditorWindowSize(DEFAULT_EDITOR_WINDOW_SIZE),
+            position = preferences.readEditorWindowPosition(),
+        )
     val editorState by viewModel.editorState.collectAsState()
 
     LaunchedEffect(state.isFullscreen) {
         windowState.placement = if (state.isFullscreen) WindowPlacement.Fullscreen else WindowPlacement.Floating
+    }
+
+    LaunchedEffect(Unit) {
+        snapshotFlow { windowState.size }
+            .distinctUntilChanged()
+            .debounce(EDITOR_PERSIST_DEBOUNCE_MS)
+            .collect { size -> preferences.writeEditorWindowSize(size) }
+    }
+
+    LaunchedEffect(Unit) {
+        snapshotFlow { windowState.position }
+            .distinctUntilChanged()
+            .debounce(EDITOR_PERSIST_DEBOUNCE_MS)
+            .collect { position -> preferences.writeEditorWindowPosition(position) }
     }
 
     LaunchedEffect(Unit) {
