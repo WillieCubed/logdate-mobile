@@ -18,6 +18,14 @@
     <string name="rewind_settings_include_screenshots_helper">Off by default. Turn on to let saved screen captures appear in your Rewinds alongside your real photos.</string>
     <string name="rewind_upgrade_chip_message">Your Rewind is built locally.</string>
     <string name="rewind_upgrade_chip_action">Upgrade for AI-written stories</string>
+    <string name="first_rewind_onboarding_title">Welcome to Rewind</string>
+    <string name="first_rewind_onboarding_cadence_heading">Every week, a story</string>
+    <string name="first_rewind_onboarding_cadence_body">Every Sunday, LogDate weaves your week\'s entries and photos into a short story you can replay.</string>
+    <string name="first_rewind_onboarding_share_heading">Share what stood out</string>
+    <string name="first_rewind_onboarding_share_body">Tap any moment in a Rewind to share it as a card. The rest stays on your phone.</string>
+    <string name="first_rewind_onboarding_strictness_heading">Tune the photo picker</string>
+    <string name="first_rewind_onboarding_strictness_body">Choose how aggressively borderline shots get filtered from Settings. Strict for the best of the best, Lenient to keep more.</string>
+    <string name="first_rewind_onboarding_got_it">Got it</string>
 
     <!-- Annual rewind -->
     <string name="annual_rewind_generate">Create your %1$d Year in Review</string>
