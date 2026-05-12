@@ -79,6 +79,7 @@ import app.logdate.client.domain.rewind.GetRewindUseCase
 import app.logdate.client.domain.rewind.GetWeekRewindUseCase
 import app.logdate.client.domain.rewind.MarkRewindViewedUseCase
 import app.logdate.client.domain.rewind.ObserveReflectionPromptResponsesUseCase
+import app.logdate.client.domain.rewind.RegenerateRewindUseCase
 import app.logdate.client.domain.rewind.SaveReflectionPromptResponseUseCase
 import app.logdate.client.domain.search.ObserveRecentSearchesUseCase
 import app.logdate.client.domain.search.SearchEntriesUseCase
@@ -180,6 +181,7 @@ val domainModule: Module =
 
         // Create the GenerateBasicRewindUseCase with all its dependencies
         factory { GenerateBasicRewindUseCase(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+        factory { RegenerateRewindUseCase(get(), get()) }
 
         // Timeline
         factory { GetJournalMembershipUseCase(get()) }
