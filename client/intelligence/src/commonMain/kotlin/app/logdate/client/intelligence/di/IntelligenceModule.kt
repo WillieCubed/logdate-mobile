@@ -63,13 +63,14 @@ val intelligenceModule: Module =
         // Rewind generation strategies. Local first (no LLM dependency), then the LLM
         // strategies that compose with local fallback. The selector picks based on
         // [RewindAIAvailability] (bound by the domain module).
-        single { LocalRewindStrategy(curator = get(), sequencer = get()) }
+        single { LocalRewindStrategy(curator = get(), sequencer = get(), configProvider = get()) }
         single {
             FullLLMRewindStrategy(
                 narrativeSynthesizer = get(),
                 curator = get(),
                 sequencer = get(),
                 localFallback = get(),
+                configProvider = get(),
             )
         }
         single { QuotesOnlyLLMRewindStrategy(localFallback = get()) }

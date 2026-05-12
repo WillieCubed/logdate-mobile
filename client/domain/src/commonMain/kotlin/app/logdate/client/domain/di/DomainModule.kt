@@ -79,6 +79,7 @@ import app.logdate.client.domain.rewind.GetRewindUseCase
 import app.logdate.client.domain.rewind.GetWeekRewindUseCase
 import app.logdate.client.domain.rewind.MarkRewindViewedUseCase
 import app.logdate.client.domain.rewind.ObserveReflectionPromptResponsesUseCase
+import app.logdate.client.domain.rewind.PreferencesCurationConfigProvider
 import app.logdate.client.domain.rewind.RegenerateRewindUseCase
 import app.logdate.client.domain.rewind.SaveReflectionPromptResponseUseCase
 import app.logdate.client.domain.search.ObserveRecentSearchesUseCase
@@ -100,6 +101,7 @@ import app.logdate.client.domain.timeline.GroupNotesByDayBoundsUseCase
 import app.logdate.client.domain.timeline.InferMomentsUseCase
 import app.logdate.client.domain.timeline.SummarizeJournalEntriesUseCase
 import app.logdate.client.intelligence.availability.RewindAIAvailability
+import app.logdate.client.intelligence.curation.CurationConfigProvider
 import app.logdate.client.intelligence.events.EventNamingExtractor
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -175,6 +177,7 @@ val domainModule: Module =
             val getEntitlement: GetCurrentEntitlementUseCase = get()
             EntitlementRewindAIAvailability(getEntitlement::invoke)
         }
+        factory<CurationConfigProvider> { PreferencesCurationConfigProvider(get()) }
 
         // Media indexing
         factory { IndexMediaForPeriodUseCase(get(), get()) }

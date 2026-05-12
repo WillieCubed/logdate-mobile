@@ -2,7 +2,7 @@ package app.logdate.client.intelligence.rewind.strategy
 
 import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.availability.RewindAITier
-import app.logdate.client.intelligence.curation.CurationConfig
+import app.logdate.client.intelligence.curation.CurationConfigProvider
 import app.logdate.client.intelligence.curation.RewindMediaCurator
 import app.logdate.client.intelligence.narrative.RewindSequencer
 import app.logdate.client.intelligence.narrative.WeekNarrativeSynthesizer
@@ -28,7 +28,7 @@ class FullLLMRewindStrategy(
     private val curator: RewindMediaCurator,
     private val sequencer: RewindSequencer,
     private val localFallback: LocalRewindStrategy,
-    private val curationConfig: CurationConfig = CurationConfig(),
+    private val configProvider: CurationConfigProvider = CurationConfigProvider.Default,
 ) : RewindGenerationStrategy {
     override val name: String = STRATEGY_NAME
 
@@ -68,7 +68,7 @@ class FullLLMRewindStrategy(
                 locationHistory = input.locationHistory,
                 periodStart = input.periodStart,
                 periodEnd = input.periodEnd,
-                config = curationConfig,
+                config = configProvider.get(),
             )
 
         val activities = deriveActivities(narrative.themes)

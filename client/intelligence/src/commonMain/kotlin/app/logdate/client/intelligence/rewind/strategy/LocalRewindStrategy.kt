@@ -2,6 +2,7 @@ package app.logdate.client.intelligence.rewind.strategy
 
 import app.logdate.client.intelligence.availability.RewindAITier
 import app.logdate.client.intelligence.curation.CurationConfig
+import app.logdate.client.intelligence.curation.CurationConfigProvider
 import app.logdate.client.intelligence.curation.CurationResult
 import app.logdate.client.intelligence.curation.RewindMediaCurator
 import app.logdate.client.intelligence.narrative.RewindSequencer
@@ -37,11 +38,17 @@ class LocalRewindStrategy(
     private val themeExtractor: LocalThemeExtractor = LocalThemeExtractor(),
     private val quoteSelector: LocalQuoteSelector = LocalQuoteSelector(),
     private val storyBeatDetector: LocalStoryBeatDetector = LocalStoryBeatDetector(),
+    private val configProvider: CurationConfigProvider = CurationConfigProvider.Default,
 ) : RewindGenerationStrategy {
     override val name: String = STRATEGY_NAME
 
     override suspend fun produce(input: RewindInput): RewindStrategyOutput {
         val narrative = buildLocalNarrative(input)
+        // Bump the per-beat cap for local Rewinds — without real beat detection we have
+        // only one synthetic beat, and shipping 4 photos for a whole week would feel
+        // anemic. The global cap stays. The user's screenshot-inclusion choice still
+        // applies, however, because the hard filter runs the same way.
+        val userConfig = configProvider.get()
         val curation =
             curator.curate(
                 allMedia = input.media,
@@ -51,10 +58,7 @@ class LocalRewindStrategy(
                 locationHistory = input.locationHistory,
                 periodStart = input.periodStart,
                 periodEnd = input.periodEnd,
-                // Bump the per-beat cap for local Rewinds — without real beat detection
-                // we have only one synthetic beat, and shipping 4 photos for a whole
-                // week would feel anemic. The global cap stays.
-                config = LOCAL_CURATION_CONFIG,
+                config = LOCAL_CURATION_CONFIG.copy(excludeScreenshots = userConfig.excludeScreenshots),
             )
 
         val mapPoints = downsampleLocationPath(input.locationHistory)
