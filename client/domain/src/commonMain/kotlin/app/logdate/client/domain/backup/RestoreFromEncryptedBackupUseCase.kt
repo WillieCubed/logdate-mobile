@@ -3,9 +3,12 @@ package app.logdate.client.domain.backup
 import app.logdate.client.device.crypto.CryptoManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import okio.Buffer
 import okio.FileSystem
 import okio.Path
 import okio.buffer
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Restores user data from an encrypted backup file.
@@ -27,7 +30,7 @@ class RestoreFromEncryptedBackupUseCase(
      * @param recoveryPhrase The user's 12-word master secret.
      * @return A [Flow] emitting the current state of the restore process.
      */
-    @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+    @OptIn(ExperimentalEncodingApi::class)
     operator fun invoke(
         backupFile: Path,
         recoveryPhrase: List<String>,
@@ -39,11 +42,8 @@ class RestoreFromEncryptedBackupUseCase(
                 emit(RestoreProgress.DerivingKeys)
                 val masterKey = deriveKeys(recoveryPhrase)
 
-                // In a production implementation, the IV is read from the BackupManifest header.
-                val iv = ByteArray(12)
-
                 emit(RestoreProgress.Decrypting)
-                performRestore(backupFile, masterKey, iv)
+                performRestore(backupFile, masterKey)
 
                 emit(RestoreProgress.Completed)
             } catch (e: Exception) {
@@ -62,16 +62,33 @@ class RestoreFromEncryptedBackupUseCase(
     private fun performRestore(
         backupFile: Path,
         masterKey: ByteArray,
-        iv: ByteArray,
     ) {
-        val fileSource = fileSystem.source(backupFile)
-        val decryptedSource = cryptoManager.decryptSource(fileSource, masterKey, iv)
-        val bufferedSource = decryptedSource.buffer()
+        readPlaintext(backupFile, masterKey).close()
+    }
 
-        // Final implementation must iterate through the ZIP entries and perform
-        // database writes within a transaction to maintain integrity.
+    @OptIn(ExperimentalEncodingApi::class)
+    internal suspend fun readPlaintextForTest(
+        backupFile: Path,
+        recoveryPhrase: List<String>,
+    ): Buffer = readPlaintext(backupFile, deriveKeys(recoveryPhrase))
 
-        bufferedSource.close()
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun readPlaintext(
+        backupFile: Path,
+        masterKey: ByteArray,
+    ): Buffer {
+        val fileSource = fileSystem.source(backupFile).buffer()
+        val header = EncryptedBackupFileFormat.readHeader(fileSource)
+        val iv = Base64.decode(header.manifest.encryption.iv)
+        val decryptedSource = cryptoManager.decryptSource(fileSource, masterKey, iv).buffer()
+
+        return Buffer().also { plaintext ->
+            try {
+                plaintext.writeAll(decryptedSource)
+            } finally {
+                decryptedSource.close()
+            }
+        }
     }
 }
 

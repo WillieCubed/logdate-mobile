@@ -31,6 +31,8 @@ class CreateEncryptedBackupUseCase(
     private val cryptoManager: CryptoManager,
     private val fileSystem: FileSystem,
     private val clock: Clock = Clock.System,
+    private val deviceIdProvider: () -> String = { "local-device" },
+    private val userIdProvider: () -> String = { "local-user" },
 ) {
     /**
      * Executes the backup operation and streams progress updates.
@@ -85,8 +87,8 @@ class CreateEncryptedBackupUseCase(
     ): BackupManifest =
         BackupManifest(
             timestamp = clock.now(),
-            deviceId = "device-id-placeholder",
-            userId = "user-id-placeholder",
+            deviceId = deviceIdProvider().ifBlank { "local-device" },
+            userId = userIdProvider().ifBlank { "local-user" },
             encryption =
                 BackupEncryptionMetadata(
                     salt = Base64.encode(salt),
@@ -103,14 +105,17 @@ class CreateEncryptedBackupUseCase(
         manifest: BackupManifest,
         contentWriter: (BufferedSink) -> Unit,
     ) {
-        val fileSink = fileSystem.sink(outputPath)
+        val fileSink = fileSystem.sink(outputPath).buffer()
+        EncryptedBackupFileFormat.writeHeader(fileSink, manifest)
+        fileSink.flush()
+
         val encryptedSink = cryptoManager.encryptSink(fileSink, keys.masterKey, keys.iv)
-        val bufferedSink = encryptedSink.buffer()
+        val encryptedBufferedSink = encryptedSink.buffer()
 
-        contentWriter(bufferedSink)
+        contentWriter(encryptedBufferedSink)
 
-        // Closing the buffer flushes the cipher and appends the GCM authentication tag.
-        bufferedSink.close()
+        // Closing the buffer flushes the cipher, appends the GCM authentication tag, and closes the file.
+        encryptedBufferedSink.close()
     }
 
     /**

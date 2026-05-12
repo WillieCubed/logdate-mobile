@@ -2,9 +2,11 @@ package app.logdate.client.domain.backup
 
 import app.logdate.client.device.crypto.CryptoManager
 import app.logdate.client.domain.export.ExportUserDataUseCase
+import app.logdate.shared.model.backup.BackupManifest
 import io.mockk.mockk
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
 import okio.CipherSink
 import okio.CipherSource
 import okio.Path.Companion.toPath
@@ -13,6 +15,7 @@ import okio.Source
 import okio.buffer
 import okio.fakefilesystem.FakeFileSystem
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -39,6 +42,14 @@ class BackupIntegrityTest {
             exportUserDataUseCase = mockk<ExportUserDataUseCase>(relaxed = true),
             cryptoManager = cryptoManager,
             fileSystem = fileSystem,
+            deviceIdProvider = { "test-device" },
+            userIdProvider = { "test-user" },
+        )
+
+    private val restoreBackup =
+        RestoreFromEncryptedBackupUseCase(
+            cryptoManager = cryptoManager,
+            fileSystem = fileSystem,
         )
 
     @Test
@@ -52,7 +63,33 @@ class BackupIntegrityTest {
         }
 
     @Test
-    fun `e2e encryption and decryption preserves data integrity`() =
+    fun `encrypted backup writes manifest header with real identity and stored iv`() =
+        runBlocking {
+            val backupPath = "/backup.enc".toPath()
+            val recoveryPhrase =
+                listOf("witch", "collapse", "practice", "feed", "shame", "open", "despair", "creek", "road", "again", "ice", "least")
+            val secretData = "This is the user's soul. It must be protected at all costs."
+
+            val progress =
+                createBackup(backupPath, recoveryPhrase) { sink ->
+                    sink.writeUtf8(secretData)
+                }.toList()
+
+            val lastState = progress.last()
+            assertTrue("Expected Completed state, got $lastState", lastState is BackupProgress.Completed)
+
+            val header = fileSystem.source(backupPath).buffer().use { source -> EncryptedBackupFileFormat.readHeader(source) }
+            val manifest = Json.decodeFromString<BackupManifest>(header.manifestJson)
+
+            assertEquals("test-device", manifest.deviceId)
+            assertEquals("test-user", manifest.userId)
+            assertFalse(manifest.deviceId.contains("placeholder"))
+            assertFalse(manifest.userId.contains("placeholder"))
+            assertTrue(manifest.encryption.iv.isNotBlank())
+        }
+
+    @Test
+    fun `e2e encryption and restore uses header iv and preserves data integrity`() =
         runBlocking {
             val backupPath = "/backup.enc".toPath()
             val recoveryPhrase =
@@ -69,22 +106,9 @@ class BackupIntegrityTest {
             assertTrue("Expected Completed state, got $lastState", lastState is BackupProgress.Completed)
             assertTrue("Encrypted file should exist on disk", fileSystem.exists(backupPath))
 
-            // 2. Verify: Decrypt manually (simulating RestoreFromEncryptedBackupUseCase logic)
-            val masterKey = cryptoManager.deriveMasterKey(recoveryPhrase)
+            val restored = restoreBackup.readPlaintextForTest(backupPath, recoveryPhrase)
 
-            // In this test environment, generateRandomBytes is deterministic (sequential)
-            val deterministicIv = ByteArray(12) { it.toByte() }
-
-            val decryptedData =
-                cryptoManager
-                    .decryptSource(
-                        fileSystem.source(backupPath),
-                        masterKey,
-                        deterministicIv,
-                    ).buffer()
-                    .use { source -> source.readUtf8() }
-
-            assertEquals("Decrypted plaintext must match the original secret", secretData, decryptedData)
+            assertEquals("Decrypted plaintext must match the original secret", secretData, restored.readUtf8())
 
             // 3. Verify Integrity: Corrupt the file
             val fileBytes = fileSystem.read(backupPath) { readByteArray() }
@@ -93,13 +117,7 @@ class BackupIntegrityTest {
             fileSystem.write(backupPath) { write(fileBytes) }
 
             try {
-                cryptoManager
-                    .decryptSource(
-                        fileSystem.source(backupPath),
-                        masterKey,
-                        deterministicIv,
-                    ).buffer()
-                    .use { source -> source.readUtf8() }
+                restoreBackup.readPlaintextForTest(backupPath, recoveryPhrase).readUtf8()
                 fail("Decryption should have failed due to bit-level corruption (GCM tag mismatch)")
             } catch (_: Exception) {
                 // Expected - Authenticated encryption detected the tampering
