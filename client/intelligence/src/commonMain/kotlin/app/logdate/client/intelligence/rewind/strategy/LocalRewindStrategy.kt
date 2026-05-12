@@ -6,6 +6,7 @@ import app.logdate.client.intelligence.curation.CurationResult
 import app.logdate.client.intelligence.curation.RewindMediaCurator
 import app.logdate.client.intelligence.narrative.RewindSequencer
 import app.logdate.client.intelligence.rewind.local.LocalQuoteSelector
+import app.logdate.client.intelligence.rewind.local.LocalStoryBeatDetector
 import app.logdate.client.intelligence.rewind.local.LocalThemeExtractor
 import app.logdate.client.intelligence.rewind.local.deriveActivitiesFromThemes
 import app.logdate.client.repository.location.LocationHistoryItem
@@ -35,6 +36,7 @@ class LocalRewindStrategy(
     private val sequencer: RewindSequencer,
     private val themeExtractor: LocalThemeExtractor = LocalThemeExtractor(),
     private val quoteSelector: LocalQuoteSelector = LocalQuoteSelector(),
+    private val storyBeatDetector: LocalStoryBeatDetector = LocalStoryBeatDetector(),
 ) : RewindGenerationStrategy {
     override val name: String = STRATEGY_NAME
 
@@ -105,20 +107,34 @@ class LocalRewindStrategy(
      * the local path.
      */
     private fun buildLocalNarrative(input: RewindInput): WeekNarrative {
-        val evidenceIds = input.media.map { it.uid.toString() } + input.textEntries.map { it.uid.toString() }
-        val catchAllBeat =
-            StoryBeat(
-                moment = "Your week",
-                context = "A summary of the period",
-                emotionalWeight = "varied",
-                evidenceIds = evidenceIds,
-            )
         val themes = themeExtractor.extract(input.textEntries.map { it.content })
         val quotes = quoteSelector.select(input.textEntries)
+        val detectedBeats =
+            storyBeatDetector.detect(
+                textEntries = input.textEntries,
+                periodStart = input.periodStart,
+                periodEnd = input.periodEnd,
+                media = input.media,
+            )
+        // Fallback to a single catch-all beat when the period has neither text nor
+        // media — keeps the sequencer happy without special-casing.
+        val storyBeats =
+            detectedBeats.ifEmpty {
+                listOf(
+                    StoryBeat(
+                        moment = "Your week",
+                        context = "A summary of the period",
+                        emotionalWeight = "varied",
+                        evidenceIds =
+                            input.media.map { it.uid.toString() } +
+                                input.textEntries.map { it.uid.toString() },
+                    ),
+                )
+            }
         return WeekNarrative(
             themes = themes,
-            emotionalTone = "varied",
-            storyBeats = listOf(catchAllBeat),
+            emotionalTone = storyBeats.firstOrNull()?.emotionalWeight ?: "varied",
+            storyBeats = storyBeats,
             overallNarrative = "A summary of your week.",
             reflectionPrompts = emptyList(),
             highlightedQuotes = quotes,
