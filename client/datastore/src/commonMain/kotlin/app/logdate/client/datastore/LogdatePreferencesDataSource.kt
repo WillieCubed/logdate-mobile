@@ -35,6 +35,7 @@ class LogdatePreferencesDataSource(
         val DAY_END_HOUR = intPreferencesKey("day_end_hour")
         val BACKGROUND_SYNC_ENABLED = booleanPreferencesKey("background_sync_enabled")
         val SYSTEM_SEARCH_VISIBILITY_ENABLED = booleanPreferencesKey("system_search_visibility_enabled")
+        val FAVORITE_NOTE_IDS = stringSetPreferencesKey("favorite_note_ids")
 
         // Account IDs that have already had their local data backfilled into the sync queue
         // after first sign-in. Idempotency guard so a re-sign-in into the same account doesn't
@@ -65,6 +66,7 @@ class LogdatePreferencesDataSource(
         val REWIND_AUTO_GENERATION_ENABLED = booleanPreferencesKey("rewind_auto_generation_enabled")
         val REWIND_NOTIFICATIONS_ENABLED = booleanPreferencesKey("rewind_notifications_enabled")
         val REWIND_REFLECTION_REPLIES_ENABLED = booleanPreferencesKey("rewind_reflection_replies_enabled")
+        val HAS_SEEN_REWIND_ONBOARDING = booleanPreferencesKey("has_seen_rewind_onboarding")
 
         // Event inference preferences
         val EVENT_INFERENCE_SENSITIVITY = stringPreferencesKey("event_inference_sensitivity")
@@ -100,7 +102,7 @@ class LogdatePreferencesDataSource(
                     AppSecurityLevel.valueOf(
                         prefs[SECURITY_LEVEL] ?: AppSecurityLevel.NONE.name,
                     ),
-                favoriteNotes = emptyList(),
+                favoriteNotes = prefs[FAVORITE_NOTE_IDS]?.toList().orEmpty(),
                 // Profile data
                 displayName = prefs[DISPLAY_NAME] ?: "",
                 profilePhotoUri = prefs[PROFILE_PHOTO_URI],
@@ -278,6 +280,17 @@ class LogdatePreferencesDataSource(
                 putAll(
                     SECURITY_LEVEL to if (value) AppSecurityLevel.BIOMETRIC.name else AppSecurityLevel.NONE.name,
                 )
+            }
+        }
+    }
+
+    suspend fun addFavoriteNotes(noteIds: Set<String>) {
+        if (noteIds.isEmpty()) return
+
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                val current = this[FAVORITE_NOTE_IDS].orEmpty()
+                this[FAVORITE_NOTE_IDS] = current + noteIds
             }
         }
     }
@@ -565,6 +578,26 @@ class LogdatePreferencesDataSource(
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
                 this[REWIND_REFLECTION_REPLIES_ENABLED] = enabled
+            }
+        }
+    }
+
+    /**
+     * Whether the user has seen the first-Rewind onboarding bottom sheet that explains
+     * how the cadence, share, and curation strictness work. Defaults to false so brand-new
+     * users still see it; gets set true the first time the sheet is dismissed.
+     */
+    fun observeHasSeenRewindOnboarding(): Flow<Boolean> =
+        userPreferences.data.map { prefs ->
+            prefs[HAS_SEEN_REWIND_ONBOARDING] ?: false
+        }
+
+    suspend fun hasSeenRewindOnboarding(): Boolean = observeHasSeenRewindOnboarding().first()
+
+    suspend fun setHasSeenRewindOnboarding(value: Boolean) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[HAS_SEEN_REWIND_ONBOARDING] = value
             }
         }
     }
