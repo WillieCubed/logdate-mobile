@@ -46,7 +46,7 @@
     <string name="delete_rewind_dialog_message">The story, the photos and notes pulled into it, and any replies you typed back at it will all be removed from this device. Your original journal entries are not touched.</string>
     <string name="delete_rewind_dialog_confirm">Delete</string>
     <string name="delete_rewind_dialog_cancel">Keep it</string>
-    <string name="past_rewind">Past rewind</string>
+    <string name="past_rewind">Past rewinds</string>
     <string name="past_rewinds_empty">No past rewinds yet. Your weekly stories will show up here once they\'re generated.</string>
     <string name="more_rewinds_below">More rewinds below</string>
     <string name="youve_reviewed_all_your_weekly_rewinds">You&apos;ve reviewed all your weekly rewinds</string>
