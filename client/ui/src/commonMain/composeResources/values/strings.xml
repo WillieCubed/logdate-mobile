@@ -17,6 +17,7 @@
     <string name="start_writing">Start Writing</string>
     <string name="view_memory">View Memory</string>
     <string name="add_to_memories">Add to Memories</string>
+    <string name="create_new_entry">New entry</string>
 
     <!-- Suggestion cards -->
     <string name="suggestion_label_today">Today</string>

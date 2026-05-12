@@ -62,6 +62,7 @@ import app.logdate.ui.audio.TranscriptionState
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.platform.LocalPlatformHaptics
+import app.logdate.ui.platform.currentPlatform
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.profiles.toUiState
 import app.logdate.ui.sync.SyncAction
@@ -133,26 +134,34 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val haptics = LocalPlatformHaptics.current
+    // On Apple platforms the timeline's new-entry action lives in the top app bar, so the
+    // floating button is hidden there. Other tabs (Journals, Library, Rewind, etc.) keep
+    // the FAB until their own headers grow a native create affordance. Android always shows
+    // the FAB.
+    val showFloatingActionButton =
+        !(currentPlatform.isApple && currentDestination == HomeRouteDestination.Timeline)
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    when (currentDestination) {
-                        HomeRouteDestination.Journals -> onCreateJournal()
-                        else -> onNewEntry()
-                    }
-                },
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            ) {
-                Icon(
-                    Icons.Default.EditNote,
-                    contentDescription = stringResource(Res.string.create_new_entry),
-                )
+            if (showFloatingActionButton) {
+                FloatingActionButton(
+                    onClick = {
+                        when (currentDestination) {
+                            HomeRouteDestination.Journals -> onCreateJournal()
+                            else -> onNewEntry()
+                        }
+                    },
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ) {
+                    Icon(
+                        Icons.Default.EditNote,
+                        contentDescription = stringResource(Res.string.create_new_entry),
+                    )
+                }
             }
         },
         modifier = modifier,

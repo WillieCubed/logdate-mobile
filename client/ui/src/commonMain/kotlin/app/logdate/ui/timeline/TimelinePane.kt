@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.platform.currentPlatform
 import app.logdate.ui.sync.SyncAction
 import app.logdate.ui.sync.SyncErrorBanner
 import app.logdate.ui.sync.SyncPresentation
@@ -105,6 +106,10 @@ fun TimelinePane(
                 onSearchClick = onSearchClick,
                 onSettingsClick = onProfileClick,
                 onHistoryClick = onHistoryClick,
+                // On iPhone and iPad the floating create button is hidden, so the new-entry
+                // affordance moves into the top bar as a trailing action. Other hosts keep
+                // the FAB and don't need the duplicate.
+                onNewEntry = onNewEntry.takeIf { currentPlatform.isApple },
                 syncPresentation = syncPresentation,
                 onSyncChipClick = { onSyncAction(SyncAction.Retry) },
             )

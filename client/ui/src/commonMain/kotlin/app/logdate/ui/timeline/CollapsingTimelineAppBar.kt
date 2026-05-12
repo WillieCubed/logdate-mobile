@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.sync.SyncIndicatorChip
 import app.logdate.ui.sync.SyncPresentation
 import logdate.client.ui.generated.resources.*
@@ -26,7 +27,15 @@ import org.jetbrains.compose.resources.stringResource
 private const val BENCHMARK_TAG_HISTORY = "logdate_home_history"
 private const val BENCHMARK_TAG_SEARCH = "logdate_home_search"
 private const val BENCHMARK_TAG_SETTINGS = "logdate_home_settings"
+private const val BENCHMARK_TAG_NEW_ENTRY = "logdate_home_new_entry"
 
+/**
+ * Top app bar for the home timeline.
+ *
+ * On hosts where the floating create button is hidden (currently iOS / iPadOS), pass a
+ * non-null [onNewEntry] so the bar renders a trailing "new entry" action as the replacement
+ * affordance. Other hosts keep [onNewEntry] null and rely on their own create paths.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimelineTopAppBar(
@@ -34,6 +43,7 @@ fun TimelineTopAppBar(
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit = {},
     onHistoryClick: () -> Unit = {},
+    onNewEntry: (() -> Unit)? = null,
     syncPresentation: SyncPresentation = SyncPresentation.Hidden,
     onSyncChipClick: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -57,6 +67,7 @@ fun TimelineTopAppBar(
             val historyLabel = stringResource(Res.string.location_history)
             val searchLabel = stringResource(Res.string.search)
             val settingsLabel = stringResource(Res.string.settings)
+            val newEntryLabel = stringResource(Res.string.create_new_entry)
 
             IconButton(
                 onClick = onHistoryClick,
@@ -84,6 +95,17 @@ fun TimelineTopAppBar(
                     imageVector = Icons.Default.Settings,
                     contentDescription = settingsLabel,
                 )
+            }
+            if (onNewEntry != null) {
+                IconButton(
+                    onClick = onNewEntry,
+                    modifier = Modifier.testTag(BENCHMARK_TAG_NEW_ENTRY),
+                ) {
+                    Icon(
+                        painter = PlatformIcons.newEntry(),
+                        contentDescription = newEntryLabel,
+                    )
+                }
             }
         },
         scrollBehavior = scrollBehavior,
