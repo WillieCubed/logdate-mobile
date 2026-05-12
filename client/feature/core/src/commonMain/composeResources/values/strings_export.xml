@@ -21,6 +21,7 @@
     <string name="export_progress_title">Exporting\u2026</string>
     <string name="export_complete_title">Export complete</string>
     <string name="export_complete_description">Your data has been saved.</string>
+    <string name="export_complete_stats_summary">%1$d journals, %2$d notes, %3$d drafts, %4$d media files</string>
     <string name="export_failed_title">Export failed</string>
     <string name="waiting_for_export_destination">Choose where to save your export…</string>
     <string name="action_browse">Open</string>
