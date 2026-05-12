@@ -21,6 +21,7 @@ object AccountsTable : Table("accounts") {
     val plcRecoveryDidKey = text("plc_recovery_did_key").nullable()
     val email = varchar("email", 255).nullable()
     val emailVerified = bool("email_verified").default(false)
+    val emailVerifiedAt = timestamp("email_verified_at").nullable()
     val bio = text("bio").nullable()
     val createdAt = timestamp("created_at")
     val lastSignInAt = timestamp("last_sign_in_at").nullable()
@@ -28,6 +29,28 @@ object AccountsTable : Table("accounts") {
     val preferences = text("preferences").default("{}")
 
     override val primaryKey = PrimaryKey(id)
+}
+
+/**
+ * Short-lived (~5 min) one-row-per-attempt binding of a server-issued nonce to
+ * an account during the Android Digital Credentials email-verification flow.
+ * Rows are burned by [app.logdate.server.auth.EmailVerificationService.complete]
+ * regardless of outcome to prevent nonce replay.
+ */
+@OptIn(ExperimentalUuidApi::class)
+object PendingEmailVerificationsTable : Table("pending_email_verifications") {
+    val transactionId = javaUUID("transaction_id")
+    val accountId = javaUUID("account_id").references(AccountsTable.id)
+    val nonce = varchar("nonce", 128)
+    val expiresAt = timestamp("expires_at")
+    val createdAt = timestamp("created_at")
+
+    override val primaryKey = PrimaryKey(transactionId)
+
+    init {
+        index("idx_pev_account", false, accountId)
+        index("idx_pev_expires", false, expiresAt)
+    }
 }
 
 @OptIn(ExperimentalUuidApi::class)

@@ -38,6 +38,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[plcRecoveryDidKey] = account.plcRecoveryDidKey
                     it[email] = account.email
                     it[emailVerified] = account.emailVerified
+                    it[emailVerifiedAt] = account.emailVerifiedAt
                     it[bio] = account.bio
                     it[lastSignInAt] = account.lastSignInAt
                     it[isActive] = account.isActive
@@ -56,6 +57,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[plcRecoveryDidKey] = account.plcRecoveryDidKey
                     it[email] = account.email
                     it[emailVerified] = account.emailVerified
+                    it[emailVerifiedAt] = account.emailVerifiedAt
                     it[bio] = account.bio
                     it[createdAt] = account.createdAt
                     it[lastSignInAt] = account.lastSignInAt
@@ -192,6 +194,7 @@ class PostgreSQLAccountRepository : AccountRepository {
             plcRecoveryDidKey = this[AccountsTable.plcRecoveryDidKey],
             email = this[AccountsTable.email],
             emailVerified = this[AccountsTable.emailVerified],
+            emailVerifiedAt = this[AccountsTable.emailVerifiedAt],
             bio = this[AccountsTable.bio],
             createdAt = this[AccountsTable.createdAt],
             lastSignInAt = this[AccountsTable.lastSignInAt],

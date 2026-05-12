@@ -18,6 +18,7 @@ data class Account(
     val plcRecoveryDidKey: String? = null,
     val email: String? = null,
     val emailVerified: Boolean = false,
+    val emailVerifiedAt: Instant? = null,
     val bio: String? = null,
     val createdAt: Instant,
     val lastSignInAt: Instant? = null,
