@@ -6,8 +6,8 @@ import app.logdate.client.intelligence.curation.CurationResult
 import app.logdate.client.intelligence.curation.RewindMediaCurator
 import app.logdate.client.intelligence.narrative.RewindSequencer
 import app.logdate.client.intelligence.rewind.local.LocalThemeExtractor
+import app.logdate.client.intelligence.rewind.local.deriveActivitiesFromThemes
 import app.logdate.client.repository.location.LocationHistoryItem
-import app.logdate.shared.model.ActivityType
 import app.logdate.shared.model.LocationSummary
 import app.logdate.shared.model.MapPoint
 import app.logdate.shared.model.NarrativeOrigin
@@ -55,7 +55,7 @@ class LocalRewindStrategy(
 
         val mapPoints = downsampleLocationPath(input.locationHistory)
         val stats = buildLocalStats(input, curation)
-        val activities = listOf(ActivityType.MIXED)
+        val activities = deriveActivitiesFromThemes(narrative.themes)
 
         val content =
             sequencer.sequence(
