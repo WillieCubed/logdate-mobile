@@ -23,6 +23,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.ui.common.plus
 import app.logdate.ui.common.scrollToTop
 import app.logdate.ui.platform.PlatformIcons
+import app.logdate.ui.platform.rememberLogDateHaptics
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.TimelineDayUiState
@@ -73,6 +74,11 @@ fun TimelineDayDetailPanel(
                 )
             }
         }
+
+    val haptics = rememberLogDateHaptics()
+    LaunchedEffect(Unit) {
+        haptics.dayExpanded()
+    }
 
     LaunchedEffect(uiState, scrollToEntryId) {
         val targetIndex =

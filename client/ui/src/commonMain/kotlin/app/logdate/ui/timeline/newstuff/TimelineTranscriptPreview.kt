@@ -14,6 +14,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.audio.LocalTranscriptionState
+import app.logdate.ui.platform.rememberLogDateHaptics
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.buildTranscriptExcerpt
 import logdate.client.ui.generated.resources.Res
@@ -37,14 +39,24 @@ internal fun TimelineTranscriptPreview(
     modifier: Modifier = Modifier,
 ) {
     val transcriptionState = LocalTranscriptionState.current
+    val rawTranscript = noteId?.let(transcriptionState.getTranscriptionText)?.trim()
+
+    // Fire a haptic the first time a transcript appears for this noteId while we're
+    // on screen — but stay silent if it was already there when we first rendered.
+    val haptics = rememberLogDateHaptics()
+    var hadTranscript by remember(noteId) { mutableStateOf(!rawTranscript.isNullOrEmpty()) }
+    LaunchedEffect(noteId, rawTranscript) {
+        if (!hadTranscript && !rawTranscript.isNullOrEmpty()) {
+            haptics.transcriptionReady()
+            hadTranscript = true
+        }
+    }
+
     val transcript =
         fallbackTranscript
             ?.trim()
             ?.takeIf(String::isNotEmpty)
-            ?: noteId
-                ?.let(transcriptionState.getTranscriptionText)
-                ?.trim()
-                ?.takeIf(String::isNotEmpty)
+            ?: rawTranscript?.takeIf(String::isNotEmpty)
             ?: return
 
     val excerpt = remember(transcript) { buildTranscriptExcerpt(transcript) } ?: return

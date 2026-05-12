@@ -242,6 +242,29 @@ fun FloatingRewindCardList(
     val listState = rememberLazyListState()
     val snapFlingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
 
+    val haptics = rememberLogDateHaptics()
+    val centeredIndex by remember(listState) {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val viewportCenter = layoutInfo.viewportStartOffset + layoutInfo.viewportSize.height / 2
+            layoutInfo.visibleItemsInfo
+                .minByOrNull {
+                    kotlin.math.abs((it.offset + it.size / 2) - viewportCenter)
+                }?.index
+        }
+    }
+    var lastSettledIndex by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(centeredIndex, listState.isScrollInProgress) {
+        if (!listState.isScrollInProgress &&
+            centeredIndex != null &&
+            centeredIndex != lastSettledIndex
+        ) {
+            // Skip the first emission so opening the screen doesn't fire on its own.
+            if (lastSettledIndex != null) haptics.rewindCardCentered()
+            lastSettledIndex = centeredIndex
+        }
+    }
+
     // Simple fixed card dimensions
     val cardWidth = 360.dp
     val cardHeight = cardWidth * AspectRatios.RATIO_3_2 // 3:2 aspect ratio for rewind cards
@@ -577,6 +600,11 @@ fun EndOfListSurprise(
             val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()
             lastVisibleItem?.index == itemCount // This is the surprise item index
         }
+    }
+
+    val haptics = rememberLogDateHaptics()
+    LaunchedEffect(isNearEnd) {
+        if (isNearEnd) haptics.rewindEndReached()
     }
 
     Box(
