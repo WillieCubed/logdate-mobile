@@ -49,6 +49,15 @@ private class IosPlatformHapticsController : PlatformHapticsController {
         notificationGenerator.prepare()
         notificationGenerator.notificationOccurred(style)
     }
+
+    /**
+     * Lighter than [HapticImpactStrength.Light] — uses the soft generator at half intensity so
+     * high-rate ticks (Rewind snap, settings slider) feel like a quiet detent, not a tap.
+     */
+    override fun tick() {
+        impactSoft.prepare()
+        impactSoft.impactOccurredWithIntensity(0.5)
+    }
 }
 
 actual fun createPlatformHapticsController(): PlatformHapticsController = IosPlatformHapticsController()

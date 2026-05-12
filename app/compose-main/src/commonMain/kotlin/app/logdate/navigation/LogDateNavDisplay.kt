@@ -5,7 +5,6 @@ package app.logdate.navigation
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -22,6 +21,8 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
@@ -81,9 +82,12 @@ import app.logdate.navigation.scenes.supportsDualPaneHomeScene
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.audio.AudioPlaybackProvider
 import app.logdate.ui.navigation.taggedEntry
+import app.logdate.ui.platform.DefaultLogDateHaptics
+import app.logdate.ui.platform.LocalLogDateHaptics
 import app.logdate.ui.platform.LocalPlatformHaptics
-import app.logdate.ui.platform.createPlatformHapticsController
 import app.logdate.ui.platform.iosEdgeSwipeBack
+import app.logdate.ui.platform.rememberPlatformHapticsController
+import app.logdate.ui.platform.rememberSystemReduceMotion
 import app.logdate.ui.theme.LogDateTheme
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -158,12 +162,15 @@ fun LogDateNavDisplay(
         }
     }
 
-    val haptics = remember { createPlatformHapticsController() }
+    val haptics = rememberPlatformHapticsController()
+    val reduceMotion = rememberSystemReduceMotion()
+    val logDateHaptics = remember(haptics) { DefaultLogDateHaptics(haptics) { reduceMotion.value } }
     LogDateTheme {
         SharedTransitionLayout {
             CompositionLocalProvider(
                 LocalSharedTransitionScope provides this,
                 LocalPlatformHaptics provides haptics,
+                LocalLogDateHaptics provides logDateHaptics,
             ) {
                 LockableContent(
                     isLocked = appUiState.requiresUnlock,
@@ -356,7 +363,14 @@ fun LogDateNavDisplay(
  */
 @Composable
 private fun rememberHomeSceneStrategy(): SceneStrategy<NavKey> {
-    val supportsDualPane = currentWindowAdaptiveInfo().windowSizeClass.supportsDualPaneHomeScene()
+    val windowSize = LocalWindowInfo.current.containerSize
+    val supportsDualPane =
+        with(LocalDensity.current) {
+            supportsDualPaneHomeScene(
+                width = windowSize.width.toDp(),
+                height = windowSize.height.toDp(),
+            )
+        }
     return remember(supportsDualPane) {
         HomeSceneStrategy { supportsDualPane }
     }
