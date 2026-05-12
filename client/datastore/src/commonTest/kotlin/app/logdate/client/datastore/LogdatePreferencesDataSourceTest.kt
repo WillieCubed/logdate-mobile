@@ -45,6 +45,37 @@ class LogdatePreferencesDataSourceTest {
             assertEquals(42L, dataSource.getAndroidPlatformSearchIndexedGeneration())
             assertEquals(3, dataSource.getAndroidPlatformSearchSchemaVersion())
         }
+
+    @Test
+    fun favoriteNotes_arePersistedAndDeduplicated() =
+        runTest {
+            dataSource.addFavoriteNotes(setOf("note-1", "note-2"))
+            dataSource.addFavoriteNotes(setOf("note-2", "note-3"))
+
+            assertEquals(
+                setOf("note-1", "note-2", "note-3"),
+                dataSource
+                    .userData
+                    .first()
+                    .favoriteNotes
+                    .toSet(),
+            )
+        }
+
+    @Test
+    fun hasSeenRewindOnboarding_defaultsToFalse() =
+        runTest {
+            assertEquals(false, dataSource.hasSeenRewindOnboarding())
+        }
+
+    @Test
+    fun hasSeenRewindOnboarding_canBePersisted() =
+        runTest {
+            dataSource.setHasSeenRewindOnboarding(true)
+
+            assertEquals(true, dataSource.hasSeenRewindOnboarding())
+            assertEquals(true, dataSource.observeHasSeenRewindOnboarding().first())
+        }
 }
 
 private class TestPreferencesDataStore : DataStore<Preferences> {
