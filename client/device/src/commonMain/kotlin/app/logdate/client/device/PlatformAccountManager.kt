@@ -1,6 +1,7 @@
 package app.logdate.client.device
 
 import app.logdate.shared.model.LogDateAccount
+import kotlinx.serialization.Serializable
 
 /**
  * Cross-platform interface for managing LogDate Cloud accounts in the system account managers
@@ -74,6 +75,7 @@ data class PlatformAccountInfo(
 /**
  * Access and refresh token pair
  */
+@Serializable
 data class TokenPair(
     val accessToken: String,
     val refreshToken: String,
