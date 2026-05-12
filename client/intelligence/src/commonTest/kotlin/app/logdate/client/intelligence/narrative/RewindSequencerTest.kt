@@ -374,16 +374,102 @@ class RewindSequencerTest {
         assertTrue(result.last() is RewindContent.NarrativeContext)
     }
 
+    @Test
+    fun `local-heuristic origin leads with a personality card`() {
+        val narrative =
+            narrativeOf(
+                overallNarrative = "Your week.",
+                origin = app.logdate.shared.model.NarrativeOrigin.LOCAL_HEURISTIC,
+            )
+
+        val result =
+            sequencer.sequence(
+                narrative = narrative,
+                curation = CurationResult.EMPTY,
+                textEntries = emptyList(),
+                people = emptyList(),
+                weather = null,
+                locationPath = emptyList(),
+                stats = emptyStats,
+                activities = emptyList(),
+            )
+
+        assertTrue(result.isNotEmpty())
+        assertIs<RewindContent.PersonalityCard>(
+            result.first(),
+            message = "expected local-origin Rewind to open on a personality card",
+        )
+    }
+
+    @Test
+    fun `local-heuristic origin skips the closing prose panel`() {
+        val narrative =
+            narrativeOf(
+                overallNarrative = "First sentence. Second sentence.",
+                origin = app.logdate.shared.model.NarrativeOrigin.LOCAL_HEURISTIC,
+            )
+
+        val result =
+            sequencer.sequence(
+                narrative = narrative,
+                curation = CurationResult.EMPTY,
+                textEntries = emptyList(),
+                people = emptyList(),
+                weather = null,
+                locationPath = emptyList(),
+                stats = emptyStats,
+                activities = emptyList(),
+            )
+
+        // Local origin should never close on a NarrativeContext that echoes the templated
+        // resolution sentence; that copy would feel hollow without an AI-written narrative.
+        val closingResolution =
+            result.filterIsInstance<RewindContent.NarrativeContext>().any {
+                it.contextText == "Second sentence."
+            }
+        assertEquals(
+            false,
+            closingResolution,
+            "local-origin Rewind should not emit a resolution panel; got panels=${result.map { it::class.simpleName }}",
+        )
+    }
+
+    @Test
+    fun `quotes-only-llm origin still opens with narrative prose`() {
+        val narrative =
+            narrativeOf(
+                overallNarrative = "Opening line. Closing line.",
+                origin = app.logdate.shared.model.NarrativeOrigin.QUOTES_ONLY_LLM,
+            )
+
+        val result =
+            sequencer.sequence(
+                narrative = narrative,
+                curation = CurationResult.EMPTY,
+                textEntries = emptyList(),
+                people = emptyList(),
+                weather = null,
+                locationPath = emptyList(),
+                stats = emptyStats,
+                activities = emptyList(),
+            )
+
+        val firstPanel = assertIs<RewindContent.NarrativeContext>(result.first())
+        assertEquals("Opening line.", firstPanel.contextText)
+    }
+
     /** Builds a minimal [WeekNarrative] for tests, defaulting the unused fields. */
     private fun narrativeOf(
         storyBeats: List<StoryBeat> = emptyList(),
         overallNarrative: String = "A week.",
+        origin: app.logdate.shared.model.NarrativeOrigin = app.logdate.shared.model.NarrativeOrigin.LLM,
     ): WeekNarrative =
         WeekNarrative(
             themes = emptyList(),
             emotionalTone = "neutral",
             storyBeats = storyBeats,
             overallNarrative = overallNarrative,
+            origin = origin,
         )
 
     /**
