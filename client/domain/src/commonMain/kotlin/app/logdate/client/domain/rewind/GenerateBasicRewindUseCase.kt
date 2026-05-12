@@ -3,30 +3,17 @@ package app.logdate.client.domain.rewind
 import app.logdate.client.domain.media.IndexMediaForPeriodUseCase
 import app.logdate.client.domain.notes.FetchNotesForDayUseCase
 import app.logdate.client.intelligence.AIResult
-import app.logdate.client.intelligence.curation.CurationConfig
-import app.logdate.client.intelligence.curation.CurationResult
-import app.logdate.client.intelligence.curation.MediaCandidate
-import app.logdate.client.intelligence.curation.RewindMediaCurator
 import app.logdate.client.intelligence.entity.people.PeopleExtractor
-import app.logdate.client.intelligence.narrative.RewindSequencer
-import app.logdate.client.intelligence.narrative.WeekNarrativeSynthesizer
-import app.logdate.client.intelligence.weather.WeatherFetchLocation
+import app.logdate.client.intelligence.rewind.strategy.RewindInput
+import app.logdate.client.intelligence.rewind.strategy.RewindStrategySelector
 import app.logdate.client.repository.journals.JournalNote
-import app.logdate.client.repository.location.LocationHistoryItem
 import app.logdate.client.repository.location.LocationHistoryRepository
-import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.repository.rewind.RewindGenerationManager
 import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.shared.model.ActivityType
-import app.logdate.shared.model.LocationSummary
-import app.logdate.shared.model.MapPoint
 import app.logdate.shared.model.Rewind
-import app.logdate.shared.model.RewindContent
 import app.logdate.shared.model.RewindGenerationRequest
-import app.logdate.shared.model.RewindMetadata
-import app.logdate.shared.model.WeekNarrative
-import app.logdate.shared.model.WeekStatsSnapshot
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.firstOrNull
@@ -44,15 +31,10 @@ import kotlin.uuid.Uuid
 /**
  * Use case for generating a narrative-driven rewind for a given time period.
  *
- * This use case coordinates the generation of a rewind by:
- * 1. Ensuring all media in the time period is properly indexed
- * 2. Fetching notes and indexed media for the period
- * 3. Using AI to understand the STORY of the week (themes, emotional tone, key moments)
- * 4. Sequencing content into a narrative-driven structure
- * 5. Saving the rewind to the repository
- *
- * Unlike mechanical content aggregation, this creates a story that contextualizes
- * what the week was ABOUT, not just what content exists.
+ * This use case is a thin orchestration layer — it collects the period's text entries,
+ * media, people, and location history, hands them to the tier-aware strategy chosen by
+ * [RewindStrategySelector], and saves the produced Rewind. All real work (narrative
+ * synthesis, curation, sequencing, fallback handling) lives inside the strategies.
  */
 class GenerateBasicRewindUseCase(
     private val rewindRepository: RewindRepository,
@@ -61,46 +43,22 @@ class GenerateBasicRewindUseCase(
     private val indexedMediaRepository: IndexedMediaRepository,
     private val indexMediaForPeriod: IndexMediaForPeriodUseCase,
     private val generateRewindTitle: GenerateRewindTitleUseCase,
-    private val narrativeSynthesizer: WeekNarrativeSynthesizer,
-    private val rewindSequencer: RewindSequencer,
-    private val rewindMediaCurator: RewindMediaCurator,
+    private val strategySelector: RewindStrategySelector,
     private val peopleExtractor: PeopleExtractor,
     private val locationHistoryRepository: LocationHistoryRepository,
 ) {
     private companion object {
-        /**
-         * Default wait timeout when checking for an existing rewind generation.
-         */
         private val DEFAULT_WAIT_TIMEOUT = 5.seconds
-
-        /**
-         * Default polling interval when waiting for a rewind generation to complete.
-         */
         private val DEFAULT_POLL_INTERVAL = 1.seconds
-
-        /**
-         * Cap on the number of [MapPoint]s persisted on a rewind so the metadata JSON
-         * blob stays compact. Enough resolution for a coarse weekly path; the renderer
-         * doesn't need higher fidelity to read as a map.
-         */
-        private const val MAP_POINT_LIMIT = 50
     }
 
     /**
-     * Generates a rewind for the specified time period.
-     *
-     * This operation will:
-     * 1. Check if a generation is already in progress
-     * 2. Create a generation request to track progress
-     * 3. Index any unindexed media in the time period
-     * 4. Collect all notes and indexed media for the period
-     * 5. Create and save a rewind with this content
+     * Generates a Rewind for the specified time period.
      *
      * @param startTime Start of the time period (inclusive)
      * @param endTime End of the time period (exclusive)
      * @param waitTimeout Maximum time to wait for an in-progress generation
      * @param pollInterval How frequently to check generation status when waiting
-     * @return Result of the generation attempt
      */
     suspend operator fun invoke(
         startTime: Instant,
@@ -110,27 +68,16 @@ class GenerateBasicRewindUseCase(
     ): GenerateBasicRewindResult {
         Napier.d("Generating rewind for period: $startTime to $endTime")
 
-        // Check if a generation is already in progress
         if (generationManager.isGenerationInProgress(startTime, endTime)) {
             Napier.i("Rewind generation already in progress for this period")
-
-            // TODO: In the future, we may want to support different types of rewinds
-            // for the same time period (e.g., different themes or content focuses).
-            // The current implementation assumes only one rewind per time period.
-
-            // Wait for any in-progress generation to complete
             if (waitForExistingGeneration(startTime, endTime, waitTimeout, pollInterval)) {
                 rewindRepository.getRewindBetween(startTime, endTime).firstOrNull()?.let { existingRewind ->
-                    Napier.d("Successfully retrieved rewind after waiting")
                     return GenerateBasicRewindResult.Success(existingRewind)
                 }
             }
-
-            // If we waited but no rewind was produced, report that generation is in progress
             return GenerateBasicRewindResult.AlreadyInProgress
         }
 
-        // Create generation request
         val request =
             try {
                 generationManager.requestGeneration(startTime, endTime)
@@ -142,10 +89,8 @@ class GenerateBasicRewindUseCase(
                 )
             }
 
-        Napier.d("Created generation request: ${request.id}")
-
         try {
-            // Index media for the period — non-fatal if this fails
+            // Index media for the period — non-fatal if this fails.
             try {
                 val newlyIndexedCount = indexMediaForPeriod(startTime, endTime)
                 Napier.d("Indexed $newlyIndexedCount new media items")
@@ -153,10 +98,7 @@ class GenerateBasicRewindUseCase(
                 Napier.w("Media indexing failed, continuing with already-indexed media", e)
             }
 
-            // Collect all raw content for narrative synthesis
             val allTextEntries = mutableListOf<JournalNote.Text>()
-
-            // Convert the date range to local dates for day-by-day processing
             val timezone = TimeZone.currentSystemDefault()
             var currentDate = startTime.toLocalDateTime(timezone).date
             if (startTime < endTime) {
@@ -165,8 +107,6 @@ class GenerateBasicRewindUseCase(
                         .minus(1.nanoseconds)
                         .toLocalDateTime(timezone)
                         .date
-
-                // Collect notes for each day in the period
                 while (currentDate <= lastIncludedDate) {
                     val notesForDay = fetchNotesForDay(currentDate).firstOrNull() ?: emptyList()
                     allTextEntries.addAll(notesForDay.filterIsInstance<JournalNote.Text>())
@@ -174,10 +114,8 @@ class GenerateBasicRewindUseCase(
                 }
             }
 
-            // Collect indexed media for the period
             val mediaItems = indexedMediaRepository.getForPeriod(startTime, endTime).firstOrNull() ?: emptyList()
 
-            // Check if we have any content
             if (allTextEntries.isEmpty() && mediaItems.isEmpty()) {
                 updateGenerationStatus(
                     request.id,
@@ -187,9 +125,7 @@ class GenerateBasicRewindUseCase(
                 return GenerateBasicRewindResult.NoContent
             }
 
-            Napier.d("Collected ${allTextEntries.size} text entries and ${mediaItems.size} media items")
-
-            // Extract people mentioned in entries for narrative context
+            // Extract people for narrative + curation signals.
             val people =
                 allTextEntries
                     .flatMap { entry ->
@@ -201,104 +137,35 @@ class GenerateBasicRewindUseCase(
                                 )
                         ) {
                             is AIResult.Success -> result.value
-                            is AIResult.Unavailable -> {
-                                Napier.w("People extraction unavailable for entry ${entry.uid}")
-                                emptyList()
-                            }
-                            is AIResult.Error -> {
-                                Napier.w("Failed to extract people from entry ${entry.uid}: ${result.error}")
-                                emptyList()
-                            }
+                            is AIResult.Unavailable -> emptyList()
+                            is AIResult.Error -> emptyList()
                         }
                     }.distinctBy { it.name }
 
-            Napier.d("Extracted ${people.size} unique people from entries")
-
-            // Generate week identifier for narrative caching
-            val weekId = "${startTime.toLocalDateTime(timezone).date}"
-
-            // Compute the rewind's primary location so the synthesizer can fetch
-            // historical weather in parallel with the LLM call. Best-effort: a missing
-            // or empty location history just skips weather entirely.
             val locationHistory =
                 runCatching { locationHistoryRepository.getLocationHistoryBetween(startTime, endTime) }
                     .getOrElse { emptyList() }
-            val primaryLocation = computePrimaryLocation(locationHistory)
 
-            // Synthesize narrative understanding of the week
-            val narrativeResult =
-                narrativeSynthesizer.synthesize(
-                    weekId = weekId,
+            val input =
+                RewindInput(
+                    periodStart = startTime,
+                    periodEnd = endTime,
                     textEntries = allTextEntries,
                     media = mediaItems,
                     people = people,
-                    primaryLocation = primaryLocation,
-                    periodStart = startTime,
-                    periodEnd = endTime,
-                    useCached = true,
-                )
-
-            // Curate media before sequencing — strips screenshots / doc scans / burst
-            // duplicates and assigns each survivor to a story-beat window when one fits.
-            // Runs in both the AI-success and fallback paths so even a Rewind without
-            // narrative still benefits from photo curation.
-            val narrative = (narrativeResult as? AIResult.Success)?.value
-            val curation =
-                rewindMediaCurator.curate(
-                    allMedia = mediaItems,
-                    narrative = narrative,
-                    textEntries = allTextEntries,
-                    people = people,
                     locationHistory = locationHistory,
-                    periodStart = startTime,
-                    periodEnd = endTime,
-                    config = CurationConfig(),
+                    weekId = "${startTime.toLocalDateTime(timezone).date}",
                 )
 
-            val activities = narrative?.themes?.let { deriveActivitiesFromThemes(it) } ?: listOf(ActivityType.MIXED)
-            val mapPoints = downsampleToMapPoints(locationHistory)
-            val stats = buildWeekStats(allTextEntries, curation, locationHistory, people)
+            val strategy = strategySelector.select()
+            Napier.d("Selected strategy: ${strategy.name}")
+            val output = strategy.produce(input)
+            Napier.d(
+                "Strategy ${output.provenance.strategy} produced ${output.content.size} panels" +
+                    (output.provenance.fellBackFrom?.let { " (fell back from $it)" } ?: ""),
+            )
 
-            // Sequence content into narrative-driven panels
-            val narrativeContent =
-                when (narrativeResult) {
-                    is AIResult.Success -> {
-                        Napier.d("Using AI narrative with ${narrativeResult.value.storyBeats.size} story beats")
-                        rewindSequencer.sequence(
-                            narrative = narrativeResult.value,
-                            curation = curation,
-                            textEntries = allTextEntries,
-                            people = people,
-                            weather = narrativeResult.value.weatherContext,
-                            locationPath = mapPoints,
-                            stats = stats,
-                            activities = activities,
-                        )
-                    }
-                    is AIResult.Unavailable -> {
-                        Napier.w("Narrative synthesis unavailable, building curated chronological fallback")
-                        buildCuratedFallback(allTextEntries, curation)
-                    }
-                    is AIResult.Error -> {
-                        Napier.w("Narrative synthesis failed, building curated chronological fallback")
-                        buildCuratedFallback(allTextEntries, curation)
-                    }
-                }
-
-            Napier.d("Generated ${narrativeContent.size} narrative panels")
-
-            // Generate a title and label based on the period
             val titleInfo = generateRewindTitle(startTime, endTime)
-
-            // Build intelligence metadata from collected data
-            val metadata =
-                buildMetadata(
-                    narrative = narrative,
-                    people = people,
-                    locationHistory = locationHistory,
-                )
-
-            // Create the rewind with narrative-driven content
             val rewind =
                 Rewind(
                     uid = Uuid.random(),
@@ -307,28 +174,16 @@ class GenerateBasicRewindUseCase(
                     generationDate = Clock.System.now(),
                     label = titleInfo.label,
                     title = titleInfo.title,
-                    content = narrativeContent,
-                    metadata = metadata,
+                    content = output.content,
+                    metadata = output.metadata,
                 )
 
-            // Save the rewind to the repository
             rewindRepository.saveRewind(rewind)
-
-            // Update generation request status
-            updateGenerationStatus(
-                request.id,
-                RewindGenerationRequest.Status.COMPLETED,
-            )
-
-            Napier.d("Successfully generated rewind with ${narrativeContent.size} content items")
+            updateGenerationStatus(request.id, RewindGenerationRequest.Status.COMPLETED)
             return GenerateBasicRewindResult.Success(rewind)
         } catch (e: Exception) {
             Napier.e("Failed to generate rewind", e)
-            updateGenerationStatus(
-                request.id,
-                RewindGenerationRequest.Status.FAILED,
-                e.message,
-            )
+            updateGenerationStatus(request.id, RewindGenerationRequest.Status.FAILED, e.message)
             return GenerateBasicRewindResult.Error(
                 "Failed to generate rewind: ${e.message ?: "Unknown error"}",
                 e,
@@ -336,218 +191,24 @@ class GenerateBasicRewindUseCase(
         }
     }
 
-    /**
-     * Builds intelligence metadata from the data collected during generation.
-     *
-     * @param locationHistory Pre-fetched history shared with the weather lookup so we
-     *   don't hit the location DAO twice per rewind.
-     */
-    private fun buildMetadata(
-        narrative: WeekNarrative?,
-        people: List<app.logdate.shared.model.Person>,
-        locationHistory: List<LocationHistoryItem>,
-    ): RewindMetadata {
-        // Derive activity types from narrative themes
-        val activities =
-            narrative?.themes?.let { deriveActivities(it) }
-                ?: listOf(ActivityType.MIXED)
-
-        // Extract milestones from story beats
-        val milestones =
-            narrative
-                ?.storyBeats
-                ?.filter { it.emotionalWeight.lowercase() in setOf("triumphant", "milestone", "significant", "proud") }
-                ?.map { it.moment }
-                ?: emptyList()
-
-        // Build location summary from the already-fetched history
-        val locationSummary =
-            if (locationHistory.isNotEmpty()) {
-                LocationSummary(
-                    distinctLocations =
-                        locationHistory
-                            .map {
-                                "${it.location.latitude.toInt()},${it.location.longitude.toInt()}"
-                            }.distinct()
-                            .size,
-                    newPlaces = 0, // Would require historical comparison
-                    primaryLocation = null, // Would require reverse geocoding
-                )
-            } else {
-                null
-            }
-
-        return RewindMetadata(
-            detectedActivities = activities,
-            locationSummary = locationSummary,
-            milestones = milestones,
-            peopleHighlighted = people.map { it.name },
-            reflectionPrompts = narrative?.reflectionPrompts ?: emptyList(),
-            highlightedQuotes = narrative?.highlightedQuotes ?: emptyList(),
-            weatherContext = narrative?.weatherContext,
-            locationPath = downsampleToMapPoints(locationHistory),
-        )
-    }
-
-    /**
-     * Reduces a raw location history list to at most [MAP_POINT_LIMIT] points by even
-     * sampling, so the metadata blob stays small enough to round-trip cheaply through
-     * the rewinds row's metadata column. The first and last samples are always
-     * preserved so the renderer's polyline still anchors at the period's actual
-     * endpoints.
-     */
-    private fun downsampleToMapPoints(history: List<LocationHistoryItem>): List<MapPoint> {
-        if (history.isEmpty()) return emptyList()
-        val asPoints =
-            history.map { item ->
-                MapPoint(
-                    latitude = item.location.latitude,
-                    longitude = item.location.longitude,
-                    timestamp = item.timestamp,
-                )
-            }
-        if (asPoints.size <= MAP_POINT_LIMIT) return asPoints
-        val step = asPoints.size.toDouble() / MAP_POINT_LIMIT
-        val sampled = mutableListOf<MapPoint>()
-        var index = 0.0
-        while (sampled.size < MAP_POINT_LIMIT - 1 && index.toInt() < asPoints.size) {
-            sampled.add(asPoints[index.toInt()])
-            index += step
-        }
-        // Always include the last point so the polyline ends where the user actually was.
-        if (sampled.lastOrNull() != asPoints.last()) sampled.add(asPoints.last())
-        return sampled
-    }
-
-    /**
-     * Picks one representative point from the period's location history to anchor a
-     * weather lookup against. Uses the centroid of the entries because the user might
-     * have moved around the same general area all week and a single sample would be
-     * arbitrary; an average over all samples is stable and cheap.
-     */
-    private fun computePrimaryLocation(history: List<LocationHistoryItem>): WeatherFetchLocation? {
-        if (history.isEmpty()) return null
-        val avgLat = history.sumOf { it.location.latitude } / history.size
-        val avgLon = history.sumOf { it.location.longitude } / history.size
-        return WeatherFetchLocation(latitude = avgLat, longitude = avgLon)
-    }
-
-    private fun deriveActivities(themes: List<String>): List<ActivityType> = deriveActivitiesFromThemes(themes)
-
-    /**
-     * Summarizes the period as headline counts for the personality card. Photo count is
-     * the curated total (post-filter), not the device-side raw count — what the user
-     * sees in their Rewind is what gets summarized.
-     */
-    private fun buildWeekStats(
-        textEntries: List<JournalNote.Text>,
-        curation: CurationResult,
-        locationHistory: List<LocationHistoryItem>,
-        people: List<app.logdate.shared.model.Person>,
-    ): WeekStatsSnapshot {
-        val curatedMediaCount =
-            curation.perBeat.values.sumOf { it.size } + curation.freeAgents.size
-        val distinctLocations =
-            locationHistory
-                .map { "${it.location.latitude.toInt()},${it.location.longitude.toInt()}" }
-                .distinct()
-                .size
-        return WeekStatsSnapshot(
-            photoCount = curatedMediaCount,
-            textNoteCount = textEntries.size,
-            distinctLocations = distinctLocations,
-            distinctPeople = people.size,
-        )
-    }
-
-    /**
-     * Builds the fallback panel list when narrative synthesis was unavailable.
-     *
-     * Still chronological — but only curated media (screenshots / doc scans / burst
-     * duplicates already dropped). A real local-heuristic narrative replaces this once
-     * the strategy pattern lands; until then this is the floor a Rewind drops to when AI
-     * is offline or off-plan.
-     */
-    private fun buildCuratedFallback(
-        textEntries: List<JournalNote.Text>,
-        curation: CurationResult,
-    ): List<RewindContent> {
-        val out = mutableListOf<RewindContent>()
-        out.addAll(textEntries.map { it.toRewindContent() })
-        val curatedCandidates: List<MediaCandidate> =
-            curation.perBeat.values.flatten() + curation.freeAgents
-        curatedCandidates.forEach { c ->
-            val score = curation.sigByMediaUid[c.media.uid]
-            when (val m = c.media) {
-                is IndexedMedia.Image ->
-                    out.add(
-                        RewindContent.Image(
-                            timestamp = m.timestamp,
-                            sourceId = m.uid,
-                            uri = m.uri,
-                            caption = m.caption,
-                            significanceScore = score,
-                        ),
-                    )
-                is IndexedMedia.Video ->
-                    out.add(
-                        RewindContent.Video(
-                            timestamp = m.timestamp,
-                            sourceId = m.uid,
-                            uri = m.uri,
-                            caption = m.caption,
-                            duration = m.duration,
-                            significanceScore = score,
-                        ),
-                    )
-            }
-        }
-        return out.sortedBy { it.timestamp }
-    }
-
-    /**
-     * Waits for an existing rewind generation to complete.
-     *
-     * @param startTime Start of the time period
-     * @param endTime End of the time period
-     * @param timeout Maximum time to wait
-     * @param pollInterval How frequently to check generation status
-     * @return True if waiting was successful (generation completed), false otherwise
-     */
     private suspend fun waitForExistingGeneration(
         startTime: Instant,
         endTime: Instant,
         timeout: Duration,
         pollInterval: Duration,
     ): Boolean {
-        Napier.d("Waiting for existing generation to complete (timeout: $timeout)")
-
         val endWaitTime = Clock.System.now() + timeout
-
         while (Clock.System.now() < endWaitTime) {
-            // Check if the rewind is now available
-            rewindRepository.getRewindBetween(startTime, endTime).firstOrNull()?.let {
-                return true
-            }
-
-            // Check if generation is still in progress
+            rewindRepository.getRewindBetween(startTime, endTime).firstOrNull()?.let { return true }
             if (!generationManager.isGenerationInProgress(startTime, endTime)) {
-                // Generation completed but no rewind found, something went wrong
                 Napier.w("Generation no longer in progress but no rewind found")
                 return false
             }
-
-            // Wait before checking again
             delay(pollInterval)
         }
-
-        Napier.d("Timed out waiting for existing generation")
         return false
     }
 
-    /**
-     * Updates the status of a generation request.
-     */
     private suspend fun updateGenerationStatus(
         requestId: Uuid,
         status: RewindGenerationRequest.Status,
@@ -559,7 +220,6 @@ class GenerateBasicRewindUseCase(
             } else {
                 generationManager.updateRequestStatus(requestId, status, details)
             }
-            Napier.d("Updated generation request $requestId to $status ${details?.let { "($it)" } ?: ""}")
         } catch (e: Exception) {
             Napier.e("Failed to update generation status", e)
         }
@@ -567,11 +227,9 @@ class GenerateBasicRewindUseCase(
 }
 
 /**
- * Derives activity types from a list of narrative themes.
- *
- * Pure function — exposed at file scope so it can be unit tested without standing up
- * the full use case dependency graph. Returns [ActivityType.MIXED] when no specific
- * activities can be inferred from the themes.
+ * Derives activity types from a list of narrative themes. Kept at file scope so it can
+ * be unit tested without standing up the full use case dependency graph; the result is
+ * used by intelligence strategies that build metadata.
  */
 internal fun deriveActivitiesFromThemes(themes: List<String>): List<ActivityType> {
     val activities = mutableSetOf<ActivityType>()
@@ -608,20 +266,3 @@ internal fun deriveActivitiesFromThemes(themes: List<String>): List<ActivityType
 
     return activities.toList().ifEmpty { listOf(ActivityType.MIXED) }
 }
-
-/**
- * Extension function to convert a JournalNote to RewindContent.
- *
- * TODO: Consider replacing with a proper mapper class that handles all conversions
- * between domain models and persistence models in a centralized way.
- */
-private fun JournalNote.toRewindContent(): RewindContent =
-    when (this) {
-        is JournalNote.Text ->
-            RewindContent.TextNote(
-                timestamp = creationTimestamp,
-                sourceId = uid,
-                content = content,
-            )
-        else -> throw IllegalArgumentException("Unsupported note type: $this")
-    }

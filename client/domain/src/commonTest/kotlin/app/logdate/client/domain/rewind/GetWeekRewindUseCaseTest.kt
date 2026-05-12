@@ -5,6 +5,8 @@ import app.logdate.client.domain.media.IndexMediaForPeriodUseCase
 import app.logdate.client.domain.notes.FetchNotesForDayUseCase
 import app.logdate.client.intelligence.AIError
 import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.availability.RewindAIAvailability
+import app.logdate.client.intelligence.availability.RewindAITier
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.cache.GenerativeAICacheEntry
 import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
@@ -20,6 +22,10 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
 import app.logdate.client.intelligence.generativeai.GenerativeAIResponse
 import app.logdate.client.intelligence.narrative.RewindSequencer
 import app.logdate.client.intelligence.narrative.WeekNarrativeSynthesizer
+import app.logdate.client.intelligence.rewind.strategy.FullLLMRewindStrategy
+import app.logdate.client.intelligence.rewind.strategy.LocalRewindStrategy
+import app.logdate.client.intelligence.rewind.strategy.QuotesOnlyLLMRewindStrategy
+import app.logdate.client.intelligence.rewind.strategy.RewindStrategySelector
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.MediaPayload
@@ -102,6 +108,25 @@ class GetWeekRewindUseCaseTest {
                 bucketer = BeatBucketer(),
                 selector = DiversitySelector(),
             )
+        val localStrategy = LocalRewindStrategy(curator = curator, sequencer = rewindSequencer)
+        val fullStrategy =
+            FullLLMRewindStrategy(
+                narrativeSynthesizer = narrativeSynthesizer,
+                curator = curator,
+                sequencer = rewindSequencer,
+                localFallback = localStrategy,
+            )
+        val quotesOnlyStrategy = QuotesOnlyLLMRewindStrategy(localFallback = localStrategy)
+        val strategySelector =
+            RewindStrategySelector(
+                availability =
+                    object : RewindAIAvailability {
+                        override suspend fun current(): RewindAITier = RewindAITier.FULL
+                    },
+                fullStrategy = fullStrategy,
+                quotesOnlyStrategy = quotesOnlyStrategy,
+                localStrategy = localStrategy,
+            )
         val generateBasicRewindUseCase =
             GenerateBasicRewindUseCase(
                 rewindRepository = rewindRepository,
@@ -110,9 +135,7 @@ class GetWeekRewindUseCaseTest {
                 indexedMediaRepository = indexedMediaRepository,
                 indexMediaForPeriod = indexMediaForPeriod,
                 generateRewindTitle = GenerateRewindTitleUseCase(),
-                narrativeSynthesizer = narrativeSynthesizer,
-                rewindSequencer = rewindSequencer,
-                rewindMediaCurator = curator,
+                strategySelector = strategySelector,
                 peopleExtractor = peopleExtractor,
                 locationHistoryRepository = FakeLocationHistoryRepository(),
             )

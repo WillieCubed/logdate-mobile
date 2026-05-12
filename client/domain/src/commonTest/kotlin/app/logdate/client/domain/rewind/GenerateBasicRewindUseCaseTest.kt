@@ -3,6 +3,8 @@ package app.logdate.client.domain.rewind
 import app.logdate.client.domain.media.IndexMediaForPeriodUseCase
 import app.logdate.client.domain.notes.FetchNotesForDayUseCase
 import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.availability.RewindAIAvailability
+import app.logdate.client.intelligence.availability.RewindAITier
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.cache.GenerativeAICacheEntry
 import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
@@ -18,6 +20,10 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
 import app.logdate.client.intelligence.generativeai.GenerativeAIResponse
 import app.logdate.client.intelligence.narrative.RewindSequencer
 import app.logdate.client.intelligence.narrative.WeekNarrativeSynthesizer
+import app.logdate.client.intelligence.rewind.strategy.FullLLMRewindStrategy
+import app.logdate.client.intelligence.rewind.strategy.LocalRewindStrategy
+import app.logdate.client.intelligence.rewind.strategy.QuotesOnlyLLMRewindStrategy
+import app.logdate.client.intelligence.rewind.strategy.RewindStrategySelector
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.MediaPayload
@@ -110,9 +116,12 @@ class GenerateBasicRewindUseCaseTest {
             val result = useCase(start, end)
 
             val success = assertIs<GenerateBasicRewindResult.Success>(result)
-            assertEquals(1, success.rewind.content.size)
-            val textPanel = assertIs<RewindContent.TextNote>(success.rewind.content.single())
-            assertEquals("Included note", textPanel.content)
+            // The strategy adds structural panels (e.g. a PersonalityCard opener) around
+            // text evidence; the contract under test is that the exclusive-end note is
+            // never rendered, so assert on the TextNote panels specifically.
+            val textPanels = success.rewind.content.filterIsInstance<RewindContent.TextNote>()
+            assertEquals(1, textPanels.size)
+            assertEquals("Included note", textPanels.single().content)
             assertNotNull(rewindRepository.savedRewind)
         }
 
@@ -157,6 +166,26 @@ class GenerateBasicRewindUseCaseTest {
                 bucketer = BeatBucketer(),
                 selector = DiversitySelector(),
             )
+        val sequencer = RewindSequencer()
+        val localStrategy = LocalRewindStrategy(curator = curator, sequencer = sequencer)
+        val fullStrategy =
+            FullLLMRewindStrategy(
+                narrativeSynthesizer = narrativeSynthesizer,
+                curator = curator,
+                sequencer = sequencer,
+                localFallback = localStrategy,
+            )
+        val quotesOnlyStrategy = QuotesOnlyLLMRewindStrategy(localFallback = localStrategy)
+        val strategySelector =
+            RewindStrategySelector(
+                availability =
+                    object : RewindAIAvailability {
+                        override suspend fun current(): RewindAITier = RewindAITier.FULL
+                    },
+                fullStrategy = fullStrategy,
+                quotesOnlyStrategy = quotesOnlyStrategy,
+                localStrategy = localStrategy,
+            )
         return GenerateBasicRewindUseCase(
             rewindRepository = rewindRepository,
             generationManager = generationManager,
@@ -164,9 +193,7 @@ class GenerateBasicRewindUseCaseTest {
             indexedMediaRepository = indexedMediaRepository,
             indexMediaForPeriod = indexMediaForPeriod,
             generateRewindTitle = GenerateRewindTitleUseCase(),
-            narrativeSynthesizer = narrativeSynthesizer,
-            rewindSequencer = RewindSequencer(),
-            rewindMediaCurator = curator,
+            strategySelector = strategySelector,
             peopleExtractor = peopleExtractor,
             locationHistoryRepository = FakeLocationHistoryRepository(),
         )

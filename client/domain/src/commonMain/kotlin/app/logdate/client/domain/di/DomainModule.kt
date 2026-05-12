@@ -179,7 +179,7 @@ val domainModule: Module =
         factory { IndexMediaForPeriodUseCase(get(), get()) }
 
         // Create the GenerateBasicRewindUseCase with all its dependencies
-        factory { GenerateBasicRewindUseCase(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+        factory { GenerateBasicRewindUseCase(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 
         // Timeline
         factory { GetJournalMembershipUseCase(get()) }

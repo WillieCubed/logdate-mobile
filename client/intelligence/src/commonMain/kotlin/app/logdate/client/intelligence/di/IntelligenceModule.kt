@@ -17,6 +17,10 @@ import app.logdate.client.intelligence.narrative.WeekNarrativeSynthesizer
 import app.logdate.client.intelligence.narrative.YearNarrativeSynthesizer
 import app.logdate.client.intelligence.rewind.RewindMessageGenerator
 import app.logdate.client.intelligence.rewind.WittyRewindMessageGenerator
+import app.logdate.client.intelligence.rewind.strategy.FullLLMRewindStrategy
+import app.logdate.client.intelligence.rewind.strategy.LocalRewindStrategy
+import app.logdate.client.intelligence.rewind.strategy.QuotesOnlyLLMRewindStrategy
+import app.logdate.client.intelligence.rewind.strategy.RewindStrategySelector
 import app.logdate.client.intelligence.weather.HistoricalWeatherProvider
 import app.logdate.client.intelligence.weather.OpenMeteoHistoricalWeatherProvider
 import org.koin.core.module.Module
@@ -55,6 +59,28 @@ val intelligenceModule: Module =
         single { BeatBucketer() }
         single { DiversitySelector() }
         single { RewindMediaCurator(get(), get(), get(), get(), get()) }
+
+        // Rewind generation strategies. Local first (no LLM dependency), then the LLM
+        // strategies that compose with local fallback. The selector picks based on
+        // [RewindAIAvailability] (bound by the domain module).
+        single { LocalRewindStrategy(curator = get(), sequencer = get()) }
+        single {
+            FullLLMRewindStrategy(
+                narrativeSynthesizer = get(),
+                curator = get(),
+                sequencer = get(),
+                localFallback = get(),
+            )
+        }
+        single { QuotesOnlyLLMRewindStrategy(localFallback = get()) }
+        single {
+            RewindStrategySelector(
+                availability = get(),
+                fullStrategy = get(),
+                quotesOnlyStrategy = get(),
+                localStrategy = get(),
+            )
+        }
 
         // Annual rewind
         single { YearNarrativeSynthesizer(get(), get(), get(), get()) }
