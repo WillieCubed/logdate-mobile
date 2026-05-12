@@ -16,6 +16,8 @@
     <string name="rewind_settings_strictness_strict">Strict</string>
     <string name="rewind_settings_include_screenshots_label">Include screenshots</string>
     <string name="rewind_settings_include_screenshots_helper">Off by default. Turn on to let saved screen captures appear in your Rewinds alongside your real photos.</string>
+    <string name="rewind_upgrade_chip_message">Your Rewind is built locally.</string>
+    <string name="rewind_upgrade_chip_action">Upgrade for AI-written stories</string>
 
     <!-- Annual rewind -->
     <string name="annual_rewind_generate">Create your %1$d Year in Review</string>
