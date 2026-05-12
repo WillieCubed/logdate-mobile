@@ -47,5 +47,9 @@ kotlin {
             implementation(libs.android.billingKtx)
             implementation(libs.koin.android)
         }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+        }
     }
 }
