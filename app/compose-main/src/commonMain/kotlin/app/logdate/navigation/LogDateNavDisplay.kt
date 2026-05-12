@@ -85,6 +85,7 @@ import app.logdate.ui.navigation.taggedEntry
 import app.logdate.ui.platform.DefaultLogDateHaptics
 import app.logdate.ui.platform.LocalLogDateHaptics
 import app.logdate.ui.platform.LocalPlatformHaptics
+import app.logdate.ui.platform.currentPlatform
 import app.logdate.ui.platform.iosEdgeSwipeBack
 import app.logdate.ui.platform.rememberPlatformHapticsController
 import app.logdate.ui.platform.rememberSystemReduceMotion
@@ -360,21 +361,35 @@ fun LogDateNavDisplay(
  * Default [SceneStrategy] for the LogDate graph. Activates [HomeSceneStrategy]'s two-pane
  * layout when the current window is wide enough; otherwise the strategy returns `null` and
  * `NavDisplay` falls back to its single-pane default.
+ *
+ * iPad gets a softer threshold because standard iPad portrait widths (e.g. 768pt on a 10.2"
+ * model, 834pt on an 11" Pro) sit just below the Material expanded breakpoint of 840dp. On
+ * those devices users still expect a list/detail layout, so we drop the activation point to
+ * the medium breakpoint (600dp) when the host is iPad. Narrow Split View widths stay below
+ * that floor and continue to render single-pane.
  */
 @Composable
 private fun rememberHomeSceneStrategy(): SceneStrategy<NavKey> {
     val windowSize = LocalWindowInfo.current.containerSize
+    val isIpad = currentPlatform.isIpad
     val supportsDualPane =
         with(LocalDensity.current) {
-            supportsDualPaneHomeScene(
-                width = windowSize.width.toDp(),
-                height = windowSize.height.toDp(),
-            )
+            val widthDp = windowSize.width.toDp()
+            val heightDp = windowSize.height.toDp()
+            supportsDualPaneHomeScene(width = widthDp, height = heightDp) ||
+                (isIpad && widthDp.value >= IPAD_DUAL_PANE_MIN_WIDTH_DP)
         }
     return remember(supportsDualPane) {
         HomeSceneStrategy { supportsDualPane }
     }
 }
+
+/**
+ * Lower bound (in dp) at which an iPad host should render the two-pane home layout. Set to
+ * the Material medium breakpoint so iPad portrait fits comfortably while narrow Split View
+ * widths still fall back to single-pane.
+ */
+private const val IPAD_DUAL_PANE_MIN_WIDTH_DP = 600
 
 /**
  * Wraps the existing `TimelineDayDetailPanel` (which lives in client/feature/timeline) so the
