@@ -1,7 +1,9 @@
 package app.logdate.screenshots.shared
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -65,6 +67,8 @@ import app.logdate.feature.rewind.ui.components.RewindCoverCard
 import app.logdate.feature.rewind.ui.detail.RewindDetailScreenContent
 import app.logdate.feature.rewind.ui.detail.RewindErrorScreen
 import app.logdate.feature.rewind.ui.detail.RewindLoadingScreen
+import app.logdate.feature.rewind.ui.detail.RewindUpgradeChip
+import app.logdate.feature.rewind.ui.overview.FirstRewindOnboardingSheetContent
 import app.logdate.feature.rewind.ui.overview.RewindHistoryUiState
 import app.logdate.feature.rewind.ui.overview.RewindOverviewScreenUiState
 import app.logdate.feature.rewind.ui.overview.RewindPreviewUiState
@@ -126,6 +130,8 @@ enum class SharedScreenshotSceneId(
     RewindError("rewind-error"),
     PastRewinds("past-rewinds"),
     RewindSettings("rewind-settings"),
+    RewindUpgradeChip("rewind-upgrade-chip"),
+    FirstRewindOnboardingSheet("first-rewind-onboarding-sheet"),
     DayBoundaryRecovery("day-boundary-recovery"),
 }
 
@@ -804,6 +810,20 @@ object SharedScreenshotCatalog {
                     onReflectionRepliesToggled = {},
                     onBack = {},
                 )
+            },
+            sharedScene(SharedScreenshotSceneId.RewindUpgradeChip, ScreenshotSceneGroup.REWIND, desktopOnlyVariants) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .background(Color.Black)
+                            .padding(48.dp),
+                ) {
+                    RewindUpgradeChip(onUpgradeClick = {})
+                }
+            },
+            sharedScene(SharedScreenshotSceneId.FirstRewindOnboardingSheet, ScreenshotSceneGroup.REWIND, desktopOnlyVariants) {
+                FirstRewindOnboardingSheetContent(onDismiss = {})
             },
             sharedScene(SharedScreenshotSceneId.DayBoundaryRecovery, ScreenshotSceneGroup.SETTINGS, desktopTallVariants) {
                 DayBoundarySettingsContent(

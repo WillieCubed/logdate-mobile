@@ -20,7 +20,7 @@
     <string name="rewind_upgrade_chip_action">Upgrade for AI-written stories</string>
     <string name="first_rewind_onboarding_title">Welcome to Rewind</string>
     <string name="first_rewind_onboarding_cadence_heading">Every week, a story</string>
-    <string name="first_rewind_onboarding_cadence_body">Every Sunday, LogDate weaves your week\'s entries and photos into a short story you can replay.</string>
+    <string name="first_rewind_onboarding_cadence_body">Every Sunday, LogDate weaves your week&apos;s entries and photos into a short story you can replay.</string>
     <string name="first_rewind_onboarding_share_heading">Share what stood out</string>
     <string name="first_rewind_onboarding_share_body">Tap any moment in a Rewind to share it as a card. The rest stays on your phone.</string>
     <string name="first_rewind_onboarding_strictness_heading">Tune the photo picker</string>
@@ -57,7 +57,7 @@
     <string name="delete_rewind_dialog_confirm">Delete</string>
     <string name="delete_rewind_dialog_cancel">Keep it</string>
     <string name="past_rewind">Past rewinds</string>
-    <string name="past_rewinds_empty">No past rewinds yet. Your weekly stories will show up here once they\'re generated.</string>
+    <string name="past_rewinds_empty">No past rewinds yet. Your weekly stories will show up here once they&apos;re generated.</string>
     <string name="more_rewinds_below">More rewinds below</string>
     <string name="youve_reviewed_all_your_weekly_rewinds">You&apos;ve reviewed all your weekly rewinds</string>
 

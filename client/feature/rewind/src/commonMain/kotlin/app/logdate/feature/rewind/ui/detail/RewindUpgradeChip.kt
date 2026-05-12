@@ -38,7 +38,7 @@ fun RewindUpgradeChip(
         modifier =
             modifier
                 .clip(RoundedCornerShape(20.dp))
-                .background(Color.Black.copy(alpha = 0.55f))
+                .background(Color.White.copy(alpha = 0.15f))
                 .clickable(onClick = onUpgradeClick)
                 .padding(PaddingValues(horizontal = 16.dp, vertical = 10.dp)),
         verticalArrangement = Arrangement.spacedBy(2.dp),
