@@ -207,6 +207,21 @@ sealed class IndexedMedia {
         override val uri: String,
         override val timestamp: Instant,
         override val caption: String? = null,
+        /**
+         * Pixel width as recorded by the underlying media store. Nullable when the
+         * value wasn't captured at index time (older rows, platforms that don't
+         * surface dimensions).
+         */
+        val widthPx: Int? = null,
+        /**
+         * Pixel height; same semantics as [widthPx].
+         */
+        val heightPx: Int? = null,
+        /**
+         * MIME type as recorded by the underlying media store (e.g. `image/jpeg`,
+         * `image/heic`). Null when not captured.
+         */
+        val mimeType: String? = null,
     ) : IndexedMedia()
 
     /**
@@ -226,5 +241,11 @@ sealed class IndexedMedia {
         override val timestamp: Instant,
         override val caption: String? = null,
         val duration: Duration,
+        /** Pixel width as recorded at index time. Nullable when not captured. */
+        val widthPx: Int? = null,
+        /** Pixel height; same semantics as [widthPx]. */
+        val heightPx: Int? = null,
+        /** MIME type as recorded at index time (e.g. `video/mp4`). Null when not captured. */
+        val mimeType: String? = null,
     ) : IndexedMedia()
 }

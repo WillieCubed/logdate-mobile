@@ -227,6 +227,9 @@ class OfflineIndexedMediaRepository(
             uri = entity.uri,
             timestamp = entity.timestamp,
             caption = null, // Caption not yet supported in new entity model
+            widthPx = entity.dimensions.width.takeIf { it > 0 },
+            heightPx = entity.dimensions.height.takeIf { it > 0 },
+            mimeType = entity.mimeType.takeIf { it.isNotBlank() },
         )
 
     private fun mapToIndexedVideo(entity: IndexedVideoEntity): IndexedMedia.Video =
@@ -236,5 +239,8 @@ class OfflineIndexedMediaRepository(
             timestamp = entity.timestamp,
             caption = null, // Caption not yet supported in new entity model
             duration = entity.duration,
+            widthPx = entity.dimensions.width.takeIf { it > 0 },
+            heightPx = entity.dimensions.height.takeIf { it > 0 },
+            mimeType = entity.mimeType.takeIf { it.isNotBlank() },
         )
 }

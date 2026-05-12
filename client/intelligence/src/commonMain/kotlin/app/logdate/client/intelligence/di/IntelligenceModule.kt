@@ -3,8 +3,6 @@ package app.logdate.client.intelligence.di
 import app.logdate.client.intelligence.EntrySummarizer
 import app.logdate.client.intelligence.curation.BeatBucketer
 import app.logdate.client.intelligence.curation.DiversitySelector
-import app.logdate.client.intelligence.curation.MediaSignalExtractor
-import app.logdate.client.intelligence.curation.NoSignalsExtractor
 import app.logdate.client.intelligence.curation.PhotoHardFilter
 import app.logdate.client.intelligence.curation.RewindMediaCurator
 import app.logdate.client.intelligence.curation.SignificanceScorer
@@ -31,6 +29,7 @@ val intelligenceModule: Module =
     module {
         includes(clientsModule)
         includes(cacheModule)
+        includes(curationModule)
 
         single<RewindMessageGenerator> { WittyRewindMessageGenerator() }
         single { EntrySummarizer(get(), get(), networkAvailabilityMonitor = get(), dataUsagePolicy = get()) }
@@ -49,10 +48,8 @@ val intelligenceModule: Module =
         }
         single { RewindSequencer() }
 
-        // Rewind media curation pipeline. The default signal extractor returns all-null
-        // signals; platform-specific Koin modules will replace this binding once the real
-        // MediaStore / PHAsset / image-header readers land. The four stages are stateless.
-        single<MediaSignalExtractor> { NoSignalsExtractor() }
+        // Rewind media curation pipeline. The platform-specific signal extractor is
+        // bound by [curationModule] above; the four stages here are stateless.
         single { PhotoHardFilter() }
         single { SignificanceScorer() }
         single { BeatBucketer() }
@@ -75,3 +72,5 @@ val intelligenceModule: Module =
     }
 
 expect val cacheModule: Module
+
+expect val curationModule: Module
