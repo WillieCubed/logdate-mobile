@@ -5,6 +5,7 @@ import app.logdate.client.intelligence.curation.CurationConfig
 import app.logdate.client.intelligence.curation.CurationResult
 import app.logdate.client.intelligence.curation.RewindMediaCurator
 import app.logdate.client.intelligence.narrative.RewindSequencer
+import app.logdate.client.intelligence.rewind.local.LocalQuoteSelector
 import app.logdate.client.intelligence.rewind.local.LocalThemeExtractor
 import app.logdate.client.intelligence.rewind.local.deriveActivitiesFromThemes
 import app.logdate.client.repository.location.LocationHistoryItem
@@ -33,6 +34,7 @@ class LocalRewindStrategy(
     private val curator: RewindMediaCurator,
     private val sequencer: RewindSequencer,
     private val themeExtractor: LocalThemeExtractor = LocalThemeExtractor(),
+    private val quoteSelector: LocalQuoteSelector = LocalQuoteSelector(),
 ) : RewindGenerationStrategy {
     override val name: String = STRATEGY_NAME
 
@@ -112,13 +114,14 @@ class LocalRewindStrategy(
                 evidenceIds = evidenceIds,
             )
         val themes = themeExtractor.extract(input.textEntries.map { it.content })
+        val quotes = quoteSelector.select(input.textEntries)
         return WeekNarrative(
             themes = themes,
             emotionalTone = "varied",
             storyBeats = listOf(catchAllBeat),
             overallNarrative = "A summary of your week.",
             reflectionPrompts = emptyList(),
-            highlightedQuotes = emptyList(),
+            highlightedQuotes = quotes,
             weatherContext = null, // weather fetch belongs to the use case for now
             origin = NarrativeOrigin.LOCAL_HEURISTIC,
         )
