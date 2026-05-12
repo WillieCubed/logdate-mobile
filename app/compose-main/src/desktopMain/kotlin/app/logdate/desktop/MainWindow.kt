@@ -75,6 +75,15 @@ internal fun MainWindow(
                     shortcut = KeyShortcut(Key.Q, meta = true),
                     onClick = appState::exit,
                 )
+                // Only surfaced while the cascade is fanning out so the keyboard shortcut and
+                // menu both vanish back to normal once there's nothing to cancel.
+                if (appState.exitCascadeInFlight) {
+                    Item(
+                        text = "Cancel Quit",
+                        shortcut = KeyShortcut(Key.Period, meta = true),
+                        onClick = appState::cancelExit,
+                    )
+                }
             }
         }
         MainWindowContent(

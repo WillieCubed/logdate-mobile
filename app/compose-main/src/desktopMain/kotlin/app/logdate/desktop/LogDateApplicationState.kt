@@ -42,9 +42,11 @@ class LogDateApplicationState {
      * True while the main-window close request is fanning out through the editor windows. Used so
      * the last editor to actually close (after persisting its draft) can trip
      * [shouldExitApplication] without the application state needing to know which save finished
-     * last.
+     * last. Read-only from outside so menus can disable "Cancel Quit" unless there's a quit to
+     * cancel.
      */
-    private var exitCascadeInFlight: Boolean by mutableStateOf(false)
+    var exitCascadeInFlight: Boolean by mutableStateOf(false)
+        private set
 
     fun openJournal(journalId: String) {
     }
@@ -79,6 +81,20 @@ class LogDateApplicationState {
      */
     fun exit() {
         beginApplicationExit()
+    }
+
+    /**
+     * Aborts an in-flight quit so editors that haven't finished saving stay open. No-op when no
+     * quit is in flight (so the user can mash the shortcut without surprise). Once the cascade has
+     * already flipped [shouldExitApplication], the application is past the point of return —
+     * `cancelExit` will not resurrect it.
+     */
+    fun cancelExit() {
+        if (!exitCascadeInFlight || shouldExitApplication) return
+        exitCascadeInFlight = false
+        for (editor in _editorWindows) {
+            editor.clearCloseRequest()
+        }
     }
 
     private fun closeEditor(editor: EntryEditorWindowState): Boolean {

@@ -117,6 +117,15 @@ internal fun EntryEditorWindow(
                     shortcut = KeyShortcut(Key.Q, meta = true),
                     onClick = appState::exit,
                 )
+                // Cmd+. mirrors macOS's standard "cancel current operation"; only rendered while
+                // a quit is fanning out, so the shortcut and menu disappear once it's irrelevant.
+                if (appState.exitCascadeInFlight) {
+                    Item(
+                        text = "Cancel Quit",
+                        shortcut = KeyShortcut(Key.Period, meta = true),
+                        onClick = appState::cancelExit,
+                    )
+                }
             }
         }
         SharedTransitionLayout {
@@ -171,6 +180,15 @@ class EntryEditorWindowState(
 
     fun requestClose() {
         closeRequested = true
+    }
+
+    /**
+     * Resets [closeRequested] without closing the window. Called when the application's exit
+     * cascade is cancelled so the editor returns to its normal interactive state instead of
+     * keeping its save-then-close intent latched.
+     */
+    fun clearCloseRequest() {
+        closeRequested = false
     }
 
     override fun exit(): Boolean = true
