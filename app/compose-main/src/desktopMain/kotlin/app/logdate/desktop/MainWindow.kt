@@ -34,13 +34,24 @@ internal fun MainWindow(
     state: MainWindowState = rememberMainWindowState(appState),
 ) {
     val preferences = remember { DesktopWindowPreferences() }
-    val windowState = rememberWindowState(size = preferences.readMainWindowSize(DEFAULT_MAIN_WINDOW_SIZE))
+    val windowState =
+        rememberWindowState(
+            size = preferences.readMainWindowSize(DEFAULT_MAIN_WINDOW_SIZE),
+            position = preferences.readMainWindowPosition(),
+        )
 
     LaunchedEffect(Unit) {
         snapshotFlow { windowState.size }
             .distinctUntilChanged()
             .debounce(RESIZE_PERSIST_DEBOUNCE_MS)
             .collect { size -> preferences.writeMainWindowSize(size) }
+    }
+
+    LaunchedEffect(Unit) {
+        snapshotFlow { windowState.position }
+            .distinctUntilChanged()
+            .debounce(RESIZE_PERSIST_DEBOUNCE_MS)
+            .collect { position -> preferences.writeMainWindowPosition(position) }
     }
 
     Window(
