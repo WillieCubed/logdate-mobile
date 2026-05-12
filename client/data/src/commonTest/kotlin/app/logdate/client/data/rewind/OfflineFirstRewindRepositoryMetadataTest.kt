@@ -9,8 +9,15 @@ import app.logdate.client.database.entities.rewind.RewindTextContentEntity
 import app.logdate.client.database.entities.rewind.RewindVideoContentEntity
 import app.logdate.shared.model.ActivityType
 import app.logdate.shared.model.LocationSummary
+import app.logdate.shared.model.MapPoint
 import app.logdate.shared.model.Rewind
+import app.logdate.shared.model.RewindContent
 import app.logdate.shared.model.RewindMetadata
+import app.logdate.shared.model.TopListItem
+import app.logdate.shared.model.TopListKind
+import app.logdate.shared.model.WeatherCategory
+import app.logdate.shared.model.WeatherContext
+import app.logdate.shared.model.WeekStatsSnapshot
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -19,6 +26,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.time.Instant
@@ -129,6 +137,115 @@ class OfflineFirstRewindRepositoryMetadataTest {
             assertNotNull(retrieved.metadata)
             assertNull(retrieved.metadata!!.locationSummary)
             assertEquals(listOf(ActivityType.QUIET), retrieved.metadata!!.detectedActivities)
+        }
+
+    @Test
+    fun `rich rewind content panels round-trip through save and retrieve`() =
+        runTest {
+            val dao = FakeCachedRewindDao()
+            val repository = OfflineFirstRewindRepository(dao, UnconfinedTestDispatcher(testScheduler))
+
+            val start = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val mapTimestamp = Instant.fromEpochMilliseconds(1_700_000_001_000L)
+            val weatherTimestamp = Instant.fromEpochMilliseconds(1_700_000_002_000L)
+            val personalityTimestamp = Instant.fromEpochMilliseconds(1_700_000_003_000L)
+            val topListTimestamp = Instant.fromEpochMilliseconds(1_700_000_004_000L)
+            val topListSourceId = Uuid.random()
+            val locationPath =
+                listOf(
+                    MapPoint(latitude = 37.7749, longitude = -122.4194, timestamp = mapTimestamp),
+                    MapPoint(latitude = 37.8715, longitude = -122.2730, timestamp = mapTimestamp),
+                    MapPoint(latitude = 37.8044, longitude = -122.2712, timestamp = mapTimestamp),
+                )
+            val weather =
+                WeatherContext(
+                    category = WeatherCategory.RAINY,
+                    avgTempCelsius = 12.5,
+                    maxTempCelsius = 16.0,
+                    minTempCelsius = 8.0,
+                    precipitationMm = 22.4,
+                )
+            val stats =
+                WeekStatsSnapshot(
+                    photoCount = 12,
+                    textNoteCount = 7,
+                    distinctLocations = 4,
+                    distinctPeople = 3,
+                    newPlaces = 2,
+                )
+            val topListItems =
+                listOf(
+                    TopListItem(
+                        label = "Maya",
+                        subtitle = "4 entries",
+                        count = 4,
+                        sourceId = topListSourceId,
+                    ),
+                    TopListItem(
+                        label = "Eli",
+                        subtitle = "2 entries",
+                        count = 2,
+                        sourceId = null,
+                    ),
+                )
+            val rewind =
+                Rewind(
+                    uid = Uuid.random(),
+                    startDate = start,
+                    endDate = topListTimestamp,
+                    generationDate = topListTimestamp,
+                    label = "2025#04",
+                    title = "A richer week",
+                    content =
+                        listOf(
+                            RewindContent.MapPanel(
+                                timestamp = mapTimestamp,
+                                sourceId = Uuid.random(),
+                                locationPath = locationPath,
+                                significanceScore = 81f,
+                            ),
+                            RewindContent.WeatherPanel(
+                                timestamp = weatherTimestamp,
+                                sourceId = Uuid.random(),
+                                weather = weather,
+                                significanceScore = 64f,
+                            ),
+                            RewindContent.PersonalityCard(
+                                timestamp = personalityTimestamp,
+                                sourceId = Uuid.random(),
+                                stats = stats,
+                                dominantActivity = ActivityType.SOCIAL,
+                                significanceScore = 92f,
+                            ),
+                            RewindContent.TopList(
+                                timestamp = topListTimestamp,
+                                sourceId = Uuid.random(),
+                                kind = TopListKind.PEOPLE,
+                                items = topListItems,
+                                significanceScore = 75f,
+                            ),
+                        ),
+                    metadata = null,
+                )
+
+            repository.saveRewind(rewind)
+            val retrieved = repository.getRewind(rewind.uid).first()
+
+            assertEquals(4, retrieved.content.size)
+
+            val mapPanel = assertIs<RewindContent.MapPanel>(retrieved.content[0])
+            assertEquals(locationPath, mapPanel.locationPath)
+
+            val weatherPanel = assertIs<RewindContent.WeatherPanel>(retrieved.content[1])
+            assertEquals(weather, weatherPanel.weather)
+
+            val personalityCard = assertIs<RewindContent.PersonalityCard>(retrieved.content[2])
+            assertEquals(stats, personalityCard.stats)
+            assertEquals(ActivityType.SOCIAL, personalityCard.dominantActivity)
+
+            val topList = assertIs<RewindContent.TopList>(retrieved.content[3])
+            assertEquals(TopListKind.PEOPLE, topList.kind)
+            assertEquals(topListItems, topList.items)
         }
 }
 

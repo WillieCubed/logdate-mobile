@@ -54,7 +54,7 @@ sealed interface RewindOverviewScreenUiState {
      * significant activity has occurred.
      *
      * ## UI Behavior:
-     * - Shows "Coming Soon" placeholder card for current week with muted styling
+     * - Shows a muted in-progress card for the current week
      * - Displays all available past rewinds as interactive cards
      * - Maintains the same floating card layout and interactions
      *

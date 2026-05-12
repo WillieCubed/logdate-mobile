@@ -52,9 +52,7 @@ import kotlin.uuid.Uuid
 /**
  * ViewModel managing rewind detail screen state and data.
  *
- * Handles loading individual rewind data and transforming it into story panels
- * for the Instagram Stories-like interface. Currently provides sample data
- * while the backend implementation is completed.
+ * Handles loading individual rewind data and transforming it into story panels.
  *
  * ## Architecture:
  * - **Data Source**: GetRewindUseCase for rewind content
@@ -367,7 +365,7 @@ class RewindDetailViewModel(
 
         // 2. Transform content items to panels
         val contentPanels =
-            rewind.content.map { content ->
+            rewind.content.mapNotNull { content ->
                 when (content) {
                     is RewindContent.TextNote -> {
                         TextNoteRewindPanelUiState(
@@ -417,6 +415,51 @@ class RewindDetailViewModel(
                             sourceId = content.sourceId,
                             timestamp = content.timestamp,
                             transitionText = content.transitionText,
+                        )
+                    }
+
+                    is RewindContent.MapPanel -> {
+                        val points = content.locationPath.map { it.toPanelPoint() }
+                        if (points.qualifiesForMapPanel()) {
+                            LocationMapRewindPanelUiState(
+                                points = points,
+                                title = rewind.title,
+                                subtitle = "",
+                                accentSeed = content.sourceId.hashCode() xor MAP_SEED_OFFSET,
+                            )
+                        } else {
+                            null
+                        }
+                    }
+
+                    is RewindContent.WeatherPanel -> {
+                        SubtitledRewindPanelUiState(
+                            title = rewind.title,
+                            subtitle = "",
+                            weatherChip = content.weather.toChipUiState(),
+                        )
+                    }
+
+                    is RewindContent.PersonalityCard -> {
+                        BigStatisticRewindPanelUiState(
+                            title = rewind.title,
+                            statistic = content.stats.totalCount.toString(),
+                            units = "",
+                            description = "",
+                            background =
+                                RewindPanelBackgroundSpec(
+                                    color = 0xFF4CAF50, // Green
+                                ),
+                        )
+                    }
+
+                    is RewindContent.TopList -> {
+                        BasicTextRewindPanelUiState(
+                            text = content.items.joinToString(separator = "\n") { it.label },
+                            background =
+                                RewindPanelBackgroundSpec(
+                                    color = 0xFF2196F3, // Blue
+                                ),
                         )
                     }
                 }
@@ -725,6 +768,9 @@ class RewindDetailViewModel(
                 },
             avgTempCelsius = avgTempCelsius,
         )
+
+    private val app.logdate.shared.model.WeekStatsSnapshot.totalCount: Int
+        get() = photoCount + textNoteCount + distinctLocations + distinctPeople + newPlaces
 
     private companion object {
         // Per-panel-type offsets keep quote and prompt accent seeds from colliding when both

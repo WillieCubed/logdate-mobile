@@ -15,7 +15,10 @@ import app.logdate.shared.model.ReflectionPrompt
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
 import app.logdate.shared.model.RewindMetadata
+import app.logdate.shared.model.TopListItem
+import app.logdate.shared.model.TopListKind
 import app.logdate.shared.model.WeatherContext
+import app.logdate.shared.model.WeekStatsSnapshot
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
@@ -311,6 +314,103 @@ class OfflineFirstRewindRepository(
                     )
                 }
             }
+            content.startsWith(MAP_PANEL_PREFIX) -> {
+                runCatching {
+                    contentJson.decodeFromString<MapPanelPayload>(
+                        content.removePrefix(MAP_PANEL_PREFIX),
+                    )
+                }.map { payload ->
+                    RewindContent.MapPanel(
+                        timestamp = timestamp,
+                        sourceId = sourceId,
+                        locationPath = payload.locationPath,
+                    )
+                }.getOrElse {
+                    Napier.w("Failed to decode map panel payload for rewind text content", it)
+                    RewindContent.TextNote(
+                        timestamp = timestamp,
+                        sourceId = sourceId,
+                        content = content,
+                    )
+                }
+            }
+            content.startsWith(WEATHER_PANEL_PREFIX) -> {
+                runCatching {
+                    contentJson.decodeFromString<WeatherPanelPayload>(
+                        content.removePrefix(WEATHER_PANEL_PREFIX),
+                    )
+                }.map { payload ->
+                    RewindContent.WeatherPanel(
+                        timestamp = timestamp,
+                        sourceId = sourceId,
+                        weather = payload.weather,
+                    )
+                }.getOrElse {
+                    Napier.w("Failed to decode weather panel payload for rewind text content", it)
+                    RewindContent.TextNote(
+                        timestamp = timestamp,
+                        sourceId = sourceId,
+                        content = content,
+                    )
+                }
+            }
+            content.startsWith(PERSONALITY_CARD_PREFIX) -> {
+                runCatching {
+                    contentJson.decodeFromString<PersonalityCardPayload>(
+                        content.removePrefix(PERSONALITY_CARD_PREFIX),
+                    )
+                }.map { payload ->
+                    RewindContent.PersonalityCard(
+                        timestamp = timestamp,
+                        sourceId = sourceId,
+                        stats =
+                            WeekStatsSnapshot(
+                                photoCount = payload.photoCount,
+                                textNoteCount = payload.textNoteCount,
+                                distinctLocations = payload.distinctLocations,
+                                distinctPeople = payload.distinctPeople,
+                                newPlaces = payload.newPlaces,
+                            ),
+                        dominantActivity = payload.dominantActivity,
+                    )
+                }.getOrElse {
+                    Napier.w("Failed to decode personality card payload for rewind text content", it)
+                    RewindContent.TextNote(
+                        timestamp = timestamp,
+                        sourceId = sourceId,
+                        content = content,
+                    )
+                }
+            }
+            content.startsWith(TOP_LIST_PREFIX) -> {
+                runCatching {
+                    contentJson.decodeFromString<TopListPayload>(
+                        content.removePrefix(TOP_LIST_PREFIX),
+                    )
+                }.map { payload ->
+                    RewindContent.TopList(
+                        timestamp = timestamp,
+                        sourceId = sourceId,
+                        kind = payload.kind,
+                        items =
+                            payload.items.map { item ->
+                                TopListItem(
+                                    label = item.label,
+                                    subtitle = item.subtitle,
+                                    count = item.count,
+                                    sourceId = item.sourceId?.let { Uuid.parse(it) },
+                                )
+                            },
+                    )
+                }.getOrElse {
+                    Napier.w("Failed to decode top list payload for rewind text content", it)
+                    RewindContent.TextNote(
+                        timestamp = timestamp,
+                        sourceId = sourceId,
+                        content = content,
+                    )
+                }
+            }
             else ->
                 RewindContent.TextNote(
                     timestamp = timestamp,
@@ -363,6 +463,10 @@ class OfflineFirstRewindRepository(
                 is RewindContent.Video -> videoEntities.add(content.toVideoEntity(rewindId))
                 is RewindContent.NarrativeContext -> textEntities.add(content.toNarrativeEntity(rewindId))
                 is RewindContent.Transition -> textEntities.add(content.toTransitionEntity(rewindId))
+                is RewindContent.MapPanel -> textEntities.add(content.toMapPanelEntity(rewindId))
+                is RewindContent.WeatherPanel -> textEntities.add(content.toWeatherPanelEntity(rewindId))
+                is RewindContent.PersonalityCard -> textEntities.add(content.toPersonalityCardEntity(rewindId))
+                is RewindContent.TopList -> textEntities.add(content.toTopListEntity(rewindId))
             }
         }
 
@@ -403,6 +507,70 @@ class OfflineFirstRewindRepository(
         )
     }
 
+    private fun RewindContent.MapPanel.toMapPanelEntity(rewindId: Uuid): RewindTextContentEntity {
+        val payload = MapPanelPayload(locationPath = locationPath)
+        return RewindTextContentEntity(
+            id = sourceId,
+            rewindId = rewindId,
+            sourceId = sourceId,
+            timestamp = timestamp,
+            content = MAP_PANEL_PREFIX + contentJson.encodeToString(payload),
+        )
+    }
+
+    private fun RewindContent.WeatherPanel.toWeatherPanelEntity(rewindId: Uuid): RewindTextContentEntity {
+        val payload = WeatherPanelPayload(weather = weather)
+        return RewindTextContentEntity(
+            id = sourceId,
+            rewindId = rewindId,
+            sourceId = sourceId,
+            timestamp = timestamp,
+            content = WEATHER_PANEL_PREFIX + contentJson.encodeToString(payload),
+        )
+    }
+
+    private fun RewindContent.PersonalityCard.toPersonalityCardEntity(rewindId: Uuid): RewindTextContentEntity {
+        val payload =
+            PersonalityCardPayload(
+                photoCount = stats.photoCount,
+                textNoteCount = stats.textNoteCount,
+                distinctLocations = stats.distinctLocations,
+                distinctPeople = stats.distinctPeople,
+                newPlaces = stats.newPlaces,
+                dominantActivity = dominantActivity,
+            )
+        return RewindTextContentEntity(
+            id = sourceId,
+            rewindId = rewindId,
+            sourceId = sourceId,
+            timestamp = timestamp,
+            content = PERSONALITY_CARD_PREFIX + contentJson.encodeToString(payload),
+        )
+    }
+
+    private fun RewindContent.TopList.toTopListEntity(rewindId: Uuid): RewindTextContentEntity {
+        val payload =
+            TopListPayload(
+                kind = kind,
+                items =
+                    items.map { item ->
+                        SerializableTopListItem(
+                            label = item.label,
+                            subtitle = item.subtitle,
+                            count = item.count,
+                            sourceId = item.sourceId?.toString(),
+                        )
+                    },
+            )
+        return RewindTextContentEntity(
+            id = sourceId,
+            rewindId = rewindId,
+            sourceId = sourceId,
+            timestamp = timestamp,
+            content = TOP_LIST_PREFIX + contentJson.encodeToString(payload),
+        )
+    }
+
     /**
      * Converts an Image to a RewindImageContentEntity.
      */
@@ -439,6 +607,40 @@ class OfflineFirstRewindRepository(
     @Serializable
     private data class TransitionPayload(
         val transitionText: String,
+    )
+
+    @Serializable
+    private data class MapPanelPayload(
+        val locationPath: List<MapPoint>,
+    )
+
+    @Serializable
+    private data class WeatherPanelPayload(
+        val weather: WeatherContext,
+    )
+
+    @Serializable
+    private data class PersonalityCardPayload(
+        val photoCount: Int,
+        val textNoteCount: Int,
+        val distinctLocations: Int,
+        val distinctPeople: Int,
+        val newPlaces: Int,
+        val dominantActivity: ActivityType,
+    )
+
+    @Serializable
+    private data class TopListPayload(
+        val kind: TopListKind,
+        val items: List<SerializableTopListItem>,
+    )
+
+    @Serializable
+    private data class SerializableTopListItem(
+        val label: String,
+        val subtitle: String?,
+        val count: Int?,
+        val sourceId: String?,
     )
 
     @Serializable
@@ -506,5 +708,9 @@ class OfflineFirstRewindRepository(
     private companion object {
         private const val NARRATIVE_PREFIX = "LD_NARRATIVE:"
         private const val TRANSITION_PREFIX = "LD_TRANSITION:"
+        private const val MAP_PANEL_PREFIX = "LD_MAP_PANEL:"
+        private const val WEATHER_PANEL_PREFIX = "LD_WEATHER_PANEL:"
+        private const val PERSONALITY_CARD_PREFIX = "LD_PERSONALITY_CARD:"
+        private const val TOP_LIST_PREFIX = "LD_TOP_LIST:"
     }
 }
