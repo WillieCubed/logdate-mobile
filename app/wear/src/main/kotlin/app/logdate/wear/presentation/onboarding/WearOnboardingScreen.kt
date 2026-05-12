@@ -175,12 +175,14 @@ private fun PermissionsPage(onNext: () -> Unit) {
                 locationGranted
         }
 
+    val permissionsState = OnboardingPermissionsUiState(micGranted, locationGranted)
+
     // Auto-advance once mic and location are both granted. If the user only
     // grants the mic (location is optional but strongly encouraged), they can
     // continue manually via the "Maybe later" button below; geotagging can be
     // enabled afterwards from Settings.
-    LaunchedEffect(micGranted, locationGranted) {
-        if (micGranted && locationGranted) {
+    LaunchedEffect(permissionsState.allRequiredGranted) {
+        if (permissionsState.allRequiredGranted) {
             delay(PERMISSION_GRANTED_DELAY_MS)
             onNext()
         }
@@ -253,7 +255,7 @@ private fun PermissionsPage(onNext: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            if (micGranted && locationGranted) {
+            if (permissionsState.allRequiredGranted) {
                 item {
                     Icon(
                         imageVector = Icons.Default.Check,
@@ -275,25 +277,27 @@ private fun PermissionsPage(onNext: () -> Unit) {
                     )
                 }
             } else {
-                item {
-                    Button(
-                        onClick = {
-                            permissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.RECORD_AUDIO,
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION,
-                                ),
-                            )
-                        },
-                        label = { Text(stringResource(R.string.wear_onboarding_permissions_allow)) },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp),
-                    )
+                if (permissionsState.showAllowButton) {
+                    item {
+                        Button(
+                            onClick = {
+                                permissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.RECORD_AUDIO,
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                                    ),
+                                )
+                            },
+                            label = { Text(stringResource(R.string.wear_onboarding_permissions_allow)) },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                        )
+                    }
                 }
-                if (micGranted) {
+                if (permissionsState.showSkipLocationButton) {
                     item {
                         FilledTonalButton(
                             onClick = onNext,
