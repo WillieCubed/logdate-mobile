@@ -52,7 +52,27 @@ fun PastRewindCard(
             shape = MaterialTheme.shapes.large,
             modifier = modifier,
         ) {
-            Text(history.title)
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = history.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f),
+                )
+                Text(
+                    text = history.title,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                if (history.message.isNotBlank()) {
+                    Text(
+                        text = history.message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
+                    )
+                }
+            }
         }
     }
 }
