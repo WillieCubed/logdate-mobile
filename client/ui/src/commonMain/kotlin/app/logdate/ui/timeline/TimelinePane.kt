@@ -83,7 +83,12 @@ fun TimelinePane(
     onSyncAction: (SyncAction) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val scrollBehavior =
+        if (currentPlatform.isApple) {
+            TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+        } else {
+            TopAppBarDefaults.enterAlwaysScrollBehavior()
+        }
     val endOfTimelineState by remember(birthday) {
         derivedStateOf {
             if (birthday != null && birthday != Instant.DISTANT_PAST) {
