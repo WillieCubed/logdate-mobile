@@ -42,24 +42,12 @@ fun QuickTextLauncher(
                         ?.firstOrNull()
                 if (!spokenText.isNullOrBlank()) {
                     scope.launch(Dispatchers.IO) {
-                        try {
-                            val now = Clock.System.now()
-                            val noteLocation = locationCaptureCoordinator.captureForJournalEntry()
-                            val note =
-                                JournalNote.Text(
-                                    content = spokenText,
-                                    uid = Uuid.random(),
-                                    creationTimestamp = now,
-                                    lastUpdated = now,
-                                    location = noteLocation,
-                                )
-                            notesRepository.create(note)
-                            Napier.d("Quick text note saved: ${spokenText.take(30)}...")
-                        } catch (e: Exception) {
-                            Napier.e("Failed to save quick text note", e)
-                        } finally {
-                            onDone()
-                        }
+                        saveQuickTextAndComplete(
+                            notesRepository = notesRepository,
+                            locationCaptureCoordinator = locationCaptureCoordinator,
+                            spokenText = spokenText,
+                            onDone = onDone,
+                        )
                     }
                 } else {
                     onDone()
@@ -80,5 +68,38 @@ fun QuickTextLauncher(
                 putExtra(RecognizerIntent.EXTRA_PROMPT, prompt)
             }
         launcher.launch(intent)
+    }
+}
+
+/**
+ * Persists [spokenText] as a journal note and invokes [onDone] when the save settles — succeed or
+ * fail. Extracted from the composable so the save-then-navigate contract has a unit test home:
+ * if the repository throws, the user still leaves the quick-text screen instead of being stuck on
+ * a stale STT result. Errors are logged via Napier; they're not re-raised because the watch UI has
+ * no place to surface them and the user's verbal note is already gone.
+ */
+internal suspend fun saveQuickTextAndComplete(
+    notesRepository: JournalNotesRepository,
+    locationCaptureCoordinator: WearLocationCaptureCoordinator,
+    spokenText: String,
+    onDone: () -> Unit,
+) {
+    try {
+        val now = Clock.System.now()
+        val noteLocation = locationCaptureCoordinator.captureForJournalEntry()
+        val note =
+            JournalNote.Text(
+                content = spokenText,
+                uid = Uuid.random(),
+                creationTimestamp = now,
+                lastUpdated = now,
+                location = noteLocation,
+            )
+        notesRepository.create(note)
+        Napier.d("Quick text note saved: ${spokenText.take(30)}...")
+    } catch (e: Exception) {
+        Napier.e("Failed to save quick text note", e)
+    } finally {
+        onDone()
     }
 }
