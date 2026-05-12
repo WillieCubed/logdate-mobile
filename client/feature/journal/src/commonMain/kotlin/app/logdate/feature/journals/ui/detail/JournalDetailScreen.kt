@@ -92,6 +92,7 @@ import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.common.applyStandardContentWidth
 import app.logdate.ui.common.transitions.TransitionKeys
+import app.logdate.ui.platform.rememberLogDateHaptics
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.localTime
 import app.logdate.util.toReadableDateShort
@@ -974,6 +975,8 @@ fun DeleteConfirmationDialog(
     onConfirmation: () -> Unit,
     icon: ImageVector = Icons.Rounded.Warning,
 ) {
+    val haptics = rememberLogDateHaptics()
+    LaunchedEffect(Unit) { haptics.warning() }
     AlertDialog(
         icon = {
             Icon(icon, contentDescription = null)
@@ -987,7 +990,10 @@ fun DeleteConfirmationDialog(
         onDismissRequest = onDismissRequest,
         confirmButton = {
             TextButton(
-                onClick = onConfirmation,
+                onClick = {
+                    haptics.confirmDestruction()
+                    onConfirmation()
+                },
             ) {
                 Text(stringResource(Res.string.action_delete))
             }

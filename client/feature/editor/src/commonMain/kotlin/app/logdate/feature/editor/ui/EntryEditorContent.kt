@@ -34,11 +34,13 @@ import app.logdate.feature.editor.ui.common.PlatformBackHandler
 import app.logdate.feature.editor.ui.content.EditorBottomContent
 import app.logdate.feature.editor.ui.dialog.DraftsBottomSheet
 import app.logdate.feature.editor.ui.dialog.alert.ConfirmEntryExitDialog
+import app.logdate.feature.editor.ui.editor.BlockType
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.rememberEditorAutoSave
 import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
 import app.logdate.feature.editor.ui.state.rememberBlocksUiState
 import app.logdate.ui.common.noteDropTarget
+import app.logdate.ui.platform.rememberLogDateHaptics
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.draft_deleted
@@ -61,6 +63,7 @@ fun EntryEditorContent(
     val snackbarHostState = remember { SnackbarHostState() }
     val shouldReturnToPickerOnBack = editorState.shouldReturnToPickerOnBack()
     var journalSelectorExpanded by remember { mutableStateOf(false) }
+    val haptics = rememberLogDateHaptics()
 
     val uiState =
         rememberBlocksUiState(
@@ -72,6 +75,9 @@ fun EntryEditorContent(
             },
             onCreateBlock = { type, id ->
                 journalSelectorExpanded = false
+                if (type != BlockType.TEXT) {
+                    haptics.blockAdded()
+                }
                 viewModel.createNewBlock(type, id)
             },
             onDeleteBlock = viewModel::removeBlock,
@@ -196,7 +202,10 @@ fun EntryEditorContent(
         topBarContent = {
             NoteEditorToolbar(
                 onBack = handleEditorBack,
-                onSave = { viewModel.saveEntry(editorState) },
+                onSave = {
+                    haptics.saveSucceeded()
+                    viewModel.saveEntry(editorState)
+                },
                 onShowDrafts = { showDraftsDialog = true },
                 draftCount = editorState.availableDrafts.size,
                 autoSaveStatus = autoSaveState.status,

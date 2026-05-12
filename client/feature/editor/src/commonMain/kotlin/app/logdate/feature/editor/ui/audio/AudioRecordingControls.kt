@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.logdate.feature.editor.ui.editor.RecordingState
 import app.logdate.ui.platform.PlatformIcons
+import app.logdate.ui.platform.rememberLogDateHaptics
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.record
 import logdate.client.feature.editor.generated.resources.start_recording
@@ -54,6 +55,7 @@ fun AudioRecordingControls(
     onStopRecording: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptics = rememberLogDateHaptics()
     Column(
         modifier =
             modifier
@@ -159,7 +161,10 @@ fun AudioRecordingControls(
         if (recordingState == RecordingState.RECORDING) {
             // Stop button
             Button(
-                onClick = onStopRecording,
+                onClick = {
+                    haptics.recordingFinished()
+                    onStopRecording()
+                },
                 colors =
                     ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error,
@@ -183,7 +188,10 @@ fun AudioRecordingControls(
         } else {
             // Start button
             Button(
-                onClick = onStartRecording,
+                onClick = {
+                    haptics.recordingStarted()
+                    onStartRecording()
+                },
                 colors =
                     ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,

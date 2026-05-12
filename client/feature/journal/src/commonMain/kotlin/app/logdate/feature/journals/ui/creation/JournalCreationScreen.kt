@@ -47,6 +47,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import app.logdate.ui.platform.rememberLogDateHaptics
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import logdate.client.feature.journal.generated.resources.*
@@ -80,9 +81,11 @@ fun JournalCreationScreen(
         modifier = modifier,
     )
 
+    val haptics = rememberLogDateHaptics()
     LaunchedEffect(uiState.journalId) {
         val journalId = uiState.journalId
         if (uiState.created && journalId != null) {
+            haptics.saveSucceeded()
             onJournalCreated(journalId)
         }
     }

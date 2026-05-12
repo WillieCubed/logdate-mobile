@@ -68,6 +68,7 @@ import app.logdate.feature.postcards.model.InkTool
 import app.logdate.feature.postcards.model.ShapeKind
 import app.logdate.ui.common.CursorType
 import app.logdate.ui.common.cursorIcon
+import app.logdate.ui.platform.rememberLogDateHaptics
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -87,6 +88,19 @@ fun CanvasEditorScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val haptics = rememberLogDateHaptics()
+    val onUndo: () -> Unit = {
+        haptics.undo()
+        viewModel.undo()
+    }
+    val onRedo: () -> Unit = {
+        haptics.redo()
+        viewModel.redo()
+    }
+    val onToolSelected: (CanvasTool) -> Unit = { tool ->
+        haptics.toolSelected()
+        viewModel.setActiveTool(tool)
+    }
 
     LaunchedEffect(state.saveError) {
         state.saveError?.let { error ->
@@ -109,8 +123,8 @@ fun CanvasEditorScreen(
                 canRedo = viewModel.canRedo,
                 hasSelection = state.selectedElementId != null,
                 onBack = onNavigateBack,
-                onUndo = viewModel::undo,
-                onRedo = viewModel::redo,
+                onUndo = onUndo,
+                onRedo = onRedo,
                 onDelete = viewModel::deleteSelectedElement,
                 onSave = {
                     viewModel.save()
@@ -129,11 +143,11 @@ fun CanvasEditorScreen(
                 val isModifier = event.isCtrlPressed || event.isMetaPressed
                 when {
                     isModifier && !event.isShiftPressed && event.key == Key.Z -> {
-                        viewModel.undo()
+                        onUndo()
                         true
                     }
                     isModifier && event.isShiftPressed && event.key == Key.Z -> {
-                        viewModel.redo()
+                        onRedo()
                         true
                     }
                     isModifier && event.key == Key.S -> {
@@ -157,23 +171,23 @@ fun CanvasEditorScreen(
                         true
                     }
                     event.key == Key.One -> {
-                        viewModel.setActiveTool(CanvasTool.SELECT)
+                        onToolSelected(CanvasTool.SELECT)
                         true
                     }
                     event.key == Key.Two -> {
-                        viewModel.setActiveTool(CanvasTool.INK)
+                        onToolSelected(CanvasTool.INK)
                         true
                     }
                     event.key == Key.Three -> {
-                        viewModel.setActiveTool(CanvasTool.SHAPE)
+                        onToolSelected(CanvasTool.SHAPE)
                         true
                     }
                     event.key == Key.Four -> {
-                        viewModel.setActiveTool(CanvasTool.TEXT)
+                        onToolSelected(CanvasTool.TEXT)
                         true
                     }
                     event.key == Key.Five -> {
-                        viewModel.setActiveTool(CanvasTool.STICKER)
+                        onToolSelected(CanvasTool.STICKER)
                         true
                     }
                     else -> false
@@ -191,7 +205,7 @@ fun CanvasEditorScreen(
             ) {
                 EditorToolRail(
                     activeTool = state.activeTool,
-                    onToolSelected = viewModel::setActiveTool,
+                    onToolSelected = onToolSelected,
                     modifier =
                         Modifier
                             .fillMaxHeight()
@@ -272,7 +286,7 @@ fun CanvasEditorScreen(
 
                 EditorToolPalette(
                     activeTool = state.activeTool,
-                    onToolSelected = viewModel::setActiveTool,
+                    onToolSelected = onToolSelected,
                     modifier = Modifier.navigationBarsPadding(),
                 )
             }

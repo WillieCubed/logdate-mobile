@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.onboarding.flow.OnboardingStep
+import app.logdate.ui.platform.rememberLogDateHaptics
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
@@ -95,9 +96,11 @@ fun OnboardingCompletionContent(
     modifier: Modifier = Modifier,
 ) {
     var finalContentVisible by remember { mutableStateOf(true) }
+    val haptics = rememberLogDateHaptics()
 
     LaunchedEffect(shouldShowFinish) {
         if (shouldShowFinish) {
+            haptics.saveSucceeded()
             // Hold the final message, then fade out before leaving onboarding so the
             // next screen doesn't snap in on top of "Happy logging!"
             delay(1_600)
