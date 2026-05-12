@@ -4,6 +4,7 @@ import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.narrative.AnnualRewindSequencer
 import app.logdate.client.intelligence.narrative.WeekSummaryInput
 import app.logdate.client.intelligence.narrative.YearNarrativeSynthesizer
+import app.logdate.client.intelligence.narrative.buildLocalYearNarrative
 import app.logdate.client.repository.rewind.RewindGenerationManager
 import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.shared.model.ActivityType
@@ -127,12 +128,12 @@ class GenerateAnnualRewindUseCase(
                 when (narrativeResult) {
                     is AIResult.Success -> narrativeResult.value
                     is AIResult.Unavailable -> {
-                        updateStatus(request.id, RewindGenerationRequest.Status.FAILED, "AI unavailable")
-                        return GenerateBasicRewindResult.Error("AI synthesis unavailable for annual rewind")
+                        Napier.w("AI unavailable for annual rewind — falling back to local narrative")
+                        buildLocalYearNarrative(year = year, weeklyRewinds = weeklyRewinds)
                     }
                     is AIResult.Error -> {
-                        updateStatus(request.id, RewindGenerationRequest.Status.FAILED, "AI error")
-                        return GenerateBasicRewindResult.Error("AI synthesis failed for annual rewind", narrativeResult.throwable)
+                        Napier.w("AI error for annual rewind — falling back to local narrative", narrativeResult.throwable)
+                        buildLocalYearNarrative(year = year, weeklyRewinds = weeklyRewinds)
                     }
                 }
 
