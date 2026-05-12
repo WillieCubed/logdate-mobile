@@ -1,66 +1,152 @@
 package app.logdate.client.domain.entities
 
+import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.AIUnavailableReason
+import app.logdate.client.intelligence.cache.GenerativeAICache
+import app.logdate.client.intelligence.cache.GenerativeAICacheEntry
+import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
+import app.logdate.client.intelligence.entity.people.PeopleExtractor
+import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
+import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
+import app.logdate.client.intelligence.generativeai.GenerativeAIResponse
+import app.logdate.client.networking.DataUsageMode
+import app.logdate.client.networking.DataUsagePolicy
+import app.logdate.client.networking.NetworkAvailabilityMonitor
+import app.logdate.client.networking.NetworkState
+import app.logdate.client.repository.knowledge.PeopleRepository
+import app.logdate.shared.model.Person
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
-import kotlin.test.assertFailsWith
+import kotlin.test.assertEquals
+import kotlin.uuid.Uuid
 
 class GetPeopleForNoteUseCaseTest {
-    @Test
-    fun `invoke should throw NotImplementedError for any input`() =
-        runTest {
-            // Note: This is a simplified test that validates the UseCase behavior
-            // without complex dependency injection, since the actual implementation
-            // uses TODO() which throws NotImplementedError
+    private val existingPerson = Person(name = "Jane Doe")
+    private val repository = FakePeopleRepository(listOf(existingPerson))
 
-            // When/Then
-            assertFailsWith<NotImplementedError> {
-                // This represents the current implementation behavior
-                TODO("Not yet implemented")
-            }
+    @Test
+    fun `invoke resolves extracted people against repository`() =
+        runTest {
+            val useCase =
+                GetPeopleForNoteUseCase(
+                    extractPeopleUseCase =
+                        ExtractPeopleUseCase(
+                            peopleExtractor =
+                                peopleExtractor(
+                                    AIResult.Success(
+                                        GenerativeAIResponse(
+                                            content = """{"names":["Jane Doe","Sam Lee"]}""",
+                                        ),
+                                    ),
+                                ),
+                        ),
+                    peopleRepository = repository,
+                )
+
+            val result = useCase(noteId = "note-1", text = "Dinner with Jane Doe and Sam Lee")
+
+            assertEquals(existingPerson, result[0])
+            assertEquals("Sam Lee", result[1].name)
         }
 
     @Test
-    fun `invoke should throw NotImplementedError with empty noteId`() =
+    fun `invoke returns empty list when extraction is unavailable`() =
         runTest {
-            // When/Then
-            assertFailsWith<NotImplementedError> {
-                TODO("Not yet implemented")
-            }
+            val useCase =
+                GetPeopleForNoteUseCase(
+                    extractPeopleUseCase =
+                        ExtractPeopleUseCase(
+                            peopleExtractor =
+                                peopleExtractor(
+                                    AIResult.Unavailable(AIUnavailableReason.ProviderDisabled),
+                                ),
+                        ),
+                    peopleRepository = repository,
+                )
+
+            assertEquals(emptyList(), useCase(noteId = "note-1", text = "Dinner with Jane Doe"))
         }
 
-    @Test
-    fun `invoke should throw NotImplementedError with empty text`() =
-        runTest {
-            // When/Then
-            assertFailsWith<NotImplementedError> {
-                TODO("Not yet implemented")
-            }
-        }
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun peopleExtractor(result: AIResult<GenerativeAIResponse>) =
+        PeopleExtractor(
+            generativeAICache = NoopGenerativeAICache,
+            generativeAIChatClient = FakeGenerativeAIChatClient(result),
+            networkAvailabilityMonitor = AlwaysConnectedNetworkMonitor,
+            dataUsagePolicy = UnrestrictedDataUsagePolicy,
+            ioDispatcher = UnconfinedTestDispatcher(),
+        )
+}
 
-    @Test
-    fun `invoke should throw NotImplementedError with whitespace-only text`() =
-        runTest {
-            // When/Then
-            assertFailsWith<NotImplementedError> {
-                TODO("Not yet implemented")
-            }
-        }
+private object NoopGenerativeAICache : GenerativeAICache {
+    override suspend fun getEntry(request: GenerativeAICacheRequest): GenerativeAICacheEntry? = null
 
-    @Test
-    fun `invoke should throw NotImplementedError with long text`() =
-        runTest {
-            // When/Then
-            assertFailsWith<NotImplementedError> {
-                TODO("Not yet implemented")
-            }
-        }
+    override suspend fun putEntry(
+        request: GenerativeAICacheRequest,
+        content: String,
+    ) = Unit
 
-    @Test
-    fun `invoke should throw NotImplementedError with special characters in input`() =
-        runTest {
-            // When/Then
-            assertFailsWith<NotImplementedError> {
-                TODO("Not yet implemented")
-            }
-        }
+    override suspend fun purge() = Unit
+}
+
+private class FakeGenerativeAIChatClient(
+    private val result: AIResult<GenerativeAIResponse>,
+) : GenerativeAIChatClient {
+    override val providerId: String = "test"
+    override val defaultModel: String = "test-model"
+
+    override suspend fun submit(request: GenerativeAIRequest): AIResult<GenerativeAIResponse> = result
+}
+
+private object AlwaysConnectedNetworkMonitor : NetworkAvailabilityMonitor {
+    override fun isNetworkAvailable(): Boolean = true
+
+    override fun observeNetwork(): MutableSharedFlow<NetworkState> = MutableSharedFlow()
+}
+
+private object UnrestrictedDataUsagePolicy : DataUsagePolicy {
+    override val policy: Flow<DataUsageMode> = flowOf(DataUsageMode.Unrestricted)
+
+    override suspend fun currentMode(): DataUsageMode = DataUsageMode.Unrestricted
+}
+
+private class FakePeopleRepository(
+    people: List<Person>,
+) : PeopleRepository {
+    private val peopleById = people.associateBy { it.uid }.toMutableMap()
+
+    override suspend fun getPerson(uid: Uuid): Person = peopleById.getValue(uid)
+
+    override fun getAllPeople(): Flow<List<Person>> = flowOf(peopleById.values.toList())
+
+    override suspend fun resolvePersonByName(name: String): Person? = peopleById.values.firstOrNull { it.name == name }
+
+    override suspend fun resolvePersonByDescription(description: String): Person? = null
+
+    override suspend fun addPerson(person: Person) {
+        peopleById[person.uid] = person
+    }
+
+    override suspend fun updatePerson(person: Person) {
+        peopleById[person.uid] = person
+    }
+
+    override suspend fun deletePerson(uid: Uuid) {
+        peopleById.remove(uid)
+    }
+
+    override suspend fun addAliasToPerson(
+        personUid: Uuid,
+        alias: String,
+    ) = Unit
+
+    override suspend fun removeAliasFromPerson(
+        personUid: Uuid,
+        alias: String,
+    ) = Unit
 }

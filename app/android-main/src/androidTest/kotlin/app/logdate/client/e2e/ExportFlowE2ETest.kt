@@ -283,12 +283,12 @@ class ExportFlowE2ETest {
         composeRule.onNodeWithText("Export complete").assertIsDisplayed()
         composeRule.onNodeWithText("logdate_export.zip").assertIsDisplayed()
         composeRule.onNodeWithText("3 journals, 42 notes, 5 drafts, 10 media files").assertIsDisplayed()
-        composeRule.onNodeWithText("Share").assertIsDisplayed()
+        composeRule.onNodeWithText("Open").assertIsDisplayed()
         composeRule.onNodeWithText("Done").assertIsDisplayed()
     }
 
     @Test
-    fun completedState_shareButtonTriggersShareExport() {
+    fun completedState_openButtonTriggersBrowseExport() {
         var sharedPath: String? = null
 
         composeRule.setContent {
@@ -325,7 +325,7 @@ class ExportFlowE2ETest {
             )
         }
 
-        composeRule.onNodeWithText("Share").performClick()
+        composeRule.onNodeWithText("Open").performClick()
         assert(sharedPath == "content://downloads/export.zip") {
             "Expected share with path content://downloads/export.zip, got $sharedPath"
         }

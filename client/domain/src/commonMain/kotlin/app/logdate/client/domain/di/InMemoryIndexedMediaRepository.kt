@@ -10,12 +10,11 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * Stub implementation of [IndexedMediaRepository] for testing and development.
+ * In-memory [IndexedMediaRepository] for local-only targets and tests.
  *
- * This implementation returns empty data and doesn't perform any real operations.
- * It's mainly used for dependency injection when the real implementation is not needed.
+ * It indexes transient media objects and returns empty query results when no index is configured.
  */
-class StubIndexedMediaRepository : IndexedMediaRepository {
+class InMemoryIndexedMediaRepository : IndexedMediaRepository {
     override suspend fun indexImage(
         uri: String,
         timestamp: Instant,

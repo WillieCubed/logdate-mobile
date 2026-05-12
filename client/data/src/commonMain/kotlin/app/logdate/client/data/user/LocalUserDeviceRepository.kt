@@ -8,19 +8,19 @@ import kotlinx.coroutines.flow.flowOf
 import kotlin.time.Clock
 
 /**
- * Stub implementation of [UserDeviceRepository].
+ * Local [UserDeviceRepository] used when a target cannot sync device inventory.
  */
-object StubUserDeviceRepository : UserDeviceRepository {
+object LocalUserDeviceRepository : UserDeviceRepository {
     override val allDevices: Flow<List<UserDevice>>
         get() = flowOf(emptyList())
     override val currentDevice: Flow<UserDevice>
         get() =
             flowOf(
                 UserDevice(
-                    "stub",
-                    "stub",
-                    "stub",
-                    "stub",
+                    "local",
+                    "local",
+                    "local",
+                    "local",
                     "",
                     "",
                     DeviceType.OTHER,

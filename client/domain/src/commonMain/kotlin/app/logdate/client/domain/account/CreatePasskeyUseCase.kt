@@ -2,7 +2,6 @@ package app.logdate.client.domain.account
 
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.shared.model.LogDateAccount
-import io.github.aakira.napier.Napier
 
 /**
  * Use case for creating a new passkey for an existing account.
@@ -46,10 +45,8 @@ class CreatePasskeyUseCase(
      * @param request The creation request
      * @return Result indicating success or failure
      */
-    suspend operator fun invoke(request: CreatePasskeyRequest): CreatePasskeyResult {
-        Napier.w("Passkey creation for existing accounts is not available yet (name=${request.name}).")
-        return CreatePasskeyResult.Error(
-            message = "Adding passkeys from settings isn't supported yet.",
+    suspend operator fun invoke(request: CreatePasskeyRequest): CreatePasskeyResult =
+        CreatePasskeyResult.Error(
+            message = "Adding passkeys from settings is unsupported by the current account API.",
         )
-    }
 }

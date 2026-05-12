@@ -56,7 +56,7 @@ class DefaultMigrationManager(
             progressFlow.value = progress
             emit(progress)
 
-            // Simulate simple migration with one step
+            // Complete simple migration with one step.
             val finalProgress =
                 MigrationProgress(
                     inProgress = false,

@@ -7,7 +7,7 @@ import kotlin.time.Instant
  * the desktop target, so we return empty results. The settings screen detects this via
  * [hasPermission] returning `false` and renders the appropriate empty state.
  */
-class StubDeviceCalendarReader : DeviceCalendarReader {
+class UnavailableDeviceCalendarReader : DeviceCalendarReader {
     override suspend fun hasPermission(): Boolean = false
 
     override suspend fun listCalendars(): List<DeviceCalendar> = emptyList()

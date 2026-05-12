@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
@@ -29,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.conditional
@@ -38,16 +40,13 @@ import org.jetbrains.compose.resources.stringResource
 
 @Stable
 class SearchAppBarState(
-    var query: String = "",
-)
+    initialQuery: String = "",
+) {
+    var query by mutableStateOf(initialQuery)
+}
 
 @Composable
-fun rememberSearchAppBarState(initialQuery: String = ""): SearchAppBarState {
-    var query by remember { mutableStateOf(initialQuery) }
-    return SearchAppBarState(
-        query = query,
-    )
-}
+fun rememberSearchAppBarState(initialQuery: String = ""): SearchAppBarState = remember(initialQuery) { SearchAppBarState(initialQuery) }
 
 /**
  * A search bar that can be expanded to show a search field.
@@ -60,6 +59,8 @@ fun SearchBarBase(
     onDismiss: () -> Unit = {},
     onNavigationClick: () -> Unit = {},
     hint: String = "Search",
+    query: String = "",
+    onQueryChange: (String) -> Unit = {},
     content: @Composable () -> Unit = {},
 ) {
     val cornerRadius by animateDpAsState(
@@ -119,15 +120,31 @@ fun SearchBarBase(
                         }
                     Icon(icon, contentDescription)
                 }
-                // TODO: Actually implement text field
-                Text(
-                    text = hint,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Box(
                     modifier =
                         Modifier
                             .weight(1f)
                             .padding(end = 8.dp),
-                )
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    BasicTextField(
+                        value = query,
+                        onValueChange = onQueryChange,
+                        singleLine = true,
+                        textStyle =
+                            TextStyle(
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = MaterialTheme.typography.bodyLarge.fontSize,
+                            ),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (query.isEmpty()) {
+                        Text(
+                            text = hint,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 Icon(Icons.Default.Search, contentDescription = stringResource(Res.string.search))
             }
             content()
@@ -142,6 +159,7 @@ fun SearchAppBar(
     onExpand: () -> Unit = {},
     onNavigationClick: () -> Unit = {},
     expanded: Boolean = false,
+    state: SearchAppBarState = rememberSearchAppBarState(),
     expandedContent: @Composable () -> Unit = {},
 ) {
     SearchBarBase(
@@ -154,6 +172,8 @@ fun SearchAppBar(
         onExpand = onExpand,
         onNavigationClick = onNavigationClick,
         hint = hint,
+        query = state.query,
+        onQueryChange = { state.query = it },
     ) {
         expandedContent()
     }

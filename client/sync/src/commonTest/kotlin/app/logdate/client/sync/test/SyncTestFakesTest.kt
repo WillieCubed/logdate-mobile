@@ -1,6 +1,6 @@
 package app.logdate.client.sync.test
 
-import app.logdate.client.media.StubMediaManager
+import app.logdate.client.media.InMemoryMediaManager
 import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.cloud.ContentUploadRequest
 import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
@@ -183,7 +183,7 @@ class SyncTestFakesTest {
                     cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = accountRepository,
                     sessionStorage = fakeSessionStorage(),
-                    mediaManager = StubMediaManager(),
+                    mediaManager = InMemoryMediaManager(),
                     mediaSyncRefStore = InMemoryMediaSyncRefStore(),
                     journalRepository = journalRepository,
                     journalNotesRepository = journalNotesRepository,
@@ -228,7 +228,7 @@ class SyncTestFakesTest {
                     cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = accountRepository,
                     sessionStorage = fakeSessionStorage(authenticated = false),
-                    mediaManager = StubMediaManager(),
+                    mediaManager = InMemoryMediaManager(),
                     mediaSyncRefStore = InMemoryMediaSyncRefStore(),
                     journalRepository = journalRepository,
                     journalNotesRepository = journalNotesRepository,
@@ -270,7 +270,7 @@ class SyncTestFakesTest {
                     cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = accountRepository,
                     sessionStorage = fakeSessionStorage(),
-                    mediaManager = StubMediaManager(),
+                    mediaManager = InMemoryMediaManager(),
                     mediaSyncRefStore = InMemoryMediaSyncRefStore(),
                     journalRepository = journalRepository,
                     journalNotesRepository = journalNotesRepository,

@@ -8,8 +8,8 @@ import kotlinx.datetime.TimeZone
 /**
  * iOS implementation of HealthConnectRepository.
  *
- * This implementation would use HealthKit on iOS, but for now it uses the default implementation.
- * In a production app, this would integrate with Apple HealthKit to access sleep data.
+ * iOS does not expose Health Connect. Until a HealthKit-backed repository is available, timeline
+ * day bounds fall back to the app's deterministic default.
  */
 class IosHealthConnectRepository : HealthConnectRepository {
     private val defaultRepository = DefaultHealthConnectRepository()
@@ -18,9 +18,7 @@ class IosHealthConnectRepository : HealthConnectRepository {
         date: LocalDate,
         timeZone: TimeZone,
     ): DayBounds {
-        // For iOS, we would use HealthKit to access sleep data
-        // This is a placeholder for future implementation
-        Napier.d("iOS Health Connect not implemented, using default day bounds")
+        Napier.d("HealthKit day bounds unavailable; using default day bounds")
         return defaultRepository.getDayBoundsForDate(date, timeZone)
     }
 

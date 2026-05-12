@@ -1,8 +1,8 @@
 package app.logdate.client.networking
 
+import app.logdate.client.networking.saver.ConfigurableNetworkSaverModeProvider
 import app.logdate.client.networking.saver.NetworkConnectionType
 import app.logdate.client.networking.saver.NetworkSaverState
-import app.logdate.client.networking.saver.StubNetworkSaverModeProvider
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -11,13 +11,13 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class DefaultDataUsagePolicyTest {
-    private val stubProvider = StubNetworkSaverModeProvider()
-    private val policy = DefaultDataUsagePolicy(stubProvider)
+    private val networkSaverProvider = ConfigurableNetworkSaverModeProvider()
+    private val policy = DefaultDataUsagePolicy(networkSaverProvider)
 
     @Test
     fun noConnection_returnsRestricted() =
         runTest {
-            stubProvider.setNetworkSaverState(
+            networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = false, connectionType = NetworkConnectionType.NONE),
             )
             assertIs<DataUsageMode.Restricted>(policy.currentMode())
@@ -26,7 +26,7 @@ class DefaultDataUsagePolicyTest {
     @Test
     fun cellularWithDataSaverOn_returnsRestricted() =
         runTest {
-            stubProvider.setNetworkSaverState(
+            networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = true, connectionType = NetworkConnectionType.CELLULAR),
             )
             assertIs<DataUsageMode.Restricted>(policy.currentMode())
@@ -35,7 +35,7 @@ class DefaultDataUsagePolicyTest {
     @Test
     fun cellularWithDataSaverOff_returnsConservative() =
         runTest {
-            stubProvider.setNetworkSaverState(
+            networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = false, connectionType = NetworkConnectionType.CELLULAR),
             )
             assertIs<DataUsageMode.Conservative>(policy.currentMode())
@@ -44,7 +44,7 @@ class DefaultDataUsagePolicyTest {
     @Test
     fun wifiWithDataSaverOff_returnsUnrestricted() =
         runTest {
-            stubProvider.setNetworkSaverState(
+            networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = false, connectionType = NetworkConnectionType.WIFI),
             )
             assertIs<DataUsageMode.Unrestricted>(policy.currentMode())
@@ -53,7 +53,7 @@ class DefaultDataUsagePolicyTest {
     @Test
     fun wifiWithDataSaverOn_returnsRestricted() =
         runTest {
-            stubProvider.setNetworkSaverState(
+            networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = true, connectionType = NetworkConnectionType.WIFI),
             )
             assertIs<DataUsageMode.Restricted>(policy.currentMode())
@@ -62,7 +62,7 @@ class DefaultDataUsagePolicyTest {
     @Test
     fun ethernetWithDataSaverOff_returnsUnrestricted() =
         runTest {
-            stubProvider.setNetworkSaverState(
+            networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = false, connectionType = NetworkConnectionType.ETHERNET),
             )
             assertIs<DataUsageMode.Unrestricted>(policy.currentMode())
@@ -71,7 +71,7 @@ class DefaultDataUsagePolicyTest {
     @Test
     fun ethernetWithDataSaverOn_returnsRestricted() =
         runTest {
-            stubProvider.setNetworkSaverState(
+            networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = true, connectionType = NetworkConnectionType.ETHERNET),
             )
             assertIs<DataUsageMode.Restricted>(policy.currentMode())
@@ -80,7 +80,7 @@ class DefaultDataUsagePolicyTest {
     @Test
     fun otherConnectionWithDataSaverOff_returnsUnrestricted() =
         runTest {
-            stubProvider.setNetworkSaverState(
+            networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = false, connectionType = NetworkConnectionType.OTHER),
             )
             assertIs<DataUsageMode.Unrestricted>(policy.currentMode())
@@ -89,17 +89,17 @@ class DefaultDataUsagePolicyTest {
     @Test
     fun policyFlowEmitsOnStateChange() =
         runTest {
-            stubProvider.setNetworkSaverState(
+            networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = false, connectionType = NetworkConnectionType.WIFI),
             )
             assertIs<DataUsageMode.Unrestricted>(policy.policy.first())
 
-            stubProvider.setNetworkSaverState(
+            networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = false, connectionType = NetworkConnectionType.CELLULAR),
             )
             assertIs<DataUsageMode.Conservative>(policy.policy.first())
 
-            stubProvider.setNetworkSaverState(
+            networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = true, connectionType = NetworkConnectionType.CELLULAR),
             )
             assertIs<DataUsageMode.Restricted>(policy.policy.first())

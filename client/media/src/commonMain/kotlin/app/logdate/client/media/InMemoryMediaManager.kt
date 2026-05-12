@@ -6,23 +6,17 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /**
- * A stub implementation of MediaManager for testing and development purposes.
- *
- * This implementation returns empty or dummy data and doesn't perform any real operations.
- * It's mainly used for dependency injection when the real implementation is not needed
- * or during development when media access isn't required.
+ * Deterministic in-memory [MediaManager] used by cross-module tests.
  */
-class StubMediaManager : MediaManager {
-    override suspend fun getMedia(uri: String): MediaObject {
-        // Return a dummy video object
-        return MediaObject.Video(
-            name = "Sample Video",
+class InMemoryMediaManager : MediaManager {
+    override suspend fun getMedia(uri: String): MediaObject =
+        MediaObject.Video(
+            name = "In-memory video",
             uri = uri,
             size = 0,
             timestamp = Instant.parse("2023-01-01T12:00:00Z"),
             duration = 30.seconds,
         )
-    }
 
     override suspend fun exists(mediaId: String): Boolean = false
 
@@ -34,12 +28,11 @@ class StubMediaManager : MediaManager {
     ): Flow<List<MediaObject>> = flowOf(emptyList())
 
     override suspend fun addToDefaultCollection(uri: String) {
-        // No-op
     }
 
     override suspend fun readMedia(uri: String): MediaPayload =
         MediaPayload(
-            fileName = "stub.bin",
+            fileName = "memory.bin",
             mimeType = "application/octet-stream",
             sizeBytes = 0,
             data = ByteArray(0),

@@ -168,8 +168,7 @@ interface TranscriptionService {
 /**
  * Shared "no-op" download state used by [TranscriptionService] and
  * [app.logdate.client.media.audio.tagging.AudioTaggingService] implementations
- * that don't ship a downloadable model. Allocated once so every stub doesn't
- * have to declare its own field.
+ * that don't ship a downloadable model.
  */
 private val NotSupportedDownloadStatus: StateFlow<ModelDownloadStatus> =
     MutableStateFlow(ModelDownloadStatus.NotSupported).asStateFlow()

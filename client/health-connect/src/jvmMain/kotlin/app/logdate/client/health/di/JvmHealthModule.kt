@@ -1,6 +1,6 @@
 package app.logdate.client.health.di
 
-import app.logdate.client.health.datasource.JvmStubRemoteHealthDataSource
+import app.logdate.client.health.datasource.JvmUnavailableRemoteHealthDataSource
 import app.logdate.client.health.datasource.RemoteHealthDataSource
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -13,7 +13,7 @@ val jvmHealthModule =
     module {
         // JVM-specific remote data source
         single<RemoteHealthDataSource> {
-            JvmStubRemoteHealthDataSource()
+            JvmUnavailableRemoteHealthDataSource()
         }
 
         // JVM-specific IO dispatcher

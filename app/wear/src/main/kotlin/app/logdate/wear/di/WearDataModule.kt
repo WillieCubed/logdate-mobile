@@ -31,7 +31,7 @@ import app.logdate.shared.config.configModule
 import app.logdate.shared.model.Journal
 import app.logdate.wear.health.HealthServicesWearHealthSensorManager
 import app.logdate.wear.health.NoteHealthAnnotator
-import app.logdate.wear.health.StubWearHealthSensorManager
+import app.logdate.wear.health.UnavailableWearHealthSensorManager
 import app.logdate.wear.health.WearHealthSensorManager
 import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.sync.GoogleWearDataLayerClient
@@ -46,7 +46,7 @@ import org.koin.dsl.module
  * Koin module providing the full data stack for Wear OS.
  *
  * Includes Room database with SqlCipher encryption, DAOs, DataStore preferences,
- * and offline-first repository implementations. Stubs out account, networking,
+ * and offline-first repository implementations. Provides local-only account, networking,
  * and Firebase bindings that are not applicable on Wear OS.
  */
 val wearDataModule =
@@ -99,12 +99,12 @@ val wearDataModule =
                 HealthServicesWearHealthSensorManager(get())
             } catch (e: Exception) {
                 Napier.w("Health Services not available; health capture disabled for this device", e)
-                StubWearHealthSensorManager()
+                UnavailableWearHealthSensorManager()
             }
         }
         single { NoteHealthAnnotator(get(), get()) }
 
-        // Stub remote data source (no Firebase on Wear)
+        // Remote data source unavailable (no Firebase on Wear)
         factory<RemoteJournalDataSource> { NoOpRemoteJournalDataSource }
 
         // Draft storage

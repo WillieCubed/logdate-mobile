@@ -2,16 +2,13 @@ package app.logdate.client.health.data
 
 import app.logdate.client.health.model.SleepSession
 import app.logdate.client.health.model.TimeOfDay
-import io.github.aakira.napier.Napier
 import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 
 /**
- * Desktop implementation of RemoteHealthDataSource.
- * This is a stub implementation since desktop platforms don't have health APIs.
+ * Desktop [RemoteHealthDataSource] for platforms without health APIs.
  */
 class DesktopLocalHealthDataSource : RemoteHealthDataSource {
-    
     override suspend fun isHealthApiAvailable(): Boolean {
         // Health APIs are not available on desktop
         return false

@@ -4,7 +4,7 @@ import app.logdate.client.domain.places.ResolveLocationToPlaceUseCase
 import app.logdate.client.location.places.GeocodedAddress
 import app.logdate.client.location.places.PlaceSuggestion
 import app.logdate.client.location.places.ReverseGeocodingProvider
-import app.logdate.client.media.display.StubRemoteDisplayManager
+import app.logdate.client.media.display.UnavailableRemoteDisplayManager
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
@@ -42,7 +42,7 @@ class MediaDetailViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private val contentRepository = FakeJournalContentRepository()
     private val indexedMediaRepository = FakeIndexedMediaRepository()
-    private val remoteDisplayManager = StubRemoteDisplayManager()
+    private val remoteDisplayManager = UnavailableRemoteDisplayManager()
     private val resolveLocationUseCase =
         ResolveLocationToPlaceUseCase(
             userPlacesRepository =

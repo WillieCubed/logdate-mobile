@@ -2,8 +2,8 @@ package app.logdate.client.sync.test
 
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
+import app.logdate.client.media.InMemoryMediaManager
 import app.logdate.client.media.MediaManager
-import app.logdate.client.media.StubMediaManager
 import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.repository.journals.JournalContentRepository
@@ -168,7 +168,7 @@ fun testDefaultSyncManager(
     cloudDraftDataSource: CloudDraftDataSource = DefaultCloudDraftDataSource(fakeCloudApiClient()),
     cloudAccountRepository: CloudAccountRepository = fakeAccountRepository(),
     sessionStorage: SessionStorage = fakeSessionStorage(),
-    mediaManager: MediaManager = StubMediaManager(),
+    mediaManager: MediaManager = InMemoryMediaManager(),
     mediaSyncRefStore: MediaSyncRefStore = InMemoryMediaSyncRefStore(),
     journalRepository: JournalRepository = FakeJournalRepository(),
     journalNotesRepository: JournalNotesRepository = FakeJournalNotesRepository(),

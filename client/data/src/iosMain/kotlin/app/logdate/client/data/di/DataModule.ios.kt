@@ -7,11 +7,11 @@ import app.logdate.client.data.audio.OfflineFirstAudioTagRepository
 import app.logdate.client.data.events.OfflineFirstEventRepository
 import app.logdate.client.data.journals.JournalUserDataRepository
 import app.logdate.client.data.journals.LocalFirstDraftRepository
+import app.logdate.client.data.journals.NoOpJournalDataSource
 import app.logdate.client.data.journals.OfflineFirstJournalContentRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
 import app.logdate.client.data.journals.OfflineFirstJournalUserDataRepository
 import app.logdate.client.data.journals.RemoteJournalDataSource
-import app.logdate.client.data.journals.StubJournalDataSource
 import app.logdate.client.data.location.OfflineFirstLocationHistoryRepository
 import app.logdate.client.data.maintenance.DataIntegrityService
 import app.logdate.client.data.media.OfflineIndexedMediaRepository
@@ -103,9 +103,9 @@ actual val dataModule: Module =
 
         // Journals — RemoteJournalDataSource is a vestigial pre-AT-Protocol abstraction.
         // OfflineFirstJournalRepository sources real sync through SyncManager + the
-        // record-level /api/v1/sync/journals endpoints; the stub here is intentional and the
+        // record-level /api/v1/sync/journals endpoints; the no-op source here is intentional and the
         // field is unused at runtime.
-        factory<RemoteJournalDataSource> { StubJournalDataSource }
+        factory<RemoteJournalDataSource> { NoOpJournalDataSource }
         single<JournalUserDataRepository> { OfflineFirstJournalUserDataRepository(get()) }
         single<DraftRepository> { LocalFirstDraftRepository(get(), get()) }
         single<JournalRepository> {

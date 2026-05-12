@@ -1,10 +1,7 @@
 package app.logdate.client.health.util
 
-// This file contains stub types for dependencies that we need for compilation
-// but will be provided by the actual dependencies at runtime.
-
 /**
- * Stub data class for user preferences.
+ * Minimal user preference contract consumed by health aggregation logic.
  */
 data class UserPreferences(
     val dayStartHour: Int? = null,
@@ -12,7 +9,7 @@ data class UserPreferences(
 )
 
 /**
- * Stub interface for data source.
+ * Preference source required by health aggregation logic.
  */
 interface LogdatePreferencesDataSource {
     suspend fun getPreferences(): UserPreferences

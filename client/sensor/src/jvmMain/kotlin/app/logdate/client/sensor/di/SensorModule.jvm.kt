@@ -2,7 +2,7 @@ package app.logdate.client.sensor.di
 
 import app.logdate.client.networking.saver.NetworkSaverModeProvider
 import app.logdate.client.sensor.GyroSensorProvider
-import app.logdate.client.sensor.StubGyroSensorProvider
+import app.logdate.client.sensor.UnavailableGyroSensorProvider
 import app.logdate.client.sensor.battery.BatteryInfoProvider
 import app.logdate.client.sensor.battery.JvmBatteryInfoProvider
 import app.logdate.client.sensor.network.JvmNetworkSaverModeProvider
@@ -26,6 +26,6 @@ actual val sensorModule: Module =
 
         // No CoreMotion/SensorManager equivalent on the JVM; emit nothing.
         single<GyroSensorProvider> {
-            StubGyroSensorProvider(coroutineScope = get())
+            UnavailableGyroSensorProvider(coroutineScope = get())
         }
     }

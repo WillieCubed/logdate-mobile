@@ -15,7 +15,7 @@ import kotlin.time.Clock
 /**
  * iOS [UserDeviceRepository] backed by [UIDevice] for the current device. Until the LogDate
  * sync server enumerates a user's full device list (see §S3 backend), `allDevices` only ever
- * contains the local entry — better than the stubbed empty list since the device-management
+ * contains the local entry so the device-management
  * UI can at least render this device's real model and OS version.
  */
 class IosUserDeviceRepository : UserDeviceRepository {

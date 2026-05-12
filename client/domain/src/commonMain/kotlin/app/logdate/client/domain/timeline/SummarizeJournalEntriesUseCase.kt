@@ -13,9 +13,8 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 /**
  * A use case that summarizes journal entries.
  *
- * This relies on a generative model to summarize text entries.
- *
- * TODO: Ensure summarization works offline
+ * This relies on [EntrySummarizer], which returns cached summaries while offline and reports
+ * [SummarizeJournalEntriesResult.NetworkUnavailable] when no cached summary is available.
  */
 class SummarizeJournalEntriesUseCase(
     private val summarizer: EntrySummarizer,
@@ -122,8 +121,6 @@ ${it.content}
 sealed interface SummarizeJournalEntriesResult {
     /**
      * A summary could not be generated because the client was not connected to the internet.
-     *
-     * TODO: Support on-device models
      */
     data object NetworkUnavailable : SummarizeJournalEntriesResult
 

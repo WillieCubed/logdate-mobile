@@ -8,29 +8,29 @@ import kotlinx.datetime.TimeZone
 import kotlin.time.Instant
 
 /**
- * Stub implementation of RemoteHealthDataSource that can be used as a fallback
+ * Unavailable implementation of RemoteHealthDataSource that can be used as a fallback
  * if platform-specific implementations fail or are unavailable.
  *
  * This implementation returns empty or false results for all methods.
  */
-class StubRemoteHealthDataSource : RemoteHealthDataSource {
+class UnavailableRemoteHealthDataSource : RemoteHealthDataSource {
     override suspend fun getAvailability(): HealthDataAvailability {
-        Napier.d("StubRemoteHealthDataSource.getAvailability() called")
+        Napier.d("UnavailableRemoteHealthDataSource.getAvailability() called")
         return HealthDataAvailability.NOT_AVAILABLE
     }
 
     override suspend fun isAvailable(): Boolean {
-        Napier.d("StubRemoteHealthDataSource.isAvailable() called")
+        Napier.d("UnavailableRemoteHealthDataSource.isAvailable() called")
         return false
     }
 
     override suspend fun hasSleepPermissions(): Boolean {
-        Napier.d("StubRemoteHealthDataSource.hasSleepPermissions() called")
+        Napier.d("UnavailableRemoteHealthDataSource.hasSleepPermissions() called")
         return false
     }
 
     override suspend fun requestSleepPermissions(): Boolean {
-        Napier.d("StubRemoteHealthDataSource.requestSleepPermissions() called")
+        Napier.d("UnavailableRemoteHealthDataSource.requestSleepPermissions() called")
         return false
     }
 
@@ -38,7 +38,7 @@ class StubRemoteHealthDataSource : RemoteHealthDataSource {
         start: Instant,
         end: Instant,
     ): List<SleepSession> {
-        Napier.d("StubRemoteHealthDataSource.getSleepSessions() called")
+        Napier.d("UnavailableRemoteHealthDataSource.getSleepSessions() called")
         return emptyList()
     }
 
@@ -46,7 +46,7 @@ class StubRemoteHealthDataSource : RemoteHealthDataSource {
         timeZone: TimeZone,
         days: Int,
     ): TimeOfDay? {
-        Napier.d("StubRemoteHealthDataSource.getAverageWakeUpTime() called")
+        Napier.d("UnavailableRemoteHealthDataSource.getAverageWakeUpTime() called")
         return null
     }
 
@@ -54,7 +54,7 @@ class StubRemoteHealthDataSource : RemoteHealthDataSource {
         timeZone: TimeZone,
         days: Int,
     ): TimeOfDay? {
-        Napier.d("StubRemoteHealthDataSource.getAverageSleepTime() called")
+        Napier.d("UnavailableRemoteHealthDataSource.getAverageSleepTime() called")
         return null
     }
 }

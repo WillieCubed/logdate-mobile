@@ -6,8 +6,7 @@ import kotlinx.datetime.TimeZone
 import kotlin.time.Instant
 
 /**
- * JVM implementation of SleepRepository.
- * This is a stub implementation for desktop platforms.
+ * JVM [SleepRepository] for desktop platforms where sleep APIs are unavailable.
  */
 class JvmSleepRepository : SleepRepository {
     override suspend fun hasSleepPermissions(): Boolean {

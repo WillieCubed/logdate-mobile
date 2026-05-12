@@ -4,10 +4,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
- * A stub implementation of [BatteryInfoProvider] for testing or platforms
- * where battery information is not available.
+ * Static [BatteryInfoProvider] for tests and platforms where battery information is unavailable.
  */
-class StubBatteryInfoProvider : BatteryInfoProvider {
+class StaticBatteryInfoProvider : BatteryInfoProvider {
     private val batteryStateFlow =
         MutableStateFlow(
             BatteryState(
@@ -31,6 +30,5 @@ class StubBatteryInfoProvider : BatteryInfoProvider {
     }
 
     override fun cleanup() {
-        // No-op for stub implementation
     }
 }

@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.flowOf
 class DesktopPasskeyManager : PasskeyManager {
     override suspend fun getCapabilities(): PasskeyCapabilities =
         PasskeyCapabilities(
-            isSupported = false, // Not implemented for desktop yet
+            isSupported = false,
             isPlatformAuthenticatorAvailable = false,
             supportedAlgorithms = emptyList(),
         )

@@ -1,10 +1,7 @@
-@file:Suppress("ktlint:standard:filename")
-
 package app.logdate.client.health
 
 /**
- * These are helper constants and stub types to assist with compatibility when
- * the actual Health Connect classes are not directly accessible.
+ * Sleep stage constants used when Health Connect stage enums are not directly accessible.
  */
 object SleepSessionConstants {
     const val STAGE_TYPE_UNKNOWN = 0

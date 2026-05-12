@@ -20,8 +20,8 @@ import kotlin.time.Instant
 interface DeviceCalendarReader {
     /**
      * Whether the host platform has granted the read-only calendar permission required for
-     * [listCalendars] and [readEvents] to return real data. Stub implementations always
-     * return `true` because they never read anything sensitive in the first place.
+     * [listCalendars] and [readEvents] to return real data. Unavailable implementations return `false` because they cannot read OS calendar data
+     * on the current platform.
      */
     suspend fun hasPermission(): Boolean
 

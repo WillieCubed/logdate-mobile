@@ -1,5 +1,6 @@
 package app.logdate.client.domain.entities
 
+import app.logdate.client.intelligence.AIResult
 import app.logdate.client.repository.knowledge.PeopleRepository
 import app.logdate.shared.model.Person
 
@@ -13,7 +14,14 @@ class GetPeopleForNoteUseCase(
     suspend operator fun invoke(
         noteId: String,
         text: String,
-    ): List<Person> {
-        TODO("Not yet implemented")
-    }
+    ): List<Person> =
+        when (val result = extractPeopleUseCase(noteId, text)) {
+            is AIResult.Success ->
+                result.value.map { extractedPerson ->
+                    peopleRepository.resolvePersonByName(extractedPerson.name) ?: extractedPerson
+                }
+            is AIResult.Error,
+            is AIResult.Unavailable,
+            -> emptyList()
+        }
 }

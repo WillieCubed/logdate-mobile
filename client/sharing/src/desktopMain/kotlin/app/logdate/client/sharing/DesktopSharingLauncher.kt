@@ -104,17 +104,13 @@ class DesktopSharingLauncher(
     }
 
     /**
-     * Not implemented for desktop.
-     *
-     * @throws UnsupportedOperationException This operation is not supported on desktop
+     * @throws UnsupportedOperationException This operation is not supported on desktop.
      */
     override fun sharePhotoToInstagramFeed(photoId: String): Unit =
         throw UnsupportedOperationException("Sharing photos to Instagram is not supported on desktop")
 
     /**
-     * Not implemented for desktop.
-     *
-     * @throws UnsupportedOperationException This operation is not supported on desktop
+     * @throws UnsupportedOperationException This operation is not supported on desktop.
      */
     override fun shareVideoToInstagramFeed(videoId: String): Unit =
         throw UnsupportedOperationException("Sharing videos to Instagram is not supported on desktop")

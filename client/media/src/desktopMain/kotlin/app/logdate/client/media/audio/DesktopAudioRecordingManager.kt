@@ -189,9 +189,6 @@ class DesktopAudioRecordingManager(
                     } catch (e: Exception) {
                         Napier.e("Error transcribing audio file", e)
                     }
-                } else {
-                    // Fallback to simulated transcription
-                    transcriptionFlow.value = "This is a transcription placeholder. Real transcription would be implemented with a service."
                 }
             }
 

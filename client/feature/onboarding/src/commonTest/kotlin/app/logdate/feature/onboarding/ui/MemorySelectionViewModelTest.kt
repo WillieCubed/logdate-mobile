@@ -68,7 +68,7 @@ class MemorySelectionViewModelTest {
         runTest {
             fakeMediaManager.queryMediaByDateFlow = {
                 flow {
-                    throw SecurityException("Media access denied")
+                    throw IllegalStateException("Media access denied")
                 }
             }
 

@@ -9,13 +9,11 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * Stub implementation of [RewindGenerationManager] for testing and development.
+ * In-memory [RewindGenerationManager] for local-only targets and tests.
  *
- * This implementation provides minimal functionality for rewind generation management
- * without relying on database or other external services. It's primarily used for
- * dependency injection when the real implementation is not available or needed.
+ * It tracks generation requests in process without relying on external services.
  */
-class StubRewindGenerationManager : RewindGenerationManager {
+class InMemoryRewindGenerationManager : RewindGenerationManager {
     // Map to store active requests
     private val activeRequests = mutableMapOf<Uuid, RewindGenerationRequest>()
 

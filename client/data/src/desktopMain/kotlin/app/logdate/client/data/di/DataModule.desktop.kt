@@ -1,16 +1,16 @@
 package app.logdate.client.data.di
 
-import app.logdate.client.data.account.StubAccountIdentityRepository
-import app.logdate.client.data.account.StubAccountRepository
-import app.logdate.client.data.account.StubPasskeyAccountRepository
+import app.logdate.client.data.account.UnavailableAccountIdentityRepository
+import app.logdate.client.data.account.UnavailableAccountRepository
+import app.logdate.client.data.account.UnavailablePasskeyAccountRepository
 import app.logdate.client.data.events.OfflineFirstEventRepository
 import app.logdate.client.data.journals.JournalUserDataRepository
 import app.logdate.client.data.journals.LocalFirstDraftRepository
+import app.logdate.client.data.journals.NoOpJournalDataSource
 import app.logdate.client.data.journals.OfflineFirstJournalContentRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
 import app.logdate.client.data.journals.OfflineFirstJournalUserDataRepository
 import app.logdate.client.data.journals.RemoteJournalDataSource
-import app.logdate.client.data.journals.StubJournalDataSource
 import app.logdate.client.data.location.OfflineFirstLocationHistoryRepository
 import app.logdate.client.data.maintenance.DataIntegrityService
 import app.logdate.client.data.media.OfflineIndexedMediaRepository
@@ -22,10 +22,10 @@ import app.logdate.client.data.notes.drafts.LocalEntryDraftStore
 import app.logdate.client.data.notes.drafts.OfflineFirstEntryDraftRepository
 import app.logdate.client.data.people.OfflineFirstPeopleGraphRepository
 import app.logdate.client.data.people.OfflineFirstPeopleRepository
-import app.logdate.client.data.people.StubDeviceContactsReader
+import app.logdate.client.data.people.UnavailableDeviceContactsReader
 import app.logdate.client.data.places.OfflineFirstUserPlacesRepository
 import app.logdate.client.data.profile.OfflineFirstProfileRepository
-import app.logdate.client.data.quota.StubRemoteQuotaDataSource
+import app.logdate.client.data.quota.UnavailableRemoteQuotaDataSource
 import app.logdate.client.data.rewind.DefaultRewindGenerationManager
 import app.logdate.client.data.rewind.OfflineFirstReflectionPromptResponseRepository
 import app.logdate.client.data.rewind.OfflineFirstRewindRepository
@@ -34,8 +34,8 @@ import app.logdate.client.data.search.OfflineFirstSearchRepository
 import app.logdate.client.data.streak.DefaultStreakSettingsRepository
 import app.logdate.client.data.timeline.OfflineFirstActivityTimelineRepository
 import app.logdate.client.data.transcription.OfflineFirstTranscriptionRepository
+import app.logdate.client.data.user.LocalUserDeviceRepository
 import app.logdate.client.data.user.OfflineFirstUserStateRepository
-import app.logdate.client.data.user.StubUserDeviceRepository
 import app.logdate.client.database.databaseModule
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.di.datastoreModule
@@ -94,7 +94,7 @@ actual val dataModule: Module =
         }
 
         // Journals
-        factory<RemoteJournalDataSource> { StubJournalDataSource }
+        factory<RemoteJournalDataSource> { NoOpJournalDataSource }
         single<JournalUserDataRepository> { OfflineFirstJournalUserDataRepository(get()) }
         single<DraftRepository> { LocalFirstDraftRepository(get(), get()) }
         single<JournalRepository> {
@@ -179,22 +179,22 @@ actual val dataModule: Module =
         single<InferredPeopleRepository> { get<OfflineFirstPeopleGraphRepository>() }
         single<PersonLinkRepository> { get<OfflineFirstPeopleGraphRepository>() }
         single<PeopleProfileRepository> { get<OfflineFirstPeopleGraphRepository>() }
-        single<DeviceContactsReader> { StubDeviceContactsReader() }
+        single<DeviceContactsReader> { UnavailableDeviceContactsReader() }
 
         // Profile
         single<ProfileRepository> { OfflineFirstProfileRepository(get()) }
 
         // User
-        single<UserDeviceRepository> { StubUserDeviceRepository }
+        single<UserDeviceRepository> { LocalUserDeviceRepository }
         single<UserStateRepository> { OfflineFirstUserStateRepository(get()) }
 
         // Quota
-        factory<RemoteQuotaDataSource> { StubRemoteQuotaDataSource() }
+        factory<RemoteQuotaDataSource> { UnavailableRemoteQuotaDataSource() }
 
         // Account
-        single<AccountRepository> { StubAccountRepository() }
-        single<AccountIdentityRepository> { StubAccountIdentityRepository() }
-        single<PasskeyAccountRepository> { StubPasskeyAccountRepository() }
+        single<AccountRepository> { UnavailableAccountRepository() }
+        single<AccountIdentityRepository> { UnavailableAccountIdentityRepository() }
+        single<PasskeyAccountRepository> { UnavailablePasskeyAccountRepository() }
 
         // Transcription
         single<TranscriptionRepository> {

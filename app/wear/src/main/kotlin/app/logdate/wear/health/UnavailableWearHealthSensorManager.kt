@@ -4,7 +4,7 @@ package app.logdate.wear.health
  * No-op implementation of [WearHealthSensorManager] for devices without Health Services
  * or when health permissions are not granted.
  */
-class StubWearHealthSensorManager : WearHealthSensorManager {
+class UnavailableWearHealthSensorManager : WearHealthSensorManager {
     override suspend fun isAvailable(): Boolean = false
 
     override suspend fun sampleCurrent(): HealthSnapshot = HealthSnapshot()

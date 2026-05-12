@@ -1,6 +1,6 @@
 package app.logdate.client.sync
 
-import app.logdate.client.media.StubMediaManager
+import app.logdate.client.media.InMemoryMediaManager
 import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
 import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
 import app.logdate.client.sync.cloud.DefaultCloudDraftDataSource
@@ -49,7 +49,7 @@ class NetworkRecoveryIntegrationTest {
                     cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
-                    mediaManager = StubMediaManager(),
+                    mediaManager = InMemoryMediaManager(),
                     mediaSyncRefStore = InMemoryMediaSyncRefStore(),
                     journalRepository = fakeJournalRepository(),
                     journalNotesRepository = fakeJournalNotesRepository(),
@@ -92,7 +92,7 @@ class NetworkRecoveryIntegrationTest {
                     cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
-                    mediaManager = StubMediaManager(),
+                    mediaManager = InMemoryMediaManager(),
                     mediaSyncRefStore = InMemoryMediaSyncRefStore(),
                     journalRepository = fakeJournalRepository(),
                     journalNotesRepository = fakeJournalNotesRepository(),
@@ -132,7 +132,7 @@ class NetworkRecoveryIntegrationTest {
                     cloudDraftDataSource = DefaultCloudDraftDataSource(failingApiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
-                    mediaManager = StubMediaManager(),
+                    mediaManager = InMemoryMediaManager(),
                     mediaSyncRefStore = InMemoryMediaSyncRefStore(),
                     journalRepository = fakeJournalRepository(),
                     journalNotesRepository = fakeJournalNotesRepository(),

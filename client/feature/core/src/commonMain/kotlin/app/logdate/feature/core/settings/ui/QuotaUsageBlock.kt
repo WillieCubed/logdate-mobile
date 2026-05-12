@@ -210,7 +210,7 @@ fun QuotaUsageBlock(
 @Preview
 @Composable
 private fun QuotaUsageBlockPreview() {
-    val mockQuotaUsage =
+    val sampleQuotaUsage =
         StorageQuotaUi(
             totalBytes = 100L * 1024L * 1024L * 1024L, // 100GB
             usedBytes = 12L * 1024L * 1024L * 1024L + 300L * 1024L * 1024L, // 12.3GB
@@ -252,6 +252,6 @@ private fun QuotaUsageBlockPreview() {
             text = stringResource(Res.string.quota_usage_block),
             style = MaterialTheme.typography.headlineMedium,
         )
-        QuotaUsageBlock(quotaUsage = mockQuotaUsage)
+        QuotaUsageBlock(quotaUsage = sampleQuotaUsage)
     }
 }

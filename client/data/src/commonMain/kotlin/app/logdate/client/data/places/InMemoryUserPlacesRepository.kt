@@ -6,12 +6,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 
 /**
- * Stub implementation of UserPlacesRepository for development purposes.
+ * In-memory [UserPlacesRepository].
  *
- * This implementation returns empty results and performs no-ops for all operations.
- * Should be replaced with a real implementation that stores user places in the database.
+ * Production modules should prefer [OfflineFirstUserPlacesRepository]; this class exists for
+ * tests and targets that intentionally do not persist custom places.
  */
-class StubUserPlacesRepository : UserPlacesRepository {
+class InMemoryUserPlacesRepository : UserPlacesRepository {
     override suspend fun getAllPlaces(): List<Place> = emptyList()
 
     override fun observeAllPlaces(): Flow<List<Place>> = flowOf(emptyList())

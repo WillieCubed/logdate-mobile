@@ -9,9 +9,8 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
- * Stub implementation of DeviceRepository for testing and offline operation.
- * This implementation stores devices in memory and provides basic functionality
- * without connecting to a cloud service.
+ * In-memory [DeviceRepository] for testing and offline operation.
+ * This implementation stores devices locally without connecting to a cloud service.
  *
  * TODO: Perhaps consolidate with other repositories for consistency.
  */

@@ -5,8 +5,6 @@ package app.logdate.feature.journals.ui
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -22,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.feature.journals.ui.list.JournalsListDialog
 import app.logdate.shared.model.Journal
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.journal.generated.resources.*
 import logdate.client.feature.journal.generated.resources.Res
@@ -54,7 +53,7 @@ fun JournalsSeeMoreButton(
             ),
     ) {
         Icon(
-            imageVector = Icons.Default.MoreHoriz,
+            painter = PlatformIcons.more(),
             contentDescription = null,
             modifier = Modifier.padding(end = Spacing.sm),
         )

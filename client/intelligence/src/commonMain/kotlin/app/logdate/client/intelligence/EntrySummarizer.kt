@@ -17,9 +17,8 @@ import kotlinx.coroutines.withContext
 /**
  * A utility that summarizes journal entries.
  *
- * This currently only supports text entries.
- *
- * TODO: Incorporate other information into summarizes, such as people and places.
+ * This currently summarizes the text passed by the caller. Callers that want people, places,
+ * or media context should include that context in the prompt text.
  */
 class EntrySummarizer(
     private val generativeAICache: GenerativeAICache,

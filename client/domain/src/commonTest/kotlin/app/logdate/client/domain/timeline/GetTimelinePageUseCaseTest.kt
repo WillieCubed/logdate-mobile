@@ -32,7 +32,7 @@ class GetTimelinePageUseCaseTest {
                 )
 
             val result =
-                GetTimelinePageUseCase(repository, calendarDateGrouper(), PageNoOpEventRepository)(
+                GetTimelinePageUseCase(repository, calendarDateGrouper(), PageNoOpEventRepository, PageTimelineDayBuilder)(
                     TimelinePageRequest(
                         pageSize = 3,
                     ),
@@ -61,7 +61,7 @@ class GetTimelinePageUseCaseTest {
                             textNote("Jan 1", "2025-01-01T18:00:00Z"),
                         ),
                 )
-            val useCase = GetTimelinePageUseCase(repository, calendarDateGrouper(), PageNoOpEventRepository)
+            val useCase = GetTimelinePageUseCase(repository, calendarDateGrouper(), PageNoOpEventRepository, PageTimelineDayBuilder)
 
             val firstPage = useCase(TimelinePageRequest(pageSize = 3))
             val secondPage =
@@ -93,7 +93,7 @@ class GetTimelinePageUseCaseTest {
                             textNote("Only day early", "2025-01-03T15:00:00Z"),
                         ),
                 )
-            val useCase = GetTimelinePageUseCase(repository, calendarDateGrouper(), PageNoOpEventRepository)
+            val useCase = GetTimelinePageUseCase(repository, calendarDateGrouper(), PageNoOpEventRepository, PageTimelineDayBuilder)
 
             val firstPage = useCase(TimelinePageRequest(pageSize = 1))
             val secondPage =
@@ -107,6 +107,44 @@ class GetTimelinePageUseCaseTest {
             assertTrue(secondPage.days.isEmpty())
             assertFalse(secondPage.hasMoreOlderContent)
             assertEquals(null, secondPage.oldestLoadedTimestamp)
+        }
+
+    @Test
+    fun `invoke returns complete dense day even when it exceeds page size`() =
+        runTest {
+            val repository =
+                FakeJournalNotesRepository(
+                    notes =
+                        listOf(
+                            textNote("Jan 3 late", "2025-01-03T18:00:00Z"),
+                            textNote("Jan 3 afternoon", "2025-01-03T15:00:00Z"),
+                            textNote("Jan 3 morning", "2025-01-03T09:00:00Z"),
+                            textNote("Jan 2", "2025-01-02T18:00:00Z"),
+                        ),
+                )
+
+            val result =
+                GetTimelinePageUseCase(repository, calendarDateGrouper(), PageNoOpEventRepository, PageTimelineDayBuilder)(
+                    TimelinePageRequest(pageSize = 1),
+                )
+
+            assertEquals(1, result.days.size)
+            assertEquals(
+                3,
+                result.days
+                    .single()
+                    .date
+                    .day,
+            )
+            assertEquals(
+                3,
+                result.days
+                    .single()
+                    .entries
+                    .size,
+            )
+            assertEquals(Instant.parse("2025-01-03T09:00:00Z"), result.oldestLoadedTimestamp)
+            assertTrue(result.hasMoreOlderContent)
         }
 
     private fun textNote(
@@ -199,3 +237,19 @@ private object PageNoOpEventRepository : EventRepository {
         noteId: Uuid,
     ): Result<Unit> = Result.success(Unit)
 }
+
+private val PageTimelineDayBuilder =
+    TimelineDayBuilder { date, entries, events ->
+        val places = extractPlacesVisited(entries)
+        TimelineDay(
+            start = entries.minOf { it.creationTimestamp },
+            end = entries.maxOf { it.creationTimestamp },
+            tldr = "Test summary",
+            date = date,
+            events = events,
+            placesVisited = places,
+            moments = inferMomentsHeuristically(date, entries, places),
+            parts = extractDayParts(entries),
+            entries = entries.sortedByDescending { it.creationTimestamp },
+        )
+    }

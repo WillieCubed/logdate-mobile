@@ -104,9 +104,9 @@ private val NotSupportedAudioTaggingDownloadStatus: StateFlow<ModelDownloadStatu
     MutableStateFlow(ModelDownloadStatus.NotSupported).asStateFlow()
 
 /**
- * Stub [AudioTaggingService] for platforms that don't ship the on-device
- * tagger (iOS, desktop, JVM tests). Stateless — exposed as a singleton
- * object so DI bindings don't allocate per resolution.
+ * Unavailable [AudioTaggingService] for platforms that don't ship the on-device
+ * tagger. Stateless — exposed as a singleton object so DI bindings don't allocate
+ * per resolution.
  */
 object NoopAudioTaggingService : AudioTaggingService {
     override val isAvailable: Boolean = false

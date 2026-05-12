@@ -2,7 +2,7 @@ package app.logdate.client.data.journals
 
 import app.logdate.shared.model.Journal
 
-object StubJournalDataSource : RemoteJournalDataSource {
+object NoOpJournalDataSource : RemoteJournalDataSource {
     override suspend fun observeAllJournals(): List<Journal> {
         // no-op
         return emptyList()

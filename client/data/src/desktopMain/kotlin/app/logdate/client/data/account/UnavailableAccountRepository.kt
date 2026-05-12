@@ -6,9 +6,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 
 /**
- * Stub implementation of AccountRepository for desktop platform without cloud account.
+ * Account repository for desktop builds without cloud account support.
  */
-class StubAccountRepository : AccountRepository {
+class UnavailableAccountRepository : AccountRepository {
     override val currentAccount: Flow<LogDateAccount?> = flowOf(null)
 
     override suspend fun updateProfile(

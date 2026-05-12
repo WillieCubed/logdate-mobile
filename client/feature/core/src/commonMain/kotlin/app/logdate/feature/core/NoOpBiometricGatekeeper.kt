@@ -4,11 +4,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * A stub implementation of [BiometricGatekeeper] that does nothing.
+ * A no-op [BiometricGatekeeper] for platforms without biometric auth.
  *
- * This can be used for tests or for platforms where biometric authentication is not supported.
+ * Desktop does not expose a biometric challenge flow, so authentication is already satisfied.
  */
-class StubBiometricGatekeeper : BiometricGatekeeper {
+class NoOpBiometricGatekeeper : BiometricGatekeeper {
     private val _authState = MutableStateFlow(AppAuthState.NO_PROMPT_NEEDED)
     override val authState: StateFlow<AppAuthState> = _authState
 

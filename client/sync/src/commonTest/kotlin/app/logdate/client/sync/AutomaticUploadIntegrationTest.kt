@@ -1,6 +1,6 @@
 package app.logdate.client.sync
 
-import app.logdate.client.media.StubMediaManager
+import app.logdate.client.media.InMemoryMediaManager
 import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
 import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
 import app.logdate.client.sync.cloud.DefaultCloudDraftDataSource
@@ -54,7 +54,7 @@ class AutomaticUploadIntegrationTest {
                     cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
-                    mediaManager = StubMediaManager(),
+                    mediaManager = InMemoryMediaManager(),
                     mediaSyncRefStore = InMemoryMediaSyncRefStore(),
                     journalRepository = fakeJournalRepository(),
                     journalNotesRepository = notesRepository,
@@ -107,7 +107,7 @@ class AutomaticUploadIntegrationTest {
                     cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
-                    mediaManager = StubMediaManager(),
+                    mediaManager = InMemoryMediaManager(),
                     mediaSyncRefStore = InMemoryMediaSyncRefStore(),
                     journalRepository = journalRepository,
                     journalNotesRepository = fakeJournalNotesRepository(),
@@ -161,7 +161,7 @@ class AutomaticUploadIntegrationTest {
                     cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
-                    mediaManager = StubMediaManager(),
+                    mediaManager = InMemoryMediaManager(),
                     mediaSyncRefStore = InMemoryMediaSyncRefStore(),
                     journalRepository = fakeJournalRepository(),
                     journalNotesRepository = fakeJournalNotesRepository(),
@@ -208,7 +208,7 @@ class AutomaticUploadIntegrationTest {
                     cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(),
                     sessionStorage = fakeSessionStorage(),
-                    mediaManager = StubMediaManager(),
+                    mediaManager = InMemoryMediaManager(),
                     mediaSyncRefStore = InMemoryMediaSyncRefStore(),
                     journalRepository = fakeJournalRepository(),
                     journalNotesRepository = notesRepository,
@@ -259,7 +259,7 @@ class AutomaticUploadIntegrationTest {
                     cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
                     cloudAccountRepository = fakeAccountRepository(authenticated = false),
                     sessionStorage = fakeSessionStorage(authenticated = false),
-                    mediaManager = StubMediaManager(),
+                    mediaManager = InMemoryMediaManager(),
                     mediaSyncRefStore = InMemoryMediaSyncRefStore(),
                     journalRepository = fakeJournalRepository(),
                     journalNotesRepository = notesRepository,

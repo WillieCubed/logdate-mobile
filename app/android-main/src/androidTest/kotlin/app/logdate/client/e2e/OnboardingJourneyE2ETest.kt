@@ -3,14 +3,12 @@ package app.logdate.client.e2e
 import android.content.pm.ActivityInfo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
-import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.MainActivity
@@ -18,7 +16,6 @@ import app.logdate.client.testing.launch.ActivityLaunchTestOverrides
 import app.logdate.client.testing.onboarding.OnboardingTestFixture
 import app.logdate.feature.onboarding.ui.CLOUD_ACCOUNT_SETUP_ROOT_TAG
 import app.logdate.feature.onboarding.ui.CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG
-import app.logdate.feature.onboarding.ui.CLOUD_ACCOUNT_SETUP_SKIP_OPTION_TAG
 import app.logdate.feature.onboarding.ui.MEMORIES_IMPORT_INFO_CONTINUE_TAG
 import app.logdate.feature.onboarding.ui.MEMORIES_IMPORT_INFO_ROOT_TAG
 import app.logdate.feature.onboarding.ui.MEMORY_SELECTION_CONTINUE_TAG
@@ -106,11 +103,7 @@ class OnboardingJourneyE2ETest {
 
         composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_ROOT_TAG).assertIsDisplayed()
         capture(CLOUD_ACCOUNT_SETUP_ROOT_TAG, "fresh", "06_backup_sync.png")
-        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_SKIP_OPTION_TAG).performClick()
-        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_ROOT_TAG).performScrollToNode(hasTestTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG))
-        waitForTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG)
-        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG).performScrollTo()
-        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG).performClick()
+        skipCloudAccountSetup()
         waitForTag(ONBOARDING_BIRTHDAY_ROOT_TAG)
 
         composeRule.onNodeWithTag(ONBOARDING_BIRTHDAY_ROOT_TAG).assertIsDisplayed()
@@ -188,12 +181,7 @@ class OnboardingJourneyE2ETest {
         waitForTag(MEMORY_SELECTION_CONTINUE_TAG)
         composeRule.onNodeWithTag(MEMORY_SELECTION_CONTINUE_TAG).performScrollTo()
         composeRule.onNodeWithTag(MEMORY_SELECTION_CONTINUE_TAG).performClick()
-        waitForTag(CLOUD_ACCOUNT_SETUP_SKIP_OPTION_TAG)
-        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_SKIP_OPTION_TAG).performClick()
-        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_ROOT_TAG).performScrollToNode(hasTestTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG))
-        waitForTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG)
-        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG).performScrollTo()
-        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG).performClick()
+        skipCloudAccountSetup()
         waitForTag(ONBOARDING_BIRTHDAY_ROOT_TAG)
 
         composeRule.onNodeWithTag(ONBOARDING_BIRTHDAY_ROOT_TAG).assertIsDisplayed()
@@ -231,11 +219,7 @@ class OnboardingJourneyE2ETest {
 
         composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_ROOT_TAG).assertIsDisplayed()
         capture(CLOUD_ACCOUNT_SETUP_ROOT_TAG, "continue_setup", "02_account.png")
-        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_SKIP_OPTION_TAG).performClick()
-        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_ROOT_TAG).performScrollToNode(hasTestTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG))
-        waitForTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG)
-        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG).performScrollTo()
-        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG).performClick()
+        skipCloudAccountSetup()
         waitForTag(ONBOARDING_BIRTHDAY_ROOT_TAG)
 
         composeRule.onNodeWithTag(ONBOARDING_BIRTHDAY_ROOT_TAG).assertIsDisplayed()
@@ -284,12 +268,7 @@ class OnboardingJourneyE2ETest {
         waitForTag(MEMORY_SELECTION_CONTINUE_TAG)
         composeRule.onNodeWithTag(MEMORY_SELECTION_CONTINUE_TAG).performScrollTo()
         composeRule.onNodeWithTag(MEMORY_SELECTION_CONTINUE_TAG).performClick()
-        waitForTag(CLOUD_ACCOUNT_SETUP_SKIP_OPTION_TAG)
-        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_SKIP_OPTION_TAG).performClick()
-        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_ROOT_TAG).performScrollToNode(hasTestTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG))
-        waitForTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG)
-        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG).performScrollTo()
-        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG).performClick()
+        skipCloudAccountSetup()
         waitForTag(ONBOARDING_BIRTHDAY_ROOT_TAG)
         selectBirthday()
 
@@ -331,6 +310,12 @@ class OnboardingJourneyE2ETest {
         composeRule.onAllNodesWithText(dayOfMonth, useUnmergedTree = true)[0].performClick()
         composeRule.onNodeWithTag(ONBOARDING_BIRTHDAY_CONFIRM_TAG).performClick()
         composeRule.waitForIdle()
+    }
+
+    private fun skipCloudAccountSetup() {
+        waitForTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG)
+        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG).performScrollTo()
+        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG).performClick()
     }
 
     private fun capture(

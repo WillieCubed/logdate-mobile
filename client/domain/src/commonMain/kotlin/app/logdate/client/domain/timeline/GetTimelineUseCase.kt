@@ -57,6 +57,9 @@ class GetTimelineUseCase(
 }
 
 data class Timeline(
+    /**
+     * Timeline days ready for presentation in the requested sort order.
+     */
     val days: List<TimelineDay>,
 )
 
@@ -80,21 +83,56 @@ data class TimelineDay(
      * timestamp corresponding to 2:30 a.m. on October 29.
      */
     val end: Instant,
+    /**
+     * Short human-readable summary for the day.
+     */
     val tldr: String,
+    /**
+     * Calendar date represented by this timeline day.
+     */
     val date: LocalDate,
+    /**
+     * People inferred from the day's journal entries.
+     */
     val people: List<Person> = emptyList(),
+    /**
+     * Calendar or app events that overlap this day's activity bounds.
+     */
     val events: List<Event> = emptyList(),
+    /**
+     * Places visited during this day, de-duplicated by place or coordinate.
+     */
     val placesVisited: List<TimelinePlaceVisit> = emptyList(),
+    /**
+     * Higher-level moments inferred from entries and places.
+     */
     val moments: List<Moment> = emptyList(),
+    /**
+     * Time-of-day sections used by timeline presentation.
+     */
     val parts: List<DayPart> = emptyList(),
+    /**
+     * Raw journal notes that contributed to this day.
+     */
     val entries: List<JournalNote> = emptyList(),
-//    val mediaUris: List<MediaObjectUiState> = emptyList(), // TODO: Actually include media
 )
 
 data class TimelinePlaceVisit(
+    /**
+     * Stable identifier for the visit, using the place id when available or a coordinate key.
+     */
     val id: String,
+    /**
+     * Display name for the place or rounded coordinates when no name is available.
+     */
     val name: String,
+    /**
+     * Latitude in decimal degrees, when available.
+     */
     val latitude: Double? = null,
+    /**
+     * Longitude in decimal degrees, when available.
+     */
     val longitude: Double? = null,
 )
 
@@ -105,7 +143,13 @@ data class DayPart(
      * Example: Party at Dan's Place
      */
     val label: String = "",
+    /**
+     * Short supporting text shown under [label].
+     */
     val description: String? = null,
+    /**
+     * Optional image URI used to visually represent this part of the day.
+     */
     val featuredGraphicUri: String?,
 )
 
@@ -122,21 +166,19 @@ class GetTimelineDayUseCase(
     private val getMediaUrisUseCase: GetMediaUrisUseCase,
     private val extractPeopleUseCase: ExtractPeopleUseCase,
     private val inferMomentsUseCase: InferMomentsUseCase,
-) {
+) : TimelineDayBuilder {
     /**
      * Creates a TimelineDay from journal entries for a specific date.
      *
      * @param date The date for which to create the TimelineDay
      * @param entries The journal entries for the date
-     * @param events Events that overlap this day, pre-filtered by the caller. Defaults to
-     *   empty so callers that don't surface events (such as the streaming and paged variants)
-     *   stay simple.
+     * @param events Events that overlap this day, pre-filtered by the caller.
      * @return A TimelineDay object representing the aggregated data for the day
      */
-    suspend operator fun invoke(
+    override suspend operator fun invoke(
         date: LocalDate,
         entries: List<JournalNote>,
-        events: List<Event> = emptyList(),
+        events: List<Event>,
     ): TimelineDay {
         val summary =
             when (val result = summarizeJournalEntriesUseCase(entries)) {
@@ -145,7 +187,6 @@ class GetTimelineDayUseCase(
                 SummarizeJournalEntriesResult.SummaryUnavailable -> "No summary available."
             }
 
-        val mediaUris = getMediaUrisUseCase(date)
         val people =
             when (
                 val peopleResult =
@@ -181,6 +222,21 @@ class GetTimelineDayUseCase(
             entries = entries.sortedByDescending { entry -> entry.creationTimestamp },
         )
     }
+}
+
+/**
+ * Builds a fully enriched [TimelineDay] from a grouped set of journal entries.
+ *
+ * @param date Calendar date represented by [entries].
+ * @param entries Journal entries grouped into the day.
+ * @param events Events that overlap the day's activity bounds.
+ */
+fun interface TimelineDayBuilder {
+    suspend operator fun invoke(
+        date: LocalDate,
+        entries: List<JournalNote>,
+        events: List<Event>,
+    ): TimelineDay
 }
 
 internal fun extractPlacesVisited(entries: List<JournalNote>): List<TimelinePlaceVisit> =

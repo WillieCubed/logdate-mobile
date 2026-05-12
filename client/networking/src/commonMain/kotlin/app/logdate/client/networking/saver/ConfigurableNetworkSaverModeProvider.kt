@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 /**
  * No-op [NetworkSaverModeProvider] for platforms or tests that don't support data saver detection.
  */
-class StubNetworkSaverModeProvider : NetworkSaverModeProvider {
+class ConfigurableNetworkSaverModeProvider : NetworkSaverModeProvider {
     private val mutableState =
         MutableStateFlow(
             NetworkSaverState(

@@ -5,7 +5,7 @@ import app.logdate.client.domain.di.domainModule
 import app.logdate.client.location.di.locationSettingsModule
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.BiometricGatekeeper
-import app.logdate.feature.core.StubBiometricGatekeeper
+import app.logdate.feature.core.NoOpBiometricGatekeeper
 import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.feature.core.export.DesktopExportLauncher
 import app.logdate.feature.core.export.ExportLauncher
@@ -53,7 +53,7 @@ actual val coreFeatureModule: Module =
         includes(locationSettingsModule)
 
         // TODO: Refactor to separate auth module
-        single<BiometricGatekeeper> { StubBiometricGatekeeper() }
+        single<BiometricGatekeeper> { NoOpBiometricGatekeeper() }
         single<AppUpdateController> { UnsupportedAppUpdateController(get()) }
         single<MemoriesWidgetInstallController> { HiddenMemoriesWidgetInstallController() }
 
@@ -124,7 +124,6 @@ actual val coreFeatureModule: Module =
             )
         }
         viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
-        // TODO(desktop): Wire location settings UX and platform permissions; keep settings storage available for now.
         viewModel { LocationSettingsViewModel(get()) }
         viewModel { MemoriesSettingsViewModel(get(), get()) }
         viewModel { VoiceNotesSettingsViewModel(get(), get()) }

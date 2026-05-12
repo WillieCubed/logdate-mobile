@@ -5,7 +5,6 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.repository.search.SearchContentType
@@ -111,8 +110,7 @@ class JournalSearchToolbarE2ETest {
             )
         }
 
-        // Expand the search bar
-        composeRule.onNodeWithText("Search journals").performClick()
+        expandSearch("trip")
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("Journals").assertIsDisplayed()
@@ -132,7 +130,7 @@ class JournalSearchToolbarE2ETest {
             )
         }
 
-        composeRule.onNodeWithText("Search journals").performClick()
+        expandSearch("hiking")
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("Entries").assertIsDisplayed()
@@ -152,7 +150,7 @@ class JournalSearchToolbarE2ETest {
             )
         }
 
-        composeRule.onNodeWithText("Search journals").performClick()
+        expandSearch("zzz_no_match")
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("No results for \"zzz_no_match\"").assertIsDisplayed()
@@ -180,7 +178,7 @@ class JournalSearchToolbarE2ETest {
             )
         }
 
-        composeRule.onNodeWithText("Search journals").performClick()
+        expandSearch("trip")
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("Summer Trip 2025").performClick()
@@ -218,4 +216,12 @@ class JournalSearchToolbarE2ETest {
     }
 
     // endregion
+
+    /**
+     * Expands the toolbar through the text currently displayed in the collapsed
+     * search field. Non-empty queries replace the placeholder before expansion.
+     */
+    private fun expandSearch(displayedText: String = "Search journals") {
+        composeRule.onNodeWithText(displayedText).performClick()
+    }
 }

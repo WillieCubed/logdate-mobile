@@ -9,7 +9,7 @@ import app.logdate.client.domain.account.passkey.PasskeyRegistrationResult
 import app.logdate.client.domain.account.passkey.RegistrationOptions
 
 /**
- * iOS stub implementation of [PasskeyManager].
+ * iOS implementation of the legacy domain [PasskeyManager].
  *
  * The AuthenticationServices-based passkey flow is not wired for iOS yet, so the
  * operations return a not-supported error until the native implementation lands.

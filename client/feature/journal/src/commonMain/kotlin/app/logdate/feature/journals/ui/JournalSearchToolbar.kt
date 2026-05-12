@@ -12,8 +12,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExpandedFullScreenSearchBar
@@ -39,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.search.EntrySearchResultItem
 import app.logdate.ui.search.EntrySearchResultUiState
 import app.logdate.ui.search.parseSnippetMarkers
@@ -101,7 +100,7 @@ fun JournalSearchToolbar(
                 textFieldState = textFieldState,
                 onSearch = {},
                 placeholder = { Text(stringResource(Res.string.search_journals)) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                leadingIcon = { Icon(painter = PlatformIcons.search(), contentDescription = null) },
             )
         },
         modifier = modifier.fillMaxWidth(),
@@ -118,7 +117,7 @@ fun JournalSearchToolbar(
                 leadingIcon = {
                     IconButton(onClick = { searchBarScope.launch { searchBarState.animateToCollapsed() } }) {
                         Icon(
-                            Icons.AutoMirrored.Default.ArrowBack,
+                            painter = PlatformIcons.back(),
                             contentDescription = stringResource(Res.string.cd_close_search),
                         )
                     }
@@ -127,7 +126,7 @@ fun JournalSearchToolbar(
                     if (textFieldState.text.isNotEmpty()) {
                         IconButton(onClick = { textFieldState.clearText() }) {
                             Icon(
-                                Icons.Default.Close,
+                                painter = PlatformIcons.close(),
                                 contentDescription = stringResource(Res.string.cd_clear_search),
                             )
                         }

@@ -7,10 +7,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.data.journals.OfflineFirstJournalContentRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
 import app.logdate.client.data.journals.RemoteJournalDataSource
-import app.logdate.client.data.location.StubLocationHistoryRepository
 import app.logdate.client.data.notes.EmptyNotePlaceResolver
 import app.logdate.client.data.notes.OfflineFirstJournalNotesRepository
-import app.logdate.client.data.places.StubUserPlacesRepository
+import app.logdate.client.data.places.InMemoryUserPlacesRepository
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.device.AppInfo
 import app.logdate.client.device.AppInfoProvider
@@ -138,10 +137,10 @@ class ArchiveRoundTripTest {
         exportUseCase = ExportUserDataUseCase(
             journalRepository = sourceJournalRepo,
             journalNotesRepository = sourceNotesRepo,
-            profileRepository = StubProfileRepository(),
-            userPlacesRepository = StubUserPlacesRepository(),
-            locationHistoryRepository = StubLocationHistoryRepository(),
-            userStateRepository = StubUserStateRepository(),
+            profileRepository = StoredProfileRepository(),
+            userPlacesRepository = InMemoryUserPlacesRepository(),
+            locationHistoryRepository = InMemoryLocationHistoryRepository(),
+            userStateRepository = InMemoryUserStateRepository(),
             deviceIdProvider = FixedDeviceIdProvider(),
             appInfoProvider = FixedAppInfoProvider(),
         )
@@ -183,9 +182,9 @@ class ArchiveRoundTripTest {
             journalRepository = destJournalRepo,
             journalNotesRepository = destNotesRepo,
             journalContentRepository = destContentRepo,
-            profileRepository = StubProfileRepository(),
-            userPlacesRepository = StubUserPlacesRepository(),
-            locationHistoryRepository = StubLocationHistoryRepository(),
+            profileRepository = StoredProfileRepository(),
+            userPlacesRepository = InMemoryUserPlacesRepository(),
+            locationHistoryRepository = InMemoryLocationHistoryRepository(),
         )
     }
 
@@ -591,7 +590,7 @@ class ArchiveRoundTripTest {
         override suspend fun deleteJournal(journalId: String) {}
     }
 
-    private class StubProfileRepository : ProfileRepository {
+    private class StoredProfileRepository : ProfileRepository {
         private val profile = MutableStateFlow(LogDateProfile())
         override val currentProfile: Flow<LogDateProfile> = profile
 
@@ -628,7 +627,7 @@ class ArchiveRoundTripTest {
         )
     }
 
-    private class StubUserStateRepository : UserStateRepository {
+    private class InMemoryUserStateRepository : UserStateRepository {
         override val userData: Flow<UserData> = MutableStateFlow(UserData())
         override suspend fun setBirthday(birthday: Instant) {}
         override suspend fun setIsOnboardingComplete(isComplete: Boolean) {}

@@ -143,7 +143,7 @@ class AndroidPermissionManager(
         type: PermissionType,
         onResult: (PermissionResult) -> Unit,
     ) {
-        // This is a stub implementation since we can't directly request permissions from a non-activity context
+        // This is a capability fallback since we can't directly request permissions from a non-activity context
         // In real usage, this would be implemented in the activity/fragment
         Napier.w("Cannot request permission directly from AndroidPermissionManager. Use ActivityResultContracts in your Activity/Fragment.")
 
@@ -155,7 +155,7 @@ class AndroidPermissionManager(
         types: Set<PermissionType>,
         onResult: (List<PermissionResult>) -> Unit,
     ) {
-        // This is a stub implementation since we can't directly request permissions from a non-activity context
+        // This is a capability fallback since we can't directly request permissions from a non-activity context
         Napier.w(
             "Cannot request permissions directly from AndroidPermissionManager. Use ActivityResultContracts in your Activity/Fragment.",
         )

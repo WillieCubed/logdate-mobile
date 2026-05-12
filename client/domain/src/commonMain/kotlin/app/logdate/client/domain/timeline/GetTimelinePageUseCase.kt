@@ -9,15 +9,40 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
 
+/**
+ * Request for an older or recent timeline page.
+ */
 data class TimelinePageRequest(
+    /**
+     * Cursor timestamp. When present, the page starts before this note timestamp.
+     */
     val beforeExclusive: Instant? = null,
+    /**
+     * Number of notes used to choose candidate days. Returned days are always complete, so the
+     * response may include more than this many entries when a dense day crosses the cursor window.
+     */
     val pageSize: Int = 50,
+    /**
+     * Sort order for the returned days.
+     */
     val sortOrder: TimelineSortOrder = TimelineSortOrder.REVERSE_CHRONOLOGICAL,
 )
 
+/**
+ * A timeline page containing complete day cards.
+ */
 data class TimelinePage(
+    /**
+     * Complete timeline days included in this page.
+     */
     val days: List<TimelineDay> = emptyList(),
+    /**
+     * Oldest note timestamp represented by [days]. Use as the next [TimelinePageRequest.beforeExclusive].
+     */
     val oldestLoadedTimestamp: Instant? = null,
+    /**
+     * Whether older notes exist before [oldestLoadedTimestamp].
+     */
     val hasMoreOlderContent: Boolean = false,
 )
 
@@ -25,6 +50,7 @@ class GetTimelinePageUseCase(
     private val notesRepository: JournalNotesRepository,
     private val groupNotesByDayBoundsUseCase: GroupNotesByDayBoundsUseCase,
     private val eventRepository: EventRepository,
+    private val timelineDayBuilder: TimelineDayBuilder,
 ) {
     suspend operator fun invoke(request: TimelinePageRequest = TimelinePageRequest()): TimelinePage {
         val candidateNotes =
@@ -48,7 +74,8 @@ class GetTimelinePageUseCase(
                 if (entries.isEmpty()) {
                     null
                 } else {
-                    createBasicTimeline(entries, request.sortOrder, allEvents).days.firstOrNull()
+                    val date = entries.first().timelineDate()
+                    timelineDayBuilder(date, entries, allEvents.overlapping(entries))
                 }
             }
 
@@ -69,33 +96,6 @@ class GetTimelinePageUseCase(
             hasMoreOlderContent = hasMoreOlderContent,
         )
     }
-}
-
-private fun createBasicTimeline(
-    notes: List<JournalNote>,
-    sortOrder: TimelineSortOrder,
-    events: List<Event>,
-): Timeline {
-    val notesByDay = notes.groupBy(JournalNote::timelineDate)
-
-    val basicDays =
-        notesByDay.map { (date, entries) ->
-            val places = extractPlacesVisited(entries)
-            TimelineDay(
-                start = entries.minOf { it.creationTimestamp },
-                end = entries.maxOf { it.creationTimestamp },
-                tldr = "",
-                date = date,
-                people = emptyList(),
-                events = events.overlapping(entries),
-                placesVisited = places,
-                moments = inferMomentsHeuristically(date, entries, places),
-                parts = extractDayParts(entries),
-                entries = entries.sortedByDescending { it.creationTimestamp },
-            )
-        }
-
-    return Timeline(applySorting(basicDays, sortOrder))
 }
 
 private fun applySorting(

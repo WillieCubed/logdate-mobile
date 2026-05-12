@@ -25,7 +25,7 @@ class OnDemandRemoteDisplayManager(
 
     private val splitInstallManager = SplitInstallManagerFactory.create(context)
     private val delegate = MutableStateFlow<RemoteDisplayManager?>(null)
-    private val stub = StubRemoteDisplayManager()
+    private val unavailableManager = UnavailableRemoteDisplayManager()
 
     init {
         if (isModuleInstalled()) {
@@ -62,7 +62,7 @@ class OnDemandRemoteDisplayManager(
     }
 
     override fun observeExternalDisplays(): Flow<List<ExternalDisplay>> =
-        delegate.value?.observeExternalDisplays() ?: stub.observeExternalDisplays()
+        delegate.value?.observeExternalDisplays() ?: unavailableManager.observeExternalDisplays()
 
     override fun present(
         displayId: Int,
@@ -83,7 +83,7 @@ class OnDemandRemoteDisplayManager(
         delegate.value?.dismiss()
     }
 
-    override fun observeIsPresenting(): Flow<Boolean> = delegate.value?.observeIsPresenting() ?: stub.observeIsPresenting()
+    override fun observeIsPresenting(): Flow<Boolean> = delegate.value?.observeIsPresenting() ?: unavailableManager.observeIsPresenting()
 
     private fun isModuleInstalled(): Boolean = splitInstallManager.installedModules.contains(MODULE_NAME)
 

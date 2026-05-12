@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.AspectRatios
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.journal.generated.resources.*
 import logdate.client.feature.journal.generated.resources.Res
@@ -59,7 +58,7 @@ internal fun CreateJournalPlaceholder(
             modifier = Modifier.padding(Spacing.lg),
         ) {
             Icon(
-                Icons.Default.Add,
+                painter = PlatformIcons.add(),
                 contentDescription = stringResource(Res.string.create_new_journal),
                 modifier = Modifier.size(48.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,

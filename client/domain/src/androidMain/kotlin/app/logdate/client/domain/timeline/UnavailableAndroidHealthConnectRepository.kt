@@ -6,19 +6,19 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 
 /**
- * Stub implementation of the Android Health Connect repository.
+ * Android Health Connect repository used when the runtime integration is unavailable.
  *
- * This is a temporary implementation that uses the default behavior
- * while we resolve the actual Health Connect API integration.
+ * It preserves default day-boundary behavior and explicitly reports Health Connect
+ * sleep data as unavailable.
  */
-class StubAndroidHealthConnectRepository : HealthConnectRepository {
+class UnavailableAndroidHealthConnectRepository : HealthConnectRepository {
     private val defaultRepository = DefaultHealthConnectRepository()
 
     override suspend fun getDayBoundsForDate(
         date: LocalDate,
         timeZone: TimeZone,
     ): DayBounds {
-        Napier.d("Using stub Android Health Connect repository")
+        Napier.d("Health Connect integration unavailable; using default day-boundary repository")
         return defaultRepository.getDayBoundsForDate(date, timeZone)
     }
 

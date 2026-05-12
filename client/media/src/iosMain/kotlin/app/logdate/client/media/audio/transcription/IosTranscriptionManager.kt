@@ -4,20 +4,17 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSURL
 import kotlin.concurrent.AtomicReference
-import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
 /**
  * iOS implementation of [TranscriptionManager].
  *
- * This implementation provides a basic simulation of transcription jobs for iOS environments.
- * It uses NSFileManager to validate audio files and simulates the transcription process
- * with delays and logging.
+ * This implementation validates local audio files and schedules transcription through the
+ * configured [TranscriptionService].
  */
 class IosTranscriptionManager(
     private val transcriptionService: TranscriptionService,
@@ -58,11 +55,7 @@ class IosTranscriptionManager(
         // Start the transcription job
         scope.launch {
             try {
-                // Simulate a background job with a delay
                 Napier.d("Starting transcription job for note $noteId")
-                delay(2.seconds) // Simulate initialization delay
-
-                // Perform the actual transcription using the service
                 val result = transcriptionService.transcribeAudioFile(audioUri)
 
                 // Log the result

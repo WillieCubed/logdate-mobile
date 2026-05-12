@@ -70,7 +70,7 @@ class ExportWorkerTest {
                     every { serializeProfile() } returns null
                     every { serializePlaces() } returns null
                     every { serializeLocationHistory() } returns null
-                    every { serializeMediaManifest() } returns null
+                    every { serializeMediaManifest(any()) } returns null
                     every { renderIssuesText(any()) } returns null
                     every { mediaFiles } returns emptyList()
                     every { stats } returns ExportStats(0, 0, 0, 0)

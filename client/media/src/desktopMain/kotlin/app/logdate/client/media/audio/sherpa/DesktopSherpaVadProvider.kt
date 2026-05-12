@@ -32,8 +32,7 @@ internal class DesktopSherpaVadProvider(
 
             // Desktop never bundles VAD as an asset; the user has to download
             // the on-device models from settings before transcription works.
-            // We treat a missing model as "not available yet" rather than an
-            // exception so callers degrade cleanly.
+            // Missing on-device models disable VAD without crashing the transcription pipeline.
             val whisperPath = modelManager.getWhisperModelPath() ?: return@withLock false
             val vadModelFile =
                 java.io

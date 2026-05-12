@@ -7,10 +7,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.shareIn
 
 /**
- * A stub implementation of [GyroSensorProvider] that emits no real sensor data.
- * This can be used on platforms where gyroscope access is not yet implemented.
+ * [GyroSensorProvider] for platforms without gyroscope access.
  */
-class StubGyroSensorProvider(
+class UnavailableGyroSensorProvider(
     coroutineScope: CoroutineScope,
 ) : GyroSensorProvider {
     private val _currentValue = MutableSharedFlow<GyroOffset>()
@@ -22,6 +21,5 @@ class StubGyroSensorProvider(
         )
 
     override fun cleanup() {
-        // No-op for stub implementation
     }
 }
