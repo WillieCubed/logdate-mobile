@@ -76,6 +76,36 @@ class LogdatePreferencesDataSourceTest {
             assertEquals(true, dataSource.hasSeenRewindOnboarding())
             assertEquals(true, dataSource.observeHasSeenRewindOnboarding().first())
         }
+
+    @Test
+    fun rewindCurationStrictness_defaultsToStandard() =
+        runTest {
+            assertEquals("STANDARD", dataSource.getRewindCurationStrictness())
+        }
+
+    @Test
+    fun rewindCurationStrictness_canBePersisted() =
+        runTest {
+            dataSource.setRewindCurationStrictness("STRICT")
+
+            assertEquals("STRICT", dataSource.getRewindCurationStrictness())
+            assertEquals("STRICT", dataSource.observeRewindCurationStrictness().first())
+        }
+
+    @Test
+    fun rewindIncludeScreenshots_defaultsToFalse() =
+        runTest {
+            assertEquals(false, dataSource.isRewindIncludeScreenshots())
+        }
+
+    @Test
+    fun rewindIncludeScreenshots_canBePersisted() =
+        runTest {
+            dataSource.setRewindIncludeScreenshots(true)
+
+            assertEquals(true, dataSource.isRewindIncludeScreenshots())
+            assertEquals(true, dataSource.observeRewindIncludeScreenshots().first())
+        }
 }
 
 private class TestPreferencesDataStore : DataStore<Preferences> {

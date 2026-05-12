@@ -67,6 +67,8 @@ class LogdatePreferencesDataSource(
         val REWIND_NOTIFICATIONS_ENABLED = booleanPreferencesKey("rewind_notifications_enabled")
         val REWIND_REFLECTION_REPLIES_ENABLED = booleanPreferencesKey("rewind_reflection_replies_enabled")
         val HAS_SEEN_REWIND_ONBOARDING = booleanPreferencesKey("has_seen_rewind_onboarding")
+        val REWIND_CURATION_STRICTNESS = stringPreferencesKey("rewind_curation_strictness")
+        val REWIND_INCLUDE_SCREENSHOTS = booleanPreferencesKey("rewind_include_screenshots")
 
         // Event inference preferences
         val EVENT_INFERENCE_SENSITIVITY = stringPreferencesKey("event_inference_sensitivity")
@@ -598,6 +600,46 @@ class LogdatePreferencesDataSource(
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
                 this[HAS_SEEN_REWIND_ONBOARDING] = value
+            }
+        }
+    }
+
+    /**
+     * How aggressively photo curation drops borderline items. Persisted as the enum name
+     * (`LENIENT`, `STANDARD`, `STRICT`) so the lexicon can extend without renumbering.
+     * Defaults to STANDARD for new users.
+     */
+    fun observeRewindCurationStrictness(): Flow<String> =
+        userPreferences.data.map { prefs ->
+            prefs[REWIND_CURATION_STRICTNESS] ?: "STANDARD"
+        }
+
+    suspend fun getRewindCurationStrictness(): String = observeRewindCurationStrictness().first()
+
+    suspend fun setRewindCurationStrictness(strictness: String) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[REWIND_CURATION_STRICTNESS] = strictness
+            }
+        }
+    }
+
+    /**
+     * Whether screenshots are allowed to land in a Rewind. Defaults to false so brand-new
+     * users get a clean story; the user can opt in from the Rewind settings screen if they
+     * want their UI screenshots and saved images to participate.
+     */
+    fun observeRewindIncludeScreenshots(): Flow<Boolean> =
+        userPreferences.data.map { prefs ->
+            prefs[REWIND_INCLUDE_SCREENSHOTS] ?: false
+        }
+
+    suspend fun isRewindIncludeScreenshots(): Boolean = observeRewindIncludeScreenshots().first()
+
+    suspend fun setRewindIncludeScreenshots(value: Boolean) {
+        userPreferences.updateData { preferences ->
+            preferences.toMutablePreferences().apply {
+                this[REWIND_INCLUDE_SCREENSHOTS] = value
             }
         }
     }
