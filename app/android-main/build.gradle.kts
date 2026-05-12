@@ -17,6 +17,16 @@ val baselineProfileRequested =
     }
 val androidTestClassOverride = providers.gradleProperty("logdate.androidTestClass").orNull
 val androidTestPackageOverride = providers.gradleProperty("logdate.androidTestPackage").orNull
+val androidTestCoverageEnabled =
+    providers
+        .gradleProperty("logdate.androidTestCoverage")
+        .map(String::toBoolean)
+        .getOrElse(true)
+val androidTestOrchestratorEnabled =
+    providers
+        .gradleProperty("logdate.androidTestOrchestrator")
+        .map(String::toBoolean)
+        .getOrElse(true)
 
 /**
  * Production release versionCode comes from CI. Priority order:
@@ -130,7 +140,9 @@ extensions.configure<ApplicationExtension> {
     buildTypes {
         getByName("debug") {
             enableUnitTestCoverage = true
-            enableAndroidTestCoverage = true
+            // Local managed-device runs can disable instrumentation coverage to
+            // reduce emulator memory pressure while keeping CI coverage enabled.
+            enableAndroidTestCoverage = androidTestCoverageEnabled
         }
         getByName("release") {
             isMinifyEnabled = true
@@ -195,7 +207,11 @@ extensions.configure<ApplicationExtension> {
 
     testOptions {
         animationsDisabled = true
-        execution = "ANDROID_TEST_ORCHESTRATOR"
+        // Local managed-device runs can disable orchestration when UTP fails during
+        // per-test process result collection. CI keeps orchestration on by default.
+        if (androidTestOrchestratorEnabled) {
+            execution = "ANDROID_TEST_ORCHESTRATOR"
+        }
         unitTests.all {
             it.maxHeapSize = "4g"
         }
