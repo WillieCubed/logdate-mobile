@@ -204,6 +204,14 @@ class IosMediaManager(
         return resolveRenderableUri(asset)
     }
 
+    suspend fun resolvePhotoLibraryVideoUri(localIdentifier: String): String? {
+        val asset = fetchPhotoLibraryAsset(localIdentifier) ?: return null
+        if (asset.mediaType != PHAssetMediaTypeVideo) {
+            return null
+        }
+        return resolveRenderableUri(asset) ?: photoLibraryUri(localIdentifier)
+    }
+
     private suspend fun listPhotoLibraryMedia(fetchLimit: Int? = null): List<MediaObject> {
         if (!hasPhotoLibraryReadAccess()) {
             return emptyList()

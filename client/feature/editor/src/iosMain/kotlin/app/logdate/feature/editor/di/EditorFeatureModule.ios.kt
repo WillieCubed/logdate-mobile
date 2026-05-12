@@ -15,7 +15,7 @@ import org.koin.dsl.module
  */
 actual val platformEditorModule: Module =
     module {
-        // Provide iOS stub implementation of CameraCaptureManager
+        // Provide iOS capability fallback of CameraCaptureManager
         factory<CameraCaptureManager> {
             IosCameraCaptureManager()
         }
