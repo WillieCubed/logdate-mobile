@@ -3,6 +3,7 @@ package app.logdate.feature.rewind.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.datastore.LogdatePreferencesDataSource
+import app.logdate.client.intelligence.curation.CurationConfig
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -12,7 +13,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Backs the Rewind settings screen. Reads and writes the user's rewind preferences
- * (auto-generation, ready notification) directly through [LogdatePreferencesDataSource].
+ * (auto-generation, ready notification, reflection-prompt replies, curation strictness,
+ * and screenshot inclusion) directly through [LogdatePreferencesDataSource].
  */
 class RewindSettingsViewModel(
     private val preferences: LogdatePreferencesDataSource,
@@ -21,6 +23,8 @@ class RewindSettingsViewModel(
         val autoGenerationEnabled: Boolean = true,
         val notificationsEnabled: Boolean = true,
         val reflectionRepliesEnabled: Boolean = true,
+        val curationStrictness: CurationConfig.Strictness = CurationConfig.Strictness.STANDARD,
+        val includeScreenshots: Boolean = false,
     )
 
     val uiState: StateFlow<UiState> =
@@ -28,11 +32,17 @@ class RewindSettingsViewModel(
             preferences.observeRewindAutoGenerationEnabled(),
             preferences.observeRewindNotificationsEnabled(),
             preferences.observeRewindReflectionRepliesEnabled(),
-        ) { autoGen, notifications, replies ->
+            preferences.observeRewindCurationStrictness(),
+            preferences.observeRewindIncludeScreenshots(),
+        ) { autoGen, notifications, replies, strictness, includeScreenshots ->
             UiState(
                 autoGenerationEnabled = autoGen,
                 notificationsEnabled = notifications,
                 reflectionRepliesEnabled = replies,
+                curationStrictness =
+                    runCatching { CurationConfig.Strictness.valueOf(strictness) }
+                        .getOrDefault(CurationConfig.Strictness.STANDARD),
+                includeScreenshots = includeScreenshots,
             )
         }.stateIn(
             scope = viewModelScope,
@@ -66,6 +76,26 @@ class RewindSettingsViewModel(
                 preferences.setRewindReflectionRepliesEnabled(enabled)
             } catch (e: Exception) {
                 Napier.e("Failed to update rewind reflection replies preference", e)
+            }
+        }
+    }
+
+    fun setCurationStrictness(strictness: CurationConfig.Strictness) {
+        viewModelScope.launch {
+            try {
+                preferences.setRewindCurationStrictness(strictness.name)
+            } catch (e: Exception) {
+                Napier.e("Failed to update rewind curation strictness preference", e)
+            }
+        }
+    }
+
+    fun setIncludeScreenshots(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                preferences.setRewindIncludeScreenshots(enabled)
+            } catch (e: Exception) {
+                Napier.e("Failed to update rewind include-screenshots preference", e)
             }
         }
     }

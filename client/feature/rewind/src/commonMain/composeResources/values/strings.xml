@@ -9,6 +9,13 @@
     <string name="rewind_settings_notifications_helper">Get a tap-to-watch notification the moment your latest weekly Rewind finishes. This is on top of Android&apos;s notification controls; turning it off here stops the app from posting one at all.</string>
     <string name="rewind_settings_replies_label">Let me reply to noticing prompts</string>
     <string name="rewind_settings_replies_helper">Each Rewind invents a couple of quiet questions about your week. Leave this on to type your answer back at them right inside the story. Off hides the reply chrome and just shows the prompts.</string>
+    <string name="rewind_settings_strictness_label">Photo selection</string>
+    <string name="rewind_settings_strictness_helper">Choose how aggressively borderline photos get filtered out. Strict trims to your best moments; Lenient keeps more of your camera roll.</string>
+    <string name="rewind_settings_strictness_lenient">Lenient</string>
+    <string name="rewind_settings_strictness_standard">Standard</string>
+    <string name="rewind_settings_strictness_strict">Strict</string>
+    <string name="rewind_settings_include_screenshots_label">Include screenshots</string>
+    <string name="rewind_settings_include_screenshots_helper">Off by default. Turn on to let saved screen captures appear in your Rewinds alongside your real photos.</string>
 
     <!-- Annual rewind -->
     <string name="annual_rewind_generate">Create your %1$d Year in Review</string>
