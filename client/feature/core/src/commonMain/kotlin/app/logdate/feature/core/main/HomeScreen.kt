@@ -27,6 +27,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -62,6 +63,7 @@ import app.logdate.ui.audio.TranscriptionState
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.platform.LocalPlatformHaptics
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.currentPlatform
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.profiles.toUiState
@@ -208,15 +210,22 @@ fun HomeScreen(
                                 currentDestination = destination
                             },
                             icon = {
-                                Icon(
-                                    imageVector =
-                                        if (destination == currentDestination) {
-                                            destination.selectedIcon
-                                        } else {
-                                            destination.unselectedIcon
-                                        },
-                                    contentDescription = destination.label,
-                                )
+                                if (currentPlatform.isApple) {
+                                    Icon(
+                                        painter = destination.iosTabBarIcon(),
+                                        contentDescription = destination.label,
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector =
+                                            if (destination == currentDestination) {
+                                                destination.selectedIcon
+                                            } else {
+                                                destination.unselectedIcon
+                                            },
+                                        contentDescription = destination.label,
+                                    )
+                                }
                             },
                             label = { Text(destination.label) },
                         )
@@ -847,6 +856,21 @@ private fun mergeTimelineDays(
 }
 
 private fun List<TimelineDay>.oldestLoadedTimestamp() = flatMap(TimelineDay::entries).minOfOrNull { note -> note.creationTimestamp }
+
+/**
+ * Resolves the SF Symbol painter shown for a home tab on Apple platforms. iOS tab bars
+ * conventionally use a single glyph per tab with the system tint indicating selection, so
+ * we don't switch between filled/outlined variants here — the tint color handles it.
+ */
+@Composable
+private fun HomeRouteDestination.iosTabBarIcon(): Painter =
+    when (this) {
+        HomeRouteDestination.Timeline -> PlatformIcons.timeline()
+        HomeRouteDestination.LocationHistory -> PlatformIcons.location()
+        HomeRouteDestination.Journals -> PlatformIcons.journal()
+        HomeRouteDestination.Library -> PlatformIcons.library()
+        HomeRouteDestination.Rewind -> PlatformIcons.rewind()
+    }
 
 private data class HomeTimelineVisualState(
     val items: List<TimelineDayUiState>,
