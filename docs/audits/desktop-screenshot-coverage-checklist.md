@@ -128,12 +128,12 @@ Allowed exception categories:
 - `[android-only]` Rewind story/detail route states
 - `[android-only]` Rewind settings route states
 - `[done]` Rewind cover card
-- `[todo]` Rewind overview screen canonical state
-- `[todo]` Rewind detail screen populated state
-- `[todo]` Rewind loading screen
-- `[todo]` Rewind error screen
-- `[todo]` Past rewinds screen
-- `[todo]` Rewind settings screen
+- `[done]` Rewind overview screen canonical state
+- `[done]` Rewind detail screen populated state
+- `[done]` Rewind loading screen
+- `[done]` Rewind error screen
+- `[done]` Past rewinds screen
+- `[done]` Rewind settings screen
 - `[done]` Day boundary recovery
 
 ## Profile And Account

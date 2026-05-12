@@ -55,8 +55,21 @@ import app.logdate.feature.onboarding.ui.PersonalIntroContent
 import app.logdate.feature.onboarding.ui.PersonalIntroStep
 import app.logdate.feature.onboarding.ui.PersonalIntroUiState
 import app.logdate.feature.onboarding.ui.WelcomeBackScreenContent
+import app.logdate.feature.rewind.ui.BasicTextRewindPanelUiState
+import app.logdate.feature.rewind.ui.HighlightedQuoteRewindPanelUiState
+import app.logdate.feature.rewind.ui.NarrativeContextRewindPanelUiState
+import app.logdate.feature.rewind.ui.RewindDetailUiState
+import app.logdate.feature.rewind.ui.RewindScreenContent
+import app.logdate.feature.rewind.ui.SubtitledRewindPanelUiState
 import app.logdate.feature.rewind.ui.components.RewindCoverCard
+import app.logdate.feature.rewind.ui.detail.RewindDetailScreenContent
+import app.logdate.feature.rewind.ui.detail.RewindErrorScreen
+import app.logdate.feature.rewind.ui.detail.RewindLoadingScreen
+import app.logdate.feature.rewind.ui.overview.RewindHistoryUiState
+import app.logdate.feature.rewind.ui.overview.RewindOverviewScreenUiState
 import app.logdate.feature.rewind.ui.overview.RewindPreviewUiState
+import app.logdate.feature.rewind.ui.past.PastRewindsScreen
+import app.logdate.feature.rewind.ui.settings.RewindSettingsContent
 import app.logdate.feature.search.ui.SearchScreenContent
 import app.logdate.feature.search.ui.SearchScreenState
 import kotlinx.datetime.LocalDate
@@ -107,6 +120,12 @@ enum class SharedScreenshotSceneId(
     SearchEmpty("search-empty"),
     SearchResults("search-results"),
     RewindCoverCard("rewind-cover-card"),
+    RewindOverviewCanonical("rewind-overview-canonical"),
+    RewindDetailPopulated("rewind-detail-populated"),
+    RewindLoading("rewind-loading"),
+    RewindError("rewind-error"),
+    PastRewinds("past-rewinds"),
+    RewindSettings("rewind-settings"),
     DayBoundaryRecovery("day-boundary-recovery"),
 }
 
@@ -742,6 +761,46 @@ object SharedScreenshotCatalog {
                     )
                 }
             },
+            sharedScene(SharedScreenshotSceneId.RewindOverviewCanonical, ScreenshotSceneGroup.REWIND, desktopOnlyVariants) {
+                RewindScreenContent(
+                    state =
+                        RewindOverviewScreenUiState.Ready(
+                            pastRewinds = pastRewindSamples,
+                            mostRecentRewind = rewindPreview,
+                        ),
+                    onOpenRewind = {},
+                    onGenerateAnnualRewind = null,
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.RewindDetailPopulated, ScreenshotSceneGroup.REWIND, desktopOnlyVariants) {
+                RewindDetailScreenContent(
+                    uiState = RewindDetailUiState.Success(panels = rewindDetailPanels),
+                    onExitRewind = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.RewindLoading, ScreenshotSceneGroup.REWIND, desktopOnlyVariants) {
+                RewindLoadingScreen()
+            },
+            sharedScene(SharedScreenshotSceneId.RewindError, ScreenshotSceneGroup.REWIND, desktopOnlyVariants) {
+                RewindErrorScreen(
+                    message = "Whoops, we couldn't catch the rewind. Try again later.",
+                    onExit = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.PastRewinds, ScreenshotSceneGroup.REWIND, desktopOnlyVariants) {
+                PastRewindsScreen(onGoBack = {})
+            },
+            sharedScene(SharedScreenshotSceneId.RewindSettings, ScreenshotSceneGroup.REWIND, desktopOnlyVariants) {
+                RewindSettingsContent(
+                    autoGenerationEnabled = true,
+                    notificationsEnabled = true,
+                    reflectionRepliesEnabled = true,
+                    onAutoGenerationToggled = {},
+                    onNotificationsToggled = {},
+                    onReflectionRepliesToggled = {},
+                    onBack = {},
+                )
+            },
             sharedScene(SharedScreenshotSceneId.DayBoundaryRecovery, ScreenshotSceneGroup.SETTINGS, desktopTallVariants) {
                 DayBoundarySettingsContent(
                     sleepBasedPreferenceEnabled = true,
@@ -813,6 +872,69 @@ private val rewindPreview =
         photoCount = 41,
         peopleCount = 6,
         primaryLocation = "San Francisco",
+    )
+
+private val pastRewindSamples =
+    listOf(
+        RewindHistoryUiState(
+            uid = Uuid.parse("22222222-3333-4444-5555-666666666666"),
+            title = "A quieter week at home",
+            label = "Week of Mar 30",
+            startDate = LocalDate(2026, 3, 30),
+            endDate = LocalDate(2026, 4, 5),
+            message = "Rain three days running, three book chapters, and one really good chili.",
+            isViewed = true,
+            entryCount = 6,
+            photoCount = 12,
+            peopleCount = 2,
+            primaryLocation = "Brooklyn",
+        ),
+        RewindHistoryUiState(
+            uid = Uuid.parse("33333333-4444-5555-6666-777777777777"),
+            title = "The trip that almost wasn't",
+            label = "Week of Mar 23",
+            startDate = LocalDate(2026, 3, 23),
+            endDate = LocalDate(2026, 3, 29),
+            message = "Late flight, new city, and the kind of dinner you talk about for months.",
+            isViewed = true,
+            entryCount = 11,
+            photoCount = 53,
+            peopleCount = 4,
+            primaryLocation = "Lisbon",
+        ),
+        RewindHistoryUiState(
+            uid = Uuid.parse("44444444-5555-6666-7777-888888888888"),
+            title = "Heads-down week",
+            label = "Week of Mar 16",
+            startDate = LocalDate(2026, 3, 16),
+            endDate = LocalDate(2026, 3, 22),
+            message = "You shipped the thing on Friday and slept eleven hours on Saturday.",
+            isViewed = true,
+            entryCount = 4,
+            photoCount = 7,
+            peopleCount = 1,
+            primaryLocation = "Brooklyn",
+        ),
+    )
+
+private val rewindDetailPanels =
+    listOf(
+        SubtitledRewindPanelUiState(
+            title = "Five cities in seven days",
+            subtitle = "April 6 — April 12, 2026",
+        ),
+        NarrativeContextRewindPanelUiState(
+            sourceId = Uuid.parse("aaaaaaaa-1111-2222-3333-444444444444"),
+            timestamp = baseInstant,
+            contextText = "You started in San Francisco and chased one open afternoon at a time across the coast.",
+        ),
+        HighlightedQuoteRewindPanelUiState(
+            text = "I forgot how loud the ocean is when nothing else is.",
+            whyItHits = "You came back to silence twice this week.",
+        ),
+        BasicTextRewindPanelUiState(
+            text = "That was your week.",
+        ),
     )
 
 private val searchResults =
