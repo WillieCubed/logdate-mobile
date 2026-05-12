@@ -88,6 +88,14 @@ internal fun EntryEditorWindow(
         }
     }
 
+    // If a save fails while the app is trying to quit, abort the cascade so the user can read
+    // the error and retry instead of having the next interaction re-trigger the exit.
+    LaunchedEffect(editorState.errorMessage, state.closeRequested) {
+        if (state.closeRequested && editorState.errorMessage != null) {
+            appState.cancelExit()
+        }
+    }
+
     Window(
         onCloseRequest = handleClose,
         title = state.title,
