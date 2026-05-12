@@ -11,7 +11,6 @@ import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.repository.rewind.RewindGenerationManager
 import app.logdate.client.repository.rewind.RewindRepository
-import app.logdate.shared.model.ActivityType
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindGenerationRequest
 import io.github.aakira.napier.Napier
@@ -224,45 +223,4 @@ class GenerateBasicRewindUseCase(
             Napier.e("Failed to update generation status", e)
         }
     }
-}
-
-/**
- * Derives activity types from a list of narrative themes. Kept at file scope so it can
- * be unit tested without standing up the full use case dependency graph; the result is
- * used by intelligence strategies that build metadata.
- */
-internal fun deriveActivitiesFromThemes(themes: List<String>): List<ActivityType> {
-    val activities = mutableSetOf<ActivityType>()
-    val lowerThemes = themes.map { it.lowercase() }
-
-    for (theme in lowerThemes) {
-        when {
-            theme.contains("travel") ||
-                theme.contains("trip") ||
-                theme.contains("vacation") ||
-                theme.contains("flight") ||
-                theme.contains("road") -> activities.add(ActivityType.TRAVEL)
-            theme.contains("social") ||
-                theme.contains("friend") ||
-                theme.contains("party") ||
-                theme.contains("gathering") ||
-                theme.contains("dinner") -> activities.add(ActivityType.SOCIAL)
-            theme.contains("work") ||
-                theme.contains("project") ||
-                theme.contains("deadline") ||
-                theme.contains("focus") ||
-                theme.contains("productive") -> activities.add(ActivityType.FOCUSED_WORK)
-            theme.contains("quiet") ||
-                theme.contains("rest") ||
-                theme.contains("relax") ||
-                theme.contains("solitude") -> activities.add(ActivityType.QUIET)
-            theme.contains("milestone") ||
-                theme.contains("achievement") ||
-                theme.contains("graduation") ||
-                theme.contains("birthday") ||
-                theme.contains("anniversary") -> activities.add(ActivityType.MILESTONE)
-        }
-    }
-
-    return activities.toList().ifEmpty { listOf(ActivityType.MIXED) }
 }
