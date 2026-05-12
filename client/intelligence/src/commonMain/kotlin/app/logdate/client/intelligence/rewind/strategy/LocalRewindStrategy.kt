@@ -5,6 +5,7 @@ import app.logdate.client.intelligence.curation.CurationConfig
 import app.logdate.client.intelligence.curation.CurationResult
 import app.logdate.client.intelligence.curation.RewindMediaCurator
 import app.logdate.client.intelligence.narrative.RewindSequencer
+import app.logdate.client.intelligence.rewind.local.LocalThemeExtractor
 import app.logdate.client.repository.location.LocationHistoryItem
 import app.logdate.shared.model.ActivityType
 import app.logdate.shared.model.LocationSummary
@@ -31,6 +32,7 @@ import kotlin.uuid.Uuid
 class LocalRewindStrategy(
     private val curator: RewindMediaCurator,
     private val sequencer: RewindSequencer,
+    private val themeExtractor: LocalThemeExtractor = LocalThemeExtractor(),
 ) : RewindGenerationStrategy {
     override val name: String = STRATEGY_NAME
 
@@ -109,8 +111,9 @@ class LocalRewindStrategy(
                 emotionalWeight = "varied",
                 evidenceIds = evidenceIds,
             )
+        val themes = themeExtractor.extract(input.textEntries.map { it.content })
         return WeekNarrative(
-            themes = emptyList(),
+            themes = themes,
             emotionalTone = "varied",
             storyBeats = listOf(catchAllBeat),
             overallNarrative = "A summary of your week.",
