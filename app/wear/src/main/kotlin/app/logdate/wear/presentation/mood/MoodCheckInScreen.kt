@@ -28,8 +28,10 @@ import androidx.wear.compose.material3.OutlinedButton
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import app.logdate.wear.R
+import app.logdate.wear.haptic.WearHapticEngine
 import app.logdate.wear.presentation.common.SaveFeedback
 import kotlinx.coroutines.flow.collectLatest
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -39,6 +41,7 @@ fun MoodCheckInScreen(
     viewModel: MoodCheckInViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val haptics = koinInject<WearHapticEngine>()
 
     LaunchedEffect(Unit) {
         viewModel.events.collectLatest { event ->
@@ -49,16 +52,31 @@ fun MoodCheckInScreen(
         }
     }
 
+    LaunchedEffect(uiState.step) {
+        if (uiState.step == MoodCheckInStep.SAVED) {
+            haptics.success()
+        }
+    }
+
     when (uiState.step) {
         MoodCheckInStep.SELECT_MOOD ->
             SelectMoodContent(
-                onMoodSelected = viewModel::selectMood,
+                onMoodSelected = { mood ->
+                    haptics.confirmTap()
+                    viewModel.selectMood(mood)
+                },
             )
         MoodCheckInStep.VOICE_PROMPT ->
             VoicePromptContent(
                 selectedMood = uiState.selectedMood,
-                onAttachVoice = viewModel::attachVoice,
-                onSkip = viewModel::skipVoiceAttachment,
+                onAttachVoice = {
+                    haptics.confirmTap()
+                    viewModel.attachVoice()
+                },
+                onSkip = {
+                    haptics.confirmTap()
+                    viewModel.skipVoiceAttachment()
+                },
             )
         MoodCheckInStep.SAVED ->
             MoodSavedContent(
