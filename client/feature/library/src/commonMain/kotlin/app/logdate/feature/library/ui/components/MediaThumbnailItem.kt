@@ -40,7 +40,14 @@ import app.logdate.ui.common.focusableWithRing
 import app.logdate.ui.common.noteDragSource
 import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.platform.PlatformIcons
+import app.logdate.util.formatDateLocalized
 import coil3.compose.AsyncImage
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import logdate.client.feature.library.generated.resources.Res
+import logdate.client.feature.library.generated.resources.cd_library_photo
+import logdate.client.feature.library.generated.resources.cd_library_video
+import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
 
 /**
@@ -112,9 +119,18 @@ fun MediaThumbnailItem(
                     .focusableWithRing()
                     .clickable { onItemClick(item.uid) },
         ) {
+            val capturedAt =
+                remember(item.timestamp) {
+                    formatDateLocalized(item.timestamp.toLocalDateTime(TimeZone.currentSystemDefault()).date)
+                }
+            val description =
+                stringResource(
+                    if (item.isVideo) Res.string.cd_library_video else Res.string.cd_library_photo,
+                    capturedAt,
+                )
             AsyncImage(
                 model = item.thumbnailUri ?: item.uri,
-                contentDescription = null,
+                contentDescription = description,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
