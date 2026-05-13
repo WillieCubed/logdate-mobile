@@ -9,6 +9,7 @@ import app.logdate.client.media.audio.transcription.AndroidTranscriptionManager
 import app.logdate.client.media.audio.transcription.TranscriptionManager
 import app.logdate.client.media.display.OnDemandRemoteDisplayManager
 import app.logdate.client.media.display.RemoteDisplayManager
+import app.logdate.client.media.video.ExoPlayerPool
 import app.logdate.client.media.video.MediaCache
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
@@ -36,4 +37,8 @@ actual val mediaModule: Module =
         // recently watched video replays instantly and scrubbing doesn't
         // re-fetch from upstream.
         single { MediaCache(androidContext()) }
+
+        // Pool of warm ExoPlayer instances. Lets video composables hand off
+        // players on scroll instead of rebuilding from scratch.
+        single { ExoPlayerPool(androidContext(), get()) }
     }
