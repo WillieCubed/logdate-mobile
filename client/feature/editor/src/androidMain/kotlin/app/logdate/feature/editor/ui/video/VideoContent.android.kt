@@ -40,6 +40,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,6 +66,9 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.video.videoFramePercent
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.add_a_video_to_your_entry
 import logdate.client.feature.editor.generated.resources.choose_from_gallery
@@ -276,6 +280,7 @@ actual fun VideoPickerContent(
     }
 
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     val videoPickerLauncher =
         rememberLauncherForActivityResult(
@@ -283,8 +288,14 @@ actual fun VideoPickerContent(
         ) { uri: Uri? ->
             uri?.let {
                 Napier.d("Video selected: $uri")
-                val duration = getVideoDuration(context, uri)
-                onVideoSelected(uri.toString(), duration)
+                // Duration extraction goes through MediaMetadataRetriever, which
+                // can block for hundreds of milliseconds on cloud-backed URIs.
+                // Read it off the main thread so the picker dismiss animation
+                // stays smooth.
+                coroutineScope.launch {
+                    val duration = getVideoDuration(context, uri)
+                    onVideoSelected(uri.toString(), duration)
+                }
             }
         }
 
@@ -421,19 +432,31 @@ private fun PreviewVideoPlayerContent(
 }
 
 /**
- * Gets the duration of a video in milliseconds using MediaMetadataRetriever.
+ * Reads a video's duration in milliseconds via [android.media.MediaMetadataRetriever].
+ *
+ * [android.media.MediaMetadataRetriever.setDataSource] performs blocking IO and
+ * can stall for hundreds of milliseconds — multiple seconds on cloud-backed
+ * content URIs — so this is suspending and dispatched to [Dispatchers.IO].
  */
-private fun getVideoDuration(
+private suspend fun getVideoDuration(
     context: android.content.Context,
     uri: Uri,
 ): Long =
-    try {
+    withContext(Dispatchers.IO) {
         val retriever = android.media.MediaMetadataRetriever()
-        retriever.setDataSource(context, uri)
-        val durationStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
-        retriever.release()
-        durationStr?.toLongOrNull() ?: 0L
-    } catch (e: Exception) {
-        Napier.e("Failed to get video duration", e)
-        0L
+        try {
+            retriever.setDataSource(context, uri)
+            retriever
+                .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                ?.toLongOrNull() ?: 0L
+        } catch (e: Exception) {
+            Napier.e("Failed to get video duration", e)
+            0L
+        } finally {
+            try {
+                retriever.release()
+            } catch (e: Exception) {
+                Napier.e("Failed to release MediaMetadataRetriever", e)
+            }
+        }
     }
