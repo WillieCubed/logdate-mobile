@@ -46,7 +46,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -80,6 +79,7 @@ import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.adaptive.AdaptivePaneLayout
 import app.logdate.ui.common.transitions.TransitionKeys
+import app.logdate.ui.platform.PlatformSheet
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.all_time
 import logdate.client.feature.location.timeline.generated.resources.current_location
@@ -796,7 +796,7 @@ private fun LocationPlaceDetailSheet(
     onDismissRequest: () -> Unit,
     onOpenNote: (Uuid) -> Unit,
 ) {
-    ModalBottomSheet(
+    PlatformSheet(
         onDismissRequest = onDismissRequest,
     ) {
         LazyColumn(

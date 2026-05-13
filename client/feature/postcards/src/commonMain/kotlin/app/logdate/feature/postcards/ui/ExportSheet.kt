@@ -13,7 +13,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import app.logdate.feature.postcards.model.PostcardDocument
+import app.logdate.ui.platform.PlatformSheet
 import kotlin.uuid.Uuid
 
 /**
@@ -78,7 +78,7 @@ fun ExportSheet(
         )
     } else {
         val sheetState = rememberModalBottomSheetState()
-        ModalBottomSheet(
+        PlatformSheet(
             onDismissRequest = onDismissRequest,
             sheetState = sheetState,
         ) {

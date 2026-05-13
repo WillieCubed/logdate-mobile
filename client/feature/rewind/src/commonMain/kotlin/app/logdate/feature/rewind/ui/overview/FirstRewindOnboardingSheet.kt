@@ -11,13 +11,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.platform.PlatformSheet
 import logdate.client.feature.rewind.generated.resources.Res
 import logdate.client.feature.rewind.generated.resources.first_rewind_onboarding_cadence_body
 import logdate.client.feature.rewind.generated.resources.first_rewind_onboarding_cadence_heading
@@ -46,7 +46,7 @@ fun FirstRewindOnboardingSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(
+    PlatformSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         modifier = modifier,

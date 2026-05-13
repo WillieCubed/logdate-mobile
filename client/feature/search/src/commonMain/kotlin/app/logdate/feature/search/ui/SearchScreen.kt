@@ -29,7 +29,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Surface
@@ -59,6 +58,7 @@ import app.logdate.client.domain.search.SearchFilters
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.ui.platform.PlatformIcons
+import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.search.UniversalSearchResultItem
 import app.logdate.ui.search.UniversalSearchResultUiState
 import app.logdate.ui.search.rememberSearchHighlightStyle
@@ -463,9 +463,9 @@ private fun ResultActionsSheet(
     onShare: (() -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState()
-    ModalBottomSheet(
-        sheetState = sheetState,
+    PlatformSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.lg),

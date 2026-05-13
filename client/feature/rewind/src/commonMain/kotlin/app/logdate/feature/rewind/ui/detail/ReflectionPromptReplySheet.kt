@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -24,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.platform.PlatformSheet
 import logdate.client.feature.rewind.generated.resources.Res
 import logdate.client.feature.rewind.generated.resources.reflection_prompt_reply_cancel
 import logdate.client.feature.rewind.generated.resources.reflection_prompt_reply_clear
@@ -53,7 +53,7 @@ fun ReflectionPromptReplySheet(
     var draft by remember(state) { mutableStateOf(state.existing.orEmpty()) }
     val hasExisting = state.existing != null
 
-    ModalBottomSheet(
+    PlatformSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         modifier = modifier,

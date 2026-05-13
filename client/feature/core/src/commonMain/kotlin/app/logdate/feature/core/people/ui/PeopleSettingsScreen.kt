@@ -16,7 +16,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,6 +32,7 @@ import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.SettingsNavigationItem
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.ToggleSettingsItem
+import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.people_browse_description
@@ -257,7 +257,7 @@ fun PeopleSettingsContent(
     }
 
     if (showSetupSheet) {
-        ModalBottomSheet(onDismissRequest = { showSetupSheet = false }) {
+        PlatformSheet(onDismissRequest = { showSetupSheet = false }) {
             Column(
                 modifier =
                     Modifier

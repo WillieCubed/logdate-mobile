@@ -13,7 +13,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -24,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import app.logdate.shared.model.Place
+import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.theme.Spacing
 import kotlin.uuid.Uuid
 
@@ -73,7 +73,7 @@ internal fun EventPlacePicker(
         )
     } else {
         val sheetState = rememberModalBottomSheetState()
-        ModalBottomSheet(
+        PlatformSheet(
             onDismissRequest = onDismiss,
             sheetState = sheetState,
         ) {
