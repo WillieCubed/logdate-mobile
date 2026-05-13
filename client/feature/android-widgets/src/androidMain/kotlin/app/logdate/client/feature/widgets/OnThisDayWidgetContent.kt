@@ -342,19 +342,58 @@ private fun EmptyStateBody(
  * Uses [inSampleSize] = 4 to keep the embedded bitmap small enough to avoid
  * [android.os.TransactionTooLargeException] when the widget is updated.
  *
+ * The decoded bitmap is cached in a single-entry process-singleton keyed by
+ * file path + last-modified time, so the home screen doesn't pay the decode
+ * cost again on every Glance recomposition for the same thumbnail. A new
+ * source — or a touched source file — invalidates the cache automatically.
+ *
  * Returns null if the file cannot be decoded (missing file, unsupported format, etc.).
  */
-private fun loadScaledThumbnail(uriString: String): Bitmap? =
-    try {
-        val path =
-            if (uriString.startsWith("file://")) {
-                Uri.parse(uriString).path ?: uriString
-            } else {
-                uriString
+private fun loadScaledThumbnail(uriString: String): Bitmap? {
+    val path =
+        if (uriString.startsWith("file://")) {
+            Uri.parse(uriString).path ?: uriString
+        } else {
+            uriString
+        }
+    val key = thumbnailCacheKey(path)
+    if (key != null) {
+        synchronized(thumbnailCacheLock) {
+            cachedThumbnail?.let { cached ->
+                if (cached.key == key) return cached.bitmap
             }
-        BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = 4 })
+        }
+    }
+    val decoded =
+        try {
+            BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = 4 })
+        } catch (_: Exception) {
+            null
+        } ?: return null
+    if (key != null) {
+        synchronized(thumbnailCacheLock) {
+            cachedThumbnail = CachedWidgetThumbnail(key, decoded)
+        }
+    }
+    return decoded
+}
+
+private fun thumbnailCacheKey(path: String): String? =
+    try {
+        val mtime = java.io.File(path).lastModified()
+        if (mtime > 0) "$path:$mtime" else null
     } catch (_: Exception) {
         null
     }
+
+private data class CachedWidgetThumbnail(
+    val key: String,
+    val bitmap: Bitmap,
+)
+
+private val thumbnailCacheLock = Any()
+
+@Volatile
+private var cachedThumbnail: CachedWidgetThumbnail? = null
 
 // endregion
