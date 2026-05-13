@@ -5,6 +5,8 @@ import android.content.ContentValues
 import android.content.Context
 import android.os.Build
 import android.provider.MediaStore
+import android.view.HapticFeedbackConstants
+import android.view.Surface
 import androidx.annotation.RequiresPermission
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
@@ -16,6 +18,7 @@ import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.lifecycle.awaitInstance
+import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.MediaStoreOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
@@ -145,6 +148,12 @@ class AndroidCameraCaptureManager(
                 .setAutoCancelDuration(3, TimeUnit.SECONDS)
                 .build()
         cam.cameraControl.startFocusAndMetering(action)
+
+        // Subtle haptic confirms the tap landed; users tap-to-focus expecting
+        // direct feedback the way iOS Camera and Google Camera both provide.
+        runCatching {
+            currentPreviewView.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+        }
     }
 
     override suspend fun startPreview(facing: CameraFacing) =
@@ -463,11 +472,13 @@ class AndroidCameraCaptureManager(
     private fun createUseCases() {
         val currentPreviewView = previewView ?: error("PreviewView is not attached")
         val resolutionSelector = resolutionSelector()
+        val targetRotation = currentDisplayRotation(currentPreviewView)
 
         preview =
             Preview
                 .Builder()
                 .setResolutionSelector(resolutionSelector)
+                .setTargetRotation(targetRotation)
                 .build()
                 .apply {
                     setSurfaceProvider(currentPreviewView.surfaceProvider)
@@ -478,15 +489,42 @@ class AndroidCameraCaptureManager(
                 .Builder()
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                 .setResolutionSelector(resolutionSelector)
+                .setTargetRotation(targetRotation)
                 .build()
+
+        // Prefer the highest reasonable quality the device supports, with a
+        // graceful fallback so cameras that don't expose UHD/FHD still record
+        // instead of failing with no producer.
+        val qualitySelector =
+            QualitySelector.fromOrderedList(
+                listOf(Quality.UHD, Quality.FHD, Quality.HD, Quality.SD),
+                FallbackStrategy.higherQualityOrLowerThan(Quality.SD),
+            )
 
         val recorder =
             Recorder
                 .Builder()
-                .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
+                .setQualitySelector(qualitySelector)
                 .build()
-        videoCapture = VideoCapture.withOutput(recorder)
+        videoCapture =
+            VideoCapture
+                .Builder(recorder)
+                .setTargetRotation(targetRotation)
+                .build()
     }
+
+    /**
+     * Resolves the current display rotation so CameraX can pre-rotate frames.
+     * Without an explicit target the camera can output sideways frames on
+     * foldables and tablets that change orientation mid-session.
+     */
+    private fun currentDisplayRotation(view: PreviewView): Int =
+        view.display?.rotation
+            ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                view.context.display?.rotation ?: Surface.ROTATION_0
+            } else {
+                Surface.ROTATION_0
+            }
 
     private fun resolutionSelector(): ResolutionSelector {
         val aspectRatioStrategy =
