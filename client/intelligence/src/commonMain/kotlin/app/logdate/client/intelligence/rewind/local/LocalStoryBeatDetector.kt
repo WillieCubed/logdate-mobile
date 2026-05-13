@@ -45,10 +45,10 @@ class LocalStoryBeatDetector(
         val textByDay = textEntries.groupBy { it.creationTimestamp.toLocalDateTime(tz).date }
         val mediaByDay = media.groupBy { it.timestamp.toLocalDateTime(tz).date }
 
+        // Set + Set deduplicates (Set semantics), .sorted() yields a List in
+        // natural date order; both available cross-platform unlike toSortedSet.
         val daysWithContent =
-            (textByDay.keys + mediaByDay.keys)
-                .toSortedSet()
-                .toList()
+            (textByDay.keys + mediaByDay.keys).sorted()
 
         // If we have more days than beats allowed, collapse the oldest days into a
         // single opening "phase" beat.
