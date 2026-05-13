@@ -40,25 +40,30 @@ class AndroidMediaManager(
         VIDEO,
     }
 
-    override suspend fun getMedia(uri: String): MediaObject {
-        val parsedUri = Uri.parse(uri)
-        val fileName = resolveFileName(parsedUri)
+    override suspend fun getMedia(uri: String): MediaObject =
+        withContext(ioDispatcher) {
+            // Every helper below either queries ContentResolver or reads metadata
+            // through MediaMetadataRetriever for file:// URIs, so the entire
+            // body is IO. Keep it dispatched off the caller's thread so this
+            // can never freeze a Compose render scope.
+            val parsedUri = Uri.parse(uri)
+            val fileName = resolveFileName(parsedUri)
 
-        return when (resolveMediaKind(parsedUri, fileName)) {
-            MediaKind.IMAGE ->
-                if (parsedUri.scheme == ContentResolver.SCHEME_FILE) {
-                    getImageMediaFromFileUri(parsedUri)
-                } else {
-                    getImageMedia(parsedUri)
-                }
-            MediaKind.VIDEO ->
-                if (parsedUri.scheme == ContentResolver.SCHEME_FILE) {
-                    getVideoMediaFromFileUri(parsedUri)
-                } else {
-                    getVideoMedia(parsedUri)
-                }
+            when (resolveMediaKind(parsedUri, fileName)) {
+                MediaKind.IMAGE ->
+                    if (parsedUri.scheme == ContentResolver.SCHEME_FILE) {
+                        getImageMediaFromFileUri(parsedUri)
+                    } else {
+                        getImageMedia(parsedUri)
+                    }
+                MediaKind.VIDEO ->
+                    if (parsedUri.scheme == ContentResolver.SCHEME_FILE) {
+                        getVideoMediaFromFileUri(parsedUri)
+                    } else {
+                        getVideoMedia(parsedUri)
+                    }
+            }
         }
-    }
 
     /**
      * Retrieves image media information from the content provider.
