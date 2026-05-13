@@ -57,9 +57,9 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import app.logdate.client.media.video.ExoPlayerPool
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
@@ -76,6 +76,7 @@ import logdate.client.feature.editor.generated.resources.pause_video
 import logdate.client.feature.editor.generated.resources.play_video
 import logdate.client.feature.editor.generated.resources.video_thumbnail
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 
 /**
  * Android implementation of video player content.
@@ -97,8 +98,8 @@ actual fun VideoPlayerContent(
         return
     }
 
-    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val exoPlayerPool: ExoPlayerPool = koinInject()
 
     var isPlaying by remember { mutableStateOf(false) }
     var showThumbnail by remember { mutableStateOf(true) }
@@ -107,9 +108,12 @@ actual fun VideoPlayerContent(
     // cropped into a 16:9 box.
     var videoAspectRatio by remember { mutableStateOf(DEFAULT_VIDEO_ASPECT_RATIO) }
 
+    // Acquire a warm player from the pool instead of rebuilding renderers on
+    // every video tile that scrolls into view. The pool also wires the shared
+    // disk cache so a video the user already opened once replays instantly.
     val exoPlayer =
-        remember {
-            ExoPlayer.Builder(context).build().apply {
+        remember(uri) {
+            exoPlayerPool.acquire().apply {
                 setMediaItem(MediaItem.fromUri(uri))
                 prepare()
                 playWhenReady = false
@@ -146,7 +150,7 @@ actual fun VideoPlayerContent(
             }
         }
 
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, exoPlayer) {
         val observer =
             LifecycleEventObserver { _, event ->
                 when (event) {
@@ -163,7 +167,7 @@ actual fun VideoPlayerContent(
 
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            exoPlayer.release()
+            exoPlayerPool.release(exoPlayer)
         }
     }
 
