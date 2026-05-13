@@ -83,6 +83,7 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.koin.android)
+            implementation(libs.androidx.exifinterface)
             implementation("androidx.print:print:1.0.0")
         }
     }

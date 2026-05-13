@@ -112,6 +112,7 @@ androidxAppSearch = "1.1.0"
 androidxCoreKtx = "1.18.0"
 androidxCoreSplashScreen = "1.2.0"
 androidxGlance = "1.1.1"
+androidxExifInterface = "1.4.1"
 androidxWork = "2.11.2"
 healthConnect = "1.2.0-alpha03"
 healthServicesClient = "1.1.0-rc01"
@@ -331,6 +332,7 @@ androidx-camera-extensions = { group = "androidx.camera", name = "camera-extensi
 androidx-biometric = { group = "androidx.biometric", name = "biometric-ktx", version.ref = "androidxBiometric" }
 
 ## AndroidX Glance
+androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "androidxExifInterface" }
 androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "androidxGlance" }
 androidx-glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "androidxGlance" }
 

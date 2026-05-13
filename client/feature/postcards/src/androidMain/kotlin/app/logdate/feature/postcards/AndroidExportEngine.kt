@@ -4,12 +4,15 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.net.Uri
 import androidx.core.content.FileProvider
+import androidx.exifinterface.media.ExifInterface
 import app.logdate.feature.postcards.model.CanvasBackground
 import app.logdate.feature.postcards.model.CanvasElement
 import app.logdate.feature.postcards.model.InkTool
@@ -110,22 +113,16 @@ class AndroidExportEngine(
         element: CanvasElement.Photo,
     ) {
         val dest = RectF(0f, 0f, PHOTO_EXPORT_SIZE, PHOTO_EXPORT_SIZE)
-        try {
-            val inputStream =
-                context.contentResolver.openInputStream(Uri.parse(element.mediaUri))
-            if (inputStream != null) {
-                val photoBitmap = BitmapFactory.decodeStream(inputStream)
-                inputStream.close()
-                if (photoBitmap != null) {
-                    canvas.drawBitmap(photoBitmap, null, dest, null)
-                    photoBitmap.recycle()
-                    return
-                }
-            }
-        } catch (e: Exception) {
-            Napier.w("Could not load photo for export: ${element.mediaUri}", e)
+        val bitmap = loadOrientedDownsampledBitmap(element.mediaUri, PHOTO_DECODE_MAX_DIM_PX)
+        if (bitmap == null) {
+            drawMissingPlaceholder(canvas, dest)
+            return
         }
-        drawMissingPlaceholder(canvas, dest)
+        // Center-crop the source into the square destination so the user's
+        // photo keeps its aspect ratio (no horizontal/vertical squashing).
+        val src = centerCropSquare(bitmap.width, bitmap.height)
+        canvas.drawBitmap(bitmap, src, dest, photoPaint)
+        bitmap.recycle()
     }
 
     private fun drawSticker(
@@ -135,21 +132,126 @@ class AndroidExportEngine(
     ) {
         val imageUri = stickerUriMap[element.stickerRef] ?: return
         val dest = RectF(0f, 0f, STICKER_EXPORT_SIZE, STICKER_EXPORT_SIZE)
-        try {
-            val inputStream = context.contentResolver.openInputStream(Uri.parse(imageUri))
-            if (inputStream != null) {
-                val stickerBitmap = BitmapFactory.decodeStream(inputStream)
-                inputStream.close()
-                if (stickerBitmap != null) {
-                    canvas.drawBitmap(stickerBitmap, null, dest, null)
-                    stickerBitmap.recycle()
-                    return
-                }
+        val bitmap = loadOrientedDownsampledBitmap(imageUri, STICKER_DECODE_MAX_DIM_PX) ?: return
+        val src = centerCropSquare(bitmap.width, bitmap.height)
+        canvas.drawBitmap(bitmap, src, dest, photoPaint)
+        bitmap.recycle()
+    }
+
+    /**
+     * Decodes [uriString] at no larger than [maxDimPx] on its longest edge and
+     * applies the EXIF orientation tag so the resulting bitmap is upright. Two
+     * passes — one with `inJustDecodeBounds` to read source dimensions, one
+     * with the computed `inSampleSize` — keep us from ever pulling the full
+     * resolution into memory for a small render rect.
+     *
+     * Returns null on any failure; callers should fall back to a placeholder.
+     */
+    private fun loadOrientedDownsampledBitmap(
+        uriString: String,
+        maxDimPx: Int,
+    ): Bitmap? {
+        val uri =
+            try {
+                Uri.parse(uriString)
+            } catch (e: Exception) {
+                Napier.w("Could not parse URI for bitmap decode: $uriString", e)
+                return null
             }
+
+        val bounds =
+            try {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    BitmapFactory.Options().apply {
+                        inJustDecodeBounds = true
+                        BitmapFactory.decodeStream(stream, null, this)
+                    }
+                }
+            } catch (e: Exception) {
+                Napier.w("Could not read bitmap bounds: $uriString", e)
+                null
+            }
+        if (bounds == null || bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        val decoded =
+            try {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    val options =
+                        BitmapFactory.Options().apply {
+                            inSampleSize = computeInSampleSize(bounds.outWidth, bounds.outHeight, maxDimPx)
+                            inPreferredConfig = Bitmap.Config.ARGB_8888
+                        }
+                    BitmapFactory.decodeStream(stream, null, options)
+                }
+            } catch (e: Exception) {
+                Napier.w("Could not decode bitmap: $uriString", e)
+                null
+            } ?: return null
+
+        val rotation = readExifRotationDegrees(uri)
+        if (rotation == 0) return decoded
+
+        return try {
+            val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
+            Bitmap
+                .createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
+                .also { rotated ->
+                    if (rotated !== decoded) decoded.recycle()
+                }
         } catch (e: Exception) {
-            Napier.w("Could not load sticker for export: $imageUri", e)
+            Napier.w("Could not rotate bitmap by $rotation°: $uriString", e)
+            decoded
         }
     }
+
+    private fun computeInSampleSize(
+        sourceWidth: Int,
+        sourceHeight: Int,
+        maxDimPx: Int,
+    ): Int {
+        if (maxDimPx <= 0) return 1
+        var sampleSize = 1
+        var w = sourceWidth
+        var h = sourceHeight
+        while (w / 2 >= maxDimPx && h / 2 >= maxDimPx) {
+            sampleSize *= 2
+            w /= 2
+            h /= 2
+        }
+        return sampleSize
+    }
+
+    private fun readExifRotationDegrees(uri: Uri): Int =
+        try {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                when (
+                    ExifInterface(stream).getAttributeInt(
+                        ExifInterface.TAG_ORIENTATION,
+                        ExifInterface.ORIENTATION_NORMAL,
+                    )
+                ) {
+                    ExifInterface.ORIENTATION_ROTATE_90 -> 90
+                    ExifInterface.ORIENTATION_ROTATE_180 -> 180
+                    ExifInterface.ORIENTATION_ROTATE_270 -> 270
+                    else -> 0
+                }
+            } ?: 0
+        } catch (e: Exception) {
+            Napier.w("Could not read EXIF orientation: $uri", e)
+            0
+        }
+
+    private fun centerCropSquare(
+        sourceWidth: Int,
+        sourceHeight: Int,
+    ): Rect {
+        val side = minOf(sourceWidth, sourceHeight)
+        val left = (sourceWidth - side) / 2
+        val top = (sourceHeight - side) / 2
+        return Rect(left, top, left + side, top + side)
+    }
+
+    private val photoPaint: Paint = Paint(Paint.FILTER_BITMAP_FLAG)
 
     private fun drawMissingPlaceholder(
         canvas: Canvas,
@@ -354,6 +456,14 @@ class AndroidExportEngine(
     companion object {
         private const val PHOTO_EXPORT_SIZE = 200f
         private const val STICKER_EXPORT_SIZE = 80f
+
+        // Decode caps in source pixels. The export destination is a small
+        // square (200 dp), and even on a 1920-px-wide postcard with a 2x
+        // scaled-up photo element the final pixel rect is ~1600 px — so
+        // 2000 px of source on the longest edge is more than enough and
+        // keeps memory predictable on mid-range devices.
+        private const val PHOTO_DECODE_MAX_DIM_PX = 2000
+        private const val STICKER_DECODE_MAX_DIM_PX = 512
         private const val SHAPE_CORNER_RADIUS = 4f
         private const val ARROW_HEAD_SCALE = 4
         private const val PLACEHOLDER_STROKE_WIDTH = 2f
