@@ -23,6 +23,7 @@ import coil3.SingletonImageLoader
 import coil3.disk.DiskCache
 import coil3.disk.directory
 import coil3.memory.MemoryCache
+import coil3.request.crossfade
 import coil3.video.VideoFrameDecoder
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
@@ -41,6 +42,10 @@ class LogdateApplication :
     override fun newImageLoader(context: Context): ImageLoader =
         ImageLoader
             .Builder(context)
+            // Cross-fade every image as it loads. Without this, thumbnails
+            // pop in abruptly when the placeholder color is replaced; with
+            // it, the gallery and timeline feel smooth on scroll.
+            .crossfade(IMAGE_CROSSFADE_MS)
             .components {
                 add(VideoFrameDecoder.Factory())
                 add(DataSaverImageInterceptor(get<DataUsagePolicy>()))
@@ -113,3 +118,4 @@ class LogdateApplication :
 private const val APP_STARTUP_TAG = "LogDateStartup"
 private const val IMAGE_CACHE_DIR = "image_cache"
 private const val IMAGE_CACHE_MAX_BYTES = 250L * 1024 * 1024 // 250 MB
+private const val IMAGE_CROSSFADE_MS = 200
