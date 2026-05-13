@@ -44,14 +44,16 @@ data class ExportResult(
  * 1. Define a capture region over the unbounded canvas
  * 2. Choose a target pixel resolution via an [ExportPreset]
  * 3. Render all elements within the capture region to a bitmap
- * 4. Save as PNG to device storage
+ * 4. Save to device storage in a format appropriate to the content
+ *    (JPEG for photo-heavy postcards, PNG when the canvas is mostly
+ *    flat colors and crisp typography)
  *
  * Platform-specific implementations handle the actual bitmap rendering
  * and file I/O.
  */
 interface ExportEngine {
     /**
-     * Exports the document to a PNG image.
+     * Exports the document to an image file.
      *
      * @param document The Postcard to export.
      * @param captureRegion The rectangular region of the canvas to capture.
@@ -60,7 +62,7 @@ interface ExportEngine {
      * @return The result containing the saved file URI and dimensions,
      *         or null if export failed.
      */
-    suspend fun exportToPng(
+    suspend fun exportToImage(
         document: PostcardDocument,
         captureRegion: ExportCaptureRegion,
         preset: ExportPreset,

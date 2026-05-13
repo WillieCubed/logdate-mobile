@@ -11,7 +11,7 @@ import kotlin.uuid.Uuid
  * No-op export engine for platforms where export is not yet implemented.
  */
 class NoOpExportEngine : ExportEngine {
-    override suspend fun exportToPng(
+    override suspend fun exportToImage(
         document: PostcardDocument,
         captureRegion: ExportCaptureRegion,
         preset: ExportPreset,

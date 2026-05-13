@@ -69,7 +69,7 @@ class ExportViewModel(
         viewModelScope.launch {
             val captureRegion = computeCaptureRegion(document, preset)
             val result =
-                exportEngine.exportToPng(
+                exportEngine.exportToImage(
                     document = document,
                     captureRegion = captureRegion,
                     preset = preset,

@@ -38,7 +38,7 @@ import kotlin.uuid.Uuid
 class AndroidExportEngine(
     private val context: Context,
 ) : ExportEngine {
-    override suspend fun exportToPng(
+    override suspend fun exportToImage(
         document: PostcardDocument,
         captureRegion: ExportCaptureRegion,
         preset: ExportPreset,
@@ -66,7 +66,13 @@ class AndroidExportEngine(
                 drawElement(canvas, element, stickerUriMap)
             }
 
-            val file = saveBitmapToCache(bitmap)
+            // PNG is the right choice when the canvas is mostly flat colors,
+            // ink, or crisp text — JPEG would add subtle ringing around the
+            // letterforms. As soon as there's a photo on the postcard the
+            // PNG bloats by 5–10× for no visible quality gain, so switch to
+            // a high-quality JPEG so share-to-Messages stays sub-megabyte.
+            val containsPhoto = document.elements.any { it is CanvasElement.Photo }
+            val file = saveBitmapToCache(bitmap, asJpeg = containsPhoto)
             bitmap.recycle()
 
             val uri =
@@ -443,12 +449,18 @@ class AndroidExportEngine(
         }
     }
 
-    private fun saveBitmapToCache(bitmap: Bitmap): File {
+    private fun saveBitmapToCache(
+        bitmap: Bitmap,
+        asJpeg: Boolean,
+    ): File {
         val cacheDir = File(context.externalCacheDir, CACHE_SUBDIR)
         cacheDir.mkdirs()
-        val file = File(cacheDir, "postcard_${System.currentTimeMillis()}.png")
+        val extension = if (asJpeg) "jpg" else "png"
+        val file = File(cacheDir, "postcard_${System.currentTimeMillis()}.$extension")
+        val format = if (asJpeg) Bitmap.CompressFormat.JPEG else Bitmap.CompressFormat.PNG
+        val quality = if (asJpeg) JPEG_QUALITY else PNG_QUALITY
         FileOutputStream(file).use { out ->
-            bitmap.compress(Bitmap.CompressFormat.PNG, PNG_QUALITY, out)
+            bitmap.compress(format, quality, out)
         }
         return file
     }
@@ -469,6 +481,10 @@ class AndroidExportEngine(
         private const val PLACEHOLDER_STROKE_WIDTH = 2f
         private const val CACHE_SUBDIR = "postcards"
         private const val PNG_QUALITY = 100
+
+        // 92 is a sweet spot for JPEG quality on photo content — visually
+        // indistinguishable from 100 at full-screen zoom but ~70 % smaller.
+        private const val JPEG_QUALITY = 92
         private const val HIGHLIGHTER_ALPHA = 0.4f
     }
 }
