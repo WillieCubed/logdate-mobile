@@ -44,7 +44,7 @@ actual fun ImagePickerContent(
     val coroutineScope = rememberCoroutineScope()
     val mediaManager: MediaManager = koinInject()
     val permissionManager: PermissionManager = koinInject()
-    val imagePermission = remember { imageLibraryPermission() }
+    val imagePermissions = remember { imageLibraryPermissions() }
 
     var hasRequestedPermission by rememberSaveable { mutableStateOf(false) }
     var reloadTrigger by remember { mutableIntStateOf(0) }
@@ -62,23 +62,32 @@ actual fun ImagePickerContent(
 
     val permissionLauncher =
         rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.RequestPermission(),
+            contract = ActivityResultContracts.RequestMultiplePermissions(),
         ) {
             hasRequestedPermission = true
             reloadTrigger++
         }
 
+    fun hasAnyImagePermission(): Boolean =
+        imagePermissions.any { permission ->
+            ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        }
+
     fun permissionRequiredState(): ImagePickerLibraryState.PermissionRequired {
+        // Use the primary permission for rationale detection; if the system
+        // won't show rationale for it, the user has dismissed the prompt
+        // enough times that we should route them to Settings instead.
+        val rationalePermission = imagePermissions.first()
         val permanentlyDenied =
             hasRequestedPermission &&
                 context.findActivity()?.let { activity ->
-                    !ActivityCompat.shouldShowRequestPermissionRationale(activity, imagePermission)
+                    !ActivityCompat.shouldShowRequestPermissionRationale(activity, rationalePermission)
                 } == true
         return ImagePickerLibraryState.PermissionRequired(permanentlyDenied = permanentlyDenied)
     }
 
     fun refreshRecentImages() {
-        if (ContextCompat.checkSelfPermission(context, imagePermission) != PackageManager.PERMISSION_GRANTED) {
+        if (!hasAnyImagePermission()) {
             libraryState = permissionRequiredState()
             return
         }
@@ -88,6 +97,9 @@ actual fun ImagePickerContent(
 
             libraryState =
                 try {
+                    // When the user grants partial access on Android 14+,
+                    // MediaStore transparently filters its results to the
+                    // selected items — no extra work needed here.
                     val images = recentImagePreviews(mediaManager.getRecentMedia().first())
                     if (images.isEmpty()) {
                         ImagePickerLibraryState.Empty
@@ -104,11 +116,11 @@ actual fun ImagePickerContent(
         }
     }
 
-    LaunchedEffect(imagePermission, reloadTrigger) {
+    LaunchedEffect(imagePermissions, reloadTrigger) {
         refreshRecentImages()
     }
 
-    DisposableEffect(lifecycleOwner, imagePermission, hasRequestedPermission) {
+    DisposableEffect(lifecycleOwner, imagePermissions, hasRequestedPermission) {
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
@@ -133,7 +145,7 @@ actual fun ImagePickerContent(
         },
         onRequestLibraryAccess = {
             hasRequestedPermission = true
-            permissionLauncher.launch(imagePermission)
+            permissionLauncher.launch(imagePermissions)
         },
         onOpenSettings = { permissionManager.openPermissionSettings() },
         onRetryLoading = { reloadTrigger++ },
@@ -141,11 +153,26 @@ actual fun ImagePickerContent(
     )
 }
 
-private fun imageLibraryPermission(): String =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        Manifest.permission.READ_MEDIA_IMAGES
-    } else {
-        Manifest.permission.READ_EXTERNAL_STORAGE
+/**
+ * The set of media-library permissions to request together.
+ *
+ * On Android 14+, requesting `READ_MEDIA_VISUAL_USER_SELECTED` alongside
+ * `READ_MEDIA_IMAGES` opts the app into the three-way system prompt
+ * (All photos / Select photos / Don't allow). When the user picks "Select",
+ * MediaStore transparently scopes results to the selected items, so the
+ * recent-photos grid below works without further changes.
+ */
+private fun imageLibraryPermissions(): Array<String> =
+    when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ->
+            arrayOf(
+                Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+            )
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+            arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
+        else ->
+            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
 
 private tailrec fun Context.findActivity(): Activity? =

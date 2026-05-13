@@ -41,7 +41,18 @@ class AndroidPermissionManager(
                     Manifest.permission.RECORD_AUDIO,
                 )
             PermissionType.STORAGE ->
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    // Android 14+: include READ_MEDIA_VISUAL_USER_SELECTED so the
+                    // system serves the three-way photo-picker prompt. The
+                    // granted check below treats any of {IMAGES, VIDEO,
+                    // USER_SELECTED} as visual access granted.
+                    arrayOf(
+                        Manifest.permission.READ_MEDIA_IMAGES,
+                        Manifest.permission.READ_MEDIA_VIDEO,
+                        Manifest.permission.READ_MEDIA_AUDIO,
+                        Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+                    )
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     arrayOf(
                         Manifest.permission.READ_MEDIA_IMAGES,
                         Manifest.permission.READ_MEDIA_VIDEO,
@@ -95,8 +106,17 @@ class AndroidPermissionManager(
             ContextCompat.checkSelfPermission(context, p) == PackageManager.PERMISSION_GRANTED
         }
         // Location is disjunctive: either fine or coarse is sufficient.
+        // Storage on Android 14+ is also disjunctive: partial media access
+        // (READ_MEDIA_VISUAL_USER_SELECTED) counts as granted even when the
+        // user denied READ_MEDIA_IMAGES.
         return when (type) {
             PermissionType.LOCATION -> permissions.any(isGranted)
+            PermissionType.STORAGE ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    permissions.any(isGranted)
+                } else {
+                    permissions.all(isGranted)
+                }
             else -> permissions.all(isGranted)
         }
     }
@@ -128,6 +148,12 @@ class AndroidPermissionManager(
         val granted =
             when (type) {
                 PermissionType.LOCATION -> permissions.any(isGranted)
+                PermissionType.STORAGE ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        permissions.any(isGranted)
+                    } else {
+                        permissions.all(isGranted)
+                    }
                 else -> permissions.all(isGranted)
             }
 
