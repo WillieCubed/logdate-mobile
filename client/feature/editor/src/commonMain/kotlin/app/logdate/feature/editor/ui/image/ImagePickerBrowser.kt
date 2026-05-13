@@ -40,8 +40,10 @@ import logdate.client.feature.editor.generated.resources.allow_access
 import logdate.client.feature.editor.generated.resources.browse_all_photos
 import logdate.client.feature.editor.generated.resources.editor_image_permission_prompt
 import logdate.client.feature.editor.generated.resources.loading_recent_photos
+import logdate.client.feature.editor.generated.resources.manage_photo_selection
 import logdate.client.feature.editor.generated.resources.no_recent_photos_found
 import logdate.client.feature.editor.generated.resources.open_app_settings
+import logdate.client.feature.editor.generated.resources.partial_photo_access_message
 import logdate.client.feature.editor.generated.resources.pick_from_your_library_or_browse_all_your_photos
 import logdate.client.feature.editor.generated.resources.recent_photos
 import logdate.client.feature.editor.generated.resources.we_couldnt_load_your_recent_photos
@@ -57,6 +59,16 @@ internal sealed interface ImagePickerLibraryState {
     data object Loading : ImagePickerLibraryState
 
     data class Loaded(
+        val images: List<MediaObject.Image>,
+    ) : ImagePickerLibraryState
+
+    /**
+     * The user granted access to a subset of their photo library on Android 14+
+     * via the `READ_MEDIA_VISUAL_USER_SELECTED` flow. Render the shared photos
+     * alongside a "Manage selection" affordance so they can adjust which photos
+     * LogDate sees.
+     */
+    data class PartialAccess(
         val images: List<MediaObject.Image>,
     ) : ImagePickerLibraryState
 
@@ -118,6 +130,7 @@ internal fun ImagePickerBrowser(
     onBrowseLibrary: () -> Unit,
     modifier: Modifier = Modifier,
     onRequestLibraryAccess: (() -> Unit)? = null,
+    onManageSelection: (() -> Unit)? = null,
     onOpenSettings: (() -> Unit)? = null,
     onRetryLoading: (() -> Unit)? = null,
 ) {
@@ -150,6 +163,21 @@ internal fun ImagePickerBrowser(
             }
 
             is ImagePickerLibraryState.Loaded -> {
+                items(
+                    items = state.images,
+                    key = { "${it.uri}_${it.timestamp.toEpochMilliseconds()}" },
+                ) { image ->
+                    RecentImageTile(
+                        image = image,
+                        onClick = { onImageSelected(image.uri) },
+                    )
+                }
+            }
+
+            is ImagePickerLibraryState.PartialAccess -> {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    PartialAccessBanner(onManageSelection = onManageSelection)
+                }
                 items(
                     items = state.images,
                     key = { "${it.uri}_${it.timestamp.toEpochMilliseconds()}" },
@@ -260,6 +288,37 @@ private fun ImagePickerPreviewState.toLibraryState(): ImagePickerLibraryState =
         ImagePickerPreviewState.Empty -> ImagePickerLibraryState.Empty
         ImagePickerPreviewState.Error -> ImagePickerLibraryState.Error
     }
+
+@Composable
+private fun PartialAccessBanner(
+    onManageSelection: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = stringResource(Res.string.partial_photo_access_message),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (onManageSelection != null) {
+                OutlinedButton(onClick = onManageSelection) {
+                    Text(stringResource(Res.string.manage_photo_selection))
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun ImagePickerHeader(

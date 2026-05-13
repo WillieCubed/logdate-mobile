@@ -69,6 +69,12 @@ actual fun ImagePickerContent(
             ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
         }
 
+    fun hasFullImageAccess(): Boolean =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) ==
+            PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) ==
+            PackageManager.PERMISSION_GRANTED
+
     fun permissionRequiredState(): ImagePickerLibraryState.PermissionRequired {
         // Use the primary permission for rationale detection; if the system
         // won't show rationale for it, the user has dismissed the prompt
@@ -98,10 +104,13 @@ actual fun ImagePickerContent(
             mediaManager.getRecentMedia().collect { mediaList ->
                 val images = recentImagePreviews(mediaList)
                 libraryState =
-                    if (images.isEmpty()) {
-                        ImagePickerLibraryState.Empty
-                    } else {
-                        ImagePickerLibraryState.Loaded(images)
+                    when {
+                        images.isEmpty() -> ImagePickerLibraryState.Empty
+                        // On Android 14+, "Select photos" grants the user-selected
+                        // permission but denies READ_MEDIA_IMAGES; surface a
+                        // distinct state so the picker can show the Manage pill.
+                        !hasFullImageAccess() -> ImagePickerLibraryState.PartialAccess(images)
+                        else -> ImagePickerLibraryState.Loaded(images)
                     }
             }
         } catch (error: SecurityException) {
@@ -140,6 +149,13 @@ actual fun ImagePickerContent(
             )
         },
         onRequestLibraryAccess = {
+            hasRequestedPermission = true
+            permissionLauncher.launch(imagePermissions)
+        },
+        onManageSelection = {
+            // Re-running the permission request on Android 14+ shows the same
+            // three-way prompt the user originally answered, which is what
+            // the system documents as the "Manage selection" entry point.
             hasRequestedPermission = true
             permissionLauncher.launch(imagePermissions)
         },

@@ -86,6 +86,8 @@
     <string name="skip_back_10_seconds">Skip back 10 seconds</string>
     <string name="skip_forward_10_seconds">Skip forward 10 seconds</string>
     <string name="editor_image_permission_prompt">Show your recent photos here after you allow library access.</string>
+    <string name="manage_photo_selection">Manage selection</string>
+    <string name="partial_photo_access_message">You shared a few photos with LogDate. Manage which ones any time.</string>
     <string name="start_recording">Start Recording</string>
     <string name="start_text_entry">Start text entry</string>
     <string name="start_writing_to_create_your_first_draft">Start writing to create your first draft.</string>
