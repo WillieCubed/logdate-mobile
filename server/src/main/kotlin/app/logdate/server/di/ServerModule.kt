@@ -14,13 +14,18 @@ import app.logdate.server.auth.AccountDeletionService
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.AuthMetricsRegistry
+import app.logdate.server.auth.DigitalCredentialVerifier
+import app.logdate.server.auth.EmailVerificationService
 import app.logdate.server.auth.GoogleIdTokenVerifier
+import app.logdate.server.auth.GoogleVcJwksCache
 import app.logdate.server.auth.HttpGoogleIdTokenVerifier
 import app.logdate.server.auth.InMemoryAccountIdentityRepository
 import app.logdate.server.auth.InMemoryAccountRepository
+import app.logdate.server.auth.InMemoryPendingEmailVerificationRepository
 import app.logdate.server.auth.InMemoryRefreshTokenRevocationRepository
 import app.logdate.server.auth.InMemorySessionManager
 import app.logdate.server.auth.JwtTokenService
+import app.logdate.server.auth.PendingEmailVerificationRepository
 import app.logdate.server.auth.RefreshTokenRevocationRepository
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.TokenService
@@ -37,6 +42,7 @@ import app.logdate.server.database.PostgreSQLLogDateCollectionsMetadataStore
 import app.logdate.server.database.PostgreSQLLogDateMediaRepository
 import app.logdate.server.database.PostgreSQLOAuthRuntimeStateRepository
 import app.logdate.server.database.PostgreSQLPasskeyRepository
+import app.logdate.server.database.PostgreSQLPendingEmailVerificationRepository
 import app.logdate.server.database.PostgreSQLRefreshTokenRevocationRepository
 import app.logdate.server.database.PostgreSQLRepoBlockStore
 import app.logdate.server.database.PostgreSQLResourceRouteRepository
@@ -211,6 +217,24 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 relyingPartyId = webAuthnConfig.relyingPartyId,
                 relyingPartyName = webAuthnConfig.relyingPartyName,
                 origin = webAuthnConfig.origin,
+            )
+        }
+
+        single<PendingEmailVerificationRepository> {
+            if (isDatabaseAvailable) PostgreSQLPendingEmailVerificationRepository() else InMemoryPendingEmailVerificationRepository()
+        }
+        single { GoogleVcJwksCache() }
+        single {
+            DigitalCredentialVerifier(
+                jwksCache = get(),
+                expectedAudience = "https://logdate.app/auth/email",
+            )
+        }
+        single {
+            EmailVerificationService(
+                pendingRepository = get(),
+                accountRepository = get(),
+                verifier = get(),
             )
         }
         single { AtprotoIdentityConfig.fromEnvironment() }

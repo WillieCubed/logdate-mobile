@@ -245,6 +245,7 @@ fun Application.module(
     val authMetrics by inject<AuthMetricsRegistry>()
     val accountDeletionService by inject<AccountDeletionService>()
     val entitlementService by inject<EntitlementService>()
+    val emailVerificationService by inject<app.logdate.server.auth.EmailVerificationService>()
     val syncRepository by inject<SyncRepository>()
     val syncMetrics by inject<SyncMetricsRegistry>()
     val logDateCollectionsRepository by inject<RepoBackedLogDateCollectionsRepository>()
@@ -408,6 +409,7 @@ fun Application.module(
                 metrics = authMetrics,
                 accountDeletionService = accountDeletionService,
                 entitlementService = entitlementService,
+                emailVerificationService = emailVerificationService,
             )
             identityApiRoutes(
                 accountRepository = accountRepository,

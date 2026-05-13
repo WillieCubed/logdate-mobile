@@ -53,13 +53,13 @@ import kotlin.time.Instant
  * NOTE: This implementation is scoped to Google's UserInfoCredential. Adding
  * other issuers means broadening the trust anchor + tightening the issuer allow-list.
  */
-class DigitalCredentialVerifier(
+open class DigitalCredentialVerifier(
     private val jwksCache: GoogleVcJwksCache,
     private val expectedAudience: String,
     private val allowedClockSkew: Duration = 5.minutes,
     private val clock: () -> Instant = { Clock.System.now() },
 ) {
-    suspend fun verify(
+    open suspend fun verify(
         credentialJson: String,
         expectedNonce: String,
     ): Result<VerifiedEmailClaims> =
