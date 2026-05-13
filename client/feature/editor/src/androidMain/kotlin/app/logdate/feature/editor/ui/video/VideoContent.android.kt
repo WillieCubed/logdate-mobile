@@ -2,12 +2,11 @@
 
 package app.logdate.feature.editor.ui.video
 
-import android.Manifest
 import android.net.Uri
-import android.os.Build
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
@@ -284,7 +283,10 @@ actual fun VideoPickerContent(
 
     val videoPickerLauncher =
         rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.GetContent(),
+            // The system photo picker runs in its own process, so it needs no
+            // storage permission. This keeps the "browse all" path zero-prompt
+            // and only surfaces videos, not arbitrary documents.
+            contract = ActivityResultContracts.PickVisualMedia(),
         ) { uri: Uri? ->
             uri?.let {
                 Napier.d("Video selected: $uri")
@@ -299,29 +301,12 @@ actual fun VideoPickerContent(
             }
         }
 
-    val permissionLauncher =
-        rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.RequestPermission(),
-        ) { isGranted ->
-            if (isGranted) {
-                videoPickerLauncher.launch("video/*")
-            } else {
-                Napier.w("Video permission denied")
-            }
-        }
-
-    fun launchVideoPicker() {
-        val permission =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                Manifest.permission.READ_MEDIA_VIDEO
-            } else {
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            }
-        permissionLauncher.launch(permission)
-    }
-
     VideoPickerCard(
-        onChooseFromGallery = { launchVideoPicker() },
+        onChooseFromGallery = {
+            videoPickerLauncher.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly),
+            )
+        },
         modifier = modifier,
     )
 }
