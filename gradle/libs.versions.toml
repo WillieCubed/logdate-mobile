@@ -157,6 +157,7 @@ zxing = "3.5.4"
 sherpaOnnx = "8.5.1"
 commonsCompress = "1.28.0"
 cryptographyKotlin = "0.6.0"
+nimbusJoseJwt = "9.40"
 
 [libraries]
 desugar_jdk_libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar_jdk_libs" }
@@ -275,6 +276,7 @@ coil-network-ktor3 = { group = "io.coil-kt.coil3", name = "coil-network-ktor3", 
 coil-video = { group = "io.coil-kt.coil3", name = "coil-video", version.ref = "coil" }
 okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 cryptography-provider-optimal = { module = "dev.whyoleg.cryptography:cryptography-provider-optimal", version.ref = "cryptographyKotlin" }
+nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimbusJoseJwt" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 
 napier = { group = "io.github.aakira", name = "napier", version.ref = "napier" }

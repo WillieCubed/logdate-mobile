@@ -86,6 +86,7 @@ dependencies {
     implementation(libs.hikariCP)
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.postgresql)
+    implementation(libs.nimbus.jose.jwt) // SD-JWT verification for Digital Credentials email flow
 
     // Google Cloud Storage
     implementation(libs.google.cloud.storage)
