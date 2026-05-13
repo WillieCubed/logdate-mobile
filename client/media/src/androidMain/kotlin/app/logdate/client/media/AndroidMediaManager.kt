@@ -3,15 +3,21 @@ package app.logdate.client.media
 import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.Context
+import android.database.ContentObserver
 import android.database.Cursor
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.webkit.MimeTypeMap
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -164,13 +170,49 @@ class AndroidMediaManager(
     override suspend fun getRecentMedia(): Flow<List<MediaObject>> =
         flow {
             ensureLegacyManagedMediaBackfilled()
+            // Initial snapshot.
             try {
                 emit(getRecentMediaInternal())
             } catch (error: Exception) {
                 Napier.e("Failed to query recent Android media", error)
                 throw error
             }
+            // Re-emit a fresh snapshot every time MediaStore reports a change
+            // (new capture, deletion, edit). Lets the in-app picker surface a
+            // photo taken in the system camera without any manual refresh.
+            mediaStoreInvalidations().collect {
+                try {
+                    emit(getRecentMediaInternal())
+                } catch (error: Exception) {
+                    Napier.e("Failed to refresh recent Android media after MediaStore change", error)
+                }
+            }
         }
+
+    /**
+     * Emits Unit each time MediaStore's image or video collection changes.
+     * The flow registers a [ContentObserver] for the lifetime of each
+     * collection and tears it down when the collector cancels.
+     */
+    private fun mediaStoreInvalidations(): Flow<Unit> =
+        callbackFlow {
+            val handler = Handler(Looper.getMainLooper())
+            val observer =
+                object : ContentObserver(handler) {
+                    override fun onChange(selfChange: Boolean) {
+                        trySend(Unit)
+                    }
+                }
+            val uris =
+                listOf(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                )
+            uris.forEach { uri ->
+                contentResolver.registerContentObserver(uri, true, observer)
+            }
+            awaitClose { contentResolver.unregisterContentObserver(observer) }
+        }.conflate()
 
     override suspend fun exists(mediaId: String): Boolean {
         val parsedUri = Uri.parse(mediaId)

@@ -16,7 +16,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -29,8 +28,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.logdate.client.media.MediaManager
 import app.logdate.client.permissions.PermissionManager
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 @Suppress("ktlint:standard:function-naming")
@@ -41,7 +38,6 @@ actual fun ImagePickerContent(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val coroutineScope = rememberCoroutineScope()
     val mediaManager: MediaManager = koinInject()
     val permissionManager: PermissionManager = koinInject()
     val imagePermissions = remember { imageLibraryPermissions() }
@@ -86,45 +82,45 @@ actual fun ImagePickerContent(
         return ImagePickerLibraryState.PermissionRequired(permanentlyDenied = permanentlyDenied)
     }
 
-    fun refreshRecentImages() {
+    // Long-lived collection: emits the initial snapshot and then re-emits a
+    // fresh list every time MediaStore reports a change, so a photo captured
+    // in the system camera appears in this grid without a manual refresh.
+    LaunchedEffect(imagePermissions, reloadTrigger) {
         if (!hasAnyImagePermission()) {
             libraryState = permissionRequiredState()
-            return
+            return@LaunchedEffect
         }
-
-        coroutineScope.launch {
-            libraryState = ImagePickerLibraryState.Loading
-
-            libraryState =
-                try {
-                    // When the user grants partial access on Android 14+,
-                    // MediaStore transparently filters its results to the
-                    // selected items — no extra work needed here.
-                    val images = recentImagePreviews(mediaManager.getRecentMedia().first())
+        libraryState = ImagePickerLibraryState.Loading
+        try {
+            // When the user grants partial access on Android 14+, MediaStore
+            // transparently filters its results to the selected items — no
+            // extra work needed here.
+            mediaManager.getRecentMedia().collect { mediaList ->
+                val images = recentImagePreviews(mediaList)
+                libraryState =
                     if (images.isEmpty()) {
                         ImagePickerLibraryState.Empty
                     } else {
                         ImagePickerLibraryState.Loaded(images)
                     }
-                } catch (error: SecurityException) {
-                    Napier.w("Recent image access requires permission", error)
-                    permissionRequiredState()
-                } catch (error: Exception) {
-                    Napier.e("Failed to load recent Android images", error)
-                    ImagePickerLibraryState.Error
-                }
+            }
+        } catch (error: SecurityException) {
+            Napier.w("Recent image access requires permission", error)
+            libraryState = permissionRequiredState()
+        } catch (error: Exception) {
+            Napier.e("Failed to load recent Android images", error)
+            libraryState = ImagePickerLibraryState.Error
         }
     }
 
-    LaunchedEffect(imagePermissions, reloadTrigger) {
-        refreshRecentImages()
-    }
-
+    // On returning from system settings, re-check permission status — the
+    // reactive flow above doesn't get notified about permission changes, only
+    // content changes. Bumping the trigger re-runs the LaunchedEffect.
     DisposableEffect(lifecycleOwner, imagePermissions, hasRequestedPermission) {
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
-                    refreshRecentImages()
+                    reloadTrigger++
                 }
             }
 

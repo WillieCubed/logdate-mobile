@@ -521,7 +521,7 @@ class AndroidCameraCaptureManager(
     private fun currentDisplayRotation(view: PreviewView): Int =
         view.display?.rotation
             ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                view.context.display?.rotation ?: Surface.ROTATION_0
+                view.context.display.rotation
             } else {
                 Surface.ROTATION_0
             }
