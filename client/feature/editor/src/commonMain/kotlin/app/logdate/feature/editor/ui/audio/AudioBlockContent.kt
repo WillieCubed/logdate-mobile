@@ -120,17 +120,18 @@ fun AudioBlockContent(
             return@produceState
         }
 
-        value =
-            runCatching {
-                audioContextProcessor
-                    .process(
-                        audioUri = uri,
-                        durationMs = block.duration,
-                        createdAt = block.timestamp,
-                        latitude = block.location?.latitude,
-                        longitude = block.location?.longitude,
-                    ).amplitudes
-            }.getOrElse { emptyList() }
+        runCatching {
+            audioContextProcessor
+                .processProgressively(
+                    audioUri = uri,
+                    durationMs = block.duration,
+                    createdAt = block.timestamp,
+                    latitude = block.location?.latitude,
+                    longitude = block.location?.longitude,
+                ).collect { context ->
+                    value = context.amplitudes
+                }
+        }
     }
 
     // Track expanded state internally, with external override capability via isExpanded parameter

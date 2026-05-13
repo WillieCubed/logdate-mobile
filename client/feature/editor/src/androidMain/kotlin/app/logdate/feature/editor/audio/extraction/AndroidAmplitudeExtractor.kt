@@ -7,8 +7,12 @@ import android.media.MediaFormat
 import android.net.Uri
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlin.math.sqrt
+
+private const val PROGRESS_EMIT_INTERVAL = 32
 
 /**
  * Android implementation of AmplitudeExtractor using MediaExtractor and MediaCodec.
@@ -22,54 +26,84 @@ class AndroidAmplitudeExtractor(
     override suspend fun extractAmplitudes(
         uri: String,
         targetSampleCount: Int,
-    ): List<Float> =
-        withContext(Dispatchers.Default) {
-            val extractor = MediaExtractor()
-            try {
-                val parsedUri = Uri.parse(uri)
-                if (parsedUri.scheme.isNullOrBlank()) {
-                    extractor.setDataSource(uri)
+    ): List<Float> = runDecode(uri, targetSampleCount, onProgress = null) ?: emptyList()
+
+    override fun extractAmplitudesProgressively(
+        uri: String,
+        targetSampleCount: Int,
+    ): Flow<List<Float>> =
+        flow {
+            val finalResult =
+                runDecode(uri, targetSampleCount) { snapshot ->
+                    emit(snapshot)
+                }
+            emit(finalResult ?: emptyList())
+        }.flowOn(Dispatchers.Default)
+
+    /**
+     * Runs the full decode pipeline once. If [onProgress] is provided, intermediate
+     * normalized snapshots are emitted as decoding advances.
+     *
+     * Returns `null` only when the audio track or MIME type cannot be resolved.
+     */
+    private suspend fun runDecode(
+        uri: String,
+        targetSampleCount: Int,
+        onProgress: (suspend (List<Float>) -> Unit)?,
+    ): List<Float>? {
+        val extractor = MediaExtractor()
+        return try {
+            val parsedUri = Uri.parse(uri)
+            if (parsedUri.scheme.isNullOrBlank()) {
+                extractor.setDataSource(uri)
+            } else {
+                extractor.setDataSource(context, parsedUri, null)
+            }
+
+            val audioTrackIndex =
+                findAudioTrack(extractor) ?: run {
+                    Napier.w { "No audio track found in $uri" }
+                    return emptyList()
+                }
+            extractor.selectTrack(audioTrackIndex)
+
+            val format = extractor.getTrackFormat(audioTrackIndex)
+            val mimeType =
+                format.getString(MediaFormat.KEY_MIME) ?: run {
+                    Napier.w { "No MIME type found for audio track" }
+                    return emptyList()
+                }
+            val durationUs =
+                if (format.containsKey(MediaFormat.KEY_DURATION)) {
+                    format.getLong(MediaFormat.KEY_DURATION)
                 } else {
-                    extractor.setDataSource(context, parsedUri, null)
+                    -1L
                 }
 
-                val audioTrackIndex =
-                    findAudioTrack(extractor) ?: run {
-                        Napier.w { "No audio track found in $uri" }
-                        return@withContext emptyList()
-                    }
-                extractor.selectTrack(audioTrackIndex)
+            val decoder = MediaCodec.createDecoderByType(mimeType)
+            decoder.configure(format, null, null, 0)
+            decoder.start()
 
-                val format = extractor.getTrackFormat(audioTrackIndex)
-                val mimeType =
-                    format.getString(MediaFormat.KEY_MIME) ?: run {
-                        Napier.w { "No MIME type found for audio track" }
-                        return@withContext emptyList()
-                    }
-                val durationUs =
-                    if (format.containsKey(MediaFormat.KEY_DURATION)) {
-                        format.getLong(MediaFormat.KEY_DURATION)
-                    } else {
-                        -1L
-                    }
+            val amplitudes =
+                decodeAndExtractAmplitudes(
+                    extractor = extractor,
+                    decoder = decoder,
+                    durationUs = durationUs,
+                    targetSampleCount = targetSampleCount,
+                    onProgress = onProgress,
+                )
 
-                val decoder = MediaCodec.createDecoderByType(mimeType)
-                decoder.configure(format, null, null, 0)
-                decoder.start()
+            decoder.stop()
+            decoder.release()
 
-                val amplitudes = decodeAndExtractAmplitudes(extractor, decoder, durationUs, targetSampleCount)
-
-                decoder.stop()
-                decoder.release()
-
-                normalizeAmplitudes(amplitudes)
-            } catch (e: Exception) {
-                Napier.e(e) { "Error extracting amplitudes from $uri" }
-                emptyList()
-            } finally {
-                extractor.release()
-            }
+            normalizeAmplitudes(amplitudes)
+        } catch (e: Exception) {
+            Napier.e(e) { "Error extracting amplitudes from $uri" }
+            emptyList()
+        } finally {
+            extractor.release()
         }
+    }
 
     private fun findAudioTrack(extractor: MediaExtractor): Int? {
         for (i in 0 until extractor.trackCount) {
@@ -88,12 +122,18 @@ class AndroidAmplitudeExtractor(
      * Each output buffer from MediaCodec is assigned to a waveform bucket using
      * its presentation timestamp, so no intermediate sample list is accumulated.
      * Memory usage is O(targetSampleCount) regardless of audio length.
+     *
+     * When [onProgress] is non-null, an interim normalized snapshot is emitted every
+     * [PROGRESS_EMIT_INTERVAL] output buffers — the waveform fills in from start to
+     * end while decoding continues. Snapshots are taken from a copy so concurrent
+     * accumulation can't corrupt them.
      */
-    private fun decodeAndExtractAmplitudes(
+    private suspend fun decodeAndExtractAmplitudes(
         extractor: MediaExtractor,
         decoder: MediaCodec,
         durationUs: Long,
         targetSampleCount: Int,
+        onProgress: (suspend (List<Float>) -> Unit)?,
     ): List<Float> {
         val bufferInfo = MediaCodec.BufferInfo()
         var sawInputEOS = false
@@ -103,6 +143,7 @@ class AndroidAmplitudeExtractor(
         val sumSquares = DoubleArray(targetSampleCount)
         val counts = IntArray(targetSampleCount)
         var framesProcessed = 0L
+        var buffersSinceEmit = 0
 
         while (!sawOutputEOS) {
             if (!sawInputEOS) {
@@ -159,6 +200,18 @@ class AndroidAmplitudeExtractor(
                     sumSquares[bucketIndex] += bufferSumSquares
                     counts[bucketIndex] += frameCount
                     framesProcessed++
+                    buffersSinceEmit++
+
+                    if (onProgress != null && buffersSinceEmit >= PROGRESS_EMIT_INTERVAL) {
+                        buffersSinceEmit = 0
+                        onProgress(
+                            normalizeAmplitudes(
+                                (0 until targetSampleCount).map { i ->
+                                    if (counts[i] > 0) sqrt(sumSquares[i] / counts[i]).toFloat() else 0f
+                                },
+                            ),
+                        )
+                    }
                 }
                 decoder.releaseOutputBuffer(outputBufferIndex, false)
             }

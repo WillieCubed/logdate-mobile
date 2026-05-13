@@ -10,6 +10,9 @@ import app.logdate.feature.editor.audio.model.AudioSegment
 import app.logdate.feature.editor.audio.storage.WaveformStorage
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Instant
@@ -92,6 +95,89 @@ class AudioContextProcessor(
                 palette = palette,
             )
         }
+
+    /**
+     * Processes an audio file progressively, emitting context updates as the waveform
+     * decodes. The first emission carries the daylight period and palette plus any
+     * cached amplitudes (or empty if uncached) so the UI can paint immediately; later
+     * emissions refresh the amplitudes and segments as decoding fills in.
+     *
+     * On cache hit, only one emission is sent — the cached waveform is already complete.
+     * On cache miss, the underlying extractor's progressive flow drives multiple emissions,
+     * and the final amplitudes are written back to [WaveformStorage].
+     */
+    fun processProgressively(
+        audioUri: String,
+        durationMs: Long,
+        createdAt: Instant,
+        latitude: Double?,
+        longitude: Double?,
+    ): Flow<AudioContext> =
+        flow {
+            Napier.d { "Processing audio context progressively for $audioUri" }
+
+            val daylightPeriod = classifyDaylightPeriod(createdAt, latitude, longitude)
+            val palette = paletteGenerator.generate(daylightPeriod)
+
+            val cached = waveformStorage.load(audioUri)
+            if (cached != null) {
+                Napier.d { "Loaded cached waveform for $audioUri" }
+                emit(
+                    AudioContext(
+                        amplitudes = cached,
+                        segments =
+                            if (cached.isNotEmpty() && durationMs > 0) {
+                                segmentDetector.detectSegments(cached, durationMs)
+                            } else {
+                                emptyList()
+                            },
+                        daylightPeriod = daylightPeriod,
+                        palette = palette,
+                    ),
+                )
+                return@flow
+            }
+
+            // First emission: empty waveform, but palette and segments-from-empty are set so
+            // the player paints immediately while decoding runs.
+            emit(
+                AudioContext(
+                    amplitudes = emptyList(),
+                    segments = emptyList(),
+                    daylightPeriod = daylightPeriod,
+                    palette = palette,
+                ),
+            )
+
+            var lastSnapshot: List<Float> = emptyList()
+            amplitudeExtractor
+                .extractAmplitudesProgressively(audioUri)
+                .collect { snapshot ->
+                    lastSnapshot = snapshot
+                    emit(
+                        AudioContext(
+                            amplitudes = snapshot,
+                            segments =
+                                if (snapshot.isNotEmpty() && durationMs > 0) {
+                                    segmentDetector.detectSegments(snapshot, durationMs)
+                                } else {
+                                    emptyList()
+                                },
+                            daylightPeriod = daylightPeriod,
+                            palette = palette,
+                        ),
+                    )
+                }
+
+            if (lastSnapshot.isNotEmpty()) {
+                try {
+                    waveformStorage.save(audioUri, lastSnapshot)
+                    Napier.d { "Cached waveform for $audioUri" }
+                } catch (e: Exception) {
+                    Napier.w(e) { "Failed to cache waveform for $audioUri" }
+                }
+            }
+        }.flowOn(coroutineContext)
 
     /**
      * Loads cached amplitudes or extracts them from the audio file.

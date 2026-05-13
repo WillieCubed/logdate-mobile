@@ -83,6 +83,10 @@ tied to that.
 - [ ] Audio recording: use a foreground service with the
       `microphone|mediaPlayback` types; the service notifications must include
       a meaningful title so the user can find their way back.
+- [ ] Long voice notes: amplitude/waveform extraction must surface progress.
+      Call `AudioContextProcessor.processProgressively(...)` and `collect`
+      the flow on the UI side rather than awaiting a single result — the
+      waveform should fill in from start to end while decoding runs.
 
 ## Export and sharing
 

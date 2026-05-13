@@ -76,17 +76,18 @@ fun AudioPlaybackComponent(
         key1 = audioUri,
         key2 = resolvedDuration,
     ) {
-        value =
-            runCatching {
-                audioContextProcessor
-                    .process(
-                        audioUri = audioUri,
-                        durationMs = resolvedDuration.inWholeMilliseconds,
-                        createdAt = Clock.System.now(),
-                        latitude = null,
-                        longitude = null,
-                    ).amplitudes
-            }.getOrElse { emptyList() }
+        runCatching {
+            audioContextProcessor
+                .processProgressively(
+                    audioUri = audioUri,
+                    durationMs = resolvedDuration.inWholeMilliseconds,
+                    createdAt = Clock.System.now(),
+                    latitude = null,
+                    longitude = null,
+                ).collect { context ->
+                    value = context.amplitudes
+                }
+        }
     }
 
     // Create playback state that manages playback
