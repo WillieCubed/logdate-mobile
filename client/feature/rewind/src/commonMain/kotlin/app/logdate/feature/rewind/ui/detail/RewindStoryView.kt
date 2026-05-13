@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindPanelUiState
 import app.logdate.ui.platform.PlatformIcons
+import app.logdate.ui.platform.rememberSystemReduceMotion
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import logdate.client.feature.rewind.generated.resources.*
@@ -182,10 +183,16 @@ fun RewindStoryView(
         autoAdvanceProgress = 0f
     }
 
+    // Respect the OS "reduce motion" setting — auto-advancing a story panel
+    // every few seconds feels like the screen is moving without consent for
+    // users with vestibular sensitivities or who simply prefer manual paging.
+    // The story still renders normally; the user advances by tapping.
+    val reduceMotion by rememberSystemReduceMotion()
+
     // The story stays paused whenever the user is interacting with chrome that lives outside
     // this composable (the share sheet, the reply sheet) so its contents don't tick away
     // while attention is elsewhere.
-    val effectivelyPaused = isPaused || externalPause
+    val effectivelyPaused = isPaused || externalPause || reduceMotion
 
     LaunchedEffect(currentPanelIndex, effectivelyPaused) {
         if (effectivelyPaused) {
