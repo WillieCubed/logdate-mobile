@@ -148,6 +148,7 @@ kotlin {
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
+            implementation(libs.coil.compose)
         }
         desktopTest.dependencies {
             implementation(kotlin("test"))

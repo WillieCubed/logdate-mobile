@@ -6,6 +6,7 @@ import androidx.compose.ui.window.application
 import app.logdate.desktop.LogDateApplication
 import app.logdate.desktop.rememberApplicationState
 import app.logdate.di.appModule
+import coil3.SingletonImageLoader
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
 import org.koin.compose.KoinApplication
@@ -15,6 +16,7 @@ import org.koin.compose.KoinApplication
  */
 fun main() =
     application {
+        SingletonImageLoader.setSafe { context -> buildLogDateImageLoader(context) }
         KoinApplication(application = {
             modules(appModule)
         }) {
