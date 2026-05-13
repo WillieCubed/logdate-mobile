@@ -55,6 +55,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -101,6 +102,10 @@ actual fun VideoPlayerContent(
 
     var isPlaying by remember { mutableStateOf(false) }
     var showThumbnail by remember { mutableStateOf(true) }
+    // Default to a landscape frame while metadata loads; the player updates this
+    // as soon as it knows the real dimensions so portrait videos don't get
+    // cropped into a 16:9 box.
+    var videoAspectRatio by remember { mutableStateOf(DEFAULT_VIDEO_ASPECT_RATIO) }
 
     val exoPlayer =
         remember {
@@ -131,6 +136,10 @@ actual fun VideoPlayerContent(
                             if (playing) {
                                 showThumbnail = false
                             }
+                        }
+
+                        override fun onVideoSizeChanged(videoSize: VideoSize) {
+                            videoAspectRatio = videoSize.toAspectRatioOrDefault()
                         }
                     },
                 )
@@ -163,7 +172,7 @@ actual fun VideoPlayerContent(
             modifier
                 .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .aspectRatio(16f / 9f),
+                .aspectRatio(videoAspectRatio),
     ) {
         // ExoPlayer view - always present for seamless playback
         AndroidView(
@@ -171,7 +180,9 @@ actual fun VideoPlayerContent(
                 PlayerView(ctx).apply {
                     player = exoPlayer
                     useController = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                    // FIT keeps the whole frame on screen; ZOOM would center-crop
+                    // and chop the top and bottom off a portrait video.
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     layoutParams =
                         FrameLayout.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -378,7 +389,7 @@ private fun PreviewVideoPlayerContent(
         modifier =
             modifier
                 .clip(RoundedCornerShape(12.dp))
-                .aspectRatio(16f / 9f),
+                .aspectRatio(DEFAULT_VIDEO_ASPECT_RATIO),
     ) {
         if (previewThumbnailModel != null) {
             AsyncImage(
@@ -414,6 +425,24 @@ private fun PreviewVideoPlayerContent(
             }
         }
     }
+}
+
+/**
+ * Default aspect ratio used while the player is still resolving real video
+ * dimensions. Landscape 16:9 is a sensible neutral framing for journal videos.
+ */
+private const val DEFAULT_VIDEO_ASPECT_RATIO = 16f / 9f
+
+/**
+ * Resolves a [VideoSize] to a display-aspect ratio that accounts for any
+ * non-square pixels (anamorphic content), falling back to
+ * [DEFAULT_VIDEO_ASPECT_RATIO] if dimensions are not yet known.
+ */
+private fun VideoSize.toAspectRatioOrDefault(): Float {
+    if (width <= 0 || height <= 0) return DEFAULT_VIDEO_ASPECT_RATIO
+    val displayWidth = width.toFloat() * pixelWidthHeightRatio
+    val displayHeight = height.toFloat()
+    return if (displayHeight > 0f) displayWidth / displayHeight else DEFAULT_VIDEO_ASPECT_RATIO
 }
 
 /**
