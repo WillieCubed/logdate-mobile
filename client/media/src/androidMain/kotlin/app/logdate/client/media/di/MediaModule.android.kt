@@ -9,6 +9,7 @@ import app.logdate.client.media.audio.transcription.AndroidTranscriptionManager
 import app.logdate.client.media.audio.transcription.TranscriptionManager
 import app.logdate.client.media.display.OnDemandRemoteDisplayManager
 import app.logdate.client.media.display.RemoteDisplayManager
+import app.logdate.client.media.video.MediaCache
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -30,4 +31,9 @@ actual val mediaModule: Module =
 
         // Remote display manager
         single<RemoteDisplayManager> { OnDemandRemoteDisplayManager(androidContext()) }
+
+        // Process-singleton video cache shared by every Media3 player so a
+        // recently watched video replays instantly and scrubbing doesn't
+        // re-fetch from upstream.
+        single { MediaCache(androidContext()) }
     }
