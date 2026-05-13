@@ -1,8 +1,10 @@
 package app.logdate.client.permissions.di
 
+import app.logdate.client.permissions.EmailVerificationManager
 import app.logdate.client.permissions.NoOpRestoreCredentialManager
 import app.logdate.client.permissions.PermissionManager
 import app.logdate.client.permissions.RestoreCredentialManager
+import app.logdate.client.permissions.UnavailableEmailVerificationManager
 import app.logdate.client.permissions.createPermissionManager
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -18,6 +20,9 @@ val commonPermissionsModule =
 
         // Default no-op — Android overrides with AndroidRestoreCredentialManager
         single<RestoreCredentialManager> { NoOpRestoreCredentialManager() }
+
+        // Default unavailable — Android overrides with AndroidEmailVerificationManager
+        single<EmailVerificationManager> { UnavailableEmailVerificationManager() }
     }
 
 /**

@@ -126,7 +126,7 @@ playFeatureDelivery = "2.1.0"
 billingKtx = "8.3.0"
 googleMapsPlaces = "5.2.0"
 googleMapsCompose = "8.3.0"
-androidxCredentials = "1.6.0"
+androidxCredentials = "1.7.0-alpha02"
 androidx-security-crypto = "1.1.0"
 
 accompanist = "0.37.3"

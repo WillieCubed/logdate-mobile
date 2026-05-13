@@ -43,6 +43,8 @@ import app.logdate.client.database.databaseModule
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.di.datastoreModule
+import app.logdate.client.networking.EmailVerificationApiClient
+import app.logdate.client.networking.EmailVerificationApiClientContract
 import app.logdate.client.networking.IdentityApiClient
 import app.logdate.client.networking.IdentityApiClientContract
 import app.logdate.client.networking.PasskeyApiClient
@@ -203,6 +205,7 @@ actual val dataModule: Module =
 
         // Networking
         single<PasskeyApiClientContract> { PasskeyApiClient(httpClient, get(), get()) }
+        single<EmailVerificationApiClientContract> { EmailVerificationApiClient(httpClient, get()) }
         single<IdentityApiClientContract> { IdentityApiClient(httpClient, get(), get()) }
         single<QuotaApiClientContract> { QuotaApiClient(httpClient, get(), get()) }
 
