@@ -16,6 +16,13 @@ class UnlimitedEntitlementService : EntitlementService {
             tier = EntitlementTier.UNLIMITED,
             status = EntitlementStatus.SELF_HOST,
             limits = EntitlementLimits(storageBytes = null, backupCount = null),
+            // Self-host / dev / staging builds get every non-paid feature flag
+            // on by default. Paid plans go through StoredEntitlementService and
+            // opt in per-plan.
+            features =
+                mapOf(
+                    EntitlementFeature.EMAIL_VERIFICATION.key to true,
+                ),
         )
 
     override suspend fun resolve(accountId: UUID): Entitlement = unlimited

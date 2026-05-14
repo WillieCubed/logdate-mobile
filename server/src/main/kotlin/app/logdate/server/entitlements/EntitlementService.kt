@@ -45,6 +45,15 @@ enum class EntitlementFeature(
 ) {
     CLOUD_TRANSCRIPTION_REALTIME("cloud_transcription_realtime"),
     CLOUD_TRANSCRIPT_REFINEMENT("cloud_transcript_refinement"),
+
+    /**
+     * Gates the Android Digital Credentials email-verification flow
+     * (`/api/v1/auth/me/email/verify/{begin,complete}` plus the onboarding
+     * sub-step and Settings entry point). Currently on for self-host /
+     * unlimited installs; paid plans default off until we promote the
+     * underlying alpha credentials artifact.
+     */
+    EMAIL_VERIFICATION("email_verification"),
 }
 
 enum class EntitlementTier { FREE, STANDARD, PRO, UNLIMITED }
