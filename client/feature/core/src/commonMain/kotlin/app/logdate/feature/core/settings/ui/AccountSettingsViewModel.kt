@@ -4,13 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.domain.account.EmailVerificationAvailability
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
+import app.logdate.client.domain.account.VerifyEmailUseCase
 import app.logdate.client.domain.identity.ObserveUserIdentityUseCase
 import app.logdate.client.domain.identity.ResolvedUserIdentity
 import app.logdate.client.domain.profile.UpdateProfileUseCase
 import app.logdate.client.domain.streak.ObserveStreakUseCase
 import app.logdate.client.domain.streak.RefreshStreakUseCase
 import app.logdate.client.domain.streak.StreakData
+import app.logdate.client.permissions.EmailVerificationOutcome
 import app.logdate.client.repository.account.AccountHostedPlcOperation
 import app.logdate.client.repository.account.AccountIdentityRepository
 import app.logdate.client.repository.account.AccountIdentityStatus
@@ -35,6 +38,10 @@ data class AccountSettingsState(
     val userData: UserData,
     val currentAccount: LogDateAccount,
     val isAuthenticated: Boolean,
+    /** Cached from [EmailVerificationAvailability]; hides the Settings row when false. */
+    val isEmailVerificationAvailable: Boolean = false,
+    val isVerifyingEmail: Boolean = false,
+    val emailVerificationOutcome: EmailVerificationOutcome? = null,
 )
 
 data class AccountIdentityState(
@@ -74,6 +81,13 @@ sealed class IdentityActionState {
     ) : IdentityActionState()
 }
 
+/** Internal aggregator for the Settings-bottom-sheet email-verification slice. */
+private data class EmailVerificationViewState(
+    val isAvailable: Boolean = false,
+    val isVerifying: Boolean = false,
+    val outcome: EmailVerificationOutcome? = null,
+)
+
 class AccountSettingsViewModel(
     private val userStateRepository: UserStateRepository,
     private val getCurrentAccountUseCase: GetCurrentAccountUseCase,
@@ -86,6 +100,8 @@ class AccountSettingsViewModel(
     private val observeUserIdentityUseCase: ObserveUserIdentityUseCase,
     observeStreakUseCase: ObserveStreakUseCase,
     private val refreshStreakUseCase: RefreshStreakUseCase,
+    private val verifyEmailUseCase: VerifyEmailUseCase,
+    private val emailVerificationAvailability: EmailVerificationAvailability,
 ) : ViewModel() {
     private val _profileUpdateState = MutableStateFlow<ProfileUpdateState>(ProfileUpdateState.Idle)
     val profileUpdateState: StateFlow<ProfileUpdateState> = _profileUpdateState
@@ -110,16 +126,22 @@ class AccountSettingsViewModel(
             }
         }
 
+    private val emailVerificationStateFlow = MutableStateFlow(EmailVerificationViewState())
+
     val state: StateFlow<AccountSettingsState> =
         combine(
             userStateRepository.userData,
             currentAccountFlow,
             sessionStorage.getSessionFlow(),
-        ) { userData, currentAccount, session ->
+            emailVerificationStateFlow,
+        ) { userData, currentAccount, session, emailState ->
             AccountSettingsState(
                 userData = userData.orDefault(),
                 currentAccount = currentAccount.orDefault(),
                 isAuthenticated = session != null,
+                isEmailVerificationAvailable = emailState.isAvailable,
+                isVerifyingEmail = emailState.isVerifying,
+                emailVerificationOutcome = emailState.outcome,
             )
         }.stateIn(
             viewModelScope,
@@ -176,6 +198,52 @@ class AccountSettingsViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            val isAvailable =
+                try {
+                    emailVerificationAvailability.isAvailable()
+                } catch (e: Exception) {
+                    Napier.w("Failed to resolve email verification availability for Settings row", e)
+                    false
+                }
+            emailVerificationStateFlow.value = emailVerificationStateFlow.value.copy(isAvailable = isAvailable)
+        }
+    }
+
+    fun onVerifyEmailClicked() {
+        if (emailVerificationStateFlow.value.isVerifying) return
+        emailVerificationStateFlow.value =
+            emailVerificationStateFlow.value.copy(
+                isVerifying = true,
+                outcome = null,
+            )
+        viewModelScope.launch {
+            val outcome =
+                try {
+                    verifyEmailUseCase()
+                } catch (e: Exception) {
+                    Napier.e("Email verification crashed", e)
+                    EmailVerificationOutcome.Failed("verification_crashed")
+                }
+            emailVerificationStateFlow.value =
+                emailVerificationStateFlow.value.copy(
+                    isVerifying = false,
+                    outcome = outcome,
+                )
+            if (outcome is EmailVerificationOutcome.Success) {
+                // Force-refresh the cached LogDateAccount so the Settings row flips to
+                // the verified state immediately.
+                getCurrentAccountUseCase(GetCurrentAccountUseCase.AccountRequest.RefreshAccountInfo)
+            }
+        }
+    }
+
+    fun dismissEmailVerificationSheet() {
+        emailVerificationStateFlow.value =
+            emailVerificationStateFlow.value.copy(
+                outcome = null,
+                isVerifying = false,
+            )
     }
 
     fun updateProfile(

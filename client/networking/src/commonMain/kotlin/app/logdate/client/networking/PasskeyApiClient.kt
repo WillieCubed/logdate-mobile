@@ -589,6 +589,9 @@ private data class AuthAccountDto(
     val passkeyCredentialIds: List<String> = emptyList(),
     val createdAt: String,
     val updatedAt: String,
+    val email: String? = null,
+    val emailVerified: Boolean = false,
+    val emailVerifiedAt: String? = null,
 )
 
 @Serializable
@@ -625,4 +628,7 @@ private fun AuthAccountDto.toLogDateAccount(): LogDateAccount =
         passkeyCredentialIds = passkeyCredentialIds,
         createdAt = Instant.parse(createdAt),
         updatedAt = Instant.parse(updatedAt),
+        email = email,
+        emailVerified = emailVerified,
+        emailVerifiedAt = emailVerifiedAt?.let { Instant.parse(it) },
     )

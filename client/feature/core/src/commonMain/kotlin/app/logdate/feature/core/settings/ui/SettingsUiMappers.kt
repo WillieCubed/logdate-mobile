@@ -32,6 +32,9 @@ fun LogDateAccount.toUserProfile(): UserProfile =
         username = username.ifEmpty { "" },
         isEditable = username.isNotEmpty(),
         isAuthenticated = username.isNotEmpty() && passkeyCredentialIds.isNotEmpty(),
+        email = email,
+        emailVerified = emailVerified,
+        emailVerifiedAt = emailVerifiedAt,
     )
 
 fun LogDateAccount.toPasskeyInfoList(): List<PasskeyInfo> =

@@ -19,6 +19,9 @@ data class LogDateAccount(
     val passkeyCredentialIds: List<String> = emptyList(),
     val createdAt: Instant = Clock.System.now(),
     val updatedAt: Instant = Clock.System.now(),
+    val email: String? = null,
+    val emailVerified: Boolean = false,
+    val emailVerifiedAt: Instant? = null,
 )
 
 @Serializable

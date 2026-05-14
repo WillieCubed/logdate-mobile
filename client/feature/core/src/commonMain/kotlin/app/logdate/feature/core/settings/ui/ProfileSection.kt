@@ -61,6 +61,9 @@ data class UserProfile(
     val username: String, // @handle without the @
     val isEditable: Boolean = true,
     val isAuthenticated: Boolean = false,
+    val email: String? = null,
+    val emailVerified: Boolean = false,
+    val emailVerifiedAt: kotlin.time.Instant? = null,
 )
 
 @Composable

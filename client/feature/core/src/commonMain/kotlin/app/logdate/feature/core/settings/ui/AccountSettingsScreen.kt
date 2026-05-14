@@ -2,8 +2,11 @@
 
 package app.logdate.feature.core.settings.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -34,6 +37,10 @@ import logdate.client.feature.core.generated.resources.account_sign_out_action
 import logdate.client.feature.core.generated.resources.account_sign_out_description
 import logdate.client.feature.core.generated.resources.account_sign_out_dialog_title
 import logdate.client.feature.core.generated.resources.account_sign_out_sync_warning
+import logdate.client.feature.core.generated.resources.email_verification_settings_row_subtitle
+import logdate.client.feature.core.generated.resources.email_verification_settings_row_unverified
+import logdate.client.feature.core.generated.resources.email_verification_settings_row_verified
+import logdate.client.feature.core.generated.resources.email_verification_settings_row_verified_subtitle
 import logdate.client.feature.core.generated.resources.sign_out_failed
 import logdate.client.feature.core.generated.resources.username_handle
 import logdate.client.ui.generated.resources.common_cancel
@@ -63,6 +70,11 @@ fun AccountSettingsScreen(
         onBack = onBack,
         onCreatePasskey = privacyViewModel::createPasskey,
         userProfile = accountState.currentAccount.toUserProfile(),
+        isEmailVerificationAvailable = accountState.isEmailVerificationAvailable,
+        isVerifyingEmail = accountState.isVerifyingEmail,
+        emailVerificationOutcome = accountState.emailVerificationOutcome,
+        onVerifyEmailClicked = accountViewModel::onVerifyEmailClicked,
+        onDismissEmailVerificationSheet = accountViewModel::dismissEmailVerificationSheet,
         passkeys = privacyState.passkeys,
         onRevokePasskey = { passkey -> privacyViewModel.revokePasskey(passkey.id) },
         onSignOut = { onError -> accountViewModel.signOut(onError) },
@@ -105,6 +117,11 @@ fun AccountSettingsContent(
     onClearIdentityActionState: () -> Unit,
     onClearExportedKeyJson: () -> Unit,
     onClearDerivedRecoveryDidKey: () -> Unit,
+    isEmailVerificationAvailable: Boolean = false,
+    isVerifyingEmail: Boolean = false,
+    emailVerificationOutcome: app.logdate.client.permissions.EmailVerificationOutcome? = null,
+    onVerifyEmailClicked: () -> Unit = {},
+    onDismissEmailVerificationSheet: () -> Unit = {},
     serverSelectionState: ServerSelectionState = ServerSelectionState(),
     onSelectServerPreset: (ServerPreset) -> Unit = {},
     onUpdateCustomServerUrl: (String) -> Unit = {},
@@ -120,6 +137,19 @@ fun AccountSettingsContent(
             onUseCustomServer = {
                 onSelectServerPreset(ServerPreset.CUSTOM)
                 showCustomServerInfo.value = false
+            },
+        )
+    }
+
+    val showEmailVerificationSheet = remember { mutableStateOf(false) }
+    if (showEmailVerificationSheet.value) {
+        EmailVerificationBottomSheet(
+            isVerifying = isVerifyingEmail,
+            outcome = emailVerificationOutcome,
+            onVerifyClick = onVerifyEmailClicked,
+            onDismiss = {
+                showEmailVerificationSheet.value = false
+                onDismissEmailVerificationSheet()
             },
         )
     }
@@ -148,6 +178,48 @@ fun AccountSettingsContent(
                         }
                     },
                 )
+
+                // Email verification row (Android Digital Credentials)
+                if (isEmailVerificationAvailable) {
+                    if (userProfile.emailVerified && userProfile.email != null) {
+                        ListItem(
+                            leadingContent = {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            },
+                            headlineContent = {
+                                Text(
+                                    stringResource(
+                                        Res.string.email_verification_settings_row_verified,
+                                        userProfile.email,
+                                    ),
+                                )
+                            },
+                            supportingContent = {
+                                Text(stringResource(Res.string.email_verification_settings_row_verified_subtitle))
+                            },
+                        )
+                    } else {
+                        ListItem(
+                            leadingContent = {
+                                Icon(Icons.Default.MailOutline, contentDescription = null)
+                            },
+                            headlineContent = {
+                                Text(stringResource(Res.string.email_verification_settings_row_unverified))
+                            },
+                            supportingContent = {
+                                Text(stringResource(Res.string.email_verification_settings_row_subtitle))
+                            },
+                            modifier =
+                                Modifier.clickable {
+                                    showEmailVerificationSheet.value = true
+                                },
+                        )
+                    }
+                }
             }
         }
 
