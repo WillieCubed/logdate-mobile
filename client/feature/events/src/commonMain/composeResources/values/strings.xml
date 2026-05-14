@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Accessibility -->
+    <string name="cd_event_linked_photo">Photo linked to this event</string>
+
     <!-- Events hub (settings entry that gathers everything event-related) -->
     <string name="events_hub_title">Events</string>
     <string name="events_hub_description">LogDate quietly notices the things that happen to you — places you spent time, photos you took, plans on your calendar — and groups them into events so it&apos;s easier to look back, reflect, and see how your days connect.</string>

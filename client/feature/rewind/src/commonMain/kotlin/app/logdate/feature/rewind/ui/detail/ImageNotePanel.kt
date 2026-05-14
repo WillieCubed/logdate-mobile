@@ -21,6 +21,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.content.ImageScrimOverlay
 import coil3.compose.AsyncImage
+import logdate.client.feature.rewind.generated.resources.Res
+import logdate.client.feature.rewind.generated.resources.cd_rewind_journal_photo
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Panel for displaying an image note within a rewind story.
@@ -52,7 +55,9 @@ fun ImageNotePanel(
         // Image as full background
         AsyncImage(
             model = imageUri,
-            contentDescription = caption ?: "Journal image",
+            contentDescription =
+                caption?.takeIf { it.isNotBlank() }
+                    ?: stringResource(Res.string.cd_rewind_journal_photo, dateFormatted),
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
         )

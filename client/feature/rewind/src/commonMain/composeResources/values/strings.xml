@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Accessibility -->
+    <string name="cd_rewind_journal_photo">Photo from %1$s</string>
+
     <!-- Rewind settings -->
     <string name="rewind_settings_title">Rewind</string>
     <string name="rewind_settings_description">Choose how often LogDate puts together your weekly Rewind and whether you want to be told when one is ready.</string>

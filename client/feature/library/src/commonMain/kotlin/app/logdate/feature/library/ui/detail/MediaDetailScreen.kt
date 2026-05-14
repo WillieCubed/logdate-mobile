@@ -86,6 +86,9 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
+import logdate.client.feature.library.generated.resources.Res
+import logdate.client.feature.library.generated.resources.cd_library_photo_full
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 import kotlin.time.Instant
@@ -712,7 +715,7 @@ private fun ZoomableMediaImage(
 
     AsyncImage(
         model = mediaRef,
-        contentDescription = "Photo",
+        contentDescription = stringResource(Res.string.cd_library_photo_full),
         contentScale = ContentScale.Fit,
         modifier =
             modifier
@@ -827,7 +830,7 @@ private fun MediaContent(
     } else {
         AsyncImage(
             model = mediaRef,
-            contentDescription = "Photo",
+            contentDescription = stringResource(Res.string.cd_library_photo_full),
             contentScale = ContentScale.Fit,
             modifier = modifier.fillMaxSize(),
         )

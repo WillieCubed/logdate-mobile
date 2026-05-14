@@ -29,6 +29,9 @@ import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
+import logdate.client.feature.events.generated.resources.Res
+import logdate.client.feature.events.generated.resources.cd_event_linked_photo
+import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
 
 /**
@@ -127,7 +130,7 @@ private fun NotePreview(note: JournalNote) {
         is JournalNote.Image ->
             AsyncImage(
                 model = note.mediaRef,
-                contentDescription = null,
+                contentDescription = stringResource(Res.string.cd_event_linked_photo),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.size(previewSize).clip(shape),
             )
