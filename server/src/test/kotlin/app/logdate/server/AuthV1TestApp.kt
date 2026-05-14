@@ -10,6 +10,7 @@ import app.logdate.server.atproto.LogDateRepoStore
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.AuthMetricsRegistry
+import app.logdate.server.auth.EmailVerificationService
 import app.logdate.server.auth.FakeGoogleIdTokenVerifier
 import app.logdate.server.auth.GoogleIdTokenClaims
 import app.logdate.server.auth.GoogleIdTokenVerifier
@@ -20,6 +21,7 @@ import app.logdate.server.auth.InMemorySessionManager
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.RefreshTokenRevocationRepository
 import app.logdate.server.auth.SessionManager
+import app.logdate.server.entitlements.EntitlementService
 import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.InMemorySigningKeyRepository
@@ -99,6 +101,8 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
     syncRepository: SyncRepository = InMemorySyncRepository(),
     oauthConfig: OAuthConfig = OAuthConfig(issuer = atprotoIdentityConfig.pdsServiceEndpoint),
     oauthClientMetadataResolver: OAuthClientMetadataResolver? = null,
+    emailVerificationService: EmailVerificationService? = null,
+    entitlementService: EntitlementService? = null,
 ): AuthV1TestEnvironment {
     val verifier: GoogleIdTokenVerifier = googleIdTokenVerifier ?: FakeGoogleIdTokenVerifier(googleClaimsByToken)
     val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-signing-key-kek")
@@ -231,6 +235,8 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                     refreshTokenRevocationRepository = refreshTokenRevocationRepository,
                     googleIdTokenVerifier = verifier,
                     metrics = metrics,
+                    entitlementService = entitlementService,
+                    emailVerificationService = emailVerificationService,
                 )
                 identityApiRoutes(
                     accountRepository = accountRepository,

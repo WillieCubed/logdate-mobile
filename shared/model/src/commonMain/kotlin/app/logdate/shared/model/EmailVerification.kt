@@ -1,5 +1,7 @@
 package app.logdate.shared.model
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
@@ -34,9 +36,14 @@ data class EmailVerifiedResponse(
     val emailVerifiedAt: Instant,
 )
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class EmailVerificationConflictResponse(
-    /** Stable code; clients must not localize this. */
+    /**
+     * Stable code; clients must not localize this. Always emitted on the wire even when
+     * it equals the default — the field is the entire reason this type exists.
+     */
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val code: String = "email_already_attached",
     val message: String,
 )
