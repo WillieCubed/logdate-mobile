@@ -130,7 +130,9 @@ class LocalQuoteSelector(
         // First-person pronouns. Kept narrow — "i" only with whole-word boundaries.
         val FIRST_PERSON_PRONOUNS: Set<String> = setOf("i", "me", "we", "us", "my", "our")
 
-        // Compact emotion-word seed list. Replaced by SentimentLexicon (Step 7d).
+        // Compact emotion-word seed list. Mirrors the LocalStoryBeatDetector's
+        // expanded vocabulary so quote selection picks up the same journal-y
+        // language the beat classifier responds to.
         val EMOTION_WORDS: Set<String> =
             setOf(
                 // Positive
@@ -150,6 +152,14 @@ class LocalQuoteSelector(
                 "blissful",
                 "relieved",
                 "hopeful",
+                "fulfilled",
+                "loved",
+                "lucky",
+                "blessed",
+                "tender",
+                "playful",
+                "centered",
+                "refreshed",
                 // Negative
                 "sad",
                 "angry",
@@ -167,6 +177,20 @@ class LocalQuoteSelector(
                 "regret",
                 "hurt",
                 "ashamed",
+                "drained",
+                "restless",
+                "numb",
+                "empty",
+                "tired",
+                "grief",
+                "lost",
+                "stuck",
+                "scared",
+                "rejected",
+                "ignored",
+                "panicked",
+                "hopeless",
+                "discouraged",
                 // Engaged
                 "alive",
                 "energized",

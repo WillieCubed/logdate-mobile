@@ -138,10 +138,15 @@ class LocalStoryBeatDetector(
         for (word in NEGATIVE_WORDS) {
             if (joined.contains(word)) negative++
         }
+        val total = positive + negative
+        if (total == 0) return "quiet"
+        // Ratio-based: a strong lean (≥70% on one side) classifies as that side,
+        // otherwise "mixed". The previous binary scheme tipped to "mixed" the
+        // moment a single contrasting word appeared in an otherwise positive day.
+        val positiveRatio = positive.toDouble() / total
         return when {
-            positive == 0 && negative == 0 -> "quiet"
-            positive >= 2 * (negative + 1) -> "joyful"
-            negative >= 2 * (positive + 1) -> "heavy"
+            positiveRatio >= MAJORITY_THRESHOLD -> "joyful"
+            (1.0 - positiveRatio) >= MAJORITY_THRESHOLD -> "heavy"
             else -> "mixed"
         }
     }
@@ -150,7 +155,10 @@ class LocalStoryBeatDetector(
         const val DEFAULT_MAX_BEATS: Int = 6
         const val HEADLINE_MIN: Int = 20
         const val HEADLINE_MAX: Int = 120
+        private const val MAJORITY_THRESHOLD: Double = 0.70
 
+        // Journal-vocabulary expanded; "energized", "calm", "alive", and common
+        // multi-word phrases like "feel good" are real journal language.
         val POSITIVE_WORDS: Set<String> =
             setOf(
                 "happy",
@@ -169,6 +177,23 @@ class LocalStoryBeatDetector(
                 "relieved",
                 "hopeful",
                 "great",
+                "energized",
+                "calm",
+                "alive",
+                "fulfilled",
+                "content",
+                "inspired",
+                "playful",
+                "tender",
+                "warm",
+                "feel good",
+                "loved",
+                "lucky",
+                "blessed",
+                "centered",
+                "gentle",
+                "sweet",
+                "refreshed",
             )
 
         val NEGATIVE_WORDS: Set<String> =
@@ -190,6 +215,25 @@ class LocalStoryBeatDetector(
                 "hurt",
                 "ashamed",
                 "wrong",
+                "burnt out",
+                "drained",
+                "restless",
+                "tense",
+                "numb",
+                "empty",
+                "tired",
+                "fed up",
+                "grief",
+                "lost",
+                "stuck",
+                "scared",
+                "rejected",
+                "ignored",
+                "irritable",
+                "panicked",
+                "ashamed",
+                "hopeless",
+                "discouraged",
             )
     }
 }
