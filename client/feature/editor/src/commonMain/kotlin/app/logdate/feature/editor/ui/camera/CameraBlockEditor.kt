@@ -24,6 +24,7 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.captured_photo
 import logdate.client.feature.editor.generated.resources.delete_media
 import logdate.client.feature.editor.generated.resources.play_video
 import org.jetbrains.compose.resources.stringResource
@@ -105,7 +106,7 @@ private fun CapturedMediaContent(
                             .Builder(LocalPlatformContext.current)
                             .data(block.uri)
                             .build(),
-                    contentDescription = block.caption.ifBlank { "Captured photo" },
+                    contentDescription = block.caption.ifBlank { stringResource(Res.string.captured_photo) },
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
