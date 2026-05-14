@@ -3,6 +3,7 @@ package app.logdate.client.data.di
 import app.logdate.client.data.account.UnavailableAccountIdentityRepository
 import app.logdate.client.data.account.UnavailableAccountRepository
 import app.logdate.client.data.account.UnavailablePasskeyAccountRepository
+import app.logdate.client.data.audio.OfflineFirstAudioTagRepository
 import app.logdate.client.data.events.OfflineFirstEventRepository
 import app.logdate.client.data.journals.JournalUserDataRepository
 import app.logdate.client.data.journals.LocalFirstDraftRepository
@@ -39,10 +40,20 @@ import app.logdate.client.data.user.OfflineFirstUserStateRepository
 import app.logdate.client.database.databaseModule
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.di.datastoreModule
+import app.logdate.client.networking.EmailVerificationApiClient
+import app.logdate.client.networking.EmailVerificationApiClientContract
+import app.logdate.client.networking.IdentityApiClient
+import app.logdate.client.networking.IdentityApiClientContract
+import app.logdate.client.networking.PasskeyApiClient
+import app.logdate.client.networking.PasskeyApiClientContract
+import app.logdate.client.networking.QuotaApiClient
+import app.logdate.client.networking.QuotaApiClientContract
+import app.logdate.client.networking.httpClient
 import app.logdate.client.permissions.di.permissionsModule
 import app.logdate.client.repository.account.AccountIdentityRepository
 import app.logdate.client.repository.account.AccountRepository
 import app.logdate.client.repository.account.PasskeyAccountRepository
+import app.logdate.client.repository.audio.AudioTagRepository
 import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.EntryDraftRepository
@@ -188,6 +199,12 @@ actual val dataModule: Module =
         single<UserDeviceRepository> { LocalUserDeviceRepository }
         single<UserStateRepository> { OfflineFirstUserStateRepository(get()) }
 
+        // Networking — Desktop talks to the same self-host endpoints as Android/iOS
+        single<PasskeyApiClientContract> { PasskeyApiClient(httpClient, get()) }
+        single<EmailVerificationApiClientContract> { EmailVerificationApiClient(httpClient, get()) }
+        single<IdentityApiClientContract> { IdentityApiClient(httpClient, get()) }
+        single<QuotaApiClientContract> { QuotaApiClient(httpClient, get()) }
+
         // Quota
         factory<RemoteQuotaDataSource> { UnavailableRemoteQuotaDataSource() }
 
@@ -202,6 +219,13 @@ actual val dataModule: Module =
                 get(), // transcriptionDao
                 get(), // voiceNoteDao
                 get(), // transcriptionManager
+            )
+        }
+
+        // Ambient sound tags
+        single<AudioTagRepository> {
+            OfflineFirstAudioTagRepository(
+                audioTagDao = get(),
             )
         }
 
