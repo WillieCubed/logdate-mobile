@@ -105,10 +105,16 @@ tied to that.
       `IosImageLoader.kt` + `MainViewController` on iOS,
       `DesktopImageLoader.kt` + `main.kt` on Desktop. Don't add a parallel
       loader instance for new features.
-- [ ] iOS and Desktop don't currently have native video playback — the
-      Compose `VideoContent.ios.kt` and `.desktop.kt` are stubs. Don't
-      ship a new feature that depends on cross-platform video playback
-      until those land.
+- [ ] Video playback is wired on every platform. iOS uses `AVPlayer` via
+      UIKit interop; Desktop uses VLCJ when libVLC is present on the host
+      (and falls back to the system player otherwise). New video features
+      get controls (play/pause, scrubber, mute) on all three platforms
+      from day one.
+- [ ] Recent-photos queries on platforms with big libraries push a `limit`
+      into the underlying cursor (Android: `ContentResolver.QUERY_ARG_LIMIT`).
+      Never materialize the full library and then slice in memory —
+      it's the difference between a sub-200ms first paint and a noticeable
+      stall on phones with 10k+ photos.
 
 ## Accessibility
 
@@ -129,6 +135,13 @@ tied to that.
       wide-gamut. Everywhere else stays on `ARGB_8888`.
 - [ ] Don't strip EXIF orientation on import. Don't drop the color profile
       when re-encoding for share. Honor the source's intent.
+- [ ] Don't strip EXIF metadata at sync or upload either. GPS coordinates
+      feed the Rewind algorithm's location-aware beat clustering; capture
+      timestamps drive timeline ordering and accessibility descriptions;
+      orientation is required for postcard round-trips. The server already
+      encrypts blobs before persistence, so there's no plaintext-leak
+      threat model to defend against. Treat EXIF as product data, not
+      noise.
 
 ## Verification
 
@@ -146,3 +159,9 @@ For media changes, the bar for "done" is:
    announces meaningful context.
 6. StrictMode (debug builds) reports no main-thread disk reads from any
    media path.
+7. On a fresh debug install, opening the picker on a device with a
+   synthetic large library (`adb shell content insert ...`) shows a
+   first paint under 200ms — the query cap holds.
+8. iOS + Desktop video tiles play in place with working play/pause,
+   scrubber, and mute controls; navigating away pauses playback so audio
+   doesn't keep going behind the user's back.
