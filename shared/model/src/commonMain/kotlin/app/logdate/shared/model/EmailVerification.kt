@@ -6,10 +6,9 @@ import kotlin.time.Instant
 /**
  * Wire types for the `/api/v1/auth/me/email/verify/{begin,complete}` endpoints.
  *
- * These mirror the server-side DTOs in
- * `server/src/main/kotlin/app/logdate/server/routes/EmailVerificationDtos.kt`
- * exactly. A future refactor can delete the server-local copies in favor of
- * these shared types; for now both exist to keep this diff small.
+ * Single source of truth for both the server and Kotlin Multiplatform clients —
+ * the server uses these directly from `AuthV1Routes.kt` and the client uses them
+ * through `EmailVerificationApiClient`.
  */
 
 @Serializable

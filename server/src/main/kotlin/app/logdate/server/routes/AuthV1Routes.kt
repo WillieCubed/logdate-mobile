@@ -30,6 +30,11 @@ import app.logdate.shared.model.ApiError
 import app.logdate.shared.model.ApiErrorResponse
 import app.logdate.shared.model.AuthenticatorAssertionResponse
 import app.logdate.shared.model.AuthenticatorAttestationResponse
+import app.logdate.shared.model.BeginEmailVerificationResponse
+import app.logdate.shared.model.CompleteEmailVerificationRequest
+import app.logdate.shared.model.EmailVerificationConflictResponse
+import app.logdate.shared.model.EmailVerificationErrorResponse
+import app.logdate.shared.model.EmailVerifiedResponse
 import app.logdate.shared.model.EntitlementResponse
 import app.logdate.shared.model.EntitlementStatusWire
 import app.logdate.shared.model.EntitlementTierWire
