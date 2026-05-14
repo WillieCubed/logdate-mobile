@@ -92,6 +92,8 @@ import logdate.client.ui.generated.resources.Res
 import logdate.client.ui.generated.resources.a_long_time_passed
 import logdate.client.ui.generated.resources.add_your_birthday_in_settings_to_see_something_special_here
 import logdate.client.ui.generated.resources.audio_recording
+import logdate.client.ui.generated.resources.cd_timeline_photo
+import logdate.client.ui.generated.resources.cd_timeline_video
 import logdate.client.ui.generated.resources.congrats_curious_explorer
 import logdate.client.ui.generated.resources.happy_birthday
 import logdate.client.ui.generated.resources.journey_days_count
@@ -1011,7 +1013,10 @@ internal fun TimelineMediaTile(
     ) {
         AsyncImage(
             model = media.uri,
-            contentDescription = null,
+            contentDescription =
+                stringResource(
+                    if (media.isVideo) Res.string.cd_timeline_video else Res.string.cd_timeline_photo,
+                ),
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )

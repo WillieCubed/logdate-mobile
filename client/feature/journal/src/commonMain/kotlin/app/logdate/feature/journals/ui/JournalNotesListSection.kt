@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.feature.editor.audio.AudioLabelResolver
 import app.logdate.feature.editor.audio.formatAudioLabel
+import app.logdate.util.toReadableDateShort
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
 import logdate.client.feature.journal.generated.resources.*
@@ -146,7 +147,11 @@ private fun JournalNoteItem(
                         )
                         AsyncImage(
                             model = note.mediaRef,
-                            contentDescription = null,
+                            contentDescription =
+                                stringResource(
+                                    Res.string.cd_journal_photo_from_date,
+                                    note.creationTimestamp.toReadableDateShort(),
+                                ),
                             modifier = if (expanded) Modifier.fillMaxWidth() else Modifier,
                         )
                     }

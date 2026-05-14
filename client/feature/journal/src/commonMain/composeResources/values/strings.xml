@@ -54,6 +54,7 @@
     <string name="finish">Finish</string>
     <string name="image">Image</string>
     <string name="image_note">Image note</string>
+    <string name="cd_journal_photo_from_date">Photo from %1$s</string>
     <string name="journal_entries">Journal Entries</string>
     <string name="journal_name">Journal Name</string>
     <string name="journal_privacy_settings_will_appear_here_in_future_updates">Journal privacy settings will appear here in future updates.</string>

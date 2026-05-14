@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Media accessibility -->
+    <string name="cd_timeline_photo">Photo on the timeline</string>
+    <string name="cd_timeline_video">Video clip on the timeline</string>
+
     <!-- Navigation -->
     <string name="home">Home</string>
     <string name="options">Options</string>

@@ -28,6 +28,7 @@ import app.logdate.ui.timeline.JournalBadgeRow
 import app.logdate.ui.timeline.NoteUiState
 import app.logdate.ui.timeline.TextNoteUiState
 import app.logdate.ui.timeline.VideoNoteUiState
+import app.logdate.util.toReadableDateShort
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
 import logdate.client.feature.timeline.generated.resources.*
@@ -117,7 +118,11 @@ private fun ImageNoteSnippet(uiState: ImageNoteUiState) {
             Box {
                 AsyncImage(
                     model = uiState.uri,
-                    contentDescription = null,
+                    contentDescription =
+                        stringResource(
+                            Res.string.cd_photo_from_date,
+                            uiState.timestamp.toReadableDateShort(),
+                        ),
                     contentScale = ContentScale.Crop,
                     modifier =
                         Modifier

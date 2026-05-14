@@ -33,6 +33,8 @@
     <string name="audio_recording_from_day">%1$s recording from %2$s</string>
     <string name="audio_recording_from_date">%1$s recording from %2$s %3$d</string>
     <string name="video_recording">Video recording</string>
+    <string name="cd_photo_from_date">Photo from %1$s</string>
+    <string name="cd_video_from_date">Video from %1$s</string>
     <string name="timestamp_minutes_seconds">%1$d:%2$02d</string>
 
     <!-- Transcript & summary -->

@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.AspectRatios
@@ -69,6 +70,7 @@ fun SpecialMessageSection(
     ) {
         SpecialMessagePreviewCarousel(
             mediaUris = uiState.mediaUris,
+            previewLabel = uiState.title,
             onDismiss = onDismiss,
         )
         Text(uiState.title, style = MaterialTheme.typography.titleLarge)
@@ -92,6 +94,7 @@ fun SpecialMessageSection(
 @Composable
 internal fun SpecialMessagePreviewCarousel(
     mediaUris: List<String>,
+    previewLabel: String,
     onDismiss: () -> Unit,
 ) {
     Box(
@@ -103,7 +106,8 @@ internal fun SpecialMessagePreviewCarousel(
     ) {
         AsyncImage(
             mediaUris.firstOrNull(),
-            contentDescription = null,
+            contentDescription = previewLabel,
+            contentScale = ContentScale.Crop,
         )
         OutlinedIconButton(
             onClick = onDismiss,
