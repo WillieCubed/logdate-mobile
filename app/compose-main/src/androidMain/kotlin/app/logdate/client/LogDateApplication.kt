@@ -4,6 +4,8 @@ package app.logdate.client
 
 import android.app.Application
 import android.content.Context
+import android.content.pm.ApplicationInfo
+import android.os.StrictMode
 import android.util.Log
 import app.logdate.client.ambient.AmbientPromptScheduler
 import app.logdate.client.ambient.AmbientPromptSchedulingObserver
@@ -66,6 +68,8 @@ class LogdateApplication :
         super.onCreate()
         Log.i(APP_STARTUP_TAG, "Application onCreate: initializing logging and DI")
 
+        installStrictModeIfDebuggable()
+
         Napier.base(DebugAntilog())
         Napier.base(CrashlyticsAntilog())
         initializeKoin()
@@ -111,6 +115,39 @@ class LogdateApplication :
             get<DynamicShortcutRefreshObserver>().start()
         }.onFailure { error ->
             Napier.w("Failed to initialize dynamic shortcut scheduling", error)
+        }
+    }
+
+    /**
+     * Surfaces main-thread disk reads / writes, network, slow custom calls, and leaked closables
+     * in debug builds. Violations are logged but don't crash — too aggressive for normal dev
+     * iteration. The whole block is no-op in release.
+     */
+    private fun installStrictModeIfDebuggable() {
+        val isDebuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        if (!isDebuggable) return
+        runCatching {
+            StrictMode.setThreadPolicy(
+                StrictMode.ThreadPolicy
+                    .Builder()
+                    .detectDiskReads()
+                    .detectDiskWrites()
+                    .detectNetwork()
+                    .detectCustomSlowCalls()
+                    .penaltyLog()
+                    .build(),
+            )
+            StrictMode.setVmPolicy(
+                StrictMode.VmPolicy
+                    .Builder()
+                    .detectLeakedClosableObjects()
+                    .detectLeakedRegistrationObjects()
+                    .detectActivityLeaks()
+                    .penaltyLog()
+                    .build(),
+            )
+        }.onFailure { error ->
+            Napier.w("Failed to install StrictMode policies", error)
         }
     }
 }
