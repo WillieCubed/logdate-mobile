@@ -71,6 +71,54 @@ class EntitlementPersistenceTest {
         }
 
     @Test
+    fun `stored service surfaces plan features for the resolved entitlement`() =
+        runTest {
+            withDatabase(PlansTable, AccountEntitlementsTable) { database ->
+                val accountId = UUID.randomUUID()
+                insertPlan(
+                    id = "standard",
+                    tier = "standard",
+                    storageBytes = 100L,
+                    backupCount = 3,
+                    features = mapOf("email_verification" to true, "future_flag" to false),
+                )
+                insertAccountEntitlement(accountId = accountId, planId = "standard", status = "active")
+
+                val entitlement = StoredEntitlementService(database).resolve(accountId)
+
+                assertEquals(true, entitlement.features["email_verification"])
+                assertEquals(false, entitlement.features["future_flag"])
+            }
+        }
+
+    @Test
+    fun `stored service falls back to empty features when plan column is malformed`() =
+        runTest {
+            withDatabase(PlansTable, AccountEntitlementsTable) { database ->
+                val accountId = UUID.randomUUID()
+                // Insert directly so we can poison the features column with non-JSON text.
+                transaction(database) {
+                    PlansTable.insert {
+                        it[PlansTable.id] = "broken"
+                        it[name] = "broken plan"
+                        it[tier] = "free"
+                        it[monthlyBytesLimit] = 10L
+                        it[backupCountLimit] = 1
+                        it[stripePriceId] = null
+                        it[playProductId] = null
+                        it[active] = true
+                        it[features] = "not-json"
+                    }
+                }
+                insertAccountEntitlement(accountId = accountId, planId = "broken", status = "active")
+
+                val entitlement = StoredEntitlementService(database).resolve(accountId)
+
+                assertEquals(emptyMap(), entitlement.features)
+            }
+        }
+
+    @Test
     fun `stored service defaults unknown tier and status values conservatively`() =
         runTest {
             withDatabase(PlansTable, AccountEntitlementsTable) { database ->
@@ -168,6 +216,7 @@ class EntitlementPersistenceTest {
         storageBytes: Long?,
         backupCount: Int?,
         active: Boolean = true,
+        features: Map<String, Boolean> = emptyMap(),
     ) {
         transaction {
             PlansTable.insert {
@@ -179,6 +228,11 @@ class EntitlementPersistenceTest {
                 it[stripePriceId] = null
                 it[playProductId] = null
                 it[PlansTable.active] = active
+                it[PlansTable.features] =
+                    StoredEntitlementService.FEATURES_JSON.encodeToString(
+                        StoredEntitlementService.FEATURE_MAP_SERIALIZER,
+                        features,
+                    )
             }
         }
     }

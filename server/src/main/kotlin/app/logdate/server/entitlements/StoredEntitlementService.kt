@@ -1,6 +1,10 @@
 package app.logdate.server.entitlements
 
 import io.github.aakira.napier.Napier
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.v1.core.Column
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.core.and
@@ -57,6 +61,7 @@ class StoredEntitlementService(
                         storageBytes = plan[PlansTable.monthlyBytesLimit],
                         backupCount = plan[PlansTable.backupCountLimit],
                     ),
+                features = parseFeatures(plan[PlansTable.features]),
             )
         }
 
@@ -86,6 +91,29 @@ class StoredEntitlementService(
 
     companion object {
         const val FREE_PLAN_ID: String = "free"
+        internal val FEATURE_MAP_SERIALIZER = MapSerializer(String.serializer(), Boolean.serializer())
+        internal val FEATURES_JSON =
+            Json {
+                ignoreUnknownKeys = true
+                coerceInputValues = true
+            }
+    }
+}
+
+/**
+ * Parses the JSONB `plans.features` column into a typed `Map<String, Boolean>`. Falls
+ * open on malformed JSON so a single bad row never crashes the resolve path.
+ */
+private fun parseFeatures(raw: String): Map<String, Boolean> {
+    if (raw.isBlank()) return emptyMap()
+    return try {
+        StoredEntitlementService.FEATURES_JSON.decodeFromString(
+            StoredEntitlementService.FEATURE_MAP_SERIALIZER,
+            raw,
+        )
+    } catch (e: SerializationException) {
+        Napier.w("Failed to parse plans.features JSON: '$raw'", e)
+        emptyMap()
     }
 }
 
@@ -95,6 +123,7 @@ internal object PlansTable : Table("plans") {
     val tier = text("tier")
     val monthlyBytesLimit: Column<Long?> = long("monthly_bytes_limit").nullable()
     val backupCountLimit: Column<Int?> = integer("backup_count_limit").nullable()
+    val features: Column<String> = text("features").default("{}")
     val stripePriceId = text("stripe_price_id").nullable()
     val playProductId = text("play_product_id").nullable()
     val active = bool("active")
