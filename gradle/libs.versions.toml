@@ -159,6 +159,7 @@ sherpaOnnx = "8.5.1"
 commonsCompress = "1.28.0"
 cryptographyKotlin = "0.6.0"
 nimbusJoseJwt = "9.40"
+vlcj = "4.8.2"
 
 [libraries]
 desugar_jdk_libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar_jdk_libs" }
@@ -432,6 +433,11 @@ androidx-ui-android = { group = "androidx.compose.ui", name = "ui-android", vers
 
 sherpa-onnx = { module = "com.bihe0832.android:lib-sherpa-onnx", version.ref = "sherpaOnnx" }
 commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
+
+# Desktop video — VLCJ wraps libVLC for embedded playback inside Compose Swing surfaces.
+# libVLC itself must be installed on the host (or bundled with jpackage); if missing
+# at runtime we fall back to the system player.
+vlcj = { group = "uk.co.caprica", name = "vlcj", version.ref = "vlcj" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

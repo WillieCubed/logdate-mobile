@@ -54,7 +54,14 @@ kotlin {
             compilerOptions.freeCompilerArgs.set(listOf("-Xexpect-actual-classes"))
         }
 
-        val desktopMain by getting
+        val desktopMain by getting {
+            dependencies {
+                // VLCJ for in-app video playback on Desktop. Requires libVLC on
+                // the host; if missing at runtime, the player falls back to
+                // handing the URI off to the user's system player.
+                implementation(libs.vlcj)
+            }
+        }
 
         commonMain.dependencies {
             // Project dependencies
