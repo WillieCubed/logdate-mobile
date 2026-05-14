@@ -176,6 +176,17 @@ fun CloudAccountOnboardingScreen(
             )
         }
 
+        OnboardingStep.EmailVerification -> {
+            EmailVerificationStep(
+                isVerifying = uiState.isVerifyingEmail,
+                outcome = uiState.emailVerificationOutcome,
+                onVerifyClick = viewModel::onVerifyEmailClicked,
+                onSkip = viewModel::onSkipEmailVerification,
+                onContinue = viewModel::goToNextStep,
+                modifier = modifier,
+            )
+        }
+
         OnboardingStep.Complete -> {
             // Stay here until the first sync finishes so the user sees we're actually doing
             // something; the completion LaunchedEffect above navigates away once isAccountCreated

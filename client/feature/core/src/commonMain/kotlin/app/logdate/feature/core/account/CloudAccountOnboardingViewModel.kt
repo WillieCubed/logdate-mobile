@@ -6,7 +6,10 @@ import app.logdate.client.domain.account.AuthenticateWithPasskeyUseCase
 import app.logdate.client.domain.account.BackfillLocalDataUseCase
 import app.logdate.client.domain.account.CheckUsernameAvailabilityUseCase
 import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
+import app.logdate.client.domain.account.EmailVerificationAvailability
 import app.logdate.client.domain.account.TriggerInitialSyncUseCase
+import app.logdate.client.domain.account.VerifyEmailUseCase
+import app.logdate.client.permissions.EmailVerificationOutcome
 import app.logdate.client.permissions.PasskeyManager
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
@@ -30,6 +33,8 @@ class CloudAccountOnboardingViewModel(
     private val triggerInitialSyncUseCase: TriggerInitialSyncUseCase,
     private val backfillLocalDataUseCase: BackfillLocalDataUseCase,
     private val passkeyManager: PasskeyManager,
+    private val verifyEmailUseCase: VerifyEmailUseCase,
+    private val emailVerificationAvailability: EmailVerificationAvailability,
     private val profileRepository: ProfileRepository,
     private val serverConfigurationCoordinator: ServerConfigurationCoordinator,
 ) : ViewModel() {
@@ -46,6 +51,16 @@ class CloudAccountOnboardingViewModel(
 
     init {
         checkPasskeySupport()
+        viewModelScope.launch {
+            try {
+                _uiState.value =
+                    _uiState.value.copy(
+                        isEmailVerificationAvailable = emailVerificationAvailability.isAvailable(),
+                    )
+            } catch (e: Exception) {
+                Napier.w("Failed to resolve email verification availability", e)
+            }
+        }
     }
 
     /**
@@ -79,7 +94,16 @@ class CloudAccountOnboardingViewModel(
             OnboardingStep.SignIn -> _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.Complete)
             OnboardingStep.DisplayName -> _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.Username)
             OnboardingStep.Username -> _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.PasskeyCreation)
-            OnboardingStep.PasskeyCreation -> _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.Complete)
+            OnboardingStep.PasskeyCreation -> {
+                val next =
+                    if (_uiState.value.isEmailVerificationAvailable) {
+                        OnboardingStep.EmailVerification
+                    } else {
+                        OnboardingStep.Complete
+                    }
+                _uiState.value = _uiState.value.copy(currentStep = next)
+            }
+            OnboardingStep.EmailVerification -> _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.Complete)
             OnboardingStep.Complete -> _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.Complete)
         }
     }
@@ -97,6 +121,7 @@ class CloudAccountOnboardingViewModel(
                 OnboardingStep.DisplayName -> OnboardingStep.Welcome
                 OnboardingStep.Username -> OnboardingStep.DisplayName
                 OnboardingStep.PasskeyCreation -> OnboardingStep.Username
+                OnboardingStep.EmailVerification -> OnboardingStep.PasskeyCreation
                 OnboardingStep.Complete -> OnboardingStep.Complete
             }
 
@@ -527,6 +552,49 @@ class CloudAccountOnboardingViewModel(
             is CreatePasskeyAccountUseCase.CreateAccountError.Unknown ->
                 "An unexpected error occurred: ${error.message}"
         }
+
+    fun onVerifyEmailClicked() {
+        if (_uiState.value.isVerifyingEmail) return
+        _uiState.value =
+            _uiState.value.copy(
+                isVerifyingEmail = true,
+                emailVerificationOutcome = null,
+            )
+        viewModelScope.launch {
+            val outcome =
+                try {
+                    verifyEmailUseCase()
+                } catch (e: Exception) {
+                    Napier.e("Email verification crashed", e)
+                    EmailVerificationOutcome.Failed("verification_crashed")
+                }
+            _uiState.value =
+                _uiState.value.copy(
+                    isVerifyingEmail = false,
+                    emailVerificationOutcome = outcome,
+                )
+            if (outcome is EmailVerificationOutcome.Success) {
+                // Hold the success screen for a beat so the user sees confirmation,
+                // then advance. UI may also dismiss via a manual continue.
+                delay(1_000)
+                if (_uiState.value.currentStep == OnboardingStep.EmailVerification) {
+                    _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.Complete)
+                }
+            }
+        }
+    }
+
+    fun onSkipEmailVerification() {
+        _uiState.value =
+            _uiState.value.copy(
+                currentStep = OnboardingStep.Complete,
+                isSkipped = true,
+            )
+    }
+
+    fun dismissEmailVerificationOutcome() {
+        _uiState.value = _uiState.value.copy(emailVerificationOutcome = null)
+    }
 }
 
 data class CloudAccountOnboardingUiState(
@@ -555,6 +623,15 @@ data class CloudAccountOnboardingUiState(
     val isExitRequested: Boolean = false,
     val createdAccount: LogDateAccount? = null,
     val errorMessage: String? = null,
+    /**
+     * Cached once at init time from EmailVerificationAvailability. Gates the
+     * EmailVerification sub-step transition + the inline UI in [EmailVerificationStep].
+     * Defaults to false so the flow degrades to its prior PasskeyCreation -> Complete
+     * transition until the availability check resolves.
+     */
+    val isEmailVerificationAvailable: Boolean = false,
+    val isVerifyingEmail: Boolean = false,
+    val emailVerificationOutcome: EmailVerificationOutcome? = null,
 ) {
     val canContinueFromDisplayName: Boolean
         get() = displayName.isNotBlank() && displayNameError == null
@@ -579,6 +656,7 @@ enum class OnboardingStep {
     DisplayName,
     Username,
     PasskeyCreation,
+    EmailVerification,
     Complete,
 }
 

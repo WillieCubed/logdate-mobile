@@ -174,4 +174,24 @@
     <string name="yes_clear_all_data">Yes, Clear All Data</string>
     <string name="reset_device_id">Reset Device ID</string>
     <string name="reset_device_id_confirmation">Are you sure you want to reset this device&apos;s ID? This is primarily used for privacy purposes and will generate a new unique identifier for this device. This won&apos;t affect your data but may require re-syncing with LogDate Cloud.</string>
+
+    <!-- Email verification (Android Digital Credentials) -->
+    <string name="email_verification_title">Verify your email</string>
+    <string name="email_verification_body">Adds a one-tap recovery option to your account. You can do this later in Settings.</string>
+    <string name="email_verification_verify_button">Verify with Google</string>
+    <string name="email_verification_skip_button">Skip for now</string>
+    <string name="email_verification_continue_button">Continue</string>
+    <string name="email_verification_in_progress">Waiting for system picker...</string>
+    <string name="email_verification_success_title">Email verified</string>
+    <string name="email_verification_success_body">Verified as %1$s</string>
+    <string name="email_verification_conflict_title">Already attached</string>
+    <string name="email_verification_conflict_body">This email is already attached to another LogDate account.</string>
+    <string name="email_verification_failed_title">Verification failed</string>
+    <string name="email_verification_failed_body">Try again or skip. Reason: %1$s</string>
+    <string name="email_verification_cancelled_body">The picker was cancelled.</string>
+    <string name="email_verification_no_credential_body">No verifiable email was found on this device.</string>
+    <string name="email_verification_settings_row_unverified">Verify email</string>
+    <string name="email_verification_settings_row_subtitle">Add a verified email to your account</string>
+    <string name="email_verification_settings_row_verified">%1$s</string>
+    <string name="email_verification_settings_row_verified_subtitle">Verified</string>
 </resources>

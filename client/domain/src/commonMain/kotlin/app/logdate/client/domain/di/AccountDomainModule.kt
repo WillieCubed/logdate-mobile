@@ -8,6 +8,7 @@ import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
 import app.logdate.client.domain.account.CreatePasskeyUseCase
 import app.logdate.client.domain.account.CreateRemoteAccountUseCase
 import app.logdate.client.domain.account.DeletePasskeyUseCase
+import app.logdate.client.domain.account.EmailVerificationAvailability
 import app.logdate.client.domain.account.GetAccountSetupDataUseCase
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
 import app.logdate.client.domain.account.GetCurrentEntitlementUseCase
@@ -15,6 +16,7 @@ import app.logdate.client.domain.account.HasLogDateCloudAccountUseCase
 import app.logdate.client.domain.account.PreferencesBackfilledAccountTracker
 import app.logdate.client.domain.account.TriggerInitialSyncUseCase
 import app.logdate.client.domain.account.TryRestoreSignInUseCase
+import app.logdate.client.domain.account.VerifyEmailUseCase
 import app.logdate.client.domain.user.GetUserIdUseCase
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -47,6 +49,8 @@ val accountDomainModule: Module =
             )
         }
         factory { GetCurrentEntitlementUseCase(sessionStorage = get(), apiClient = get()) }
+        factory { VerifyEmailUseCase(sessionStorage = get(), manager = get()) }
+        factory { EmailVerificationAvailability(manager = get(), getCurrentEntitlement = get()) }
 
         // User ID - depends on account
         factory { GetUserIdUseCase(get(), get()) }
