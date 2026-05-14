@@ -17,11 +17,11 @@ import app.logdate.client.permissions.EmailVerificationOutcome
  * session is present; callers should never see this path because both entry
  * points (onboarding + settings) only render after sign-in.
  */
-class VerifyEmailUseCase(
+open class VerifyEmailUseCase(
     private val sessionStorage: SessionStorage,
     private val manager: EmailVerificationManager,
 ) {
-    suspend operator fun invoke(): EmailVerificationOutcome {
+    open suspend operator fun invoke(): EmailVerificationOutcome {
         val session = sessionStorage.getSession() ?: return EmailVerificationOutcome.Failed("not_signed_in")
         return manager.verifyEmail(session.accessToken)
     }

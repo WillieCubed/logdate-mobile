@@ -66,6 +66,10 @@ kotlin {
             implementation(libs.androidx.health.connect)
             implementation(libs.koin.android)
         }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+        }
     }
 }
 

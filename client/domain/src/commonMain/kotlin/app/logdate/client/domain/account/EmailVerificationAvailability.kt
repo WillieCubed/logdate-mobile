@@ -15,11 +15,11 @@ import app.logdate.client.permissions.EmailVerificationManager
  * Mirrors the pattern in
  * `client/domain/.../rewind/EntitlementRewindAIAvailability.kt`.
  */
-class EmailVerificationAvailability(
+open class EmailVerificationAvailability(
     private val manager: EmailVerificationManager,
     private val getCurrentEntitlement: GetCurrentEntitlementUseCase,
 ) {
-    suspend fun isAvailable(): Boolean {
+    open suspend fun isAvailable(): Boolean {
         if (!manager.isSupported) return false
         val entitlement =
             when (val result = getCurrentEntitlement()) {

@@ -11,7 +11,6 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import app.logdate.client.networking.EmailVerificationApiClientContract
-import app.logdate.client.networking.EmailVerificationCompletion
 import app.logdate.shared.model.BeginEmailVerificationResponse
 import app.logdate.shared.model.CompleteEmailVerificationRequest
 import io.github.aakira.napier.Napier
@@ -84,14 +83,7 @@ class AndroidEmailVerificationManager(
                     return EmailVerificationOutcome.Failed("complete_failed:${it.message ?: "unknown"}")
                 }
 
-        return when (completion) {
-            is EmailVerificationCompletion.Success ->
-                EmailVerificationOutcome.Success(completion.email, completion.verifiedAt)
-            is EmailVerificationCompletion.Conflict ->
-                EmailVerificationOutcome.Conflict(completion.message)
-            is EmailVerificationCompletion.Failed ->
-                EmailVerificationOutcome.Failed(completion.reason)
-        }
+        return mapCompletionToOutcome(completion)
     }
 
     /**
