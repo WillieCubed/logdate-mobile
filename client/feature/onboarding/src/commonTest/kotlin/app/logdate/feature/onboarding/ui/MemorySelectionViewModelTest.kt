@@ -126,7 +126,7 @@ private class FakeMediaManager : MediaManager {
 
     override suspend fun exists(mediaId: String): Boolean = false
 
-    override suspend fun getRecentMedia(): Flow<List<MediaObject>> = recentMediaFlow()
+    override suspend fun getRecentMedia(limit: Int): Flow<List<MediaObject>> = recentMediaFlow()
 
     override suspend fun queryMediaByDate(
         start: Instant,

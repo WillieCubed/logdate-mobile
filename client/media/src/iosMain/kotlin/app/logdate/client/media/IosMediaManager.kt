@@ -92,7 +92,7 @@ class IosMediaManager(
             path != null && fileManager.fileExistsAtPath(path)
         }
 
-    override suspend fun getRecentMedia(): Flow<List<MediaObject>> =
+    override suspend fun getRecentMedia(limit: Int): Flow<List<MediaObject>> =
         withContext(Dispatchers.Default) {
             val media =
                 (listPhotoLibraryMedia(fetchLimit = MAX_RECENT_MEDIA) + listMediaObjects())

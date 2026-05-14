@@ -101,7 +101,9 @@ actual fun ImagePickerContent(
             // When the user grants partial access on Android 14+, MediaStore
             // transparently filters its results to the selected items — no
             // extra work needed here.
-            mediaManager.getRecentMedia().collect { mediaList ->
+            // Ask for ~4x the preview cap so the cursor still returns enough
+            // images after the videos-only filter strips out clips.
+            mediaManager.getRecentMedia(limit = RECENT_IMAGE_PREVIEW_LIMIT * 4).collect { mediaList ->
                 val images = recentImagePreviews(mediaList)
                 libraryState =
                     when {

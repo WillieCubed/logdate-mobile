@@ -25,11 +25,11 @@ class DesktopMediaManager : MediaManager {
 
     override suspend fun exists(mediaId: String): Boolean = Files.exists(resolvePath(mediaId))
 
-    override suspend fun getRecentMedia(): Flow<List<MediaObject>> {
+    override suspend fun getRecentMedia(limit: Int): Flow<List<MediaObject>> {
         val media =
             listLibraryMediaObjects()
                 .sortedByDescending { it.timestamp }
-                .take(MAX_RECENT_MEDIA)
+                .take(limit)
         return flowOf(media)
     }
 
@@ -200,7 +200,6 @@ class DesktopMediaManager : MediaManager {
     }
 
     private companion object {
-        private const val MAX_RECENT_MEDIA = 50
         private const val LIBRARY_SCAN_DEPTH = 4
         private val mediaRoot: Path = Path.of(System.getProperty("user.home"), ".logdate", "media")
         private val picturesRoot: Path = Path.of(System.getProperty("user.home"), "Pictures")

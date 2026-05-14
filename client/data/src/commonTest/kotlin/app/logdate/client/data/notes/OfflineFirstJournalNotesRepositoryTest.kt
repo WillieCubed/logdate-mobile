@@ -630,7 +630,7 @@ class OfflineFirstJournalNotesRepositoryTest {
 
         override suspend fun exists(mediaId: String): Boolean = mediaByUri.containsKey(mediaId)
 
-        override suspend fun getRecentMedia(): Flow<List<MediaObject>> = flowOf(mediaByUri.values.toList())
+        override suspend fun getRecentMedia(limit: Int): Flow<List<MediaObject>> = flowOf(mediaByUri.values.toList())
 
         override suspend fun queryMediaByDate(
             start: kotlin.time.Instant,

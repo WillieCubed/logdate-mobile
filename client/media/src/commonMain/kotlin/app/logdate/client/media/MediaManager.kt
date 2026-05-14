@@ -22,8 +22,13 @@ interface MediaManager {
      *
      * This consists of the most recent images and videos currently available from the
      * platform media library or photo storage source.
+     *
+     * @param limit Maximum number of items to materialize per media type (images and videos
+     *   each cap at this value). Implementations should push the limit into the underlying
+     *   query, not materialize everything and then slice. Default sized so the in-app picker
+     *   strip never starves while keeping memory bounded on huge libraries.
      */
-    suspend fun getRecentMedia(): Flow<List<MediaObject>>
+    suspend fun getRecentMedia(limit: Int = DEFAULT_RECENT_MEDIA_LIMIT): Flow<List<MediaObject>>
 
     /**
      * Retrieves all media objects between the given [start] and [end] timestamps.
@@ -79,6 +84,8 @@ interface MediaManager {
         mimeType: String,
     ): String
 }
+
+const val DEFAULT_RECENT_MEDIA_LIMIT: Int = 100
 
 data class MediaPayload(
     val fileName: String,

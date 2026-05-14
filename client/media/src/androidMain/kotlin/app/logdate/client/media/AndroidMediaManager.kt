@@ -7,6 +7,7 @@ import android.database.ContentObserver
 import android.database.Cursor
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
@@ -167,12 +168,12 @@ class AndroidMediaManager(
             }
         }
 
-    override suspend fun getRecentMedia(): Flow<List<MediaObject>> =
+    override suspend fun getRecentMedia(limit: Int): Flow<List<MediaObject>> =
         flow {
             ensureLegacyManagedMediaBackfilled()
             // Initial snapshot.
             try {
-                emit(getRecentMediaInternal())
+                emit(getRecentMediaInternal(limit))
             } catch (error: Exception) {
                 Napier.e("Failed to query recent Android media", error)
                 throw error
@@ -182,7 +183,7 @@ class AndroidMediaManager(
             // photo taken in the system camera without any manual refresh.
             mediaStoreInvalidations().collect {
                 try {
-                    emit(getRecentMediaInternal())
+                    emit(getRecentMediaInternal(limit))
                 } catch (error: Exception) {
                     Napier.e("Failed to refresh recent Android media after MediaStore change", error)
                 }
@@ -386,7 +387,7 @@ class AndroidMediaManager(
             mediaItems
         }
 
-    private suspend fun getRecentMediaInternal(): List<MediaObject> =
+    private suspend fun getRecentMediaInternal(limit: Int): List<MediaObject> =
         withContext(ioDispatcher) {
             val mediaItems = mutableListOf<MediaObject>()
 
@@ -405,6 +406,7 @@ class AndroidMediaManager(
                 collectionUri = imageCollection,
                 projection = imageProjection,
                 sortOrder = imageSortOrder,
+                limit = limit,
                 failureMessage = "Unable to query recent Android images",
             ).use { cursor ->
                 val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
@@ -448,6 +450,7 @@ class AndroidMediaManager(
                 collectionUri = videoCollection,
                 projection = videoProjection,
                 sortOrder = videoSortOrder,
+                limit = limit,
                 failureMessage = "Unable to query recent Android videos",
             ).use { cursor ->
                 val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
@@ -477,9 +480,9 @@ class AndroidMediaManager(
                 }
             }
 
-            mediaItems
-                .sortedByDescending { it.timestamp }
-                .take(50)
+            // Cursor already returned at most `limit` rows of each type pre-sorted by
+            // recency. Final sort merges images and videos.
+            mediaItems.sortedByDescending { it.timestamp }
         }
 
     override suspend fun readMedia(uri: String): MediaPayload =
@@ -970,15 +973,39 @@ class AndroidMediaManager(
         selection: String? = null,
         selectionArgs: Array<String>? = null,
         sortOrder: String? = null,
+        limit: Int? = null,
         failureMessage: String,
-    ): Cursor =
-        contentResolver.query(
-            collectionUri,
-            projection,
-            selection,
-            selectionArgs,
-            sortOrder,
-        ) ?: throw IllegalStateException(failureMessage)
+    ): Cursor {
+        // Push LIMIT into the cursor query when we know an explicit cap; on API 30+
+        // MediaStore honors QUERY_ARG_LIMIT, which keeps the cursor from materializing
+        // the entire library before the caller slices it.
+        val cursor =
+            if (limit != null) {
+                val queryArgs =
+                    Bundle().apply {
+                        if (selection != null) {
+                            putString(ContentResolver.QUERY_ARG_SQL_SELECTION, selection)
+                        }
+                        if (selectionArgs != null) {
+                            putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, selectionArgs)
+                        }
+                        if (sortOrder != null) {
+                            putString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER, sortOrder)
+                        }
+                        putInt(ContentResolver.QUERY_ARG_LIMIT, limit)
+                    }
+                contentResolver.query(collectionUri, projection, queryArgs, null)
+            } else {
+                contentResolver.query(
+                    collectionUri,
+                    projection,
+                    selection,
+                    selectionArgs,
+                    sortOrder,
+                )
+            }
+        return cursor ?: throw IllegalStateException(failureMessage)
+    }
 
     private fun imageFromCursor(
         collectionUri: Uri,

@@ -491,7 +491,7 @@ class AddNoteUseCaseTest {
 
         override suspend fun exists(mediaId: String): Boolean = false
 
-        override suspend fun getRecentMedia(): Flow<List<MediaObject>> = flowOf(emptyList())
+        override suspend fun getRecentMedia(limit: Int): Flow<List<MediaObject>> = flowOf(emptyList())
 
         override suspend fun queryMediaByDate(
             start: Instant,
