@@ -24,6 +24,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -112,6 +113,7 @@ fun PersonIcon(
         AsyncImage(
             model = photoModel,
             contentDescription = stringResource(Res.string.photo_of_name, name),
+            contentScale = ContentScale.Crop,
             modifier = Modifier.size(48.dp),
         )
     }
