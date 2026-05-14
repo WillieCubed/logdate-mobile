@@ -1,8 +1,10 @@
 package app.logdate.client.intelligence.rewind.local
 
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.location.LocationHistoryItem
 import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.shared.model.StoryBeat
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
@@ -28,6 +30,10 @@ class LocalStoryBeatDetector(
     /**
      * @param textEntries text entries from the period.
      * @param media media items from the period (used only for evidence-id grouping).
+     * @param locationHistory recorded GPS points from the period. When a single day
+     *   shows visits to >=2 places more than [LOCATION_SPLIT_DISTANCE_METERS] apart,
+     *   the detector subdivides that day into multiple beats — so trip days don't
+     *   flatten into one undifferentiated entry.
      * @param periodStart inclusive start of the period.
      * @param periodEnd exclusive end of the period.
      * @return 0–[maxBeats] story beats. Empty when neither text nor media exists.
@@ -37,6 +43,7 @@ class LocalStoryBeatDetector(
         periodStart: Instant,
         periodEnd: Instant,
         media: List<IndexedMedia> = emptyList(),
+        locationHistory: List<LocationHistoryItem> = emptyList(),
     ): List<StoryBeat> {
         if (textEntries.isEmpty() && media.isEmpty()) return emptyList()
         val tz = TimeZone.currentSystemDefault()
@@ -44,32 +51,122 @@ class LocalStoryBeatDetector(
         // Bucket entries + media by calendar date.
         val textByDay = textEntries.groupBy { it.creationTimestamp.toLocalDateTime(tz).date }
         val mediaByDay = media.groupBy { it.timestamp.toLocalDateTime(tz).date }
+        val locationsByDay =
+            locationHistory.groupBy { it.timestamp.toLocalDateTime(tz).date }
 
         // Set + Set deduplicates (Set semantics), .sorted() yields a List in
         // natural date order; both available cross-platform unlike toSortedSet.
         val daysWithContent =
             (textByDay.keys + mediaByDay.keys).sorted()
 
-        // If we have more days than beats allowed, collapse the oldest days into a
-        // single opening "phase" beat.
-        val dayBuckets =
-            if (daysWithContent.size <= maxBeats) {
-                daysWithContent.map { listOf(it) }
-            } else {
-                val collapseCount = daysWithContent.size - maxBeats + 1
-                listOf(daysWithContent.take(collapseCount)) +
-                    daysWithContent.drop(collapseCount).map { listOf(it) }
+        // Step 1: per-day, subdivide into segments by location cluster when the
+        // user travelled meaningfully. Each segment becomes a candidate beat.
+        val candidateSegments =
+            daysWithContent.flatMap { day ->
+                buildDaySegments(
+                    day = day,
+                    dayEntries = textByDay[day].orEmpty(),
+                    dayMedia = mediaByDay[day].orEmpty(),
+                    dayLocations = locationsByDay[day].orEmpty(),
+                )
             }
 
-        return dayBuckets.map { dayBucket ->
-            val bucketEntries = dayBucket.flatMap { textByDay[it].orEmpty() }
-            val bucketMedia = dayBucket.flatMap { mediaByDay[it].orEmpty() }
-            buildBeat(dayBucket, bucketEntries, bucketMedia)
+        // Step 2: enforce the ≤[maxBeats] cap. Prefer keeping the most recent
+        // segments intact (the "what happened at the end of the week" story);
+        // collapse the earliest into a single opening "phase" beat when needed.
+        val beatedSegments =
+            if (candidateSegments.size <= maxBeats) {
+                candidateSegments.map { listOf(it) }
+            } else {
+                val collapseCount = candidateSegments.size - maxBeats + 1
+                listOf(candidateSegments.take(collapseCount)) +
+                    candidateSegments.drop(collapseCount).map { listOf(it) }
+            }
+
+        return beatedSegments.map { group ->
+            val days = group.flatMap { it.days }.distinct()
+            val entries = group.flatMap { it.entries }
+            val media = group.flatMap { it.media }
+            buildBeat(days, entries, media)
         }
     }
 
+    /**
+     * Breaks one day into 1+ segments by location cluster. Returns segments in
+     * chronological order; a day with no location data or a single cluster
+     * returns a single segment with all that day's content.
+     */
+    private fun buildDaySegments(
+        day: LocalDate,
+        dayEntries: List<JournalNote.Text>,
+        dayMedia: List<IndexedMedia>,
+        dayLocations: List<LocationHistoryItem>,
+    ): List<DaySegment> {
+        if (dayLocations.size < 2) {
+            return listOf(DaySegment(listOf(day), dayEntries, dayMedia))
+        }
+
+        val clusters = clusterByDistance(dayLocations.sortedBy { it.timestamp })
+        if (clusters.size < 2) {
+            return listOf(DaySegment(listOf(day), dayEntries, dayMedia))
+        }
+
+        // Assign each entry / media to the cluster whose timestamp range it falls within.
+        val perCluster =
+            clusters.map { cluster ->
+                val clusterStart = cluster.first().timestamp
+                val clusterEnd = cluster.last().timestamp
+                val matchingEntries =
+                    dayEntries.filter {
+                        it.creationTimestamp >= clusterStart && it.creationTimestamp <= clusterEnd
+                    }
+                val matchingMedia =
+                    dayMedia.filter {
+                        it.timestamp >= clusterStart && it.timestamp <= clusterEnd
+                    }
+                DaySegment(
+                    days = listOf(day),
+                    entries = matchingEntries,
+                    media = matchingMedia,
+                )
+            }
+        val nonEmpty = perCluster.filter { it.entries.isNotEmpty() || it.media.isNotEmpty() }
+        // If filtering wiped everything, keep the whole-day segment.
+        return nonEmpty.ifEmpty { listOf(DaySegment(listOf(day), dayEntries, dayMedia)) }
+    }
+
+    /**
+     * Greedy temporal clustering — walk locations in order and start a new
+     * cluster whenever the next point is more than [LOCATION_SPLIT_DISTANCE_METERS]
+     * from the current cluster's last point. Captures "morning at home, afternoon
+     * at the coast" without trying to be a real geo-clusterer.
+     */
+    private fun clusterByDistance(sorted: List<LocationHistoryItem>): List<List<LocationHistoryItem>> {
+        if (sorted.isEmpty()) return emptyList()
+        val clusters = mutableListOf<MutableList<LocationHistoryItem>>()
+        var current = mutableListOf(sorted.first())
+        clusters.add(current)
+        for (point in sorted.drop(1)) {
+            val last = current.last()
+            val distance = point.location.distanceTo(last.location)
+            if (distance >= LOCATION_SPLIT_DISTANCE_METERS) {
+                current = mutableListOf(point)
+                clusters.add(current)
+            } else {
+                current.add(point)
+            }
+        }
+        return clusters
+    }
+
+    private data class DaySegment(
+        val days: List<LocalDate>,
+        val entries: List<JournalNote.Text>,
+        val media: List<IndexedMedia>,
+    )
+
     private fun buildBeat(
-        dayBucket: List<kotlinx.datetime.LocalDate>,
+        dayBucket: List<LocalDate>,
         entries: List<JournalNote.Text>,
         media: List<IndexedMedia>,
     ): StoryBeat {
@@ -88,7 +185,7 @@ class LocalStoryBeatDetector(
 
     private fun pickMoment(
         entries: List<JournalNote.Text>,
-        dayBucket: List<kotlinx.datetime.LocalDate>,
+        dayBucket: List<LocalDate>,
     ): String {
         // Concatenate entry text, split sentences, take the first that fits the
         // headline window.
@@ -156,6 +253,10 @@ class LocalStoryBeatDetector(
         const val HEADLINE_MIN: Int = 20
         const val HEADLINE_MAX: Int = 120
         private const val MAJORITY_THRESHOLD: Double = 0.70
+
+        // Split a day into multiple beats when GPS points stretch this far apart.
+        // 2km is "drove or took transit" — not "walked across the block."
+        const val LOCATION_SPLIT_DISTANCE_METERS: Double = 2000.0
 
         // Journal-vocabulary expanded; "energized", "calm", "alive", and common
         // multi-word phrases like "feel good" are real journal language.

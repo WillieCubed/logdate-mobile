@@ -119,6 +119,7 @@ class LocalRewindStrategy(
                 periodStart = input.periodStart,
                 periodEnd = input.periodEnd,
                 media = input.media,
+                locationHistory = input.locationHistory,
             )
         // Fallback to a single catch-all beat when the period has neither text nor
         // media — keeps the sequencer happy without special-casing.
