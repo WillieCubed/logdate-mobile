@@ -62,19 +62,6 @@ internal class AndroidPlatformHaptics(
             .build()
     }
 
-    override fun selection() {
-        // Selection is the lightest discrete confirmation we have.
-        if (supportsComposition) {
-            vibrateComposition {
-                addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, 0.5f)
-            }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            vibratePredefined(VibrationEffect.EFFECT_TICK)
-        } else {
-            vibrateLegacy(15)
-        }
-    }
-
     override fun impact(strength: HapticImpactStrength) {
         if (supportsComposition) {
             vibrateComposition {

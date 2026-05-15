@@ -36,7 +36,6 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.platform.currentPlatform
-import app.logdate.ui.platform.rememberLogDateHaptics
 import app.logdate.ui.sync.SyncAction
 import app.logdate.ui.sync.SyncErrorBanner
 import app.logdate.ui.sync.SyncPresentation
@@ -179,7 +178,6 @@ internal fun ScrollToTopButton(
     modifier: Modifier = Modifier,
 ) {
     val panelCoroutineScope = rememberCoroutineScope()
-    val haptics = rememberLogDateHaptics()
     val showScrollToTop by remember {
         derivedStateOf {
             listState.firstVisibleItemIndex > 0
@@ -187,7 +185,6 @@ internal fun ScrollToTopButton(
     }
 
     fun scrollToTop() {
-        haptics.jumpedToToday()
         panelCoroutineScope.launch {
             listState.animateScrollToItem(0)
         }

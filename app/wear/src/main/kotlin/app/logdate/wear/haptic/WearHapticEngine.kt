@@ -20,12 +20,6 @@ class WearHapticEngine(
         Napier.d { "Haptic preference set to $pref" }
     }
 
-    fun confirmTap() {
-        vibrateIfAllowed(allowReduced = false) {
-            VibrationEffect.createOneShot(15, 80)
-        }
-    }
-
     fun startRecording() {
         vibrateIfAllowed(allowReduced = true) {
             VibrationEffect.createOneShot(40, 200)

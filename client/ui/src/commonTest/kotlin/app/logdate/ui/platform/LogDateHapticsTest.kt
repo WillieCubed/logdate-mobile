@@ -11,16 +11,6 @@ import kotlin.test.assertTrue
  */
 class LogDateHapticsTest {
     @Test
-    fun `selection event maps to selection primitive`() {
-        val recorder = RecordingPlatformHaptics()
-        val haptics = DefaultLogDateHaptics(recorder)
-
-        haptics.selection()
-
-        assertEquals(listOf<RecordedHaptic>(RecordedHaptic.Selection), recorder.events)
-    }
-
-    @Test
     fun `saveSucceeded fires success notification`() {
         val recorder = RecordingPlatformHaptics()
         val haptics = DefaultLogDateHaptics(recorder)
@@ -47,14 +37,27 @@ class LogDateHapticsTest {
     }
 
     @Test
-    fun `recordingCancelled fires warning notification`() {
+    fun `recordingFinished fires success notification`() {
         val recorder = RecordingPlatformHaptics()
         val haptics = DefaultLogDateHaptics(recorder)
 
-        haptics.recordingCancelled()
+        haptics.recordingFinished()
 
         assertEquals(
-            listOf<RecordedHaptic>(RecordedHaptic.Notification(HapticNotificationType.Warning)),
+            listOf<RecordedHaptic>(RecordedHaptic.Notification(HapticNotificationType.Success)),
+            recorder.events,
+        )
+    }
+
+    @Test
+    fun `transcriptionReady fires a tick`() {
+        val recorder = RecordingPlatformHaptics()
+        val haptics = DefaultLogDateHaptics(recorder)
+
+        haptics.transcriptionReady()
+
+        assertEquals(
+            listOf<RecordedHaptic>(RecordedHaptic.Tick),
             recorder.events,
         )
     }
@@ -73,62 +76,16 @@ class LogDateHapticsTest {
     }
 
     @Test
-    fun `rewindEndReached fires a celebration pattern`() {
-        val recorder = RecordingPlatformHaptics()
-        val haptics = DefaultLogDateHaptics(recorder)
-
-        haptics.rewindEndReached()
-
-        assertEquals(1, recorder.events.size, "rewindEndReached should fire one composed pattern")
-        val event = recorder.events.single()
-        assertTrue(event is RecordedHaptic.Pattern, "expected pattern, got $event")
-        // The celebration should crescendo — last step is a success.
-        assertEquals(
-            HapticStep.Notification(HapticNotificationType.Success),
-            event.spec.steps.last(),
-        )
-    }
-
-    @Test
-    fun `autoSaved is suppressed by default - silent background save`() {
-        val recorder = RecordingPlatformHaptics()
-        val haptics = DefaultLogDateHaptics(recorder)
-
-        haptics.autoSaved()
-
-        assertTrue(
-            recorder.events.isEmpty(),
-            "autoSaved should fire nothing by default — it must feel invisible. Got: ${recorder.events}",
-        )
-    }
-
-    @Test
-    fun `toggle on differs from toggle off so users can hear the state in their hand`() {
-        val recorder = RecordingPlatformHaptics()
-        val haptics = DefaultLogDateHaptics(recorder)
-
-        haptics.toggle(on = true)
-        haptics.toggle(on = false)
-
-        assertEquals(2, recorder.events.size)
-        assertTrue(
-            recorder.events[0] != recorder.events[1],
-            "toggle(on=true) and toggle(on=false) must produce distinct feel; both were ${recorder.events[0]}",
-        )
-    }
-
-    @Test
     fun `reduce-motion controller suppresses non-critical events`() {
         val recorder = RecordingPlatformHaptics()
         val haptics = DefaultLogDateHaptics(recorder, reduceMotion = { true })
 
-        haptics.selection()
-        haptics.toolSelected()
-        haptics.pageTurned()
+        haptics.saveSucceeded()
+        haptics.transcriptionReady()
 
         assertTrue(
             recorder.events.isEmpty(),
-            "selection/toolSelected/pageTurned must not fire when reduce-motion is on. Got: ${recorder.events}",
+            "saveSucceeded/transcriptionReady must not fire when reduce-motion is on. Got: ${recorder.events}",
         )
     }
 
@@ -138,11 +95,11 @@ class LogDateHapticsTest {
         val recorder = RecordingPlatformHaptics()
         val haptics = DefaultLogDateHaptics(recorder, reduceMotion = { reduce })
 
-        haptics.selection()
+        haptics.saveSucceeded()
         reduce = true
-        haptics.selection()
+        haptics.saveSucceeded()
         reduce = false
-        haptics.selection()
+        haptics.saveSucceeded()
 
         assertEquals(
             2,
@@ -156,13 +113,12 @@ class LogDateHapticsTest {
         val recorder = RecordingPlatformHaptics()
         val haptics = DefaultLogDateHaptics(recorder, reduceMotion = { true })
 
-        haptics.error()
-        haptics.warning()
         haptics.confirmDestruction()
         haptics.recordingStarted()
+        haptics.recordingFinished()
 
         assertEquals(
-            4,
+            3,
             recorder.events.size,
             "Critical events must always fire — got ${recorder.events.size}: ${recorder.events}",
         )
@@ -172,10 +128,6 @@ class LogDateHapticsTest {
 /** Records every primitive call so tests can assert exact mapping behavior. */
 internal class RecordingPlatformHaptics : PlatformHapticsController {
     val events = mutableListOf<RecordedHaptic>()
-
-    override fun selection() {
-        events += RecordedHaptic.Selection
-    }
 
     override fun impact(strength: HapticImpactStrength) {
         events += RecordedHaptic.Impact(strength)
@@ -188,15 +140,9 @@ internal class RecordingPlatformHaptics : PlatformHapticsController {
     override fun tick() {
         events += RecordedHaptic.Tick
     }
-
-    override fun pattern(spec: HapticPattern) {
-        events += RecordedHaptic.Pattern(spec)
-    }
 }
 
 internal sealed interface RecordedHaptic {
-    data object Selection : RecordedHaptic
-
     data object Tick : RecordedHaptic
 
     data class Impact(
@@ -205,9 +151,5 @@ internal sealed interface RecordedHaptic {
 
     data class Notification(
         val type: HapticNotificationType,
-    ) : RecordedHaptic
-
-    data class Pattern(
-        val spec: HapticPattern,
     ) : RecordedHaptic
 }

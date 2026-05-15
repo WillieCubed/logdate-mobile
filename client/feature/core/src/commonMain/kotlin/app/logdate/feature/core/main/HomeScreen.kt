@@ -60,7 +60,6 @@ import app.logdate.ui.audio.TranscriptionProvider
 import app.logdate.ui.audio.TranscriptionState
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.location.PlaceUiState
-import app.logdate.ui.platform.LocalPlatformHaptics
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.currentPlatform
 import app.logdate.ui.profiles.PersonUiState
@@ -133,7 +132,6 @@ fun HomeScreen(
     }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val haptics = LocalPlatformHaptics.current
     // On Apple platforms the timeline's new-entry action lives in the top app bar, so the
     // floating button is hidden there. Other tabs (Journals, Library, Rewind, etc.) keep
     // the FAB until their own headers grow a native create affordance. Android always shows
@@ -202,9 +200,6 @@ fun HomeScreen(
                         item(
                             selected = destination == currentDestination,
                             onClick = {
-                                if (destination != currentDestination) {
-                                    haptics.selection()
-                                }
                                 currentDestination = destination
                             },
                             icon = {

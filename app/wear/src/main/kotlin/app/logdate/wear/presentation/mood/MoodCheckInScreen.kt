@@ -61,22 +61,13 @@ fun MoodCheckInScreen(
     when (uiState.step) {
         MoodCheckInStep.SELECT_MOOD ->
             SelectMoodContent(
-                onMoodSelected = { mood ->
-                    haptics.confirmTap()
-                    viewModel.selectMood(mood)
-                },
+                onMoodSelected = { mood -> viewModel.selectMood(mood) },
             )
         MoodCheckInStep.VOICE_PROMPT ->
             VoicePromptContent(
                 selectedMood = uiState.selectedMood,
-                onAttachVoice = {
-                    haptics.confirmTap()
-                    viewModel.attachVoice()
-                },
-                onSkip = {
-                    haptics.confirmTap()
-                    viewModel.skipVoiceAttachment()
-                },
+                onAttachVoice = { viewModel.attachVoice() },
+                onSkip = { viewModel.skipVoiceAttachment() },
             )
         MoodCheckInStep.SAVED ->
             MoodSavedContent(

@@ -9,7 +9,7 @@ import androidx.compose.runtime.remember
 /**
  * Wraps [content] with a fully-wired haptic stack — both the platform primitive controller
  * ([LocalPlatformHaptics]) and the semantic facade ([LocalLogDateHaptics]) — so any
- * descendant Composable can call `rememberLogDateHaptics().rewindEndReached()` and feel it.
+ * descendant Composable can call `rememberLogDateHaptics().confirmDestruction()` and feel it.
  *
  * The OS reduce-motion / haptics-off setting is observed automatically; non-critical events
  * are suppressed when the user has disabled them at the system level.

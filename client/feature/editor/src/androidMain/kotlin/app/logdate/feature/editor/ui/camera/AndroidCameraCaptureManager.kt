@@ -5,7 +5,6 @@ import android.content.ContentValues
 import android.content.Context
 import android.os.Build
 import android.provider.MediaStore
-import android.view.HapticFeedbackConstants
 import android.view.Surface
 import androidx.annotation.RequiresPermission
 import androidx.camera.core.Camera
@@ -148,12 +147,6 @@ class AndroidCameraCaptureManager(
                 .setAutoCancelDuration(3, TimeUnit.SECONDS)
                 .build()
         cam.cameraControl.startFocusAndMetering(action)
-
-        // Subtle haptic confirms the tap landed; users tap-to-focus expecting
-        // direct feedback the way iOS Camera and Google Camera both provide.
-        runCatching {
-            currentPreviewView.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-        }
     }
 
     override suspend fun startPreview(facing: CameraFacing) =

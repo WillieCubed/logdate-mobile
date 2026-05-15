@@ -37,8 +37,6 @@ import androidx.wear.compose.material3.TimeText
 import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.wear.R
 import app.logdate.wear.notification.WearPromptScheduler
-import app.logdate.wear.haptic.WearHapticEngine
-import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -76,40 +74,28 @@ fun WearSettingsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val haptics = koinInject<WearHapticEngine>()
-
     WearSettingsContent(
         settingsState = settingsState,
         morningPromptEnabled = morningPromptEnabled,
         onMorningPromptChanged = { enabled ->
-            haptics.confirmTap()
             morningPromptEnabled = enabled
             prefs.edit().putBoolean("morning_prompt", enabled).apply()
             updatePromptSchedule(context, enabled || eveningPromptEnabled)
         },
         eveningPromptEnabled = eveningPromptEnabled,
         onEveningPromptChanged = { enabled ->
-            haptics.confirmTap()
             eveningPromptEnabled = enabled
             prefs.edit().putBoolean("evening_prompt", enabled).apply()
             updatePromptSchedule(context, morningPromptEnabled || enabled)
         },
-        onSyncNow = {
-            haptics.confirmTap()
-            viewModel.syncNow()
-        },
+        onSyncNow = { viewModel.syncNow() },
         onBackgroundLocationChanged = { enabled ->
-            haptics.confirmTap()
             viewModel.setBackgroundLocationEnabled(enabled)
         },
         onLocationCaptureModeChanged = { mode ->
-            haptics.confirmTap()
             viewModel.setLocationCaptureMode(mode)
         },
-        onOpenLocationPermissions = {
-            haptics.confirmTap()
-            viewModel.openLocationPermissions()
-        },
+        onOpenLocationPermissions = { viewModel.openLocationPermissions() },
     )
 }
 

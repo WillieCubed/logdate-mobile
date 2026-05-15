@@ -23,11 +23,7 @@ class HapticEventTest {
             setOf(
                 HapticEvent.RecordingStarted,
                 HapticEvent.RecordingFinished,
-                HapticEvent.RecordingCancelled,
-                HapticEvent.Warning,
                 HapticEvent.ConfirmDestruction,
-                HapticEvent.Error,
-                HapticEvent.SyncConflictSurfaced,
             )
 
         assertEquals(
@@ -42,11 +38,8 @@ class HapticEventTest {
     fun `routine non-critical events are not in the critical set`() {
         val nonCritical =
             listOf(
-                HapticEvent.Selection,
-                HapticEvent.AutoSaved,
-                HapticEvent.RewindCardCentered,
-                HapticEvent.PageTurned,
-                HapticEvent.ToolSelected,
+                HapticEvent.SaveSucceeded,
+                HapticEvent.TranscriptionReady,
             )
 
         for (event in nonCritical) {

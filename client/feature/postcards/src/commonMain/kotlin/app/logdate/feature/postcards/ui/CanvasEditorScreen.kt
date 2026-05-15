@@ -68,7 +68,6 @@ import app.logdate.feature.postcards.model.InkTool
 import app.logdate.feature.postcards.model.ShapeKind
 import app.logdate.ui.common.CursorType
 import app.logdate.ui.common.cursorIcon
-import app.logdate.ui.platform.rememberLogDateHaptics
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -88,19 +87,9 @@ fun CanvasEditorScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    val haptics = rememberLogDateHaptics()
-    val onUndo: () -> Unit = {
-        haptics.undo()
-        viewModel.undo()
-    }
-    val onRedo: () -> Unit = {
-        haptics.redo()
-        viewModel.redo()
-    }
-    val onToolSelected: (CanvasTool) -> Unit = { tool ->
-        haptics.toolSelected()
-        viewModel.setActiveTool(tool)
-    }
+    val onUndo: () -> Unit = { viewModel.undo() }
+    val onRedo: () -> Unit = { viewModel.redo() }
+    val onToolSelected: (CanvasTool) -> Unit = { tool -> viewModel.setActiveTool(tool) }
 
     LaunchedEffect(state.saveError) {
         state.saveError?.let { error ->

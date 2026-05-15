@@ -4,16 +4,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 
 /**
- * Cross-platform haptic feedback. Maps loosely onto Apple's `UIImpactFeedbackGenerator`,
- * `UISelectionFeedbackGenerator`, and `UINotificationFeedbackGenerator`. On Android we route
- * through `HapticFeedbackConstants`; on desktop the controller is a no-op.
+ * Cross-platform haptic feedback. Maps loosely onto Apple's `UIImpactFeedbackGenerator` and
+ * `UINotificationFeedbackGenerator`. On Android we route through `Vibrator`/`VibrationEffect`;
+ * on desktop the controller is a no-op.
  *
  * Acquire via [rememberPlatformHaptics] inside Composables, or read [LocalPlatformHaptics]
  * directly when you need a stable instance to capture in a non-Composable handler.
  */
 interface PlatformHapticsController {
-    fun selection()
-
     fun impact(strength: HapticImpactStrength = HapticImpactStrength.Light)
 
     fun notification(type: HapticNotificationType)
@@ -24,23 +22,6 @@ interface PlatformHapticsController {
      * platforms that haven't opted in still feel something.
      */
     fun tick() = impact(HapticImpactStrength.Light)
-
-    /**
-     * Run a small composed [spec]. Default executes each step sequentially via the other
-     * primitives; platforms can override for more accurate timing (Android composition API,
-     * iOS sequenced generators).
-     */
-    fun pattern(spec: HapticPattern) {
-        for (step in spec.steps) {
-            when (step) {
-                HapticStep.Tick -> tick()
-                HapticStep.Selection -> selection()
-                is HapticStep.Impact -> impact(step.strength)
-                is HapticStep.Notification -> notification(step.type)
-                is HapticStep.Wait -> Unit // default: no inter-step pause
-            }
-        }
-    }
 }
 
 enum class HapticImpactStrength { Light, Medium, Heavy, Soft, Rigid }
@@ -55,8 +36,6 @@ val LocalPlatformHaptics =
 fun rememberPlatformHaptics(): PlatformHapticsController = LocalPlatformHaptics.current
 
 internal object NoOpPlatformHaptics : PlatformHapticsController {
-    override fun selection() = Unit
-
     override fun impact(strength: HapticImpactStrength) = Unit
 
     override fun notification(type: HapticNotificationType) = Unit

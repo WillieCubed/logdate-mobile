@@ -41,20 +41,6 @@ class WearHapticEngineTest {
     }
 
     @Test
-    fun `confirmTap vibrates in FULL mode`() {
-        engine.setPreference(HapticPreference.FULL)
-        engine.confirmTap()
-        verify(exactly = 1) { vibrator.vibrate(any<VibrationEffect>()) }
-    }
-
-    @Test
-    fun `confirmTap does not vibrate in REDUCED mode`() {
-        engine.setPreference(HapticPreference.REDUCED)
-        engine.confirmTap()
-        verify(exactly = 0) { vibrator.vibrate(any<VibrationEffect>()) }
-    }
-
-    @Test
     fun `no haptics fire in OFF mode`() {
         engine.setPreference(HapticPreference.OFF)
         engine.startRecording()
@@ -62,7 +48,6 @@ class WearHapticEngineTest {
         engine.success()
         engine.rejection()
         engine.warning()
-        engine.confirmTap()
         engine.scrollTick()
         verify(exactly = 0) { vibrator.vibrate(any<VibrationEffect>()) }
     }
@@ -84,7 +69,6 @@ class WearHapticEngineTest {
     fun `non-critical haptics suppressed in REDUCED mode`() {
         engine.setPreference(HapticPreference.REDUCED)
 
-        engine.confirmTap()
         engine.scrollTick()
         engine.transition()
         engine.heartbeat()
@@ -102,7 +86,6 @@ class WearHapticEngineTest {
     fun `all haptics fire in FULL mode`() {
         engine.setPreference(HapticPreference.FULL)
 
-        engine.confirmTap()
         engine.startRecording()
         engine.stopRecording()
         engine.pause()
@@ -118,12 +101,12 @@ class WearHapticEngineTest {
         engine.cameraShutter()
         engine.warning()
 
-        verify(exactly = 15) { vibrator.vibrate(any<VibrationEffect>()) }
+        verify(exactly = 14) { vibrator.vibrate(any<VibrationEffect>()) }
     }
 
     @Test
     fun `preference defaults to FULL`() {
-        engine.confirmTap()
+        engine.success()
         verify(exactly = 1) { vibrator.vibrate(any<VibrationEffect>()) }
     }
 }
