@@ -61,7 +61,6 @@ import app.logdate.feature.rewind.ui.overview.RewindOverviewScreenUiState
 import app.logdate.feature.rewind.ui.overview.RewindPreviewUiState
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.platform.PlatformIcons
-import app.logdate.ui.platform.rememberLogDateHaptics
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.getLocaleFirstDayOfWeek
 import kotlinx.coroutines.delay
@@ -241,29 +240,6 @@ fun FloatingRewindCardList(
     val density = LocalDensity.current
     val listState = rememberLazyListState()
     val snapFlingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
-
-    val haptics = rememberLogDateHaptics()
-    val centeredIndex by remember(listState) {
-        derivedStateOf {
-            val layoutInfo = listState.layoutInfo
-            val viewportCenter = layoutInfo.viewportStartOffset + layoutInfo.viewportSize.height / 2
-            layoutInfo.visibleItemsInfo
-                .minByOrNull {
-                    kotlin.math.abs((it.offset + it.size / 2) - viewportCenter)
-                }?.index
-        }
-    }
-    var lastSettledIndex by remember { mutableStateOf<Int?>(null) }
-    LaunchedEffect(centeredIndex, listState.isScrollInProgress) {
-        if (!listState.isScrollInProgress &&
-            centeredIndex != null &&
-            centeredIndex != lastSettledIndex
-        ) {
-            // Skip the first emission so opening the screen doesn't fire on its own.
-            if (lastSettledIndex != null) haptics.rewindCardCentered()
-            lastSettledIndex = centeredIndex
-        }
-    }
 
     // Simple fixed card dimensions
     val cardWidth = 360.dp
@@ -600,11 +576,6 @@ fun EndOfListSurprise(
             val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()
             lastVisibleItem?.index == itemCount // This is the surprise item index
         }
-    }
-
-    val haptics = rememberLogDateHaptics()
-    LaunchedEffect(isNearEnd) {
-        if (isNearEnd) haptics.rewindEndReached()
     }
 
     Box(

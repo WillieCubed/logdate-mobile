@@ -976,7 +976,6 @@ fun DeleteConfirmationDialog(
     icon: ImageVector = Icons.Rounded.Warning,
 ) {
     val haptics = rememberLogDateHaptics()
-    LaunchedEffect(Unit) { haptics.warning() }
     AlertDialog(
         icon = {
             Icon(icon, contentDescription = null)

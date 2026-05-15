@@ -75,9 +75,6 @@ fun EntryEditorContent(
             },
             onCreateBlock = { type, id ->
                 journalSelectorExpanded = false
-                if (type != BlockType.TEXT) {
-                    haptics.blockAdded()
-                }
                 viewModel.createNewBlock(type, id)
             },
             onDeleteBlock = viewModel::removeBlock,

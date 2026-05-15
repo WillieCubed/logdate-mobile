@@ -43,10 +43,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindPanelUiState
@@ -144,13 +142,11 @@ fun RewindStoryView(
     // First-view entrance animation: scale up from 0.92 with a spring, then settle.
     // Only plays once when the story first mounts, and only for unviewed rewinds.
     val entranceScale = remember { Animatable(if (isFirstView) 0.92f else 1f) }
-    val hapticFeedback = LocalHapticFeedback.current
 
     LaunchedEffect(isFirstView) {
         if (isFirstView) {
             // Brief pause so the user registers the screen before the spring fires
             delay(150)
-            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
             entranceScale.animateTo(
                 targetValue = 1f,
                 animationSpec =
