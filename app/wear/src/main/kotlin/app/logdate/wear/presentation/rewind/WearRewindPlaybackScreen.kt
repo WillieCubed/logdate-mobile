@@ -183,9 +183,15 @@ private fun PanelContent(panel: RewindContent) {
             }
         }
 
-        // Image and Video are filtered out for Wear
+        // Visual-heavy panels that don't translate to the watch's screen size are
+        // filtered out — Image/Video and the structural map/weather/personality/top-list
+        // cards live in the phone-side Rewind UI.
         is RewindContent.Image,
         is RewindContent.Video,
+        is RewindContent.MapPanel,
+        is RewindContent.WeatherPanel,
+        is RewindContent.PersonalityCard,
+        is RewindContent.TopList,
         -> Unit
     }
 }
