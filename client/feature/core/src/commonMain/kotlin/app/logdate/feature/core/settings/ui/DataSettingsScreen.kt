@@ -6,10 +6,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.Devices
@@ -40,6 +43,7 @@ import app.logdate.feature.core.restore.ImportOptions
 import app.logdate.feature.core.restore.RestoreBottomSheet
 import app.logdate.feature.core.restore.RestoreState
 import app.logdate.feature.core.restore.UserDataRestoreViewModel
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
@@ -216,61 +220,129 @@ fun DataSettingsContent(
         )
     }
 
-    SettingsScaffold(
-        title = stringResource(Res.string.data_and_storage),
-        onBack = onBack,
-        snackbarHostState = snackbarHostState,
-    ) {
-        if (isAuthenticated && isQuotaAvailable) {
-            item {
-                QuotaUsageBlock(
-                    quotaUsage = quotaUsage,
+    FoldableBookLayout(
+        modifier = Modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                if (isAuthenticated && isQuotaAvailable) {
+                    QuotaUsageBlock(
+                        quotaUsage = quotaUsage,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+
+                SettingsSection(
+                    title = stringResource(Res.string.data_management),
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                ) {
+                    Column {
+                        ExportDataItem(onShowExportOptions = onShowExportOptions)
+                        ImportBackupItem(onShowRestoreSheet = onShowRestoreSheet)
+                        IntegrityCheckItem(
+                            integrityState = integrityState,
+                            onRunIntegrityCheck = onRunIntegrityCheck,
+                            onRepairIntegrity = onRepairIntegrity,
+                        )
+                    }
+                }
+            }
+        },
+        endPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                if (isAuthenticated) {
+                    SyncConflictsSection(
+                        conflictsState = conflictsState,
+                        onClearConflicts = onClearConflicts,
+                        onRefreshConflicts = onRefreshConflicts,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+
+                SyncSettingsSection(
+                    syncStatus = syncStatus,
+                    isAuthenticated = isAuthenticated,
+                    onSyncNow = onSyncNow,
+                    isBackgroundSyncEnabled = isBackgroundSyncEnabled,
+                    onBackgroundSyncEnabledChange = onBackgroundSyncEnabledChange,
+                    onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
+                    onNavigateToSignIn = onNavigateToSignIn,
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
             }
-        }
-
-        item {
-            SettingsSection(
-                title = stringResource(Res.string.data_management),
-                modifier = Modifier.padding(horizontal = Spacing.lg),
+        },
+        singlePaneContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.data_and_storage),
+                onBack = onBack,
+                snackbarHostState = snackbarHostState,
             ) {
-                Column {
-                    ExportDataItem(onShowExportOptions = onShowExportOptions)
-                    ImportBackupItem(onShowRestoreSheet = onShowRestoreSheet)
-                    IntegrityCheckItem(
-                        integrityState = integrityState,
-                        onRunIntegrityCheck = onRunIntegrityCheck,
-                        onRepairIntegrity = onRepairIntegrity,
+                if (isAuthenticated && isQuotaAvailable) {
+                    item {
+                        QuotaUsageBlock(
+                            quotaUsage = quotaUsage,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+                }
+
+                item {
+                    SettingsSection(
+                        title = stringResource(Res.string.data_management),
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {
+                        Column {
+                            ExportDataItem(onShowExportOptions = onShowExportOptions)
+                            ImportBackupItem(onShowRestoreSheet = onShowRestoreSheet)
+                            IntegrityCheckItem(
+                                integrityState = integrityState,
+                                onRunIntegrityCheck = onRunIntegrityCheck,
+                                onRepairIntegrity = onRepairIntegrity,
+                            )
+                        }
+                    }
+                }
+
+                if (isAuthenticated) {
+                    item {
+                        SyncConflictsSection(
+                            conflictsState = conflictsState,
+                            onClearConflicts = onClearConflicts,
+                            onRefreshConflicts = onRefreshConflicts,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+                }
+
+                item {
+                    SyncSettingsSection(
+                        syncStatus = syncStatus,
+                        isAuthenticated = isAuthenticated,
+                        onSyncNow = onSyncNow,
+                        isBackgroundSyncEnabled = isBackgroundSyncEnabled,
+                        onBackgroundSyncEnabledChange = onBackgroundSyncEnabledChange,
+                        onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
+                        onNavigateToSignIn = onNavigateToSignIn,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
             }
-        }
-
-        if (isAuthenticated) {
-            item {
-                SyncConflictsSection(
-                    conflictsState = conflictsState,
-                    onClearConflicts = onClearConflicts,
-                    onRefreshConflicts = onRefreshConflicts,
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                )
-            }
-        }
-
-        item {
-            SyncSettingsSection(
-                syncStatus = syncStatus,
-                isAuthenticated = isAuthenticated,
-                onSyncNow = onSyncNow,
-                isBackgroundSyncEnabled = isBackgroundSyncEnabled,
-                onBackgroundSyncEnabledChange = onBackgroundSyncEnabledChange,
-                onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
-                onNavigateToSignIn = onNavigateToSignIn,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
-    }
+        },
+    )
 }
 
 @Composable

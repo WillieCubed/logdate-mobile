@@ -3,7 +3,12 @@
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MailOutline
@@ -25,6 +30,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
@@ -154,139 +161,271 @@ fun AccountSettingsContent(
         )
     }
 
-    SettingsScaffold(
-        title = stringResource(Res.string.account_and_sign_in),
-        onBack = onBack,
-        snackbarHostState = snackbarHostState,
-    ) {
-        // Account info summary
-        item {
-            SettingsSection(
-                title = stringResource(Res.string.account_information),
-                modifier = Modifier.padding(horizontal = Spacing.lg),
+    FoldableBookLayout(
+        modifier = Modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                ListItem(
-                    leadingContent = {
-                        Icon(Icons.Default.Person, contentDescription = null)
-                    },
-                    headlineContent = {
-                        Text(userProfile.name.ifEmpty { userProfile.username })
-                    },
-                    supportingContent = {
-                        if (userProfile.username.isNotEmpty()) {
-                            Text(stringResource(Res.string.username_handle, userProfile.username))
+                SettingsSection(
+                    title = stringResource(Res.string.account_information),
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                ) {
+                    ListItem(
+                        leadingContent = {
+                            Icon(Icons.Default.Person, contentDescription = null)
+                        },
+                        headlineContent = {
+                            Text(userProfile.name.ifEmpty { userProfile.username })
+                        },
+                        supportingContent = {
+                            if (userProfile.username.isNotEmpty()) {
+                                Text(stringResource(Res.string.username_handle, userProfile.username))
+                            }
+                        },
+                    )
+
+                    if (isEmailVerificationAvailable) {
+                        if (userProfile.emailVerified && userProfile.email != null) {
+                            ListItem(
+                                leadingContent = {
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                },
+                                headlineContent = {
+                                    Text(
+                                        stringResource(
+                                            Res.string.email_verification_settings_row_verified,
+                                            userProfile.email,
+                                        ),
+                                    )
+                                },
+                                supportingContent = {
+                                    Text(stringResource(Res.string.email_verification_settings_row_verified_subtitle))
+                                },
+                            )
+                        } else {
+                            ListItem(
+                                leadingContent = {
+                                    Icon(Icons.Default.MailOutline, contentDescription = null)
+                                },
+                                headlineContent = {
+                                    Text(stringResource(Res.string.email_verification_settings_row_unverified))
+                                },
+                                supportingContent = {
+                                    Text(stringResource(Res.string.email_verification_settings_row_subtitle))
+                                },
+                                modifier =
+                                    Modifier.clickable {
+                                        showEmailVerificationSheet.value = true
+                                    },
+                            )
                         }
-                    },
+                    }
+                }
+
+                ServerSelectionSection(
+                    serverSelectionState = serverSelectionState,
+                    onSelectPreset = onSelectServerPreset,
+                    onUpdateCustomUrl = onUpdateCustomServerUrl,
+                    onValidateAndSave = onValidateAndSaveServer,
+                    onShowCustomServerInfo = { showCustomServerInfo.value = true },
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+            }
+        },
+        endPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                PasskeysInfoSection(
+                    passkeys = passkeys,
+                    onCreatePasskey = onCreatePasskey,
+                    onRevokePasskey = onRevokePasskey,
+                    showCreatePasskeyAction = true,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
 
-                // Email verification row (Android Digital Credentials)
-                if (isEmailVerificationAvailable) {
-                    if (userProfile.emailVerified && userProfile.email != null) {
+                AtprotoIdentitySection(
+                    identityState = identityState,
+                    onRefresh = onRefreshIdentity,
+                    onExportSigningKey = onExportSigningKey,
+                    onRotateSigningKey = onRotateSigningKey,
+                    onImportSigningKey = onImportSigningKey,
+                    onImportSigningKeyWithRecovery = onImportSigningKeyWithRecovery,
+                    onDerivePlcRecoveryKey = onDerivePlcRecoveryKey,
+                    onRegisterPlcRecoveryKey = onRegisterPlcRecoveryKey,
+                    onRegisterDerivedPlcRecoveryKey = onRegisterDerivedPlcRecoveryKey,
+                    onClearIdentityActionState = onClearIdentityActionState,
+                    onClearExportedKeyJson = onClearExportedKeyJson,
+                    onClearDerivedRecoveryDidKey = onClearDerivedRecoveryDidKey,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+
+                SettingsSection(
+                    title = stringResource(Res.string.account_actions),
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                ) {
+                    ListItem(
+                        headlineContent = { Text(stringResource(Res.string.account_sign_out_action)) },
+                        supportingContent = {
+                            Text(stringResource(Res.string.account_sign_out_description))
+                        },
+                        trailingContent = {
+                            OutlinedButton(
+                                onClick = { showSignOutDialog = true },
+                            ) {
+                                Text(stringResource(Res.string.account_sign_out_action))
+                            }
+                        },
+                    )
+                }
+            }
+        },
+        singlePaneContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.account_and_sign_in),
+                onBack = onBack,
+                snackbarHostState = snackbarHostState,
+            ) {
+                item {
+                    SettingsSection(
+                        title = stringResource(Res.string.account_information),
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {
                         ListItem(
                             leadingContent = {
-                                Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
+                                Icon(Icons.Default.Person, contentDescription = null)
                             },
                             headlineContent = {
-                                Text(
-                                    stringResource(
-                                        Res.string.email_verification_settings_row_verified,
-                                        userProfile.email,
-                                    ),
-                                )
+                                Text(userProfile.name.ifEmpty { userProfile.username })
                             },
                             supportingContent = {
-                                Text(stringResource(Res.string.email_verification_settings_row_verified_subtitle))
+                                if (userProfile.username.isNotEmpty()) {
+                                    Text(stringResource(Res.string.username_handle, userProfile.username))
+                                }
                             },
                         )
-                    } else {
+
+                        if (isEmailVerificationAvailable) {
+                            if (userProfile.emailVerified && userProfile.email != null) {
+                                ListItem(
+                                    leadingContent = {
+                                        Icon(
+                                            Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    },
+                                    headlineContent = {
+                                        Text(
+                                            stringResource(
+                                                Res.string.email_verification_settings_row_verified,
+                                                userProfile.email,
+                                            ),
+                                        )
+                                    },
+                                    supportingContent = {
+                                        Text(stringResource(Res.string.email_verification_settings_row_verified_subtitle))
+                                    },
+                                )
+                            } else {
+                                ListItem(
+                                    leadingContent = {
+                                        Icon(Icons.Default.MailOutline, contentDescription = null)
+                                    },
+                                    headlineContent = {
+                                        Text(stringResource(Res.string.email_verification_settings_row_unverified))
+                                    },
+                                    supportingContent = {
+                                        Text(stringResource(Res.string.email_verification_settings_row_subtitle))
+                                    },
+                                    modifier =
+                                        Modifier.clickable {
+                                            showEmailVerificationSheet.value = true
+                                        },
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    ServerSelectionSection(
+                        serverSelectionState = serverSelectionState,
+                        onSelectPreset = onSelectServerPreset,
+                        onUpdateCustomUrl = onUpdateCustomServerUrl,
+                        onValidateAndSave = onValidateAndSaveServer,
+                        onShowCustomServerInfo = { showCustomServerInfo.value = true },
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+
+                item {
+                    PasskeysInfoSection(
+                        passkeys = passkeys,
+                        onCreatePasskey = onCreatePasskey,
+                        onRevokePasskey = onRevokePasskey,
+                        showCreatePasskeyAction = true,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+
+                item {
+                    AtprotoIdentitySection(
+                        identityState = identityState,
+                        onRefresh = onRefreshIdentity,
+                        onExportSigningKey = onExportSigningKey,
+                        onRotateSigningKey = onRotateSigningKey,
+                        onImportSigningKey = onImportSigningKey,
+                        onImportSigningKeyWithRecovery = onImportSigningKeyWithRecovery,
+                        onDerivePlcRecoveryKey = onDerivePlcRecoveryKey,
+                        onRegisterPlcRecoveryKey = onRegisterPlcRecoveryKey,
+                        onRegisterDerivedPlcRecoveryKey = onRegisterDerivedPlcRecoveryKey,
+                        onClearIdentityActionState = onClearIdentityActionState,
+                        onClearExportedKeyJson = onClearExportedKeyJson,
+                        onClearDerivedRecoveryDidKey = onClearDerivedRecoveryDidKey,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+
+                item {
+                    SettingsSection(
+                        title = stringResource(Res.string.account_actions),
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {
                         ListItem(
-                            leadingContent = {
-                                Icon(Icons.Default.MailOutline, contentDescription = null)
-                            },
-                            headlineContent = {
-                                Text(stringResource(Res.string.email_verification_settings_row_unverified))
-                            },
+                            headlineContent = { Text(stringResource(Res.string.account_sign_out_action)) },
                             supportingContent = {
-                                Text(stringResource(Res.string.email_verification_settings_row_subtitle))
+                                Text(stringResource(Res.string.account_sign_out_description))
                             },
-                            modifier =
-                                Modifier.clickable {
-                                    showEmailVerificationSheet.value = true
-                                },
+                            trailingContent = {
+                                OutlinedButton(
+                                    onClick = { showSignOutDialog = true },
+                                ) {
+                                    Text(stringResource(Res.string.account_sign_out_action))
+                                }
+                            },
                         )
                     }
                 }
             }
-        }
-
-        // Server configuration section
-        item {
-            ServerSelectionSection(
-                serverSelectionState = serverSelectionState,
-                onSelectPreset = onSelectServerPreset,
-                onUpdateCustomUrl = onUpdateCustomServerUrl,
-                onValidateAndSave = onValidateAndSaveServer,
-                onShowCustomServerInfo = { showCustomServerInfo.value = true },
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
-
-        // Passkeys section
-        item {
-            PasskeysInfoSection(
-                passkeys = passkeys,
-                onCreatePasskey = onCreatePasskey,
-                onRevokePasskey = onRevokePasskey,
-                showCreatePasskeyAction = true,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
-
-        // AT Protocol identity
-        item {
-            AtprotoIdentitySection(
-                identityState = identityState,
-                onRefresh = onRefreshIdentity,
-                onExportSigningKey = onExportSigningKey,
-                onRotateSigningKey = onRotateSigningKey,
-                onImportSigningKey = onImportSigningKey,
-                onImportSigningKeyWithRecovery = onImportSigningKeyWithRecovery,
-                onDerivePlcRecoveryKey = onDerivePlcRecoveryKey,
-                onRegisterPlcRecoveryKey = onRegisterPlcRecoveryKey,
-                onRegisterDerivedPlcRecoveryKey = onRegisterDerivedPlcRecoveryKey,
-                onClearIdentityActionState = onClearIdentityActionState,
-                onClearExportedKeyJson = onClearExportedKeyJson,
-                onClearDerivedRecoveryDidKey = onClearDerivedRecoveryDidKey,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
-
-        // Account actions (sign out)
-        item {
-            SettingsSection(
-                title = stringResource(Res.string.account_actions),
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            ) {
-                ListItem(
-                    headlineContent = { Text(stringResource(Res.string.account_sign_out_action)) },
-                    supportingContent = {
-                        Text(stringResource(Res.string.account_sign_out_description))
-                    },
-                    trailingContent = {
-                        OutlinedButton(
-                            onClick = { showSignOutDialog = true },
-                        ) {
-                            Text(stringResource(Res.string.account_sign_out_action))
-                        }
-                    },
-                )
-            }
-        }
-    }
+        },
+    )
 
     if (showSignOutDialog) {
         val scope = rememberCoroutineScope()
