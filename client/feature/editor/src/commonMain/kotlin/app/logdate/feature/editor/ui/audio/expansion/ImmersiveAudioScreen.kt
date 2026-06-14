@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.editor.ui.audio.expansion
 
 import androidx.compose.animation.AnimatedContent
@@ -23,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -46,11 +49,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import app.logdate.client.awareness.daylight.DaylightPeriod
+import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
 import app.logdate.feature.editor.ui.audio.AnimatedPlayPauseButton
 import app.logdate.feature.editor.ui.audio.waveform.BezierAudioWaveform
 import app.logdate.feature.editor.ui.formatMediaDuration
+import app.logdate.ui.adaptive.FoldableTabletopLayout
+import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.platform.PlatformIcons
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
@@ -93,6 +99,8 @@ fun ImmersiveAudioScreen(
     onDragEnd: () -> Unit = {},
     onCrossSegment: () -> Unit = {},
     onClose: () -> Unit = {},
+    outputSelection: MediaDeviceSelectionUiState? = null,
+    onOutputDeviceSelected: (String) -> Unit = {},
 ) {
     ImmersiveSystemBarEffect()
 
@@ -148,167 +156,293 @@ fun ImmersiveAudioScreen(
             )
         }
 
-        // Main content
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 32.dp)
-                    .statusBarsPadding()
-                    .navigationBarsPadding(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            // Time context (always visible)
-            Text(
-                text = formatDaylightPeriod(daylightPeriod),
-                style = MaterialTheme.typography.labelLarge,
-                color = onBackgroundColor.copy(alpha = 0.6f),
-            )
-
-            Text(
-                text = formatDateTime(createdAt),
-                style = MaterialTheme.typography.headlineSmall,
-                color = onBackgroundColor,
-            )
-
-            // Ambient sound chips, written to the database by the on-device tagger
-            // after the recording stops. The list typically fills in over the few
-            // seconds after stop, so we crossfade as it changes — the user sees
-            // chips appear without a loading state.
-            AnimatedContent(
-                targetState = detectedSounds,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "ambient-sound-chips",
-            ) { sounds ->
-                if (sounds.isEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                } else {
-                    AmbientSoundChips(
-                        sounds = sounds,
-                        contentColor = onBackgroundColor,
-                        modifier = Modifier.padding(top = 16.dp),
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            // Large waveform
-            BezierAudioWaveform(
-                amplitudes = amplitudes,
-                progress = progress,
-                palette = palette,
-                segments = segments,
-                durationMs = durationMs,
-                onSeek = onSeek,
-                onDragStart = {
-                    controlsVisible = true
-                    onDragStart()
-                },
-                onDragEnd = onDragEnd,
-                onCrossSegment = onCrossSegment,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(180.dp)
-                        .clip(MaterialTheme.shapes.large),
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Auto-hiding controls
-            AnimatedVisibility(
-                visible = controlsVisible,
-                enter = fadeIn(),
-                exit = fadeOut(),
-            ) {
+        FoldableTabletopLayout(
+            modifier = Modifier.fillMaxSize(),
+            topPane = {
+                ImmersiveAudioContextPane(
+                    amplitudes = amplitudes,
+                    progress = progress,
+                    palette = palette,
+                    daylightPeriod = daylightPeriod,
+                    durationMs = durationMs,
+                    createdAt = createdAt,
+                    segments = segments,
+                    detectedSounds = detectedSounds,
+                    onBackgroundColor = onBackgroundColor,
+                    onSeek = onSeek,
+                    onDragStart = {
+                        controlsVisible = true
+                        onDragStart()
+                    },
+                    onDragEnd = onDragEnd,
+                    onCrossSegment = onCrossSegment,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 32.dp)
+                            .statusBarsPadding(),
+                )
+            },
+            bottomPane = {
+                ImmersiveAudioControlsPane(
+                    progress = progress,
+                    isPlaying = isPlaying,
+                    palette = palette,
+                    durationMs = durationMs,
+                    onBackgroundColor = onBackgroundColor,
+                    controlsVisible = controlsVisible,
+                    outputSelection = outputSelection,
+                    onPlayPause = onPlayPause,
+                    onSeek = onSeek,
+                    onSkipBack = onSkipBack,
+                    onSkipForward = onSkipForward,
+                    onOutputDeviceSelected = onOutputDeviceSelected,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 32.dp)
+                            .navigationBarsPadding(),
+                )
+            },
+            fallback = {
                 Column(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 32.dp)
+                            .statusBarsPadding()
+                            .navigationBarsPadding(),
+                    verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    // Scrubber
-                    Slider(
-                        value = progress,
-                        onValueChange = onSeek,
+                    ImmersiveAudioContextPane(
+                        amplitudes = amplitudes,
+                        progress = progress,
+                        palette = palette,
+                        daylightPeriod = daylightPeriod,
+                        durationMs = durationMs,
+                        createdAt = createdAt,
+                        segments = segments,
+                        detectedSounds = detectedSounds,
+                        onBackgroundColor = onBackgroundColor,
+                        onSeek = onSeek,
+                        onDragStart = {
+                            controlsVisible = true
+                            onDragStart()
+                        },
+                        onDragEnd = onDragEnd,
+                        onCrossSegment = onCrossSegment,
                         modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(32.dp))
+                    ImmersiveAudioControlsPane(
+                        progress = progress,
+                        isPlaying = isPlaying,
+                        palette = palette,
+                        durationMs = durationMs,
+                        onBackgroundColor = onBackgroundColor,
+                        controlsVisible = controlsVisible,
+                        outputSelection = outputSelection,
+                        onPlayPause = onPlayPause,
+                        onSeek = onSeek,
+                        onSkipBack = onSkipBack,
+                        onSkipForward = onSkipForward,
+                        onOutputDeviceSelected = onOutputDeviceSelected,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun ImmersiveAudioContextPane(
+    amplitudes: List<Float>,
+    progress: Float,
+    palette: AudioPalette,
+    daylightPeriod: DaylightPeriod,
+    durationMs: Long,
+    createdAt: Instant,
+    segments: List<AudioSegment>,
+    detectedSounds: List<String>,
+    onBackgroundColor: Color,
+    onSeek: (Float) -> Unit,
+    onDragStart: () -> Unit,
+    onDragEnd: () -> Unit,
+    onCrossSegment: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = formatDaylightPeriod(daylightPeriod),
+            style = MaterialTheme.typography.labelLarge,
+            color = onBackgroundColor.copy(alpha = 0.6f),
+        )
+
+        Text(
+            text = formatDateTime(createdAt),
+            style = MaterialTheme.typography.headlineSmall,
+            color = onBackgroundColor,
+        )
+
+        AnimatedContent(
+            targetState = detectedSounds,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            label = "ambient-sound-chips",
+        ) { sounds ->
+            if (sounds.isEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+            } else {
+                AmbientSoundChips(
+                    sounds = sounds,
+                    contentColor = onBackgroundColor,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(48.dp))
+
+        BezierAudioWaveform(
+            amplitudes = amplitudes,
+            progress = progress,
+            palette = palette,
+            segments = segments,
+            durationMs = durationMs,
+            onSeek = onSeek,
+            onDragStart = onDragStart,
+            onDragEnd = onDragEnd,
+            onCrossSegment = onCrossSegment,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+                    .clip(MaterialTheme.shapes.large),
+        )
+    }
+}
+
+@Composable
+private fun ImmersiveAudioControlsPane(
+    progress: Float,
+    isPlaying: Boolean,
+    palette: AudioPalette,
+    durationMs: Long,
+    onBackgroundColor: Color,
+    controlsVisible: Boolean,
+    outputSelection: MediaDeviceSelectionUiState?,
+    onPlayPause: () -> Unit,
+    onSeek: (Float) -> Unit,
+    onSkipBack: () -> Unit,
+    onSkipForward: () -> Unit,
+    onOutputDeviceSelected: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        AnimatedVisibility(
+            visible = controlsVisible,
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Slider(
+                    value = progress,
+                    onValueChange = onSeek,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors =
+                        SliderDefaults.colors(
+                            thumbColor = Color(palette.accentColor),
+                            activeTrackColor = Color(palette.playedFillColor),
+                            inactiveTrackColor = onBackgroundColor.copy(alpha = 0.2f),
+                        ),
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = formatProgress(progress, durationMs),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = onBackgroundColor.copy(alpha = 0.7f),
+                    )
+                    Text(
+                        text = formatMediaDuration(durationMs, false),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = onBackgroundColor.copy(alpha = 0.7f),
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val skipButtonColors =
+                        IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = Color(palette.accentColor).copy(alpha = 0.2f),
+                            contentColor = Color(palette.accentColor),
+                        )
+
+                    FilledTonalIconButton(
+                        onClick = onSkipBack,
+                        colors = skipButtonColors,
+                        modifier = Modifier.size(48.dp),
+                    ) {
+                        Icon(
+                            painter = PlatformIcons.replay10(),
+                            contentDescription = stringResource(Res.string.skip_back_10_seconds),
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(24.dp))
+
+                    AnimatedPlayPauseButton(
+                        isPlaying = isPlaying,
+                        onClick = onPlayPause,
+                        modifier = Modifier.size(80.dp),
+                        iconSize = 48.dp,
                         colors =
-                            SliderDefaults.colors(
-                                thumbColor = Color(palette.accentColor),
-                                activeTrackColor = Color(palette.playedFillColor),
-                                inactiveTrackColor = onBackgroundColor.copy(alpha = 0.2f),
+                            IconButtonDefaults.filledIconButtonColors(
+                                containerColor = Color(palette.accentColor),
+                                contentColor = onBackgroundColor,
                             ),
                     )
 
-                    // Time display
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                    Spacer(modifier = Modifier.width(24.dp))
+
+                    FilledTonalIconButton(
+                        onClick = onSkipForward,
+                        colors = skipButtonColors,
+                        modifier = Modifier.size(48.dp),
                     ) {
-                        Text(
-                            text = formatProgress(progress, durationMs),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = onBackgroundColor.copy(alpha = 0.7f),
-                        )
-                        Text(
-                            text = formatMediaDuration(durationMs, false),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = onBackgroundColor.copy(alpha = 0.7f),
+                        Icon(
+                            painter = PlatformIcons.forward10(),
+                            contentDescription = stringResource(Res.string.skip_forward_10_seconds),
+                            modifier = Modifier.size(28.dp),
                         )
                     }
+                }
 
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Playback controls
-                    Row(
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        val skipButtonColors =
-                            IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = Color(palette.accentColor).copy(alpha = 0.2f),
-                                contentColor = Color(palette.accentColor),
-                            )
-
-                        FilledTonalIconButton(
-                            onClick = onSkipBack,
-                            colors = skipButtonColors,
-                            modifier = Modifier.size(48.dp),
-                        ) {
-                            Icon(
-                                painter = PlatformIcons.replay10(),
-                                contentDescription = stringResource(Res.string.skip_back_10_seconds),
-                                modifier = Modifier.size(28.dp),
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(24.dp))
-
-                        AnimatedPlayPauseButton(
-                            isPlaying = isPlaying,
-                            onClick = onPlayPause,
-                            modifier = Modifier.size(80.dp),
-                            iconSize = 48.dp,
-                            colors =
-                                IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = Color(palette.accentColor),
-                                    contentColor = onBackgroundColor,
-                                ),
-                        )
-
-                        Spacer(modifier = Modifier.width(24.dp))
-
-                        FilledTonalIconButton(
-                            onClick = onSkipForward,
-                            colors = skipButtonColors,
-                            modifier = Modifier.size(48.dp),
-                        ) {
-                            Icon(
-                                painter = PlatformIcons.forward10(),
-                                contentDescription = stringResource(Res.string.skip_forward_10_seconds),
-                                modifier = Modifier.size(28.dp),
-                            )
-                        }
-                    }
+                outputSelection?.let { selection ->
+                    Spacer(modifier = Modifier.height(16.dp))
+                    MediaDeviceSelector(
+                        selection = selection,
+                        onDeviceSelected = onOutputDeviceSelected,
+                        label = "Audio output",
+                        modifier = Modifier.widthIn(max = 240.dp),
+                    )
                 }
             }
         }

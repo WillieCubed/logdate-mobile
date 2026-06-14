@@ -81,7 +81,13 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
+import app.logdate.client.media.device.AudioRouteRepository
+import app.logdate.client.media.device.DefaultMediaDevices
+import app.logdate.client.media.device.MediaDeviceKind
+import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
+import app.logdate.ui.adaptive.FoldableTabletopLayout
+import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
@@ -89,6 +95,7 @@ import kotlinx.coroutines.launch
 import logdate.client.feature.library.generated.resources.Res
 import logdate.client.feature.library.generated.resources.cd_library_photo_full
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 import kotlin.time.Instant
@@ -109,9 +116,11 @@ fun MediaDetailScreen(
             parameters = { parametersOf(mediaId) },
         ),
 ) {
+    val audioRouteRepository: AudioRouteRepository = koinInject()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val viewerState by viewModel.viewerState.collectAsStateWithLifecycle()
     val presenterState by viewModel.presenterState.collectAsStateWithLifecycle()
+    val outputSelection by audioRouteRepository.outputDevices.collectAsStateWithLifecycle()
 
     val isExpanded =
         currentWindowAdaptiveInfo()
@@ -122,6 +131,8 @@ fun MediaDetailScreen(
         state = uiState,
         viewerState = viewerState,
         presenterState = presenterState,
+        outputSelection = outputSelection,
+        onOutputDeviceSelected = audioRouteRepository::selectOutputDevice,
         isExpanded = isExpanded,
         onBack = {
             viewModel.stopPresenting()
@@ -149,6 +160,8 @@ fun MediaDetailContent(
     state: MediaDetailUiState,
     viewerState: MediaViewerState = MediaViewerState(),
     presenterState: PresenterState = PresenterState(),
+    outputSelection: MediaDeviceSelectionUiState = defaultLibraryOutputSelection(),
+    onOutputDeviceSelected: (String) -> Unit = {},
     isExpanded: Boolean,
     onBack: () -> Unit,
     onSelectMedia: (Int) -> Unit = {},
@@ -202,6 +215,8 @@ fun MediaDetailContent(
                 onNavigateToJournal = onNavigateToJournal,
                 onShare = { onShare(state.mediaRef) },
                 presenterState = presenterState,
+                outputSelection = outputSelection,
+                onOutputDeviceSelected = onOutputDeviceSelected,
                 onStartPresenting = onStartPresenting,
                 onStopPresenting = onStopPresenting,
                 onPresentItem = onPresentItem,
@@ -223,6 +238,8 @@ fun MediaDetailContent(
                 onNavigateToJournal = onNavigateToJournal,
                 onShare = { onShare(state.mediaRef) },
                 presenterState = presenterState,
+                outputSelection = outputSelection,
+                onOutputDeviceSelected = onOutputDeviceSelected,
                 onStartPresenting = onStartPresenting,
                 onStopPresenting = onStopPresenting,
                 onPresentItem = onPresentItem,
@@ -248,56 +265,185 @@ private fun MediaDetailLayout(
     onNavigateToJournal: (Uuid) -> Unit = {},
     onShare: () -> Unit = {},
     presenterState: PresenterState = PresenterState(),
+    outputSelection: MediaDeviceSelectionUiState = defaultLibraryOutputSelection(),
+    onOutputDeviceSelected: (String) -> Unit = {},
     onStartPresenting: () -> Unit = {},
     onStopPresenting: () -> Unit = {},
     onPresentItem: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    if (isExpanded) {
-        // Side-by-side: media on left, metadata on right
-        Row(modifier = modifier.fillMaxSize()) {
+    FoldableTabletopLayout(
+        modifier = modifier,
+        minPaneHeight = 240.dp,
+        topPane = {
             Box(
-                modifier = Modifier.weight(2f).fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                MediaContent(mediaRef = mediaRef, isVideo = isVideo)
-            }
-            Column(
                 modifier =
                     Modifier
-                        .weight(1f)
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(Spacing.lg),
+                        .background(Color.Black),
+                contentAlignment = Alignment.Center,
             ) {
-                MetadataContent(
+                MediaContent(
+                    mediaRef = mediaRef,
+                    isVideo = isVideo,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        },
+        bottomPane = {
+            MediaDetailTabletopControls(
+                createdAt = createdAt,
+                locationDisplayName = locationDisplayName,
+                isVideo = isVideo,
+                journals = journals,
+                exif = exif,
+                presenterState = presenterState,
+                outputSelection = outputSelection,
+                onBack = onBack,
+                onShare = onShare,
+                onNavigateToJournal = onNavigateToJournal,
+                onOutputDeviceSelected = onOutputDeviceSelected,
+                onStartPresenting = onStartPresenting,
+                onStopPresenting = onStopPresenting,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(Spacing.lg),
+            )
+        },
+        fallback = {
+            if (isExpanded) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier.weight(2f).fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        MediaContent(mediaRef = mediaRef, isVideo = isVideo)
+                    }
+                    Column(
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(Spacing.lg),
+                    ) {
+                        MetadataContent(
+                            createdAt = createdAt,
+                            locationDisplayName = locationDisplayName,
+                            isVideo = isVideo,
+                            journals = journals,
+                            exif = exif,
+                            onNavigateToJournal = onNavigateToJournal,
+                        )
+                    }
+                }
+            } else {
+                CompactMediaDetailViewer(
+                    currentMediaRef = mediaRef,
+                    currentIsVideo = isVideo,
                     createdAt = createdAt,
                     locationDisplayName = locationDisplayName,
-                    isVideo = isVideo,
                     journals = journals,
                     exif = exif,
+                    viewerState = viewerState,
+                    presenterState = presenterState,
+                    outputSelection = outputSelection,
+                    onOutputDeviceSelected = onOutputDeviceSelected,
+                    onBack = onBack,
+                    onSelectMedia = onSelectMedia,
                     onNavigateToJournal = onNavigateToJournal,
+                    onShare = onShare,
+                    onStartPresenting = onStartPresenting,
+                    onStopPresenting = onStopPresenting,
+                    onPresentItem = onPresentItem,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        },
+    )
+}
+
+@Composable
+private fun MediaDetailTabletopControls(
+    createdAt: Instant,
+    locationDisplayName: String?,
+    isVideo: Boolean,
+    journals: List<JournalReference>,
+    exif: ExifDisplayData?,
+    presenterState: PresenterState,
+    outputSelection: MediaDeviceSelectionUiState,
+    onBack: () -> Unit,
+    onShare: () -> Unit,
+    onNavigateToJournal: (Uuid) -> Unit,
+    onOutputDeviceSelected: (String) -> Unit,
+    onStartPresenting: () -> Unit,
+    onStopPresenting: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FilledTonalIconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            if (presenterState.isExternalDisplayAvailable) {
+                FilledTonalIconButton(
+                    onClick = {
+                        if (presenterState.isPresenting) {
+                            onStopPresenting()
+                        } else {
+                            onStartPresenting()
+                        }
+                    },
+                ) {
+                    Icon(
+                        imageVector =
+                            if (presenterState.isPresenting) {
+                                Icons.AutoMirrored.Filled.StopScreenShare
+                            } else {
+                                Icons.AutoMirrored.Filled.ScreenShare
+                            },
+                        contentDescription = if (presenterState.isPresenting) "Stop presenting" else "Present",
+                    )
+                }
+            }
+            FilledTonalIconButton(
+                onClick = onShare,
+                modifier = Modifier.testTag("media_detail_share_action"),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Share,
+                    contentDescription = "Share",
                 )
             }
         }
-    } else {
-        CompactMediaDetailViewer(
-            currentMediaRef = mediaRef,
-            currentIsVideo = isVideo,
+
+        if (presenterState.isPresenting && isVideo) {
+            ExternalDisplayAudioRouteControl(
+                outputSelection = outputSelection,
+                onOutputDeviceSelected = onOutputDeviceSelected,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        MetadataContent(
             createdAt = createdAt,
             locationDisplayName = locationDisplayName,
+            isVideo = isVideo,
             journals = journals,
             exif = exif,
-            viewerState = viewerState,
-            presenterState = presenterState,
-            onBack = onBack,
-            onSelectMedia = onSelectMedia,
             onNavigateToJournal = onNavigateToJournal,
-            onShare = onShare,
-            onStartPresenting = onStartPresenting,
-            onStopPresenting = onStopPresenting,
-            onPresentItem = onPresentItem,
-            modifier = modifier,
         )
     }
 }
@@ -313,6 +459,8 @@ private fun CompactMediaDetailViewer(
     exif: ExifDisplayData?,
     viewerState: MediaViewerState,
     presenterState: PresenterState,
+    outputSelection: MediaDeviceSelectionUiState,
+    onOutputDeviceSelected: (String) -> Unit,
     onBack: () -> Unit,
     onSelectMedia: (Int) -> Unit,
     onNavigateToJournal: (Uuid) -> Unit,
@@ -459,6 +607,17 @@ private fun CompactMediaDetailViewer(
             }
 
             if (presenterState.isPresenting) {
+                if (currentIsVideo) {
+                    ExternalDisplayAudioRouteControl(
+                        outputSelection = outputSelection,
+                        onOutputDeviceSelected = onOutputDeviceSelected,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Spacing.lg)
+                                .padding(top = Spacing.sm),
+                    )
+                }
                 FilledTonalButton(
                     onClick = onStopPresenting,
                     modifier =
@@ -577,6 +736,45 @@ private fun CompactMediaDetailViewer(
         }
     }
 }
+
+@Composable
+private fun ExternalDisplayAudioRouteControl(
+    outputSelection: MediaDeviceSelectionUiState,
+    onOutputDeviceSelected: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = "External display audio",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        MediaDeviceSelector(
+            selection = outputSelection,
+            onDeviceSelected = onOutputDeviceSelected,
+            label = "Audio output",
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (!outputSelection.isSelectionControllable) {
+            Text(
+                text = "Managed by Android",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun defaultLibraryOutputSelection(): MediaDeviceSelectionUiState =
+    MediaDeviceSelectionUiState(
+        kind = MediaDeviceKind.AUDIO_OUTPUT,
+        devices = listOf(DefaultMediaDevices.systemOutput),
+        selectedDeviceId = DefaultMediaDevices.systemOutput.id,
+        isSelectionControllable = false,
+    )
 
 @Composable
 private fun MediaViewerPage(

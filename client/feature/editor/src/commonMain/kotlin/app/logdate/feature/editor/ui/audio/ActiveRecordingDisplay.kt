@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.editor.ui.audio
 
 import androidx.compose.foundation.background
@@ -6,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -30,6 +33,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.logdate.client.media.device.MediaDeviceSelectionUiState
+import app.logdate.ui.adaptive.FoldableTabletopLayout
+import app.logdate.ui.media.MediaDeviceSelector
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.finish
 import logdate.client.feature.editor.generated.resources.listening
@@ -54,143 +60,226 @@ fun ActiveRecordingDisplay(
     onPause: () -> Unit,
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
+    inputSelection: MediaDeviceSelectionUiState? = null,
+    onInputSelected: (String) -> Unit = {},
     transcriptionText: String? = null,
     transcriptionIsFinal: Boolean = false,
     transcriptionIsRefining: Boolean = false,
     isPaused: Boolean = false,
 ) {
+    FoldableTabletopLayout(
+        modifier = modifier,
+        minPaneHeight = 180.dp,
+        topPane = {
+            ActiveRecordingTranscriptPane(
+                transcriptionText = transcriptionText,
+                transcriptionIsFinal = transcriptionIsFinal,
+                transcriptionIsRefining = transcriptionIsRefining,
+                isPaused = isPaused,
+                inputSelection = inputSelection,
+                onInputSelected = onInputSelected,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+            )
+        },
+        bottomPane = {
+            ActiveRecordingTransportPane(
+                audioLevels = audioLevels,
+                recordingDuration = recordingDuration,
+                onRestart = onRestart,
+                onPause = onPause,
+                onFinish = onFinish,
+                isPaused = isPaused,
+                modifier =
+                    Modifier
+                        .align(Alignment.Center)
+                        .fillMaxWidth(),
+            )
+        },
+        fallback = {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                ActiveRecordingTranscriptPane(
+                    transcriptionText = transcriptionText,
+                    transcriptionIsFinal = transcriptionIsFinal,
+                    transcriptionIsRefining = transcriptionIsRefining,
+                    isPaused = isPaused,
+                    inputSelection = inputSelection,
+                    onInputSelected = onInputSelected,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(horizontal = 20.dp, vertical = 16.dp),
+                )
+                ActiveRecordingTransportPane(
+                    audioLevels = audioLevels,
+                    recordingDuration = recordingDuration,
+                    onRestart = onRestart,
+                    onPause = onPause,
+                    onFinish = onFinish,
+                    isPaused = isPaused,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+    )
+}
+
+@Composable
+private fun ActiveRecordingTranscriptPane(
+    transcriptionText: String?,
+    transcriptionIsFinal: Boolean,
+    transcriptionIsRefining: Boolean,
+    isPaused: Boolean,
+    inputSelection: MediaDeviceSelectionUiState?,
+    onInputSelected: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scrollState = rememberScrollState()
+    LaunchedEffect(transcriptionText) {
+        scrollState.animateScrollTo(scrollState.maxValue)
+    }
     Column(
         modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        val scrollState = rememberScrollState()
-        LaunchedEffect(transcriptionText) {
-            scrollState.animateScrollTo(scrollState.maxValue)
+        RecordingTranscriptStatus(
+            isPaused = isPaused,
+            isFinal = transcriptionIsFinal,
+            isRefining = transcriptionIsRefining,
+            hasTranscript = !transcriptionText.isNullOrBlank(),
+        )
+
+        inputSelection?.let { selection ->
+            MediaDeviceSelector(
+                selection = selection,
+                onDeviceSelected = onInputSelected,
+                label = "Microphone",
+                enabled = false,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
-        Column(
+
+        Box(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                    .heightIn(min = 160.dp)
+                    .verticalScroll(scrollState),
         ) {
-            RecordingTranscriptStatus(
-                isPaused = isPaused,
-                isFinal = transcriptionIsFinal,
-                isRefining = transcriptionIsRefining,
-                hasTranscript = !transcriptionText.isNullOrBlank(),
-            )
-
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .heightIn(min = 160.dp)
-                        .verticalScroll(scrollState),
-            ) {
-                val text = transcriptionText.takeUnless { it.isNullOrBlank() }
-                if (text == null) {
-                    Text(
-                        text = stringResource(Res.string.listening),
-                        style = MaterialTheme.typography.displaySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                    )
-                } else {
-                    LiveTranscriptText(
-                        text = text,
-                        isRefining = transcriptionIsRefining,
-                    )
-                }
+            val text = transcriptionText.takeUnless { it.isNullOrBlank() }
+            if (text == null) {
+                Text(
+                    text = stringResource(Res.string.listening),
+                    style = MaterialTheme.typography.displaySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                )
+            } else {
+                LiveTranscriptText(
+                    text = text,
+                    isRefining = transcriptionIsRefining,
+                )
             }
         }
+    }
+}
 
-        // 2. Recording info bar (red dot + timer + compact waveform)
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+@Composable
+private fun ActiveRecordingTransportPane(
+    audioLevels: List<Float>,
+    recordingDuration: Duration,
+    onRestart: () -> Unit,
+    onPause: () -> Unit,
+    onFinish: () -> Unit,
+    isPaused: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Column(
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (!isPaused) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.error),
+                    )
+                }
+                Text(
+                    text = formatDuration(recordingDuration),
+                    style =
+                        MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                        ),
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+
+            AudioWaveformComponent(
+                audioLevels = audioLevels,
+                isRecording = !isPaused,
+                waveformColor = MaterialTheme.colorScheme.primary,
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                        .height(48.dp),
+                minHeight = 48.dp,
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                // Timer with recording indicator
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxWidth(),
+                OutlinedButton(
+                    onClick = onRestart,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp),
                 ) {
-                    if (!isPaused) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .size(10.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.error),
-                        )
-                    }
-                    Text(
-                        text = formatDuration(recordingDuration),
-                        style =
-                            MaterialTheme.typography.titleMedium.copy(
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                            ),
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(start = 8.dp),
-                    )
+                    Text(stringResource(Res.string.restart))
                 }
 
-                // Compact waveform
-                AudioWaveformComponent(
-                    audioLevels = audioLevels,
-                    isRecording = !isPaused,
-                    waveformColor = MaterialTheme.colorScheme.primary,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                    minHeight = 48.dp,
-                )
-
-                // 3. Control buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                OutlinedButton(
+                    onClick = onPause,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp),
                 ) {
-                    OutlinedButton(
-                        onClick = onRestart,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(24.dp),
-                    ) {
-                        Text(stringResource(Res.string.restart))
-                    }
+                    Text(if (isPaused) "Resume" else "Pause")
+                }
 
-                    OutlinedButton(
-                        onClick = onPause,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(24.dp),
-                    ) {
-                        Text(if (isPaused) "Resume" else "Pause")
-                    }
-
-                    Button(
-                        onClick = onFinish,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(24.dp),
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            ),
-                    ) {
-                        Text(stringResource(Res.string.finish))
-                    }
+                Button(
+                    onClick = onFinish,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
+                ) {
+                    Text(stringResource(Res.string.finish))
                 }
             }
         }

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.editor.ui.audio
 
 import androidx.compose.foundation.background
@@ -23,7 +25,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.feature.editor.ui.editor.RecordingState
+import app.logdate.ui.adaptive.FoldableTabletopLayout
+import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.rememberLogDateHaptics
 import logdate.client.feature.editor.generated.resources.Res
@@ -54,164 +59,293 @@ fun AudioRecordingControls(
     onStartRecording: () -> Unit,
     onStopRecording: () -> Unit,
     modifier: Modifier = Modifier,
+    inputSelection: MediaDeviceSelectionUiState? = null,
+    onInputSelected: (String) -> Unit = {},
 ) {
     val haptics = rememberLogDateHaptics()
-    Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        // Recording state indicator
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text =
-                    if (recordingState == RecordingState.RECORDING) {
-                        "Recording in progress"
-                    } else {
-                        "Ready to record"
-                    },
-                style = MaterialTheme.typography.titleMedium,
-                color =
-                    if (recordingState == RecordingState.RECORDING) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-            )
-
-            if (recordingState == RecordingState.RECORDING) {
-                // Blinking recording indicator
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(12.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.error),
-                    )
-                    Text(
-                        text = recordingDuration.toString(),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(start = 8.dp),
-                    )
-                }
-            }
-        }
-
-        // Waveform area — placeholder before recording starts, live waveform during/after
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        if (recordingState == RecordingState.RECORDING) {
-                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        },
-                    ),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (audioLevels.isEmpty() && recordingState != RecordingState.RECORDING) {
-                // Placeholder: no data yet
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(
-                        painter = PlatformIcons.mic(),
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                    )
-                    Text(
-                        text = "Tap record to begin",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                    )
-                }
-            } else {
-                AudioWaveformComponent(
-                    audioLevels = audioLevels,
-                    isRecording = recordingState == RecordingState.RECORDING,
-                    waveformColor =
-                        if (recordingState == RecordingState.RECORDING) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.primary
-                        },
-                    strokeWidth = 3.dp,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-        }
-
-        // Recording controls
-        if (recordingState == RecordingState.RECORDING) {
-            // Stop button
-            Button(
-                onClick = {
-                    haptics.recordingFinished()
-                    onStopRecording()
-                },
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                    ),
+    FoldableTabletopLayout(
+        modifier = modifier,
+        minPaneHeight = 160.dp,
+        topPane = {
+            Column(
                 modifier =
                     Modifier
-                        .fillMaxWidth(0.8f)
-                        .testTag("audio_record_stop_button"),
+                        .fillMaxSize()
+                        .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Icon(
-                    painter = PlatformIcons.stop(),
-                    contentDescription = stringResource(Res.string.stop_recording),
-                    modifier = Modifier.size(24.dp),
+                RecordingStateRow(
+                    recordingState = recordingState,
+                    recordingDuration = recordingDuration,
                 )
-                Text(
-                    text = stringResource(Res.string.stop),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp),
+                RecordingWaveformBox(
+                    recordingState = recordingState,
+                    audioLevels = audioLevels,
+                    modifier = Modifier.weight(1f),
                 )
             }
-        } else {
-            // Start button
-            Button(
-                onClick = {
+        },
+        bottomPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                RecordingInputSelector(
+                    inputSelection = inputSelection,
+                    onInputSelected = onInputSelected,
+                    enabled = recordingState != RecordingState.RECORDING,
+                )
+                RecordingActionButton(
+                    recordingState = recordingState,
+                    onStartRecording = {
+                        haptics.recordingStarted()
+                        onStartRecording()
+                    },
+                    onStopRecording = {
+                        haptics.recordingFinished()
+                        onStopRecording()
+                    },
+                    modifier = Modifier.fillMaxWidth(0.8f),
+                )
+            }
+        },
+        fallback = {
+            AudioRecordingControlsColumn(
+                recordingState = recordingState,
+                audioLevels = audioLevels,
+                recordingDuration = recordingDuration,
+                inputSelection = inputSelection,
+                onInputSelected = onInputSelected,
+                onStartRecording = {
                     haptics.recordingStarted()
                     onStartRecording()
                 },
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                    ),
+                onStopRecording = {
+                    haptics.recordingFinished()
+                    onStopRecording()
+                },
                 modifier =
                     Modifier
-                        .fillMaxWidth(0.8f)
-                        .testTag("audio_record_start_button"),
+                        .fillMaxWidth()
+                        .padding(16.dp),
+            )
+        },
+    )
+}
+
+@Composable
+private fun AudioRecordingControlsColumn(
+    recordingState: RecordingState,
+    audioLevels: List<Float>,
+    recordingDuration: Duration,
+    inputSelection: MediaDeviceSelectionUiState?,
+    onInputSelected: (String) -> Unit,
+    onStartRecording: () -> Unit,
+    onStopRecording: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        RecordingStateRow(
+            recordingState = recordingState,
+            recordingDuration = recordingDuration,
+        )
+
+        RecordingInputSelector(
+            inputSelection = inputSelection,
+            onInputSelected = onInputSelected,
+            enabled = recordingState != RecordingState.RECORDING,
+        )
+
+        RecordingWaveformBox(
+            recordingState = recordingState,
+            audioLevels = audioLevels,
+            modifier = Modifier.weight(1f),
+        )
+
+        RecordingActionButton(
+            recordingState = recordingState,
+            onStartRecording = onStartRecording,
+            onStopRecording = onStopRecording,
+            modifier = Modifier.fillMaxWidth(0.8f),
+        )
+    }
+}
+
+@Composable
+private fun RecordingStateRow(
+    recordingState: RecordingState,
+    recordingDuration: Duration,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text =
+                if (recordingState == RecordingState.RECORDING) {
+                    "Recording in progress"
+                } else {
+                    "Ready to record"
+                },
+            style = MaterialTheme.typography.titleMedium,
+            color =
+                if (recordingState == RecordingState.RECORDING) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+        )
+
+        if (recordingState == RecordingState.RECORDING) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.error),
+                )
+                Text(
+                    text = recordingDuration.toString(),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecordingInputSelector(
+    inputSelection: MediaDeviceSelectionUiState?,
+    onInputSelected: (String) -> Unit,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    inputSelection?.let { selection ->
+        MediaDeviceSelector(
+            selection = selection,
+            onDeviceSelected = onInputSelected,
+            label = "Microphone",
+            enabled = enabled,
+            modifier = modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun RecordingWaveformBox(
+    recordingState: RecordingState,
+    audioLevels: List<Float>,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(
+                    if (recordingState == RecordingState.RECORDING) {
+                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    },
+                ),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (audioLevels.isEmpty() && recordingState != RecordingState.RECORDING) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(
                     painter = PlatformIcons.mic(),
-                    contentDescription = stringResource(Res.string.start_recording),
-                    modifier = Modifier.size(24.dp),
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                 )
                 Text(
-                    text = stringResource(Res.string.record),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp),
+                    text = "Tap record to begin",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                 )
             }
+        } else {
+            AudioWaveformComponent(
+                audioLevels = audioLevels,
+                isRecording = recordingState == RecordingState.RECORDING,
+                waveformColor =
+                    if (recordingState == RecordingState.RECORDING) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                strokeWidth = 3.dp,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecordingActionButton(
+    recordingState: RecordingState,
+    onStartRecording: () -> Unit,
+    onStopRecording: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (recordingState == RecordingState.RECORDING) {
+        Button(
+            onClick = onStopRecording,
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                ),
+            modifier = modifier.testTag("audio_record_stop_button"),
+        ) {
+            Icon(
+                painter = PlatformIcons.stop(),
+                contentDescription = stringResource(Res.string.stop_recording),
+                modifier = Modifier.size(24.dp),
+            )
+            Text(
+                text = stringResource(Res.string.stop),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp),
+            )
+        }
+    } else {
+        Button(
+            onClick = onStartRecording,
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                ),
+            modifier = modifier.testTag("audio_record_start_button"),
+        ) {
+            Icon(
+                painter = PlatformIcons.mic(),
+                contentDescription = stringResource(Res.string.start_recording),
+                modifier = Modifier.size(24.dp),
+            )
+            Text(
+                text = stringResource(Res.string.record),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp),
+            )
         }
     }
 }

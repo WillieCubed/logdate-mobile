@@ -61,6 +61,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -84,6 +85,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import app.logdate.client.media.device.AudioRouteRepository
+import app.logdate.client.media.device.MediaDeviceCategory
+import app.logdate.ui.adaptive.FoldableTabletopLayout
+import app.logdate.ui.media.MediaDeviceSelector
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
@@ -94,6 +99,7 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.captured_photo
@@ -106,6 +112,7 @@ import logdate.client.feature.editor.generated.resources.use_photo
 import logdate.client.feature.editor.generated.resources.use_video
 import logdate.client.feature.editor.generated.resources.video
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -136,6 +143,7 @@ actual fun CameraCaptureContent(
     onMediaCaptured: (uri: String, mediaType: CapturedMediaType, durationMs: Long) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier,
+    remoteControl: CameraRemoteControl,
 ) {
     if (LocalInspectionMode.current) {
         CameraCapturePreviewContent(
@@ -147,6 +155,8 @@ actual fun CameraCaptureContent(
 
     val viewModel: CameraViewModel = koinViewModel()
     val uiState by viewModel.uiState.collectAsState()
+    val currentOnClose by rememberUpdatedState(onClose)
+    val currentOnMediaCaptured by rememberUpdatedState(onMediaCaptured)
 
     val cameraPermissions =
         rememberMultiplePermissionsState(
@@ -166,8 +176,45 @@ actual fun CameraCaptureContent(
         uiState.capturedMediaUri?.let { uri ->
             val mediaType = uiState.capturedMediaType ?: CapturedMediaType.PHOTO
             val duration = if (mediaType == CapturedMediaType.VIDEO) uiState.recordingDurationMs else 0L
-            pendingReview = PendingReview(uri, mediaType, duration)
+            if (remoteControl.autoAcceptCapturedMedia) {
+                currentOnMediaCaptured(uri, mediaType, duration)
+                remoteControl.onCaptureCompleted(uri, mediaType)
+            } else {
+                pendingReview = PendingReview(uri, mediaType, duration)
+            }
             viewModel.clearCapturedMedia()
+        }
+    }
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let(remoteControl.onCaptureFailed)
+    }
+
+    LaunchedEffect(uiState.cameraSelection) {
+        remoteControl.onCameraSelectionChanged(uiState.cameraSelection)
+    }
+
+    LaunchedEffect(remoteControl.commands, viewModel) {
+        remoteControl.commands.collect { command ->
+            when (command) {
+                CameraRemoteCommand.Capture -> viewModel.capture()
+                CameraRemoteCommand.Close -> currentOnClose()
+                is CameraRemoteCommand.SelectCameraCategory -> {
+                    val deviceId =
+                        viewModel
+                            .uiState
+                            .value
+                            .cameraSelection
+                            .devices
+                            .firstOrNull { it.category == command.category }
+                            ?.id
+                    if (deviceId != null) {
+                        viewModel.selectCameraDevice(deviceId)
+                    }
+                }
+                is CameraRemoteCommand.SelectCameraDevice -> viewModel.selectCameraDevice(command.deviceId)
+                CameraRemoteCommand.SwitchBuiltInCamera -> viewModel.switchCamera()
+            }
         }
     }
 
@@ -513,6 +560,9 @@ private fun InlineCameraCapture(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    val audioRouteRepository: AudioRouteRepository = koinInject()
+    val inputSelection by audioRouteRepository.inputDevices.collectAsState()
 
     val manager = viewModel.getCaptureManager() as? AndroidCameraCaptureManager
     val previewStreaming by manager?.previewStreaming?.collectAsState()
@@ -616,12 +666,15 @@ private fun InlineCameraCapture(
         animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
         label = "viewfinderAspectRatio",
     )
+    val showCameraSwitchShortcut =
+        uiState.cameraSelection.devices.count { device ->
+            device.category == MediaDeviceCategory.FRONT_CAMERA ||
+                device.category == MediaDeviceCategory.BACK_CAMERA
+        } >= 2
 
-    Surface(
-        modifier = modifier.fillMaxSize(),
-        color = Color.Black,
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+    @Composable
+    fun PreviewPane(modifier: Modifier = Modifier) {
+        Box(modifier = modifier) {
             Box(
                 modifier =
                     Modifier
@@ -656,7 +709,6 @@ private fun InlineCameraCapture(
                     },
                 )
 
-                // Focus ring overlay
                 currentFocusPoint?.let { point ->
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val ringSize = 80f * focusRingScale.value
@@ -670,7 +722,6 @@ private fun InlineCameraCapture(
                 }
             }
 
-            // Capture flash overlay
             AnimatedVisibility(
                 visible = showFlash,
                 enter = fadeIn(tween(50)),
@@ -684,7 +735,6 @@ private fun InlineCameraCapture(
                 )
             }
 
-            // Camera switch crossfade overlay
             if (switchOverlayAlpha.value > 0f) {
                 Box(
                     modifier =
@@ -694,95 +744,96 @@ private fun InlineCameraCapture(
                 )
             }
 
-            // Top controls — recording indicator only (back handled by editor toolbar)
-            AnimatedVisibility(
+            RecordingIndicator(
                 visible = uiState.isRecording,
-                enter = fadeIn(),
-                exit = fadeOut(),
+                duration = uiState.formattedDuration,
                 modifier =
                     Modifier
                         .align(Alignment.TopEnd)
                         .statusBarsPadding()
                         .padding(16.dp),
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.errorContainer,
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FiberManualRecord,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.size(12.dp),
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = uiState.formattedDuration,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            style = MaterialTheme.typography.labelMedium,
-                        )
+            )
+        }
+    }
+
+    @Composable
+    fun CameraDeviceControls(modifier: Modifier = Modifier) {
+        Column(
+            modifier = modifier,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            MediaDeviceSelector(
+                selection = uiState.cameraSelection,
+                onDeviceSelected = { deviceId ->
+                    if (!uiState.isRecording) {
+                        scope.launch { viewModel.selectCameraDevice(deviceId) }
                     }
+                },
+                label = "Camera",
+                enabled = !uiState.isRecording,
+            )
+
+            if (uiState.captureMode == CaptureMode.VIDEO) {
+                MediaDeviceSelector(
+                    selection = inputSelection,
+                    onDeviceSelected = audioRouteRepository::selectInputDevice,
+                    label = "Microphone",
+                    enabled = !uiState.isRecording,
+                )
+            }
+        }
+    }
+
+    @Composable
+    fun CaptureControls(modifier: Modifier = Modifier) {
+        Column(
+            modifier = modifier,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            AnimatedVisibility(
+                visible = !uiState.isRecording,
+                enter = fadeIn(),
+                exit = fadeOut(),
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    AspectRatioSelector(
+                        selected = uiState.aspectRatio,
+                        onSelected = { viewModel.setAspectRatio(it) },
+                    )
+
+                    PhotoVideoToggle(
+                        currentMode = uiState.captureMode,
+                        onModeChanged = { viewModel.setCaptureMode(it) },
+                    )
                 }
             }
 
-            // Bottom controls
-            Column(
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .padding(bottom = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                AnimatedVisibility(
-                    visible = !uiState.isRecording,
-                    enter = fadeIn(),
-                    exit = fadeOut(),
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        AspectRatioSelector(
-                            selected = uiState.aspectRatio,
-                            onSelected = { viewModel.setAspectRatio(it) },
-                        )
+                Spacer(modifier = Modifier.size(48.dp))
 
-                        PhotoVideoToggle(
-                            currentMode = uiState.captureMode,
-                            onModeChanged = { viewModel.setCaptureMode(it) },
-                        )
-                    }
-                }
+                ShutterButton(
+                    isRecording = uiState.isRecording,
+                    captureMode = uiState.captureMode,
+                    isCapturing = uiState.isCapturing,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (uiState.captureMode == CaptureMode.PHOTO) {
+                            showFlash = true
+                        }
+                        viewModel.capture()
+                    },
+                )
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Shutter row: empty spacer | shutter | switch camera
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    // Balance spacer so shutter stays centered
-                    Spacer(modifier = Modifier.size(48.dp))
-
-                    ShutterButton(
-                        isRecording = uiState.isRecording,
-                        captureMode = uiState.captureMode,
-                        isCapturing = uiState.isCapturing,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            if (uiState.captureMode == CaptureMode.PHOTO) {
-                                showFlash = true
-                            }
-                            viewModel.capture()
-                        },
-                    )
-
+                if (showCameraSwitchShortcut) {
                     IconButton(
                         onClick = {
                             if (!isSwitchingCamera) {
@@ -809,27 +860,117 @@ private fun InlineCameraCapture(
                                 },
                         )
                     }
+                } else {
+                    Spacer(modifier = Modifier.size(48.dp))
                 }
             }
+        }
+    }
 
-            // Error display
-            uiState.error?.let { error ->
-                Surface(
+    @Composable
+    fun ErrorMessage(modifier: Modifier = Modifier) {
+        uiState.error?.let { error ->
+            Surface(
+                modifier = modifier,
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
+            ) {
+                Text(
+                    text = error,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
+
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = Color.Black,
+    ) {
+        FoldableTabletopLayout(
+            modifier = Modifier.fillMaxSize(),
+            minPaneHeight = 220.dp,
+            topPane = {
+                PreviewPane(modifier = Modifier.fillMaxSize())
+            },
+            bottomPane = {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    CameraDeviceControls(modifier = Modifier.fillMaxWidth())
+                    Spacer(modifier = Modifier.height(16.dp))
+                    CaptureControls(modifier = Modifier.fillMaxWidth())
+                    ErrorMessage(modifier = Modifier.padding(top = 16.dp))
+                }
+            },
+            fallback = {
+                PreviewPane(modifier = Modifier.fillMaxSize())
+                CameraDeviceControls(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopStart)
+                            .statusBarsPadding()
+                            .padding(16.dp),
+                )
+                CaptureControls(
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .padding(bottom = 24.dp),
+                )
+                ErrorMessage(
                     modifier =
                         Modifier
                             .align(Alignment.TopCenter)
                             .statusBarsPadding()
                             .padding(top = 16.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.errorContainer,
-                ) {
-                    Text(
-                        text = error,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+                )
+            },
+        )
+    }
+}
+
+@Composable
+private fun RecordingIndicator(
+    visible: Boolean,
+    duration: String,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = modifier,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.errorContainer,
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FiberManualRecord,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.size(12.dp),
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = duration,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    style = MaterialTheme.typography.labelMedium,
+                )
             }
         }
     }
