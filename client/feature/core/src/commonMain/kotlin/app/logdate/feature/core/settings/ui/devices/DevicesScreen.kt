@@ -7,12 +7,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -40,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
@@ -169,48 +173,101 @@ fun DevicesScreenContent(
         )
     }
 
-    SettingsScaffold(
-        title = stringResource(Res.string.devices),
-        onBack = onBackClick,
-        modifier = modifier,
-    ) {
-        if (uiState.isLoading) {
-            item {
-                LoadingState()
-            }
-        } else {
-            // Device list
-            items(uiState.devices) { device ->
-                DeviceItem(
-                    device = device,
-                    onRenameClick = { onRenameClick(device) },
-                    onRemoveClick = { onRemoveClick(device) },
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                )
-            }
-
-            // Reset Device ID action
-            item {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Spacing.lg),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Button(onClick = onShowResetDialog) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                if (uiState.isLoading) {
+                    LoadingState(modifier = Modifier.padding(horizontal = Spacing.lg))
+                } else {
+                    uiState.devices.forEach { device ->
+                        DeviceItem(
+                            device = device,
+                            onRenameClick = { onRenameClick(device) },
+                            onRemoveClick = { onRemoveClick(device) },
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
                         )
-                        Spacer(modifier = Modifier.width(Spacing.sm))
-                        Text(stringResource(Res.string.reset_device_id))
                     }
                 }
             }
-        }
-    }
+        },
+        endPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = stringResource(Res.string.sync_device_rename_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+                Button(onClick = onShowResetDialog) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(modifier = Modifier.width(Spacing.sm))
+                    Text(stringResource(Res.string.reset_device_id))
+                }
+            }
+        },
+        singlePaneContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.devices),
+                onBack = onBackClick,
+                modifier = modifier,
+            ) {
+                if (uiState.isLoading) {
+                    item {
+                        LoadingState()
+                    }
+                } else {
+                    items(uiState.devices) { device ->
+                        DeviceItem(
+                            device = device,
+                            onRenameClick = { onRenameClick(device) },
+                            onRemoveClick = { onRemoveClick(device) },
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+
+                    item {
+                        Column(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Spacing.lg),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Button(onClick = onShowResetDialog) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                                Spacer(modifier = Modifier.width(Spacing.sm))
+                                Text(stringResource(Res.string.reset_device_id))
+                            }
+                        }
+                    }
+                }
+            }
+        },
+    )
 }
 
 @Composable
