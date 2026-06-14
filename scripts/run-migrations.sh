@@ -124,7 +124,12 @@ secret_value_or_empty() {
 
 psql_url_from_jdbc_url() {
     local jdbc_url="$1"
-    printf '%s\n' "${jdbc_url#jdbc:}"
+    printf '%s\n' "${jdbc_url#jdbc:}" |
+        sed -E \
+            -e 's/([?&])channelBinding=[^&]*&/\1/' \
+            -e 's/([?&])channelBinding=[^&]*$//' \
+            -e 's/\?&/?/' \
+            -e 's/[?&]$//'
 }
 
 proxy_download_url() {
