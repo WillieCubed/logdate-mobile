@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -63,6 +64,7 @@ import app.logdate.feature.journals.ui.AddToJournalPicker
 import app.logdate.feature.journals.ui.deriveCoverColor
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.theme.Spacing
@@ -404,28 +406,68 @@ fun NoteViewerScaffoldContent(
             remember(it.journalId) { deriveCoverColor(it.journalId) }
         }
 
-    ImmersiveEditorLayout(
-        topBarContent = {
-            NoteViewerToolbar(
-                onGoBack = onGoBack,
-                journalContext = journalContext,
-                accentColor = accentColor,
-                onNavigateToNote = onNavigateToNote,
-                onShowAddToJournal = onShowAddToJournal,
-                onShare = onShare,
-            )
-        },
-        editorContent = {
-            NoteViewerContent(
-                shared = shared,
-                onOpenLocationTimeline = onOpenLocationTimeline,
-                noteContent = noteContent,
-            )
-        },
-        bottomContent = {
-            Spacer(modifier = Modifier.fillMaxWidth())
-        },
+    FoldableTabletopLayout(
         modifier = modifier,
+        minPaneHeight = 220.dp,
+        topPane = {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceDim),
+            ) {
+                NoteViewerContent(
+                    shared = shared,
+                    onOpenLocationTimeline = onOpenLocationTimeline,
+                    noteContent = noteContent,
+                )
+            }
+        },
+        bottomPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceDim)
+                        .navigationBarsPadding()
+                        .padding(horizontal = Spacing.sm, vertical = Spacing.md),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                NoteViewerToolbar(
+                    onGoBack = onGoBack,
+                    journalContext = journalContext,
+                    accentColor = accentColor,
+                    onNavigateToNote = onNavigateToNote,
+                    onShowAddToJournal = onShowAddToJournal,
+                    onShare = onShare,
+                )
+            }
+        },
+        fallback = {
+            ImmersiveEditorLayout(
+                topBarContent = {
+                    NoteViewerToolbar(
+                        onGoBack = onGoBack,
+                        journalContext = journalContext,
+                        accentColor = accentColor,
+                        onNavigateToNote = onNavigateToNote,
+                        onShowAddToJournal = onShowAddToJournal,
+                        onShare = onShare,
+                    )
+                },
+                editorContent = {
+                    NoteViewerContent(
+                        shared = shared,
+                        onOpenLocationTimeline = onOpenLocationTimeline,
+                        noteContent = noteContent,
+                    )
+                },
+                bottomContent = {
+                    Spacer(modifier = Modifier.fillMaxWidth())
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
     )
 }
 
