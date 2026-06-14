@@ -2,10 +2,12 @@ package app.logdate.navigation.scenes
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -15,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.scene.Scene
+import app.logdate.ui.foldable.FoldableSplitLayout
 import app.logdate.ui.theme.Spacing
 
 /**
@@ -27,43 +30,90 @@ class ListDetailHomeScene<T : NavKey>(
     override val previousEntries: List<NavEntry<T>>,
     val mainEntry: NavEntry<T>,
     val detailEntry: NavEntry<T>,
+    val foldableSplitLayout: FoldableSplitLayout = FoldableSplitLayout.None,
 ) : Scene<T> {
     override val entries: List<NavEntry<T>> = listOf(mainEntry, detailEntry)
 
     override val content: @Composable (() -> Unit) = {
         val panelShape = MaterialTheme.shapes.extraLarge
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .padding(top = Spacing.sm)
-                    .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Surface(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .widthIn(min = 320.dp, max = 420.dp)
-                        .fillMaxHeight()
-                        .padding(bottom = 8.dp),
-                shape = panelShape,
-                color = MaterialTheme.colorScheme.surface,
-            ) {
-                mainEntry.Content()
+        when (val splitLayout = foldableSplitLayout) {
+            is FoldableSplitLayout.Vertical -> {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .padding(top = Spacing.sm),
+                ) {
+                    Surface(
+                        modifier =
+                            Modifier
+                                .width(splitLayout.leftPane.width)
+                                .widthIn(min = 320.dp)
+                                .fillMaxHeight()
+                                .padding(start = 8.dp, end = 4.dp, bottom = 8.dp),
+                        shape = panelShape,
+                        color = MaterialTheme.colorScheme.surface,
+                    ) {
+                        mainEntry.Content()
+                    }
+                    Spacer(
+                        modifier =
+                            Modifier
+                                .width(splitLayout.hingeBounds.width)
+                                .fillMaxHeight(),
+                    )
+                    Surface(
+                        modifier =
+                            Modifier
+                                .width(splitLayout.rightPane.width)
+                                .widthIn(min = 320.dp)
+                                .fillMaxHeight()
+                                .padding(start = 4.dp, end = 8.dp, bottom = 8.dp),
+                        shape = panelShape,
+                        color = MaterialTheme.colorScheme.surface,
+                    ) {
+                        detailEntry.Content()
+                    }
+                }
             }
+            FoldableSplitLayout.None,
+            is FoldableSplitLayout.Horizontal,
+            -> {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .padding(top = Spacing.sm)
+                            .padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Surface(
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .widthIn(min = 320.dp, max = 420.dp)
+                                .fillMaxHeight()
+                                .padding(bottom = 8.dp),
+                        shape = panelShape,
+                        color = MaterialTheme.colorScheme.surface,
+                    ) {
+                        mainEntry.Content()
+                    }
 
-            Surface(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .padding(bottom = 8.dp),
-                shape = panelShape,
-                color = MaterialTheme.colorScheme.surface,
-            ) {
-                detailEntry.Content()
+                    Surface(
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .padding(bottom = 8.dp),
+                        shape = panelShape,
+                        color = MaterialTheme.colorScheme.surface,
+                    ) {
+                        detailEntry.Content()
+                    }
+                }
             }
         }
     }
@@ -73,10 +123,12 @@ internal fun <T : NavKey> createTwoPaneHomeScene(
     mainEntry: NavEntry<T>,
     detailEntry: NavEntry<T>,
     previousEntries: List<NavEntry<T>>,
+    foldableSplitLayout: FoldableSplitLayout = FoldableSplitLayout.None,
 ): ListDetailHomeScene<T> =
     ListDetailHomeScene(
         key = Triple("ListDetailHomeScene", mainEntry.contentKey, detailEntry.contentKey),
         previousEntries = previousEntries,
         mainEntry = mainEntry,
         detailEntry = detailEntry,
+        foldableSplitLayout = foldableSplitLayout,
     )

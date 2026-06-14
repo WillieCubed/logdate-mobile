@@ -2,7 +2,13 @@
 
 package app.logdate.feature.editor.ui.video
 
+import android.app.Activity
+import android.app.PictureInPictureParams
+import android.content.Context
+import android.content.ContextWrapper
 import android.net.Uri
+import android.os.Build
+import android.util.Rational
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -25,17 +31,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,7 +68,9 @@ import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.client.media.video.ExoPlayerPool
+import app.logdate.ui.media.MediaDeviceSelector
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
@@ -72,6 +83,7 @@ import kotlinx.coroutines.withContext
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.add_a_video_to_your_entry
 import logdate.client.feature.editor.generated.resources.choose_from_gallery
+import logdate.client.feature.editor.generated.resources.enter_picture_in_picture
 import logdate.client.feature.editor.generated.resources.pause_video
 import logdate.client.feature.editor.generated.resources.play_video
 import logdate.client.feature.editor.generated.resources.video_thumbnail
@@ -99,7 +111,11 @@ actual fun VideoPlayerContent(
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
     val exoPlayerPool: ExoPlayerPool = koinInject()
+    val audioRouteRepository: AudioRouteRepository = koinInject()
+    val outputSelection by audioRouteRepository.outputDevices.collectAsState()
 
     var isPlaying by remember { mutableStateOf(false) }
     var showThumbnail by remember { mutableStateOf(true) }
@@ -107,6 +123,7 @@ actual fun VideoPlayerContent(
     // as soon as it knows the real dimensions so portrait videos don't get
     // cropped into a 16:9 box.
     var videoAspectRatio by remember { mutableStateOf(DEFAULT_VIDEO_ASPECT_RATIO) }
+    val pipAspectRatio = remember(videoAspectRatio) { videoAspectRatio.toPictureInPictureRatio() }
 
     // Acquire a warm player from the pool instead of rebuilding renderers on
     // every video tile that scrolls into view. The pool also wires the shared
@@ -155,10 +172,14 @@ actual fun VideoPlayerContent(
             LifecycleEventObserver { _, event ->
                 when (event) {
                     Lifecycle.Event.ON_PAUSE -> {
-                        exoPlayer.pause()
+                        if (activity?.isInPictureInPictureMode != true) {
+                            exoPlayer.pause()
+                        }
                     }
                     Lifecycle.Event.ON_STOP -> {
-                        exoPlayer.pause()
+                        if (activity?.isInPictureInPictureMode != true) {
+                            exoPlayer.pause()
+                        }
                     }
                     else -> {}
                 }
@@ -168,6 +189,28 @@ actual fun VideoPlayerContent(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             exoPlayerPool.release(exoPlayer)
+        }
+    }
+
+    DisposableEffect(activity, isPlaying, pipAspectRatio) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && activity != null) {
+            activity.setPictureInPictureParams(
+                buildVideoPictureInPictureParams(
+                    aspectRatio = pipAspectRatio,
+                    autoEnterEnabled = isPlaying,
+                ),
+            )
+        }
+
+        onDispose {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && activity != null) {
+                activity.setPictureInPictureParams(
+                    buildVideoPictureInPictureParams(
+                        aspectRatio = pipAspectRatio,
+                        autoEnterEnabled = false,
+                    ),
+                )
+            }
         }
     }
 
@@ -275,8 +318,94 @@ actual fun VideoPlayerContent(
                 }
             }
         }
+
+        MediaDeviceSelector(
+            selection = outputSelection,
+            onDeviceSelected = audioRouteRepository::selectOutputDevice,
+            label = "Audio output",
+            modifier =
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp),
+        )
+
+        if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            IconButton(
+                onClick = {
+                    showThumbnail = false
+                    exoPlayer.play()
+                    enterVideoPictureInPicture(
+                        activity = activity,
+                        aspectRatio = pipAspectRatio,
+                    )
+                },
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
+                            shape = CircleShape,
+                        ),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PictureInPictureAlt,
+                    contentDescription = stringResource(Res.string.enter_picture_in_picture),
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
     }
 }
+
+private fun enterVideoPictureInPicture(
+    activity: Activity,
+    aspectRatio: Rational,
+) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+
+    try {
+        activity.enterPictureInPictureMode(
+            buildVideoPictureInPictureParams(
+                aspectRatio = aspectRatio,
+                autoEnterEnabled = false,
+            ),
+        )
+    } catch (e: IllegalStateException) {
+        Napier.w("Could not enter video picture-in-picture mode", e)
+    } catch (e: IllegalArgumentException) {
+        Napier.w("Could not enter video picture-in-picture mode with ratio $aspectRatio", e)
+    }
+}
+
+private fun buildVideoPictureInPictureParams(
+    aspectRatio: Rational,
+    autoEnterEnabled: Boolean,
+): PictureInPictureParams {
+    val builder =
+        PictureInPictureParams
+            .Builder()
+            .setAspectRatio(aspectRatio)
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        builder.setAutoEnterEnabled(autoEnterEnabled)
+    }
+
+    return builder.build()
+}
+
+private fun Float.toPictureInPictureRatio(): Rational {
+    val boundedRatio = coerceIn(MIN_PIP_ASPECT_RATIO, MAX_PIP_ASPECT_RATIO)
+    val width = (boundedRatio * PIP_RATIO_DENOMINATOR).toInt().coerceAtLeast(1)
+    return Rational(width, PIP_RATIO_DENOMINATOR)
+}
+
+private tailrec fun Context.findActivity(): Activity? =
+    when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
+    }
 
 /**
  * Android implementation of video picker content.
@@ -436,6 +565,9 @@ private fun PreviewVideoPlayerContent(
  * dimensions. Landscape 16:9 is a sensible neutral framing for journal videos.
  */
 private const val DEFAULT_VIDEO_ASPECT_RATIO = 16f / 9f
+private const val MIN_PIP_ASPECT_RATIO = 1f / 2.39f
+private const val MAX_PIP_ASPECT_RATIO = 2.39f
+private const val PIP_RATIO_DENOMINATOR = 10_000
 
 /**
  * Resolves a [VideoSize] to a display-aspect ratio that accounts for any

@@ -63,6 +63,7 @@ import app.logdate.feature.journals.ui.AddToJournalPicker
 import app.logdate.feature.journals.ui.deriveCoverColor
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
@@ -100,7 +101,6 @@ fun NoteViewerScreen(
     enableSharedBounds: Boolean = journalId != null,
     onOpenLocationTimeline: () -> Unit = {},
     onNavigateToNote: (Uuid) -> Unit = {},
-    onEnterPiP: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: NoteViewerViewModel =
         koinViewModel(
@@ -131,7 +131,6 @@ fun NoteViewerScreen(
             AudioNoteViewerEntry(
                 noteId = state.shared.noteId,
                 onGoBack = onGoBack,
-                onEnterPiP = onEnterPiP,
                 modifier = modifier.then(sharedBoundsModifier),
             )
         }
@@ -337,7 +336,6 @@ private fun VideoNoteViewer(
 private fun AudioNoteViewerEntry(
     noteId: Uuid,
     onGoBack: () -> Unit,
-    onEnterPiP: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: AudioNoteViewerViewModel =
         koinViewModel(
@@ -352,7 +350,6 @@ private fun AudioNoteViewerEntry(
         onSeek = viewModel::seekTo,
         onSkipBack = { viewModel.skipByMillis(-10_000L) },
         onSkipForward = { viewModel.skipByMillis(10_000L) },
-        onEnterPiP = onEnterPiP,
         modifier = modifier,
     )
 }
@@ -668,9 +665,10 @@ fun AudioNoteViewerContent(
     onSeek: (Float) -> Unit = {},
     onSkipBack: () -> Unit = {},
     onSkipForward: () -> Unit = {},
-    onEnterPiP: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val audioPlaybackState = LocalAudioPlaybackState.current
+
     when (uiState) {
         AudioNoteViewerUiState.Loading -> {
             NoteViewerLoadingContent(modifier = modifier)
@@ -699,6 +697,8 @@ fun AudioNoteViewerContent(
                 onSkipBack = onSkipBack,
                 onSkipForward = onSkipForward,
                 onClose = onGoBack,
+                outputSelection = audioPlaybackState.outputSelection,
+                onOutputDeviceSelected = audioPlaybackState.selectOutputDevice,
                 modifier = modifier.fillMaxSize(),
             )
         }

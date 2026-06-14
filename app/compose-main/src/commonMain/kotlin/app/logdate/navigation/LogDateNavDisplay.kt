@@ -81,6 +81,9 @@ import app.logdate.navigation.scenes.HomeSceneStrategy
 import app.logdate.navigation.scenes.supportsDualPaneHomeScene
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.audio.AudioPlaybackProvider
+import app.logdate.ui.foldable.FoldableSplitLayout
+import app.logdate.ui.foldable.calculateFoldableSplitLayout
+import app.logdate.ui.foldable.rememberFoldableLayoutInfo
 import app.logdate.ui.navigation.taggedEntry
 import app.logdate.ui.platform.DefaultLogDateHaptics
 import app.logdate.ui.platform.LocalLogDateHaptics
@@ -372,15 +375,42 @@ fun LogDateNavDisplay(
 private fun rememberHomeSceneStrategy(): SceneStrategy<NavKey> {
     val windowSize = LocalWindowInfo.current.containerSize
     val isIpad = currentPlatform.isIpad
+    val foldableLayoutInfo = rememberFoldableLayoutInfo()
+    val density = LocalDensity.current
     val supportsDualPane =
-        with(LocalDensity.current) {
+        with(density) {
             val widthDp = windowSize.width.toDp()
             val heightDp = windowSize.height.toDp()
-            supportsDualPaneHomeScene(width = widthDp, height = heightDp) ||
-                (isIpad && widthDp.value >= IPAD_DUAL_PANE_MIN_WIDTH_DP)
+            val defaultDualPane =
+                supportsDualPaneHomeScene(width = widthDp, height = heightDp) ||
+                    (isIpad && widthDp.value >= IPAD_DUAL_PANE_MIN_WIDTH_DP)
+            supportsDualPaneHomeScene(
+                width = widthDp,
+                height = heightDp,
+                foldableLayoutInfo = foldableLayoutInfo,
+            ) ||
+                (defaultDualPane && foldableLayoutInfo.hinge?.isSeparating != true)
         }
-    return remember(supportsDualPane) {
-        HomeSceneStrategy { supportsDualPane }
+    val foldableSplitLayout =
+        with(density) {
+            calculateFoldableSplitLayout(
+                containerWidth = windowSize.width.toDp(),
+                containerHeight = windowSize.height.toDp(),
+                layoutInfo = foldableLayoutInfo,
+            )
+        }
+    val sceneSplitLayout =
+        when (foldableSplitLayout) {
+            is FoldableSplitLayout.Vertical -> foldableSplitLayout
+            FoldableSplitLayout.None,
+            is FoldableSplitLayout.Horizontal,
+            -> FoldableSplitLayout.None
+        }
+    return remember(supportsDualPane, sceneSplitLayout) {
+        HomeSceneStrategy(
+            supportsDualPane = { supportsDualPane },
+            foldableSplitLayout = { sceneSplitLayout },
+        )
     }
 }
 

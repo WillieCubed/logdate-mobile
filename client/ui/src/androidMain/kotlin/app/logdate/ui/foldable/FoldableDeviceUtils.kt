@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.layout.FoldingFeature
 import androidx.window.layout.WindowInfoTracker
@@ -98,20 +99,23 @@ fun rememberFoldableDeviceInfo(): FoldableDeviceInfo {
 }
 
 /**
- * Cross-platform implementation of rememberFoldableState for Android.
+ * Cross-platform implementation of rememberFoldableLayoutInfo for Android.
  *
  * Uses androidx.window to detect foldable devices and their state.
  */
 @Composable
-actual fun rememberFoldableState(): FoldableState {
-    val foldableInfo = rememberFoldableDeviceInfo()
+actual fun rememberFoldableLayoutInfo(): FoldableLayoutInfo {
+    val context = LocalContext.current
+    val density = LocalDensity.current
 
-    return FoldableState(
-        isFoldable = foldableInfo.isFoldable,
-        isHalfOpened = foldableInfo.foldingFeature?.state == FoldingFeature.State.HALF_OPENED,
-        hasVerticalHinge = foldableInfo.foldingFeature?.orientation == FoldingFeature.Orientation.VERTICAL,
-        hasHorizontalHinge = foldableInfo.foldingFeature?.orientation == FoldingFeature.Orientation.HORIZONTAL,
-    )
+    val windowInfoTracker = remember { WindowInfoTracker.getOrCreate(context) }
+    val windowLayoutInfo by windowInfoTracker
+        .windowLayoutInfo(context)
+        .collectAsStateWithLifecycle(initialValue = WindowLayoutInfo(emptyList()))
+
+    return remember(windowLayoutInfo, density.density) {
+        processFoldableLayoutInfo(windowLayoutInfo, density.density)
+    }
 }
 
 /**
@@ -123,7 +127,7 @@ actual fun rememberFoldableState(): FoldableState {
  */
 fun processFoldableInfo(
     windowLayoutInfo: WindowLayoutInfo,
-    densityDpi: Float,
+    density: Float,
 ): FoldableDeviceInfo {
     val foldingFeature =
         windowLayoutInfo.displayFeatures
@@ -135,7 +139,7 @@ fun processFoldableInfo(
     }
 
     val bounds = foldingFeature.bounds
-    val pxToDp = { px: Int -> px / (densityDpi / 160f) }
+    val pxToDp = { px: Int -> pixelsToDp(px, density) }
 
     val hingePosition =
         when (foldingFeature.orientation) {
@@ -180,6 +184,43 @@ fun processFoldableInfo(
     )
 }
 
+fun processFoldableLayoutInfo(
+    windowLayoutInfo: WindowLayoutInfo,
+    density: Float,
+): FoldableLayoutInfo {
+    val foldingFeature =
+        windowLayoutInfo.displayFeatures
+            .filterIsInstance<FoldingFeature>()
+            .firstOrNull()
+            ?: return FoldableLayoutInfo()
+
+    val bounds = foldingFeature.bounds
+    val hingeBounds =
+        FoldableHingeBounds(
+            left = pixelsToDp(bounds.left, density).dp,
+            top = pixelsToDp(bounds.top, density).dp,
+            right = pixelsToDp(bounds.right, density).dp,
+            bottom = pixelsToDp(bounds.bottom, density).dp,
+            width = pixelsToDp(bounds.width(), density).dp,
+            height = pixelsToDp(bounds.height(), density).dp,
+        )
+    val orientation = foldingFeature.orientation.toFoldableHingeOrientation()
+    val state = foldingFeature.state.toFoldableHingeState()
+
+    return FoldableLayoutInfo(
+        isFoldable = true,
+        posture = postureFor(orientation = orientation, state = state),
+        hinge =
+            FoldableHingeInfo(
+                orientation = orientation,
+                state = state,
+                occlusionType = foldingFeature.occlusionType.toFoldableOcclusionType(),
+                bounds = hingeBounds,
+                isSeparating = foldingFeature.isSeparating,
+            ),
+    )
+}
+
 /**
  * Determines if content should use a dual-pane layout based on foldable state.
  *
@@ -205,3 +246,38 @@ fun shouldUseDualPaneLayout(foldableInfo: FoldableDeviceInfo): Boolean {
         else -> false
     }
 }
+
+private fun FoldingFeature.Orientation.toFoldableHingeOrientation(): FoldableHingeOrientation =
+    when (this) {
+        FoldingFeature.Orientation.VERTICAL -> FoldableHingeOrientation.Vertical
+        FoldingFeature.Orientation.HORIZONTAL -> FoldableHingeOrientation.Horizontal
+        else -> FoldableHingeOrientation.Unknown
+    }
+
+private fun FoldingFeature.State.toFoldableHingeState(): FoldableHingeState =
+    when (this) {
+        FoldingFeature.State.FLAT -> FoldableHingeState.Flat
+        FoldingFeature.State.HALF_OPENED -> FoldableHingeState.HalfOpened
+        else -> FoldableHingeState.Unknown
+    }
+
+private fun FoldingFeature.OcclusionType.toFoldableOcclusionType(): FoldableOcclusionType =
+    when (this) {
+        FoldingFeature.OcclusionType.NONE -> FoldableOcclusionType.None
+        FoldingFeature.OcclusionType.FULL -> FoldableOcclusionType.Full
+        else -> FoldableOcclusionType.Unknown
+    }
+
+private fun postureFor(
+    orientation: FoldableHingeOrientation,
+    state: FoldableHingeState,
+): FoldablePosture =
+    if (state == FoldableHingeState.HalfOpened) {
+        when (orientation) {
+            FoldableHingeOrientation.Vertical -> FoldablePosture.Book
+            FoldableHingeOrientation.Horizontal -> FoldablePosture.Tabletop
+            FoldableHingeOrientation.Unknown -> FoldablePosture.Standard
+        }
+    } else {
+        FoldablePosture.Standard
+    }

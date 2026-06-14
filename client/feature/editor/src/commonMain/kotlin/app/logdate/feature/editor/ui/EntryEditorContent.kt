@@ -34,7 +34,6 @@ import app.logdate.feature.editor.ui.common.PlatformBackHandler
 import app.logdate.feature.editor.ui.content.EditorBottomContent
 import app.logdate.feature.editor.ui.dialog.DraftsBottomSheet
 import app.logdate.feature.editor.ui.dialog.alert.ConfirmEntryExitDialog
-import app.logdate.feature.editor.ui.editor.BlockType
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.rememberEditorAutoSave
 import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout

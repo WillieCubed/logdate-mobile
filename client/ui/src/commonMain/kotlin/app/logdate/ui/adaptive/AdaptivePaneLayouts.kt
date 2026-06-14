@@ -5,13 +5,16 @@ package app.logdate.ui.adaptive
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
@@ -23,6 +26,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.foldable.FoldableLayoutInfo
+import app.logdate.ui.foldable.FoldableSplitLayout
+import app.logdate.ui.foldable.calculateFoldableSplitLayout
+import app.logdate.ui.foldable.rememberFoldableLayoutInfo
 
 @Immutable
 enum class AdaptiveWidthClass {
@@ -41,6 +48,7 @@ data class AdaptivePaneLayoutInfo(
 fun AdaptivePaneLayout(
     modifier: Modifier = Modifier,
     contentWindowInsets: WindowInsets = WindowInsets.safeDrawing,
+    foldableLayoutInfo: FoldableLayoutInfo = rememberFoldableLayoutInfo(),
     supportingPaneBreakpoint: Dp = 840.dp,
     supportingPaneWidth: Dp = 360.dp,
     paneSpacing: Dp = 24.dp,
@@ -74,58 +82,161 @@ fun AdaptivePaneLayout(
                 showSupportingPane = maxWidth >= effectiveSupportingPaneBreakpoint,
             )
         val insetsPadding = contentWindowInsets.asPaddingValues()
+        val foldableSplitLayout =
+            calculateFoldableSplitLayout(
+                containerWidth = maxWidth,
+                containerHeight = maxHeight,
+                layoutInfo = foldableLayoutInfo,
+                minPaneWidth = mainPaneMinWidth,
+            )
 
-        if (layoutInfo.showSupportingPane) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(insetsPadding)
-                        .padding(contentPadding),
-                horizontalArrangement = Arrangement.spacedBy(paneSpacing),
-            ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .fillMaxHeight(),
-                    contentAlignment = Alignment.TopCenter,
-                ) {
+        when (val splitLayout = foldableSplitLayout) {
+            is FoldableSplitLayout.Vertical -> {
+                val splitLayoutInfo = layoutInfo.copy(showSupportingPane = true)
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .width(splitLayout.leftPane.width)
+                                .fillMaxHeight()
+                                .padding(insetsPadding)
+                                .padding(contentPadding),
+                        contentAlignment = Alignment.TopCenter,
+                    ) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .widthIn(max = mainPaneMaxWidth),
+                        ) {
+                            mainPane(splitLayoutInfo)
+                        }
+                    }
+                    Spacer(
+                        modifier =
+                            Modifier
+                                .width(splitLayout.hingeBounds.width)
+                                .fillMaxHeight(),
+                    )
+                    Box(
+                        modifier =
+                            Modifier
+                                .width(splitLayout.rightPane.width)
+                                .fillMaxHeight()
+                                .padding(insetsPadding)
+                                .padding(contentPadding),
+                    ) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .widthIn(max = supportingPaneMaxWidth),
+                        ) {
+                            supportingPane(splitLayoutInfo)
+                        }
+                    }
+                }
+            }
+            is FoldableSplitLayout.Horizontal -> {
+                val splitLayoutInfo = layoutInfo.copy(showSupportingPane = true)
+                Column(modifier = Modifier.fillMaxSize()) {
                     Box(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .widthIn(max = mainPaneMaxWidth),
+                                .height(splitLayout.topPane.height)
+                                .padding(insetsPadding)
+                                .padding(contentPadding),
+                        contentAlignment = Alignment.TopCenter,
                     ) {
-                        mainPane(layoutInfo)
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .widthIn(max = mainPaneMaxWidth),
+                        ) {
+                            mainPane(splitLayoutInfo)
+                        }
+                    }
+                    Spacer(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(splitLayout.hingeBounds.height),
+                    )
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(splitLayout.bottomPane.height)
+                                .padding(insetsPadding)
+                                .padding(contentPadding),
+                    ) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .widthIn(max = supportingPaneMaxWidth),
+                        ) {
+                            supportingPane(splitLayoutInfo)
+                        }
                     }
                 }
-                Box(
-                    modifier =
-                        Modifier
-                            .width(supportingPaneWidth)
-                            .widthIn(max = supportingPaneMaxWidth)
-                            .fillMaxHeight(),
-                ) {
-                    supportingPane(layoutInfo)
-                }
             }
-        } else {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(insetsPadding)
-                        .padding(contentPadding),
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = mainPaneMaxWidth),
-                ) {
-                    mainPane(layoutInfo)
+            FoldableSplitLayout.None -> {
+                if (layoutInfo.showSupportingPane) {
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(insetsPadding)
+                                .padding(contentPadding),
+                        horizontalArrangement = Arrangement.spacedBy(paneSpacing),
+                    ) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                            contentAlignment = Alignment.TopCenter,
+                        ) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .widthIn(max = mainPaneMaxWidth),
+                            ) {
+                                mainPane(layoutInfo)
+                            }
+                        }
+                        Box(
+                            modifier =
+                                Modifier
+                                    .width(supportingPaneWidth)
+                                    .widthIn(max = supportingPaneMaxWidth)
+                                    .fillMaxHeight(),
+                        ) {
+                            supportingPane(layoutInfo)
+                        }
+                    }
+                } else {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(insetsPadding)
+                                .padding(contentPadding),
+                        contentAlignment = Alignment.TopCenter,
+                    ) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .widthIn(max = mainPaneMaxWidth),
+                        ) {
+                            mainPane(layoutInfo)
+                        }
+                    }
                 }
             }
         }

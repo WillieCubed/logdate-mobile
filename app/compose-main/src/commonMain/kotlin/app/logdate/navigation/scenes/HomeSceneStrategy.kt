@@ -5,6 +5,7 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
+import app.logdate.ui.foldable.FoldableSplitLayout
 import app.logdate.ui.navigation.routeClass
 
 /**
@@ -16,6 +17,7 @@ import app.logdate.ui.navigation.routeClass
  */
 class HomeSceneStrategy<T : NavKey>(
     private val supportsDualPane: () -> Boolean,
+    private val foldableSplitLayout: () -> FoldableSplitLayout = { FoldableSplitLayout.None },
 ) : SceneStrategy<T> {
     override fun SceneStrategyScope<T>.calculateScene(entries: List<NavEntry<T>>): Scene<T>? {
         if (entries.size < 2) return null
@@ -35,6 +37,7 @@ class HomeSceneStrategy<T : NavKey>(
             mainEntry = sourceEntry,
             detailEntry = detailEntry,
             previousEntries = entries.dropLast(1),
+            foldableSplitLayout = foldableSplitLayout(),
         )
     }
 }
