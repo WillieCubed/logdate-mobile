@@ -82,7 +82,6 @@ dependencies {
     implementation(libs.exposed.dao)
     implementation(libs.exposed.kotlin.datetime)
     implementation(libs.postgresql)
-    implementation(libs.postgres.socket.factory)
     implementation(libs.hikariCP)
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.postgresql)

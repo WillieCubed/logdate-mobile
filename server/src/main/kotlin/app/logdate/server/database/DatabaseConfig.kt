@@ -38,10 +38,8 @@ object DatabaseConfig {
         username: String? = System.getenv("DATABASE_USER") ?: System.getenv("DB_USER"),
         password: String? = System.getenv("DATABASE_PASSWORD") ?: System.getenv("DB_PASSWORD"),
         databaseUrl: String? = System.getenv("DATABASE_URL"),
-        instanceConnectionName: String? = System.getenv("CLOUD_SQL_INSTANCE_CONNECTION_NAME"),
     ): DataSource {
         val urlFromEnv = databaseUrl?.trim().takeIf { !it.isNullOrEmpty() }
-        val instanceConnection = instanceConnectionName?.trim().takeIf { !it.isNullOrEmpty() }
         val dataSourceConfig =
             if (urlFromEnv != null) {
                 val parsedUrl = parseDatabaseUrl(urlFromEnv)
@@ -49,14 +47,6 @@ object DatabaseConfig {
                 val resolvedUsername = resolveCredential("DATABASE_USER", username, parsedUrl?.username)
                 val resolvedPassword = resolveCredential("DATABASE_PASSWORD", password, parsedUrl?.password)
                 buildConfig(jdbcUrl, resolvedUsername, resolvedPassword)
-            } else if (instanceConnection != null) {
-                val resolvedUsername = resolveCredential("DATABASE_USER", username, null)
-                val resolvedPassword = resolveCredential("DATABASE_PASSWORD", password, null)
-                buildConfig("jdbc:postgresql://google/$database", resolvedUsername, resolvedPassword).apply {
-                    addDataSourceProperty("socketFactory", "com.google.cloud.sql.postgres.SocketFactory")
-                    addDataSourceProperty("cloudSqlInstance", instanceConnection)
-                    addDataSourceProperty("cloudSqlRefreshStrategy", "lazy")
-                }
             } else {
                 val jdbcUrl = "jdbc:postgresql://$host:$port/$database"
                 val resolvedUsername = resolveCredential("DATABASE_USER", username, null)
@@ -152,11 +142,15 @@ object DatabaseConfig {
             this.password = password
             driverClassName = "org.postgresql.Driver"
 
-            // Connection pool settings
-            maximumPoolSize = 20
-            minimumIdle = 5
+            // Connection pool settings, tuned for serverless Postgres (Neon) on Cloud Run.
+            // Kept small with no idle floor: releasing idle connections is what lets Neon
+            // autosuspend its compute to zero when traffic stops, keeping idle cost near zero.
+            // Cloud Run caps request concurrency at 16 per instance, so a handful of connections
+            // is ample; `connectionTimeout` leaves headroom for a cold-start wake from autosuspend.
+            maximumPoolSize = 5
+            minimumIdle = 0
             connectionTimeout = 30000
-            idleTimeout = 600000
+            idleTimeout = 300000
             maxLifetime = 1800000
             initializationFailTimeout = -1
 

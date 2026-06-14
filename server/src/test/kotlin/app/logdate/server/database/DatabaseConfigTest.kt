@@ -87,10 +87,11 @@ class DatabaseConfigTest {
         assertEquals("user", config.username)
         assertEquals("pass", config.password)
         assertEquals("org.postgresql.Driver", config.driverClassName)
-        assertEquals(20, config.maximumPoolSize)
-        assertEquals(5, config.minimumIdle)
+        // Small pool with no idle floor so serverless Postgres (Neon) can autosuspend when idle.
+        assertEquals(5, config.maximumPoolSize)
+        assertEquals(0, config.minimumIdle)
         assertEquals(30000, config.connectionTimeout)
-        assertEquals(600000, config.idleTimeout)
+        assertEquals(300000, config.idleTimeout)
         assertEquals(1800000, config.maxLifetime)
         assertTrue(!config.isAutoCommit)
         assertEquals("TRANSACTION_READ_COMMITTED", config.transactionIsolation)
@@ -127,33 +128,6 @@ class DatabaseConfigTest {
         assertTrue(createFromUrl.isSuccess)
         (createFromUrl.getOrNull() as? HikariDataSource)?.close()
 
-        val createFromCloudSql =
-            runCatching {
-                DatabaseConfig.createDataSource(
-                    database = "logdate",
-                    username = "cloud",
-                    password = "secret",
-                    databaseUrl = null,
-                    instanceConnectionName = "project:region:instance",
-                )
-            }
-        assertTrue(createFromCloudSql.isSuccess)
-        val cloudSqlDataSource = createFromCloudSql.getOrNull() as? HikariDataSource
-        assertEquals("jdbc:postgresql://google/logdate", cloudSqlDataSource?.jdbcUrl)
-        assertEquals(
-            "com.google.cloud.sql.postgres.SocketFactory",
-            cloudSqlDataSource?.dataSourceProperties?.getProperty("socketFactory"),
-        )
-        assertEquals(
-            "project:region:instance",
-            cloudSqlDataSource?.dataSourceProperties?.getProperty("cloudSqlInstance"),
-        )
-        assertEquals(
-            "lazy",
-            cloudSqlDataSource?.dataSourceProperties?.getProperty("cloudSqlRefreshStrategy"),
-        )
-        cloudSqlDataSource?.close()
-
         val createTest = runCatching { DatabaseConfig.createTestDataSource() }
         assertTrue(createTest.isSuccess)
         (createTest.getOrNull() as? HikariDataSource)?.close()
@@ -170,7 +144,6 @@ class DatabaseConfigTest {
                     username = null,
                     password = null,
                     databaseUrl = null,
-                    instanceConnectionName = null,
                 )
             }
         assertTrue(failure.message!!.contains("DATABASE_USER"))
