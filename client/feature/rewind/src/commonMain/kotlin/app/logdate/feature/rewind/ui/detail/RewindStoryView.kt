@@ -50,6 +50,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindPanelUiState
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.rememberSystemReduceMotion
@@ -518,27 +519,61 @@ fun RewindStoryView(
                 )
             },
             fallback = {
-                Box(
+                FoldableBookLayout(
                     modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    StoryPanel(
-                        modifier =
-                            Modifier
-                                .widthIn(max = maxRewindStoryWidth)
-                                .fillMaxSize(),
-                    )
-                }
-                StoryChrome(
-                    showNavigationButtons = false,
-                    modifier =
-                        Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .widthIn(max = maxRewindStoryWidth)
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                    minPaneWidth = 320.dp,
+                    startPane = {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            StoryPanel(
+                                modifier =
+                                    Modifier
+                                        .widthIn(max = maxRewindStoryWidth)
+                                        .fillMaxSize(),
+                            )
+                        }
+                        TapNavigationLayer(modifier = Modifier.fillMaxSize())
+                    },
+                    endPane = {
+                        StoryChrome(
+                            showNavigationButtons = true,
+                            modifier =
+                                Modifier
+                                    .align(Alignment.Center)
+                                    .widthIn(max = maxRewindStoryWidth)
+                                    .fillMaxSize()
+                                    .navigationBarsPadding()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                        )
+                    },
+                    fallback = {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            StoryPanel(
+                                modifier =
+                                    Modifier
+                                        .widthIn(max = maxRewindStoryWidth)
+                                        .fillMaxSize(),
+                            )
+                        }
+                        StoryChrome(
+                            showNavigationButtons = false,
+                            modifier =
+                                Modifier
+                                    .align(Alignment.TopCenter)
+                                    .fillMaxWidth()
+                                    .widthIn(max = maxRewindStoryWidth)
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                        )
+                        TapNavigationLayer(modifier = Modifier.fillMaxSize())
+                    },
                 )
-                TapNavigationLayer(modifier = Modifier.fillMaxSize())
             },
         )
     }
