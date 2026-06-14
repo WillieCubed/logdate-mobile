@@ -167,12 +167,12 @@ actual fun VideoPlayerContent(
             }
         }
 
-    DisposableEffect(lifecycleOwner, exoPlayer) {
+    DisposableEffect(lifecycleOwner, activity, exoPlayer, pipAspectRatio) {
         val observer =
             LifecycleEventObserver { _, event ->
                 when (event) {
                     Lifecycle.Event.ON_PAUSE -> {
-                        if (activity?.isInPictureInPictureMode != true) {
+                        if (!keepVideoVisibleWhilePaused(activity, exoPlayer, pipAspectRatio)) {
                             exoPlayer.pause()
                         }
                     }
@@ -358,23 +358,41 @@ actual fun VideoPlayerContent(
     }
 }
 
+private fun keepVideoVisibleWhilePaused(
+    activity: Activity?,
+    player: Player,
+    aspectRatio: Rational,
+): Boolean {
+    if (activity == null) return false
+    if (activity.isInPictureInPictureMode) return true
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity.isInMultiWindowMode) return true
+    if (!player.isPlaying) return false
+    return enterVideoPictureInPicture(
+        activity = activity,
+        aspectRatio = aspectRatio,
+    )
+}
+
 private fun enterVideoPictureInPicture(
     activity: Activity,
     aspectRatio: Rational,
-) {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
 
-    try {
+    return try {
         activity.enterPictureInPictureMode(
             buildVideoPictureInPictureParams(
                 aspectRatio = aspectRatio,
                 autoEnterEnabled = false,
             ),
         )
+        true
     } catch (e: IllegalStateException) {
         Napier.w("Could not enter video picture-in-picture mode", e)
+        false
     } catch (e: IllegalArgumentException) {
         Napier.w("Could not enter video picture-in-picture mode with ratio $aspectRatio", e)
+        false
     }
 }
 
