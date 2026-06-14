@@ -86,6 +86,7 @@ import app.logdate.client.media.device.DefaultMediaDevices
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.theme.Spacing
@@ -312,54 +313,96 @@ private fun MediaDetailLayout(
             )
         },
         fallback = {
-            if (isExpanded) {
-                Row(modifier = Modifier.fillMaxSize()) {
+            FoldableBookLayout(
+                modifier = Modifier.fillMaxSize(),
+                minPaneWidth = 320.dp,
+                startPane = {
                     Box(
-                        modifier = Modifier.weight(2f).fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        MediaContent(mediaRef = mediaRef, isVideo = isVideo)
-                    }
-                    Column(
                         modifier =
                             Modifier
-                                .weight(1f)
                                 .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                                .padding(Spacing.lg),
+                                .background(Color.Black),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        MetadataContent(
-                            createdAt = createdAt,
-                            locationDisplayName = locationDisplayName,
+                        MediaContent(
+                            mediaRef = mediaRef,
                             isVideo = isVideo,
-                            journals = journals,
-                            exif = exif,
-                            onNavigateToJournal = onNavigateToJournal,
+                            modifier = Modifier.fillMaxSize(),
                         )
                     }
-                }
-            } else {
-                CompactMediaDetailViewer(
-                    currentMediaRef = mediaRef,
-                    currentIsVideo = isVideo,
-                    createdAt = createdAt,
-                    locationDisplayName = locationDisplayName,
-                    journals = journals,
-                    exif = exif,
-                    viewerState = viewerState,
-                    presenterState = presenterState,
-                    outputSelection = outputSelection,
-                    onOutputDeviceSelected = onOutputDeviceSelected,
-                    onBack = onBack,
-                    onSelectMedia = onSelectMedia,
-                    onNavigateToJournal = onNavigateToJournal,
-                    onShare = onShare,
-                    onStartPresenting = onStartPresenting,
-                    onStopPresenting = onStopPresenting,
-                    onPresentItem = onPresentItem,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
+                },
+                endPane = {
+                    MediaDetailTabletopControls(
+                        createdAt = createdAt,
+                        locationDisplayName = locationDisplayName,
+                        isVideo = isVideo,
+                        journals = journals,
+                        exif = exif,
+                        presenterState = presenterState,
+                        outputSelection = outputSelection,
+                        onBack = onBack,
+                        onShare = onShare,
+                        onNavigateToJournal = onNavigateToJournal,
+                        onOutputDeviceSelected = onOutputDeviceSelected,
+                        onStartPresenting = onStartPresenting,
+                        onStopPresenting = onStopPresenting,
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(Spacing.lg),
+                    )
+                },
+                fallback = {
+                    if (isExpanded) {
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            Box(
+                                modifier = Modifier.weight(2f).fillMaxSize(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                MediaContent(mediaRef = mediaRef, isVideo = isVideo)
+                            }
+                            Column(
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(Spacing.lg),
+                            ) {
+                                MetadataContent(
+                                    createdAt = createdAt,
+                                    locationDisplayName = locationDisplayName,
+                                    isVideo = isVideo,
+                                    journals = journals,
+                                    exif = exif,
+                                    onNavigateToJournal = onNavigateToJournal,
+                                )
+                            }
+                        }
+                    } else {
+                        CompactMediaDetailViewer(
+                            currentMediaRef = mediaRef,
+                            currentIsVideo = isVideo,
+                            createdAt = createdAt,
+                            locationDisplayName = locationDisplayName,
+                            journals = journals,
+                            exif = exif,
+                            viewerState = viewerState,
+                            presenterState = presenterState,
+                            outputSelection = outputSelection,
+                            onOutputDeviceSelected = onOutputDeviceSelected,
+                            onBack = onBack,
+                            onSelectMedia = onSelectMedia,
+                            onNavigateToJournal = onNavigateToJournal,
+                            onShare = onShare,
+                            onStartPresenting = onStartPresenting,
+                            onStopPresenting = onStopPresenting,
+                            onPresentItem = onPresentItem,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                },
+            )
         },
     )
 }
