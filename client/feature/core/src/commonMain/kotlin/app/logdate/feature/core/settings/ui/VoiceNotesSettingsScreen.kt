@@ -5,8 +5,11 @@ package app.logdate.feature.core.settings.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -15,8 +18,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.client.media.audio.download.ModelDownloadStatus
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
@@ -67,41 +72,92 @@ internal fun VoiceNotesSettingsContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(
-        title = stringResource(Res.string.voice_notes_settings),
-        onBack = onBack,
-        modifier = modifier,
-    ) {
-        item {
-            Text(
-                text = stringResource(Res.string.voice_notes_settings_intro),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(
                 modifier =
                     Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-            )
-        }
-        item {
-            ModelRow(
-                title = stringResource(Res.string.voice_notes_model_transcription_title),
-                description = stringResource(Res.string.voice_notes_model_transcription_description),
-                row = state.transcription,
-                onDownload = onDownloadTranscription,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
-        item {
-            ModelRow(
-                title = stringResource(Res.string.voice_notes_model_tagging_title),
-                description = stringResource(Res.string.voice_notes_model_tagging_description),
-                row = state.tagging,
-                onDownload = onDownloadTagging,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
-    }
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                Text(
+                    text = stringResource(Res.string.voice_notes_settings_intro),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                )
+                ModelRow(
+                    title = stringResource(Res.string.voice_notes_model_transcription_title),
+                    description = stringResource(Res.string.voice_notes_model_transcription_description),
+                    row = state.transcription,
+                    onDownload = onDownloadTranscription,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+            }
+        },
+        endPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                ModelRow(
+                    title = stringResource(Res.string.voice_notes_model_tagging_title),
+                    description = stringResource(Res.string.voice_notes_model_tagging_description),
+                    row = state.tagging,
+                    onDownload = onDownloadTagging,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+            }
+        },
+        singlePaneContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.voice_notes_settings),
+                onBack = onBack,
+                modifier = modifier,
+            ) {
+                item {
+                    Text(
+                        text = stringResource(Res.string.voice_notes_settings_intro),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                    )
+                }
+                item {
+                    ModelRow(
+                        title = stringResource(Res.string.voice_notes_model_transcription_title),
+                        description = stringResource(Res.string.voice_notes_model_transcription_description),
+                        row = state.transcription,
+                        onDownload = onDownloadTranscription,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+                item {
+                    ModelRow(
+                        title = stringResource(Res.string.voice_notes_model_tagging_title),
+                        description = stringResource(Res.string.voice_notes_model_tagging_description),
+                        row = state.tagging,
+                        onDownload = onDownloadTagging,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+            }
+        },
+    )
 }
 
 @Composable

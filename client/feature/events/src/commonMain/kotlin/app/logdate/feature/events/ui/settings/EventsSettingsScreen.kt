@@ -2,7 +2,12 @@
 
 package app.logdate.feature.events.ui.settings
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Sync
@@ -13,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.PrimaryTogglePill
 import app.logdate.ui.common.SettingsNavigationItem
@@ -75,67 +82,140 @@ fun EventsSettingsContent(
     onNavigateToCalendarSync: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(
-        title = stringResource(Res.string.events_hub_title),
-        onBack = onBack,
-        modifier = modifier,
-    ) {
-        item {
-            Text(
-                text = stringResource(Res.string.events_hub_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                Text(
+                    text = stringResource(Res.string.events_hub_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
 
-        item {
-            PrimaryTogglePill(
-                label = stringResource(Res.string.events_hub_master_toggle),
-                checked = uiState.isAutoEventsEnabled,
-                onCheckedChange = onAutoEventsToggled,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
+                PrimaryTogglePill(
+                    label = stringResource(Res.string.events_hub_master_toggle),
+                    checked = uiState.isAutoEventsEnabled,
+                    onCheckedChange = onAutoEventsToggled,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
 
-        if (uiState.isAutoEventsEnabled) {
-            item {
-                MaterialContainer(
+                if (uiState.isAutoEventsEnabled) {
+                    MaterialContainer(
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {
+                        ToggleSettingsItem(
+                            title = stringResource(Res.string.events_hub_smart_names_title),
+                            description =
+                                if (uiState.isSmartNamingEnabled) {
+                                    stringResource(Res.string.events_hub_smart_names_on)
+                                } else {
+                                    stringResource(Res.string.events_hub_smart_names_off)
+                                },
+                            checked = uiState.isSmartNamingEnabled,
+                            onCheckedChange = onSmartNamingToggled,
+                        )
+                    }
+                }
+            }
+        },
+        endPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                SettingsSection(
+                    title = stringResource(Res.string.events_calendar_title),
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 ) {
-                    ToggleSettingsItem(
-                        title = stringResource(Res.string.events_hub_smart_names_title),
-                        description =
-                            if (uiState.isSmartNamingEnabled) {
-                                stringResource(Res.string.events_hub_smart_names_on)
-                            } else {
-                                stringResource(Res.string.events_hub_smart_names_off)
-                            },
-                        checked = uiState.isSmartNamingEnabled,
-                        onCheckedChange = onSmartNamingToggled,
+                    SettingsNavigationItem(
+                        title = stringResource(Res.string.events_hub_calendar_row_title),
+                        description = stringResource(Res.string.events_hub_calendar_row_subtitle),
+                        icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                        onClick = onNavigateToCalendar,
+                    )
+                    SettingsNavigationItem(
+                        title = stringResource(Res.string.events_hub_sync_row_title),
+                        description = stringResource(Res.string.events_hub_sync_row_subtitle),
+                        icon = { Icon(Icons.Default.Sync, contentDescription = null) },
+                        onClick = onNavigateToCalendarSync,
                     )
                 }
             }
-        }
-
-        item {
-            SettingsSection(
-                title = stringResource(Res.string.events_calendar_title),
-                modifier = Modifier.padding(horizontal = Spacing.lg),
+        },
+        singlePaneContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.events_hub_title),
+                onBack = onBack,
+                modifier = modifier,
             ) {
-                SettingsNavigationItem(
-                    title = stringResource(Res.string.events_hub_calendar_row_title),
-                    description = stringResource(Res.string.events_hub_calendar_row_subtitle),
-                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
-                    onClick = onNavigateToCalendar,
-                )
-                SettingsNavigationItem(
-                    title = stringResource(Res.string.events_hub_sync_row_title),
-                    description = stringResource(Res.string.events_hub_sync_row_subtitle),
-                    icon = { Icon(Icons.Default.Sync, contentDescription = null) },
-                    onClick = onNavigateToCalendarSync,
-                )
+                item {
+                    Text(
+                        text = stringResource(Res.string.events_hub_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+                item {
+                    PrimaryTogglePill(
+                        label = stringResource(Res.string.events_hub_master_toggle),
+                        checked = uiState.isAutoEventsEnabled,
+                        onCheckedChange = onAutoEventsToggled,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+                if (uiState.isAutoEventsEnabled) {
+                    item {
+                        MaterialContainer(
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        ) {
+                            ToggleSettingsItem(
+                                title = stringResource(Res.string.events_hub_smart_names_title),
+                                description =
+                                    if (uiState.isSmartNamingEnabled) {
+                                        stringResource(Res.string.events_hub_smart_names_on)
+                                    } else {
+                                        stringResource(Res.string.events_hub_smart_names_off)
+                                    },
+                                checked = uiState.isSmartNamingEnabled,
+                                onCheckedChange = onSmartNamingToggled,
+                            )
+                        }
+                    }
+                }
+                item {
+                    SettingsSection(
+                        title = stringResource(Res.string.events_calendar_title),
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.events_hub_calendar_row_title),
+                            description = stringResource(Res.string.events_hub_calendar_row_subtitle),
+                            icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                            onClick = onNavigateToCalendar,
+                        )
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.events_hub_sync_row_title),
+                            description = stringResource(Res.string.events_hub_sync_row_subtitle),
+                            icon = { Icon(Icons.Default.Sync, contentDescription = null) },
+                            onClick = onNavigateToCalendarSync,
+                        )
+                    }
+                }
             }
-        }
-    }
+        },
+    )
 }

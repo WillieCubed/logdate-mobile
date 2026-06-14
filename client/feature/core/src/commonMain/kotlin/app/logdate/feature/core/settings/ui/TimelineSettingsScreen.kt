@@ -2,15 +2,24 @@
 
 package app.logdate.feature.core.settings.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.dayboundary.HealthConnectStatus
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.SettingsNavigationItem
 import app.logdate.ui.common.SettingsScaffold
@@ -56,30 +65,84 @@ fun TimelineSettingsContent(
     healthConnectStatus: HealthConnectStatus,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(
-        title = stringResource(Res.string.timeline_settings),
-        onBack = onBack,
-        modifier = modifier,
-    ) {
-        item {
-            MaterialContainer(
-                modifier = Modifier.padding(horizontal = Spacing.lg),
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                SettingsNavigationItem(
-                    title = stringResource(Res.string.day_schedule),
-                    description =
-                        stringResource(
-                            resolveDayBoundarySummaryText(
-                                sleepBasedBoundariesEnabled = sleepBasedBoundariesEnabled,
-                                healthConnectStatus = healthConnectStatus,
-                            ),
-                        ),
-                    icon = { Icon(Icons.Rounded.Bedtime, contentDescription = null) },
-                    onClick = onNavigateToDayBoundary,
+                Text(
+                    text = stringResource(Res.string.timeline_settings),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+                Text(
+                    text = stringResource(Res.string.day_schedule),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
             }
-        }
-    }
+        },
+        endPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+            ) {
+                MaterialContainer(
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                ) {
+                    SettingsNavigationItem(
+                        title = stringResource(Res.string.day_schedule),
+                        description =
+                            stringResource(
+                                resolveDayBoundarySummaryText(
+                                    sleepBasedBoundariesEnabled = sleepBasedBoundariesEnabled,
+                                    healthConnectStatus = healthConnectStatus,
+                                ),
+                            ),
+                        icon = { Icon(Icons.Rounded.Bedtime, contentDescription = null) },
+                        onClick = onNavigateToDayBoundary,
+                    )
+                }
+            }
+        },
+        singlePaneContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.timeline_settings),
+                onBack = onBack,
+                modifier = modifier,
+            ) {
+                item {
+                    MaterialContainer(
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.day_schedule),
+                            description =
+                                stringResource(
+                                    resolveDayBoundarySummaryText(
+                                        sleepBasedBoundariesEnabled = sleepBasedBoundariesEnabled,
+                                        healthConnectStatus = healthConnectStatus,
+                                    ),
+                                ),
+                            icon = { Icon(Icons.Rounded.Bedtime, contentDescription = null) },
+                            onClick = onNavigateToDayBoundary,
+                        )
+                    }
+                }
+            }
+        },
+    )
 }
 
 internal fun resolveDayBoundarySummaryText(

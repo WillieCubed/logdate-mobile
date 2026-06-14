@@ -4,9 +4,12 @@ package app.logdate.feature.events.ui.calendarsync
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.History
@@ -20,7 +23,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import app.logdate.client.permissions.rememberCalendarPermissionState
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.PrimaryTogglePill
 import app.logdate.ui.common.SettingsNavigationItem
 import app.logdate.ui.common.SettingsScaffold
@@ -93,73 +98,154 @@ fun CalendarSyncSettingsContent(
     onNavigateToActivity: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(
-        title = stringResource(Res.string.calendar_sync_settings_title),
-        onBack = onBack,
-        modifier = modifier,
-    ) {
-        item {
-            Text(
-                text = stringResource(Res.string.calendar_sync_settings_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                Text(
+                    text = stringResource(Res.string.calendar_sync_settings_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
 
-        when (uiState.permissionState) {
-            PermissionState.Granted -> {
+                when (uiState.permissionState) {
+                    PermissionState.Granted -> {
+                        PrimaryTogglePill(
+                            label = stringResource(Res.string.calendar_sync_settings_master_toggle),
+                            checked = uiState.isSyncEnabled,
+                            onCheckedChange = onSyncEnabledToggled,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+                    PermissionState.Denied,
+                    PermissionState.Unknown,
+                    -> {
+                        PermissionRequestCard(
+                            onRequestPermission = onRequestPermission,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+                }
+            }
+        },
+        endPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                if (uiState.permissionState == PermissionState.Granted && uiState.isSyncEnabled) {
+                    SettingsSection(
+                        title = stringResource(Res.string.calendar_sync_settings_title),
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.calendar_sync_settings_calendars_row_title),
+                            description =
+                                if (uiState.selectedCalendarCount == 0) {
+                                    stringResource(Res.string.calendar_sync_settings_calendars_row_subtitle_none)
+                                } else {
+                                    stringResource(
+                                        Res.string.calendar_sync_settings_calendars_row_subtitle_some,
+                                        uiState.selectedCalendarCount,
+                                        uiState.totalCalendarCount,
+                                    )
+                                },
+                            icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                            onClick = onNavigateToCalendars,
+                        )
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.calendar_sync_settings_activity_row_title),
+                            description = stringResource(Res.string.calendar_sync_settings_activity_row_subtitle),
+                            icon = { Icon(Icons.Default.History, contentDescription = null) },
+                            onClick = onNavigateToActivity,
+                        )
+                    }
+                }
+            }
+        },
+        singlePaneContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.calendar_sync_settings_title),
+                onBack = onBack,
+                modifier = modifier,
+            ) {
                 item {
-                    PrimaryTogglePill(
-                        label = stringResource(Res.string.calendar_sync_settings_master_toggle),
-                        checked = uiState.isSyncEnabled,
-                        onCheckedChange = onSyncEnabledToggled,
+                    Text(
+                        text = stringResource(Res.string.calendar_sync_settings_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
-                if (uiState.isSyncEnabled) {
-                    item {
-                        SettingsSection(
-                            title = stringResource(Res.string.calendar_sync_settings_title),
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
-                        ) {
-                            SettingsNavigationItem(
-                                title = stringResource(Res.string.calendar_sync_settings_calendars_row_title),
-                                description =
-                                    if (uiState.selectedCalendarCount == 0) {
-                                        stringResource(Res.string.calendar_sync_settings_calendars_row_subtitle_none)
-                                    } else {
-                                        stringResource(
-                                            Res.string.calendar_sync_settings_calendars_row_subtitle_some,
-                                            uiState.selectedCalendarCount,
-                                            uiState.totalCalendarCount,
-                                        )
-                                    },
-                                icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
-                                onClick = onNavigateToCalendars,
+
+                when (uiState.permissionState) {
+                    PermissionState.Granted -> {
+                        item {
+                            PrimaryTogglePill(
+                                label = stringResource(Res.string.calendar_sync_settings_master_toggle),
+                                checked = uiState.isSyncEnabled,
+                                onCheckedChange = onSyncEnabledToggled,
+                                modifier = Modifier.padding(horizontal = Spacing.lg),
                             )
-                            SettingsNavigationItem(
-                                title = stringResource(Res.string.calendar_sync_settings_activity_row_title),
-                                description = stringResource(Res.string.calendar_sync_settings_activity_row_subtitle),
-                                icon = { Icon(Icons.Default.History, contentDescription = null) },
-                                onClick = onNavigateToActivity,
+                        }
+                        if (uiState.isSyncEnabled) {
+                            item {
+                                SettingsSection(
+                                    title = stringResource(Res.string.calendar_sync_settings_title),
+                                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                                ) {
+                                    SettingsNavigationItem(
+                                        title = stringResource(Res.string.calendar_sync_settings_calendars_row_title),
+                                        description =
+                                            if (uiState.selectedCalendarCount == 0) {
+                                                stringResource(Res.string.calendar_sync_settings_calendars_row_subtitle_none)
+                                            } else {
+                                                stringResource(
+                                                    Res.string.calendar_sync_settings_calendars_row_subtitle_some,
+                                                    uiState.selectedCalendarCount,
+                                                    uiState.totalCalendarCount,
+                                                )
+                                            },
+                                        icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                                        onClick = onNavigateToCalendars,
+                                    )
+                                    SettingsNavigationItem(
+                                        title = stringResource(Res.string.calendar_sync_settings_activity_row_title),
+                                        description = stringResource(Res.string.calendar_sync_settings_activity_row_subtitle),
+                                        icon = { Icon(Icons.Default.History, contentDescription = null) },
+                                        onClick = onNavigateToActivity,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    PermissionState.Denied,
+                    PermissionState.Unknown,
+                    -> {
+                        item {
+                            PermissionRequestCard(
+                                onRequestPermission = onRequestPermission,
+                                modifier = Modifier.padding(horizontal = Spacing.lg),
                             )
                         }
                     }
                 }
             }
-            PermissionState.Denied,
-            PermissionState.Unknown,
-            -> {
-                item {
-                    PermissionRequestCard(
-                        onRequestPermission = onRequestPermission,
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    )
-                }
-            }
-        }
-    }
+        },
+    )
 }
 
 @Composable
