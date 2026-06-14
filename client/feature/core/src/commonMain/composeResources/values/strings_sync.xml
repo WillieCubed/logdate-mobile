@@ -4,7 +4,7 @@
     <string name="cloud_sync">Cloud Sync</string>
     <string name="background_sync">Background Sync</string>
     <string name="automatically_sync_your_data_in_the_background">Automatically sync your data in the background</string>
-    <string name="sync_and_backup">Sync &amp; Backup</string>
+    <string name="sync_and_backup">Sync</string>
     <string name="sync_and_backup_description">Sync status, background sync, and conflict resolution</string>
     <string name="sync_now">Sync Now</string>
     <string name="sync_status">Sync Status</string>
@@ -15,12 +15,12 @@
 
     <!-- Sync promotion -->
     <string name="sync_promotion_title">Sync your journals across devices</string>
-    <string name="sync_promotion_description">Sign in to back up your data and access it from anywhere</string>
-    <string name="sync_feature_backup">Automatic cloud backup keeps your data safe</string>
+    <string name="sync_promotion_description">Sign in to keep your data synced across devices and access it from anywhere</string>
+    <string name="sync_feature_backup">Your signed-in devices stay in sync</string>
     <string name="sync_feature_access">Access your journals from any device</string>
     <string name="sync_feature_sync">Changes sync seamlessly in the background</string>
-    <string name="account_cloud_sync_promotion_description">Connect your account to sync your journals, access them from anywhere, and unlock powerful cloud features.</string>
-    <string name="sync_devices_subtitle">Securely sync your journals, notes, and memories across all your devices.</string>
+    <string name="account_cloud_sync_promotion_description">Connect your account to sync your journals and access them from any signed-in device.</string>
+    <string name="sync_devices_subtitle">Keep your journals, notes, and memories in sync across all your devices.</string>
 
     <!-- Conflicts -->
     <string name="sync_conflicts">Sync Conflicts</string>

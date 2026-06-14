@@ -1,11 +1,38 @@
 package app.logdate.client.domain.backup
 
+import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.crypto.CryptoManager
+import app.logdate.client.device.crypto.IdentityKeyManager
+import app.logdate.client.device.storage.SecureStorage
+import app.logdate.client.domain.export.ExportMediaFile
+import app.logdate.client.domain.export.ExportMetadata
+import app.logdate.client.domain.export.ExportNote
+import app.logdate.client.domain.export.ExportProgress
+import app.logdate.client.domain.export.ExportResult
+import app.logdate.client.domain.export.ExportStats
 import app.logdate.client.domain.export.ExportUserDataUseCase
+import app.logdate.client.domain.restore.MediaImporter
+import app.logdate.client.domain.restore.RestoreBundle
+import app.logdate.client.domain.restore.RestoreResult
+import app.logdate.client.domain.restore.RestoreUserDataUseCase
+import app.logdate.client.media.MediaManager
+import app.logdate.client.media.MediaObject
+import app.logdate.client.media.MediaPayload
 import app.logdate.shared.model.backup.BackupManifest
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okio.CipherSink
 import okio.CipherSource
@@ -25,6 +52,9 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.time.Instant
 
 /**
  * Verifies the end-to-end data integrity of the backup system.
@@ -36,6 +66,24 @@ import javax.crypto.spec.SecretKeySpec
 class BackupIntegrityTest {
     private val fileSystem = FakeFileSystem()
     private val cryptoManager = JvmCryptoManager()
+    private val json =
+        Json {
+            encodeDefaults = true
+        }
+    private val metadata =
+        ExportMetadata(
+            exportDate = Instant.parse("2026-06-14T12:00:00Z"),
+            userId = "test-user",
+            deviceId = "test-device",
+            appVersion = "1.0-test",
+            stats =
+                ExportStats(
+                    journalCount = 0,
+                    noteCount = 4,
+                    draftCount = 0,
+                    mediaCount = 3,
+                ),
+        )
 
     private val createBackup =
         CreateEncryptedBackupUseCase(
@@ -123,6 +171,285 @@ class BackupIntegrityTest {
                 // Expected - Authenticated encryption detected the tampering
             }
         }
+
+    @Test
+    fun `default encrypted backup writes structured export payload with all note media types`() =
+        runBlocking {
+            val backupPath = "/structured-backup.enc".toPath()
+            val recoveryPhrase =
+                listOf("witch", "collapse", "practice", "feed", "shame", "open", "despair", "creek", "road", "again", "ice", "least")
+            val exportUserDataUseCase = mockk<ExportUserDataUseCase>()
+            val mediaManager =
+                FakeBackupMediaManager(
+                    readableMedia =
+                        mapOf(
+                            "file:///local/image-1.jpg" to MediaPayload("image-1.jpg", "image/jpeg", 3, byteArrayOf(1, 2, 3)),
+                            "file:///local/video-1.mp4" to MediaPayload("video-1.mp4", "video/mp4", 4, byteArrayOf(4, 5, 6, 7)),
+                            "file:///local/audio-1.m4a" to MediaPayload("audio-1.m4a", "audio/mp4", 2, byteArrayOf(8, 9)),
+                        ),
+                )
+            every { exportUserDataUseCase.exportUserData() } returns
+                flowOf(ExportProgress.Completed(createExportResult()))
+            val createStructuredBackup =
+                CreateEncryptedBackupUseCase(
+                    exportUserDataUseCase = exportUserDataUseCase,
+                    cryptoManager = cryptoManager,
+                    fileSystem = fileSystem,
+                    mediaManager = mediaManager,
+                    deviceIdProvider = { "test-device" },
+                    userIdProvider = { "test-user" },
+                )
+
+            val progress = createStructuredBackup(backupPath, recoveryPhrase).toList()
+
+            assertTrue(progress.last() is BackupProgress.Completed)
+            val plaintext = restoreBackup.readPlaintextForTest(backupPath, recoveryPhrase).readUtf8()
+            val payload = json.decodeFromString<EncryptedBackupPayload>(plaintext)
+            assertEquals(metadata.serializeForTest(), payload.metadataJson)
+            assertTrue(payload.notesJson.contains("\"type\":\"text\""))
+            assertTrue(payload.notesJson.contains("\"type\":\"image\""))
+            assertTrue(payload.notesJson.contains("\"type\":\"video\""))
+            assertTrue(payload.notesJson.contains("\"type\":\"audio\""))
+            assertTrue(payload.mediaManifestJson?.contains("media/image-1.jpg") == true)
+            assertTrue(payload.mediaManifestJson?.contains("media/video-1.mp4") == true)
+            assertTrue(payload.mediaManifestJson?.contains("media/audio-1.m4a") == true)
+            assertEquals(3, payload.mediaFiles.size)
+            assertEquals(byteArrayOf(1, 2, 3).toList(), payload.mediaFiles[0].decodeBytes().toList())
+            assertEquals(byteArrayOf(4, 5, 6, 7).toList(), payload.mediaFiles[1].decodeBytes().toList())
+            assertEquals(byteArrayOf(8, 9).toList(), payload.mediaFiles[2].decodeBytes().toList())
+        }
+
+    @Test
+    fun `encrypted restore imports decrypted backup payload through restore use case`() =
+        runBlocking {
+            val backupPath = "/restore-payload.enc".toPath()
+            val recoveryPhrase =
+                listOf("witch", "collapse", "practice", "feed", "shame", "open", "despair", "creek", "road", "again", "ice", "least")
+            val restoreUserDataUseCase = mockk<RestoreUserDataUseCase>()
+            val bundleSlot = slot<RestoreBundle>()
+            val mediaImporterSlot = slot<MediaImporter>()
+            val mediaManager = FakeBackupMediaManager()
+            coEvery {
+                restoreUserDataUseCase.restore(capture(bundleSlot), any(), capture(mediaImporterSlot), any())
+            } returns
+                RestoreResult(
+                    metadata = metadata,
+                    journalsImported = 0,
+                    notesImported = 4,
+                    draftsImported = 0,
+                    journalLinksImported = 0,
+                    mediaImported = 0,
+                    warnings = emptyList(),
+                )
+            val restoreStructuredBackup =
+                RestoreFromEncryptedBackupUseCase(
+                    cryptoManager = cryptoManager,
+                    fileSystem = fileSystem,
+                    restoreUserDataUseCase = restoreUserDataUseCase,
+                    mediaManager = mediaManager,
+                )
+            val payload = createEncryptedBackupPayload()
+            createBackup(backupPath, recoveryPhrase) { sink ->
+                sink.writeUtf8(json.encodeToString(payload))
+            }.toList()
+
+            val progress = restoreStructuredBackup(backupPath, recoveryPhrase).toList()
+
+            assertTrue(progress.contains(RestoreProgress.RestoringData))
+            assertTrue(progress.last() is RestoreProgress.Completed)
+            coVerify(exactly = 1) {
+                restoreUserDataUseCase.restore(any(), any(), any(), any())
+            }
+            assertEquals(payload.metadataJson, bundleSlot.captured.metadataJson)
+            assertEquals(payload.journalsJson, bundleSlot.captured.journalsJson)
+            assertTrue(bundleSlot.captured.notesJson.contains("\"type\":\"text\""))
+            assertTrue(bundleSlot.captured.notesJson.contains("\"type\":\"image\""))
+            assertTrue(bundleSlot.captured.notesJson.contains("\"type\":\"video\""))
+            assertTrue(bundleSlot.captured.notesJson.contains("\"type\":\"audio\""))
+            val mediaImporter = mediaImporterSlot.captured
+            val restoredUri = mediaImporter.importMedia("media/image-1.jpg")
+            val restoredBytes =
+                mediaManager.savedMedia
+                    .single()
+                    .data
+                    .toList()
+            assertEquals("restored://image-1.jpg", restoredUri)
+            assertEquals(
+                byteArrayOf(1, 2, 3).toList(),
+                restoredBytes,
+            )
+        }
+
+    private fun createEncryptedBackupPayload(): EncryptedBackupPayload =
+        createExportResult().let { result ->
+            EncryptedBackupPayload(
+                metadataJson = result.serializeMetadata(),
+                journalsJson = result.serializeJournals(),
+                notesJson = result.serializeNotes(),
+                journalNotesJson = result.serializeJournalNotes(),
+                draftsJson = result.serializeDrafts(),
+                profileJson = result.serializeProfile(),
+                placesJson = result.serializePlaces(),
+                locationHistoryJson = result.serializeLocationHistory(),
+                mediaManifestJson = result.serializeMediaManifest(),
+                mediaFiles =
+                    listOf(
+                        EncryptedBackupMediaFile(
+                            exportPath = "media/image-1.jpg",
+                            fileName = "image-1.jpg",
+                            mimeType = "image/jpeg",
+                            sizeBytes = 3,
+                            base64Data = Base64.encode(byteArrayOf(1, 2, 3)),
+                        ),
+                    ),
+            )
+        }
+
+    private fun createExportResult(): ExportResult {
+        val notes =
+            listOf(
+                ExportNote(
+                    id = "00000000-0000-0000-0000-000000000001",
+                    type = "text",
+                    content = "Today was worth keeping.",
+                    createdAt = Instant.parse("2026-06-14T10:00:00Z"),
+                    updatedAt = Instant.parse("2026-06-14T10:01:00Z"),
+                ),
+                ExportNote(
+                    id = "00000000-0000-0000-0000-000000000002",
+                    type = "image",
+                    mediaPath = "file:///local/image-1.jpg",
+                    caption = "Window light",
+                    createdAt = Instant.parse("2026-06-14T10:02:00Z"),
+                    updatedAt = Instant.parse("2026-06-14T10:03:00Z"),
+                ),
+                ExportNote(
+                    id = "00000000-0000-0000-0000-000000000003",
+                    type = "video",
+                    mediaPath = "file:///local/video-1.mp4",
+                    caption = "Walkthrough",
+                    createdAt = Instant.parse("2026-06-14T10:04:00Z"),
+                    updatedAt = Instant.parse("2026-06-14T10:05:00Z"),
+                ),
+                ExportNote(
+                    id = "00000000-0000-0000-0000-000000000004",
+                    type = "audio",
+                    mediaPath = "file:///local/audio-1.m4a",
+                    durationMs = 42_000,
+                    createdAt = Instant.parse("2026-06-14T10:06:00Z"),
+                    updatedAt = Instant.parse("2026-06-14T10:07:00Z"),
+                ),
+            )
+        return ExportResult(
+            json = json,
+            exportMetadata = metadata,
+            journals = emptyList(),
+            exportNotes = notes,
+            exportRelations = emptyList(),
+            exportDrafts = emptyList(),
+            profilePayload = null,
+            placesPayload = null,
+            locationHistoryPayload = null,
+            mediaFiles =
+                listOf(
+                    ExportMediaFile("media/image-1.jpg", "file:///local/image-1.jpg"),
+                    ExportMediaFile("media/video-1.mp4", "file:///local/video-1.mp4"),
+                    ExportMediaFile("media/audio-1.m4a", "file:///local/audio-1.m4a"),
+                ),
+            stats = metadata.stats,
+            issues = emptyList(),
+        )
+    }
+
+    private fun ExportMetadata.serializeForTest(): String = json.encodeToString(this)
+
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun EncryptedBackupMediaFile.decodeBytes(): ByteArray = Base64.decode(base64Data)
+}
+
+private class InMemorySessionStorage(
+    initialSession: UserSession? = null,
+) : SessionStorage {
+    private val sessionState = MutableStateFlow(initialSession)
+
+    override fun getSession(): UserSession? = sessionState.value
+
+    override fun getSessionFlow(): Flow<UserSession?> = sessionState.asStateFlow()
+
+    override suspend fun hasValidSession(): Boolean = sessionState.value != null
+
+    override fun saveSession(session: UserSession) {
+        sessionState.value = session
+    }
+
+    override fun clearSession() {
+        sessionState.value = null
+    }
+}
+
+private class InMemorySecureStorage : SecureStorage {
+    private val values = mutableMapOf<String, String>()
+    private val state = MutableStateFlow<Map<String, String>>(emptyMap())
+
+    override suspend fun getString(key: String): String? = values[key]
+
+    override suspend fun putString(
+        key: String,
+        value: String,
+    ) {
+        values[key] = value
+        state.value = values.toMap()
+    }
+
+    override suspend fun remove(key: String) {
+        values.remove(key)
+        state.value = values.toMap()
+    }
+
+    override suspend fun clear() {
+        values.clear()
+        state.value = emptyMap()
+    }
+
+    override fun observeString(key: String): Flow<String?> = state.map { values -> values[key] }
+
+    override fun observeAll(): Flow<Map<String, String>> = state.asStateFlow()
+
+    override suspend fun encrypt(data: ByteArray): ByteArray = data
+
+    override suspend fun decrypt(data: ByteArray): ByteArray = data
+}
+
+private class FakeBackupMediaManager(
+    private val readableMedia: Map<String, MediaPayload> = emptyMap(),
+) : MediaManager {
+    val savedMedia = mutableListOf<MediaPayload>()
+
+    override suspend fun getMedia(uri: String): MediaObject = error("Not used")
+
+    override suspend fun exists(mediaId: String): Boolean = false
+
+    override suspend fun getRecentMedia(limit: Int): kotlinx.coroutines.flow.Flow<List<MediaObject>> = flowOf(emptyList())
+
+    override suspend fun queryMediaByDate(
+        start: Instant,
+        end: Instant,
+    ): kotlinx.coroutines.flow.Flow<List<MediaObject>> = flowOf(emptyList())
+
+    override suspend fun addToDefaultCollection(uri: String) = Unit
+
+    override suspend fun readMedia(uri: String): MediaPayload = readableMedia[uri] ?: error("Missing readable media for $uri")
+
+    override suspend fun saveMedia(payload: MediaPayload): String {
+        savedMedia += payload
+        return "restored://${payload.fileName}"
+    }
+
+    override suspend fun saveMediaFromFile(
+        sourceFilePath: String,
+        fileName: String,
+        mimeType: String,
+    ): String = error("Not used")
 }
 
 /**

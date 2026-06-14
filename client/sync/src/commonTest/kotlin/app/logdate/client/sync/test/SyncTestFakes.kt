@@ -10,6 +10,7 @@ import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.SyncableDraftRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.SyncError
@@ -69,6 +70,7 @@ import app.logdate.shared.model.BeginAccountCreationResponse
 import app.logdate.shared.model.BeginAccountCreationResult
 import app.logdate.shared.model.CloudAccount
 import app.logdate.shared.model.CloudAccountRepository
+import app.logdate.shared.model.CloudQuotaManager
 import app.logdate.shared.model.CompleteAccountCreationRequest
 import app.logdate.shared.model.CompleteAccountCreationResponse
 import app.logdate.shared.model.DeviceInfo
@@ -181,6 +183,7 @@ fun testDefaultSyncManager(
     syncMetadataService: SyncMetadataService = fakeSyncMetadataService(),
     transactionManager: SyncTransactionManager = testSyncTransactionManager(),
     dataUsagePolicy: DataUsagePolicy = fakeDataUsagePolicy(),
+    cloudQuotaManager: CloudQuotaManager? = null,
 ): DefaultSyncManager =
     DefaultSyncManager(
         cloudContentDataSource = cloudContentDataSource,
@@ -203,6 +206,7 @@ fun testDefaultSyncManager(
         syncMetadataService = syncMetadataService,
         transactionManager = transactionManager,
         dataUsagePolicy = dataUsagePolicy,
+        cloudQuotaManager = cloudQuotaManager,
     )
 
 // =============================================================================
@@ -250,11 +254,22 @@ open class FakeCloudApiClient : CloudApiClient {
     var downloadMediaResponse: Result<MediaDownloadResponse> =
         Result.success(MediaDownloadResponse("content-id", "test.jpg", "image/jpeg", 1024, byteArrayOf(), "https://example.com/test.jpg"))
 
+    var uploadDraftResponse: Result<DraftUploadResponse>? = null
+
+    var getDraftChangesResponse: Result<DraftChangesResponse> =
+        Result.success(DraftChangesResponse(drafts = emptyList()))
+
+    var deleteDraftResponse: Result<Unit> = Result.success(Unit)
+
     val methodCalls = mutableListOf<String>()
     val uploadContentCalls = mutableListOf<Pair<String, ContentUploadRequest>>()
     val updateContentCalls = mutableListOf<Triple<String, String, ContentUpdateRequest>>()
     val deleteContentCalls = mutableListOf<Pair<String, String>>()
     val getContentChangesCalls = mutableListOf<Pair<String, Long>>()
+    val uploadMediaCalls = mutableListOf<Pair<String, MediaUploadRequest>>()
+    val downloadMediaCalls = mutableListOf<Pair<String, String>>()
+    val uploadDraftCalls = mutableListOf<Pair<String, DraftUploadRequest>>()
+    val deleteDraftCalls = mutableListOf<Pair<String, String>>()
 
     // Account methods - stubs that throw for sync-only testing
     override suspend fun checkUsernameAvailability(username: String): Result<CheckUsernameAvailabilityResponse> {
@@ -388,13 +403,15 @@ open class FakeCloudApiClient : CloudApiClient {
         draft: DraftUploadRequest,
     ): Result<DraftUploadResponse> {
         methodCalls.add("uploadDraft")
-        return Result.success(
-            DraftUploadResponse(
-                id = draft.id,
-                serverVersion = 1L,
-                uploadedAt = draft.lastUpdated,
-            ),
-        )
+        uploadDraftCalls.add(accessToken to draft)
+        return uploadDraftResponse
+            ?: Result.success(
+                DraftUploadResponse(
+                    id = draft.id,
+                    serverVersion = 1L,
+                    uploadedAt = draft.lastUpdated,
+                ),
+            )
     }
 
     override suspend fun getDraftChanges(
@@ -403,10 +420,7 @@ open class FakeCloudApiClient : CloudApiClient {
         limit: Int?,
     ): Result<DraftChangesResponse> {
         methodCalls.add("getDraftChanges")
-        return Result.success(
-            app.logdate.shared.model.sync
-                .DraftChangesResponse(drafts = emptyList()),
-        )
+        return getDraftChangesResponse
     }
 
     override suspend fun deleteDraft(
@@ -414,7 +428,8 @@ open class FakeCloudApiClient : CloudApiClient {
         draftId: String,
     ): Result<Unit> {
         methodCalls.add("deleteDraft")
-        return Result.success(Unit)
+        deleteDraftCalls.add(accessToken to draftId)
+        return deleteDraftResponse
     }
 
     // Media sync methods
@@ -423,6 +438,7 @@ open class FakeCloudApiClient : CloudApiClient {
         media: MediaUploadRequest,
     ): Result<MediaUploadResponse> {
         methodCalls.add("uploadMedia")
+        uploadMediaCalls.add(accessToken to media)
         return uploadMediaResponse
     }
 
@@ -431,6 +447,7 @@ open class FakeCloudApiClient : CloudApiClient {
         mediaId: String,
     ): Result<MediaDownloadResponse> {
         methodCalls.add("downloadMedia")
+        downloadMediaCalls.add(accessToken to mediaId)
         return downloadMediaResponse
     }
 
@@ -440,6 +457,10 @@ open class FakeCloudApiClient : CloudApiClient {
         updateContentCalls.clear()
         deleteContentCalls.clear()
         getContentChangesCalls.clear()
+        uploadMediaCalls.clear()
+        downloadMediaCalls.clear()
+        uploadDraftCalls.clear()
+        deleteDraftCalls.clear()
     }
 
     fun wasMethodCalled(methodName: String): Boolean = methodCalls.contains(methodName)
@@ -817,9 +838,12 @@ class FailingJournalNotesRepository(
 /**
  * Fake JournalRepository for testing.
  */
-class FakeJournalRepository : JournalRepository {
+class FakeJournalRepository :
+    JournalRepository,
+    SyncableDraftRepository {
     private val journals = mutableListOf<Journal>()
     private val journalsStateFlow = MutableStateFlow<List<Journal>>(emptyList())
+    private val drafts = mutableMapOf<Uuid, EditorDraft>()
 
     override val allJournalsObserved: Flow<List<Journal>> = journalsStateFlow.asStateFlow()
 
@@ -846,19 +870,32 @@ class FakeJournalRepository : JournalRepository {
         journalsStateFlow.value = journals.toList()
     }
 
-    override suspend fun saveDraft(draft: EditorDraft) {}
+    override suspend fun saveDraft(draft: EditorDraft) {
+        drafts[draft.id] = draft
+    }
 
-    override suspend fun getLatestDraft(): EditorDraft? = null
+    override suspend fun getLatestDraft(): EditorDraft? = drafts.values.maxByOrNull { it.lastModifiedAt }
 
-    override suspend fun getAllDrafts(): List<EditorDraft> = emptyList()
+    override suspend fun getAllDrafts(): List<EditorDraft> = drafts.values.toList()
 
-    override suspend fun getDraft(id: Uuid): EditorDraft? = null
+    override suspend fun getDraft(id: Uuid): EditorDraft? = drafts[id]
 
-    override suspend fun deleteDraft(id: Uuid) {}
+    override suspend fun deleteDraft(id: Uuid) {
+        drafts.remove(id)
+    }
+
+    override suspend fun saveDraftFromSync(draft: EditorDraft) {
+        drafts[draft.id] = draft
+    }
+
+    override suspend fun deleteDraftFromSync(id: Uuid) {
+        drafts.remove(id)
+    }
 
     fun clear() {
         journals.clear()
         journalsStateFlow.value = emptyList()
+        drafts.clear()
     }
 }
 

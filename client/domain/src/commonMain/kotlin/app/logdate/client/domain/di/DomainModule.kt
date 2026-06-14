@@ -3,6 +3,8 @@ package app.logdate.client.domain.di
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.domain.account.GetCurrentEntitlementUseCase
 import app.logdate.client.domain.app.GetAppInfoUseCase
+import app.logdate.client.domain.backup.CreateEncryptedBackupUseCase
+import app.logdate.client.domain.backup.RestoreFromEncryptedBackupUseCase
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
 import app.logdate.client.domain.dayboundary.DefaultDayBoundarySettingsRepository
 import app.logdate.client.domain.di.healthDomainModule
@@ -103,6 +105,7 @@ import app.logdate.client.domain.timeline.SummarizeJournalEntriesUseCase
 import app.logdate.client.intelligence.availability.RewindAIAvailability
 import app.logdate.client.intelligence.curation.CurationConfigProvider
 import app.logdate.client.intelligence.events.EventNamingExtractor
+import okio.FileSystem
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -125,6 +128,8 @@ val domainModule: Module =
         factory { ExportUserDataUseCase(get(), get(), get(), get(), get(), get(), get(), get()) }
         factory { GetExportCountsUseCase(get(), get()) }
         factory { RestoreUserDataUseCase(get(), get(), get(), get(), get(), get()) }
+        factory { CreateEncryptedBackupUseCase(get(), get(), FileSystem.SYSTEM, get()) }
+        factory { RestoreFromEncryptedBackupUseCase(get(), FileSystem.SYSTEM, get(), get()) }
         factory { PreviewArchiveUseCase() }
 
         // Notes

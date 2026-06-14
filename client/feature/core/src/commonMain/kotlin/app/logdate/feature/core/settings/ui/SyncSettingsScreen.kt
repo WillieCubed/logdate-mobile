@@ -73,14 +73,10 @@ import kotlin.time.Instant
 import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
- * Sync & Backup settings screen.
+ * Sync settings screen.
  *
  * This screen handles cloud sync status, background sync, storage quota,
  * and sync conflict resolution.
- *
- * @param onBack Callback for when the user presses the back button
- * @param onNavigateToSignIn Callback for navigating to sign-in when user taps sign-in CTA
- * @param viewModel ViewModel for the settings
  */
 @Composable
 fun SyncSettingsScreen(
