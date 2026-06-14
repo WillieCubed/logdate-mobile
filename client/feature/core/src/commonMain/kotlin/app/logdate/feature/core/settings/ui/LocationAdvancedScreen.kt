@@ -2,8 +2,13 @@
 
 package app.logdate.feature.core.settings.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -16,8 +21,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
 import app.logdate.client.location.settings.DefaultLocation
 import app.logdate.client.location.settings.LocationTrackingSettings
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
@@ -68,35 +75,81 @@ fun LocationAdvancedContent(
 ) {
     val platformKind = rememberPlatformKind()
 
-    SettingsScaffold(
-        title = stringResource(Res.string.location_advanced),
-        onBack = onBack,
-        modifier = modifier,
-    ) {
-        item {
-            SettingsSection(
-                title = stringResource(Res.string.location_advanced),
-                modifier = Modifier.padding(horizontal = Spacing.lg),
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                ToggleSettingsItem(
-                    title = stringResource(Res.string.location_server_assist),
-                    description = stringResource(Res.string.location_server_assist_description),
-                    checked = settings.serverAssistEnabled,
-                    onCheckedChange = onToggleServerAssist,
-                )
-            }
-        }
-
-        if (platformKind == PlatformKind.Desktop) {
-            item {
-                DefaultLocationSettingsSection(
-                    defaultLocation = settings.defaultLocation,
-                    onSetDefaultLocation = onSetDefaultLocation,
+                SettingsSection(
+                    title = stringResource(Res.string.location_advanced),
                     modifier = Modifier.padding(horizontal = Spacing.lg),
-                )
+                ) {
+                    ToggleSettingsItem(
+                        title = stringResource(Res.string.location_server_assist),
+                        description = stringResource(Res.string.location_server_assist_description),
+                        checked = settings.serverAssistEnabled,
+                        onCheckedChange = onToggleServerAssist,
+                    )
+                }
             }
-        }
-    }
+        },
+        endPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                if (platformKind == PlatformKind.Desktop) {
+                    DefaultLocationSettingsSection(
+                        defaultLocation = settings.defaultLocation,
+                        onSetDefaultLocation = onSetDefaultLocation,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+            }
+        },
+        singlePaneContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.location_advanced),
+                onBack = onBack,
+                modifier = modifier,
+            ) {
+                item {
+                    SettingsSection(
+                        title = stringResource(Res.string.location_advanced),
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {
+                        ToggleSettingsItem(
+                            title = stringResource(Res.string.location_server_assist),
+                            description = stringResource(Res.string.location_server_assist_description),
+                            checked = settings.serverAssistEnabled,
+                            onCheckedChange = onToggleServerAssist,
+                        )
+                    }
+                }
+
+                if (platformKind == PlatformKind.Desktop) {
+                    item {
+                        DefaultLocationSettingsSection(
+                            defaultLocation = settings.defaultLocation,
+                            onSetDefaultLocation = onSetDefaultLocation,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+                }
+            }
+        },
+    )
 }
 
 /**

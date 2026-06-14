@@ -6,8 +6,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocationOn
@@ -27,8 +30,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.client.location.settings.LocationTrackingSettings
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
@@ -104,51 +109,60 @@ fun LocationSettingsContent(
     onNavigateToAdvanced: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(
-        title = stringResource(Res.string.location_settings),
-        onBack = onBack,
-        modifier = modifier,
-    ) {
-        // Primary background tracking toggle
-        item {
-            SettingsSection(
-                title = stringResource(Res.string.location_services),
-                modifier = Modifier.padding(horizontal = Spacing.lg),
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                ToggleSettingsItem(
-                    title = stringResource(Res.string.location_enable_background_tracking),
-                    description = stringResource(Res.string.location_background_tracking_description),
-                    checked = settings.backgroundTrackingEnabled,
-                    onCheckedChange = onToggleBackgroundTracking,
-                )
-
-                // Navigation to detail screens
-                LocationSettingsNavItem(
-                    title = stringResource(Res.string.location_tracking_options),
-                    description = stringResource(Res.string.location_tracking_options_description),
-                    onClick = onNavigateToTrackingOptions,
-                )
-                LocationSettingsNavItem(
-                    title = stringResource(Res.string.location_advanced),
-                    description = stringResource(Res.string.location_advanced_description),
-                    onClick = onNavigateToAdvanced,
-                )
-            }
-        }
-
-        // Tracking mode selector — only shown when background tracking is enabled
-        if (settings.backgroundTrackingEnabled) {
-            item {
-                CaptureModeSelector(
-                    currentMode = settings.captureMode,
-                    onModeSelected = onSetCaptureMode,
+                SettingsSection(
+                    title = stringResource(Res.string.location_services),
                     modifier = Modifier.padding(horizontal = Spacing.lg),
-                )
-            }
+                ) {
+                    ToggleSettingsItem(
+                        title = stringResource(Res.string.location_enable_background_tracking),
+                        description = stringResource(Res.string.location_background_tracking_description),
+                        checked = settings.backgroundTrackingEnabled,
+                        onCheckedChange = onToggleBackgroundTracking,
+                    )
 
-            // Interval setting — only relevant in passive mode
-            if (settings.captureMode == LocationCaptureMode.PASSIVE) {
-                item {
+                    LocationSettingsNavItem(
+                        title = stringResource(Res.string.location_tracking_options),
+                        description = stringResource(Res.string.location_tracking_options_description),
+                        onClick = onNavigateToTrackingOptions,
+                    )
+                    LocationSettingsNavItem(
+                        title = stringResource(Res.string.location_advanced),
+                        description = stringResource(Res.string.location_advanced_description),
+                        onClick = onNavigateToAdvanced,
+                    )
+                }
+
+                if (settings.backgroundTrackingEnabled) {
+                    CaptureModeSelector(
+                        currentMode = settings.captureMode,
+                        onModeSelected = onSetCaptureMode,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+            }
+        },
+        endPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                if (settings.backgroundTrackingEnabled && settings.captureMode == LocationCaptureMode.PASSIVE) {
                     SettingsSection(
                         title = "",
                         modifier = Modifier.padding(horizontal = Spacing.lg),
@@ -160,63 +174,166 @@ fun LocationSettingsContent(
                         )
                     }
                 }
-            }
-        }
 
-        // Location Timeline Section
-        item {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-            ) {
-                Text(
-                    text = stringResource(Res.string.location_timeline),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(vertical = Spacing.sm),
-                )
-                OutlinedCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onShowLocationTimeline,
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.lg),
                 ) {
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(Spacing.md),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                    Text(
+                        text = stringResource(Res.string.location_timeline),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(vertical = Spacing.sm),
+                    )
+                    OutlinedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onShowLocationTimeline,
                     ) {
-                        Icon(
-                            Icons.Default.Timeline,
-                            contentDescription = stringResource(Res.string.view_timeline),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                stringResource(Res.string.view_location_timeline),
-                                style = MaterialTheme.typography.titleSmall,
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(Spacing.md),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                        ) {
+                            Icon(
+                                Icons.Default.Timeline,
+                                contentDescription = stringResource(Res.string.view_timeline),
+                                tint = MaterialTheme.colorScheme.primary,
                             )
 
-                            Text(
-                                stringResource(Res.string.location_timeline_description),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    stringResource(Res.string.view_location_timeline),
+                                    style = MaterialTheme.typography.titleSmall,
+                                )
+
+                                Text(
+                                    stringResource(Res.string.location_timeline_description),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }
-            }
-        }
 
-        // Location Privacy Notes
-        item {
-            LocationSettingsNotes()
-        }
-    }
+                LocationSettingsNotes()
+            }
+        },
+        singlePaneContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.location_settings),
+                onBack = onBack,
+                modifier = modifier,
+            ) {
+                item {
+                    SettingsSection(
+                        title = stringResource(Res.string.location_services),
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {
+                        ToggleSettingsItem(
+                            title = stringResource(Res.string.location_enable_background_tracking),
+                            description = stringResource(Res.string.location_background_tracking_description),
+                            checked = settings.backgroundTrackingEnabled,
+                            onCheckedChange = onToggleBackgroundTracking,
+                        )
+
+                        LocationSettingsNavItem(
+                            title = stringResource(Res.string.location_tracking_options),
+                            description = stringResource(Res.string.location_tracking_options_description),
+                            onClick = onNavigateToTrackingOptions,
+                        )
+                        LocationSettingsNavItem(
+                            title = stringResource(Res.string.location_advanced),
+                            description = stringResource(Res.string.location_advanced_description),
+                            onClick = onNavigateToAdvanced,
+                        )
+                    }
+                }
+
+                if (settings.backgroundTrackingEnabled) {
+                    item {
+                        CaptureModeSelector(
+                            currentMode = settings.captureMode,
+                            onModeSelected = onSetCaptureMode,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+
+                    if (settings.captureMode == LocationCaptureMode.PASSIVE) {
+                        item {
+                            SettingsSection(
+                                title = "",
+                                modifier = Modifier.padding(horizontal = Spacing.lg),
+                            ) {
+                                LocationSettingsNavItem(
+                                    title = stringResource(Res.string.location_update_interval),
+                                    description = stringResource(Res.string.location_update_interval_description),
+                                    onClick = onNavigateToInterval,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Spacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.location_timeline),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(vertical = Spacing.sm),
+                        )
+                        OutlinedCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = onShowLocationTimeline,
+                        ) {
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(Spacing.md),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                            ) {
+                                Icon(
+                                    Icons.Default.Timeline,
+                                    contentDescription = stringResource(Res.string.view_timeline),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        stringResource(Res.string.view_location_timeline),
+                                        style = MaterialTheme.typography.titleSmall,
+                                    )
+
+                                    Text(
+                                        stringResource(Res.string.location_timeline_description),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    LocationSettingsNotes()
+                }
+            }
+        },
+    )
 }
 
 @Composable
