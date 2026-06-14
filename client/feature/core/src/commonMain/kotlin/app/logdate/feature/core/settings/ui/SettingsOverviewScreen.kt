@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsNavigationItem
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
@@ -196,170 +197,330 @@ fun SettingsOverviewContent(
     streakCount: Int? = null,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(
-        title = stringResource(Res.string.screen_title_settings),
-        onBack = onBack,
+    FoldableBookLayout(
         modifier = modifier,
-    ) {
-        item {
-            SettingsIdentityCard(
-                userProfile = userProfile,
-                onboardedDate = onboardedDate,
-                streakCount = streakCount,
-                onEditProfile = onNavigateToProfile,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                SettingsIdentityCard(
+                    userProfile = userProfile,
+                    onboardedDate = onboardedDate,
+                    streakCount = streakCount,
+                    onEditProfile = onNavigateToProfile,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
 
-        // Personal group
-        item {
-            SettingsSection(
-                title = stringResource(Res.string.settings_group_personal),
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            ) {
-                SettingsNavigationItem(
-                    title = stringResource(Res.string.profile),
-                    description = stringResource(Res.string.profile_settings_description),
-                    icon = { Icon(Icons.Default.AccountCircle, contentDescription = null) },
-                    onClick = onNavigateToProfile,
-                )
-                SettingsNavigationItem(
-                    title = stringResource(Res.string.memories),
-                    description = stringResource(Res.string.memories_description),
-                    icon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
-                    onClick = onNavigateToMemories,
-                )
-                SettingsNavigationItem(
-                    title = stringResource(Res.string.voice_notes_settings),
-                    description = stringResource(Res.string.voice_notes_settings_description),
-                    icon = { Icon(Icons.Default.GraphicEq, contentDescription = null) },
-                    onClick = onNavigateToVoiceNotes,
-                )
-                SettingsNavigationItem(
-                    title = stringResource(Res.string.timeline_settings),
-                    description = stringResource(Res.string.timeline_settings_description),
-                    icon = { Icon(Icons.Default.Timeline, contentDescription = null) },
-                    onClick = onNavigateToTimeline,
-                )
-                SettingsNavigationItem(
-                    title = stringResource(Res.string.streaks),
-                    description = stringResource(Res.string.streaks_description),
-                    icon = { Icon(Icons.Default.LocalFireDepartment, contentDescription = null) },
-                    onClick = onNavigateToStreaks,
-                )
-                SettingsNavigationItem(
-                    title = stringResource(Res.string.rewind_settings_overview_title),
-                    description = stringResource(Res.string.rewind_settings_overview_description),
-                    icon = { Icon(Icons.Default.Replay, contentDescription = null) },
-                    onClick = onNavigateToRewindSettings,
-                )
-                SettingsNavigationItem(
-                    title = "Events",
-                    description = "The moments worth remembering, gathered for you",
-                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
-                    onClick = onNavigateToEventsSettings,
-                )
-                SettingsNavigationItem(
-                    title = stringResource(Res.string.people_title),
-                    description = stringResource(Res.string.people_overview_description),
-                    icon = { Icon(Icons.Default.Person, contentDescription = null) },
-                    onClick = onNavigateToPeopleSettings,
-                )
-                SettingsNavigationItem(
-                    title = "Your library",
-                    description = "Browse and manage your photos and videos",
-                    icon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
-                    onClick = onNavigateToLibrarySettings,
-                )
-            }
-        }
-
-        // Privacy & Security group
-        item {
-            SettingsSection(
-                title = stringResource(Res.string.settings_group_privacy_security),
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            ) {
-                SettingsNavigationItem(
-                    title = stringResource(Res.string.privacy_and_security),
-                    description = stringResource(Res.string.privacy_security_description),
-                    icon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                    onClick = onNavigateToPrivacy,
-                )
-                if (userProfile.isAuthenticated) {
+                SettingsSection(
+                    title = stringResource(Res.string.settings_group_personal),
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                ) {
                     SettingsNavigationItem(
-                        title = stringResource(Res.string.account_and_sign_in),
-                        description = stringResource(Res.string.account_settings_description),
-                        icon = { Icon(Icons.Default.Cloud, contentDescription = null) },
-                        onClick = onNavigateToAccount,
+                        title = stringResource(Res.string.profile),
+                        description = stringResource(Res.string.profile_settings_description),
+                        icon = { Icon(Icons.Default.AccountCircle, contentDescription = null) },
+                        onClick = onNavigateToProfile,
                     )
                     SettingsNavigationItem(
-                        title = stringResource(Res.string.devices),
-                        description = stringResource(Res.string.devices_settings_description),
-                        icon = { Icon(Icons.Default.Devices, contentDescription = null) },
-                        onClick = onNavigateToDevices,
+                        title = stringResource(Res.string.memories),
+                        description = stringResource(Res.string.memories_description),
+                        icon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
+                        onClick = onNavigateToMemories,
                     )
-                }
-                SettingsNavigationItem(
-                    title = stringResource(Res.string.location_settings),
-                    description = stringResource(Res.string.location_settings_description),
-                    icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
-                    onClick = onNavigateToLocation,
-                )
-                onNavigateToWatch?.let { navigateToWatch ->
                     SettingsNavigationItem(
-                        title = stringResource(Res.string.watch_settings),
-                        description = stringResource(Res.string.watch_settings_description),
-                        icon = { Icon(Icons.Default.Watch, contentDescription = null) },
-                        onClick = navigateToWatch,
+                        title = stringResource(Res.string.voice_notes_settings),
+                        description = stringResource(Res.string.voice_notes_settings_description),
+                        icon = { Icon(Icons.Default.GraphicEq, contentDescription = null) },
+                        onClick = onNavigateToVoiceNotes,
                     )
-                }
-                onNavigateToNotifications?.let { navigateToNotifications ->
                     SettingsNavigationItem(
-                        title = stringResource(Res.string.notifications_settings),
-                        description = stringResource(Res.string.notifications_settings_description),
-                        icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
-                        onClick = navigateToNotifications,
+                        title = stringResource(Res.string.timeline_settings),
+                        description = stringResource(Res.string.timeline_settings_description),
+                        icon = { Icon(Icons.Default.Timeline, contentDescription = null) },
+                        onClick = onNavigateToTimeline,
+                    )
+                    SettingsNavigationItem(
+                        title = stringResource(Res.string.streaks),
+                        description = stringResource(Res.string.streaks_description),
+                        icon = { Icon(Icons.Default.LocalFireDepartment, contentDescription = null) },
+                        onClick = onNavigateToStreaks,
+                    )
+                    SettingsNavigationItem(
+                        title = stringResource(Res.string.rewind_settings_overview_title),
+                        description = stringResource(Res.string.rewind_settings_overview_description),
+                        icon = { Icon(Icons.Default.Replay, contentDescription = null) },
+                        onClick = onNavigateToRewindSettings,
+                    )
+                    SettingsNavigationItem(
+                        title = "Events",
+                        description = "The moments worth remembering, gathered for you",
+                        icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                        onClick = onNavigateToEventsSettings,
+                    )
+                    SettingsNavigationItem(
+                        title = stringResource(Res.string.people_title),
+                        description = stringResource(Res.string.people_overview_description),
+                        icon = { Icon(Icons.Default.Person, contentDescription = null) },
+                        onClick = onNavigateToPeopleSettings,
+                    )
+                    SettingsNavigationItem(
+                        title = "Your library",
+                        description = "Browse and manage your photos and videos",
+                        icon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
+                        onClick = onNavigateToLibrarySettings,
                     )
                 }
             }
-        }
-
-        // Data & Storage group
-        item {
-            SettingsSection(
-                title = stringResource(Res.string.settings_group_data_storage),
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            ) {
-                if (userProfile.isAuthenticated) {
+        },
+        endPane = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                SettingsSection(
+                    title = stringResource(Res.string.settings_group_privacy_security),
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                ) {
                     SettingsNavigationItem(
-                        title = stringResource(Res.string.sync_and_backup),
-                        description = stringResource(Res.string.sync_and_backup_description),
-                        icon = { Icon(Icons.Default.Sync, contentDescription = null) },
-                        onClick = onNavigateToSync,
+                        title = stringResource(Res.string.privacy_and_security),
+                        description = stringResource(Res.string.privacy_security_description),
+                        icon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        onClick = onNavigateToPrivacy,
                     )
-                } else {
-                    SyncPromotionCard(
-                        onCreateAccount = onNavigateToCloudAccountCreation,
-                        onSignIn = onNavigateToSignIn,
-                        onNavigateToSync = onNavigateToSync,
+                    if (userProfile.isAuthenticated) {
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.account_and_sign_in),
+                            description = stringResource(Res.string.account_settings_description),
+                            icon = { Icon(Icons.Default.Cloud, contentDescription = null) },
+                            onClick = onNavigateToAccount,
+                        )
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.devices),
+                            description = stringResource(Res.string.devices_settings_description),
+                            icon = { Icon(Icons.Default.Devices, contentDescription = null) },
+                            onClick = onNavigateToDevices,
+                        )
+                    }
+                    SettingsNavigationItem(
+                        title = stringResource(Res.string.location_settings),
+                        description = stringResource(Res.string.location_settings_description),
+                        icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+                        onClick = onNavigateToLocation,
+                    )
+                    onNavigateToWatch?.let { navigateToWatch ->
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.watch_settings),
+                            description = stringResource(Res.string.watch_settings_description),
+                            icon = { Icon(Icons.Default.Watch, contentDescription = null) },
+                            onClick = navigateToWatch,
+                        )
+                    }
+                    onNavigateToNotifications?.let { navigateToNotifications ->
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.notifications_settings),
+                            description = stringResource(Res.string.notifications_settings_description),
+                            icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
+                            onClick = navigateToNotifications,
+                        )
+                    }
+                }
+
+                SettingsSection(
+                    title = stringResource(Res.string.settings_group_data_storage),
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                ) {
+                    if (userProfile.isAuthenticated) {
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.sync_and_backup),
+                            description = stringResource(Res.string.sync_and_backup_description),
+                            icon = { Icon(Icons.Default.Sync, contentDescription = null) },
+                            onClick = onNavigateToSync,
+                        )
+                    } else {
+                        SyncPromotionCard(
+                            onCreateAccount = onNavigateToCloudAccountCreation,
+                            onSignIn = onNavigateToSignIn,
+                            onNavigateToSync = onNavigateToSync,
+                        )
+                    }
+                    SettingsNavigationItem(
+                        title = stringResource(Res.string.export_and_import),
+                        description = stringResource(Res.string.export_and_import_description),
+                        icon = { Icon(Icons.Default.FileDownload, contentDescription = null) },
+                        onClick = onNavigateToExport,
+                    )
+                    SettingsNavigationItem(
+                        title = stringResource(Res.string.reset),
+                        description = stringResource(Res.string.reset_description),
+                        icon = { Icon(Icons.Default.RestartAlt, contentDescription = null) },
+                        onClick = onNavigateToReset,
                     )
                 }
-                SettingsNavigationItem(
-                    title = stringResource(Res.string.export_and_import),
-                    description = stringResource(Res.string.export_and_import_description),
-                    icon = { Icon(Icons.Default.FileDownload, contentDescription = null) },
-                    onClick = onNavigateToExport,
-                )
-                SettingsNavigationItem(
-                    title = stringResource(Res.string.reset),
-                    description = stringResource(Res.string.reset_description),
-                    icon = { Icon(Icons.Default.RestartAlt, contentDescription = null) },
-                    onClick = onNavigateToReset,
-                )
             }
-        }
-    }
+        },
+        singlePaneContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.screen_title_settings),
+                onBack = onBack,
+                modifier = modifier,
+            ) {
+                item {
+                    SettingsIdentityCard(
+                        userProfile = userProfile,
+                        onboardedDate = onboardedDate,
+                        streakCount = streakCount,
+                        onEditProfile = onNavigateToProfile,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+
+                // Personal group
+                item {
+                    SettingsSection(
+                        title = stringResource(Res.string.settings_group_personal),
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.profile),
+                            description = stringResource(Res.string.profile_settings_description),
+                            icon = { Icon(Icons.Default.AccountCircle, contentDescription = null) },
+                            onClick = onNavigateToProfile,
+                        )
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.memories),
+                            description = stringResource(Res.string.memories_description),
+                            icon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
+                            onClick = onNavigateToMemories,
+                        )
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.voice_notes_settings),
+                            description = stringResource(Res.string.voice_notes_settings_description),
+                            icon = { Icon(Icons.Default.GraphicEq, contentDescription = null) },
+                            onClick = onNavigateToVoiceNotes,
+                        )
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.timeline_settings),
+                            description = stringResource(Res.string.timeline_settings_description),
+                            icon = { Icon(Icons.Default.Timeline, contentDescription = null) },
+                            onClick = onNavigateToTimeline,
+                        )
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.streaks),
+                            description = stringResource(Res.string.streaks_description),
+                            icon = { Icon(Icons.Default.LocalFireDepartment, contentDescription = null) },
+                            onClick = onNavigateToStreaks,
+                        )
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.rewind_settings_overview_title),
+                            description = stringResource(Res.string.rewind_settings_overview_description),
+                            icon = { Icon(Icons.Default.Replay, contentDescription = null) },
+                            onClick = onNavigateToRewindSettings,
+                        )
+                        SettingsNavigationItem(
+                            title = "Events",
+                            description = "The moments worth remembering, gathered for you",
+                            icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                            onClick = onNavigateToEventsSettings,
+                        )
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.people_title),
+                            description = stringResource(Res.string.people_overview_description),
+                            icon = { Icon(Icons.Default.Person, contentDescription = null) },
+                            onClick = onNavigateToPeopleSettings,
+                        )
+                        SettingsNavigationItem(
+                            title = "Your library",
+                            description = "Browse and manage your photos and videos",
+                            icon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
+                            onClick = onNavigateToLibrarySettings,
+                        )
+                    }
+                }
+
+                // Privacy & Security group
+                item {
+                    SettingsSection(
+                        title = stringResource(Res.string.settings_group_privacy_security),
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.privacy_and_security),
+                            description = stringResource(Res.string.privacy_security_description),
+                            icon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                            onClick = onNavigateToPrivacy,
+                        )
+                        if (userProfile.isAuthenticated) {
+                            SettingsNavigationItem(
+                                title = stringResource(Res.string.account_and_sign_in),
+                                description = stringResource(Res.string.account_settings_description),
+                                icon = { Icon(Icons.Default.Cloud, contentDescription = null) },
+                                onClick = onNavigateToAccount,
+                            )
+                            SettingsNavigationItem(
+                                title = stringResource(Res.string.devices),
+                                description = stringResource(Res.string.devices_settings_description),
+                                icon = { Icon(Icons.Default.Devices, contentDescription = null) },
+                                onClick = onNavigateToDevices,
+                            )
+                        }
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.location_settings),
+                            description = stringResource(Res.string.location_settings_description),
+                            icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+                            onClick = onNavigateToLocation,
+                        )
+                        onNavigateToWatch?.let { navigateToWatch ->
+                            SettingsNavigationItem(
+                                title = stringResource(Res.string.watch_settings),
+                                description = stringResource(Res.string.watch_settings_description),
+                                icon = { Icon(Icons.Default.Watch, contentDescription = null) },
+                                onClick = navigateToWatch,
+                            )
+                        }
+                        onNavigateToNotifications?.let { navigateToNotifications ->
+                            SettingsNavigationItem(
+                                title = stringResource(Res.string.notifications_settings),
+                                description = stringResource(Res.string.notifications_settings_description),
+                                icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
+                                onClick = navigateToNotifications,
+                            )
+                        }
+                    }
+                }
+
+                // Data & Storage group
+                item {
+                    SettingsSection(
+                        title = stringResource(Res.string.settings_group_data_storage),
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {
+                        if (userProfile.isAuthenticated) {
+                            SettingsNavigationItem(
+                                title = stringResource(Res.string.sync_and_backup),
+                                description = stringResource(Res.string.sync_and_backup_description),
+                                icon = { Icon(Icons.Default.Sync, contentDescription = null) },
+                                onClick = onNavigateToSync,
+                            )
+                        } else {
+                            SyncPromotionCard(
+                                onCreateAccount = onNavigateToCloudAccountCreation,
+                                onSignIn = onNavigateToSignIn,
+                                onNavigateToSync = onNavigateToSync,
+                            )
+                        }
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.export_and_import),
+                            description = stringResource(Res.string.export_and_import_description),
+                            icon = { Icon(Icons.Default.FileDownload, contentDescription = null) },
+                            onClick = onNavigateToExport,
+                        )
+                        SettingsNavigationItem(
+                            title = stringResource(Res.string.reset),
+                            description = stringResource(Res.string.reset_description),
+                            icon = { Icon(Icons.Default.RestartAlt, contentDescription = null) },
+                            onClick = onNavigateToReset,
+                        )
+                    }
+                }
+            }
+        },
+    )
 }
 
 @Composable

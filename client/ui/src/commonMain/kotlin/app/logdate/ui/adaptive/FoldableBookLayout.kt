@@ -33,7 +33,7 @@ fun FoldableBookLayout(
     minPaneWidth: Dp = 320.dp,
     startPane: @Composable BoxScope.(FoldableBookPaneInfo) -> Unit,
     endPane: @Composable BoxScope.(FoldableBookPaneInfo) -> Unit,
-    fallback: @Composable BoxScope.() -> Unit,
+    singlePaneContent: @Composable BoxScope.() -> Unit,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val splitLayout =
@@ -81,7 +81,7 @@ fun FoldableBookLayout(
             }
         } else {
             Box(modifier = Modifier.fillMaxSize()) {
-                fallback()
+                singlePaneContent()
             }
         }
     }

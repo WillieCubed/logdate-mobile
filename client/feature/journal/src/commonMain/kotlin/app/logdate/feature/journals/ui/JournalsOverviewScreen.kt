@@ -141,7 +141,7 @@ fun JournalsOverviewScreenContent(
                 modifier = Modifier.fillMaxSize(),
             )
         },
-        fallback = {
+        singlePaneContent = {
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
                 containerColor = Color.Transparent,
