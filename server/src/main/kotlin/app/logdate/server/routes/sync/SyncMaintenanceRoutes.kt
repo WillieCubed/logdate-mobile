@@ -7,6 +7,7 @@ import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.responses.error
 import app.logdate.server.sync.SyncMetricsRegistry
+import io.github.aakira.napier.Napier
 import io.github.smiley4.ktoropenapi.post
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
@@ -60,8 +61,8 @@ internal fun Route.syncMaintenanceRoutes(
         }
     }
 
-    route("/ops/backups") {
-        post(":purge", {}) {
+    route("/ops") {
+        post("/backups:purge", {}) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -85,14 +86,28 @@ internal fun Route.syncMaintenanceRoutes(
                     )
                 val backups = backupRepository.listBackups(userId)
                 val toPurge = policy.backupsToPurge(backups, System.currentTimeMillis())
+                val storage =
+                    mediaStorage
+                        ?: return@post call.respond(
+                            HttpStatusCode.ServiceUnavailable,
+                            error("BACKUP_STORAGE_UNAVAILABLE", "Backup storage not configured"),
+                        )
+                var deletedCount = 0
                 toPurge.forEach { backup ->
-                    runCatching { mediaStorage?.deleteBlob(backup.storagePath) }
+                    if (!storage.deleteBlob(backup.storagePath)) {
+                        Napier.w("Failed to delete backup blob for ${backup.id} at ${backup.storagePath}")
+                        return@post call.respond(
+                            HttpStatusCode.InternalServerError,
+                            error("BACKUP_DELETE_FAILED", "Failed to delete backup blob"),
+                        )
+                    }
                     backupRepository.deleteBackup(userId, backup.id)
+                    deletedCount += 1
                 }
                 call.respond(
                     BackupPurgeResponse(
-                        deleted = toPurge.size,
-                        remaining = backups.size - toPurge.size,
+                        deleted = deletedCount,
+                        remaining = backups.size - deletedCount,
                         keepPerDevice = keepPerDevice,
                         maxAgeDaysApplied = maxAgeDays,
                     ),

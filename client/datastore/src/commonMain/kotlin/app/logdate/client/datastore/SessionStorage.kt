@@ -128,7 +128,11 @@ class DataStoreSessionStorage(
         return try {
             val preferences = dataStore.data.first()
             val backendUrl = configRepository.getCurrentBackendUrl()
-            decodeSession(preferences, backendUrl) != null
+            val loaded = decodeSession(preferences, backendUrl)
+            if (loaded != null) {
+                sessionState.value = loaded
+            }
+            loaded != null
         } catch (e: Exception) {
             false
         }

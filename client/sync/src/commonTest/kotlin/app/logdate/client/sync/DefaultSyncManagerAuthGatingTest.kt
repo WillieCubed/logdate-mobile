@@ -1,10 +1,14 @@
 package app.logdate.client.sync
 
 import app.logdate.client.datastore.UserSession
+import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.sync.test.fakeSessionStorage
 import app.logdate.client.sync.test.fakeSyncMetadataService
 import app.logdate.client.sync.test.testDefaultSyncManager
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -74,5 +78,35 @@ class DefaultSyncManagerAuthGatingTest {
 
             val status = manager.getSyncStatus()
             assertFalse(status.isEnabled, "After clearing session, isEnabled must be false")
+        }
+
+    @Test
+    fun startup_cleanup_keeps_pending_queue_when_auth_is_loaded_but_cache_is_still_empty() =
+        runTest {
+            val session =
+                object : SessionStorage {
+                    override fun getSession(): UserSession? = null
+
+                    override fun getSessionFlow(): Flow<UserSession?> = kotlinx.coroutines.flow.flowOf(null)
+
+                    override suspend fun hasValidSession(): Boolean = true
+
+                    override fun saveSession(session: UserSession) = Unit
+
+                    override fun clearSession() = Unit
+                }
+            val metadata = fakeSyncMetadataService(session)
+            val manager =
+                testDefaultSyncManager(
+                    sessionStorage = session,
+                    syncMetadataService = metadata,
+                    syncScope = TestScope(StandardTestDispatcher(testScheduler)),
+                )
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(0, metadata.clearPendingCalls, "Cleanup must not run when durable auth exists")
+            // Sanity: the manager stays usable once the session cache catches up.
+            assertFalse(manager.getSyncStatus().isEnabled, "Cached session is still empty in this test")
         }
 }

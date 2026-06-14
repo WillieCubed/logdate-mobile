@@ -78,6 +78,7 @@ import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyCredential
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -184,30 +185,58 @@ fun testDefaultSyncManager(
     transactionManager: SyncTransactionManager = testSyncTransactionManager(),
     dataUsagePolicy: DataUsagePolicy = fakeDataUsagePolicy(),
     cloudQuotaManager: CloudQuotaManager? = null,
+    syncScope: CoroutineScope? = null,
 ): DefaultSyncManager =
-    DefaultSyncManager(
-        cloudContentDataSource = cloudContentDataSource,
-        cloudJournalDataSource = cloudJournalDataSource,
-        cloudAssociationDataSource = cloudAssociationDataSource,
-        cloudMediaDataSource = cloudMediaDataSource,
-        cloudDraftDataSource = cloudDraftDataSource,
-        cloudAccountRepository = cloudAccountRepository,
-        sessionStorage = sessionStorage,
-        mediaManager = mediaManager,
-        mediaSyncRefStore = mediaSyncRefStore,
-        journalRepository = journalRepository,
-        journalNotesRepository = journalNotesRepository,
-        journalContentRepository = journalContentRepository,
-        journalConflictResolver = journalConflictResolver,
-        noteConflictResolver = noteConflictResolver,
-        conflictStore = conflictStore,
-        deadLetterStore = deadLetterStore,
-        retryScheduleStore = retryScheduleStore,
-        syncMetadataService = syncMetadataService,
-        transactionManager = transactionManager,
-        dataUsagePolicy = dataUsagePolicy,
-        cloudQuotaManager = cloudQuotaManager,
-    )
+    if (syncScope == null) {
+        DefaultSyncManager(
+            cloudContentDataSource = cloudContentDataSource,
+            cloudJournalDataSource = cloudJournalDataSource,
+            cloudAssociationDataSource = cloudAssociationDataSource,
+            cloudMediaDataSource = cloudMediaDataSource,
+            cloudDraftDataSource = cloudDraftDataSource,
+            cloudAccountRepository = cloudAccountRepository,
+            sessionStorage = sessionStorage,
+            mediaManager = mediaManager,
+            mediaSyncRefStore = mediaSyncRefStore,
+            journalRepository = journalRepository,
+            journalNotesRepository = journalNotesRepository,
+            journalContentRepository = journalContentRepository,
+            journalConflictResolver = journalConflictResolver,
+            noteConflictResolver = noteConflictResolver,
+            conflictStore = conflictStore,
+            deadLetterStore = deadLetterStore,
+            retryScheduleStore = retryScheduleStore,
+            syncMetadataService = syncMetadataService,
+            transactionManager = transactionManager,
+            dataUsagePolicy = dataUsagePolicy,
+            cloudQuotaManager = cloudQuotaManager,
+        )
+    } else {
+        DefaultSyncManager(
+            cloudContentDataSource = cloudContentDataSource,
+            cloudJournalDataSource = cloudJournalDataSource,
+            cloudAssociationDataSource = cloudAssociationDataSource,
+            cloudMediaDataSource = cloudMediaDataSource,
+            cloudDraftDataSource = cloudDraftDataSource,
+            cloudAccountRepository = cloudAccountRepository,
+            sessionStorage = sessionStorage,
+            mediaManager = mediaManager,
+            mediaSyncRefStore = mediaSyncRefStore,
+            journalRepository = journalRepository,
+            journalNotesRepository = journalNotesRepository,
+            journalContentRepository = journalContentRepository,
+            journalConflictResolver = journalConflictResolver,
+            noteConflictResolver = noteConflictResolver,
+            conflictStore = conflictStore,
+            deadLetterStore = deadLetterStore,
+            retryScheduleStore = retryScheduleStore,
+            syncMetadataService = syncMetadataService,
+            transactionManager = transactionManager,
+            dataUsagePolicy = dataUsagePolicy,
+            cloudQuotaManager = cloudQuotaManager,
+            syncScope = syncScope,
+        )
+    }
 
 // =============================================================================
 // Fake implementations
@@ -594,6 +623,7 @@ class FakeSyncMetadataService(
     private val retryCounts = mutableMapOf<EntityType, MutableMap<String, Int>>()
     private val syncTimes = mutableMapOf<EntityType, Instant>()
     private val pendingCountFlow = MutableStateFlow(0)
+    var clearPendingCalls: Int = 0
 
     private fun isAuthenticated(): Boolean = sessionStorage.getSession() != null
 
@@ -659,6 +689,7 @@ class FakeSyncMetadataService(
     override fun observePendingCount(): Flow<Int> = pendingCountFlow
 
     override suspend fun clearPending() {
+        clearPendingCalls += 1
         pendingUploads.clear()
         retryCounts.clear()
         pendingCountFlow.value = 0

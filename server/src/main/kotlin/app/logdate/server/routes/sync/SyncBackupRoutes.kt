@@ -120,18 +120,30 @@ internal fun Route.syncBackupRoutes(
                     )
 
                 val record =
-                    backupRepository.createBackup(
-                        userId,
-                        LogDateBackup(
-                            id = backupId,
-                            userId = userId,
-                            deviceId = req.deviceId,
-                            manifest = req.manifest,
-                            storagePath = storagePath,
-                            createdAt = System.currentTimeMillis(),
-                            sizeBytes = bytes,
-                        ),
-                    )
+                    runCatching {
+                        backupRepository.createBackup(
+                            userId,
+                            LogDateBackup(
+                                id = backupId,
+                                userId = userId,
+                                deviceId = req.deviceId,
+                                manifest = req.manifest,
+                                storagePath = storagePath,
+                                createdAt = System.currentTimeMillis(),
+                                sizeBytes = bytes,
+                            ),
+                        )
+                    }.getOrElse { error ->
+                        runCatching { storage.deleteBlob(storagePath) }
+                            .onFailure { deleteError ->
+                                Napier.w("Failed to roll back backup blob $backupId after metadata write failure", deleteError)
+                            }
+                        Napier.e("Failed to persist backup metadata", error)
+                        return@post call.respond(
+                            HttpStatusCode.InternalServerError,
+                            error("BACKUP_METADATA_WRITE_FAILED", "Failed to store backup metadata"),
+                        )
+                    }
 
                 call.response.headers.append(HttpHeaders.Location, "/api/v1/backups/${record.id}")
                 call.respond(
@@ -277,7 +289,19 @@ internal fun Route.syncBackupRoutes(
 
                 val record = backupRepository.getBackup(userId, backupId)
                 if (record != null) {
-                    mediaStorage?.deleteBlob(record.storagePath)
+                    val storage =
+                        mediaStorage
+                            ?: return@delete call.respond(
+                                HttpStatusCode.ServiceUnavailable,
+                                error("BACKUP_STORAGE_UNAVAILABLE", "Backup storage not configured"),
+                            )
+                    if (!storage.deleteBlob(record.storagePath)) {
+                        Napier.w("Failed to delete backup blob for $backupId at ${record.storagePath}")
+                        return@delete call.respond(
+                            HttpStatusCode.InternalServerError,
+                            error("BACKUP_DELETE_FAILED", "Failed to delete backup blob"),
+                        )
+                    }
                     backupRepository.deleteBackup(userId, backupId)
                 }
 

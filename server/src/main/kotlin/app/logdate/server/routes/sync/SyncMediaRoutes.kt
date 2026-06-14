@@ -127,25 +127,39 @@ internal fun Route.syncMediaRoutes(
                         null
                     }
                 val stored =
-                    mediaBlobRepository.upsertMedia(
-                        userId,
-                        LogDateMedia(
-                            mediaId = mediaId,
-                            contentId = req.contentId,
-                            userId = userId,
-                            fileName = req.fileName,
-                            mimeType = req.mimeType,
-                            sizeBytes = req.sizeBytes,
-                            data = if (storagePath == null) encryptedPayload.data else ByteArray(0),
-                            storagePath = storagePath,
-                            createdAt = System.currentTimeMillis(),
-                            version = 0L,
-                            deviceId = DeviceId(req.deviceId),
-                            encryptionVersion = 1,
-                            encryptionKeyId = "default",
-                            encryptionMode = "SERVER",
-                        ),
-                    )
+                    runCatching {
+                        mediaBlobRepository.upsertMedia(
+                            userId,
+                            LogDateMedia(
+                                mediaId = mediaId,
+                                contentId = req.contentId,
+                                userId = userId,
+                                fileName = req.fileName,
+                                mimeType = req.mimeType,
+                                sizeBytes = req.sizeBytes,
+                                data = if (storagePath == null) encryptedPayload.data else ByteArray(0),
+                                storagePath = storagePath,
+                                createdAt = System.currentTimeMillis(),
+                                version = 0L,
+                                deviceId = DeviceId(req.deviceId),
+                                encryptionVersion = 1,
+                                encryptionKeyId = "default",
+                                encryptionMode = "SERVER",
+                            ),
+                        )
+                    }.getOrElse { error ->
+                        if (storagePath != null) {
+                            runCatching { mediaStorage?.deleteBlob(storagePath) }
+                                .onFailure { deleteError ->
+                                    Napier.w("Failed to roll back media blob $mediaId after metadata write failure", deleteError)
+                                }
+                        }
+                        Napier.e("Failed to persist media metadata", error)
+                        return@post call.respond(
+                            HttpStatusCode.InternalServerError,
+                            error("MEDIA_METADATA_WRITE_FAILED", "Failed to store media metadata"),
+                        )
+                    }
                 val downloadUrl = resolveMediaDownloadUrl(call, stored, mediaStorage, mediaAccessPolicy)
                 val response =
                     MediaUploadResponse(
@@ -294,7 +308,22 @@ internal fun Route.syncMediaRoutes(
                 val mediaId = call.requiredPathParam("mediaId")
                 val record = mediaBlobRepository.getMedia(userId, mediaId)
                 if (record != null) {
-                    record.storagePath?.let { mediaStorage?.deleteBlob(it) }
+                    val storagePath = record.storagePath
+                    if (storagePath != null) {
+                        val storage =
+                            mediaStorage
+                                ?: return@delete call.respond(
+                                    HttpStatusCode.ServiceUnavailable,
+                                    error("MEDIA_STORAGE_UNAVAILABLE", "Media storage not configured"),
+                                )
+                        if (!storage.deleteBlob(storagePath)) {
+                            Napier.w("Failed to delete media blob for $mediaId at $storagePath")
+                            return@delete call.respond(
+                                HttpStatusCode.InternalServerError,
+                                error("MEDIA_DELETE_FAILED", "Failed to delete media blob"),
+                            )
+                        }
+                    }
                     mediaBlobRepository.deleteMedia(userId, mediaId, System.currentTimeMillis())
                 }
                 call.respond(HttpStatusCode.NoContent)

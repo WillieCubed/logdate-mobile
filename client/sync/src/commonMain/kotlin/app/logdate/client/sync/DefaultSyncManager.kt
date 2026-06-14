@@ -1,6 +1,7 @@
 package app.logdate.client.sync
 
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
 import app.logdate.client.networking.DataUsagePolicy
@@ -9,6 +10,7 @@ import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.SyncableDraftRepository
 import app.logdate.client.repository.journals.SyncableJournalContentRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalRepository
@@ -20,6 +22,7 @@ import app.logdate.client.sync.cloud.CloudJournalDataSource
 import app.logdate.client.sync.cloud.CloudMediaDataSource
 import app.logdate.client.sync.cloud.JournalContentAssociation
 import app.logdate.client.sync.cloud.MediaFile
+import app.logdate.client.sync.cloud.SyncedDraft
 import app.logdate.client.sync.conflict.ConflictResolution
 import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.SyncConflictRecord
@@ -37,7 +40,11 @@ import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.CloudAccountRepository
+import app.logdate.shared.model.CloudQuotaManager
+import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
+import app.logdate.shared.model.SerializableTextBlock
+import app.logdate.shared.model.sync.DeviceId
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
@@ -82,6 +89,8 @@ class DefaultSyncManager(
     private val syncMetadataService: SyncMetadataService,
     private val transactionManager: SyncTransactionManager,
     private val dataUsagePolicy: DataUsagePolicy,
+    private val deviceIdProvider: DeviceIdProvider? = null,
+    private val cloudQuotaManager: CloudQuotaManager? = null,
     private val backoff: SyncBackoff = SyncBackoff(),
     private val syncScope: CoroutineScope = CoroutineScope(platformIODispatcher),
 ) : SyncManager {
@@ -126,7 +135,13 @@ class DefaultSyncManager(
         // While unauthenticated, no row in pending_uploads should exist post-gating. If any do,
         // they came from a pre-gating build and would otherwise sit invisibly. clearPending is
         // an unconditional DB delete, so this is safe even on a clean install.
-        if (sessionStorage.getSession() != null) return
+        val hasSession =
+            runCatching { sessionStorage.hasValidSession() }
+                .getOrElse { error ->
+                    Napier.w("Skipping orphan queue cleanup after session check failure", error)
+                    return
+                }
+        if (hasSession) return
         runCatching { syncMetadataService.clearPending() }
             .onFailure { Napier.w("Failed to clear orphan pending queue", it) }
     }
@@ -175,6 +190,13 @@ class DefaultSyncManager(
         val errors: List<SyncError>,
     )
 
+    private data class UploadBatchResult(
+        val journalResult: SyncResult,
+        val contentResult: SyncResult,
+        val associationResult: SyncResult,
+        val draftResult: SyncResult,
+    )
+
     override fun sync(startNow: Boolean) {
         if (startNow) {
             syncScope.launch {
@@ -218,25 +240,29 @@ class DefaultSyncManager(
                     getAccessToken()
                         ?: return authError()
 
-                val (journalResult, contentResult, associationResult) =
+                val (journalResult, contentResult, associationResult, draftResult) =
                     coroutineScope {
                         val j = async { uploadJournals(accessToken) }
                         val c = async { uploadContent(accessToken) }
                         val a = async { uploadAssociations(accessToken) }
-                        Triple(j.await(), c.await(), a.await())
+                        val d = async { uploadDrafts(accessToken) }
+                        UploadBatchResult(j.await(), c.await(), a.await(), d.await())
                     }
                 val totalUploaded =
                     journalResult.uploadedItems +
                         contentResult.uploadedItems +
-                        associationResult.uploadedItems
+                        associationResult.uploadedItems +
+                        draftResult.uploadedItems
                 val errors =
                     journalResult.errors +
                         contentResult.errors +
-                        associationResult.errors
+                        associationResult.errors +
+                        draftResult.errors
 
                 val success = errors.isEmpty()
                 if (success) {
                     lastErrorFlow.value = null
+                    refreshObservedQuotaFromServer("pending upload")
                 } else {
                     lastErrorFlow.value = errors.firstOrNull()
                 }
@@ -311,6 +337,7 @@ class DefaultSyncManager(
                 val success = errors.isEmpty()
                 if (success) {
                     lastErrorFlow.value = null
+                    refreshObservedQuotaFromServer("remote download")
                 } else {
                     lastErrorFlow.value = errors.firstOrNull()
                 }
@@ -369,6 +396,7 @@ class DefaultSyncManager(
                 val success = uploadResult.success && downloadResult.success
                 if (success) {
                     lastErrorFlow.value = null
+                    refreshObservedQuotaFromServer("content sync")
                 } else {
                     lastErrorFlow.value = (downloadResult.errors + uploadResult.errors).firstOrNull()
                 }
@@ -423,6 +451,7 @@ class DefaultSyncManager(
                 val success = uploadResult.success && downloadResult.success
                 if (success) {
                     lastErrorFlow.value = null
+                    refreshObservedQuotaFromServer("journal sync")
                 } else {
                     lastErrorFlow.value = (downloadResult.errors + uploadResult.errors).firstOrNull()
                 }
@@ -477,6 +506,7 @@ class DefaultSyncManager(
                 val success = uploadResult.success && downloadResult.success
                 if (success) {
                     lastErrorFlow.value = null
+                    refreshObservedQuotaFromServer("association sync")
                 } else {
                     lastErrorFlow.value = (downloadResult.errors + uploadResult.errors).firstOrNull()
                 }
@@ -507,52 +537,18 @@ class DefaultSyncManager(
                         errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "No access token")),
                     )
 
-                // Server caps /drafts/changes at 100 per response with no hasMore in the
-                // contract today; if the response is full we keep paging by max(lastUpdated).
-                // Without this loop, a fresh device with > 100 drafts would only ever pull the
-                // first page and silently lose the rest until manual edits forced the cursor
-                // forward. Mirrors the journals / content pagination loop above.
-                var cursor = syncMetadataService.getLastSyncTime(EntityType.DRAFT) ?: Instant.fromEpochMilliseconds(0)
-                var totalDownloaded = 0
-                var success = true
-
-                while (true) {
-                    val changesResult =
-                        cloudDraftDataSource.getDraftChanges(
-                            accessToken = accessToken,
-                            since = cursor,
-                        )
-                    if (changesResult.isFailure) {
-                        success = false
-                        break
-                    }
-                    val result = changesResult.getOrThrow()
-                    totalDownloaded += result.changes.size
-
-                    if (result.changes.isEmpty() && result.deletions.isEmpty()) {
-                        break
-                    }
-
-                    syncMetadataService.updateLastSyncTime(EntityType.DRAFT, result.lastSyncTimestamp)
-
-                    if (result.lastSyncTimestamp <= cursor) {
-                        Napier.w(
-                            "Draft sync pagination cursor did not advance (since=$cursor, last=${result.lastSyncTimestamp})",
-                        )
-                        break
-                    }
-
-                    cursor = result.lastSyncTimestamp
-
-                    if (!result.hasMore) {
-                        break
-                    }
-                }
+                val since = cursorFor(EntityType.DRAFT)
+                val downloadResult = downloadDrafts(accessToken, since)
+                val uploadResult = uploadDrafts(accessToken)
+                val success = downloadResult.success && uploadResult.success
 
                 SyncResult(
                     success = success,
-                    downloadedItems = totalDownloaded,
-                    lastSyncTime = Clock.System.now(),
+                    uploadedItems = uploadResult.uploadedItems,
+                    downloadedItems = downloadResult.downloadedItems,
+                    conflictsResolved = downloadResult.conflictsResolved,
+                    errors = downloadResult.errors + uploadResult.errors,
+                    lastSyncTime = latestSyncTime(),
                 )
             } catch (e: Exception) {
                 Napier.e("Draft sync failed", e)
@@ -578,6 +574,12 @@ class DefaultSyncManager(
             errors = downloadResult.errors + uploadResult.errors + draftResult.errors,
             lastSyncTime = latestSyncTime(),
         )
+    }
+
+    private suspend fun refreshObservedQuotaFromServer(reason: String) {
+        val manager = cloudQuotaManager ?: return
+        runCatching { manager.syncWithServer() }
+            .onFailure { Napier.w("Failed to refresh quota after $reason", it) }
     }
 
     override suspend fun getSyncStatus(): SyncStatus {
@@ -739,10 +741,39 @@ class DefaultSyncManager(
                 syncMetadataService.getLastSyncTime(EntityType.NOTE),
                 syncMetadataService.getLastSyncTime(EntityType.ASSOCIATION),
                 syncMetadataService.getLastSyncTime(EntityType.MEDIA),
+                syncMetadataService.getLastSyncTime(EntityType.DRAFT),
             ).filterNotNull()
 
         return times.maxOrNull()
     }
+
+    private fun currentDeviceId(): DeviceId =
+        deviceIdProvider
+            ?.getDeviceId()
+            ?.value
+            ?.toString()
+            ?.let(::DeviceId)
+            ?: DeviceId.UNKNOWN
+
+    private fun SyncedDraft.toEditorDraft(): EditorDraft =
+        EditorDraft(
+            id = id,
+            blocks =
+                content
+                    .takeIf { it.isNotBlank() }
+                    ?.let {
+                        listOf(
+                            SerializableTextBlock(
+                                id = id,
+                                timestamp = createdAt,
+                                content = it,
+                            ),
+                        )
+                    }.orEmpty(),
+            selectedJournalIds = journalIds,
+            createdAt = createdAt,
+            lastModifiedAt = lastUpdated,
+        )
 
     private fun JournalNote.mediaRefOrNull(): String? =
         when (this) {
@@ -1227,7 +1258,7 @@ class DefaultSyncManager(
                             if (mediaRef != null && !isRemoteMediaRef(mediaRef)) {
                                 if (!dataUsagePolicy.currentMode().shouldSyncMedia()) {
                                     Napier.d("Deferring media upload for note ${note.uid} — data usage policy restricts media sync")
-                                    note
+                                    continue
                                 } else {
                                     val mediaUpload = uploadMediaIfNeeded(accessToken, note)
                                     if (mediaUpload.isFailure) {
@@ -1473,6 +1504,107 @@ class DefaultSyncManager(
             handleCloudApiError(e)
         } catch (e: Exception) {
             handleSyncException(e, "Upload associations")
+        }
+    }
+
+    private suspend fun uploadDrafts(accessToken: String): SyncResult {
+        return try {
+            var uploadedCount = 0
+            val errors = mutableListOf<SyncError>()
+            val pendingUploads = syncMetadataService.getPendingUploads(EntityType.DRAFT)
+            if (pendingUploads.isEmpty()) {
+                return SyncResult(success = true, uploadedItems = 0)
+            }
+
+            val draftsById = journalRepository.getAllDrafts().associateBy { it.id.toString() }
+            val deviceId = currentDeviceId()
+
+            for (pending in pendingUploads) {
+                val draftId = runCatching { Uuid.parse(pending.entityId) }.getOrNull()
+                if (draftId == null) {
+                    errors.add(
+                        SyncError(
+                            SyncErrorType.UNKNOWN_ERROR,
+                            "Invalid draft ID in outbox: ${pending.entityId}",
+                            retryable = false,
+                        ),
+                    )
+                    syncMetadataService.markAsSynced(pending.entityId, EntityType.DRAFT, Clock.System.now(), 0L)
+                    continue
+                }
+                if (!shouldAttempt(EntityType.DRAFT, pending.entityId)) {
+                    continue
+                }
+
+                when (pending.operation) {
+                    PendingOperation.DELETE -> {
+                        val result =
+                            retryWithFreshToken(
+                                { token -> cloudDraftDataSource.deleteDraft(token, draftId) },
+                                "deleteDraft($draftId)",
+                            )
+                        if (result.isSuccess) {
+                            uploadedCount++
+                            syncMetadataService.markAsSynced(pending.entityId, EntityType.DRAFT, Clock.System.now(), 0L)
+                            retryScheduleStore.clear(EntityType.DRAFT, pending.entityId)
+                        } else {
+                            val error = result.exceptionOrNull() ?: Exception("Unknown draft delete error")
+                            val movedToDeadLetter = handleRetryFailure(EntityType.DRAFT, pending, error)
+                            errors.add(
+                                SyncError(
+                                    SyncErrorType.SERVER_ERROR,
+                                    "Failed to delete draft $draftId: ${error.message}",
+                                    error,
+                                    retryable = !movedToDeadLetter,
+                                ),
+                            )
+                        }
+                    }
+                    PendingOperation.CREATE,
+                    PendingOperation.UPDATE,
+                    -> {
+                        val draft = draftsById[pending.entityId]
+                        if (draft == null) {
+                            syncMetadataService.markAsSynced(pending.entityId, EntityType.DRAFT, Clock.System.now(), 0L)
+                            continue
+                        }
+
+                        val result =
+                            retryWithFreshToken(
+                                { token -> cloudDraftDataSource.uploadDraft(token, draft, deviceId) },
+                                "uploadDraft(${draft.id})",
+                            )
+                        if (result.isSuccess) {
+                            val upload = result.getOrThrow()
+                            uploadedCount++
+                            syncMetadataService.markAsSynced(
+                                pending.entityId,
+                                EntityType.DRAFT,
+                                upload.syncedAt,
+                                upload.serverVersion,
+                            )
+                            retryScheduleStore.clear(EntityType.DRAFT, pending.entityId)
+                        } else {
+                            val error = result.exceptionOrNull() ?: Exception("Unknown draft upload error")
+                            val movedToDeadLetter = handleRetryFailure(EntityType.DRAFT, pending, error)
+                            errors.add(
+                                SyncError(
+                                    SyncErrorType.SERVER_ERROR,
+                                    "Failed to upload draft ${draft.id}: ${error.message}",
+                                    error,
+                                    retryable = !movedToDeadLetter,
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+
+            SyncResult(success = errors.isEmpty(), uploadedItems = uploadedCount, errors = errors)
+        } catch (e: CloudApiException) {
+            handleCloudApiError(e)
+        } catch (e: Exception) {
+            handleSyncException(e, "Upload drafts")
         }
     }
 
@@ -1904,6 +2036,168 @@ class DefaultSyncManager(
             handleCloudApiError(e)
         } catch (e: Exception) {
             handleSyncException(e, "Download content")
+        }
+
+    private suspend fun downloadDrafts(
+        accessToken: String,
+        since: Instant,
+    ): SyncResult =
+        try {
+            val pendingDrafts =
+                syncMetadataService
+                    .getPendingUploads(EntityType.DRAFT)
+                    .map { it.entityId }
+                    .toSet()
+            val localDrafts =
+                journalRepository
+                    .getAllDrafts()
+                    .associateBy { it.id }
+                    .toMutableMap()
+            val syncableDraftRepository = journalRepository as? SyncableDraftRepository
+
+            var cursor = since
+            var totalDownloaded = 0
+            var totalConflicts = 0
+            val errors = mutableListOf<SyncError>()
+
+            while (true) {
+                val result = cloudDraftDataSource.getDraftChanges(accessToken, cursor, SYNC_PAGE_SIZE).getOrThrow()
+
+                val batchResult =
+                    transactionManager.withTransaction {
+                        var downloadedCount = 0
+                        var conflictsResolved = 0
+                        val batchErrors = mutableListOf<SyncError>()
+
+                        for (remoteDraft in result.changes) {
+                            try {
+                                val existingDraft = localDrafts[remoteDraft.id]
+                                val hasPendingLocal = pendingDrafts.contains(remoteDraft.id.toString())
+                                if (hasPendingLocal) {
+                                    conflictsResolved++
+                                    Napier.w("Skipping draft update for ${remoteDraft.id} due to local pending changes")
+                                    recordConflict(
+                                        entityType = EntityType.DRAFT,
+                                        entityId = remoteDraft.id.toString(),
+                                        reason = "Local pending draft changes vs remote update",
+                                        localVersion = null,
+                                        remoteVersion = remoteDraft.serverVersion,
+                                        localUpdatedAt = existingDraft?.lastModifiedAt,
+                                        remoteUpdatedAt = remoteDraft.lastUpdated,
+                                    )
+                                    continue
+                                }
+
+                                if (existingDraft != null && existingDraft.lastModifiedAt > remoteDraft.lastUpdated) {
+                                    syncMetadataService.enqueuePending(
+                                        entityId = existingDraft.id.toString(),
+                                        entityType = EntityType.DRAFT,
+                                        operation = PendingOperation.UPDATE,
+                                    )
+                                    conflictsResolved++
+                                    Napier.w("Preserving newer local draft ${existingDraft.id} over older remote draft")
+                                    continue
+                                }
+
+                                val draft = remoteDraft.toEditorDraft()
+                                if (syncableDraftRepository != null) {
+                                    syncableDraftRepository.saveDraftFromSync(draft)
+                                } else {
+                                    journalRepository.saveDraft(draft)
+                                }
+                                localDrafts[draft.id] = draft
+                                downloadedCount++
+                            } catch (e: Exception) {
+                                batchErrors.add(
+                                    SyncError(
+                                        SyncErrorType.UNKNOWN_ERROR,
+                                        "Failed to apply draft change for ${remoteDraft.id}: ${e.message}",
+                                        e,
+                                    ),
+                                )
+                                Napier.e("Failed to apply draft change for ${remoteDraft.id}", e)
+                            }
+                        }
+
+                        for (draftId in result.deletions) {
+                            try {
+                                val existingDraft = localDrafts[draftId]
+                                val hasPendingLocal =
+                                    existingDraft != null &&
+                                        pendingDrafts.contains(draftId.toString())
+                                if (hasPendingLocal) {
+                                    conflictsResolved++
+                                    Napier.w("Skipping draft deletion for $draftId due to local pending changes")
+                                    recordConflict(
+                                        entityType = EntityType.DRAFT,
+                                        entityId = draftId.toString(),
+                                        reason = "Local pending draft changes vs remote deletion",
+                                        localVersion = null,
+                                        remoteVersion = null,
+                                        localUpdatedAt = existingDraft.lastModifiedAt,
+                                        remoteUpdatedAt = null,
+                                    )
+                                    continue
+                                }
+
+                                if (syncableDraftRepository != null) {
+                                    syncableDraftRepository.deleteDraftFromSync(draftId)
+                                } else {
+                                    journalRepository.deleteDraft(draftId)
+                                }
+                                localDrafts.remove(draftId)
+                                downloadedCount++
+                            } catch (e: Exception) {
+                                batchErrors.add(
+                                    SyncError(
+                                        SyncErrorType.UNKNOWN_ERROR,
+                                        "Failed to delete draft $draftId: ${e.message}",
+                                        e,
+                                    ),
+                                )
+                                Napier.e("Failed to delete draft $draftId", e)
+                            }
+                        }
+
+                        BatchResult(downloadedCount, conflictsResolved, batchErrors)
+                    }
+
+                totalDownloaded += batchResult.downloadedCount
+                totalConflicts += batchResult.conflictsResolved
+                errors.addAll(batchResult.errors)
+
+                if (batchResult.errors.isNotEmpty()) {
+                    break
+                }
+
+                if (result.changes.isEmpty() && result.deletions.isEmpty()) {
+                    break
+                }
+
+                syncMetadataService.updateLastSyncTime(EntityType.DRAFT, result.lastSyncTimestamp)
+
+                if (!result.hasMore) {
+                    break
+                }
+
+                if (result.lastSyncTimestamp <= cursor) {
+                    Napier.w("Draft sync pagination cursor did not advance (since=$cursor, last=${result.lastSyncTimestamp})")
+                    break
+                }
+
+                cursor = result.lastSyncTimestamp
+            }
+
+            SyncResult(
+                success = errors.isEmpty(),
+                downloadedItems = totalDownloaded,
+                conflictsResolved = totalConflicts,
+                errors = errors,
+            )
+        } catch (e: CloudApiException) {
+            handleCloudApiError(e)
+        } catch (e: Exception) {
+            handleSyncException(e, "Download drafts")
         }
 
     private suspend fun downloadAssociations(

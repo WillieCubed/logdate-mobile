@@ -46,7 +46,11 @@ class SecureSessionStorage(
         if (sessionState.value != null) {
             return true
         }
-        return loadSession(configRepository.getCurrentBackendUrl()) != null
+        val loaded = loadSession(configRepository.getCurrentBackendUrl())
+        if (loaded != null) {
+            sessionState.value = loaded
+        }
+        return loaded != null
     }
 
     override fun saveSession(session: UserSession) {

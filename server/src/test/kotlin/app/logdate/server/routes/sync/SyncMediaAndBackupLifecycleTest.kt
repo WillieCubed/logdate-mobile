@@ -4,6 +4,8 @@ import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.crypto.EncryptionService
 import app.logdate.server.crypto.ProcessedPayload
 import app.logdate.server.logdate.LogDateBlobNamespace
+import app.logdate.server.logdate.LogDateBackupRepository
+import app.logdate.server.logdate.LogDateMediaBlobRepository
 import app.logdate.server.logdate.asLogDateBackupRepository
 import app.logdate.server.logdate.asLogDateCollectionsRepository
 import app.logdate.server.logdate.asLogDateMediaBlobRepository
@@ -15,6 +17,7 @@ import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.MediaAccessPolicy
 import app.logdate.server.sync.MediaRecord
+import app.logdate.server.sync.BackupRecord
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.shared.model.sync.DeviceId
 import io.ktor.client.request.delete
@@ -33,6 +36,7 @@ import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -118,6 +122,83 @@ class SyncMediaAndBackupLifecycleTest {
 
             val listed = client.get("/api/v1/backups") { header(HttpHeaders.Authorization, auth) }
             assertEquals(HttpStatusCode.OK, listed.status)
+        }
+
+    @Test
+    fun `media and backup uploads roll back blob writes when metadata persistence fails`() =
+        testApplication {
+            val repository = InMemorySyncRepository()
+            val tokenService = JwtTokenService("sync-binary-secret")
+            val storage = mockk<GcsMediaStorage>()
+            val mediaBlobRepository = mockk<LogDateMediaBlobRepository>()
+            val backupRepository = mockk<LogDateBackupRepository>()
+            val mediaPath = "users/u/media/media-rollback/photo.jpg"
+            val backupPath = "users/u/backups/backup-rollback.enc"
+
+            every { storage.putBlob(match { it.namespace == LogDateBlobNamespace.MEDIA }) } returns mediaPath
+            every { storage.putBlob(match { it.namespace == LogDateBlobNamespace.BACKUP }) } returns backupPath
+            every { storage.deleteBlob(mediaPath) } returns true
+            every { storage.deleteBlob(backupPath) } returns true
+            every { storage.getBlob(any()) } returns null
+            every { storage.getSignedDownloadUrl(any(), any()) } returns "https://signed.example/object"
+            every { mediaBlobRepository.upsertMedia(any(), any()) } throws IllegalStateException("media metadata fail")
+            every { backupRepository.createBackup(any(), any()) } throws IllegalStateException("backup metadata fail")
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    route("/api/v1") {
+                        syncRoutes(
+                            tokenService = tokenService,
+                            mediaStorage = storage,
+                            metrics = SyncMetricsRegistry(),
+                            mediaAccessPolicy = MediaAccessPolicy(useSignedUrls = true, signedUrlTtlHours = 1),
+                            collectionsRepository = repository.asLogDateCollectionsRepository(),
+                            mediaBlobRepository = mediaBlobRepository,
+                            backupRepository = backupRepository,
+                        )
+                    }
+                }
+            }
+
+            val auth = "Bearer ${tokenService.generateAccessToken(UUID.randomUUID().toString())}"
+            val payload = byteArrayOf(1, 2, 3, 4)
+
+            val mediaUpload =
+                client.post("/api/v1/media") {
+                    header(HttpHeaders.Authorization, auth)
+                    setBody(
+                        mediaMultipartWithFields(
+                            includeContentId = true,
+                            includeFileName = true,
+                            includeMimeType = true,
+                            includeSizeBytes = true,
+                            includeDeviceId = true,
+                            includeData = true,
+                            sizeBytes = payload.size.toLong(),
+                            payload = payload,
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.InternalServerError, mediaUpload.status)
+            assertTrue(mediaUpload.bodyAsText().contains("MEDIA_METADATA_WRITE_FAILED"))
+            verify(exactly = 1) { storage.deleteBlob(mediaPath) }
+
+            val backupUpload =
+                client.post("/api/v1/backups") {
+                    header(HttpHeaders.Authorization, auth)
+                    setBody(
+                        backupMultipartWithFields(
+                            includeDeviceId = true,
+                            includeManifest = true,
+                            includeData = true,
+                            payload = payload,
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.InternalServerError, backupUpload.status)
+            assertTrue(backupUpload.bodyAsText().contains("BACKUP_METADATA_WRITE_FAILED"))
+            verify(exactly = 1) { storage.deleteBlob(backupPath) }
         }
 
     @Test
@@ -266,6 +347,130 @@ class SyncMediaAndBackupLifecycleTest {
                     header(HttpHeaders.Authorization, auth)
                 }
             assertEquals(HttpStatusCode.BadRequest, deleteInvalidBackupId.status)
+        }
+
+    @Test
+    fun `delete endpoints refuse to drop metadata when blob deletion fails`() =
+        testApplication {
+            val repository = InMemorySyncRepository()
+            val tokenService = JwtTokenService("sync-binary-secret")
+            val storage = mockk<GcsMediaStorage>()
+            val userId = UUID.randomUUID()
+            val auth = "Bearer ${tokenService.generateAccessToken(userId.toString())}"
+            val mediaId = "media-delete-fails"
+            val backupId = UUID.randomUUID()
+
+            every { storage.deleteBlob("users/$userId/media/$mediaId/file.bin") } returns false
+            every { storage.deleteBlob("users/$userId/backups/$backupId.enc") } returns false
+            every { storage.getBlob(any()) } returns null
+            every { storage.getSignedDownloadUrl(any(), any()) } returns "https://signed.example/object"
+
+            repository.upsertMedia(
+                userId,
+                MediaRecord(
+                    mediaId = mediaId,
+                    contentId = "content-$mediaId",
+                    userId = userId,
+                    fileName = "file.bin",
+                    mimeType = "application/octet-stream",
+                    sizeBytes = 3,
+                    data = byteArrayOf(1, 2, 3),
+                    storagePath = "users/$userId/media/$mediaId/file.bin",
+                    createdAt = 1,
+                    serverVersion = 1,
+                    deviceId = DeviceId("device-1"),
+                ),
+            )
+            repository.createBackupRecord(
+                userId,
+                BackupRecord(
+                    id = backupId,
+                    userId = userId,
+                    deviceId = "device-1",
+                    manifest = "{}",
+                    storagePath = "users/$userId/backups/$backupId.enc",
+                    createdAt = 1,
+                    sizeBytes = 3,
+                ),
+            )
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    route("/api/v1") {
+                        syncRoutes(
+                            tokenService = tokenService,
+                            mediaStorage = storage,
+                            metrics = SyncMetricsRegistry(),
+                            collectionsRepository = repository.asLogDateCollectionsRepository(),
+                            mediaBlobRepository = repository.asLogDateMediaRepository().asLogDateMediaBlobRepository(),
+                            backupRepository = repository.asLogDateBackupRepository(),
+                        )
+                    }
+                }
+            }
+
+            val mediaDelete =
+                client.delete("/api/v1/media/$mediaId") {
+                    header(HttpHeaders.Authorization, auth)
+                }
+            assertEquals(HttpStatusCode.InternalServerError, mediaDelete.status)
+            assertTrue(mediaDelete.bodyAsText().contains("MEDIA_DELETE_FAILED"))
+            assertTrue(repository.getMedia(userId, mediaId) != null, "Metadata must remain when blob delete fails")
+
+            val backupDelete =
+                client.delete("/api/v1/backups/$backupId") {
+                    header(HttpHeaders.Authorization, auth)
+                }
+            assertEquals(HttpStatusCode.InternalServerError, backupDelete.status)
+            assertTrue(backupDelete.bodyAsText().contains("BACKUP_DELETE_FAILED"))
+            assertTrue(repository.getBackupRecord(userId, backupId) != null, "Backup metadata must remain when blob delete fails")
+        }
+
+    @Test
+    fun `backup purge returns unavailable when blob storage is missing`() =
+        testApplication {
+            val repository = InMemorySyncRepository()
+            val tokenService = JwtTokenService("sync-binary-secret")
+            val userId = UUID.randomUUID()
+            val backupId = UUID.randomUUID()
+            repository.createBackupRecord(
+                userId,
+                BackupRecord(
+                    id = backupId,
+                    userId = userId,
+                    deviceId = "device-1",
+                    manifest = "{}",
+                    storagePath = "users/$userId/backups/$backupId.enc",
+                    createdAt = 1,
+                    sizeBytes = 3,
+                ),
+            )
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    route("/api/v1") {
+                        syncRoutes(
+                            tokenService = tokenService,
+                            mediaStorage = null,
+                            metrics = SyncMetricsRegistry(),
+                            collectionsRepository = repository.asLogDateCollectionsRepository(),
+                            mediaBlobRepository = repository.asLogDateMediaRepository().asLogDateMediaBlobRepository(),
+                            backupRepository = repository.asLogDateBackupRepository(),
+                        )
+                    }
+                }
+            }
+
+            val auth = "Bearer ${tokenService.generateAccessToken(userId.toString())}"
+            val purge =
+                client.post("/api/v1/ops/backups:purge") {
+                    header(HttpHeaders.Authorization, auth)
+                }
+            assertEquals(HttpStatusCode.ServiceUnavailable, purge.status)
+            assertTrue(purge.bodyAsText().contains("BACKUP_STORAGE_UNAVAILABLE"))
+            assertTrue(repository.getBackupRecord(userId, backupId) != null, "Purge must not remove metadata when storage is unavailable")
         }
 
     @Test
