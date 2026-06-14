@@ -14,6 +14,8 @@ import app.logdate.client.domain.account.GetCurrentAccountUseCase
 import app.logdate.client.domain.account.GetCurrentEntitlementUseCase
 import app.logdate.client.domain.account.HasLogDateCloudAccountUseCase
 import app.logdate.client.domain.account.PreferencesBackfilledAccountTracker
+import app.logdate.client.domain.account.SignInWithGoogleUseCase
+import app.logdate.client.domain.account.SignUpWithGoogleUseCase
 import app.logdate.client.domain.account.TriggerInitialSyncUseCase
 import app.logdate.client.domain.account.TryRestoreSignInUseCase
 import app.logdate.client.domain.account.VerifyEmailUseCase
@@ -37,6 +39,8 @@ val accountDomainModule: Module =
         factory { CreateRemoteAccountUseCase(get()) }
         factory { CheckUsernameAvailabilityUseCase(get()) }
         factory { AuthenticateWithPasskeyUseCase(get()) }
+        factory { SignInWithGoogleUseCase(get()) }
+        factory { SignUpWithGoogleUseCase(get()) }
         factory { TryRestoreSignInUseCase(get()) }
         factory { TriggerInitialSyncUseCase(syncManager = get()) }
         factory<BackfilledAccountTracker> { PreferencesBackfilledAccountTracker(preferences = get()) }

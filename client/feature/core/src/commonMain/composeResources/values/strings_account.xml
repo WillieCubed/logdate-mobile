@@ -40,6 +40,15 @@
     <string name="account_sign_in_to_enable_sync">Sign in to your LogDate Cloud account to enable sync</string>
     <string name="account_sign_in_with_passkey_description">Sign in to your LogDate Cloud account using your passkey.</string>
     <string name="sign_in_with_passkey">Sign In with Passkey</string>
+    <string name="continue_with_google">Continue with Google</string>
+    <string name="google_sign_in_cancelled">Google sign-in was cancelled. Please try again.</string>
+    <string name="google_sign_in_no_account">No Google account is available on this device.</string>
+    <string name="google_sign_in_unavailable">Google sign-in isn\'t available right now.</string>
+    <string name="google_sign_in_failed">Google sign-in failed. Please try again.</string>
+    <string name="google_sign_in_account_conflict">This Google account is already linked to a different LogDate account.</string>
+    <string name="google_sign_in_rate_limited">Too many attempts. Please wait a moment before trying again.</string>
+    <string name="google_sign_in_network_error">Network error. Please check your connection and try again.</string>
+    <string name="google_sign_in_server_error">Something went wrong on our end. Please try again in a few minutes.</string>
     <string name="sign_in_without_username">Sign In without Username</string>
     <string name="signing_in">Signing In...</string>
     <string name="sign_in_to_enable_cloud_backup">Sign in to enable cloud backup and sync.</string>

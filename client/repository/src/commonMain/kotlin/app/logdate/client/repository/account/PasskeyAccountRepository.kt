@@ -97,6 +97,22 @@ interface PasskeyAccountRepository {
      * Non-fatal — failures are silently ignored.
      */
     suspend fun deleteRestoreKey(): Result<Unit>
+
+    /**
+     * Create a LogDate Cloud account from a Google account. Obtains a Google ID token through the
+     * platform credential flow and exchanges it with the server. Defaults to failure so platforms
+     * and test doubles without Google support don't need to implement it.
+     */
+    suspend fun signUpWithGoogle(
+        username: String? = null,
+        displayName: String? = null,
+    ): Result<LogDateAccount> = Result.failure(UnsupportedOperationException("Google sign-up is not supported"))
+
+    /**
+     * Authenticate with an existing LogDate Cloud account using Google.
+     */
+    suspend fun signInWithGoogle(): Result<LogDateAccount> =
+        Result.failure(UnsupportedOperationException("Google sign-in is not supported"))
 }
 
 /**

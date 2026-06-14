@@ -51,6 +51,12 @@ class DefaultLogDateConfigRepository(
         val DEFAULT_BACKEND_URL: String = BuildConfig.DEFAULT_BACKEND_URL
         const val DEFAULT_API_VERSION = "v1"
         const val DEFAULT_LOCAL_SERVER_ADDRESS = "localhost:8765"
+
+        /**
+         * Web OAuth client ID Google ID tokens are issued for ("Sign in with Google"). Blank when
+         * Google sign-in is not configured for this build, in which case the client hides the option.
+         */
+        val GOOGLE_SERVER_CLIENT_ID: String = BuildConfig.GOOGLE_SERVER_CLIENT_ID
     }
 
     private val _backendUrl = MutableStateFlow(initialBackendUrl)

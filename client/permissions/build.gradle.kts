@@ -62,6 +62,10 @@ kotlin {
             implementation(libs.accompanist.permissions)
             implementation(libs.androidx.credentials)
             implementation(libs.androidx.credentials.play.services)
+            // Google Identity Services GetGoogleIdOption for "Sign in with Google" via Credential
+            // Manager. Declared inline rather than in the version catalog, which is mid dependency
+            // upgrade in a separate change; move to libs.versions.toml once that lands.
+            implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.health.connect)
             implementation(libs.koin.android)

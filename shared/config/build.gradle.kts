@@ -20,6 +20,13 @@ buildConfig {
         "DEFAULT_BACKEND_URL",
         providers.gradleProperty("logdate.backendUrl").orElse("https://cloud.logdate.app").get(),
     )
+    // Web OAuth client ID that Google ID tokens are issued for ("Sign in with Google"). Empty by
+    // default; set with -Plogdate.googleServerClientId=<id> (or in gradle.properties) once a Google
+    // OAuth client exists. Blank disables the Google sign-in option in the client.
+    buildConfigField(
+        "GOOGLE_SERVER_CLIENT_ID",
+        providers.gradleProperty("logdate.googleServerClientId").orElse("").get(),
+    )
 }
 
 kotlin {

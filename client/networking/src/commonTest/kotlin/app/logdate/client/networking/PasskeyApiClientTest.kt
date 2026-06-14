@@ -246,4 +246,97 @@ class PasskeyApiClientTest {
             assertTrue(result.isSuccess)
             assertEquals("new-access", result.getOrThrow())
         }
+
+    @Test
+    fun `signUpWithGoogle posts to google signup path and maps auth response`() =
+        runTest {
+            val mockEngine =
+                MockEngine { request ->
+                    assertEquals("/api/v1/auth/signup/google", request.url.encodedPath)
+                    respond(
+                        content =
+                            """
+                            {
+                              "success": true,
+                              "data": {
+                                "account": {
+                                  "id": "550e8400-e29b-41d4-a716-446655440000",
+                                  "username": "googleuser",
+                                  "displayName": "Google User",
+                                  "createdAt": "2026-03-05T00:00:00Z",
+                                  "updatedAt": "2026-03-05T00:00:00Z"
+                                },
+                                "tokens": {"accessToken": "access", "refreshToken": "refresh"}
+                              }
+                            }
+                            """.trimIndent(),
+                        status = HttpStatusCode.Created,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+
+            val apiClient = createMockApiClient(mockEngine)
+            val result = apiClient.signUpWithGoogle(idToken = "google-id-token", displayName = "Google User")
+
+            assertTrue(result.isSuccess)
+            assertEquals("googleuser", result.getOrThrow().account.username)
+            assertEquals("access", result.getOrThrow().tokens.accessToken)
+        }
+
+    @Test
+    fun `signInWithGoogle posts to google signin path and maps auth response`() =
+        runTest {
+            val mockEngine =
+                MockEngine { request ->
+                    assertEquals("/api/v1/auth/signin/google", request.url.encodedPath)
+                    respond(
+                        content =
+                            """
+                            {
+                              "success": true,
+                              "data": {
+                                "account": {
+                                  "id": "550e8400-e29b-41d4-a716-446655440000",
+                                  "username": "googleuser",
+                                  "displayName": "Google User",
+                                  "createdAt": "2026-03-05T00:00:00Z",
+                                  "updatedAt": "2026-03-05T00:00:00Z"
+                                },
+                                "tokens": {"accessToken": "access", "refreshToken": "refresh"}
+                              }
+                            }
+                            """.trimIndent(),
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+
+            val apiClient = createMockApiClient(mockEngine)
+            val result = apiClient.signInWithGoogle(idToken = "google-id-token")
+
+            assertTrue(result.isSuccess)
+            assertEquals("googleuser", result.getOrThrow().account.username)
+        }
+
+    @Test
+    fun `signInWithGoogle maps server error code`() =
+        runTest {
+            val mockEngine =
+                MockEngine {
+                    respond(
+                        content = """{"error": {"code": "GOOGLE_TOKEN_INVALID", "message": "Invalid token"}}""",
+                        status = HttpStatusCode.Unauthorized,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+
+            val apiClient = createMockApiClient(mockEngine)
+            val result = apiClient.signInWithGoogle(idToken = "bad-token")
+
+            assertTrue(result.isFailure)
+            assertEquals(
+                PasskeyApiErrorCodes.GOOGLE_TOKEN_INVALID,
+                (result.exceptionOrNull() as PasskeyApiException).errorCode,
+            )
+        }
 }

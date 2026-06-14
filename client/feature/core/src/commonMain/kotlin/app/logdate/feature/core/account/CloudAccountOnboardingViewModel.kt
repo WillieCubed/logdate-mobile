@@ -7,6 +7,8 @@ import app.logdate.client.domain.account.BackfillLocalDataUseCase
 import app.logdate.client.domain.account.CheckUsernameAvailabilityUseCase
 import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
 import app.logdate.client.domain.account.EmailVerificationAvailability
+import app.logdate.client.domain.account.GoogleAuthError
+import app.logdate.client.domain.account.SignInWithGoogleUseCase
 import app.logdate.client.domain.account.TriggerInitialSyncUseCase
 import app.logdate.client.domain.account.VerifyEmailUseCase
 import app.logdate.client.permissions.EmailVerificationOutcome
@@ -16,6 +18,7 @@ import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
 import app.logdate.feature.core.settings.ui.ServerPreset
 import app.logdate.feature.core.settings.ui.ServerSelectionState
 import app.logdate.feature.core.settings.ui.ServerValidationState
+import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.ServerDescriptor
 import io.github.aakira.napier.Napier
@@ -30,6 +33,7 @@ class CloudAccountOnboardingViewModel(
     private val createPasskeyAccountUseCase: CreatePasskeyAccountUseCase,
     private val checkUsernameAvailabilityUseCase: CheckUsernameAvailabilityUseCase,
     private val authenticateWithPasskeyUseCase: AuthenticateWithPasskeyUseCase,
+    private val signInWithGoogleUseCase: SignInWithGoogleUseCase,
     private val triggerInitialSyncUseCase: TriggerInitialSyncUseCase,
     private val backfillLocalDataUseCase: BackfillLocalDataUseCase,
     private val passkeyManager: PasskeyManager,
@@ -42,6 +46,9 @@ class CloudAccountOnboardingViewModel(
         MutableStateFlow(
             CloudAccountOnboardingUiState(
                 serverSelectionState = serverConfigurationCoordinator.initialSelectionState(),
+                // Google sign-in is offered only when a web OAuth client ID is configured for this
+                // build; otherwise the server would reject every token and the option is hidden.
+                isGoogleSignInAvailable = DefaultLogDateConfigRepository.GOOGLE_SERVER_CLIENT_ID.isNotBlank(),
             ),
         )
     val uiState: StateFlow<CloudAccountOnboardingUiState> = _uiState.asStateFlow()
@@ -258,7 +265,7 @@ class CloudAccountOnboardingViewModel(
     }
 
     fun clearError() {
-        _uiState.value = _uiState.value.copy(errorMessage = null)
+        _uiState.value = _uiState.value.copy(errorMessage = null, googleAuthError = null)
     }
 
     fun goToSignIn() {
@@ -294,6 +301,44 @@ class CloudAccountOnboardingViewModel(
                         _uiState.value.copy(
                             isSigningIn = false,
                             errorMessage = mapAuthErrorToMessage(result.error),
+                        )
+                }
+            }
+        }
+    }
+
+    /**
+     * Signs in (or links/creates, per the server's implicit Google linking) with a Google account.
+     * Mirrors [signInWithPasskey]: on success it runs the blocking initial sync before completing.
+     */
+    fun signInWithGoogle() {
+        _uiState.value =
+            _uiState.value.copy(
+                isSigningIn = true,
+                errorMessage = null,
+                googleAuthError = null,
+            )
+
+        viewModelScope.launch {
+            when (val result = signInWithGoogleUseCase()) {
+                is SignInWithGoogleUseCase.Result.Success -> {
+                    syncDisplayNameToLocalProfile(result.account.displayName)
+                    _uiState.value =
+                        _uiState.value.copy(
+                            isSigningIn = false,
+                            createdAccount = result.account,
+                            currentStep = OnboardingStep.Complete,
+                            isInitialSyncing = true,
+                            initialSyncStatus = InitialSyncStatus.Running,
+                        )
+                    performInitialSync(markCompletedBy = SyncCompletion.SIGNED_IN)
+                }
+                is SignInWithGoogleUseCase.Result.Error -> {
+                    // Semantic error type; the UI maps it to a localized string resource.
+                    _uiState.value =
+                        _uiState.value.copy(
+                            isSigningIn = false,
+                            googleAuthError = result.error,
                         )
                 }
             }
@@ -608,6 +653,8 @@ data class CloudAccountOnboardingUiState(
     val usernameAvailability: UsernameAvailability = UsernameAvailability.Unknown,
     val isPasskeySupported: Boolean = true,
     val isPlatformAuthenticatorAvailable: Boolean = true,
+    /** True when a Google web OAuth client ID is configured; gates the "Continue with Google" option. */
+    val isGoogleSignInAvailable: Boolean = false,
     val isCreatingAccount: Boolean = false,
     val isAccountCreated: Boolean = false,
     val isSigningIn: Boolean = false,
@@ -623,6 +670,8 @@ data class CloudAccountOnboardingUiState(
     val isExitRequested: Boolean = false,
     val createdAccount: LogDateAccount? = null,
     val errorMessage: String? = null,
+    /** Semantic Google sign-in failure; the UI resolves it to a localized string resource. */
+    val googleAuthError: GoogleAuthError? = null,
     /**
      * Cached once at init time from EmailVerificationAvailability. Gates the
      * EmailVerification sub-step transition + the inline UI in [EmailVerificationStep].

@@ -114,6 +114,26 @@ interface PasskeyApiClientContract {
      * "Account deletion is temporarily unavailable" rather than a generic error.
      */
     suspend fun deleteAccount(accessToken: String): Result<Unit>
+
+    /**
+     * Create an account from a verified Google ID token. The server validates the token against its
+     * configured Google OIDC client IDs and returns the new account plus tokens. Default fails so
+     * non-Google clients/fakes don't have to implement it.
+     */
+    suspend fun signUpWithGoogle(
+        idToken: String,
+        username: String? = null,
+        displayName: String? = null,
+        nonce: String? = null,
+    ): Result<CompleteAccountCreationData> =
+        Result.failure(PasskeyApiException("NOT_SUPPORTED", "Google sign-up is not supported by this client"))
+
+    /** Sign in with a verified Google ID token. */
+    suspend fun signInWithGoogle(
+        idToken: String,
+        nonce: String? = null,
+    ): Result<CompleteAuthenticationData> =
+        Result.failure(PasskeyApiException("NOT_SUPPORTED", "Google sign-in is not supported by this client"))
 }
 
 /**
@@ -396,6 +416,73 @@ class PasskeyApiClient(
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to delete account", e))
         }
 
+    override suspend fun signUpWithGoogle(
+        idToken: String,
+        username: String?,
+        displayName: String?,
+        nonce: String?,
+    ): Result<CompleteAccountCreationData> =
+        try {
+            val baseUrl = getBaseUrl()
+            val response =
+                httpClient.post("$baseUrl$AUTH_PATH/signup/google") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        GoogleAuthRequestDto(
+                            idToken = idToken,
+                            username = username,
+                            displayName = displayName,
+                            nonce = nonce,
+                        ),
+                    )
+                }
+
+            if (response.status.value in 200..299) {
+                val apiResponse = json.decodeFromString<AuthResponseDto>(response.bodyAsText())
+                Result.success(
+                    CompleteAccountCreationData(
+                        account = apiResponse.data.account.toLogDateAccount(),
+                        tokens = apiResponse.data.tokens,
+                    ),
+                )
+            } else {
+                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+            }
+        } catch (e: Exception) {
+            Napier.w("Failed to sign up with Google", e)
+            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to sign up with Google", e))
+        }
+
+    override suspend fun signInWithGoogle(
+        idToken: String,
+        nonce: String?,
+    ): Result<CompleteAuthenticationData> =
+        try {
+            val baseUrl = getBaseUrl()
+            val response =
+                httpClient.post("$baseUrl$AUTH_PATH/signin/google") {
+                    contentType(ContentType.Application.Json)
+                    setBody(GoogleAuthRequestDto(idToken = idToken, nonce = nonce))
+                }
+
+            if (response.status.value in 200..299) {
+                val apiResponse = json.decodeFromString<AuthResponseDto>(response.bodyAsText())
+                Result.success(
+                    CompleteAuthenticationData(
+                        account = apiResponse.data.account.toLogDateAccount(),
+                        tokens = apiResponse.data.tokens,
+                    ),
+                )
+            } else {
+                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+            }
+        } catch (e: Exception) {
+            Napier.w("Failed to sign in with Google", e)
+            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to sign in with Google", e))
+        }
+
     override suspend fun beginRestoreKeyRegistration(accessToken: String): Result<PasskeyRegistrationOptions> =
         try {
             val baseUrl = getBaseUrl()
@@ -531,6 +618,14 @@ object PasskeyApiErrorCodes {
     const val DELETION_UNAVAILABLE = "DELETION_UNAVAILABLE"
     const val SERVER_ERROR = "SERVER_ERROR"
 }
+
+@Serializable
+private data class GoogleAuthRequestDto(
+    val idToken: String,
+    val username: String? = null,
+    val displayName: String? = null,
+    val nonce: String? = null,
+)
 
 @Serializable
 private data class SignupPasskeyBeginRequestDto(

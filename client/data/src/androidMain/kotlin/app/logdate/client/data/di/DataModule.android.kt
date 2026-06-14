@@ -84,6 +84,7 @@ import app.logdate.client.repository.timeline.ActivityTimelineRepository
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.repository.user.devices.UserDeviceRepository
+import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.configModule
 import kotlinx.serialization.json.Json
 import org.koin.android.ext.koin.androidContext
@@ -215,7 +216,18 @@ actual val dataModule: Module =
                 get<SessionStorage>().getSession()?.accessToken
             }
         }
-        single<PasskeyAccountRepository> { DefaultPasskeyAccountRepository(get(), get(), get(), get(), get(), get()) }
+        single<PasskeyAccountRepository> {
+            DefaultPasskeyAccountRepository(
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                googleSignInManager = get(),
+                serverClientId = DefaultLogDateConfigRepository.GOOGLE_SERVER_CLIENT_ID,
+            )
+        }
         single<AccountIdentityRepository> { DefaultAccountIdentityRepository(get(), get(), get(), get()) }
 
         // Quota

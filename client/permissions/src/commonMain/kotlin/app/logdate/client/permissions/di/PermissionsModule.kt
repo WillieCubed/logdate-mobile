@@ -1,6 +1,8 @@
 package app.logdate.client.permissions.di
 
 import app.logdate.client.permissions.EmailVerificationManager
+import app.logdate.client.permissions.GoogleSignInManager
+import app.logdate.client.permissions.NoOpGoogleSignInManager
 import app.logdate.client.permissions.NoOpRestoreCredentialManager
 import app.logdate.client.permissions.PermissionManager
 import app.logdate.client.permissions.RestoreCredentialManager
@@ -23,6 +25,9 @@ val commonPermissionsModule =
 
         // Default unavailable — Android overrides with AndroidEmailVerificationManager
         single<EmailVerificationManager> { UnavailableEmailVerificationManager() }
+
+        // Default no-op — Android overrides with AndroidGoogleSignInManager
+        single<GoogleSignInManager> { NoOpGoogleSignInManager() }
     }
 
 /**

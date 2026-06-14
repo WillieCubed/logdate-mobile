@@ -26,6 +26,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -48,6 +49,7 @@ import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_recovery
 import logdate.client.feature.core.generated.resources.at
+import logdate.client.feature.core.generated.resources.continue_with_google
 import logdate.client.feature.core.generated.resources.privacy_policy
 import logdate.client.feature.core.generated.resources.server_domain_sign_in_hint
 import logdate.client.feature.core.generated.resources.server_sign_in_title
@@ -74,6 +76,7 @@ fun CloudAccountSignInScreen(
     isSigningIn: Boolean = false,
     errorMessage: String? = null,
     onClearError: () -> Unit = {},
+    onSignInWithGoogle: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var username by remember { mutableStateOf("") }
@@ -93,6 +96,13 @@ fun CloudAccountSignInScreen(
         serverHandleDomain = serverHandleDomain,
         isSigningIn = isSigningIn,
         errorMessage = errorMessage,
+        onSignInWithGoogle =
+            onSignInWithGoogle?.let {
+                {
+                    onClearError()
+                    it()
+                }
+            },
         modifier = modifier,
     )
 }
@@ -110,6 +120,7 @@ fun CloudAccountSignInContent(
     serverHandleDomain: String,
     isSigningIn: Boolean = false,
     errorMessage: String? = null,
+    onSignInWithGoogle: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -241,6 +252,16 @@ fun CloudAccountSignInContent(
                             Text(stringResource(UiRes.string.common_try_again))
                         } else {
                             Text(stringResource(Res.string.sign_in_with_passkey))
+                        }
+                    }
+
+                    if (onSignInWithGoogle != null) {
+                        OutlinedButton(
+                            onClick = onSignInWithGoogle,
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isSigningIn,
+                        ) {
+                            Text(stringResource(Res.string.continue_with_google))
                         }
                     }
 

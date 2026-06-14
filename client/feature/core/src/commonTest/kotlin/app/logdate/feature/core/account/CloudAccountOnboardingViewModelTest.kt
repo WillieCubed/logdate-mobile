@@ -9,6 +9,7 @@ import app.logdate.client.domain.account.CheckUsernameAvailabilityUseCase
 import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
 import app.logdate.client.domain.account.EmailVerificationAvailability
 import app.logdate.client.domain.account.GetCurrentEntitlementUseCase
+import app.logdate.client.domain.account.SignInWithGoogleUseCase
 import app.logdate.client.domain.account.TriggerInitialSyncUseCase
 import app.logdate.client.domain.account.VerifyEmailUseCase
 import app.logdate.client.networking.PasskeyApiClientContract
@@ -234,6 +235,7 @@ class CloudAccountOnboardingViewModelTest {
             createPasskeyAccountUseCase = CreatePasskeyAccountUseCase(passkeyRepo),
             checkUsernameAvailabilityUseCase = CheckUsernameAvailabilityUseCase(passkeyRepo),
             authenticateWithPasskeyUseCase = AuthenticateWithPasskeyUseCase(passkeyRepo),
+            signInWithGoogleUseCase = SignInWithGoogleUseCase(passkeyRepo),
             triggerInitialSyncUseCase = TriggerInitialSyncUseCase(FakeSyncManager()),
             backfillLocalDataUseCase =
                 BackfillLocalDataUseCase(

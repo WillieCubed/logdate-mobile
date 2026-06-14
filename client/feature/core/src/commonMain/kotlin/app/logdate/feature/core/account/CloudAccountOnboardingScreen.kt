@@ -22,12 +22,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.logdate.client.domain.account.GoogleAuthError
 import app.logdate.feature.core.settings.ui.CustomServerInfoBottomSheet
 import app.logdate.feature.core.settings.ui.ServerPreset
 import app.logdate.shared.model.ServerDescriptor
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.atproto_recovery_guidance_body
 import logdate.client.feature.core.generated.resources.atproto_recovery_guidance_title
+import logdate.client.feature.core.generated.resources.google_sign_in_account_conflict
+import logdate.client.feature.core.generated.resources.google_sign_in_cancelled
+import logdate.client.feature.core.generated.resources.google_sign_in_failed
+import logdate.client.feature.core.generated.resources.google_sign_in_network_error
+import logdate.client.feature.core.generated.resources.google_sign_in_no_account
+import logdate.client.feature.core.generated.resources.google_sign_in_rate_limited
+import logdate.client.feature.core.generated.resources.google_sign_in_server_error
+import logdate.client.feature.core.generated.resources.google_sign_in_unavailable
 import logdate.client.ui.generated.resources.common_dismiss
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
@@ -36,6 +45,23 @@ private const val FALLBACK_HANDLE_DOMAIN = "logdate.app"
 private const val FALLBACK_PRIVACY_POLICY_URL = "https://logdate.app/privacy"
 private const val FALLBACK_TERMS_OF_SERVICE_URL = "https://logdate.app/terms"
 private const val CUSTOM_SERVER_FALLBACK_NAME = "Custom server"
+
+/** Resolves a semantic [GoogleAuthError] to a localized message string. */
+@Composable
+private fun googleAuthErrorMessage(error: GoogleAuthError): String =
+    stringResource(
+        when (error) {
+            GoogleAuthError.Cancelled -> Res.string.google_sign_in_cancelled
+            GoogleAuthError.NoGoogleAccount -> Res.string.google_sign_in_no_account
+            GoogleAuthError.NotConfigured -> Res.string.google_sign_in_unavailable
+            GoogleAuthError.InvalidToken -> Res.string.google_sign_in_failed
+            GoogleAuthError.AccountLinkConflict -> Res.string.google_sign_in_account_conflict
+            GoogleAuthError.RateLimited -> Res.string.google_sign_in_rate_limited
+            GoogleAuthError.NetworkError -> Res.string.google_sign_in_network_error
+            GoogleAuthError.ServerError -> Res.string.google_sign_in_server_error
+            is GoogleAuthError.Unknown -> Res.string.google_sign_in_failed
+        },
+    )
 
 /**
  * Cloud account onboarding screen reusable from both onboarding and settings.
@@ -119,6 +145,10 @@ fun CloudAccountOnboardingScreen(
         }
 
         OnboardingStep.SignIn -> {
+            val googleAuthError = uiState.googleAuthError
+            val signInError =
+                uiState.errorMessage
+                    ?: if (googleAuthError != null) googleAuthErrorMessage(googleAuthError) else null
             CloudAccountSignInScreen(
                 onSignIn = viewModel::signInWithPasskey,
                 onAccountRecovery = { showRecoveryInfo.value = true },
@@ -126,8 +156,10 @@ fun CloudAccountOnboardingScreen(
                 onTermsOfService = serverPresentation.termsOfServiceUrl?.let { { uriHandler.openUri(it) } },
                 onBack = viewModel::goToPreviousStep,
                 isSigningIn = uiState.isSigningIn,
-                errorMessage = uiState.errorMessage,
+                errorMessage = signInError,
                 onClearError = viewModel::clearError,
+                onSignInWithGoogle =
+                    if (uiState.isGoogleSignInAvailable) viewModel::signInWithGoogle else null,
                 serverDisplayName = serverPresentation.displayName,
                 serverHandleDomain = serverPresentation.handleDomain,
                 modifier = modifier,
