@@ -23,8 +23,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,6 +50,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindPanelUiState
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.rememberSystemReduceMotion
 import kotlinx.coroutines.delay
@@ -231,57 +234,30 @@ fun RewindStoryView(
         autoAdvanceProgress = progressAnimatable.value
     }
 
-    Box(
-        modifier =
-            modifier
-                .graphicsLayer {
-                    scaleX = entranceScale.value
-                    scaleY = entranceScale.value
-                }.background(Color.Black)
-                .statusBarsPadding()
-                // Swipe gesture with accumulated drag distance
-                .pointerInput(Unit) {
-                    var accumulatedDrag = 0f
-                    var swipeHandled = false
+    fun goToPreviousPanel() {
+        scope.launch {
+            progressAnimatable.stop()
+            if (currentPanelIndex > 0) {
+                navigatingForward = false
+                currentPanelIndex--
+            }
+        }
+    }
 
-                    detectHorizontalDragGestures(
-                        onDragStart = {
-                            accumulatedDrag = 0f
-                            swipeHandled = false
-                        },
-                        onDragEnd = {
-                            accumulatedDrag = 0f
-                            swipeHandled = false
-                        },
-                        onDragCancel = {
-                            accumulatedDrag = 0f
-                            swipeHandled = false
-                        },
-                        onHorizontalDrag = { _, dragAmount ->
-                            accumulatedDrag += dragAmount
-                            val swipeThreshold = with(density) { 50.dp.toPx() }
+    fun goToNextPanel() {
+        scope.launch {
+            progressAnimatable.stop()
+            if (currentPanelIndex < panels.size - 1) {
+                navigatingForward = true
+                currentPanelIndex++
+            } else {
+                if (onComplete != null) onComplete() else onExit()
+            }
+        }
+    }
 
-                            if (!swipeHandled && abs(accumulatedDrag) > swipeThreshold) {
-                                swipeHandled = true
-                                scope.launch {
-                                    progressAnimatable.stop()
-
-                                    if (accumulatedDrag > 0 && currentPanelIndex > 0) {
-                                        navigatingForward = false
-                                        currentPanelIndex--
-                                    } else if (accumulatedDrag < 0 && currentPanelIndex < panels.size - 1) {
-                                        navigatingForward = true
-                                        currentPanelIndex++
-                                    } else if (accumulatedDrag < 0 && currentPanelIndex == panels.size - 1) {
-                                        if (onComplete != null) onComplete() else onExit()
-                                    }
-                                }
-                            }
-                        },
-                    )
-                },
-    ) {
-        // Main content area with animated transitions
+    @Composable
+    fun StoryPanel(modifier: Modifier = Modifier) {
         AnimatedContent(
             targetState = currentPanelIndex,
             transitionSpec = {
@@ -294,18 +270,18 @@ fun RewindStoryView(
                 }
             },
             label = "PanelTransition",
-            modifier = Modifier.fillMaxSize(),
+            modifier = modifier,
         ) { panelIndex ->
             content(panels[panelIndex])
         }
+    }
 
-        // Top overlay with progress indicators and controls
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-        ) {
+    @Composable
+    fun StoryChrome(
+        showNavigationButtons: Boolean,
+        modifier: Modifier = Modifier,
+    ) {
+        Column(modifier = modifier) {
             StoryProgressIndicators(
                 totalPanels = panels.size,
                 currentPanelIndex = currentPanelIndex,
@@ -404,49 +380,171 @@ fun RewindStoryView(
                     )
                 }
             }
-        }
 
-        // Tap and long-press overlay for navigation and pause
+            if (showNavigationButtons) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(
+                        onClick = ::goToPreviousPanel,
+                        enabled = currentPanelIndex > 0,
+                    ) {
+                        Icon(
+                            painter = PlatformIcons.back(),
+                            contentDescription = "Previous rewind moment",
+                            tint = Color.White,
+                        )
+                    }
+                    IconButton(onClick = ::goToNextPanel) {
+                        Icon(
+                            painter = PlatformIcons.chevronRight(),
+                            contentDescription = "Next rewind moment",
+                            tint = Color.White,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun TapNavigationLayer(modifier: Modifier = Modifier) {
         Box(
             modifier =
-                Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onPress = {
-                                // Long press detection: pause while pressed
-                                isPaused = true
-                                try {
-                                    awaitRelease()
-                                } finally {
-                                    isPaused = false
-                                }
-                            },
-                            onTap = { offset ->
+                modifier.pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = {
+                            isPaused = true
+                            try {
+                                awaitRelease()
+                            } finally {
+                                isPaused = false
+                            }
+                        },
+                        onTap = { offset ->
+                            if (offset.x < size.width / 2) {
+                                goToPreviousPanel()
+                            } else {
+                                goToNextPanel()
+                            }
+                        },
+                    )
+                },
+        )
+    }
+
+    Box(
+        modifier =
+            modifier
+                .graphicsLayer {
+                    scaleX = entranceScale.value
+                    scaleY = entranceScale.value
+                }.background(Color.Black)
+                .statusBarsPadding()
+                // Swipe gesture with accumulated drag distance
+                .pointerInput(Unit) {
+                    var accumulatedDrag = 0f
+                    var swipeHandled = false
+
+                    detectHorizontalDragGestures(
+                        onDragStart = {
+                            accumulatedDrag = 0f
+                            swipeHandled = false
+                        },
+                        onDragEnd = {
+                            accumulatedDrag = 0f
+                            swipeHandled = false
+                        },
+                        onDragCancel = {
+                            accumulatedDrag = 0f
+                            swipeHandled = false
+                        },
+                        onHorizontalDrag = { _, dragAmount ->
+                            accumulatedDrag += dragAmount
+                            val swipeThreshold = with(density) { 50.dp.toPx() }
+
+                            if (!swipeHandled && abs(accumulatedDrag) > swipeThreshold) {
+                                swipeHandled = true
                                 scope.launch {
                                     progressAnimatable.stop()
-                                    if (offset.x < size.width / 2) {
-                                        // Left half: previous
-                                        if (currentPanelIndex > 0) {
-                                            navigatingForward = false
-                                            currentPanelIndex--
-                                        }
-                                    } else {
-                                        // Right half: next
-                                        if (currentPanelIndex < panels.size - 1) {
-                                            navigatingForward = true
-                                            currentPanelIndex++
-                                        } else {
-                                            if (onComplete != null) onComplete() else onExit()
-                                        }
+
+                                    if (accumulatedDrag > 0 && currentPanelIndex > 0) {
+                                        navigatingForward = false
+                                        currentPanelIndex--
+                                    } else if (accumulatedDrag < 0 && currentPanelIndex < panels.size - 1) {
+                                        navigatingForward = true
+                                        currentPanelIndex++
+                                    } else if (accumulatedDrag < 0 && currentPanelIndex == panels.size - 1) {
+                                        if (onComplete != null) onComplete() else onExit()
                                     }
                                 }
-                            },
-                        )
-                    },
+                            }
+                        },
+                    )
+                },
+    ) {
+        FoldableTabletopLayout(
+            modifier = Modifier.fillMaxSize(),
+            minPaneHeight = 220.dp,
+            topPane = {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    StoryPanel(
+                        modifier =
+                            Modifier
+                                .widthIn(max = maxRewindStoryWidth)
+                                .fillMaxSize(),
+                    )
+                }
+                TapNavigationLayer(modifier = Modifier.fillMaxSize())
+            },
+            bottomPane = {
+                StoryChrome(
+                    showNavigationButtons = true,
+                    modifier =
+                        Modifier
+                            .align(Alignment.Center)
+                            .fillMaxSize()
+                            .widthIn(max = maxRewindStoryWidth)
+                            .navigationBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+            },
+            fallback = {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    StoryPanel(
+                        modifier =
+                            Modifier
+                                .widthIn(max = maxRewindStoryWidth)
+                                .fillMaxSize(),
+                    )
+                }
+                StoryChrome(
+                    showNavigationButtons = false,
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .widthIn(max = maxRewindStoryWidth)
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+                TapNavigationLayer(modifier = Modifier.fillMaxSize())
+            },
         )
     }
 }
+
+private val maxRewindStoryWidth = 1200.dp
 
 /**
  * Progress indicators showing the current position in the story sequence.

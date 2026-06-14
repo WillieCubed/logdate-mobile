@@ -5,16 +5,12 @@ package app.logdate.feature.rewind.ui.detail
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,17 +20,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindDetailUiState
 import app.logdate.feature.rewind.ui.RewindDetailViewModel
 import app.logdate.feature.rewind.ui.RewindPanelUiState
-import app.logdate.ui.common.AspectRatios
 import app.logdate.util.toReadableDateShort
 import kotlinx.coroutines.launch
 import logdate.client.feature.rewind.generated.resources.Res
@@ -224,9 +216,6 @@ fun RewindDetailScreenContent(
     onReplyToPrompt: ((panel: ReflectionPromptRewindPanelUiState) -> Unit)? = null,
     onDeleteRewind: (() -> Unit)? = null,
 ) {
-    val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
-    val isWideScreen = windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND)
-
     var showPostViewingSheet by rememberSaveable { mutableStateOf(false) }
     var restartKey by rememberSaveable { mutableStateOf(0) }
 
@@ -236,53 +225,24 @@ fun RewindDetailScreenContent(
         }
 
         is RewindDetailUiState.Success -> {
-            if (isWideScreen) {
-                // On wide screens, center a 9:16 card with rounded corners
-                Box(
-                    modifier = modifier.fillMaxSize().background(Color.Black),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    RewindStoryView(
-                        panels = currentState.panels,
-                        onExit = onExitRewind,
-                        modifier =
-                            Modifier
-                                .fillMaxHeight(0.9f)
-                                .aspectRatio(AspectRatios.RATIO_9_16)
-                                .clip(RoundedCornerShape(16.dp)),
-                        isFirstView = isFirstView,
-                        onFirstViewConsumed = onFirstViewConsumed,
-                        restartKey = restartKey,
-                        externalPause = externalPause || showPostViewingSheet,
-                        accentColor = accentColor,
-                        onComplete = { showPostViewingSheet = true },
-                        onSharePanel = onSharePanel,
-                        onShareRewindStats = onShareRewindStats,
-                        onReplyToPrompt = onReplyToPrompt,
-                        onDeleteRewind = onDeleteRewind,
-                        content = { panel ->
-                            RewindStoryContent(panel = panel)
-                        },
-                    )
-                }
-            } else {
-                RewindStoryView(
-                    panels = currentState.panels,
-                    onExit = onExitRewind,
-                    modifier = modifier.fillMaxSize(),
-                    isFirstView = isFirstView,
-                    onFirstViewConsumed = onFirstViewConsumed,
-                    restartKey = restartKey,
-                    externalPause = externalPause || showPostViewingSheet,
-                    onComplete = { showPostViewingSheet = true },
-                    onSharePanel = onSharePanel,
-                    onShareRewindStats = onShareRewindStats,
-                    onReplyToPrompt = onReplyToPrompt,
-                    content = { panel ->
-                        RewindStoryContent(panel = panel)
-                    },
-                )
-            }
+            RewindStoryView(
+                panels = currentState.panels,
+                onExit = onExitRewind,
+                modifier = modifier.fillMaxSize(),
+                isFirstView = isFirstView,
+                onFirstViewConsumed = onFirstViewConsumed,
+                restartKey = restartKey,
+                externalPause = externalPause || showPostViewingSheet,
+                accentColor = accentColor,
+                onComplete = { showPostViewingSheet = true },
+                onSharePanel = onSharePanel,
+                onShareRewindStats = onShareRewindStats,
+                onReplyToPrompt = onReplyToPrompt,
+                onDeleteRewind = onDeleteRewind,
+                content = { panel ->
+                    RewindStoryContent(panel = panel)
+                },
+            )
         }
 
         is RewindDetailUiState.Error -> {
