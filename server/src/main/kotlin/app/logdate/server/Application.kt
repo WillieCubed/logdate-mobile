@@ -35,6 +35,8 @@ import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnConfig
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.ratelimit.SlidingWindowRateLimiter
+import app.logdate.server.routes.AssetLinksConfig
+import app.logdate.server.routes.assetLinksRoutes
 import app.logdate.server.routes.authV1Routes
 import app.logdate.server.routes.identityApiRoutes
 import app.logdate.server.routes.identityRoutes
@@ -275,6 +277,7 @@ fun Application.module(
     val serverDescriptorConfig by inject<ServerDescriptorConfig>()
     val atprotoIdentityConfig by inject<AtprotoIdentityConfig>()
     val webAuthnConfig by inject<WebAuthnConfig>()
+    val assetLinksConfig by inject<AssetLinksConfig>()
 
     val serverDescriptor =
         serverDescriptorConfig.toDescriptor(
@@ -370,6 +373,7 @@ fun Application.module(
         }
 
         identityRoutes(atprotoIdentityService)
+        assetLinksRoutes(assetLinksConfig)
         oauthRoutes(
             config = oauthConfig,
             keyService = oauthKeyService,

@@ -294,6 +294,55 @@ class ProductionConfigValidatorTest {
         )
     }
 
+    @Test
+    fun `production accepts android apk-key-hash entries in WEBAUTHN_ALLOWED_ORIGINS`() {
+        ProductionConfigValidator.validate(
+            profile = RuntimeProfile.PRODUCTION,
+            readEnv =
+                envOf(
+                    "JWT_SECRET" to VALID_JWT_SECRET,
+                    "DATABASE_PASSWORD" to VALID_DB_PASSWORD,
+                    "WEBAUTHN_RP_ID" to "logdate.app",
+                    "WEBAUTHN_ORIGIN" to "https://cloud.logdate.app",
+                    "WEBAUTHN_ALLOWED_ORIGINS" to
+                        "https://cloud.logdate.app,android:apk-key-hash:pNiP8Z6X1xH6vQX0r1Tq8m9Hb3kq9b0c0d1e2f3g4h5",
+                ),
+        )
+    }
+
+    @Test
+    fun `production rejects a malformed WEBAUTHN_ALLOWED_ORIGINS entry`() {
+        val failure =
+            assertFailsWith<InsecureProductionConfigException> {
+                ProductionConfigValidator.validate(
+                    profile = RuntimeProfile.PRODUCTION,
+                    readEnv =
+                        envOf(
+                            "JWT_SECRET" to VALID_JWT_SECRET,
+                            "DATABASE_PASSWORD" to VALID_DB_PASSWORD,
+                            "WEBAUTHN_RP_ID" to "logdate.app",
+                            "WEBAUTHN_ORIGIN" to "https://cloud.logdate.app",
+                            "WEBAUTHN_ALLOWED_ORIGINS" to "ftp://nope.example",
+                        ),
+                )
+            }
+        assertTrue(failure.message!!.contains("WEBAUTHN_ALLOWED_ORIGINS"))
+    }
+
+    @Test
+    fun `production still boots web-only when WEBAUTHN_ALLOWED_ORIGINS is unset`() {
+        ProductionConfigValidator.validate(
+            profile = RuntimeProfile.PRODUCTION,
+            readEnv =
+                envOf(
+                    "JWT_SECRET" to VALID_JWT_SECRET,
+                    "DATABASE_PASSWORD" to VALID_DB_PASSWORD,
+                    "WEBAUTHN_RP_ID" to "logdate.app",
+                    "WEBAUTHN_ORIGIN" to "https://cloud.logdate.app",
+                ),
+        )
+    }
+
     private fun envOf(vararg pairs: Pair<String, String>): (String) -> String? {
         val map = pairs.toMap()
         return { name -> map[name] }

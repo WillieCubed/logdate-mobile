@@ -1,5 +1,6 @@
 package app.logdate.server.config
 
+import io.github.aakira.napier.Napier
 import java.net.URI
 
 /**
@@ -11,6 +12,8 @@ import java.net.URI
  */
 object ProductionConfigValidator {
     private const val MIN_JWT_SECRET_LENGTH = 32
+
+    private const val ANDROID_ORIGIN_PREFIX = "android:apk-key-hash:"
 
     private val INSECURE_JWT_SECRETS =
         setOf(
@@ -77,6 +80,8 @@ object ProductionConfigValidator {
         readEnv: (String) -> String?,
         failures: MutableList<String>,
     ) {
+        validateAllowedOrigins(readEnv("WEBAUTHN_ALLOWED_ORIGINS"), failures)
+
         // Passkey credentials are pinned to the relying-party ID at registration time, so a
         // production rollout that silently derives the RP ID from the request origin (the default
         // fallback in `WebAuthnConfig.fromEnvironment`) will quietly bind every new passkey to
@@ -114,6 +119,42 @@ object ProductionConfigValidator {
             failures +=
                 "WEBAUTHN_RP_ID '$rpId' must equal or be the registrable apex of WEBAUTHN_ORIGIN host '$originHost'. " +
                 "Otherwise passkeys created against the origin will not be recognized when the user returns."
+        }
+    }
+
+    /**
+     * `WEBAUTHN_ALLOWED_ORIGINS` carries the extra origins passkey ceremonies may present — most
+     * importantly the Android `android:apk-key-hash:<hash>` origins, without which on-device signup
+     * and sign-in fail. Each entry must be an `https://` URL or an apk-key-hash origin; malformed
+     * entries are a hard failure. A missing android origin is only a warning: a web-only deployment
+     * is legitimate, but real Android clients will not be able to authenticate.
+     */
+    private fun validateAllowedOrigins(
+        raw: String?,
+        failures: MutableList<String>,
+    ) {
+        val entries =
+            raw
+                ?.split(",")
+                ?.map { it.trim() }
+                ?.filter { it.isNotBlank() }
+                .orEmpty()
+
+        entries.forEach { entry ->
+            val isHttps = entry.startsWith("https://")
+            val isAndroid = entry.startsWith(ANDROID_ORIGIN_PREFIX) && entry.length > ANDROID_ORIGIN_PREFIX.length
+            if (!isHttps && !isAndroid) {
+                failures +=
+                    "WEBAUTHN_ALLOWED_ORIGINS entry '$entry' must be an https:// URL or an " +
+                    "'${ANDROID_ORIGIN_PREFIX}<hash>' origin."
+            }
+        }
+
+        if (entries.none { it.startsWith(ANDROID_ORIGIN_PREFIX) }) {
+            Napier.w(
+                "WEBAUTHN_ALLOWED_ORIGINS has no android:apk-key-hash: origin; real Android passkey " +
+                    "signup and sign-in will fail until one is added.",
+            )
         }
     }
 }

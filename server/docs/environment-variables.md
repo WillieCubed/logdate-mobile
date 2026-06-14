@@ -112,15 +112,9 @@ The server supports two sets of database environment variables for flexibility:
 - **Required**: **Yes**, unless the password is already embedded in `DATABASE_URL` (e.g. `postgres://user:pass@host/db`). `LOGDATE_ENV=production` additionally rejects known-default passwords.
 - **Security**: Store in a secret manager; never commit.
 
-### `CLOUD_SQL_INSTANCE_CONNECTION_NAME`
-- **Description**: Cloud SQL instance connection name for Google-managed PostgreSQL connectivity
-- **Type**: String
-- **Default**: None
-- **Example**: `CLOUD_SQL_INSTANCE_CONNECTION_NAME=my-project:us-central1:logdate-db`
-- **Required**: No
-- **Notes**:
-  - Use this instead of `DATABASE_URL` for Cloud Run + Cloud SQL bootstrap deployments
-  - Requires `DATABASE_USER` / `DATABASE_PASSWORD` and the Cloud SQL PostgreSQL socket factory on the classpath
+### `CLOUD_SQL_INSTANCE_CONNECTION_NAME` (removed)
+- **Status**: No longer supported. The dedicated Cloud SQL socket-factory integration was removed in favor of a single `DATABASE_URL` path. LogDate now runs on serverless Postgres (Neon) and connects over standard TLS.
+- **Migration**: Set `DATABASE_URL` to a standard `jdbc:postgresql://HOST/DB?sslmode=require` connection string (Neon, Supabase, Cloud SQL via its public IP / Auth Proxy, or any Postgres). Credentials may be embedded in the URL or supplied via `DATABASE_USER` / `DATABASE_PASSWORD`.
 
 ### Alternative Database Variables
 
@@ -213,6 +207,17 @@ These can be used instead of `DATABASE_URL`:
 - **Required**: Yes (for production passkeys)
 - **Notes**:
   - If unset, the server derives the value from the configured public server origin when available
+
+### `WEBAUTHN_ALLOWED_ORIGINS`
+- **Description**: Additional client origins accepted during passkey ceremonies, on top of `WEBAUTHN_ORIGIN`. This is how native apps are allowed: an Android Credential Manager ceremony presents `clientDataJSON.origin` as `android:apk-key-hash:<base64url-SHA256(signing-cert)>` rather than an `https://` URL, so without the matching entry here every on-device passkey signup and sign-in is rejected.
+- **Type**: String (comma-separated list of `https://` URLs and/or `android:apk-key-hash:<hash>` origins)
+- **Default**: empty (only `WEBAUTHN_ORIGIN` is accepted — web only)
+- **Example**: `WEBAUTHN_ALLOWED_ORIGINS=https://cloud.logdate.app,android:apk-key-hash:pNiP8Z...`
+- **Required**: No, but required in practice for native Android passkeys
+- **Notes**:
+  - The canonical `WEBAUTHN_ORIGIN` is always accepted whether or not it is repeated here.
+  - List one `android:apk-key-hash:` entry per signing certificate. With Play App Signing this means both the upload certificate and the Google-managed app-signing certificate; for local/staging builds it means the debug keystore certificate. The hash is `base64url(SHA-256(DER-encoded signing cert))` — the same certificate whose colon-hex SHA-256 goes in `assetlinks.json` (served by the `logdate-web` project at the relying-party domain).
+  - Malformed entries are logged and skipped so one typo cannot break passkey verification for everyone.
 
 ### `WEBAUTHN_STRICT_VERIFICATION`
 - **Description**: Enables strict WebAuthn4J cryptographic verification for passkeys and restore credentials.
@@ -404,9 +409,9 @@ JWT_SECRET=dev-secret-key-not-for-production-min-32-chars
 PORT=8080
 HOST=0.0.0.0
 
-# Database (Cloud SQL)
-CLOUD_SQL_INSTANCE_CONNECTION_NAME=logdate-prod:us-central1:logdate-db
-DB_NAME=logdate_prod
+# Database (serverless Postgres, e.g. Neon). Use the pooled endpoint for the app
+# runtime; run Flyway migrations against the direct (non-pooler) endpoint.
+DATABASE_URL=${DATABASE_URL_FROM_SECRET_MANAGER}
 DATABASE_USER=logdate_user
 DATABASE_PASSWORD=${DB_PASSWORD_FROM_SECRET_MANAGER}
 AUTO_MIGRATE=false

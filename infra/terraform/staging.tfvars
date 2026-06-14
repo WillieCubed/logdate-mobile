@@ -30,6 +30,13 @@ cloud_run_env = {
   AUTO_MIGRATE    = "true"
   ALLOWED_ORIGINS = "https://cloud-staging.logdate.app"
   REQUIRE_HTTPS   = "true"
+  # Accept passkeys created through the Android Credential Manager (its clientDataJSON.origin
+  # is the apk-key-hash, not an https URL). Debug signing cert only on staging; production lists
+  # the Play upload + app-signing certs. SHA-256 DF:32:69:...:DB:C7 → base64url apk-key-hash below.
+  WEBAUTHN_ALLOWED_ORIGINS = "https://cloud-staging.logdate.app,android:apk-key-hash:3zJp1NzJxP5y_mFioPTp7l8EFEfcs472qSV2_DiQ28c"
+  # Colon-hex SHA-256 of the same cert, published in /.well-known/assetlinks.json so Android
+  # Credential Manager authorizes the app for the cloud-staging.logdate.app relying party.
+  ANDROID_CERT_FINGERPRINTS = "DF:32:69:D4:DC:C9:C4:FE:72:FE:61:62:A0:F4:E9:EE:5F:04:14:47:DC:B3:8E:F6:A9:25:76:FC:38:90:DB:C7"
 }
 
 # Secret IDs are scoped to this project's Secret Manager namespace (separate

@@ -44,7 +44,7 @@ class RestoreCredentialService(
     private val restoreCredentialRepository: RestoreCredentialRepository,
     val relyingPartyId: String = "logdate.app",
     private val relyingPartyName: String = "LogDate",
-    private val origin: String = "https://app.logdate.com",
+    private val origins: Set<String> = setOf("https://app.logdate.com"),
     private val strictVerificationEnabled: Boolean =
         profileAwareBoolEnv(
             name = "WEBAUTHN_STRICT_VERIFICATION",
@@ -57,6 +57,10 @@ class RestoreCredentialService(
     private val objectConverter = ObjectConverter()
     private val webAuthnManager = WebAuthnManager.createNonStrictWebAuthnManager(objectConverter)
     private val attestedCredentialDataConverter = AttestedCredentialDataConverter(objectConverter)
+
+    // All client origins accepted during verification: the https web origin plus any Android
+    // apk-key-hash origins. Restore credentials are minted by the same Credential Manager ceremony.
+    private val webAuthnOrigins: Set<Origin> = origins.map { Origin(it) }.toSet()
 
     data class RegistrationResult(
         val success: Boolean,
@@ -196,7 +200,7 @@ class RestoreCredentialService(
             val serverProperty =
                 ServerProperty
                     .builder()
-                    .origin(Origin(origin))
+                    .origins(webAuthnOrigins)
                     .rpId(relyingPartyId)
                     .challenge(DefaultChallenge(challengeBytes))
                     .build()
@@ -307,7 +311,7 @@ class RestoreCredentialService(
             val serverProperty =
                 ServerProperty
                     .builder()
-                    .origin(Origin(origin))
+                    .origins(webAuthnOrigins)
                     .rpId(relyingPartyId)
                     .challenge(DefaultChallenge(challengeBytes))
                     .build()
