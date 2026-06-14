@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -21,9 +22,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.client.domain.journals.JournalSuggestion
 import app.logdate.client.repository.search.SearchResult
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.theme.Spacing
 import kotlinx.datetime.LocalDate
 import logdate.client.feature.journal.generated.resources.Res
@@ -76,6 +79,7 @@ fun JournalsOverviewScreen(
  * Uses a transparent Scaffold so the shell's `surfaceContainer` background shows through
  * between the search toolbar and the [JournalListPanel] surface below.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JournalsOverviewScreenContent(
     journals: List<JournalListItemUiState>,
@@ -97,37 +101,31 @@ fun JournalsOverviewScreenContent(
     onNavigationClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    Scaffold(
+    FoldableBookLayout(
         modifier = modifier,
-        containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            JournalSearchToolbar(
-                searchQuery = searchQuery,
-                isEntrySearchInProgress = isEntrySearchInProgress,
-                filteredJournals = journals,
-                entryResults = entryResults,
-                onQueryChange = onQueryChange,
-                onOpenJournal = onOpenJournal,
-                onNavigateToDay = onNavigateToDay,
-                modifier = Modifier.fillMaxWidth().statusBarsPadding(),
-            )
-        },
-    ) { paddingValues ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(top = Spacing.sm),
-        ) {
-            if (suggestions.isNotEmpty()) {
-                SuggestionRow(
-                    suggestions = suggestions,
-                    onCreateJournal = onCreateJournal,
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(modifier = Modifier.fillMaxSize()) {
+                JournalSearchToolbar(
+                    searchQuery = searchQuery,
+                    isEntrySearchInProgress = isEntrySearchInProgress,
+                    filteredJournals = journals,
+                    entryResults = entryResults,
+                    onQueryChange = onQueryChange,
+                    onOpenJournal = onOpenJournal,
+                    onNavigateToDay = onNavigateToDay,
+                    modifier = Modifier.fillMaxWidth().statusBarsPadding(),
                 )
-            }
 
+                if (suggestions.isNotEmpty()) {
+                    SuggestionRow(
+                        suggestions = suggestions,
+                        onCreateJournal = onCreateJournal,
+                    )
+                }
+            }
+        },
+        endPane = {
             JournalListPanel(
                 journals = journals,
                 layoutMode = layoutMode,
@@ -140,10 +138,59 @@ fun JournalsOverviewScreenContent(
                 onSortOptionSelected = onSortOptionSelected,
                 onToggleFilter = onToggleFilter,
                 showLoading = false,
-                modifier = Modifier.fillMaxSize().weight(1f),
+                modifier = Modifier.fillMaxSize(),
             )
-        }
-    }
+        },
+        fallback = {
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                containerColor = Color.Transparent,
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                topBar = {
+                    JournalSearchToolbar(
+                        searchQuery = searchQuery,
+                        isEntrySearchInProgress = isEntrySearchInProgress,
+                        filteredJournals = journals,
+                        entryResults = entryResults,
+                        onQueryChange = onQueryChange,
+                        onOpenJournal = onOpenJournal,
+                        onNavigateToDay = onNavigateToDay,
+                        modifier = Modifier.fillMaxWidth().statusBarsPadding(),
+                    )
+                },
+            ) { paddingValues ->
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                            .padding(top = Spacing.sm),
+                ) {
+                    if (suggestions.isNotEmpty()) {
+                        SuggestionRow(
+                            suggestions = suggestions,
+                            onCreateJournal = onCreateJournal,
+                        )
+                    }
+
+                    JournalListPanel(
+                        journals = journals,
+                        layoutMode = layoutMode,
+                        sortOption = sortOption,
+                        activeFilters = activeFilters,
+                        onOpenJournal = onOpenJournal,
+                        onBrowseJournals = onBrowseJournals,
+                        onCreateJournal = onCreateJournal,
+                        onToggleLayoutMode = onToggleLayoutMode,
+                        onSortOptionSelected = onSortOptionSelected,
+                        onToggleFilter = onToggleFilter,
+                        showLoading = false,
+                        modifier = Modifier.fillMaxSize().weight(1f),
+                    )
+                }
+            }
+        },
+    )
 }
 
 @Composable
