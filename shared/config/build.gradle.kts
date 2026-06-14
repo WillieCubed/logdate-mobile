@@ -8,6 +8,18 @@ plugins {
 //    alias(libs.plugins.android.library)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.dokka)
+    alias(libs.plugins.buildConfig)
+}
+
+// Single source of truth for the default cloud API host the client talks to. Sourced from the
+// `logdate.backendUrl` Gradle property so a staging/debug build can repoint the client with
+// `-Plogdate.backendUrl=https://cloud-staging.logdate.app`; falls back to production otherwise.
+buildConfig {
+    packageName("app.logdate.shared.config")
+    buildConfigField(
+        "DEFAULT_BACKEND_URL",
+        providers.gradleProperty("logdate.backendUrl").orElse("https://cloud.logdate.app").get(),
+    )
 }
 
 kotlin {

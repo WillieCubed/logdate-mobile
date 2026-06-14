@@ -43,7 +43,12 @@ class DefaultLogDateConfigRepository(
     initialLocalServerAddress: String = DEFAULT_LOCAL_SERVER_ADDRESS,
 ) : LogDateConfigRepository {
     companion object {
-        const val DEFAULT_BACKEND_URL = "https://cloud.logdate.app"
+        /**
+         * Default cloud API host. Single source of truth lives in `shared/config`'s build config
+         * (the `logdate.backendUrl` Gradle property), so production and any per-build override flow
+         * from one place instead of a buried literal.
+         */
+        val DEFAULT_BACKEND_URL: String = BuildConfig.DEFAULT_BACKEND_URL
         const val DEFAULT_API_VERSION = "v1"
         const val DEFAULT_LOCAL_SERVER_ADDRESS = "localhost:8765"
     }
