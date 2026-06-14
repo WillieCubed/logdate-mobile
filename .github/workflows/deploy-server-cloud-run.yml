@@ -162,6 +162,18 @@ jobs:
       - name: Configure candidate tag
         run: echo "CANDIDATE_TAG=c-${DEPLOY_SHA:0:12}" >> "$GITHUB_ENV"
 
+      - name: Set up Python with pip cache
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: scripts/passkey-verify/requirements.txt
+
+      - name: Install passkey verifier dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --quiet -r scripts/passkey-verify/requirements.txt
+
       - name: Deploy candidate revision without traffic
         run: |
           service_account_args=()
@@ -202,7 +214,12 @@ jobs:
           echo "REVISION_URL=$REVISION_URL" >> "$GITHUB_ENV"
 
       - name: Smoke test candidate revision
-        run: ./scripts/smoke-test-revision.sh "$REVISION_URL"
+        run: |
+          origin_arg=()
+          if [[ -n "${DOMAIN}" ]]; then
+            origin_arg=("https://${DOMAIN}")
+          fi
+          ./scripts/smoke-test-revision.sh "$REVISION_URL" "${origin_arg[@]}"
 
       - name: Promote candidate to 100 percent traffic
         run: |

@@ -15,13 +15,18 @@ attestation, real ECDSA signatures), but the user verification is a lie.
 import argparse
 import hashlib
 import json
+import os
 import secrets
 import sys
 import time
 from base64 import urlsafe_b64encode, urlsafe_b64decode
+from datetime import datetime, timezone
+from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from fido2 import cbor
 
@@ -37,6 +42,21 @@ def b64u_decode(s: str) -> bytes:
 
 def sha256(b: bytes) -> bytes:
     return hashlib.sha256(b).digest()
+
+
+def private_key_to_pem(private_key: ec.EllipticCurvePrivateKey) -> str:
+    return private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode()
+
+
+def private_key_from_pem(pem: str) -> ec.EllipticCurvePrivateKey:
+    private_key = serialization.load_pem_private_key(pem.encode(), password=None)
+    if not isinstance(private_key, ec.EllipticCurvePrivateKey):
+        sys.exit("credential file does not contain an EC private key")
+    return private_key
 
 
 def cose_pubkey(pubkey: ec.EllipticCurvePublicKey) -> bytes:
@@ -92,6 +112,46 @@ def health(base_url: str) -> None:
     print(f"GET {base_url}/health -> {r.status_code} {r.text[:200]}")
     if not r.ok:
         sys.exit(f"health check failed; aborting passkey verification")
+
+
+def default_credential_path(base_url: str, username: str) -> Path:
+    host = urlparse(base_url).netloc or base_url.replace("://", "_").replace("/", "_")
+    safe_host = "".join(c if c.isalnum() or c in "._-" else "_" for c in host)
+    safe_username = "".join(c if c.isalnum() or c in "._-" else "_" for c in username)
+    return Path(".logdate") / "passkey-verify" / safe_host / f"{safe_username}.json"
+
+
+def save_credential(path: Path, base_url: str, origin: str, state: dict) -> None:
+    payload = {
+        "format": "logdate-passkey-verify-v1",
+        "baseUrl": base_url,
+        "origin": origin,
+        "username": state["username"],
+        "userId": state["user_id"],
+        "credentialId": b64u(state["credential_id"]),
+        "signCount": state.get("sign_count", 0),
+        "privateKeyPem": private_key_to_pem(state["private_key"]),
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    os.chmod(tmp_path, 0o600)
+    tmp_path.replace(path)
+    print(f"  saved passkey -> {path}")
+
+
+def load_credential(path: Path) -> dict:
+    payload = json.loads(path.read_text())
+    if payload.get("format") != "logdate-passkey-verify-v1":
+        sys.exit(f"unsupported credential file format: {path}")
+    return {
+        "credential_id": b64u_decode(payload["credentialId"]),
+        "private_key": private_key_from_pem(payload["privateKeyPem"]),
+        "user_id": payload["userId"],
+        "username": payload["username"],
+        "sign_count": int(payload.get("signCount", 0)),
+    }
 
 
 def signup(base_url: str, origin: str, username: str, display_name: str) -> dict:
@@ -151,11 +211,12 @@ def signup(base_url: str, origin: str, username: str, display_name: str) -> dict
         "private_key": private_key,
         "user_id": user_id,
         "username": username,
+        "sign_count": 0,
         "auth": r.json(),
     }
 
 
-def signin(base_url: str, origin: str, state: dict, sign_count: int = 1) -> dict:
+def signin(base_url: str, origin: str, state: dict) -> dict:
     print(f"\n=== SIGNIN {state['username']} ===")
     r = post(
         f"{base_url}/api/v1/auth/signin/passkey/begin",
@@ -171,6 +232,7 @@ def signin(base_url: str, origin: str, state: dict, sign_count: int = 1) -> dict
     print(f"  rpId={rp_id}  allowCreds={len(allow)}  challenge.len={len(challenge)}")
 
     client_data = build_client_data("webauthn.get", challenge, origin)
+    sign_count = state.get("sign_count", 0) + 1
     auth_data = build_auth_data(rp_id, sign_count=sign_count, include_attested=False)
     signature = state["private_key"].sign(
         auth_data + sha256(client_data),
@@ -201,6 +263,7 @@ def signin(base_url: str, origin: str, state: dict, sign_count: int = 1) -> dict
     auth = r.json()
     tokens = auth.get("data", {}).get("tokens") or auth.get("data", {})
     print(f"  body data keys: {list(auth.get('data', {}).keys())}")
+    state["sign_count"] = sign_count
     return auth
 
 
@@ -211,13 +274,36 @@ def main() -> None:
                    help="Origin in clientDataJSON; defaults to --base")
     p.add_argument("--username", default=f"verify_{int(time.time())}")
     p.add_argument("--display-name", default="Deploy Verifier")
+    p.add_argument("--credential-file", default=None,
+                   help="Where to save/load the generated verifier passkey")
+    p.add_argument("--signin-only", action="store_true",
+                   help="Load --credential-file and only verify sign-in")
     args = p.parse_args()
     origin = args.origin or args.base
+    credential_path = (
+        Path(args.credential_file)
+        if args.credential_file
+        else default_credential_path(args.base, args.username)
+    )
 
     print(f"base={args.base}  origin={origin}  username={args.username}")
     health(args.base)
-    state = signup(args.base, origin, args.username, args.display_name)
+    if args.signin_only:
+        if not credential_path.exists():
+            sys.exit(f"credential file not found: {credential_path}")
+        state = load_credential(credential_path)
+        print(f"loaded passkey <- {credential_path}")
+    else:
+        if credential_path.exists():
+            sys.exit(
+                f"credential file already exists: {credential_path}\n"
+                "Use --signin-only to reuse it, or pass --credential-file to write elsewhere."
+            )
+        state = signup(args.base, origin, args.username, args.display_name)
+        save_credential(credential_path, args.base, origin, state)
+
     auth = signin(args.base, origin, state)
+    save_credential(credential_path, args.base, origin, state)
     print("\n=== END-TO-END PASSKEY VERIFICATION SUCCEEDED ===")
 
 

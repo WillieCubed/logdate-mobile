@@ -1,27 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Smoke-test a deployed server revision. Hits /health, then issues a
-# bare passkey-signup-begin call to verify the routing layer plus DB-backed
-# session creation actually work — `/health` only proves the JVM is up.
+# Smoke-test a deployed server revision. Hits /health, issues a bare
+# passkey-signup-begin call, and can optionally complete a full passkey
+# signup/signin loop through the verifier. `/health` only proves the JVM is up.
 # Designed to run as a deploy-time gate; non-zero exit blocks traffic shift
 # to the new revision.
 #
 # Inputs:
 #   $1  Service URL (e.g. https://cloud-staging.logdate.app or a Cloud Run
 #       revision URL like https://candidate-<sha>---logdate-server-...run.app)
+#   $2  Optional WebAuthn origin for clientDataJSON (e.g.
+#       https://cloud.logdate.app when probing a tagged candidate revision)
 #
 # Exit:
-#   0 — health, signup-begin, and entitlement-shape probes succeeded
+#   0 — health, signup-begin, entitlement-shape, and optional passkey probes succeeded
 #   non-zero — at least one probe failed; deploy workflow should NOT promote
 
 if [[ $# -lt 1 ]]; then
-    echo "Usage: $0 <service-url>" >&2
+    echo "Usage: $0 <service-url> [webauthn-origin]" >&2
     exit 1
 fi
 
 URL="${1%/}"
+WEBAUTHN_ORIGIN="${2:-}"
 PROBE_USERNAME="smoketest_$(date +%s)_$$"
+PASSKEY_VERIFY_PYTHON="${PASSKEY_VERIFY_PYTHON:-.venv/bin/python}"
 
 health_status_is_healthy() {
     local body="$1"
@@ -87,10 +91,51 @@ probe_entitlement_unauth() {
     echo "[OK] me/entitlement (returns 401 without token, as expected)"
 }
 
+probe_passkey_end_to_end() {
+    if [[ -z "$WEBAUTHN_ORIGIN" ]]; then
+        echo "[SKIP] full passkey verification (no WebAuthn origin supplied)"
+        return 0
+    fi
+
+    if [[ ! -x "$PASSKEY_VERIFY_PYTHON" ]]; then
+        echo "[FAIL] passkey verifier Python not executable: $PASSKEY_VERIFY_PYTHON" >&2
+        return 1
+    fi
+
+    local credential_dir credential_file
+    credential_dir="$(mktemp -d "${TMPDIR:-/tmp}/logdate-passkey-smoke.XXXXXX")"
+    credential_file="$credential_dir/passkey.json"
+
+    if ! "$PASSKEY_VERIFY_PYTHON" scripts/passkey-verify/sim.py \
+        --base "$URL" \
+        --origin "$WEBAUTHN_ORIGIN" \
+        --username "$PROBE_USERNAME" \
+        --display-name "Smoke Test" \
+        --credential-file "$credential_file"; then
+        rm -rf "$credential_dir"
+        return 1
+    fi
+
+    if ! "$PASSKEY_VERIFY_PYTHON" scripts/passkey-verify/sim.py \
+        --base "$URL" \
+        --origin "$WEBAUTHN_ORIGIN" \
+        --username "$PROBE_USERNAME" \
+        --credential-file "$credential_file" \
+        --signin-only; then
+        rm -rf "$credential_dir"
+        return 1
+    fi
+
+    rm -rf "$credential_dir"
+
+    echo "[OK] full passkey signup/signin"
+}
+
 failed=0
 probe_health || failed=1
 probe_signup_begin || failed=1
 probe_entitlement_unauth || failed=1
+probe_passkey_end_to_end || failed=1
 
 if [[ $failed -ne 0 ]]; then
     echo "Smoke test FAILED for $URL" >&2
