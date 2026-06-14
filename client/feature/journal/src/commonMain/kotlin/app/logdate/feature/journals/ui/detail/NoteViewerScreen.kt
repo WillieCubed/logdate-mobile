@@ -64,6 +64,7 @@ import app.logdate.feature.journals.ui.AddToJournalPicker
 import app.logdate.feature.journals.ui.deriveCoverColor
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.common.transitions.TransitionKeys
@@ -387,7 +388,7 @@ private fun rememberNoteViewerSharedBoundsModifier(
 
 /**
  * Shared immersive layout for non-audio note presentations.
- * Provides the toolbar with journal context and wraps content in [ImmersiveEditorLayout].
+ * Provides the toolbar with journal context and routes foldable postures through hinge-safe panes.
  */
 @Composable
 fun NoteViewerScaffoldContent(
@@ -444,28 +445,68 @@ fun NoteViewerScaffoldContent(
             }
         },
         fallback = {
-            ImmersiveEditorLayout(
-                topBarContent = {
-                    NoteViewerToolbar(
-                        onGoBack = onGoBack,
-                        journalContext = journalContext,
-                        accentColor = accentColor,
-                        onNavigateToNote = onNavigateToNote,
-                        onShowAddToJournal = onShowAddToJournal,
-                        onShare = onShare,
-                    )
-                },
-                editorContent = {
-                    NoteViewerContent(
-                        shared = shared,
-                        onOpenLocationTimeline = onOpenLocationTimeline,
-                        noteContent = noteContent,
-                    )
-                },
-                bottomContent = {
-                    Spacer(modifier = Modifier.fillMaxWidth())
-                },
+            FoldableBookLayout(
                 modifier = Modifier.fillMaxSize(),
+                minPaneWidth = 320.dp,
+                startPane = {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surfaceDim),
+                    ) {
+                        NoteViewerContent(
+                            shared = shared,
+                            onOpenLocationTimeline = onOpenLocationTimeline,
+                            noteContent = noteContent,
+                        )
+                    }
+                },
+                endPane = {
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surfaceDim)
+                                .navigationBarsPadding()
+                                .padding(horizontal = Spacing.sm, vertical = Spacing.md),
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        NoteViewerToolbar(
+                            onGoBack = onGoBack,
+                            journalContext = journalContext,
+                            accentColor = accentColor,
+                            onNavigateToNote = onNavigateToNote,
+                            onShowAddToJournal = onShowAddToJournal,
+                            onShare = onShare,
+                        )
+                    }
+                },
+                fallback = {
+                    ImmersiveEditorLayout(
+                        topBarContent = {
+                            NoteViewerToolbar(
+                                onGoBack = onGoBack,
+                                journalContext = journalContext,
+                                accentColor = accentColor,
+                                onNavigateToNote = onNavigateToNote,
+                                onShowAddToJournal = onShowAddToJournal,
+                                onShare = onShare,
+                            )
+                        },
+                        editorContent = {
+                            NoteViewerContent(
+                                shared = shared,
+                                onOpenLocationTimeline = onOpenLocationTimeline,
+                                noteContent = noteContent,
+                            )
+                        },
+                        bottomContent = {
+                            Spacer(modifier = Modifier.fillMaxWidth())
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
             )
         },
     )
