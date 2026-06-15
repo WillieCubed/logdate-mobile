@@ -5,8 +5,11 @@ package app.logdate.feature.core.people.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PersonAdd
@@ -28,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.client.permissions.ContactsPermissionState
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.SettingsNavigationItem
 import app.logdate.ui.common.SettingsScaffold
@@ -113,148 +117,105 @@ fun PeopleSettingsContent(
 ) {
     var showSetupSheet by rememberSaveable { mutableStateOf(false) }
 
-    SettingsScaffold(
-        title = stringResource(Res.string.people_title),
-        onBack = onBack,
-        modifier = modifier,
-    ) {
-        item {
-            Text(
-                text = stringResource(Res.string.people_settings_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
-
-        item {
-            MaterialContainer(
-                modifier = Modifier.padding(horizontal = Spacing.lg),
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                ToggleSettingsItem(
-                    title = stringResource(Res.string.people_enable_label),
-                    description = stringResource(Res.string.people_enable_description),
-                    checked = uiState.isPeopleEnabled,
-                    onCheckedChange = onPeopleEnabledChanged,
+                PeopleDescription()
+                PeopleEnableToggle(
+                    uiState = uiState,
+                    onPeopleEnabledChanged = onPeopleEnabledChanged,
                 )
-            }
-        }
-
-        item {
-            MaterialContainer(
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            ) {
-                SettingsNavigationItem(
-                    title = stringResource(Res.string.people_browse_label),
-                    description =
-                        if (uiState.totalPeopleCount == 0) {
-                            stringResource(Res.string.people_directory_empty_state)
-                        } else {
-                            stringResource(Res.string.people_browse_description, uiState.totalPeopleCount)
-                        },
-                    icon = { Icon(Icons.Default.People, contentDescription = null) },
-                    onClick = onBrowsePeople,
-                    enabled = uiState.isPeopleEnabled && uiState.totalPeopleCount > 0,
+                PeopleSetupCard(
+                    uiState = uiState,
+                    onLaunchSetup = { showSetupSheet = true },
                 )
-            }
-        }
-
-        if (uiState.pendingReviewCount > 0) {
-            item {
-                MaterialContainer(
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                ) {
-                    SettingsNavigationItem(
-                        title = stringResource(Res.string.people_review_label),
-                        description = stringResource(Res.string.people_review_description, uiState.pendingReviewCount),
-                        icon = { Icon(Icons.Default.Star, contentDescription = null) },
-                        onClick = onOpenReviewInbox,
-                        enabled = uiState.isPeopleEnabled,
+                uiState.notice?.let { message ->
+                    PeopleNoticeCard(
+                        message = message,
+                        onDismissMessage = onDismissMessage,
                     )
                 }
             }
-        }
-
-        item {
-            MaterialContainer(
-                modifier = Modifier.padding(horizontal = Spacing.lg),
+        },
+        endPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(Spacing.md),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                ) {
-                    Text(
-                        text = stringResource(Res.string.people_setup_title),
-                        style = MaterialTheme.typography.titleMedium,
+                PeopleBrowseRow(
+                    uiState = uiState,
+                    onBrowsePeople = onBrowsePeople,
+                )
+                if (uiState.pendingReviewCount > 0) {
+                    PeopleReviewRow(
+                        uiState = uiState,
+                        onOpenReviewInbox = onOpenReviewInbox,
                     )
-                    Text(
-                        text =
-                            if (uiState.isPeopleEnabled) {
-                                stringResource(Res.string.people_setup_description)
-                            } else {
-                                stringResource(Res.string.people_disabled_notice)
-                            },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                }
+            }
+        },
+        standardContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.people_title),
+                onBack = onBack,
+                modifier = modifier,
+            ) {
+                item { PeopleDescription() }
+
+                item {
+                    PeopleEnableToggle(
+                        uiState = uiState,
+                        onPeopleEnabledChanged = onPeopleEnabledChanged,
                     )
-                    Button(
-                        onClick = { showSetupSheet = true },
-                        enabled = uiState.isPeopleEnabled && !uiState.isImporting,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Default.PersonAdd, contentDescription = null)
-                        Text(
-                            text =
-                                if (uiState.totalPeopleCount == 0) {
-                                    stringResource(Res.string.people_get_started)
-                                } else {
-                                    stringResource(Res.string.people_find_more)
-                                },
-                            modifier = Modifier.padding(start = Spacing.sm),
+                }
+
+                item {
+                    PeopleBrowseRow(
+                        uiState = uiState,
+                        onBrowsePeople = onBrowsePeople,
+                    )
+                }
+
+                if (uiState.pendingReviewCount > 0) {
+                    item {
+                        PeopleReviewRow(
+                            uiState = uiState,
+                            onOpenReviewInbox = onOpenReviewInbox,
                         )
                     }
-                    if (uiState.isImporting) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                        ) {
-                            CircularProgressIndicator(strokeWidth = 2.dp)
-                            Text(
-                                text = stringResource(Res.string.people_importing_contacts),
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
-                    }
                 }
-            }
-        }
 
-        uiState.notice?.let { message ->
-            item {
-                MaterialContainer(
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                ) {
-                    Column(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(Spacing.md),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    ) {
-                        Text(
-                            text = peopleSettingsNoticeText(message),
-                            style = MaterialTheme.typography.bodyMedium,
+                item {
+                    PeopleSetupCard(
+                        uiState = uiState,
+                        onLaunchSetup = { showSetupSheet = true },
+                    )
+                }
+
+                uiState.notice?.let { message ->
+                    item {
+                        PeopleNoticeCard(
+                            message = message,
+                            onDismissMessage = onDismissMessage,
                         )
-                        OutlinedButton(onClick = onDismissMessage) {
-                            Text(stringResource(UiRes.string.common_dismiss))
-                        }
                     }
                 }
             }
-        }
-    }
+        },
+    )
 
     if (showSetupSheet) {
         PlatformSheet(onDismissRequest = { showSetupSheet = false }) {
@@ -311,6 +272,182 @@ fun PeopleSettingsContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Lead-in copy explaining what the People feature does.
+ *
+ * Rendered identically in the single-column list and in the book-posture start pane.
+ */
+@Composable
+private fun PeopleDescription() {
+    Text(
+        text = stringResource(Res.string.people_settings_description),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = Spacing.lg),
+    )
+}
+
+/**
+ * Master enable toggle for the People feature.
+ */
+@Composable
+private fun PeopleEnableToggle(
+    uiState: PeopleSettingsViewModel.UiState,
+    onPeopleEnabledChanged: (Boolean) -> Unit,
+) {
+    MaterialContainer(
+        modifier = Modifier.padding(horizontal = Spacing.lg),
+    ) {
+        ToggleSettingsItem(
+            title = stringResource(Res.string.people_enable_label),
+            description = stringResource(Res.string.people_enable_description),
+            checked = uiState.isPeopleEnabled,
+            onCheckedChange = onPeopleEnabledChanged,
+        )
+    }
+}
+
+/**
+ * Navigation row that opens the people directory.
+ */
+@Composable
+private fun PeopleBrowseRow(
+    uiState: PeopleSettingsViewModel.UiState,
+    onBrowsePeople: () -> Unit,
+) {
+    MaterialContainer(
+        modifier = Modifier.padding(horizontal = Spacing.lg),
+    ) {
+        SettingsNavigationItem(
+            title = stringResource(Res.string.people_browse_label),
+            description =
+                if (uiState.totalPeopleCount == 0) {
+                    stringResource(Res.string.people_directory_empty_state)
+                } else {
+                    stringResource(Res.string.people_browse_description, uiState.totalPeopleCount)
+                },
+            icon = { Icon(Icons.Default.People, contentDescription = null) },
+            onClick = onBrowsePeople,
+            enabled = uiState.isPeopleEnabled && uiState.totalPeopleCount > 0,
+        )
+    }
+}
+
+/**
+ * Navigation row that opens the pending review inbox.
+ *
+ * Callers gate visibility on a non-zero pending review count.
+ */
+@Composable
+private fun PeopleReviewRow(
+    uiState: PeopleSettingsViewModel.UiState,
+    onOpenReviewInbox: () -> Unit,
+) {
+    MaterialContainer(
+        modifier = Modifier.padding(horizontal = Spacing.lg),
+    ) {
+        SettingsNavigationItem(
+            title = stringResource(Res.string.people_review_label),
+            description = stringResource(Res.string.people_review_description, uiState.pendingReviewCount),
+            icon = { Icon(Icons.Default.Star, contentDescription = null) },
+            onClick = onOpenReviewInbox,
+            enabled = uiState.isPeopleEnabled,
+        )
+    }
+}
+
+/**
+ * Setup card that introduces contact import and launches the setup sheet.
+ */
+@Composable
+private fun PeopleSetupCard(
+    uiState: PeopleSettingsViewModel.UiState,
+    onLaunchSetup: () -> Unit,
+) {
+    MaterialContainer(
+        modifier = Modifier.padding(horizontal = Spacing.lg),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Text(
+                text = stringResource(Res.string.people_setup_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text =
+                    if (uiState.isPeopleEnabled) {
+                        stringResource(Res.string.people_setup_description)
+                    } else {
+                        stringResource(Res.string.people_disabled_notice)
+                    },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(
+                onClick = onLaunchSetup,
+                enabled = uiState.isPeopleEnabled && !uiState.isImporting,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Default.PersonAdd, contentDescription = null)
+                Text(
+                    text =
+                        if (uiState.totalPeopleCount == 0) {
+                            stringResource(Res.string.people_get_started)
+                        } else {
+                            stringResource(Res.string.people_find_more)
+                        },
+                    modifier = Modifier.padding(start = Spacing.sm),
+                )
+            }
+            if (uiState.isImporting) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
+                    CircularProgressIndicator(strokeWidth = 2.dp)
+                    Text(
+                        text = stringResource(Res.string.people_importing_contacts),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Dismissible notice card surfacing import results and failures.
+ */
+@Composable
+private fun PeopleNoticeCard(
+    message: PeopleSettingsNotice,
+    onDismissMessage: () -> Unit,
+) {
+    MaterialContainer(
+        modifier = Modifier.padding(horizontal = Spacing.lg),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text(
+                text = peopleSettingsNoticeText(message),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            OutlinedButton(onClick = onDismissMessage) {
+                Text(stringResource(UiRes.string.common_dismiss))
             }
         }
     }
