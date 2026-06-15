@@ -557,7 +557,15 @@ object SharedScreenshotCatalog {
                     onBack = {},
                     onCreatePasskey = {},
                     userProfile = UserProfile(name = "Alex Rivera", username = "alex", isAuthenticated = true),
-                    passkeys = listOf(PasskeyInfo(id = "passkey-ios", name = "Primary Passkey", device = "iPhone 16 Pro")),
+                    passkeys =
+                        listOf(
+                            PasskeyInfo(
+                                id = "passkey-ios",
+                                name = "Primary Passkey",
+                                device = "iPhone 16 Pro",
+                                lastUsed = baseInstant,
+                            ),
+                        ),
                     onRevokePasskey = {},
                     onSignOut = {},
                     identityState = AccountIdentityState(),
@@ -587,7 +595,15 @@ object SharedScreenshotCatalog {
                     isAuthenticated = true,
                     isSystemSearchVisibilityEnabled = true,
                     showSystemSearchVisibilityToggle = true,
-                    passkeys = listOf(PasskeyInfo(id = "passkey-mac", name = "MacBook Passkey", device = "MacBook Pro")),
+                    passkeys =
+                        listOf(
+                            PasskeyInfo(
+                                id = "passkey-mac",
+                                name = "MacBook Passkey",
+                                device = "MacBook Pro",
+                                lastUsed = baseInstant,
+                            ),
+                        ),
                     onCreatePasskey = {},
                     onRevokePasskey = {},
                     onNavigateToLocationSettings = {},
