@@ -500,6 +500,60 @@ fun A02_PersonalIntroBioStep() {
 }
 
 @PreviewTest
+@Preview(name = "Personal intro book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A74_PersonalIntroBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            PersonalIntroContent(
+                uiState =
+                    PersonalIntroUiState(
+                        currentStep = PersonalIntroStep.Bio,
+                        name = "Alex",
+                        bio = "Runner, photographer, and obsessive note-taker who likes seeing context stay visible.",
+                    ),
+                onNameChanged = {},
+                onBioChanged = {},
+                onProceedToBio = {},
+                onGoBackToName = {},
+                onProcessWithLlm = {},
+                onBack = {},
+                modifier = Modifier.fillMaxSize(),
+                autoFocusInputs = false,
+                animateStepTransitions = false,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Personal intro tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A75_PersonalIntroTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            PersonalIntroContent(
+                uiState =
+                    PersonalIntroUiState(
+                        currentStep = PersonalIntroStep.Bio,
+                        name = "Alex",
+                        bio = "Runner, photographer, and obsessive note-taker who likes seeing context stay visible.",
+                    ),
+                onNameChanged = {},
+                onBioChanged = {},
+                onProceedToBio = {},
+                onGoBackToName = {},
+                onProcessWithLlm = {},
+                onBack = {},
+                modifier = Modifier.fillMaxSize(),
+                autoFocusInputs = false,
+                animateStepTransitions = false,
+            )
+        }
+    }
+}
+
+@PreviewTest
 @LargeScreenAuditPreviewMatrix
 @Composable
 fun A03_CloudAccountSetup() {

@@ -59,6 +59,8 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
@@ -142,6 +144,85 @@ fun PersonalIntroContent(
     autoFocusInputs: Boolean = true,
     animateStepTransitions: Boolean = true,
 ) {
+    FoldableTabletopLayout(
+        modifier = modifier,
+        minPaneHeight = 260.dp,
+        topPane = {
+            PersonalIntroHeaderPane(
+                uiState = uiState,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        bottomPane = {
+            PersonalIntroStepPane(
+                uiState = uiState,
+                onNameChanged = onNameChanged,
+                onBioChanged = onBioChanged,
+                onProceedToBio = onProceedToBio,
+                onGoBackToName = onGoBackToName,
+                onProcessWithLlm = onProcessWithLlm,
+                onBack = onBack,
+                autoFocusInputs = autoFocusInputs,
+                animateStepTransitions = animateStepTransitions,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        fallback = {
+            FoldableBookLayout(
+                modifier = Modifier.fillMaxSize(),
+                minPaneWidth = 320.dp,
+                startPane = {
+                    PersonalIntroHeaderPane(
+                        uiState = uiState,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+                endPane = {
+                    PersonalIntroStepPane(
+                        uiState = uiState,
+                        onNameChanged = onNameChanged,
+                        onBioChanged = onBioChanged,
+                        onProceedToBio = onProceedToBio,
+                        onGoBackToName = onGoBackToName,
+                        onProcessWithLlm = onProcessWithLlm,
+                        onBack = onBack,
+                        autoFocusInputs = autoFocusInputs,
+                        animateStepTransitions = animateStepTransitions,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+                standardContent = {
+                    PersonalIntroStandardContent(
+                        uiState = uiState,
+                        onNameChanged = onNameChanged,
+                        onBioChanged = onBioChanged,
+                        onProceedToBio = onProceedToBio,
+                        onGoBackToName = onGoBackToName,
+                        onProcessWithLlm = onProcessWithLlm,
+                        onBack = onBack,
+                        autoFocusInputs = autoFocusInputs,
+                        animateStepTransitions = animateStepTransitions,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+            )
+        },
+    )
+}
+
+@Composable
+private fun PersonalIntroStandardContent(
+    uiState: PersonalIntroUiState,
+    onNameChanged: (String) -> Unit,
+    onBioChanged: (String) -> Unit,
+    onProceedToBio: () -> Unit,
+    onGoBackToName: () -> Unit,
+    onProcessWithLlm: () -> Unit,
+    onBack: () -> Unit,
+    autoFocusInputs: Boolean,
+    animateStepTransitions: Boolean,
+    modifier: Modifier = Modifier,
+) {
     Box(
         modifier = modifier,
         contentAlignment = Alignment.TopCenter,
@@ -150,94 +231,186 @@ fun PersonalIntroContent(
             modifier =
                 Modifier
                     .testTag(PERSONAL_INTRO_ROOT_TAG)
+                    .widthIn(max = 444.dp)
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.lg)
                     .verticalScroll(rememberScrollState())
-                    .widthIn(max = 444.dp)
                     .semantics {
                         contentDescription = PERSONAL_INTRO_ROOT_TAG
                     },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(modifier = Modifier.height(Spacing.xl))
-
-            AnimatedVisibility(
-                visible = uiState.isProcessingLlm || uiState.isLoading,
-                enter = fadeIn(),
-                exit = fadeOut(),
-            ) {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-
+            PersonalIntroProgress(uiState = uiState)
             Spacer(modifier = Modifier.height(Spacing.xl))
-
-            Box(
-                modifier =
-                    Modifier
-                        .size(120.dp)
-                        .clip(CircleShape)
-                        .background(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = CircleShape,
-                        ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.AccountCircle,
-                    contentDescription = stringResource(Res.string.profile_photo),
-                    modifier = Modifier.size(80.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            }
-
+            PersonalIntroAvatar()
             Spacer(modifier = Modifier.height(Spacing.xl))
+            PersonalIntroStepContent(
+                uiState = uiState,
+                onNameChanged = onNameChanged,
+                onBioChanged = onBioChanged,
+                onProceedToBio = onProceedToBio,
+                onGoBackToName = onGoBackToName,
+                onProcessWithLlm = onProcessWithLlm,
+                onBack = onBack,
+                autoFocusInputs = autoFocusInputs,
+                animateStepTransitions = animateStepTransitions,
+            )
+        }
+    }
+}
 
-            AnimatedContent(
-                targetState = uiState.currentStep,
-                transitionSpec = {
-                    if (animateStepTransitions) {
-                        onboardingSlideTransition()
-                    } else {
-                        ContentTransform(EnterTransition.None, ExitTransition.None)
-                    }
+@Composable
+private fun PersonalIntroHeaderPane(
+    uiState: PersonalIntroUiState,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .padding(Spacing.lg)
+                .testTag(PERSONAL_INTRO_ROOT_TAG)
+                .semantics {
+                    contentDescription = PERSONAL_INTRO_ROOT_TAG
                 },
-                label = "Step Content",
-            ) { step ->
-                when (step) {
-                    PersonalIntroStep.Name ->
-                        NameStep(
-                            name = uiState.name,
-                            nameError = uiState.nameError,
-                            canContinue = uiState.canContinueFromName,
-                            onNameChanged = onNameChanged,
-                            onContinue = onProceedToBio,
-                            onBack = onBack,
-                            autoFocus = autoFocusInputs,
-                        )
+        verticalArrangement = Arrangement.spacedBy(Spacing.xl, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        PersonalIntroProgress(uiState = uiState)
+        PersonalIntroAvatar()
+    }
+}
 
-                    PersonalIntroStep.Bio ->
-                        BioStep(
-                            bio = uiState.bio,
-                            bioError = uiState.bioError,
-                            canContinue = uiState.canContinueFromBio,
-                            onBioChanged = onBioChanged,
-                            onContinue = onProcessWithLlm,
-                            onBack = onGoBackToName,
-                            autoFocus = autoFocusInputs,
-                        )
+@Composable
+private fun PersonalIntroStepPane(
+    uiState: PersonalIntroUiState,
+    onNameChanged: (String) -> Unit,
+    onBioChanged: (String) -> Unit,
+    onProceedToBio: () -> Unit,
+    onGoBackToName: () -> Unit,
+    onProcessWithLlm: () -> Unit,
+    onBack: () -> Unit,
+    autoFocusInputs: Boolean,
+    animateStepTransitions: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.padding(horizontal = Spacing.lg),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .widthIn(max = 444.dp)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Spacer(modifier = Modifier.height(Spacing.xl))
+            PersonalIntroStepContent(
+                uiState = uiState,
+                onNameChanged = onNameChanged,
+                onBioChanged = onBioChanged,
+                onProceedToBio = onProceedToBio,
+                onGoBackToName = onGoBackToName,
+                onProcessWithLlm = onProcessWithLlm,
+                onBack = onBack,
+                autoFocusInputs = autoFocusInputs,
+                animateStepTransitions = animateStepTransitions,
+            )
+        }
+    }
+}
 
-                    PersonalIntroStep.LlmResponse ->
-                        LlmResponseStep(
-                            userName = uiState.name,
-                            llmResponse = uiState.llmResponse,
-                            llmError = uiState.llmError,
-                            isLoading = uiState.isLoading,
-                        )
-                }
+@Composable
+private fun PersonalIntroProgress(uiState: PersonalIntroUiState) {
+    AnimatedVisibility(
+        visible = uiState.isProcessingLlm || uiState.isLoading,
+        enter = fadeIn(),
+        exit = fadeOut(),
+    ) {
+        LinearProgressIndicator(
+            modifier = Modifier.widthIn(max = 444.dp).fillMaxWidth(),
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+}
+
+@Composable
+private fun PersonalIntroAvatar() {
+    Box(
+        modifier =
+            Modifier
+                .size(120.dp)
+                .clip(CircleShape)
+                .background(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = CircleShape,
+                ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Default.AccountCircle,
+            contentDescription = stringResource(Res.string.profile_photo),
+            modifier = Modifier.size(80.dp),
+            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+    }
+}
+
+@Composable
+private fun PersonalIntroStepContent(
+    uiState: PersonalIntroUiState,
+    onNameChanged: (String) -> Unit,
+    onBioChanged: (String) -> Unit,
+    onProceedToBio: () -> Unit,
+    onGoBackToName: () -> Unit,
+    onProcessWithLlm: () -> Unit,
+    onBack: () -> Unit,
+    autoFocusInputs: Boolean,
+    animateStepTransitions: Boolean,
+) {
+    AnimatedContent(
+        targetState = uiState.currentStep,
+        transitionSpec = {
+            if (animateStepTransitions) {
+                onboardingSlideTransition()
+            } else {
+                ContentTransform(EnterTransition.None, ExitTransition.None)
             }
+        },
+        label = "Step Content",
+    ) { step ->
+        when (step) {
+            PersonalIntroStep.Name ->
+                NameStep(
+                    name = uiState.name,
+                    nameError = uiState.nameError,
+                    canContinue = uiState.canContinueFromName,
+                    onNameChanged = onNameChanged,
+                    onContinue = onProceedToBio,
+                    onBack = onBack,
+                    autoFocus = autoFocusInputs,
+                )
+
+            PersonalIntroStep.Bio ->
+                BioStep(
+                    bio = uiState.bio,
+                    bioError = uiState.bioError,
+                    canContinue = uiState.canContinueFromBio,
+                    onBioChanged = onBioChanged,
+                    onContinue = onProcessWithLlm,
+                    onBack = onGoBackToName,
+                    autoFocus = autoFocusInputs,
+                )
+
+            PersonalIntroStep.LlmResponse ->
+                LlmResponseStep(
+                    userName = uiState.name,
+                    llmResponse = uiState.llmResponse,
+                    llmError = uiState.llmError,
+                    isLoading = uiState.isLoading,
+                )
         }
     }
 }
