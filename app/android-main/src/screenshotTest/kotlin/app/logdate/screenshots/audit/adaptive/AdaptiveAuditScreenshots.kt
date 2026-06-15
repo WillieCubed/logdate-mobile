@@ -48,6 +48,8 @@ import app.logdate.feature.journals.ui.settings.JournalSettingsScreenContent
 import app.logdate.feature.journals.ui.settings.JournalSettingsUiState
 import app.logdate.feature.journals.ui.share.ShareJournalScreenContent
 import app.logdate.feature.journals.ui.share.ShareJournalUiState
+import app.logdate.feature.library.ui.detail.MediaDetailContent
+import app.logdate.feature.library.ui.detail.MediaDetailUiState
 import app.logdate.feature.onboarding.ui.CloudAccountSetupContent
 import app.logdate.feature.onboarding.ui.OnboardingStartScreenContent
 import app.logdate.feature.onboarding.ui.PersonalIntroContent
@@ -57,6 +59,7 @@ import app.logdate.feature.search.ui.SearchScreenContent
 import app.logdate.feature.search.ui.SearchScreenState
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.profile.LogDateProfile
+import app.logdate.screenshots.components.library.LibraryScreenshotData
 import app.logdate.screenshots.common.LargeScreenAuditPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTheme
@@ -78,6 +81,8 @@ import kotlin.uuid.Uuid
 
 private const val BOOK_FOLDABLE = "spec:width=1440dp,height=900dp"
 private const val TABLETOP_FOLDABLE = "spec:width=1440dp,height=900dp"
+private const val SAMPLE_IMAGE_URI =
+    "file:///Users/williecubed/Projects/TheHypertextStudio/logdate-android/app/android-main/src/debug/res/drawable-nodpi/sample_note_photo.jpg"
 private const val SAMPLE_VIDEO_URI = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher"
 
 private val bookPostureLayoutInfo =
@@ -588,6 +593,46 @@ fun A55_NoteViewerAudioTabletopPosture() {
 }
 
 @PreviewTest
+@Preview(name = "Media detail image book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A56_MediaDetailImageBookPosture() {
+    FoldableMediaDetailScene(
+        foldableLayoutInfo = bookPostureLayoutInfo,
+        state = LibraryScreenshotData.imageDetail.copy(mediaRef = SAMPLE_IMAGE_URI),
+    )
+}
+
+@PreviewTest
+@Preview(name = "Media detail video book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A57_MediaDetailVideoBookPosture() {
+    FoldableMediaDetailScene(
+        foldableLayoutInfo = bookPostureLayoutInfo,
+        state = LibraryScreenshotData.videoDetail.copy(mediaRef = SAMPLE_VIDEO_URI),
+    )
+}
+
+@PreviewTest
+@Preview(name = "Media detail image tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A58_MediaDetailImageTabletopPosture() {
+    FoldableMediaDetailScene(
+        foldableLayoutInfo = tabletopPostureLayoutInfo,
+        state = LibraryScreenshotData.imageDetail.copy(mediaRef = SAMPLE_IMAGE_URI),
+    )
+}
+
+@PreviewTest
+@Preview(name = "Media detail video tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A59_MediaDetailVideoTabletopPosture() {
+    FoldableMediaDetailScene(
+        foldableLayoutInfo = tabletopPostureLayoutInfo,
+        state = LibraryScreenshotData.videoDetail.copy(mediaRef = SAMPLE_VIDEO_URI),
+    )
+}
+
+@PreviewTest
 @LargeScreenAuditPreviewMatrix
 @Composable
 fun A07_JournalDetail() {
@@ -596,6 +641,22 @@ fun A07_JournalDetail() {
             uiState = auditJournalState,
             onGoBack = {},
         )
+    }
+}
+
+@Composable
+private fun FoldableMediaDetailScene(
+    foldableLayoutInfo: FoldableLayoutInfo,
+    state: MediaDetailUiState,
+) {
+    provideFoldableLayoutInfo(foldableLayoutInfo) {
+        ScreenshotTheme {
+            MediaDetailContent(
+                state = state,
+                isExpanded = true,
+                onBack = {},
+            )
+        }
     }
 }
 
