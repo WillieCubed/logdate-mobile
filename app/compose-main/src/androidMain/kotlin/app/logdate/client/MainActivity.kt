@@ -255,7 +255,7 @@ class MainActivity : FragmentActivity() {
             setHandoffEnabled(true, handoffParams)
         }
 
-        pendingNavKey = resolveNavKey(intent)
+        pendingNavKey = resolveMainActivityNavKey(intent)
 
         setContent {
             val state = appUiState as? GlobalAppUiLoadedState
@@ -324,7 +324,7 @@ class MainActivity : FragmentActivity() {
         if (handleMultiWindowIntent(intent)) {
             return
         }
-        resolveNavKey(intent)?.let { pendingNavKey = it }
+        resolveMainActivityNavKey(intent)?.let { pendingNavKey = it }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -451,8 +451,13 @@ class MainActivity : FragmentActivity() {
     }
 }
 
-/** Resolves the optional deep-link destination from intent extras. */
-private fun resolveNavKey(intent: Intent?): NavKey? {
+/**
+ * Resolves the optional launch destination from the activity intent.
+ *
+ * This is the single resolver used by `MainActivity` for deep links, notification taps,
+ * widget launches, ambient prompts, and the Android 16 handoff fallback URI.
+ */
+fun resolveMainActivityNavKey(intent: Intent?): NavKey? {
     if (intent == null) return null
     intent.readNavigationTestDestination()?.let { return it }
     return when {

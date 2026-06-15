@@ -243,21 +243,6 @@ tasks.configureEach {
     }
 }
 
-configurations.all {
-    resolutionStrategy.eachDependency {
-        // Navigation3 beta01 pulls compose.ui to 1.11.0-beta01 while JetBrains
-        // Compose 1.11.0-alpha04 maps foundation to 1.11.0-alpha06. The ABI
-        // changed between alpha and beta for PointerEventType.Pan, causing a
-        // runtime NoSuchMethodError. Force all androidx.compose artifacts to the
-        // same beta01 version so foundation and ui stay compatible.
-        if (requested.group.startsWith("androidx.compose") &&
-            requested.version?.contains("1.11.0-alpha") == true
-        ) {
-            useVersion("1.11.0-beta01")
-        }
-    }
-}
-
 play {
     track.set(resolvedPlayTrack)
     defaultToAppBundles.set(true)
@@ -286,13 +271,15 @@ dependencies {
     testImplementation(libs.kotlinx.datetime)
     testImplementation(libs.mockk)
     testImplementation(libs.compose.runtime)
-    testImplementation(libs.androidx.navigation3.runtime)
+    testImplementation(libs.nav3.runtime)
     testImplementation(libs.androidx.health.connect)
     testImplementation(libs.play.services.wearable)
     testImplementation(projects.client.feature.core)
     testImplementation(projects.client.database)
     testImplementation(projects.client.domain)
     testImplementation(projects.client.healthConnect)
+    testImplementation(projects.client.media)
+    testImplementation(projects.client.feature.editor)
     testImplementation(projects.client.repository)
     testImplementation(projects.client.sync)
     testImplementation(projects.shared.model)
@@ -300,8 +287,12 @@ dependencies {
     androidTestImplementation(projects.app.composeMain)
     androidTestImplementation(projects.client.feature.core)
     androidTestImplementation(projects.client.feature.editor)
+    androidTestImplementation(projects.client.feature.events)
     androidTestImplementation(projects.client.feature.journal)
+    androidTestImplementation(projects.client.feature.postcards)
+    androidTestImplementation(projects.client.feature.timeline)
     androidTestImplementation(projects.client.feature.onboarding)
+    androidTestImplementation(projects.client.awareness)
     androidTestImplementation(projects.client.domain)
     androidTestImplementation(projects.client.healthConnect)
     androidTestImplementation(projects.client.intelligence)
@@ -317,7 +308,9 @@ dependencies {
     androidTestImplementation(projects.client.sharing)
     androidTestImplementation(projects.client.sync)
     androidTestImplementation(projects.client.device)
+    androidTestImplementation(projects.client.feature.rewind)
     androidTestImplementation(projects.shared.model)
+    androidTestImplementation(libs.nav3.runtime)
     androidTestImplementation(libs.kotlin.test.junit)
     androidTestImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.kotlinx.datetime)
@@ -326,6 +319,7 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.androidx.test.uiautomator)
     androidTestImplementation("io.mockk:mockk-android:1.14.9")
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestUtil(libs.androidx.test.orchestrator)
@@ -333,6 +327,8 @@ dependencies {
     androidTestImplementation(libs.androidx.activity.compose)
     androidTestImplementation(libs.compose.material3)
     androidTestImplementation(libs.napier)
+    androidTestImplementation(libs.media3.common)
+    androidTestImplementation(libs.media3.session)
     androidTestImplementation(project.dependencies.platform(libs.koin.bom))
     androidTestImplementation(libs.koin.core)
     androidTestImplementation(libs.koin.android)
@@ -380,7 +376,7 @@ dependencies {
     screenshotTestImplementation(projects.shared.model)
     screenshotTestImplementation(projects.app.composeMain)
     screenshotTestImplementation(libs.kotlinx.datetime)
-    screenshotTestImplementation(libs.androidx.navigation3.runtime)
+    screenshotTestImplementation(libs.nav3.runtime)
 }
 
 afterEvaluate {
