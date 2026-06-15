@@ -42,6 +42,8 @@ import kotlin.uuid.Uuid
 
 private const val SAMPLE_IMAGE_URI = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher"
 private const val SAMPLE_VIDEO_URI = SAMPLE_IMAGE_URI
+private const val BOOK_FOLDABLE = "spec:width=1440dp,height=900dp"
+private const val TABLETOP_FOLDABLE = "spec:width=1440dp,height=900dp"
 
 private val mockPalette = AudioPalette(
     waveformGradientStart = 0xFFE8A044,
@@ -190,6 +192,30 @@ fun EditorMode_CameraCapture() {
 }
 
 @PreviewTest
+@Preview(showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun EditorMode_CameraCapture_BookPosture() {
+    EditorModeFrame(isImmersiveBlockActive = true) {
+        CameraCapturePreviewContent(
+            state = CameraCapturePreviewState.LiveCapture(),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun EditorMode_CameraCapture_TabletopPosture() {
+    EditorModeFrame(isImmersiveBlockActive = true) {
+        CameraCapturePreviewContent(
+            state = CameraCapturePreviewState.LiveCapture(),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
 @ScreenshotPreviewMatrix
 @LargeScreenAuditPreviewMatrix
 @Composable
@@ -283,9 +309,73 @@ fun EditorMode_CameraReviewPhoto() {
 }
 
 @PreviewTest
+@Preview(showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun EditorMode_CameraReviewPhoto_BookPosture() {
+    EditorModeFrame(isImmersiveBlockActive = true) {
+        CameraCapturePreviewContent(
+            state =
+                CameraCapturePreviewState.Review(
+                    uri = SAMPLE_IMAGE_URI,
+                    mediaType = CapturedMediaType.PHOTO,
+                ),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun EditorMode_CameraReviewPhoto_TabletopPosture() {
+    EditorModeFrame(isImmersiveBlockActive = true) {
+        CameraCapturePreviewContent(
+            state =
+                CameraCapturePreviewState.Review(
+                    uri = SAMPLE_IMAGE_URI,
+                    mediaType = CapturedMediaType.PHOTO,
+                ),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
 fun EditorMode_CameraReviewVideo() {
+    EditorModeFrame(isImmersiveBlockActive = true) {
+        CameraCapturePreviewContent(
+            state =
+                CameraCapturePreviewState.Review(
+                    uri = SAMPLE_IMAGE_URI,
+                    mediaType = CapturedMediaType.VIDEO,
+                ),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun EditorMode_CameraReviewVideo_BookPosture() {
+    EditorModeFrame(isImmersiveBlockActive = true) {
+        CameraCapturePreviewContent(
+            state =
+                CameraCapturePreviewState.Review(
+                    uri = SAMPLE_IMAGE_URI,
+                    mediaType = CapturedMediaType.VIDEO,
+                ),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun EditorMode_CameraReviewVideo_TabletopPosture() {
     EditorModeFrame(isImmersiveBlockActive = true) {
         CameraCapturePreviewContent(
             state =
