@@ -57,6 +57,7 @@ import app.logdate.client.domain.search.DateRangeFilter
 import app.logdate.client.domain.search.SearchFilters
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.search.UniversalSearchResultItem
@@ -277,25 +278,19 @@ fun SearchScreenContent(
                 )
             },
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                FilterChipRow(
-                    filters = filters,
-                    onToggleType = onToggleType,
-                    onSetDateRange = onSetDateRange,
-                    onClearFilters = onClearFilters,
-                )
-                SearchStateContent(
-                    searchState = searchState,
-                    filters = filters,
-                    onQueryChange = onQueryChange,
-                    onCommitSearch = onCommitSearch,
-                    onClearFilters = onClearFilters,
-                    onRemoveRecent = onRemoveRecent,
-                    onClearAllRecents = onClearAllRecents,
-                    onResultClick = onResultClick,
-                    onLongClickResult = { result -> sheetTarget = result },
-                )
-            }
+            SearchBodyContent(
+                searchState = searchState,
+                filters = filters,
+                onToggleType = onToggleType,
+                onSetDateRange = onSetDateRange,
+                onClearFilters = onClearFilters,
+                onQueryChange = onQueryChange,
+                onCommitSearch = onCommitSearch,
+                onRemoveRecent = onRemoveRecent,
+                onClearAllRecents = onClearAllRecents,
+                onResultClick = onResultClick,
+                onLongClickResult = { result -> sheetTarget = result },
+            )
         }
     }
 
@@ -324,6 +319,116 @@ fun SearchScreenContent(
 
 /**
  * Renders the body of the search screen below the SearchBar / FilterChipRow.
+ */
+@Composable
+private fun SearchBodyContent(
+    searchState: SearchScreenState,
+    filters: SearchFilters,
+    onToggleType: (SearchContentType) -> Unit,
+    onSetDateRange: (DateRangeFilter) -> Unit,
+    onClearFilters: () -> Unit,
+    onQueryChange: (String) -> Unit,
+    onCommitSearch: () -> Unit,
+    onRemoveRecent: (String) -> Unit,
+    onClearAllRecents: () -> Unit,
+    onResultClick: (SearchResult) -> Unit,
+    onLongClickResult: (SearchResult) -> Unit,
+) {
+    FoldableBookLayout(
+        modifier = Modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            SearchContextPane(
+                searchState = searchState,
+                filters = filters,
+                onToggleType = onToggleType,
+                onSetDateRange = onSetDateRange,
+                onClearFilters = onClearFilters,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        endPane = {
+            SearchStateContent(
+                searchState = searchState,
+                filters = filters,
+                onQueryChange = onQueryChange,
+                onCommitSearch = onCommitSearch,
+                onClearFilters = onClearFilters,
+                onRemoveRecent = onRemoveRecent,
+                onClearAllRecents = onClearAllRecents,
+                onResultClick = onResultClick,
+                onLongClickResult = onLongClickResult,
+            )
+        },
+        standardContent = {
+            Column(modifier = Modifier.fillMaxSize()) {
+                FilterChipRow(
+                    filters = filters,
+                    onToggleType = onToggleType,
+                    onSetDateRange = onSetDateRange,
+                    onClearFilters = onClearFilters,
+                )
+                SearchStateContent(
+                    searchState = searchState,
+                    filters = filters,
+                    onQueryChange = onQueryChange,
+                    onCommitSearch = onCommitSearch,
+                    onClearFilters = onClearFilters,
+                    onRemoveRecent = onRemoveRecent,
+                    onClearAllRecents = onClearAllRecents,
+                    onResultClick = onResultClick,
+                    onLongClickResult = onLongClickResult,
+                )
+            }
+        },
+    )
+}
+
+@Composable
+private fun SearchContextPane(
+    searchState: SearchScreenState,
+    filters: SearchFilters,
+    onToggleType: (SearchContentType) -> Unit,
+    onSetDateRange: (DateRangeFilter) -> Unit,
+    onClearFilters: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        FilterChipRow(
+            filters = filters,
+            onToggleType = onToggleType,
+            onSetDateRange = onSetDateRange,
+            onClearFilters = onClearFilters,
+        )
+        SearchContextSummary(
+            searchState = searchState,
+            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
+        )
+    }
+}
+
+@Composable
+private fun SearchContextSummary(
+    searchState: SearchScreenState,
+    modifier: Modifier = Modifier,
+) {
+    val summary =
+        when (searchState) {
+            is SearchScreenState.Idle -> stringResource(Res.string.search_for_entries)
+            is SearchScreenState.Searching -> stringResource(Res.string.searching_entries)
+            is SearchScreenState.Empty -> stringResource(Res.string.search_no_results, searchState.query)
+            is SearchScreenState.Results -> stringResource(Res.string.search_entries)
+        }
+    Text(
+        text = summary,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier,
+    )
+}
+
+/**
+ * Renders the body state for the search screen.
  */
 @Composable
 private fun SearchStateContent(
