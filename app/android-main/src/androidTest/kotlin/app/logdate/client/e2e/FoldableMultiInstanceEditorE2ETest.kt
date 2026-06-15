@@ -63,7 +63,9 @@ class FoldableMultiInstanceEditorE2ETest {
 
         waitForTag(EDITOR_TEXT_INPUT_TAG)
         composeRule.onNodeWithTag(EDITOR_TEXT_INPUT_TAG).assertIsDisplayed()
-        composeRule.onNodeWithTag(EDITOR_TEXT_INPUT_TAG).assertTextContains(PRIMARY_APPENDED_TEXT)
+        // The appended text is inserted at the cursor, so it sits alongside the seed text in the
+        // same field; match it as a substring rather than requiring an exact field value.
+        composeRule.onNodeWithTag(EDITOR_TEXT_INPUT_TAG).assertTextContains(PRIMARY_APPENDED_TEXT, substring = true)
     }
 
     @Test
@@ -74,7 +76,7 @@ class FoldableMultiInstanceEditorE2ETest {
             postureSupport.publishBookPosture(activity)
         }
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag(EDITOR_TEXT_INPUT_TAG).assertTextContains(PRIMARY_APPENDED_TEXT)
+        composeRule.onNodeWithTag(EDITOR_TEXT_INPUT_TAG).assertTextContains(PRIMARY_APPENDED_TEXT, substring = true)
 
         // Capture the primary window's runtime identity to compare against the secondary.
         var primaryInstanceId = 0
@@ -105,7 +107,7 @@ class FoldableMultiInstanceEditorE2ETest {
 
         // The primary window is untouched by the secondary's lifecycle and still hinge-aware.
         waitForTag(EDITOR_TEXT_INPUT_TAG)
-        composeRule.onNodeWithTag(EDITOR_TEXT_INPUT_TAG).assertTextContains(PRIMARY_APPENDED_TEXT)
+        composeRule.onNodeWithTag(EDITOR_TEXT_INPUT_TAG).assertTextContains(PRIMARY_APPENDED_TEXT, substring = true)
     }
 
     private fun appendToPrimaryEditor(text: String) {
