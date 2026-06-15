@@ -3,6 +3,8 @@ package app.logdate.screenshots.audit.adaptive
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.feature.core.account.CloudAccountWelcomeContent
@@ -28,9 +30,41 @@ import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.screenshots.common.LargeScreenAuditPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTheme
+import app.logdate.ui.foldable.FoldableHingeBounds
+import app.logdate.ui.foldable.FoldableHingeInfo
+import app.logdate.ui.foldable.FoldableHingeOrientation
+import app.logdate.ui.foldable.FoldableHingeState
+import app.logdate.ui.foldable.FoldableLayoutInfo
+import app.logdate.ui.foldable.FoldableOcclusionType
+import app.logdate.ui.foldable.FoldablePosture
+import app.logdate.ui.foldable.provideFoldableLayoutInfo
 import com.android.tools.screenshot.PreviewTest
 import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
+
+private const val BOOK_FOLDABLE = "spec:width=1440dp,height=900dp"
+
+private val bookPostureLayoutInfo =
+    FoldableLayoutInfo(
+        isFoldable = true,
+        posture = FoldablePosture.Book,
+        hinge =
+            FoldableHingeInfo(
+                orientation = FoldableHingeOrientation.Vertical,
+                state = FoldableHingeState.HalfOpened,
+                occlusionType = FoldableOcclusionType.Full,
+                bounds =
+                    FoldableHingeBounds(
+                        left = 708.dp,
+                        top = 0.dp,
+                        right = 732.dp,
+                        bottom = 900.dp,
+                        width = 24.dp,
+                        height = 900.dp,
+                    ),
+                isSeparating = true,
+            ),
+    )
 
 private val auditSearchResults =
     listOf(
@@ -191,6 +225,33 @@ fun A06_JournalsOverview() {
             onSortOptionSelected = {},
             onToggleFilter = {},
         )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Journals overview book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A40_JournalsOverviewBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            JournalsOverviewScreenContent(
+                journals = auditJournals,
+                layoutMode = JournalLayoutMode.CAROUSEL,
+                sortOption = JournalSortOption.LAST_UPDATED,
+                activeFilters = emptySet(),
+                searchQuery = "audit",
+                entryResults = auditSearchResults,
+                onOpenJournal = {},
+                onBrowseJournals = {},
+                onCreateJournal = {},
+                onNavigateToDay = {},
+                onNavigationClick = {},
+                onQueryChange = {},
+                onToggleLayoutMode = {},
+                onSortOptionSelected = {},
+                onToggleFilter = {},
+            )
+        }
     }
 }
 
