@@ -5,10 +5,13 @@ package app.logdate.feature.core.settings.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -27,12 +30,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.dayboundary.HealthConnectGateKind
 import app.logdate.client.domain.dayboundary.HealthConnectGateState
 import app.logdate.client.domain.dayboundary.HealthConnectMissingRequirement
 import app.logdate.client.domain.dayboundary.HealthConnectStatus
 import app.logdate.client.domain.dayboundary.reduceHealthConnectGateState
 import app.logdate.client.permissions.rememberHealthConnectPermissionState
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.PrimaryTogglePill
 import app.logdate.ui.common.SettingsScaffold
@@ -162,37 +167,33 @@ fun DayBoundarySettingsContent(
     var showTimePicker by remember { mutableStateOf(false) }
     val showSleepBasedToggle = shouldShowSleepBasedToggle(gateState)
 
-    SettingsScaffold(
-        title = stringResource(Res.string.day_schedule),
-        onBack = onBack,
-        modifier = modifier,
-    ) {
-        item {
-            Text(
-                text = stringResource(Res.string.day_schedule_detail_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
-
-        if (showSleepBasedToggle) {
-            item {
-                PrimaryTogglePill(
-                    label = stringResource(Res.string.use_sleep_schedule),
-                    checked = sleepBasedPreferenceEnabled,
-                    onCheckedChange = onToggleSleepBased,
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                Text(
+                    text = stringResource(Res.string.day_schedule_detail_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
-            }
-        }
 
-        item {
-            Column(
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                if (!showSleepBasedToggle) {
+                if (showSleepBasedToggle) {
+                    PrimaryTogglePill(
+                        label = stringResource(Res.string.use_sleep_schedule),
+                        checked = sleepBasedPreferenceEnabled,
+                        onCheckedChange = onToggleSleepBased,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                } else {
                     HealthConnectGateCard(
                         gateState = gateState,
                         isRequestInFlight = isRequestInFlight,
@@ -200,9 +201,20 @@ fun DayBoundarySettingsContent(
                         onSetUpHealthConnect = onSetUpHealthConnect,
                         onOpenHealthConnectPermissions = onOpenHealthConnectPermissions,
                         onDisableSleepBased = { onToggleSleepBased(false) },
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
-
+            }
+        },
+        endPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
                 Text(
                     text =
                         stringResource(
@@ -237,8 +249,87 @@ fun DayBoundarySettingsContent(
                     )
                 }
             }
-        }
-    }
+        },
+        standardContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.day_schedule),
+                onBack = onBack,
+                modifier = modifier,
+            ) {
+                item {
+                    Text(
+                        text = stringResource(Res.string.day_schedule_detail_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+
+                if (showSleepBasedToggle) {
+                    item {
+                        PrimaryTogglePill(
+                            label = stringResource(Res.string.use_sleep_schedule),
+                            checked = sleepBasedPreferenceEnabled,
+                            onCheckedChange = onToggleSleepBased,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+                }
+
+                item {
+                    Column(
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        if (!showSleepBasedToggle) {
+                            HealthConnectGateCard(
+                                gateState = gateState,
+                                isRequestInFlight = isRequestInFlight,
+                                onRequestPermissions = onRequestPermissions,
+                                onSetUpHealthConnect = onSetUpHealthConnect,
+                                onOpenHealthConnectPermissions = onOpenHealthConnectPermissions,
+                                onDisableSleepBased = { onToggleSleepBased(false) },
+                            )
+                        }
+
+                        Text(
+                            text =
+                                stringResource(
+                                    if (showSleepBasedToggle && sleepBasedPreferenceEnabled) {
+                                        Res.string.day_schedule_enabled_explanation
+                                    } else {
+                                        Res.string.day_schedule_disabled_explanation
+                                    },
+                                ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+
+                        Spacer(modifier = Modifier.height(Spacing.sm))
+
+                        MaterialContainer {
+                            ListItem(
+                                headlineContent = {
+                                    Text(stringResource(Res.string.day_schedule_fallback_time))
+                                },
+                                supportingContent = {
+                                    Text(stringResource(Res.string.day_schedule_fallback_time_description))
+                                },
+                                trailingContent = {
+                                    TextButton(onClick = { showTimePicker = true }) {
+                                        Text(
+                                            text = formatHour(fallbackStartHour),
+                                            style = MaterialTheme.typography.titleMedium,
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        },
+    )
 
     if (showTimePicker) {
         TimePickerDialog(

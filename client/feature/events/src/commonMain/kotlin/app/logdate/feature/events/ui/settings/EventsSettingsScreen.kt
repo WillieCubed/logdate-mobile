@@ -155,7 +155,7 @@ fun EventsSettingsContent(
                 }
             }
         },
-        singlePaneContent = {
+        standardContent = {
             SettingsScaffold(
                 title = stringResource(Res.string.events_hub_title),
                 onBack = onBack,

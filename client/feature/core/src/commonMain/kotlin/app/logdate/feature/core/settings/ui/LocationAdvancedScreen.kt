@@ -118,7 +118,7 @@ fun LocationAdvancedContent(
                 }
             }
         },
-        singlePaneContent = {
+        standardContent = {
             SettingsScaffold(
                 title = stringResource(Res.string.location_advanced),
                 onBack = onBack,

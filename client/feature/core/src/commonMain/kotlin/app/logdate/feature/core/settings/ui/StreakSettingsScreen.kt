@@ -148,7 +148,7 @@ fun StreakSettingsContent(
                 }
             }
         },
-        singlePaneContent = {
+        standardContent = {
             SettingsScaffold(
                 title = stringResource(Res.string.streaks),
                 onBack = onBack,

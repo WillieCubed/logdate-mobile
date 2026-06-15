@@ -225,7 +225,7 @@ fun DevicesScreenContent(
                 }
             }
         },
-        singlePaneContent = {
+        standardContent = {
             SettingsScaffold(
                 title = stringResource(Res.string.devices),
                 onBack = onBackClick,

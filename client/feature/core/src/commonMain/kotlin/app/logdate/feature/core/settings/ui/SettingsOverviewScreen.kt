@@ -354,7 +354,7 @@ fun SettingsOverviewContent(
                 }
             }
         },
-        singlePaneContent = {
+        standardContent = {
             SettingsScaffold(
                 title = stringResource(Res.string.screen_title_settings),
                 onBack = onBack,

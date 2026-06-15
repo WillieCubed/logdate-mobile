@@ -352,7 +352,7 @@ private fun MediaDetailLayout(
                                 .padding(Spacing.lg),
                     )
                 },
-                singlePaneContent = {
+                standardContent = {
                     if (isExpanded) {
                         Row(modifier = Modifier.fillMaxSize()) {
                             Box(

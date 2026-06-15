@@ -176,7 +176,7 @@ fun CalendarSyncSettingsContent(
                 }
             }
         },
-        singlePaneContent = {
+        standardContent = {
             SettingsScaffold(
                 title = stringResource(Res.string.calendar_sync_settings_title),
                 onBack = onBack,

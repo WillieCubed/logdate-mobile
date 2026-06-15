@@ -296,7 +296,7 @@ fun AccountSettingsContent(
                 }
             }
         },
-        singlePaneContent = {
+        standardContent = {
             SettingsScaffold(
                 title = stringResource(Res.string.account_and_sign_in),
                 onBack = onBack,

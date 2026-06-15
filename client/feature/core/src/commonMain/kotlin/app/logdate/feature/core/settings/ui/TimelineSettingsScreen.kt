@@ -116,7 +116,7 @@ fun TimelineSettingsContent(
                 }
             }
         },
-        singlePaneContent = {
+        standardContent = {
             SettingsScaffold(
                 title = stringResource(Res.string.timeline_settings),
                 onBack = onBack,

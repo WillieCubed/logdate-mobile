@@ -120,7 +120,7 @@ internal fun VoiceNotesSettingsContent(
                 )
             }
         },
-        singlePaneContent = {
+        standardContent = {
             SettingsScaffold(
                 title = stringResource(Res.string.voice_notes_settings),
                 onBack = onBack,

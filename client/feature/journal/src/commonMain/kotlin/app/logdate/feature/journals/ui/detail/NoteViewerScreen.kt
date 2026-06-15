@@ -482,7 +482,7 @@ fun NoteViewerScaffoldContent(
                         )
                     }
                 },
-                singlePaneContent = {
+                standardContent = {
                     ImmersiveEditorLayout(
                         topBarContent = {
                             NoteViewerToolbar(

@@ -4,7 +4,10 @@ package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -13,9 +16,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import app.logdate.feature.core.settings.updates.AppUpdateFlowType
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
@@ -66,19 +71,63 @@ fun AdvancedSettingsContent(
     onCheckForAppUpdates: () -> Unit,
     onCompleteAppUpdate: () -> Unit,
 ) {
-    SettingsScaffold(
-        title = stringResource(Res.string.advanced),
-        onBack = onBack,
-    ) {
-        item {
-            AppUpdateSection(
-                appUpdateUiState = appUpdateUiState,
-                onCheckForAppUpdates = onCheckForAppUpdates,
-                onCompleteAppUpdate = onCompleteAppUpdate,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
-    }
+    FoldableBookLayout(
+        modifier = Modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Text(
+                    text = stringResource(Res.string.advanced),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+                Text(
+                    text = stringResource(Res.string.app_updates),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+            }
+        },
+        endPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+            ) {
+                AppUpdateSection(
+                    appUpdateUiState = appUpdateUiState,
+                    onCheckForAppUpdates = onCheckForAppUpdates,
+                    onCompleteAppUpdate = onCompleteAppUpdate,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+            }
+        },
+        standardContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.advanced),
+                onBack = onBack,
+            ) {
+                item {
+                    AppUpdateSection(
+                        appUpdateUiState = appUpdateUiState,
+                        onCheckForAppUpdates = onCheckForAppUpdates,
+                        onCompleteAppUpdate = onCompleteAppUpdate,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+            }
+        },
+    )
 }
 
 @Composable

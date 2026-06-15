@@ -224,7 +224,7 @@ fun LocationSettingsContent(
                 LocationSettingsNotes()
             }
         },
-        singlePaneContent = {
+        standardContent = {
             SettingsScaffold(
                 title = stringResource(Res.string.location_settings),
                 onBack = onBack,

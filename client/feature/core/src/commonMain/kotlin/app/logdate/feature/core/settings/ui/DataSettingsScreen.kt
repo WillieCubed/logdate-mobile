@@ -285,7 +285,7 @@ fun DataSettingsContent(
                 )
             }
         },
-        singlePaneContent = {
+        standardContent = {
             SettingsScaffold(
                 title = stringResource(Res.string.data_and_storage),
                 onBack = onBack,

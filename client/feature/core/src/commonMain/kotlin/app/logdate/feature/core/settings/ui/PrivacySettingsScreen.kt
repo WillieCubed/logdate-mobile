@@ -387,7 +387,7 @@ fun PrivacySettingsContent(
                 }
             }
         },
-        singlePaneContent = {
+        standardContent = {
             SettingsScaffold(
                 title = stringResource(Res.string.privacy_and_security),
                 onBack = onBack,
