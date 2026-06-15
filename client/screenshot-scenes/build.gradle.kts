@@ -53,6 +53,7 @@ kotlin {
             implementation(projects.client.feature.onboarding)
             implementation(projects.client.feature.rewind)
             implementation(projects.client.feature.search)
+            implementation(projects.client.location)
             implementation(projects.client.media)
             implementation(projects.client.repository)
             implementation(projects.client.sync)

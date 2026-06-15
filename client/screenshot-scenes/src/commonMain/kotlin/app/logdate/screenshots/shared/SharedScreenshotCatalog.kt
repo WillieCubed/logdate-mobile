@@ -22,6 +22,8 @@ import app.logdate.client.domain.recommendation.WidgetContentType
 import app.logdate.client.domain.streak.StreakData
 import app.logdate.client.domain.watch.WatchNotificationSettings
 import app.logdate.client.domain.watch.WatchSyncSettings
+import app.logdate.client.location.settings.LocationCaptureMode
+import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.audio.download.ModelDownloadStatus
 import app.logdate.client.repository.search.SearchContentType
@@ -43,6 +45,10 @@ import app.logdate.feature.core.settings.ui.DataSettingsContent
 import app.logdate.feature.core.settings.ui.DayBoundarySettingsContent
 import app.logdate.feature.core.settings.ui.IntegrityState
 import app.logdate.feature.core.settings.ui.LibrarySettingsContent
+import app.logdate.feature.core.settings.ui.LocationAdvancedContent
+import app.logdate.feature.core.settings.ui.LocationIntervalContent
+import app.logdate.feature.core.settings.ui.LocationSettingsContent
+import app.logdate.feature.core.settings.ui.LocationTrackingOptionsContent
 import app.logdate.feature.core.settings.ui.MemoriesSettingsContent
 import app.logdate.feature.core.settings.ui.MemoriesWidgetInstallUiState
 import app.logdate.feature.core.settings.ui.PasskeyInfo
@@ -148,6 +154,10 @@ enum class SharedScreenshotSceneId(
     VoiceNotesSettings("voice-notes-settings"),
     SyncSettings("sync-settings"),
     SyncIssues("sync-issues"),
+    LocationSettings("location-settings"),
+    LocationTrackingOptions("location-tracking-options"),
+    LocationInterval("location-interval"),
+    LocationAdvanced("location-advanced"),
     DevicesSettings("devices-settings"),
     StreakSettings("streak-settings"),
     TimelineSettings("timeline-settings"),
@@ -843,6 +853,41 @@ object SharedScreenshotCatalog {
                     onGoBack = {},
                 )
             },
+            sharedScene(SharedScreenshotSceneId.LocationSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                LocationSettingsContent(
+                    settings = sampleLocationSettings(),
+                    onBack = {},
+                    onToggleBackgroundTracking = {},
+                    onSetCaptureMode = {},
+                    onShowLocationTimeline = {},
+                    onNavigateToTrackingOptions = {},
+                    onNavigateToInterval = {},
+                    onNavigateToAdvanced = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.LocationTrackingOptions, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                LocationTrackingOptionsContent(
+                    settings = sampleLocationSettings(),
+                    onBack = {},
+                    onToggleJournalTracking = {},
+                    onToggleTimelineTracking = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.LocationInterval, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                LocationIntervalContent(
+                    settings = sampleLocationSettings(),
+                    onBack = {},
+                    onUpdateTrackingInterval = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.LocationAdvanced, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                LocationAdvancedContent(
+                    settings = sampleLocationSettings(),
+                    onBack = {},
+                    onToggleServerAssist = {},
+                    onSetDefaultLocation = {},
+                )
+            },
             sharedScene(SharedScreenshotSceneId.DevicesSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
                 DevicesScreenContent(
                     onBackClick = {},
@@ -1290,6 +1335,16 @@ private val searchResults =
             created = baseInstant,
             contentType = SearchContentType.TRANSCRIPTION,
         ),
+    )
+
+private fun sampleLocationSettings(): LocationTrackingSettings =
+    LocationTrackingSettings(
+        backgroundTrackingEnabled = true,
+        minimumPersistIntervalMinutes = 15,
+        captureMode = LocationCaptureMode.PASSIVE,
+        serverAssistEnabled = true,
+        autoTrackForJournalEntries = true,
+        autoTrackForTimelineReview = false,
     )
 
 private fun sampleMemories(

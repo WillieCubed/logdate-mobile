@@ -187,6 +187,34 @@ fun A29_SyncIssuesBookPosture() {
     BookPostureSettingsScene(SharedScreenshotSceneId.SyncIssues)
 }
 
+@PreviewTest
+@Preview(name = "Location settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A30_LocationSettingsBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.LocationSettings)
+}
+
+@PreviewTest
+@Preview(name = "Location tracking options book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A31_LocationTrackingOptionsBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.LocationTrackingOptions)
+}
+
+@PreviewTest
+@Preview(name = "Location interval book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A32_LocationIntervalBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.LocationInterval)
+}
+
+@PreviewTest
+@Preview(name = "Location advanced book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A33_LocationAdvancedBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.LocationAdvanced)
+}
+
 @Composable
 private fun BookPostureSettingsScene(sceneId: SharedScreenshotSceneId) {
     provideFoldableLayoutInfo(bookPostureLayoutInfo) {

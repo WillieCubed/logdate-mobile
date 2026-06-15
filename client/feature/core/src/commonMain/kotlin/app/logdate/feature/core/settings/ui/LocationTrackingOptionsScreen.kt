@@ -2,12 +2,17 @@
 
 package app.logdate.feature.core.settings.ui
 
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import app.logdate.client.location.settings.LocationTrackingSettings
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
@@ -47,15 +52,17 @@ fun LocationTrackingOptionsContent(
     onToggleTimelineTracking: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(
-        title = stringResource(Res.string.location_tracking_options),
-        onBack = onBack,
-        modifier = modifier,
-    ) {
-        item {
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
             SettingsSection(
                 title = stringResource(Res.string.location_services),
-                modifier = Modifier.padding(horizontal = Spacing.lg),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
             ) {
                 ToggleSettingsItem(
                     title = stringResource(Res.string.location_track_journal_entries),
@@ -63,6 +70,17 @@ fun LocationTrackingOptionsContent(
                     checked = settings.autoTrackForJournalEntries,
                     onCheckedChange = onToggleJournalTracking,
                 )
+            }
+        },
+        endPane = {
+            SettingsSection(
+                title = stringResource(Res.string.location_tracking_options),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
+            ) {
                 ToggleSettingsItem(
                     title = stringResource(Res.string.location_track_timeline_review),
                     description = stringResource(Res.string.location_track_timeline_review_description),
@@ -70,6 +88,33 @@ fun LocationTrackingOptionsContent(
                     onCheckedChange = onToggleTimelineTracking,
                 )
             }
-        }
-    }
+        },
+        standardContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.location_tracking_options),
+                onBack = onBack,
+                modifier = modifier,
+            ) {
+                item {
+                    SettingsSection(
+                        title = stringResource(Res.string.location_services),
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    ) {
+                        ToggleSettingsItem(
+                            title = stringResource(Res.string.location_track_journal_entries),
+                            description = stringResource(Res.string.location_track_journal_entries_description),
+                            checked = settings.autoTrackForJournalEntries,
+                            onCheckedChange = onToggleJournalTracking,
+                        )
+                        ToggleSettingsItem(
+                            title = stringResource(Res.string.location_track_timeline_review),
+                            description = stringResource(Res.string.location_track_timeline_review_description),
+                            checked = settings.autoTrackForTimelineReview,
+                            onCheckedChange = onToggleTimelineTracking,
+                        )
+                    }
+                }
+            }
+        },
+    )
 }
