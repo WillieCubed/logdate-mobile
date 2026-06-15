@@ -111,6 +111,32 @@ class IncomingShareE2ETest {
     }
 
     @Test
+    fun actionSend_singleVideoImportsAttachmentAndLaunchesEditor() {
+        val videoUri = createShareableUri(fileName = "single-share.mp4", contents = byteArrayOf(1, 2, 3, 4))
+
+        val editorIntent =
+            launchShareIntentAndCaptureEditorIntent(
+                Intent(mainContext, MainActivity::class.java).apply {
+                    action = Intent.ACTION_SEND
+                    type = "video/mp4"
+                    putExtra(Intent.EXTRA_STREAM, videoUri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                },
+            )
+
+        assertNotNull(editorIntent)
+        assertNull(editorIntent.getStringExtra("initial_text"))
+        assertEquals(1, fakeMediaManager.savedRequests.size)
+        val attachments = editorIntent.getStringArrayListExtra("attachments") ?: emptyList()
+        assertEquals(
+            listOf(fakeMediaManager.savedRequests.single().returnedUri),
+            attachments,
+        )
+        assertEquals("video/mp4", fakeMediaManager.savedRequests.single().mimeType)
+        assertTrue(fakeMediaManager.savedRequests.single().fileName.endsWith(".mp4"))
+    }
+
+    @Test
     fun actionSend_textAndImagePreservesBothInEditorLaunch() {
         val imageUri = createShareableUri(fileName = "combo-share.png", contents = byteArrayOf(4, 5, 6))
         val sharedText = "Photo plus note from Android share"
@@ -261,7 +287,7 @@ private class RecordingMediaManager : MediaManager {
 
     override suspend fun exists(mediaId: String): Boolean = false
 
-    override suspend fun getRecentMedia(): Flow<List<MediaObject>> = flowOf(emptyList())
+    override suspend fun getRecentMedia(limit: Int): Flow<List<MediaObject>> = flowOf(emptyList())
 
     override suspend fun queryMediaByDate(
         start: Instant,
