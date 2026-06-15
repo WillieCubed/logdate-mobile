@@ -87,6 +87,7 @@ import app.logdate.feature.editor.ui.audio.AnimatedPlayPauseButton
 import app.logdate.feature.journals.ui.deriveCoverColor
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.audio.AudioPlaybackDisplayInfo
 import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.common.AspectRatios
@@ -305,129 +306,48 @@ fun JournalDetailScreenContent(
                     )
                 },
             ) { paddingValues ->
-                val listState = rememberLazyListState()
-
-                Column(
+                FoldableBookLayout(
                     modifier =
                         Modifier
                             .fillMaxSize()
                             .padding(paddingValues),
-                ) {
-                    if (hasMedia && uiState.entries.isNotEmpty()) {
-                        PrimaryTabRow(selectedTabIndex = selectedTab) {
-                            Tab(
-                                selected = selectedTab == 0,
-                                onClick = { selectedTab = 0 },
-                                text = { Text(stringResource(Res.string.tab_timeline)) },
-                            )
-                            Tab(
-                                selected = selectedTab == 1,
-                                onClick = { selectedTab = 1 },
-                                text = { Text(stringResource(Res.string.tab_gallery)) },
-                            )
-                        }
-                    }
-
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .weight(1f),
-                        contentAlignment = Alignment.TopCenter,
-                    ) {
-                        if (selectedTab == 1 && hasMedia) {
-                            JournalGalleryGrid(
-                                mediaEntries = mediaEntries,
-                                onOpenEntry = onNavigateToNoteDetail,
-                                modifier =
-                                    Modifier
-                                        .padding(vertical = Spacing.sm)
-                                        .applyStandardContentWidth(),
-                            )
-                        } else {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .fillMaxSize()
-                                        .padding(vertical = Spacing.sm)
-                                        .applyStandardContentWidth(),
-                            ) {
-                                if (uiState.entries.isEmpty()) {
-                                    Column(
-                                        modifier = Modifier.fillMaxSize(),
-                                        verticalArrangement = Arrangement.Center,
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                    ) {
-                                        Text(
-                                            stringResource(Res.string.no_entries_in_this_journal_yet),
-                                            style = MaterialTheme.typography.titleMedium,
-                                        )
-                                        Spacer(Modifier.height(Spacing.sm))
-                                        Text(
-                                            stringResource(Res.string.journal_empty_hint),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                } else {
-                                    val groupedEntries =
-                                        remember(uiState.entries) {
-                                            groupEntriesByDay(uiState.entries)
-                                        }
-
-                                    Column(
-                                        modifier = Modifier.fillMaxSize(),
-                                    ) {
-                                        Row(
-                                            modifier =
-                                                Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = Spacing.sm),
-                                            horizontalArrangement = Arrangement.End,
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            Text(
-                                                text =
-                                                    if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
-                                                        stringResource(Res.string.sort_newest_first)
-                                                    } else {
-                                                        stringResource(Res.string.sort_oldest_first)
-                                                    },
-                                                style = MaterialTheme.typography.labelMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-
-                                        LazyColumn(
-                                            state = listState,
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentPadding =
-                                                PaddingValues(
-                                                    bottom = Spacing.xl,
-                                                ),
-                                            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                                        ) {
-                                            groupedEntries.forEach { (dateLabel, entries) ->
-                                                item(key = "header-$dateLabel") {
-                                                    DaySectionHeader(dateLabel)
-                                                }
-                                                entries.forEach { entry ->
-                                                    item(key = "entry-${entry.id}") {
-                                                        JournalEntryItem(
-                                                            entry = entry,
-                                                            onClick = { onNavigateToNoteDetail(entry.id) },
-                                                            onRemoveFromJournal = { onRemoveNoteFromJournal(entry.id) },
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                    startPane = {
+                        JournalDetailBookSummaryPane(
+                            uiState = uiState,
+                            onToggleSortOrder = onToggleSortOrder,
+                            onNavigateToShare = onNavigateToShare,
+                            onNavigateToSettings = onNavigateToSettings,
+                            onRequestDelete = onRequestDelete,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    },
+                    endPane = {
+                        JournalDetailEntriesPane(
+                            uiState = uiState,
+                            mediaEntries = mediaEntries,
+                            hasMedia = hasMedia,
+                            selectedTab = selectedTab,
+                            onSelectTab = { selectedTab = it },
+                            onNavigateToNoteDetail = onNavigateToNoteDetail,
+                            onRemoveNoteFromJournal = onRemoveNoteFromJournal,
+                            constrainContentWidth = false,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    },
+                    standardContent = {
+                        JournalDetailEntriesPane(
+                            uiState = uiState,
+                            mediaEntries = mediaEntries,
+                            hasMedia = hasMedia,
+                            selectedTab = selectedTab,
+                            onSelectTab = { selectedTab = it },
+                            onNavigateToNoteDetail = onNavigateToNoteDetail,
+                            onRemoveNoteFromJournal = onRemoveNoteFromJournal,
+                            constrainContentWidth = true,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    },
+                )
             }
 
             if (showDeleteConfirmation) {
@@ -442,6 +362,262 @@ fun JournalDetailScreenContent(
                     onDismissRequest = onDismissRemoveNoteConfirmation,
                     onConfirmation = onConfirmRemoveNote,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun JournalDetailBookSummaryPane(
+    uiState: JournalDetailUiState.Success,
+    onToggleSortOrder: () -> Unit,
+    onNavigateToShare: (journalId: Uuid) -> Unit,
+    onNavigateToSettings: (journalId: Uuid) -> Unit,
+    onRequestDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Text(
+            text = uiState.title,
+            style = MaterialTheme.typography.headlineMedium,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = "${uiState.entries.size} entries",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text =
+                if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
+                    stringResource(Res.string.sort_newest_first)
+                } else {
+                    stringResource(Res.string.sort_oldest_first)
+                },
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            JournalDetailPaneAction(
+                icon = sortIcon(uiState.sortOrder),
+                label =
+                    if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
+                        "Show oldest first"
+                    } else {
+                        "Show newest first"
+                    },
+                onClick = onToggleSortOrder,
+            )
+            JournalDetailPaneAction(
+                icon = Icons.Rounded.Share,
+                label = stringResource(Res.string.journal_share_label),
+                onClick = { onNavigateToShare(uiState.journalId) },
+            )
+            JournalDetailPaneAction(
+                icon = Icons.Rounded.Settings,
+                label = stringResource(Res.string.journal_settings_label),
+                onClick = { onNavigateToSettings(uiState.journalId) },
+            )
+            JournalDetailPaneAction(
+                icon = Icons.Rounded.DeleteOutline,
+                label = stringResource(Res.string.journal_delete_label),
+                onClick = onRequestDelete,
+            )
+        }
+    }
+}
+
+@Composable
+private fun JournalDetailPaneAction(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 1.dp,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null)
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+private fun sortIcon(sortOrder: SortOrder): ImageVector =
+    if (sortOrder == SortOrder.NEWEST_FIRST) {
+        Icons.Rounded.ArrowDownward
+    } else {
+        Icons.Rounded.ArrowUpward
+    }
+
+@Composable
+private fun JournalDetailEntriesPane(
+    uiState: JournalDetailUiState.Success,
+    mediaEntries: List<EntryDisplayData>,
+    hasMedia: Boolean,
+    selectedTab: Int,
+    onSelectTab: (Int) -> Unit,
+    onNavigateToNoteDetail: (noteId: Uuid) -> Unit,
+    onRemoveNoteFromJournal: (noteId: Uuid) -> Unit,
+    constrainContentWidth: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val listState = rememberLazyListState()
+
+    Column(modifier = modifier) {
+        if (hasMedia && uiState.entries.isNotEmpty()) {
+            PrimaryTabRow(selectedTabIndex = selectedTab) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { onSelectTab(0) },
+                    text = { Text(stringResource(Res.string.tab_timeline)) },
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { onSelectTab(1) },
+                    text = { Text(stringResource(Res.string.tab_gallery)) },
+                )
+            }
+        }
+
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .weight(1f),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            if (selectedTab == 1 && hasMedia) {
+                JournalGalleryGrid(
+                    mediaEntries = mediaEntries,
+                    onOpenEntry = onNavigateToNoteDetail,
+                    modifier =
+                        Modifier
+                            .padding(vertical = Spacing.sm)
+                            .journalDetailContentWidth(constrainContentWidth),
+                )
+            } else {
+                JournalTimelinePane(
+                    uiState = uiState,
+                    listState = listState,
+                    onNavigateToNoteDetail = onNavigateToNoteDetail,
+                    onRemoveNoteFromJournal = onRemoveNoteFromJournal,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(vertical = Spacing.sm)
+                            .journalDetailContentWidth(constrainContentWidth),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun Modifier.journalDetailContentWidth(constrainContentWidth: Boolean): Modifier =
+    if (constrainContentWidth) {
+        applyStandardContentWidth()
+    } else {
+        padding(horizontal = Spacing.md)
+    }
+
+@Composable
+private fun JournalTimelinePane(
+    uiState: JournalDetailUiState.Success,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    onNavigateToNoteDetail: (noteId: Uuid) -> Unit,
+    onRemoveNoteFromJournal: (noteId: Uuid) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier) {
+        if (uiState.entries.isEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    stringResource(Res.string.no_entries_in_this_journal_yet),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(Modifier.height(Spacing.sm))
+                Text(
+                    stringResource(Res.string.journal_empty_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            val groupedEntries =
+                remember(uiState.entries) {
+                    groupEntriesByDay(uiState.entries)
+                }
+
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = Spacing.sm),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text =
+                            if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
+                                stringResource(Res.string.sort_newest_first)
+                            } else {
+                                stringResource(Res.string.sort_oldest_first)
+                            },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding =
+                        PaddingValues(
+                            bottom = Spacing.xl,
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    groupedEntries.forEach { (dateLabel, entries) ->
+                        item(key = "header-$dateLabel") {
+                            DaySectionHeader(dateLabel)
+                        }
+                        entries.forEach { entry ->
+                            item(key = "entry-${entry.id}") {
+                                JournalEntryItem(
+                                    entry = entry,
+                                    onClick = { onNavigateToNoteDetail(entry.id) },
+                                    onRemoveFromJournal = { onRemoveNoteFromJournal(entry.id) },
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }

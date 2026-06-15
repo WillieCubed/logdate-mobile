@@ -268,6 +268,20 @@ fun A07_JournalDetail() {
 }
 
 @PreviewTest
+@Preview(name = "Journal detail book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A41_JournalDetailBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            JournalDetailScreenContent(
+                uiState = auditJournalState,
+                onGoBack = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
 @LargeScreenAuditPreviewMatrix
 @Composable
 fun A08_ProfileDefault() {
