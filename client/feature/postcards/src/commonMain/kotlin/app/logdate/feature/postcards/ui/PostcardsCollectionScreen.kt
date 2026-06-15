@@ -36,12 +36,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import app.logdate.client.database.entities.PostcardEntity
 import app.logdate.feature.postcards.model.CanvasElement
 import app.logdate.feature.postcards.model.PostcardDocument
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.ContextMenuArea
 import app.logdate.ui.common.ContextMenuItem
 import app.logdate.ui.common.focusableWithRing
@@ -50,6 +52,7 @@ import app.logdate.ui.common.verticalScrollbar
 import coil3.compose.AsyncImage
 import io.github.aakira.napier.Napier
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.math.floor
 import kotlin.uuid.Uuid
 
 /**
@@ -126,49 +129,114 @@ fun PostcardsCollectionScreen(
                 )
             }
         } else {
-            val gridState = rememberLazyGridState()
-            LazyVerticalGrid(
-                state = gridState,
-                columns = GridCells.Fixed(columnCount),
-                contentPadding = PaddingValues(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+            val (startPanePostcards, endPanePostcards) = splitPostcardsForBookPosture(postcards)
+            FoldableBookLayout(
                 modifier =
                     Modifier
                         .padding(paddingValues)
-                        .verticalScrollbar(gridState),
-            ) {
-                items(postcards, key = { it.id.toString() }) { postcard ->
-                    val id = postcard.id.toString()
-                    val isSelected = multiSelect.isSelected(id)
-                    ContextMenuArea(
-                        items =
-                            listOf(
-                                ContextMenuItem("Open") { onOpenPostcard(postcard.id) },
-                                ContextMenuItem("Edit") { onEditPostcard(postcard.id) },
-                                ContextMenuItem("Select") { multiSelect.toggle(id) },
-                                ContextMenuItem("Delete") { onDeletePostcard(postcard.id) },
+                        .fillMaxSize(),
+                minPaneWidth = MINIMUM_BOOK_PANE_WIDTH,
+                startPane = { paneInfo ->
+                    PostcardsGridPane(
+                        postcards = startPanePostcards,
+                        columnCount =
+                            postcardGridColumnCountForBookPane(
+                                paneWidth = paneInfo.width,
+                                requestedColumnCount = columnCount,
                             ),
-                    ) {
-                        PostcardCard(
-                            postcard = postcard,
-                            isSelected = isSelected,
-                            onClick = {
-                                if (multiSelect.hasSelection) {
-                                    multiSelect.toggle(id)
-                                } else {
-                                    onOpenPostcard(postcard.id)
-                                }
-                            },
-                        )
-                    }
-                }
-            }
+                        isSelected = { id -> multiSelect.isSelected(id) },
+                        hasSelection = multiSelect.hasSelection,
+                        onToggleSelection = { id -> multiSelect.toggle(id) },
+                        onOpenPostcard = onOpenPostcard,
+                        onEditPostcard = onEditPostcard,
+                        onDeletePostcard = onDeletePostcard,
+                    )
+                },
+                endPane = { paneInfo ->
+                    PostcardsGridPane(
+                        postcards = endPanePostcards,
+                        columnCount =
+                            postcardGridColumnCountForBookPane(
+                                paneWidth = paneInfo.width,
+                                requestedColumnCount = columnCount,
+                            ),
+                        isSelected = { id -> multiSelect.isSelected(id) },
+                        hasSelection = multiSelect.hasSelection,
+                        onToggleSelection = { id -> multiSelect.toggle(id) },
+                        onOpenPostcard = onOpenPostcard,
+                        onEditPostcard = onEditPostcard,
+                        onDeletePostcard = onDeletePostcard,
+                    )
+                },
+                standardContent = {
+                    PostcardsGridPane(
+                        postcards = postcards,
+                        columnCount = columnCount,
+                        isSelected = { id -> multiSelect.isSelected(id) },
+                        hasSelection = multiSelect.hasSelection,
+                        onToggleSelection = { id -> multiSelect.toggle(id) },
+                        onOpenPostcard = onOpenPostcard,
+                        onEditPostcard = onEditPostcard,
+                        onDeletePostcard = onDeletePostcard,
+                    )
+                },
+            )
         }
     }
 }
 
 private val thumbnailJson = PostcardDocument.json
+
+@Composable
+private fun PostcardsGridPane(
+    postcards: List<PostcardEntity>,
+    columnCount: Int,
+    isSelected: (String) -> Boolean,
+    hasSelection: Boolean,
+    onToggleSelection: (String) -> Unit,
+    onOpenPostcard: (Uuid) -> Unit,
+    onEditPostcard: (Uuid) -> Unit,
+    onDeletePostcard: (Uuid) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val gridState = rememberLazyGridState()
+    LazyVerticalGrid(
+        state = gridState,
+        columns = GridCells.Fixed(columnCount),
+        contentPadding = PaddingValues(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .verticalScrollbar(gridState),
+    ) {
+        items(postcards, key = { it.id.toString() }) { postcard ->
+            val id = postcard.id.toString()
+            ContextMenuArea(
+                items =
+                    listOf(
+                        ContextMenuItem("Open") { onOpenPostcard(postcard.id) },
+                        ContextMenuItem("Edit") { onEditPostcard(postcard.id) },
+                        ContextMenuItem("Select") { onToggleSelection(id) },
+                        ContextMenuItem("Delete") { onDeletePostcard(postcard.id) },
+                    ),
+            ) {
+                PostcardCard(
+                    postcard = postcard,
+                    isSelected = isSelected(id),
+                    onClick = {
+                        if (hasSelection) {
+                            onToggleSelection(id)
+                        } else {
+                            onOpenPostcard(postcard.id)
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun PostcardCard(
@@ -237,3 +305,29 @@ private fun PostcardCard(
         }
     }
 }
+
+internal fun <T> splitPostcardsForBookPosture(items: List<T>): Pair<List<T>, List<T>> {
+    if (items.size <= 1) {
+        return items to emptyList()
+    }
+
+    val startPaneCount = (items.size + 1) / 2
+    return items.take(startPaneCount) to items.drop(startPaneCount)
+}
+
+internal fun postcardGridColumnCountForBookPane(
+    paneWidth: Dp,
+    requestedColumnCount: Int,
+): Int {
+    val paneColumnCount =
+        floor(paneWidth.value / MINIMUM_BOOK_PANE_CARD_WIDTH.value)
+            .toInt()
+            .coerceAtLeast(MINIMUM_BOOK_PANE_COLUMN_COUNT)
+    return paneColumnCount.coerceAtMost(
+        requestedColumnCount.coerceAtLeast(MINIMUM_BOOK_PANE_COLUMN_COUNT),
+    )
+}
+
+private val MINIMUM_BOOK_PANE_WIDTH = 320.dp
+private val MINIMUM_BOOK_PANE_CARD_WIDTH = 220.dp
+private const val MINIMUM_BOOK_PANE_COLUMN_COUNT = 1
