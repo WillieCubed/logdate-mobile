@@ -117,6 +117,55 @@ fun A19_WatchTroubleshootingBookPosture() {
     BookPostureSettingsScene(SharedScreenshotSceneId.WatchTroubleshooting)
 }
 
+@PreviewTest
+@Preview(name = "Streak settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A20_StreakSettingsBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.StreakSettings)
+}
+
+@PreviewTest
+@Preview(name = "Timeline settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A21_TimelineSettingsBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.TimelineSettings)
+}
+
+@PreviewTest
+@Preview(name = "Day boundary settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A22_DayBoundarySettingsBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.DayBoundarySettings)
+}
+
+@PreviewTest
+@Preview(name = "Library settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A23_LibrarySettingsBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.LibrarySettings)
+}
+
+@PreviewTest
+@Preview(name = "Recommendation settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A24_RecommendationSettingsBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.RecommendationSettings)
+}
+
+@PreviewTest
+@Preview(name = "Birthday settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A25_BirthdaySettingsBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.BirthdaySettings)
+}
+
+@PreviewTest
+@Preview(name = "Advanced settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A26_AdvancedSettingsBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.AdvancedSettings)
+}
+
 @Composable
 private fun BookPostureSettingsScene(sceneId: SharedScreenshotSceneId) {
     provideFoldableLayoutInfo(bookPostureLayoutInfo) {

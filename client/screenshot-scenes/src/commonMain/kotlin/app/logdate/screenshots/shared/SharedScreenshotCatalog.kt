@@ -14,8 +14,12 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.dayboundary.HealthConnectGateKind
 import app.logdate.client.domain.dayboundary.HealthConnectGateState
 import app.logdate.client.domain.dayboundary.HealthConnectMissingRequirement
+import app.logdate.client.domain.dayboundary.HealthConnectStatus
+import app.logdate.client.domain.recommendation.AmbientPromptTime
+import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.recommendation.RecallMode
 import app.logdate.client.domain.recommendation.WidgetContentType
+import app.logdate.client.domain.streak.StreakData
 import app.logdate.client.domain.watch.WatchNotificationSettings
 import app.logdate.client.domain.watch.WatchSyncSettings
 import app.logdate.client.media.MediaObject
@@ -28,18 +32,24 @@ import app.logdate.feature.core.export.ExportState
 import app.logdate.feature.core.restore.RestoreState
 import app.logdate.feature.core.settings.ui.AccountIdentityState
 import app.logdate.feature.core.settings.ui.AccountSettingsContent
+import app.logdate.feature.core.settings.ui.AdvancedSettingsContent
+import app.logdate.feature.core.settings.ui.BirthdaySettingsContent
 import app.logdate.feature.core.settings.ui.ConflictsState
 import app.logdate.feature.core.settings.ui.DataSettingsContent
 import app.logdate.feature.core.settings.ui.DayBoundarySettingsContent
 import app.logdate.feature.core.settings.ui.IntegrityState
+import app.logdate.feature.core.settings.ui.LibrarySettingsContent
 import app.logdate.feature.core.settings.ui.MemoriesSettingsContent
 import app.logdate.feature.core.settings.ui.MemoriesWidgetInstallUiState
 import app.logdate.feature.core.settings.ui.PasskeyInfo
 import app.logdate.feature.core.settings.ui.PrivacySettingsContent
+import app.logdate.feature.core.settings.ui.RecommendationSettingsContent
 import app.logdate.feature.core.settings.ui.ServerSelectionState
 import app.logdate.feature.core.settings.ui.SettingsOverviewContent
 import app.logdate.feature.core.settings.ui.StorageCategory
 import app.logdate.feature.core.settings.ui.StorageQuotaUi
+import app.logdate.feature.core.settings.ui.StreakSettingsContent
+import app.logdate.feature.core.settings.ui.TimelineSettingsContent
 import app.logdate.feature.core.settings.ui.UserProfile
 import app.logdate.feature.core.settings.ui.devices.DeviceInfoUiState
 import app.logdate.feature.core.settings.ui.devices.DevicesScreenContent
@@ -49,6 +59,8 @@ import app.logdate.feature.core.settings.ui.watch.WatchNotificationSettingsConte
 import app.logdate.feature.core.settings.ui.watch.WatchSettingsContent
 import app.logdate.feature.core.settings.ui.watch.WatchSyncSettingsContent
 import app.logdate.feature.core.settings.ui.watch.WatchTroubleshootingContent
+import app.logdate.feature.core.settings.updates.AppUpdateStatus
+import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.feature.onboarding.ui.MemoriesImportInfoScreen
 import app.logdate.feature.onboarding.ui.MemorySelectionScreen
 import app.logdate.feature.onboarding.ui.MemorySelectionUiState
@@ -126,6 +138,13 @@ enum class SharedScreenshotSceneId(
     DataSettings("data-settings"),
     MemoriesSettings("memories-settings"),
     DevicesSettings("devices-settings"),
+    StreakSettings("streak-settings"),
+    TimelineSettings("timeline-settings"),
+    DayBoundarySettings("day-boundary-settings"),
+    LibrarySettings("library-settings"),
+    RecommendationSettings("recommendation-settings"),
+    BirthdaySettings("birthday-settings"),
+    AdvancedSettings("advanced-settings"),
     WatchSettings("watch-settings"),
     WatchSyncSettings("watch-sync-settings"),
     WatchNotificationSettings("watch-notification-settings"),
@@ -720,6 +739,86 @@ object SharedScreenshotCatalog {
                                     ),
                                 ),
                         ),
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.StreakSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                StreakSettingsContent(
+                    streakData = StreakData(currentStreak = 12, isEnabled = true),
+                    onBack = {},
+                    onToggleStreakTracking = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.TimelineSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                TimelineSettingsContent(
+                    onBack = {},
+                    onNavigateToDayBoundary = {},
+                    sleepBasedBoundariesEnabled = true,
+                    healthConnectStatus = HealthConnectStatus.CONNECTED,
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.DayBoundarySettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                DayBoundarySettingsContent(
+                    sleepBasedPreferenceEnabled = true,
+                    fallbackStartHour = 4,
+                    gateState = HealthConnectGateState(kind = HealthConnectGateKind.READY),
+                    isRequestInFlight = false,
+                    onBack = {},
+                    onToggleSleepBased = {},
+                    onSetFallbackHour = {},
+                    onRequestPermissions = {},
+                    onSetUpHealthConnect = {},
+                    onOpenHealthConnectPermissions = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.LibrarySettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                LibrarySettingsContent(
+                    onBack = {},
+                    isLibraryEnabled = true,
+                    onSetLibraryEnabled = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.RecommendationSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                RecommendationSettingsContent(
+                    settings =
+                        MemoriesSettings(
+                            contextualRecommendationsEnabled = true,
+                            ambientPromptsEnabled = true,
+                            morningPromptTime = AmbientPromptTime(hour = 8, minute = 30),
+                            eveningPromptTime = AmbientPromptTime(hour = 21, minute = 0),
+                            aiRecallEnabled = true,
+                        ),
+                    onBack = {},
+                    onToggleContextualRecommendations = {},
+                    onToggleAmbientPrompts = {},
+                    onToggleCaptureNudges = {},
+                    onToggleDraftRescue = {},
+                    onToggleMemoryRecallNotifications = {},
+                    onToggleMorningPrompt = {},
+                    onToggleEveningPrompt = {},
+                    onSetMorningPromptTime = {},
+                    onSetEveningPromptTime = {},
+                    onToggleSmartRecall = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.BirthdaySettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                BirthdaySettingsContent(
+                    currentBirthday = baseInstant,
+                    onBack = {},
+                    onSave = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.AdvancedSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                AdvancedSettingsContent(
+                    onBack = {},
+                    appUpdateUiState =
+                        AppUpdateUiState(
+                            currentVersionName = "1.0.0",
+                            currentVersionCode = 100,
+                            status = AppUpdateStatus.UpToDate,
+                            lastCheckedAt = baseInstant,
+                        ),
+                    onCheckForAppUpdates = {},
+                    onCompleteAppUpdate = {},
                 )
             },
             sharedScene(SharedScreenshotSceneId.WatchSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
