@@ -67,6 +67,7 @@ import app.logdate.feature.journals.ui.share.ShareJournalUiState
 import app.logdate.feature.library.ui.detail.MediaDetailContent
 import app.logdate.feature.library.ui.detail.MediaDetailUiState
 import app.logdate.feature.onboarding.ui.CloudAccountSetupContent
+import app.logdate.feature.onboarding.ui.OnboardingOverviewScreen
 import app.logdate.feature.onboarding.ui.OnboardingStartScreenContent
 import app.logdate.feature.onboarding.ui.PersonalIntroContent
 import app.logdate.feature.onboarding.ui.PersonalIntroStep
@@ -441,6 +442,36 @@ fun A71_WelcomeBackTabletopPosture() {
             WelcomeBackScreenContent(
                 name = "Alex",
                 modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Onboarding overview book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A72_OnboardingOverviewBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            OnboardingOverviewScreen(
+                onBack = {},
+                onNext = {},
+                useSplitScreen = true,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Onboarding overview tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A73_OnboardingOverviewTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            OnboardingOverviewScreen(
+                onBack = {},
+                onNext = {},
+                useSplitScreen = true,
             )
         }
     }

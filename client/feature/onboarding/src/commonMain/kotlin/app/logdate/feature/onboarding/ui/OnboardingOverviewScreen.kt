@@ -34,6 +34,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.AdaptiveLayout
+import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.onboarding.generated.resources.*
@@ -131,61 +133,95 @@ private fun OverviewSplitLayout(
     onBack: () -> Unit,
     onNext: () -> Unit,
 ) {
-    AdaptiveLayout(
-        useCompactLayout = false,
+    FoldableTabletopLayout(
         modifier = Modifier.fillMaxSize().testTag(ONBOARDING_OVERVIEW_ROOT_TAG),
-        supplementalContent = {
-            // Left pane: title + subtitle with back arrow
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        Icons.AutoMirrored.Default.ArrowBack,
-                        contentDescription = stringResource(coreRes.string.common_back),
-                    )
-                }
-                Text(
-                    stringResource(Res.string.onboarding_overview_title),
-                    style = MaterialTheme.typography.headlineLarge,
-                )
-                Text(
-                    stringResource(Res.string.onboarding_overview_card_log_description),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        minPaneHeight = 260.dp,
+        topPane = {
+            OverviewContextPane(onBack = onBack, modifier = Modifier.fillMaxSize())
         },
-        mainContent = {
-            // Right pane: cards + Continue button
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                OverviewCards()
-
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    Button(
-                        onClick = onNext,
-                        modifier = Modifier.testTag(ONBOARDING_OVERVIEW_CONTINUE_TAG),
-                    ) {
-                        Text(text = stringResource(coreRes.string.common_continue))
-                    }
-                }
-            }
+        bottomPane = {
+            OverviewCardsPane(onNext = onNext, modifier = Modifier.fillMaxSize())
+        },
+        fallback = {
+            FoldableBookLayout(
+                modifier = Modifier.fillMaxSize(),
+                minPaneWidth = 320.dp,
+                startPane = {
+                    OverviewContextPane(onBack = onBack, modifier = Modifier.fillMaxSize())
+                },
+                endPane = {
+                    OverviewCardsPane(onNext = onNext, modifier = Modifier.fillMaxSize())
+                },
+                standardContent = {
+                    AdaptiveLayout(
+                        useCompactLayout = false,
+                        modifier = Modifier.fillMaxSize(),
+                        supplementalContent = {
+                            OverviewContextPane(onBack = onBack, modifier = Modifier.fillMaxSize())
+                        },
+                        mainContent = {
+                            OverviewCardsPane(onNext = onNext, modifier = Modifier.fillMaxSize())
+                        },
+                    )
+                },
+            )
         },
     )
+}
+
+@Composable
+private fun OverviewContextPane(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                Icons.AutoMirrored.Default.ArrowBack,
+                contentDescription = stringResource(coreRes.string.common_back),
+            )
+        }
+        Text(
+            stringResource(Res.string.onboarding_overview_title),
+            style = MaterialTheme.typography.headlineLarge,
+        )
+        Text(
+            stringResource(Res.string.onboarding_overview_card_log_description),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun OverviewCardsPane(
+    onNext: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .verticalScroll(rememberScrollState())
+                .padding(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        OverviewCards()
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            Button(
+                onClick = onNext,
+                modifier = Modifier.testTag(ONBOARDING_OVERVIEW_CONTINUE_TAG),
+            ) {
+                Text(text = stringResource(coreRes.string.common_continue))
+            }
+        }
+    }
 }
 
 @Composable
