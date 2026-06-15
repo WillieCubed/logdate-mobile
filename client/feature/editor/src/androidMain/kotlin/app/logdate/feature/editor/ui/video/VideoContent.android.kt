@@ -57,6 +57,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -69,6 +72,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import app.logdate.client.media.device.AudioRouteRepository
+import app.logdate.client.media.device.MediaDeviceKind
+import app.logdate.client.media.device.systemControlledSelection
 import app.logdate.client.media.video.ExoPlayerPool
 import app.logdate.ui.media.MediaDeviceSelector
 import coil3.compose.AsyncImage
@@ -89,6 +94,16 @@ import logdate.client.feature.editor.generated.resources.play_video
 import logdate.client.feature.editor.generated.resources.video_thumbnail
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+
+object VideoPlayerTags {
+    const val ROOT = "VideoPlayer"
+    const val PLAY_SURFACE = "VideoPlayer.PlaySurface"
+    const val PAUSE_SURFACE = "VideoPlayer.PauseSurface"
+    const val PLAYER_VIEW = "VideoPlayer.PlayerView"
+    const val PIP_BUTTON = "VideoPlayer.PictureInPicture"
+    const val STATE_PLAYING = "Playing"
+    const val STATE_PAUSED = "Paused"
+}
 
 /**
  * Android implementation of video player content.
@@ -219,7 +234,16 @@ actual fun VideoPlayerContent(
             modifier
                 .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .aspectRatio(videoAspectRatio),
+                .aspectRatio(videoAspectRatio)
+                .testTag(VideoPlayerTags.ROOT)
+                .semantics {
+                    stateDescription =
+                        if (isPlaying) {
+                            VideoPlayerTags.STATE_PLAYING
+                        } else {
+                            VideoPlayerTags.STATE_PAUSED
+                        }
+                },
     ) {
         // ExoPlayer view - always present for seamless playback
         AndroidView(
@@ -237,7 +261,10 @@ actual fun VideoPlayerContent(
                         )
                 }
             },
-            modifier = Modifier.fillMaxSize(),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .testTag(VideoPlayerTags.PLAYER_VIEW),
         )
 
         // Thumbnail overlay - shown when not playing
@@ -246,6 +273,7 @@ actual fun VideoPlayerContent(
                 modifier =
                     Modifier
                         .fillMaxSize()
+                        .testTag(VideoPlayerTags.PLAY_SURFACE)
                         .clickable {
                             showThumbnail = false
                             exoPlayer.play()
@@ -289,6 +317,7 @@ actual fun VideoPlayerContent(
                 modifier =
                     Modifier
                         .fillMaxSize()
+                        .testTag(VideoPlayerTags.PAUSE_SURFACE)
                         .clickable {
                             if (isPlaying) {
                                 exoPlayer.pause()
@@ -341,6 +370,7 @@ actual fun VideoPlayerContent(
                 },
                 modifier =
                     Modifier
+                        .testTag(VideoPlayerTags.PIP_BUTTON)
                         .align(Alignment.TopEnd)
                         .padding(8.dp)
                         .background(
@@ -364,14 +394,25 @@ private fun keepVideoVisibleWhilePaused(
     aspectRatio: Rational,
 ): Boolean {
     if (activity == null) return false
-    if (activity.isInPictureInPictureMode) return true
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity.isInMultiWindowMode) return true
+    if (
+        shouldKeepVideoVisibleOnPause(
+            isInPictureInPictureMode = activity.isInPictureInPictureMode,
+            isInMultiWindowMode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity.isInMultiWindowMode,
+        )
+    ) {
+        return true
+    }
     if (!player.isPlaying) return false
     return enterVideoPictureInPicture(
         activity = activity,
         aspectRatio = aspectRatio,
     )
 }
+
+internal fun shouldKeepVideoVisibleOnPause(
+    isInPictureInPictureMode: Boolean,
+    isInMultiWindowMode: Boolean,
+): Boolean = isInPictureInPictureMode || isInMultiWindowMode
 
 private fun enterVideoPictureInPicture(
     activity: Activity,
@@ -575,8 +616,39 @@ private fun PreviewVideoPlayerContent(
                 )
             }
         }
+
+        MediaDeviceSelector(
+            selection = previewVideoOutputSelection,
+            onDeviceSelected = {},
+            label = "Audio output",
+            modifier =
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp),
+        )
+
+        IconButton(
+            onClick = {},
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
+                        shape = CircleShape,
+                    ),
+        ) {
+            Icon(
+                imageVector = Icons.Default.PictureInPictureAlt,
+                contentDescription = stringResource(Res.string.enter_picture_in_picture),
+                tint = MaterialTheme.colorScheme.onSurface,
+            )
+        }
     }
 }
+
+private val previewVideoOutputSelection =
+    systemControlledSelection(MediaDeviceKind.AUDIO_OUTPUT)
 
 /**
  * Default aspect ratio used while the player is still resolving real video

@@ -4,6 +4,7 @@ package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -15,7 +16,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import app.logdate.feature.core.settings.ui.dialogs.ResetAppConfirmationDialog
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
@@ -44,29 +47,33 @@ fun ResetAppSettingsContent(
 ) {
     var showDialog by remember { mutableStateOf(false) }
 
-    SettingsScaffold(
-        title = stringResource(Res.string.settings_reset_app_title),
-        onBack = onBack,
-    ) {
-        item {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    FoldableBookLayout(
+        modifier = Modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            ResetAppIntroPane(
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        endPane = {
+            ResetAppActionPane(
+                modifier = Modifier.fillMaxSize(),
+                onResetAppClicked = { showDialog = true },
+            )
+        },
+        standardContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.settings_reset_app_title),
+                onBack = onBack,
             ) {
-                Text(
-                    text = stringResource(Res.string.reset_app_explanation),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedButton(onClick = { showDialog = true }) {
-                    Text(stringResource(Res.string.action_reset_app))
+                item {
+                    ResetAppCompactContent(
+                        onResetAppClicked = { showDialog = true },
+                    )
                 }
             }
-        }
-    }
+        },
+    )
 
     if (showDialog) {
         ResetAppConfirmationDialog(
@@ -76,5 +83,57 @@ fun ResetAppSettingsContent(
                 showDialog = false
             },
         )
+    }
+}
+
+@Composable
+private fun ResetAppIntroPane(modifier: Modifier = Modifier) {
+    Column(
+        modifier =
+            modifier.padding(horizontal = Spacing.lg, vertical = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        Text(
+            text = stringResource(Res.string.settings_reset_app_title),
+            style = MaterialTheme.typography.headlineSmall,
+        )
+        Text(
+            text = stringResource(Res.string.reset_app_explanation),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ResetAppActionPane(
+    modifier: Modifier = Modifier,
+    onResetAppClicked: () -> Unit,
+) {
+    Column(
+        modifier =
+            modifier.padding(horizontal = Spacing.lg, vertical = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        OutlinedButton(onClick = onResetAppClicked) {
+            Text(stringResource(Res.string.action_reset_app))
+        }
+    }
+}
+
+@Composable
+private fun ResetAppCompactContent(onResetAppClicked: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        Text(
+            text = stringResource(Res.string.reset_app_explanation),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedButton(onClick = onResetAppClicked) {
+            Text(stringResource(Res.string.action_reset_app))
+        }
     }
 }

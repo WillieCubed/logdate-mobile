@@ -3,11 +3,14 @@
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,8 +19,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import app.logdate.feature.core.settings.ui.dialogs.ClearDataConfirmationDialog
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.launch
@@ -52,29 +58,30 @@ fun ClearDataSettingsContent(
     val failedMessage = stringResource(Res.string.clear_data_failed)
     var showDialog by remember { mutableStateOf(false) }
 
-    SettingsScaffold(
-        title = stringResource(Res.string.account_data_clear_action),
-        onBack = onBack,
-        snackbarHostState = snackbarHostState,
-    ) {
-        item {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-            ) {
-                Text(
-                    text = stringResource(Res.string.clear_data_explanation),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+    Box(modifier = Modifier.fillMaxSize()) {
+        FoldableBookLayout(
+            modifier = Modifier.fillMaxSize(),
+            minPaneWidth = 320.dp,
+            startPane = {
+                ClearDataIntroPane(modifier = Modifier.fillMaxSize())
+            },
+            endPane = {
+                ClearDataActionPane(modifier = Modifier.fillMaxSize()) { showDialog = true }
+            },
+            standardContent = {
+                ClearDataCompactContent(
+                    onBack = onBack,
+                    onClearDataClicked = { showDialog = true },
                 )
-                OutlinedButton(onClick = { showDialog = true }) {
-                    Text(stringResource(Res.string.clear_data))
-                }
-            }
-        }
+            },
+        )
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(Spacing.lg),
+        )
     }
 
     if (showDialog) {
@@ -88,5 +95,75 @@ fun ClearDataSettingsContent(
                 )
             },
         )
+    }
+}
+
+@Composable
+private fun ClearDataIntroPane(modifier: Modifier = Modifier) {
+    ClearDataDetails(
+        modifier = modifier.padding(horizontal = Spacing.lg, vertical = Spacing.lg),
+    )
+}
+
+@Composable
+private fun ClearDataActionPane(
+    modifier: Modifier = Modifier,
+    onClearDataClicked: () -> Unit,
+) {
+    Column(
+        modifier =
+            modifier
+                .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        OutlinedButton(onClick = onClearDataClicked) {
+            Text(stringResource(Res.string.clear_data))
+        }
+    }
+}
+
+@Composable
+private fun ClearDataCompactContent(
+    onBack: () -> Unit,
+    onClearDataClicked: () -> Unit,
+) {
+    SettingsScaffold(
+        title = stringResource(Res.string.account_data_clear_action),
+        onBack = onBack,
+    ) {
+        item {
+            ClearDataDetails(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg),
+                showAction = true,
+                onClearDataClicked = onClearDataClicked,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ClearDataDetails(
+    modifier: Modifier = Modifier,
+    showAction: Boolean = false,
+    onClearDataClicked: (() -> Unit)? = null,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        Text(
+            text = stringResource(Res.string.account_data_clear_action),
+            style = MaterialTheme.typography.headlineSmall,
+        )
+        Text(
+            text = stringResource(Res.string.clear_data_explanation),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (showAction && onClearDataClicked != null) {
+            OutlinedButton(onClick = onClearDataClicked) {
+                Text(stringResource(Res.string.clear_data))
+            }
+        }
     }
 }

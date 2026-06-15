@@ -25,12 +25,27 @@ import app.logdate.client.repository.search.SearchContentType
 import app.logdate.feature.core.account.CloudAccountWelcomeContent
 import app.logdate.feature.core.account.CloudAccountSignInContent
 import app.logdate.feature.core.account.PasskeyAccountCreationFinalContent
+import app.logdate.feature.core.export.ExportOptions
+import app.logdate.feature.core.export.ExportState
+import app.logdate.feature.core.restore.ImportOptions
+import app.logdate.feature.core.restore.RestoreState
+import app.logdate.feature.core.settings.ui.ClearDataSettingsContent
+import app.logdate.feature.core.settings.ui.DataSettingsContent
 import app.logdate.feature.core.settings.ui.ServerSelectionState
+import app.logdate.feature.core.settings.ui.ResetAppSettingsContent
+import app.logdate.feature.core.settings.ui.ResetSettingsScreen
+import app.logdate.feature.core.settings.ui.ConflictsState
+import app.logdate.feature.core.settings.ui.IntegrityState
+import app.logdate.feature.core.settings.ui.StorageQuotaUi
 import app.logdate.feature.core.profile.ui.ProfileEditState
 import app.logdate.feature.core.profile.ui.ProfileScreenContent
 import app.logdate.feature.core.profile.ui.ProfileUiState
 import app.logdate.client.domain.dayboundary.HealthConnectGateKind
 import app.logdate.client.domain.dayboundary.HealthConnectGateState
+import app.logdate.client.domain.export.ExportCounts
+import app.logdate.client.domain.export.ExportSchemaVersion
+import app.logdate.client.domain.export.ExportStats
+import app.logdate.client.domain.restore.ArchivePreview
 import app.logdate.feature.editor.audio.AudioContext
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
@@ -222,6 +237,40 @@ private val auditAccount =
         username = "alex_j",
         displayName = "Alex Johnson",
         passkeyCredentialIds = listOf("credential-1"),
+    )
+
+private val auditStorageQuota =
+    StorageQuotaUi(
+        totalBytes = 5_368_709_120L,
+        usedBytes = 2_147_483_648L,
+        usagePercentage = 0.4f,
+        formattedTotal = "5.0 GB",
+        formattedUsed = "2.0 GB",
+    )
+
+private val auditExportCounts =
+    ExportCounts(
+        journalCount = 18,
+        noteCount = 126,
+        draftCount = 7,
+        mediaCount = 42,
+    )
+
+private val auditArchivePreview =
+    ArchivePreview(
+        version = ExportSchemaVersion.V1_2,
+        exportDate = ScreenshotTestData.baseInstant,
+        appVersion = "0.1.0",
+        stats =
+            ExportStats(
+                journalCount = 18,
+                noteCount = 126,
+                draftCount = 7,
+                mediaCount = 42,
+                placeCount = 12,
+                locationHistoryCount = 26,
+                hasProfile = true,
+            ),
     )
 
 private val auditNoteSiblingIds =
@@ -1128,6 +1177,198 @@ fun A109_RecoveryPhraseEntryTabletopPosture() {
                 onRecoverPhrase = { Result.success(Unit) },
                 onRecovered = {},
                 onError = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Data settings export book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A110_DataSettingsExportBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            val snackbarHostState = remember { SnackbarHostState() }
+            DataSettingsContent(
+                onBack = {},
+                quotaUsage = auditStorageQuota,
+                isQuotaAvailable = true,
+                exportState = ExportState.Configuring(options = ExportOptions(), counts = auditExportCounts),
+                isExportSheetVisible = true,
+                onShowExportOptions = {},
+                onUpdateExportOptions = {},
+                onConfirmExport = {},
+                onCancelExport = {},
+                onRetryExport = {},
+                onDismissExport = {},
+                onBrowseExport = {},
+                restoreState = RestoreState.Idle,
+                isRestoreSheetVisible = false,
+                onShowRestoreSheet = {},
+                onSelectRestoreFile = {},
+                onUpdateImportOptions = {},
+                onConfirmImport = {},
+                onCancelRestore = {},
+                onRetryRestore = {},
+                onDismissRestore = {},
+                integrityState = IntegrityState(),
+                onRunIntegrityCheck = {},
+                onRepairIntegrity = {},
+                conflictsState = ConflictsState(),
+                onClearConflicts = {},
+                onRefreshConflicts = {},
+                snackbarHostState = snackbarHostState,
+                syncStatus = null,
+                isAuthenticated = false,
+                onSyncNow = {},
+                isBackgroundSyncEnabled = true,
+                onBackgroundSyncEnabledChange = {},
+                onNavigateToCloudAccountCreation = {},
+                onNavigateToSignIn = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Data settings export progress book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A111_DataSettingsExportProgressBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            val snackbarHostState = remember { SnackbarHostState() }
+            DataSettingsContent(
+                onBack = {},
+                quotaUsage = auditStorageQuota,
+                isQuotaAvailable = true,
+                exportState = ExportState.Exporting(progressPercent = 62, message = "Packaging entries and attachments"),
+                isExportSheetVisible = true,
+                onShowExportOptions = {},
+                onUpdateExportOptions = {},
+                onConfirmExport = {},
+                onCancelExport = {},
+                onRetryExport = {},
+                onDismissExport = {},
+                onBrowseExport = {},
+                restoreState = RestoreState.Idle,
+                isRestoreSheetVisible = false,
+                onShowRestoreSheet = {},
+                onSelectRestoreFile = {},
+                onUpdateImportOptions = {},
+                onConfirmImport = {},
+                onCancelRestore = {},
+                onRetryRestore = {},
+                onDismissRestore = {},
+                integrityState = IntegrityState(),
+                onRunIntegrityCheck = {},
+                onRepairIntegrity = {},
+                conflictsState = ConflictsState(),
+                onClearConflicts = {},
+                onRefreshConflicts = {},
+                snackbarHostState = snackbarHostState,
+                syncStatus = null,
+                isAuthenticated = false,
+                onSyncNow = {},
+                isBackgroundSyncEnabled = true,
+                onBackgroundSyncEnabledChange = {},
+                onNavigateToCloudAccountCreation = {},
+                onNavigateToSignIn = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Data settings restore preview book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A112_DataSettingsRestorePreviewBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            val snackbarHostState = remember { SnackbarHostState() }
+            DataSettingsContent(
+                onBack = {},
+                quotaUsage = auditStorageQuota,
+                isQuotaAvailable = true,
+                exportState = ExportState.Idle,
+                isExportSheetVisible = false,
+                onShowExportOptions = {},
+                onUpdateExportOptions = {},
+                onConfirmExport = {},
+                onCancelExport = {},
+                onRetryExport = {},
+                onDismissExport = {},
+                onBrowseExport = {},
+                restoreState =
+                    RestoreState.Previewing(
+                        preview = auditArchivePreview,
+                        fileName = "logdate-backup.ldz",
+                        options = ImportOptions(),
+                    ),
+                isRestoreSheetVisible = true,
+                onShowRestoreSheet = {},
+                onSelectRestoreFile = {},
+                onUpdateImportOptions = {},
+                onConfirmImport = {},
+                onCancelRestore = {},
+                onRetryRestore = {},
+                onDismissRestore = {},
+                integrityState = IntegrityState(),
+                onRunIntegrityCheck = {},
+                onRepairIntegrity = {},
+                conflictsState = ConflictsState(),
+                onClearConflicts = {},
+                onRefreshConflicts = {},
+                snackbarHostState = snackbarHostState,
+                syncStatus = null,
+                isAuthenticated = false,
+                onSyncNow = {},
+                isBackgroundSyncEnabled = true,
+                onBackgroundSyncEnabledChange = {},
+                onNavigateToCloudAccountCreation = {},
+                onNavigateToSignIn = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Reset settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A113_ResetSettingsBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            ResetSettingsScreen(
+                onBack = {},
+                onNavigateToClearData = {},
+                onNavigateToResetApp = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Clear data book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A114_ClearDataSettingsBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            ClearDataSettingsContent(
+                onBack = {},
+                onClearData = { _, _ -> },
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Reset app book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A115_ResetAppSettingsBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            ResetAppSettingsContent(
+                onBack = {},
+                onAppReset = {},
             )
         }
     }

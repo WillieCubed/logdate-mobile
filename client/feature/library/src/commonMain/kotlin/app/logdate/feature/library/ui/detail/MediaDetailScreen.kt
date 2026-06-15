@@ -82,9 +82,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import app.logdate.client.media.device.AudioRouteRepository
-import app.logdate.client.media.device.DefaultMediaDevices
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
+import app.logdate.client.media.device.systemControlledSelection
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
@@ -312,7 +312,7 @@ private fun MediaDetailLayout(
                         .padding(Spacing.lg),
             )
         },
-        fallback = {
+        standardContent = {
             FoldableBookLayout(
                 modifier = Modifier.fillMaxSize(),
                 minPaneWidth = 320.dp,
@@ -366,16 +366,23 @@ private fun MediaDetailLayout(
                                     Modifier
                                         .weight(1f)
                                         .fillMaxSize()
-                                        .verticalScroll(rememberScrollState())
                                         .padding(Spacing.lg),
                             ) {
-                                MetadataContent(
+                                MediaDetailTabletopControls(
                                     createdAt = createdAt,
                                     locationDisplayName = locationDisplayName,
                                     isVideo = isVideo,
                                     journals = journals,
                                     exif = exif,
+                                    presenterState = presenterState,
+                                    outputSelection = outputSelection,
+                                    onBack = onBack,
+                                    onShare = onShare,
                                     onNavigateToJournal = onNavigateToJournal,
+                                    onOutputDeviceSelected = onOutputDeviceSelected,
+                                    onStartPresenting = onStartPresenting,
+                                    onStopPresenting = onStopPresenting,
+                                    modifier = Modifier.fillMaxSize(),
                                 )
                             }
                         }
@@ -812,11 +819,8 @@ private fun ExternalDisplayAudioRouteControl(
 }
 
 private fun defaultLibraryOutputSelection(): MediaDeviceSelectionUiState =
-    MediaDeviceSelectionUiState(
-        kind = MediaDeviceKind.AUDIO_OUTPUT,
-        devices = listOf(DefaultMediaDevices.systemOutput),
-        selectedDeviceId = DefaultMediaDevices.systemOutput.id,
-        isSelectionControllable = false,
+    systemControlledSelection(
+        MediaDeviceKind.AUDIO_OUTPUT,
     )
 
 @Composable

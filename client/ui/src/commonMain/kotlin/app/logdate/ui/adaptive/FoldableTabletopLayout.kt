@@ -33,7 +33,7 @@ fun FoldableTabletopLayout(
     minPaneHeight: Dp = 220.dp,
     topPane: @Composable BoxScope.(FoldableTabletopPaneInfo) -> Unit,
     bottomPane: @Composable BoxScope.(FoldableTabletopPaneInfo) -> Unit,
-    fallback: @Composable BoxScope.() -> Unit,
+    standardContent: @Composable BoxScope.() -> Unit,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val splitLayout =
@@ -81,7 +81,7 @@ fun FoldableTabletopLayout(
             }
         } else {
             Box(modifier = Modifier.fillMaxSize()) {
-                fallback()
+                standardContent()
             }
         }
     }

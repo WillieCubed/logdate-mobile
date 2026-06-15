@@ -184,7 +184,7 @@ private fun CloudAccountSignInAdaptiveContent(
                 modifier = Modifier.fillMaxSize(),
             )
         },
-        fallback = {
+        standardContent = {
             FoldableBookLayout(
                 modifier = Modifier.fillMaxSize(),
                 minPaneWidth = 320.dp,
@@ -255,58 +255,12 @@ private fun CloudAccountSignInTopPane(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Spacing.xl),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(UiRes.string.common_go_back),
-                    )
-                }
-            }
-
-            Card(
-                colors =
-                    CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                    ),
-            ) {
-                Box(
-                    modifier = Modifier.padding(Spacing.lg),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Cloud,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                    )
-                }
-            }
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Text(
-                    text = stringResource(Res.string.server_sign_in_title, serverDisplayName),
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    text = stringResource(Res.string.server_domain_sign_in_hint, serverHandleDomain),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-            }
-
-            ServerIdentityCard(
+            CloudAccountSignInHeader(
+                onBack = onBack,
                 serverDisplayName = serverDisplayName,
                 serverHandleDomain = serverHandleDomain,
+                errorMessage = errorMessage,
+                modifier = Modifier.fillMaxWidth(),
             )
 
             OutlinedTextField(
@@ -324,23 +278,6 @@ private fun CloudAccountSignInTopPane(
                         imeAction = ImeAction.Done,
                     ),
             )
-
-            errorMessage?.let { message ->
-                Card(
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                        ),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.padding(Spacing.md),
-                    )
-                }
-            }
         }
     }
 }
@@ -414,6 +351,92 @@ private fun CloudAccountSignInActionPane(
 }
 
 @Composable
+private fun CloudAccountSignInHeader(
+    onBack: () -> Unit,
+    serverDisplayName: String,
+    serverHandleDomain: String,
+    errorMessage: String?,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.xl),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(UiRes.string.common_go_back),
+                )
+            }
+        }
+
+        Card(
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                ),
+        ) {
+            Box(
+                modifier = Modifier.padding(Spacing.lg),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Cloud,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                )
+            }
+        }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text(
+                text = stringResource(Res.string.server_sign_in_title, serverDisplayName),
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = stringResource(Res.string.server_domain_sign_in_hint, serverHandleDomain),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
+
+        ServerIdentityCard(
+            serverDisplayName = serverDisplayName,
+            serverHandleDomain = serverHandleDomain,
+        )
+
+        errorMessage?.let { message ->
+            Card(
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                    ),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(Spacing.md),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun CloudAccountSignInCompactContent(
     username: String,
     onUsernameChange: (String) -> Unit,
@@ -446,58 +469,12 @@ private fun CloudAccountSignInCompactContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(Spacing.xl),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(UiRes.string.common_go_back),
-                        )
-                    }
-                }
-
-                Card(
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                        ),
-                ) {
-                    Box(
-                        modifier = Modifier.padding(Spacing.lg),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Cloud,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    }
-                }
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Text(
-                        text = stringResource(Res.string.server_sign_in_title, serverDisplayName),
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                    )
-                    Text(
-                        text = stringResource(Res.string.server_domain_sign_in_hint, serverHandleDomain),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-
-                ServerIdentityCard(
+                CloudAccountSignInHeader(
+                    onBack = onBack,
                     serverDisplayName = serverDisplayName,
                     serverHandleDomain = serverHandleDomain,
+                    errorMessage = errorMessage,
+                    modifier = Modifier.fillMaxWidth(),
                 )
 
                 Column(
@@ -518,23 +495,6 @@ private fun CloudAccountSignInCompactContent(
                                 imeAction = ImeAction.Done,
                             ),
                     )
-
-                    errorMessage?.let { message ->
-                        Card(
-                            colors =
-                                CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                                ),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(
-                                text = message,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.padding(Spacing.md),
-                            )
-                        }
-                    }
                 }
             }
 

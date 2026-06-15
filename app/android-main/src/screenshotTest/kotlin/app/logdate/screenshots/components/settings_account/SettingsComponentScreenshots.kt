@@ -29,6 +29,7 @@ import app.logdate.feature.core.settings.ui.SettingsOverviewContent
 import app.logdate.feature.core.settings.ui.StorageQuotaUi
 import app.logdate.feature.core.settings.ui.UserProfile
 import app.logdate.feature.core.settings.ui.dialogs.DangerConfirmationDialog
+import app.logdate.feature.core.settings.ui.dialogs.ClearDataConfirmationDialog
 import app.logdate.feature.core.settings.ui.dialogs.ResetAppConfirmationDialog
 import app.logdate.feature.core.settings.updates.AppUpdateFlowType
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
@@ -209,6 +210,7 @@ fun LocationSettings() {
             onShowLocationTimeline = {},
             onNavigateToTrackingOptions = {},
             onNavigateToInterval = {},
+            onNavigateToAdvanced = {},
         )
     }
 }
@@ -276,6 +278,18 @@ fun AdvancedSettings_UpdateAvailableImmediate() {
 fun ResetAppConfirmation_Dialog() {
     ScreenshotTheme {
         ResetAppConfirmationDialog(
+            onDismissRequest = {},
+            onConfirmation = {},
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun ClearDataConfirmation_Dialog() {
+    ScreenshotTheme {
+        ClearDataConfirmationDialog(
             onDismissRequest = {},
             onConfirmation = {},
         )
