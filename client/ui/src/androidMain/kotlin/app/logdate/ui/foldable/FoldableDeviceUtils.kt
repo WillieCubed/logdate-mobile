@@ -105,6 +105,9 @@ fun rememberFoldableDeviceInfo(): FoldableDeviceInfo {
  */
 @Composable
 actual fun rememberFoldableLayoutInfo(): FoldableLayoutInfo {
+    val override = LocalFoldableLayoutInfoOverride.current
+    if (override != null) return override
+
     val context = LocalContext.current
     val density = LocalDensity.current
 

@@ -3,6 +3,8 @@
 package app.logdate.ui.foldable
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -105,6 +107,19 @@ fun rememberFoldableState(): FoldableState = rememberFoldableLayoutInfo().toFold
 
 @Composable
 expect fun rememberFoldableLayoutInfo(): FoldableLayoutInfo
+
+val LocalFoldableLayoutInfoOverride =
+    staticCompositionLocalOf<FoldableLayoutInfo?> { null }
+
+@Composable
+fun provideFoldableLayoutInfo(
+    foldableLayoutInfo: FoldableLayoutInfo,
+    content: @Composable () -> Unit,
+) {
+    CompositionLocalProvider(LocalFoldableLayoutInfoOverride provides foldableLayoutInfo) {
+        content()
+    }
+}
 
 fun calculateFoldableSplitLayout(
     containerWidth: Dp,

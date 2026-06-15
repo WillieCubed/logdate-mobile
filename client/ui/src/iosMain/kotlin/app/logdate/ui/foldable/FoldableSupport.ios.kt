@@ -9,4 +9,4 @@ import androidx.compose.runtime.Composable
  * a non-foldable state.
  */
 @Composable
-actual fun rememberFoldableLayoutInfo(): FoldableLayoutInfo = FoldableLayoutInfo()
+actual fun rememberFoldableLayoutInfo(): FoldableLayoutInfo = LocalFoldableLayoutInfoOverride.current ?: FoldableLayoutInfo()
