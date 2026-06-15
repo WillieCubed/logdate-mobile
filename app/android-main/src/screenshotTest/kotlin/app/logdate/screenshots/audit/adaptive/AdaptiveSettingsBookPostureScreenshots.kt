@@ -89,6 +89,34 @@ fun A15_RewindSettingsBookPosture() {
     BookPostureSettingsScene(SharedScreenshotSceneId.RewindSettings)
 }
 
+@PreviewTest
+@Preview(name = "Watch settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A16_WatchSettingsBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.WatchSettings)
+}
+
+@PreviewTest
+@Preview(name = "Watch sync settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A17_WatchSyncSettingsBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.WatchSyncSettings)
+}
+
+@PreviewTest
+@Preview(name = "Watch notification settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A18_WatchNotificationSettingsBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.WatchNotificationSettings)
+}
+
+@PreviewTest
+@Preview(name = "Watch troubleshooting book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A19_WatchTroubleshootingBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.WatchTroubleshooting)
+}
+
 @Composable
 private fun BookPostureSettingsScene(sceneId: SharedScreenshotSceneId) {
     provideFoldableLayoutInfo(bookPostureLayoutInfo) {

@@ -16,6 +16,8 @@ import app.logdate.client.domain.dayboundary.HealthConnectGateState
 import app.logdate.client.domain.dayboundary.HealthConnectMissingRequirement
 import app.logdate.client.domain.recommendation.RecallMode
 import app.logdate.client.domain.recommendation.WidgetContentType
+import app.logdate.client.domain.watch.WatchNotificationSettings
+import app.logdate.client.domain.watch.WatchSyncSettings
 import app.logdate.client.media.MediaObject
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
@@ -42,6 +44,11 @@ import app.logdate.feature.core.settings.ui.UserProfile
 import app.logdate.feature.core.settings.ui.devices.DeviceInfoUiState
 import app.logdate.feature.core.settings.ui.devices.DevicesScreenContent
 import app.logdate.feature.core.settings.ui.devices.DevicesUiState
+import app.logdate.feature.core.settings.ui.watch.WatchConnectionState
+import app.logdate.feature.core.settings.ui.watch.WatchNotificationSettingsContent
+import app.logdate.feature.core.settings.ui.watch.WatchSettingsContent
+import app.logdate.feature.core.settings.ui.watch.WatchSyncSettingsContent
+import app.logdate.feature.core.settings.ui.watch.WatchTroubleshootingContent
 import app.logdate.feature.onboarding.ui.MemoriesImportInfoScreen
 import app.logdate.feature.onboarding.ui.MemorySelectionScreen
 import app.logdate.feature.onboarding.ui.MemorySelectionUiState
@@ -119,6 +126,10 @@ enum class SharedScreenshotSceneId(
     DataSettings("data-settings"),
     MemoriesSettings("memories-settings"),
     DevicesSettings("devices-settings"),
+    WatchSettings("watch-settings"),
+    WatchSyncSettings("watch-sync-settings"),
+    WatchNotificationSettings("watch-notification-settings"),
+    WatchTroubleshooting("watch-troubleshooting"),
     SearchIdle("search-idle"),
     SearchSearching("search-searching"),
     SearchEmpty("search-empty"),
@@ -709,6 +720,65 @@ object SharedScreenshotCatalog {
                                     ),
                                 ),
                         ),
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.WatchSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                WatchSettingsContent(
+                    connectionState =
+                        WatchConnectionState.Connected(
+                            watchName = "Pixel Watch 3",
+                            lastSynced = baseInstant,
+                            pendingCount = 2,
+                        ),
+                    onBack = {},
+                    onBeginAssociation = {},
+                    onRequestSync = {},
+                    onInstallOnWatch = {},
+                    onNavigateToSync = {},
+                    onNavigateToNotifications = {},
+                    onNavigateToTroubleshooting = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.WatchSyncSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                WatchSyncSettingsContent(
+                    settings =
+                        WatchSyncSettings(
+                            syncVoiceNotes = true,
+                            syncTextEntries = true,
+                            syncMoodCheckIns = true,
+                            syncHealthData = false,
+                            autoSync = true,
+                        ),
+                    onBack = {},
+                    onSetSyncVoiceNotes = {},
+                    onSetSyncTextEntries = {},
+                    onSetSyncMoodCheckIns = {},
+                    onSetSyncHealthData = {},
+                    onSetAutoSync = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.WatchNotificationSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                WatchNotificationSettingsContent(
+                    settings =
+                        WatchNotificationSettings(
+                            showEntryNotifications = true,
+                            includeAudioPreview = false,
+                        ),
+                    onBack = {},
+                    onSetShowEntryNotifications = {},
+                    onSetIncludeAudioPreview = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.WatchTroubleshooting, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                WatchTroubleshootingContent(
+                    connectionState =
+                        WatchConnectionState.AppNotInstalled(
+                            watchName = "Pixel Watch 3",
+                        ),
+                    onBack = {},
+                    onBeginAssociation = {},
+                    onInstallOnWatch = {},
+                    onOpenOnWatch = {},
                 )
             },
         )
