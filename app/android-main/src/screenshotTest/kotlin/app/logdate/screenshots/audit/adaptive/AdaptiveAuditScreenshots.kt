@@ -23,6 +23,8 @@ import app.logdate.client.repository.journals.NotePlace
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.feature.core.account.CloudAccountWelcomeContent
+import app.logdate.feature.core.account.CloudAccountSignInContent
+import app.logdate.feature.core.account.PasskeyAccountCreationFinalContent
 import app.logdate.feature.core.settings.ui.ServerSelectionState
 import app.logdate.feature.core.profile.ui.ProfileEditState
 import app.logdate.feature.core.profile.ui.ProfileScreenContent
@@ -68,6 +70,7 @@ import app.logdate.feature.journals.ui.share.ShareJournalScreenContent
 import app.logdate.feature.journals.ui.share.ShareJournalUiState
 import app.logdate.feature.library.ui.detail.MediaDetailContent
 import app.logdate.feature.library.ui.detail.MediaDetailUiState
+import app.logdate.feature.onboarding.ui.BackupSyncScreenContent
 import app.logdate.feature.onboarding.ui.CloudAccountSetupContent
 import app.logdate.feature.onboarding.ui.OnboardingBirthdayContent
 import app.logdate.feature.onboarding.ui.OnboardingCompletionContent
@@ -77,6 +80,8 @@ import app.logdate.feature.onboarding.ui.OnboardingOverviewScreen
 import app.logdate.feature.onboarding.ui.OnboardingLocationContent
 import app.logdate.feature.onboarding.ui.OnboardingRecommendationsContent
 import app.logdate.feature.onboarding.ui.OnboardingStartScreenContent
+import app.logdate.feature.onboarding.ui.RecoveryPhraseEntryScreen
+import app.logdate.feature.onboarding.ui.RecoveryPhraseSetupScreen
 import app.logdate.feature.onboarding.ui.PersonalIntroContent
 import app.logdate.feature.onboarding.ui.PersonalIntroStep
 import app.logdate.feature.onboarding.ui.PersonalIntroUiState
@@ -873,6 +878,257 @@ fun A97_MemorySelectionTabletopPosture() {
     provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
         ScreenshotTheme {
             SharedScreenshotScene(SharedScreenshotSceneId.MemorySelectionEmpty)
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Cloud account welcome book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A98_CloudAccountWelcomeBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            CloudAccountWelcomeContent(
+                onContinue = {},
+                onSignIn = {},
+                onSkip = {},
+                serverSelectionState = ServerSelectionState(),
+                onSelectServerPreset = {},
+                onCustomServerUrlChange = {},
+                onShowCustomServerInfo = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Cloud account welcome tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A99_CloudAccountWelcomeTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            CloudAccountWelcomeContent(
+                onContinue = {},
+                onSignIn = {},
+                onSkip = {},
+                serverSelectionState = ServerSelectionState(),
+                onSelectServerPreset = {},
+                onCustomServerUrlChange = {},
+                onShowCustomServerInfo = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Cloud account sign in book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A100_CloudAccountSignInBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            CloudAccountSignInContent(
+                username = "alex_j",
+                onUsernameChange = {},
+                onSignIn = {},
+                onAccountRecovery = {},
+                onPrivacyPolicy = {},
+                onTermsOfService = {},
+                onBack = {},
+                serverDisplayName = "LogDate Cloud",
+                serverHandleDomain = "logdate.app",
+                errorMessage = "Invalid username or password.",
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Cloud account sign in tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A101_CloudAccountSignInTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            CloudAccountSignInContent(
+                username = "alex_j",
+                onUsernameChange = {},
+                onSignIn = {},
+                onAccountRecovery = {},
+                onPrivacyPolicy = {},
+                onTermsOfService = {},
+                onBack = {},
+                serverDisplayName = "LogDate Cloud",
+                serverHandleDomain = "logdate.app",
+                onSignInWithGoogle = {},
+                isSigningIn = true,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Cloud account creation book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A102_CloudAccountCreationBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            PasskeyAccountCreationFinalContent(
+                displayName = "Alex Johnson",
+                username = "alex_j",
+                bio = "Explorer and photographer",
+                onBioChange = {},
+                onCreateAccount = {},
+                onBack = {},
+                isCreatingAccount = false,
+                errorMessage = null,
+                onClearError = {},
+                isPasskeySupported = true,
+                handleDomain = "logdate.app",
+                serverDisplayName = "LogDate Cloud",
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Cloud account creation tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A103_CloudAccountCreationTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            PasskeyAccountCreationFinalContent(
+                displayName = "Alex Johnson",
+                username = "alex_j",
+                bio = "Explorer and photographer",
+                onBioChange = {},
+                onCreateAccount = {},
+                onBack = {},
+                isCreatingAccount = true,
+                errorMessage = null,
+                onClearError = {},
+                isPasskeySupported = true,
+                handleDomain = "logdate.app",
+                serverDisplayName = "LogDate Cloud",
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Backup sync book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A104_BackupSyncBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            BackupSyncScreenContent(
+                useCompactLayout = false,
+                onBack = {},
+                onPlanSelected = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Backup sync tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A105_BackupSyncTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            BackupSyncScreenContent(
+                useCompactLayout = false,
+                onBack = {},
+                onPlanSelected = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Recovery phrase setup book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A106_RecoveryPhraseSetupBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            RecoveryPhraseSetupScreen(
+                words = listOf(
+                    "orbit",
+                    "paper",
+                    "candle",
+                    "forest",
+                    "river",
+                    "silver",
+                    "puzzle",
+                    "anchor",
+                    "signal",
+                    "harbor",
+                    "lantern",
+                    "sunset",
+                ),
+                isLoading = false,
+                errorMessage = null,
+                onRetry = {},
+                onPhraseContinue = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Recovery phrase setup tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A107_RecoveryPhraseSetupTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            RecoveryPhraseSetupScreen(
+                words = listOf(
+                    "orbit",
+                    "paper",
+                    "candle",
+                    "forest",
+                    "river",
+                    "silver",
+                    "puzzle",
+                    "anchor",
+                    "signal",
+                    "harbor",
+                    "lantern",
+                    "sunset",
+                ),
+                isLoading = false,
+                errorMessage = null,
+                onRetry = {},
+                onPhraseContinue = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Recovery phrase entry book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A108_RecoveryPhraseEntryBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            RecoveryPhraseEntryScreen(
+                onRecoverPhrase = { Result.success(Unit) },
+                onRecovered = {},
+                onError = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Recovery phrase entry tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A109_RecoveryPhraseEntryTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            RecoveryPhraseEntryScreen(
+                onRecoverPhrase = { Result.success(Unit) },
+                onRecovered = {},
+                onError = {},
+            )
         }
     }
 }

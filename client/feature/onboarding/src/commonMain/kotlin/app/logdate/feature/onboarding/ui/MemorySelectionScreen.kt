@@ -36,9 +36,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -296,67 +294,74 @@ private fun MemorySelectionTopPane(
     onRetryLoad: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    LazyColumn(
         modifier =
             modifier
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Text(
-            text = stringResource(Res.string.select_memories),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Medium,
-        )
-        Text(
-            text = stringResource(Res.string.onboarding_import_media_description),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        item {
+            Text(
+                text = stringResource(Res.string.select_memories),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+        item {
+            Text(
+                text = stringResource(Res.string.onboarding_import_media_description),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         when {
-            !hasMediaPermission -> {
-                MemorySelectionStatusCard(
-                    title = stringResource(Res.string.memory_access_needed),
-                    body = stringResource(Res.string.memory_access_needed_body),
-                    actionLabel = stringResource(Res.string.enable),
-                    onAction = onRequestMediaPermission,
-                    actionTag = MEMORY_SELECTION_PERMISSION_ACTION_TAG,
-                )
-            }
+            !hasMediaPermission ->
+                item {
+                    MemorySelectionStatusCard(
+                        title = stringResource(Res.string.memory_access_needed),
+                        body = stringResource(Res.string.memory_access_needed_body),
+                        actionLabel = stringResource(Res.string.enable),
+                        onAction = onRequestMediaPermission,
+                        actionTag = MEMORY_SELECTION_PERMISSION_ACTION_TAG,
+                    )
+                }
 
-            uiState.loadFailed -> {
-                MemorySelectionStatusCard(
-                    title = stringResource(Res.string.select_memories),
-                    body = stringResource(Res.string.memory_load_failed_body),
-                    actionLabel = stringResource(UiRes.string.common_retry),
-                    onAction = onRetryLoad,
-                    actionTag = MEMORY_SELECTION_STATUS_ACTION_TAG,
-                )
-            }
+            uiState.loadFailed ->
+                item {
+                    MemorySelectionStatusCard(
+                        title = stringResource(Res.string.select_memories),
+                        body = stringResource(Res.string.memory_load_failed_body),
+                        actionLabel = stringResource(UiRes.string.common_retry),
+                        onAction = onRetryLoad,
+                        actionTag = MEMORY_SELECTION_STATUS_ACTION_TAG,
+                    )
+                }
 
-            uiState.aiCuratedMemories.isEmpty() && uiState.allMemories.isEmpty() -> {
-                MemorySelectionStatusCard(
-                    title = stringResource(Res.string.select_memories),
-                    body = stringResource(Res.string.memory_no_recent_items_body),
-                    actionLabel = stringResource(UiRes.string.common_retry),
-                    onAction = onRetryLoad,
-                    actionTag = MEMORY_SELECTION_STATUS_ACTION_TAG,
-                )
-            }
+            uiState.aiCuratedMemories.isEmpty() && uiState.allMemories.isEmpty() ->
+                item {
+                    MemorySelectionStatusCard(
+                        title = stringResource(Res.string.select_memories),
+                        body = stringResource(Res.string.memory_no_recent_items_body),
+                        actionLabel = stringResource(UiRes.string.common_retry),
+                        onAction = onRetryLoad,
+                        actionTag = MEMORY_SELECTION_STATUS_ACTION_TAG,
+                    )
+                }
 
-            else -> {
-                Text(
-                    text = stringResource(Res.string.moments_that_might_matter_most),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = stringResource(Res.string.onboarding_import_smart_selection_description),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            else ->
+                item {
+                    Text(
+                        text = stringResource(Res.string.moments_that_might_matter_most),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = stringResource(Res.string.onboarding_import_smart_selection_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
         }
     }
 }
@@ -374,26 +379,29 @@ private fun SharedTransitionScope.MemorySelectionBottomPane(
     animatedVisibilityScope: AnimatedVisibilityScope,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    LazyColumn(
         modifier =
             modifier
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         when {
-            uiState.isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xl),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator()
+            uiState.isLoading ->
+                item {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = Spacing.xl),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator()
+                    }
                 }
-            }
 
             uiState.aiCuratedMemories.isNotEmpty() || uiState.allMemories.isNotEmpty() -> {
                 if (uiState.aiCuratedMemories.isNotEmpty()) {
-                    with(this@MemorySelectionBottomPane) {
+                    item {
                         AICuratedMemoriesSection(
                             memories = uiState.aiCuratedMemories,
                             selectedMemoryIds = uiState.selectedMemoryIds,
@@ -407,12 +415,14 @@ private fun SharedTransitionScope.MemorySelectionBottomPane(
                 }
 
                 if (uiState.allMemories.isNotEmpty()) {
-                    Text(
-                        text = stringResource(Res.string.all_memories),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    with(this@MemorySelectionBottomPane) {
+                    item {
+                        Text(
+                            text = stringResource(Res.string.all_memories),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    item {
                         AllMemoriesStaggeredGrid(
                             memories = uiState.allMemories,
                             selectedMemoryIds = uiState.selectedMemoryIds,
@@ -430,10 +440,12 @@ private fun SharedTransitionScope.MemorySelectionBottomPane(
             }
         }
 
-        ContinueMemoryImportButton(
-            onContinue = onContinue,
-            selectedCount = uiState.selectedMemoryIds.size,
-        )
+        item {
+            ContinueMemoryImportButton(
+                onContinue = onContinue,
+                selectedCount = uiState.selectedMemoryIds.size,
+            )
+        }
     }
 }
 

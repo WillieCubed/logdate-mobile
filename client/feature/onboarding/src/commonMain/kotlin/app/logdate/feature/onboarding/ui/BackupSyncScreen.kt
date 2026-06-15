@@ -22,8 +22,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import app.logdate.client.billing.model.LogDateBackupPlanOption
-import app.logdate.ui.AdaptiveLayout
+import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
@@ -53,81 +55,161 @@ fun BackupSyncScreenContent(
     onBack: () -> Unit,
     onPlanSelected: (option: LogDateBackupPlanOption) -> Unit,
 ) {
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    if (useCompactLayout) {
+        BackupSyncCompactContent(
+            onBack = onBack,
+            onPlanSelected = onPlanSelected,
+        )
+    } else {
+        BackupSyncAdaptiveContent(
+            onBack = onBack,
+            onPlanSelected = onPlanSelected,
+        )
+    }
+}
 
-    AdaptiveLayout(
-        useCompactLayout = useCompactLayout,
-        supplementalContent = {
-            Scaffold(
-                topBar = {
-                    LargeTopAppBar(
-                        title = { Text(stringResource(Res.string.section_title_backup_sync)) },
-                        navigationIcon = {
-                            IconButton(onClick = onBack) {
-                                Icon(
-                                    Icons.AutoMirrored.Default.ArrowBack,
-                                    contentDescription = stringResource(UiRes.string.common_back),
-                                )
-                            }
-                        },
-                        colors =
-                            TopAppBarDefaults.topAppBarColors().copy(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            ),
+@Composable
+private fun BackupSyncAdaptiveContent(
+    onBack: () -> Unit,
+    onPlanSelected: (option: LogDateBackupPlanOption) -> Unit,
+) {
+    FoldableTabletopLayout(
+        modifier = Modifier.fillMaxSize(),
+        minPaneHeight = 260.dp,
+        topPane = {
+            BackupSyncIntroPane(
+                onBack = onBack,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        bottomPane = {
+            BackupSyncPlanPane(
+                onPlanSelected = onPlanSelected,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        fallback = {
+            FoldableBookLayout(
+                modifier = Modifier.fillMaxSize(),
+                minPaneWidth = 320.dp,
+                startPane = {
+                    BackupSyncIntroPane(
+                        onBack = onBack,
+                        modifier = Modifier.fillMaxSize(),
                     )
                 },
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            ) { contentPadding ->
-                Column(
-                    Modifier
-                        .padding(contentPadding)
-                        .padding(Spacing.lg),
-                ) {
-                    Text(
-                        stringResource(
-                            Res.string.onboarding_cloud_backup_description,
-                        ),
-                    )
-                }
-            }
-        },
-        mainContent = {
-            if (useCompactLayout) {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    topBar = {
-                        LargeTopAppBar(
-                            title = { Text(stringResource(Res.string.section_title_backup_sync)) },
-                            navigationIcon = {
-                                IconButton(onClick = onBack) {
-                                    Icon(
-                                        Icons.AutoMirrored.Default.ArrowBack,
-                                        contentDescription = stringResource(UiRes.string.common_back),
-                                    )
-                                }
-                            },
-                            scrollBehavior = scrollBehavior,
-                        )
-                    },
-                ) { contentPadding ->
-                    MainContent(
+                endPane = {
+                    BackupSyncPlanPane(
                         onPlanSelected = onPlanSelected,
-                        modifier =
-                            Modifier
-                                .padding(contentPadding)
-                                .nestedScroll(
-                                    scrollBehavior.nestedScrollConnection,
-                                ),
+                        modifier = Modifier.fillMaxSize(),
                     )
-                }
-            } else {
-                // Just show content; app bar is in the supplemental content
-                MainContent(
-                    onPlanSelected = {},
-                )
-            }
+                },
+                standardContent = {
+                    BackupSyncCompactContent(
+                        onBack = onBack,
+                        onPlanSelected = onPlanSelected,
+                    )
+                },
+            )
         },
     )
+}
+
+@Composable
+private fun BackupSyncIntroPane(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Scaffold(
+        topBar = {
+            LargeTopAppBar(
+                title = { Text(stringResource(Res.string.section_title_backup_sync)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Default.ArrowBack,
+                            contentDescription = stringResource(UiRes.string.common_back),
+                        )
+                    }
+                },
+                colors =
+                    TopAppBarDefaults.topAppBarColors().copy(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    ),
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = modifier,
+    ) { contentPadding ->
+        Column(
+            Modifier
+                .padding(contentPadding)
+                .padding(Spacing.lg),
+        ) {
+            Text(
+                stringResource(
+                    Res.string.onboarding_cloud_backup_description,
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun BackupSyncPlanPane(
+    onPlanSelected: (option: LogDateBackupPlanOption) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(Spacing.lg),
+    ) {
+        MainContent(
+            onPlanSelected = onPlanSelected,
+        )
+    }
+}
+
+@Composable
+private fun BackupSyncCompactContent(
+    onBack: () -> Unit,
+    onPlanSelected: (option: LogDateBackupPlanOption) -> Unit,
+) {
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            LargeTopAppBar(
+                title = { Text(stringResource(Res.string.section_title_backup_sync)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Default.ArrowBack,
+                            contentDescription = stringResource(UiRes.string.common_back),
+                        )
+                    }
+                },
+                scrollBehavior = scrollBehavior,
+            )
+        },
+    ) { contentPadding ->
+        Column(
+            modifier =
+                Modifier
+                    .padding(contentPadding)
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+        ) {
+            Text(
+                stringResource(
+                    Res.string.onboarding_cloud_backup_description,
+                ),
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+            )
+            MainContent(
+                onPlanSelected = onPlanSelected,
+            )
+        }
+    }
 }
 
 @Composable

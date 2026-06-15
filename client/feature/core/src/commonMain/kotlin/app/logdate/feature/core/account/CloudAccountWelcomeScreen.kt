@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import app.logdate.feature.core.settings.ui.ServerPreset
 import app.logdate.feature.core.settings.ui.ServerSelectionCard
 import app.logdate.feature.core.settings.ui.ServerSelectionState
+import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_cloud_sync_promotion_description
@@ -83,9 +85,258 @@ fun CloudAccountWelcomeContent(
     isPasskeySupported: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
+    CloudAccountWelcomeAdaptiveContent(
+        onContinue = onContinue,
+        onSignIn = onSignIn,
+        onSkip = onSkip,
+        serverSelectionState = serverSelectionState,
+        onSelectServerPreset = onSelectServerPreset,
+        onCustomServerUrlChange = onCustomServerUrlChange,
+        onShowCustomServerInfo = onShowCustomServerInfo,
+        isPasskeySupported = isPasskeySupported,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun CloudAccountWelcomeAdaptiveContent(
+    onContinue: () -> Unit,
+    onSignIn: () -> Unit,
+    onSkip: () -> Unit,
+    serverSelectionState: ServerSelectionState,
+    onSelectServerPreset: (ServerPreset) -> Unit,
+    onCustomServerUrlChange: (String) -> Unit,
+    onShowCustomServerInfo: () -> Unit,
+    isPasskeySupported: Boolean = true,
+    modifier: Modifier = Modifier,
+) {
+    FoldableTabletopLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneHeight = 260.dp,
+        topPane = {
+            CloudAccountWelcomeIntroPane(
+                serverSelectionState = serverSelectionState,
+                onSelectServerPreset = onSelectServerPreset,
+                onCustomServerUrlChange = onCustomServerUrlChange,
+                onShowCustomServerInfo = onShowCustomServerInfo,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        bottomPane = {
+            CloudAccountWelcomeActionPane(
+                onContinue = onContinue,
+                onSignIn = onSignIn,
+                onSkip = onSkip,
+                isPasskeySupported = isPasskeySupported,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        fallback = {
+            FoldableBookLayout(
+                modifier = Modifier.fillMaxSize(),
+                minPaneWidth = 320.dp,
+                startPane = {
+                    CloudAccountWelcomeIntroPane(
+                        serverSelectionState = serverSelectionState,
+                        onSelectServerPreset = onSelectServerPreset,
+                        onCustomServerUrlChange = onCustomServerUrlChange,
+                        onShowCustomServerInfo = onShowCustomServerInfo,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+                endPane = {
+                    CloudAccountWelcomeActionPane(
+                        onContinue = onContinue,
+                        onSignIn = onSignIn,
+                        onSkip = onSkip,
+                        isPasskeySupported = isPasskeySupported,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+                standardContent = {
+                    CloudAccountWelcomeCompactContent(
+                        onContinue = onContinue,
+                        onSignIn = onSignIn,
+                        onSkip = onSkip,
+                        serverSelectionState = serverSelectionState,
+                        onSelectServerPreset = onSelectServerPreset,
+                        onCustomServerUrlChange = onCustomServerUrlChange,
+                        onShowCustomServerInfo = onShowCustomServerInfo,
+                        isPasskeySupported = isPasskeySupported,
+                    )
+                },
+            )
+        },
+    )
+}
+
+@Composable
+private fun CloudAccountWelcomeIntroPane(
+    serverSelectionState: ServerSelectionState,
+    onSelectServerPreset: (ServerPreset) -> Unit,
+    onCustomServerUrlChange: (String) -> Unit,
+    onShowCustomServerInfo: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier =
             modifier
+                .verticalScroll(rememberScrollState())
+                .padding(Spacing.lg),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.xl),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.padding(top = Spacing.xxl),
+        ) {
+            Card(
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                    ),
+            ) {
+                Box(
+                    modifier = Modifier.padding(Spacing.lg),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Cloud,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
+            }
+        }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Text(
+                text = stringResource(Res.string.welcome_to_logdate),
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text =
+                    stringResource(
+                        Res.string
+                            .account_cloud_sync_promotion_description,
+                    ),
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        ServerSelectionCard(
+            serverSelectionState = serverSelectionState,
+            onSelectPreset = onSelectServerPreset,
+            onUpdateCustomUrl = onCustomServerUrlChange,
+            onShowCustomServerInfo = onShowCustomServerInfo,
+        )
+
+        Column(
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            FeatureItem(
+                icon = Icons.Default.Sync,
+                title = "Sync across devices",
+                description = "Access your journals from any device that uses the same server.",
+            )
+            FeatureItem(
+                icon = Icons.Default.Key,
+                title = "Secure with passkeys",
+                description = "Use your device biometrics or screen lock instead of a password.",
+            )
+            FeatureItem(
+                icon = Icons.Default.Cloud,
+                title = "Server-based backup",
+                description = "Your selected server can keep your journals available across devices.",
+            )
+            FeatureItem(
+                icon = Icons.Default.Lock,
+                title = "Privacy first",
+                description = "Server policies come from the server you choose.",
+            )
+        }
+    }
+}
+
+@Composable
+private fun CloudAccountWelcomeActionPane(
+    onContinue: () -> Unit,
+    onSignIn: () -> Unit,
+    onSkip: () -> Unit,
+    isPasskeySupported: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .verticalScroll(rememberScrollState())
+                .padding(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (!isPasskeySupported) {
+            Card(
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                    ),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = stringResource(Res.string.passkey_not_supported_banner),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(Spacing.md),
+                )
+            }
+        }
+
+        Button(
+            onClick = onContinue,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = isPasskeySupported,
+        ) {
+            Text(stringResource(Res.string.create_new_account))
+        }
+
+        OutlinedButton(
+            onClick = onSignIn,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(Res.string.sign_in))
+        }
+
+        TextButton(
+            onClick = onSkip,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(UiRes.string.common_skip))
+        }
+    }
+}
+
+@Composable
+private fun CloudAccountWelcomeCompactContent(
+    onContinue: () -> Unit,
+    onSignIn: () -> Unit,
+    onSkip: () -> Unit,
+    serverSelectionState: ServerSelectionState,
+    onSelectServerPreset: (ServerPreset) -> Unit,
+    onCustomServerUrlChange: (String) -> Unit,
+    onShowCustomServerInfo: () -> Unit,
+    isPasskeySupported: Boolean = true,
+) {
+    Column(
+        modifier =
+            Modifier
                 .fillMaxSize()
                 .padding(Spacing.lg)
                 .verticalScroll(rememberScrollState()),
@@ -172,49 +423,6 @@ fun CloudAccountWelcomeContent(
                     title = "Privacy first",
                     description = "Server policies come from the server you choose.",
                 )
-            }
-        }
-
-        Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            if (!isPasskeySupported) {
-                Card(
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                        ),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        text = stringResource(Res.string.passkey_not_supported_banner),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.padding(Spacing.md),
-                    )
-                }
-            }
-
-            Button(
-                onClick = onContinue,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = isPasskeySupported,
-            ) {
-                Text(stringResource(Res.string.create_new_account))
-            }
-
-            OutlinedButton(
-                onClick = onSignIn,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(Res.string.sign_in))
-            }
-
-            TextButton(
-                onClick = onSkip,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(UiRes.string.common_skip))
             }
         }
     }

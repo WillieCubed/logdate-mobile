@@ -45,6 +45,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_recovery
@@ -123,9 +125,312 @@ fun CloudAccountSignInContent(
     onSignInWithGoogle: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    CloudAccountSignInAdaptiveContent(
+        username = username,
+        onUsernameChange = onUsernameChange,
+        onSignIn = onSignIn,
+        onAccountRecovery = onAccountRecovery,
+        onPrivacyPolicy = onPrivacyPolicy,
+        onTermsOfService = onTermsOfService,
+        onBack = onBack,
+        serverDisplayName = serverDisplayName,
+        serverHandleDomain = serverHandleDomain,
+        isSigningIn = isSigningIn,
+        errorMessage = errorMessage,
+        onSignInWithGoogle = onSignInWithGoogle,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun CloudAccountSignInAdaptiveContent(
+    username: String,
+    onUsernameChange: (String) -> Unit,
+    onSignIn: () -> Unit,
+    onAccountRecovery: () -> Unit,
+    onPrivacyPolicy: (() -> Unit)?,
+    onTermsOfService: (() -> Unit)?,
+    onBack: () -> Unit,
+    serverDisplayName: String,
+    serverHandleDomain: String,
+    isSigningIn: Boolean,
+    errorMessage: String?,
+    onSignInWithGoogle: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    FoldableTabletopLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneHeight = 260.dp,
+        topPane = {
+            CloudAccountSignInTopPane(
+                username = username,
+                onUsernameChange = onUsernameChange,
+                onBack = onBack,
+                serverDisplayName = serverDisplayName,
+                serverHandleDomain = serverHandleDomain,
+                errorMessage = errorMessage,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        bottomPane = {
+            CloudAccountSignInActionPane(
+                onSignIn = onSignIn,
+                onAccountRecovery = onAccountRecovery,
+                onPrivacyPolicy = onPrivacyPolicy,
+                onTermsOfService = onTermsOfService,
+                isSigningIn = isSigningIn,
+                errorMessage = errorMessage,
+                onSignInWithGoogle = onSignInWithGoogle,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        fallback = {
+            FoldableBookLayout(
+                modifier = Modifier.fillMaxSize(),
+                minPaneWidth = 320.dp,
+                startPane = {
+                    CloudAccountSignInTopPane(
+                        username = username,
+                        onUsernameChange = onUsernameChange,
+                        onBack = onBack,
+                        serverDisplayName = serverDisplayName,
+                        serverHandleDomain = serverHandleDomain,
+                        errorMessage = errorMessage,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+                endPane = {
+                    CloudAccountSignInActionPane(
+                        onSignIn = onSignIn,
+                        onAccountRecovery = onAccountRecovery,
+                        onPrivacyPolicy = onPrivacyPolicy,
+                        onTermsOfService = onTermsOfService,
+                        isSigningIn = isSigningIn,
+                        errorMessage = errorMessage,
+                        onSignInWithGoogle = onSignInWithGoogle,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+                standardContent = {
+                    CloudAccountSignInCompactContent(
+                        username = username,
+                        onUsernameChange = onUsernameChange,
+                        onSignIn = onSignIn,
+                        onAccountRecovery = onAccountRecovery,
+                        onPrivacyPolicy = onPrivacyPolicy,
+                        onTermsOfService = onTermsOfService,
+                        onBack = onBack,
+                        serverDisplayName = serverDisplayName,
+                        serverHandleDomain = serverHandleDomain,
+                        isSigningIn = isSigningIn,
+                        errorMessage = errorMessage,
+                        onSignInWithGoogle = onSignInWithGoogle,
+                    )
+                },
+            )
+        },
+    )
+}
+
+@Composable
+private fun CloudAccountSignInTopPane(
+    username: String,
+    onUsernameChange: (String) -> Unit,
+    onBack: () -> Unit,
+    serverDisplayName: String,
+    serverHandleDomain: String,
+    errorMessage: String?,
+    modifier: Modifier = Modifier,
+) {
     Box(
         modifier =
             modifier
+                .padding(Spacing.lg),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.xl),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(UiRes.string.common_go_back),
+                    )
+                }
+            }
+
+            Card(
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                    ),
+            ) {
+                Box(
+                    modifier = Modifier.padding(Spacing.lg),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Cloud,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Text(
+                    text = stringResource(Res.string.server_sign_in_title, serverDisplayName),
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = stringResource(Res.string.server_domain_sign_in_hint, serverHandleDomain),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+
+            ServerIdentityCard(
+                serverDisplayName = serverDisplayName,
+                serverHandleDomain = serverHandleDomain,
+            )
+
+            OutlinedTextField(
+                value = username,
+                onValueChange = onUsernameChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(Res.string.username)) },
+                placeholder = { Text(stringResource(Res.string.your_username_2)) },
+                prefix = { Text(stringResource(Res.string.at)) },
+                suffix = { Text("@$serverHandleDomain") },
+                singleLine = true,
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Done,
+                    ),
+            )
+
+            errorMessage?.let { message ->
+                Card(
+                    colors =
+                        CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                        ),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(Spacing.md),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CloudAccountSignInActionPane(
+    onSignIn: () -> Unit,
+    onAccountRecovery: () -> Unit,
+    onPrivacyPolicy: (() -> Unit)?,
+    onTermsOfService: (() -> Unit)?,
+    isSigningIn: Boolean,
+    errorMessage: String?,
+    onSignInWithGoogle: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .verticalScroll(rememberScrollState())
+                .padding(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Button(
+            onClick = onSignIn,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isSigningIn,
+        ) {
+            if (isSigningIn) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp,
+                    )
+                    Text(stringResource(Res.string.signing_in))
+                }
+            } else if (errorMessage != null) {
+                Text(stringResource(UiRes.string.common_try_again))
+            } else {
+                Text(stringResource(Res.string.sign_in_with_passkey))
+            }
+        }
+
+        if (onSignInWithGoogle != null) {
+            OutlinedButton(
+                onClick = onSignInWithGoogle,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isSigningIn,
+            ) {
+                Text(stringResource(Res.string.continue_with_google))
+            }
+        }
+
+        TextButton(
+            onClick = onAccountRecovery,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(Res.string.account_recovery))
+        }
+
+        if (onPrivacyPolicy != null || onTermsOfService != null) {
+            LegalLinksRow(
+                onPrivacyPolicy = onPrivacyPolicy,
+                onTermsOfService = onTermsOfService,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CloudAccountSignInCompactContent(
+    username: String,
+    onUsernameChange: (String) -> Unit,
+    onSignIn: () -> Unit,
+    onAccountRecovery: () -> Unit,
+    onPrivacyPolicy: (() -> Unit)?,
+    onTermsOfService: (() -> Unit)?,
+    onBack: () -> Unit,
+    serverDisplayName: String,
+    serverHandleDomain: String,
+    isSigningIn: Boolean,
+    errorMessage: String?,
+    onSignInWithGoogle: (() -> Unit)?,
+) {
+    Box(
+        modifier =
+            Modifier
                 .fillMaxSize()
                 .padding(Spacing.lg),
     ) {
@@ -230,55 +535,18 @@ fun CloudAccountSignInContent(
                             )
                         }
                     }
-
-                    Button(
-                        onClick = onSignIn,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !isSigningIn,
-                    ) {
-                        if (isSigningIn) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    strokeWidth = 2.dp,
-                                )
-                                Text(stringResource(Res.string.signing_in))
-                            }
-                        } else if (errorMessage != null) {
-                            Text(stringResource(UiRes.string.common_try_again))
-                        } else {
-                            Text(stringResource(Res.string.sign_in_with_passkey))
-                        }
-                    }
-
-                    if (onSignInWithGoogle != null) {
-                        OutlinedButton(
-                            onClick = onSignInWithGoogle,
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !isSigningIn,
-                        ) {
-                            Text(stringResource(Res.string.continue_with_google))
-                        }
-                    }
-
-                    TextButton(
-                        onClick = onAccountRecovery,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(Res.string.account_recovery))
-                    }
                 }
             }
 
-            if (onPrivacyPolicy != null || onTermsOfService != null) {
-                LegalLinksRow(
-                    onPrivacyPolicy = onPrivacyPolicy,
-                    onTermsOfService = onTermsOfService,
-                )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                if (onPrivacyPolicy != null || onTermsOfService != null) {
+                    LegalLinksRow(
+                        onPrivacyPolicy = onPrivacyPolicy,
+                        onTermsOfService = onTermsOfService,
+                    )
+                }
             }
         }
     }

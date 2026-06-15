@@ -10,6 +10,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.ui.generated.resources.common_continue
@@ -17,21 +19,63 @@ import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
-fun RecoveryPhraseSetupScreen(onPhraseContinue: (List<String>) -> Unit) {
-    var phase by remember { mutableStateOf<SetupPhase>(SetupPhase.Display(emptyList())) }
+fun RecoveryPhraseSetupScreen(
+    words: List<String>,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onRetry: () -> Unit,
+    onPhraseContinue: (List<String>) -> Unit,
+) {
+    var isVerifying by remember(words) { mutableStateOf(false) }
 
-    when (val currentPhase = phase) {
-        is SetupPhase.Display -> {
+    when {
+        isLoading -> {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                CircularProgressIndicator()
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(stringResource(Res.string.deriving_encryption_keys))
+            }
+        }
+        errorMessage != null -> {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(
+                    text = stringResource(Res.string.your_recovery_phrase),
+                    style = MaterialTheme.typography.headlineMedium,
+                )
+                Text(
+                    text = errorMessage,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(Res.string.recovery_setup_retry))
+                }
+            }
+        }
+        !isVerifying -> {
             RecoveryPhraseDisplayContent(
-                words = currentPhase.words,
-                onContinue = { phase = SetupPhase.Verify(currentPhase.words) },
+                words = words,
+                onContinue = { isVerifying = true },
             )
         }
 
-        is SetupPhase.Verify -> {
+        else -> {
             RecoveryPhraseVerificationContent(
-                expectedWords = currentPhase.words,
-                onVerified = { onPhraseContinue(currentPhase.words) },
+                expectedWords = words,
+                onVerified = { onPhraseContinue(words) },
             )
         }
     }
@@ -44,10 +88,62 @@ private fun RecoveryPhraseDisplayContent(
 ) {
     var userConfirmed by remember { mutableStateOf(false) }
 
+    FoldableTabletopLayout(
+        modifier = Modifier.fillMaxSize(),
+        minPaneHeight = 260.dp,
+        topPane = {
+            RecoveryPhraseDisplayTopPane(
+                words = words,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        bottomPane = {
+            RecoveryPhraseDisplayBottomPane(
+                userConfirmed = userConfirmed,
+                onUserConfirmedChange = { userConfirmed = it },
+                onContinue = onContinue,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        fallback = {
+            FoldableBookLayout(
+                modifier = Modifier.fillMaxSize(),
+                minPaneWidth = 320.dp,
+                startPane = {
+                    RecoveryPhraseDisplayTopPane(
+                        words = words,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+                endPane = {
+                    RecoveryPhraseDisplayBottomPane(
+                        userConfirmed = userConfirmed,
+                        onUserConfirmedChange = { userConfirmed = it },
+                        onContinue = onContinue,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+                standardContent = {
+                    RecoveryPhraseDisplayCompactContent(
+                        words = words,
+                        userConfirmed = userConfirmed,
+                        onUserConfirmedChange = { userConfirmed = it },
+                        onContinue = onContinue,
+                    )
+                },
+            )
+        },
+    )
+}
+
+@Composable
+private fun RecoveryPhraseDisplayTopPane(
+    words: List<String>,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier =
-            Modifier
-                .fillMaxSize()
+            modifier
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -109,22 +205,35 @@ private fun RecoveryPhraseDisplayContent(
         )
         WarningCard(
             icon = "📝",
-            text = stringResource(Res.string.warning_recovery_phrase_write_on_paper),
+            text = stringResource(Res.string.warning_recovery_phrase_store_securely),
         )
         WarningCard(
             icon = "🔒",
             text = stringResource(Res.string.warning_recovery_phrase_store_safe),
         )
+    }
+}
 
-        Spacer(modifier = Modifier.weight(1f))
-
+@Composable
+private fun RecoveryPhraseDisplayBottomPane(
+    userConfirmed: Boolean,
+    onUserConfirmedChange: (Boolean) -> Unit,
+    onContinue: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Checkbox(
                 checked = userConfirmed,
-                onCheckedChange = { userConfirmed = it },
+                onCheckedChange = onUserConfirmedChange,
             )
             Text(
                 text = stringResource(Res.string.i_have_written_down_my_recovery_phrase),
@@ -137,6 +246,89 @@ private fun RecoveryPhraseDisplayContent(
             enabled = userConfirmed,
             modifier = Modifier.fillMaxWidth(),
         ) {
+            Text(stringResource(UiRes.string.common_continue))
+        }
+    }
+}
+
+@Composable
+private fun RecoveryPhraseDisplayCompactContent(
+    words: List<String>,
+    userConfirmed: Boolean,
+    onUserConfirmedChange: (Boolean) -> Unit,
+    onContinue: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(
+            text = stringResource(Res.string.your_recovery_phrase),
+            style = MaterialTheme.typography.headlineMedium,
+        )
+        Text(
+            text =
+                stringResource(
+                    Res.string.write_these_12_words_on_paper_and_store_them_safely_youll_need_them_to_recover_your_data_if_you_lose_your_device,
+                ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Card(
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                ),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                words.forEachIndexed { index, word ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text =
+                                stringResource(
+                                    Res.string.recovery_phrase_index,
+                                    index + 1,
+                                ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.width(24.dp),
+                        )
+                        Text(
+                            text = word,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        }
+        WarningCard(icon = "⚠️", text = stringResource(Res.string.warning_recovery_phrase_never_share))
+        WarningCard(icon = "📝", text = stringResource(Res.string.warning_recovery_phrase_store_securely))
+        WarningCard(icon = "🔒", text = stringResource(Res.string.warning_recovery_phrase_store_safe))
+        Spacer(modifier = Modifier.weight(1f))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Checkbox(checked = userConfirmed, onCheckedChange = onUserConfirmedChange)
+            Text(
+                text = stringResource(Res.string.i_have_written_down_my_recovery_phrase),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        Button(onClick = onContinue, enabled = userConfirmed, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(UiRes.string.common_continue))
         }
     }
@@ -235,14 +427,4 @@ private fun WarningCard(
             Text(text, style = MaterialTheme.typography.bodySmall)
         }
     }
-}
-
-sealed class SetupPhase {
-    data class Display(
-        val words: List<String>,
-    ) : SetupPhase()
-
-    data class Verify(
-        val words: List<String>,
-    ) : SetupPhase()
 }
