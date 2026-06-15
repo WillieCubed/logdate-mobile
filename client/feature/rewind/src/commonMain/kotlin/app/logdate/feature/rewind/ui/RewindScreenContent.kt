@@ -59,6 +59,7 @@ import app.logdate.feature.rewind.ui.components.RewindCoverCard
 import app.logdate.feature.rewind.ui.overview.RewindHistoryUiState
 import app.logdate.feature.rewind.ui.overview.RewindOverviewScreenUiState
 import app.logdate.feature.rewind.ui.overview.RewindPreviewUiState
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
@@ -237,6 +238,55 @@ fun FloatingRewindCardList(
     onGenerateAnnualRewind: ((year: Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    val featuredRewinds = rewinds.take(1).ifEmpty { rewinds }
+    val historyRewinds = rewinds.drop(1)
+
+    FoldableBookLayout(
+        modifier = modifier,
+        minPaneWidth = 360.dp,
+        startPane = {
+            RewindCardScrollPane(
+                rewinds = featuredRewinds,
+                onOpenRewind = onOpenRewind,
+                scrollBehavior = scrollBehavior,
+                showEndOfListSurprise = false,
+                showNextCardIndicator = false,
+                animateCards = false,
+            )
+        },
+        endPane = {
+            RewindHistoryBookPane(
+                rewinds = historyRewinds,
+                onOpenRewind = onOpenRewind,
+                annualRewindYear = annualRewindYear,
+                onGenerateAnnualRewind = onGenerateAnnualRewind,
+            )
+        },
+        standardContent = {
+            RewindCardScrollPane(
+                rewinds = rewinds,
+                onOpenRewind = onOpenRewind,
+                scrollBehavior = scrollBehavior,
+                annualRewindYear = annualRewindYear,
+                onGenerateAnnualRewind = onGenerateAnnualRewind,
+            )
+        },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RewindCardScrollPane(
+    rewinds: List<RewindPreviewUiState>,
+    onOpenRewind: RewindOpenCallback,
+    scrollBehavior: TopAppBarScrollBehavior? = null,
+    annualRewindYear: Int? = null,
+    onGenerateAnnualRewind: ((year: Int) -> Unit)? = null,
+    showEndOfListSurprise: Boolean = true,
+    showNextCardIndicator: Boolean = true,
+    animateCards: Boolean = true,
+    modifier: Modifier = Modifier,
+) {
     val density = LocalDensity.current
     val listState = rememberLazyListState()
     val snapFlingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
@@ -245,7 +295,7 @@ fun FloatingRewindCardList(
     val cardWidth = 360.dp
     val cardHeight = cardWidth * AspectRatios.RATIO_3_2 // 3:2 aspect ratio for rewind cards
 
-    Box(modifier = modifier) {
+    Box(modifier = modifier.fillMaxSize()) {
         // Background gradient for depth
         Box(
             modifier =
@@ -282,9 +332,9 @@ fun FloatingRewindCardList(
         ) {
             itemsIndexed(rewinds) { index, rewind ->
                 val alreadyAnimated = index in animatedIndices
-                var visible by remember { mutableStateOf(alreadyAnimated) }
-                LaunchedEffect(Unit) {
-                    if (!alreadyAnimated) {
+                var visible by remember { mutableStateOf(!animateCards || alreadyAnimated) }
+                LaunchedEffect(animateCards) {
+                    if (animateCards && !alreadyAnimated) {
                         delay(index * 80L)
                         visible = true
                         animatedIndices += index
@@ -352,29 +402,151 @@ fun FloatingRewindCardList(
             }
 
             // Surprise ending item
-            item {
-                EndOfListSurprise(
-                    listState = listState,
-                    itemCount = rewinds.size,
-                    cardHeight = cardHeight,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp)
-                            .widthIn(max = cardWidth),
-                )
+            if (showEndOfListSurprise) {
+                item {
+                    EndOfListSurprise(
+                        listState = listState,
+                        itemCount = rewinds.size,
+                        cardHeight = cardHeight,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp)
+                                .widthIn(max = cardWidth),
+                    )
+                }
             }
         }
 
         // Next card indicator
-        NextCardIndicator(
-            listState = listState,
-            itemCount = rewinds.size,
+        if (showNextCardIndicator) {
+            NextCardIndicator(
+                listState = listState,
+                itemCount = rewinds.size,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(Spacing.lg),
+            )
+        }
+    }
+}
+
+@Composable
+private fun RewindHistoryBookPane(
+    rewinds: List<RewindPreviewUiState>,
+    onOpenRewind: RewindOpenCallback,
+    annualRewindYear: Int? = null,
+    onGenerateAnnualRewind: ((year: Int) -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    val listState = rememberLazyListState()
+    val cardWidth = 360.dp
+    val cardHeight = cardWidth * AspectRatios.RATIO_3_2
+
+    Box(modifier = modifier.fillMaxSize()) {
+        Box(
             modifier =
                 Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(Spacing.lg),
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors =
+                                listOf(
+                                    MaterialTheme.colorScheme.surface,
+                                    MaterialTheme.colorScheme.surfaceContainer,
+                                ),
+                        ),
+                    ),
         )
+
+        LazyColumn(
+            state = listState,
+            contentPadding =
+                PaddingValues(
+                    horizontal = 24.dp,
+                    vertical = 32.dp,
+                ),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            item {
+                Text(
+                    text = stringResource(Res.string.past_rewind),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = cardWidth),
+                )
+            }
+
+            if (rewinds.isEmpty()) {
+                item {
+                    Text(
+                        text = stringResource(Res.string.past_rewinds_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = cardWidth),
+                    )
+                }
+            } else {
+                itemsIndexed(rewinds) { index, rewind ->
+                    FloatingRewindCard(
+                        rewind = rewind,
+                        onOpenRewind = onOpenRewind,
+                        listState = listState,
+                        index = index,
+                        cardHeight = cardHeight,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = cardWidth),
+                    )
+                }
+            }
+
+            if (annualRewindYear != null && onGenerateAnnualRewind != null) {
+                item {
+                    Card(
+                        onClick = { onGenerateAnnualRewind(annualRewindYear) },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = cardWidth)
+                                .height(120.dp),
+                        colors =
+                            CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                            ),
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(Spacing.lg),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                text =
+                                    stringResource(
+                                        Res.string.annual_rewind_generate,
+                                        annualRewindYear,
+                                    ),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
