@@ -1,5 +1,6 @@
 package app.logdate.feature.editor.ui.layout
 
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Card
@@ -11,9 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import app.logdate.ui.PlatformDimensions
 import app.logdate.ui.common.AspectRatios
-import app.logdate.ui.common.constrainHeightRatioIn
 
 /**
  * A standardized surface for entry editors that maintains proper aspect ratio constraints.
@@ -36,37 +35,26 @@ fun EntryEditorSurface(
     elevation: Dp = 4.dp,
     content: @Composable () -> Unit,
 ) {
-    // If maxWidthDp is not provided, calculate the appropriate width based on screen size
-    val screenWidth = PlatformDimensions.getScreenWidth()
-    val calculatedMaxWidth =
-        remember(screenWidth, maxWidthDp) {
-            maxWidthDp ?: when {
-                screenWidth < 600.dp -> screenWidth
-                screenWidth < 900.dp -> 600.dp
-                else -> 800.dp
-            }
-        }
+    BoxWithConstraints(modifier = modifier) {
+        val calculatedMaxWidth = remember(maxWidth, maxWidthDp) { maxWidthDp ?: maxWidth }
+        val maxHeight = remember(calculatedMaxWidth) { (calculatedMaxWidth / AspectRatios.RATIO_9_16).coerceAtMost(520.dp) }
 
-    Card(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                // Apply height constraints based on width and aspect ratio
-                .constrainHeightRatioIn(
-                    width = calculatedMaxWidth,
-                    maxRatio = AspectRatios.RATIO_9_16,
-                )
-                // Add a minimum height to prevent collapsing when focused
-                .heightIn(min = 120.dp),
-        colors =
-            CardDefaults.cardColors(
-                containerColor = containerColor,
-            ),
-        elevation =
-            CardDefaults.cardElevation(
-                defaultElevation = elevation,
-            ),
-    ) {
-        content()
+        Card(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    // Apply height constraints based on the actual available pane/window width.
+                    .heightIn(min = 120.dp, max = maxHeight),
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = containerColor,
+                ),
+            elevation =
+                CardDefaults.cardElevation(
+                    defaultElevation = elevation,
+                ),
+        ) {
+            content()
+        }
     }
 }

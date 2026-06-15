@@ -30,10 +30,19 @@ import app.logdate.feature.editor.audio.AudioContext
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
 import app.logdate.feature.editor.audio.model.SegmentType
+import app.logdate.feature.editor.ui.MainEditorContent
 import app.logdate.feature.editor.ui.audio.ActiveRecordingDisplay
 import app.logdate.feature.editor.ui.audio.AudioRecordingControls
-import app.logdate.feature.editor.ui.video.VideoPlayerContent
+import app.logdate.feature.editor.ui.common.NoteEditorToolbar
+import app.logdate.feature.editor.ui.content.EditorBottomContent
+import app.logdate.feature.editor.ui.editor.BlockType
+import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.RecordingState
+import app.logdate.feature.editor.ui.editor.TextBlockUiState
+import app.logdate.feature.editor.ui.editor.VideoBlockUiState
+import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
+import app.logdate.feature.editor.ui.state.BlocksUiState
+import app.logdate.feature.editor.ui.video.VideoPlayerContent
 import app.logdate.feature.journals.ui.JournalLayoutMode
 import app.logdate.feature.journals.ui.JournalListItemUiState
 import app.logdate.feature.journals.ui.JournalSortOption
@@ -250,6 +259,40 @@ private val auditAudioPlaybackState =
                 subtitle = "3:02",
                 accentColor = 0xFFE8A044,
             ),
+    )
+
+private val auditEditorUiState =
+    BlocksUiState(
+        blocks =
+            listOf(
+                TextBlockUiState(
+                    id = Uuid.parse("00000000-0000-0000-0000-000000000621"),
+                    timestamp = ScreenshotTestData.baseInstant,
+                    content =
+                        "Drafted a field note with enough text to check reading width, scroll behavior, " +
+                            "and the position of editor controls on a folding display.",
+                ),
+                ImageBlockUiState(
+                    id = Uuid.parse("00000000-0000-0000-0000-000000000622"),
+                    timestamp = ScreenshotTestData.baseInstant,
+                    uri = SAMPLE_IMAGE_URI,
+                    caption = "Notebook reference",
+                ),
+                VideoBlockUiState(
+                    id = Uuid.parse("00000000-0000-0000-0000-000000000623"),
+                    timestamp = ScreenshotTestData.baseInstant,
+                    uri = SAMPLE_VIDEO_URI,
+                    caption = "Walkthrough clip",
+                    durationMs = 84_000L,
+                ),
+            ),
+        availableJournals = ScreenshotTestData.sampleJournals,
+        selectedJournalIds = listOf(ScreenshotTestData.sampleJournal.id),
+        onBlockFocused = {},
+        onJournalSelectionChanged = {},
+        onUpdateBlock = {},
+        onCreateBlock = { _: BlockType, id: Uuid -> TextBlockUiState(id = id) },
+        onDeleteBlock = {},
     )
 
 @PreviewTest
@@ -680,6 +723,20 @@ fun A61_ActiveRecordingTabletopPosture() {
 }
 
 @PreviewTest
+@Preview(name = "Entry editor mixed content book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A62_EntryEditorMixedContentBookPosture() {
+    FoldableEntryEditorScene(bookPostureLayoutInfo)
+}
+
+@PreviewTest
+@Preview(name = "Entry editor mixed content tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A63_EntryEditorMixedContentTabletopPosture() {
+    FoldableEntryEditorScene(tabletopPostureLayoutInfo)
+}
+
+@PreviewTest
 @LargeScreenAuditPreviewMatrix
 @Composable
 fun A07_JournalDetail() {
@@ -702,6 +759,40 @@ private fun FoldableMediaDetailScene(
                 state = state,
                 isExpanded = true,
                 onBack = {},
+            )
+        }
+    }
+}
+
+@Composable
+private fun FoldableEntryEditorScene(foldableLayoutInfo: FoldableLayoutInfo) {
+    provideFoldableLayoutInfo(foldableLayoutInfo) {
+        ScreenshotTheme {
+            ImmersiveEditorLayout(
+                topBarContent = {
+                    NoteEditorToolbar(
+                        onBack = {},
+                        onSave = {},
+                        onShowDrafts = {},
+                    )
+                },
+                editorContent = {
+                    MainEditorContent(
+                        uiState = auditEditorUiState,
+                        shouldReturnToPickerOnBack = false,
+                        onDismissExpanded = {},
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+                bottomContent = {
+                    EditorBottomContent(
+                        availableJournals = ScreenshotTestData.sampleJournals,
+                        selectedJournalIds = listOf(ScreenshotTestData.sampleJournal.id),
+                        onJournalSelectionChanged = {},
+                        journalSelectorExpanded = false,
+                        onJournalSelectorExpandedChange = {},
+                    )
+                },
             )
         }
     }

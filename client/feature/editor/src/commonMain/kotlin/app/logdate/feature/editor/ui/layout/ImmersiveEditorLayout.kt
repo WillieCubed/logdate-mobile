@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
+import app.logdate.ui.foldable.rememberFoldableLayoutInfo
 import app.logdate.ui.theme.Spacing
 
 /**
@@ -73,10 +74,13 @@ fun ImmersiveEditorLayout(
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val containerWidth = maxWidth
+        val foldableLayoutInfo = rememberFoldableLayoutInfo()
+        val hasSeparatingHinge = foldableLayoutInfo.hinge?.isSeparating == true
         // Landscape phones are typically 360–430dp tall; portrait phones start at 667dp.
         val isCompact = maxHeight < 500.dp
         val maxEditorWidth =
             when {
+                hasSeparatingHinge -> containerWidth
                 containerWidth < 600.dp -> containerWidth
                 containerWidth < 900.dp -> 600.dp
                 else -> 800.dp
