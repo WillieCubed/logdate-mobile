@@ -51,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
@@ -66,6 +67,8 @@ import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOW
 import app.logdate.feature.postcards.model.CanvasElement
 import app.logdate.feature.postcards.model.InkTool
 import app.logdate.feature.postcards.model.ShapeKind
+import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.common.CursorType
 import app.logdate.ui.common.cursorIcon
 import org.koin.compose.viewmodel.koinViewModel
@@ -183,103 +186,173 @@ fun CanvasEditorScreen(
                 }
             }
 
-        if (useWideLayout) {
-            // Tablet / landscape: tool rail on left, canvas center, shelf on right
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .then(keyboardModifier),
-            ) {
-                EditorToolRail(
-                    activeTool = state.activeTool,
-                    onToolSelected = onToolSelected,
-                    modifier =
-                        Modifier
-                            .fillMaxHeight()
-                            .navigationBarsPadding(),
-                )
+        // Editor canvas and tools react to a separating hinge: the canvas keeps to one physical
+        // pane while the tool rail/palette and shelf move into the other, clear of the fold.
+        // Padding and keyboard shortcuts are applied once on the outer wrapper so the nested
+        // posture layouts never double-apply them.
+        FoldableTabletopLayout(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .then(keyboardModifier),
+            topPane = {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    CanvasArea(
+                        state = state,
+                        viewModel = viewModel,
+                        viewportState = viewportState,
+                        modifier = Modifier.fillMaxSize(),
+                    )
 
-                CanvasArea(
-                    state = state,
-                    viewModel = viewModel,
-                    viewportState = viewportState,
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                )
-
-                EditorShelf(
-                    mode = state.shelfMode,
-                    photos = state.shelfPhotos,
-                    browsePhotos = state.browsePhotos,
-                    stickers = state.shelfStickers,
-                    onModeChange = viewModel::setShelfMode,
-                    onPhotoDrag = { photo, x, y -> viewModel.addPhotoElement(photo, x, y) },
-                    onStickerTap = { sticker -> viewModel.addStickerElement(sticker.id, 0f, 0f) },
-                    modifier =
-                        Modifier
-                            .width(200.dp)
-                            .fillMaxHeight()
-                            .navigationBarsPadding(),
-                )
-            }
-        } else {
-            // Phone: canvas on top, shelf + tool bar at bottom
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .then(keyboardModifier),
-            ) {
-                CanvasArea(
-                    state = state,
-                    viewModel = viewModel,
-                    viewportState = viewportState,
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                )
-
-                // Text editor slides up over the shelf when active
-                AnimatedVisibility(
-                    visible = state.isTextEditorVisible,
-                    enter = slideInVertically { it },
-                    exit = slideOutVertically { it },
-                ) {
-                    val editingElement =
-                        state.editingTextElementId?.let { id ->
-                            state.document.elements.find { it.id == id } as? CanvasElement.Text
-                        }
-                    TextElementEditor(
-                        initialText = editingElement?.content ?: "",
-                        initialFont = editingElement?.fontFamily ?: FontChoice.CAVEAT.id,
-                        initialColor = editingElement?.color ?: DEFAULT_STROKE_COLOR,
-                        initialFontSize = editingElement?.fontSize ?: DEFAULT_TEXT_FONT_SIZE,
-                        onConfirm = { content, fontFamily, color, fontSize ->
-                            val centerX = -viewportState.offset.x / viewportState.scale
-                            val centerY = -viewportState.offset.y / viewportState.scale
-                            viewModel.confirmTextEditing(content, fontFamily, color, fontSize, centerX, centerY)
-                        },
-                        onDismiss = viewModel::cancelTextEditing,
+                    // Text editor slides up over the canvas pane when active
+                    TextElementEditorOverlay(
+                        state = state,
+                        viewModel = viewModel,
+                        viewportState = viewportState,
+                        modifier = Modifier.align(Alignment.BottomCenter),
                     )
                 }
+            },
+            bottomPane = {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    EditorShelf(
+                        mode = state.shelfMode,
+                        photos = state.shelfPhotos,
+                        browsePhotos = state.browsePhotos,
+                        stickers = state.shelfStickers,
+                        onModeChange = viewModel::setShelfMode,
+                        onPhotoDrag = { photo, x, y -> viewModel.addPhotoElement(photo, x, y) },
+                        onStickerTap = { sticker -> viewModel.addStickerElement(sticker.id, 0f, 0f) },
+                    )
 
-                EditorShelf(
-                    mode = state.shelfMode,
-                    photos = state.shelfPhotos,
-                    browsePhotos = state.browsePhotos,
-                    stickers = state.shelfStickers,
-                    onModeChange = viewModel::setShelfMode,
-                    onPhotoDrag = { photo, x, y -> viewModel.addPhotoElement(photo, x, y) },
-                    onStickerTap = { sticker -> viewModel.addStickerElement(sticker.id, 0f, 0f) },
-                )
+                    EditorToolPalette(
+                        activeTool = state.activeTool,
+                        onToolSelected = onToolSelected,
+                        modifier = Modifier.navigationBarsPadding(),
+                    )
+                }
+            },
+            standardContent = {
+                FoldableBookLayout(
+                    startPane = {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            CanvasArea(
+                                state = state,
+                                viewModel = viewModel,
+                                viewportState = viewportState,
+                                modifier = Modifier.fillMaxSize(),
+                            )
 
-                EditorToolPalette(
-                    activeTool = state.activeTool,
-                    onToolSelected = onToolSelected,
-                    modifier = Modifier.navigationBarsPadding(),
+                            // Text editor slides up over the canvas pane when active
+                            TextElementEditorOverlay(
+                                state = state,
+                                viewModel = viewModel,
+                                viewportState = viewportState,
+                                modifier = Modifier.align(Alignment.BottomCenter),
+                            )
+                        }
+                    },
+                    endPane = {
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            EditorToolRail(
+                                activeTool = state.activeTool,
+                                onToolSelected = onToolSelected,
+                                modifier =
+                                    Modifier
+                                        .fillMaxHeight()
+                                        .navigationBarsPadding(),
+                            )
+
+                            EditorShelf(
+                                mode = state.shelfMode,
+                                photos = state.shelfPhotos,
+                                browsePhotos = state.browsePhotos,
+                                stickers = state.shelfStickers,
+                                onModeChange = viewModel::setShelfMode,
+                                onPhotoDrag = { photo, x, y -> viewModel.addPhotoElement(photo, x, y) },
+                                onStickerTap = { sticker -> viewModel.addStickerElement(sticker.id, 0f, 0f) },
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .navigationBarsPadding(),
+                            )
+                        }
+                    },
+                    standardContent = {
+                        if (useWideLayout) {
+                            // Tablet / landscape: tool rail on left, canvas center, shelf on right
+                            Row(modifier = Modifier.fillMaxSize()) {
+                                EditorToolRail(
+                                    activeTool = state.activeTool,
+                                    onToolSelected = onToolSelected,
+                                    modifier =
+                                        Modifier
+                                            .fillMaxHeight()
+                                            .navigationBarsPadding(),
+                                )
+
+                                CanvasArea(
+                                    state = state,
+                                    viewModel = viewModel,
+                                    viewportState = viewportState,
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                                )
+
+                                EditorShelf(
+                                    mode = state.shelfMode,
+                                    photos = state.shelfPhotos,
+                                    browsePhotos = state.browsePhotos,
+                                    stickers = state.shelfStickers,
+                                    onModeChange = viewModel::setShelfMode,
+                                    onPhotoDrag = { photo, x, y -> viewModel.addPhotoElement(photo, x, y) },
+                                    onStickerTap = { sticker -> viewModel.addStickerElement(sticker.id, 0f, 0f) },
+                                    modifier =
+                                        Modifier
+                                            .width(200.dp)
+                                            .fillMaxHeight()
+                                            .navigationBarsPadding(),
+                                )
+                            }
+                        } else {
+                            // Phone: canvas on top, shelf + tool bar at bottom
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                CanvasArea(
+                                    state = state,
+                                    viewModel = viewModel,
+                                    viewportState = viewportState,
+                                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                                )
+
+                                // Text editor slides up over the shelf when active
+                                TextElementEditorOverlay(
+                                    state = state,
+                                    viewModel = viewModel,
+                                    viewportState = viewportState,
+                                )
+
+                                EditorShelf(
+                                    mode = state.shelfMode,
+                                    photos = state.shelfPhotos,
+                                    browsePhotos = state.browsePhotos,
+                                    stickers = state.shelfStickers,
+                                    onModeChange = viewModel::setShelfMode,
+                                    onPhotoDrag = { photo, x, y -> viewModel.addPhotoElement(photo, x, y) },
+                                    onStickerTap = { sticker -> viewModel.addStickerElement(sticker.id, 0f, 0f) },
+                                )
+
+                                EditorToolPalette(
+                                    activeTool = state.activeTool,
+                                    onToolSelected = onToolSelected,
+                                    modifier = Modifier.navigationBarsPadding(),
+                                )
+                            }
+                        }
+                    },
                 )
-            }
-        }
+            },
+        )
     }
 }
 
@@ -398,6 +471,45 @@ private fun CanvasArea(
                 }
             }
         }
+    }
+}
+
+/**
+ * Text authoring surface that slides up over the canvas while text editing is active.
+ *
+ * Shared across every posture (phone, book, tabletop) so tapping the TEXT tool or an existing
+ * text element always mounts an editor. Uses the single [viewportState] created once in the
+ * editor content so confirmed text lands at the current viewport center.
+ */
+@Composable
+private fun TextElementEditorOverlay(
+    state: CanvasEditorState,
+    viewModel: CanvasEditorViewModel,
+    viewportState: CanvasViewportState,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        modifier = modifier,
+        visible = state.isTextEditorVisible,
+        enter = slideInVertically { it },
+        exit = slideOutVertically { it },
+    ) {
+        val editingElement =
+            state.editingTextElementId?.let { id ->
+                state.document.elements.find { it.id == id } as? CanvasElement.Text
+            }
+        TextElementEditor(
+            initialText = editingElement?.content ?: "",
+            initialFont = editingElement?.fontFamily ?: FontChoice.CAVEAT.id,
+            initialColor = editingElement?.color ?: DEFAULT_STROKE_COLOR,
+            initialFontSize = editingElement?.fontSize ?: DEFAULT_TEXT_FONT_SIZE,
+            onConfirm = { content, fontFamily, color, fontSize ->
+                val centerX = -viewportState.offset.x / viewportState.scale
+                val centerY = -viewportState.offset.y / viewportState.scale
+                viewModel.confirmTextEditing(content, fontFamily, color, fontSize, centerX, centerY)
+            },
+            onDismiss = viewModel::cancelTextEditing,
+        )
     }
 }
 

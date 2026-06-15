@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import app.logdate.feature.postcards.model.CanvasElement
 import app.logdate.feature.postcards.model.PostcardDocument
+import app.logdate.ui.adaptive.HingeAwareOverlay
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 
@@ -99,13 +100,17 @@ fun PostcardViewerScreen(
                     CircularProgressIndicator()
                 }
                 is PostcardViewerUiState.Loaded -> {
-                    PostcardViewerContent(
-                        document = state.document,
-                        stickerUriMap = state.stickerUriMap,
-                        onPhotoTap = { photo ->
-                            onNavigateToMoment(photo.momentRef)
-                        },
-                    )
+                    // The Postcard is a single immersive canvas, so on a folded device it should
+                    // live wholly inside one physical pane rather than straddle a separating hinge.
+                    HingeAwareOverlay {
+                        PostcardViewerContent(
+                            document = state.document,
+                            stickerUriMap = state.stickerUriMap,
+                            onPhotoTap = { photo ->
+                                onNavigateToMoment(photo.momentRef)
+                            },
+                        )
+                    }
 
                     if (showExportSheet) {
                         ExportSheet(
@@ -143,7 +148,7 @@ fun PostcardViewerScreen(
 }
 
 @Composable
-private fun PostcardViewerContent(
+fun PostcardViewerContent(
     document: PostcardDocument,
     stickerUriMap: Map<Uuid, String>,
     onPhotoTap: (CanvasElement.Photo) -> Unit,
