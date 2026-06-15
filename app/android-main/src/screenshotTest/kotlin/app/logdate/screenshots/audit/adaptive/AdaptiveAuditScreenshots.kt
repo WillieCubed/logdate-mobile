@@ -68,6 +68,7 @@ import app.logdate.feature.library.ui.detail.MediaDetailContent
 import app.logdate.feature.library.ui.detail.MediaDetailUiState
 import app.logdate.feature.onboarding.ui.CloudAccountSetupContent
 import app.logdate.feature.onboarding.ui.OnboardingCompletionContent
+import app.logdate.feature.onboarding.ui.OnboardingNotificationsContent
 import app.logdate.feature.onboarding.ui.OnboardingOverviewScreen
 import app.logdate.feature.onboarding.ui.OnboardingStartScreenContent
 import app.logdate.feature.onboarding.ui.PersonalIntroContent
@@ -595,6 +596,58 @@ fun A78_OnboardingCompletionTabletopPosture() {
                 onContinue = {},
                 onFinish = {},
                 modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun A79_OnboardingNotificationsPrompt() {
+    ScreenshotTheme {
+        OnboardingNotificationsContent(
+            onBack = {},
+            onPrimaryAction = {},
+            onSkip = {},
+            recommendationsEnabled = true,
+            hasDecision = false,
+            hasPermission = false,
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Onboarding notifications book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A80_OnboardingNotificationsBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            OnboardingNotificationsContent(
+                onBack = {},
+                onPrimaryAction = {},
+                onSkip = {},
+                recommendationsEnabled = true,
+                hasDecision = false,
+                hasPermission = false,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Onboarding notifications tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A81_OnboardingNotificationsTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            OnboardingNotificationsContent(
+                onBack = {},
+                onPrimaryAction = {},
+                onSkip = {},
+                recommendationsEnabled = true,
+                hasDecision = false,
+                hasPermission = false,
             )
         }
     }

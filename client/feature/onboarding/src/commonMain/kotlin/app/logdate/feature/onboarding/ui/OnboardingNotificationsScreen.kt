@@ -39,6 +39,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.client.permissions.rememberNotificationPermissionState
+import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.launch
@@ -136,79 +138,178 @@ fun OnboardingNotificationsContent(
             stringResource(Res.string.onboarding_notifications_enable)
         }
 
-    Scaffold(
-        bottomBar = {
-            Box(
-                modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Button(
-                        onClick = onPrimaryAction,
-                        modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_NOTIFICATIONS_PRIMARY_TAG),
-                        enabled = !isSaving,
-                    ) {
-                        if (isSaving) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Text(primaryActionLabel)
-                        }
-                    }
-                    TextButton(onClick = onSkip, modifier = Modifier.testTag(ONBOARDING_NOTIFICATIONS_SKIP_TAG)) {
-                        Text(stringResource(Res.string.onboarding_notifications_not_now))
-                    }
-                    errorMessage?.let { message ->
-                        Text(
-                            text = message,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
+    Scaffold { contentPadding ->
+        FoldableTabletopLayout(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(contentPadding),
+            minPaneHeight = 220.dp,
+            topPane = {
+                NotificationsBodyPane(
+                    bodyText = bodyText,
+                    onBack = onBack,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            },
+            bottomPane = {
+                NotificationsActionsPane(
+                    primaryActionLabel = primaryActionLabel,
+                    onPrimaryAction = onPrimaryAction,
+                    onSkip = onSkip,
+                    isSaving = isSaving,
+                    errorMessage = errorMessage,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            },
+            fallback = {
+                FoldableBookLayout(
+                    modifier = Modifier.fillMaxSize(),
+                    minPaneWidth = 320.dp,
+                    startPane = {
+                        NotificationsBodyPane(
+                            bodyText = bodyText,
+                            onBack = onBack,
+                            modifier = Modifier.fillMaxSize(),
                         )
-                    }
+                    },
+                    endPane = {
+                        NotificationsActionsPane(
+                            primaryActionLabel = primaryActionLabel,
+                            onPrimaryAction = onPrimaryAction,
+                            onSkip = onSkip,
+                            isSaving = isSaving,
+                            errorMessage = errorMessage,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    },
+                    standardContent = {
+                        NotificationsStandardContent(
+                            bodyText = bodyText,
+                            primaryActionLabel = primaryActionLabel,
+                            onBack = onBack,
+                            onPrimaryAction = onPrimaryAction,
+                            onSkip = onSkip,
+                            isSaving = isSaving,
+                            errorMessage = errorMessage,
+                        )
+                    },
+                )
+            },
+        )
+    }
+}
+
+@Composable
+private fun NotificationsStandardContent(
+    bodyText: String,
+    primaryActionLabel: String,
+    onBack: () -> Unit,
+    onPrimaryAction: () -> Unit,
+    onSkip: () -> Unit,
+    isSaving: Boolean,
+    errorMessage: String?,
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        NotificationsBodyPane(
+            bodyText = bodyText,
+            onBack = onBack,
+            modifier = Modifier.fillMaxSize(),
+        )
+        NotificationsActionsPane(
+            primaryActionLabel = primaryActionLabel,
+            onPrimaryAction = onPrimaryAction,
+            onSkip = onSkip,
+            isSaving = isSaving,
+            errorMessage = errorMessage,
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun NotificationsBodyPane(
+    bodyText: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier) {
+        Column(
+            modifier =
+                Modifier
+                    .testTag(ONBOARDING_NOTIFICATIONS_ROOT_TAG)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = Spacing.lg),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
+                horizontalArrangement = Arrangement.Start,
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
                 }
             }
-        },
-    ) { contentPadding ->
-        Box(
-            modifier = Modifier.fillMaxSize().padding(contentPadding),
-        ) {
             Column(
-                modifier =
-                    Modifier
-                        .testTag(ONBOARDING_NOTIFICATIONS_ROOT_TAG)
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = Spacing.lg),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.widthIn(max = 444.dp),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
-                    horizontalArrangement = Arrangement.Start,
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
-                    }
-                }
-                Column(
-                    modifier = Modifier.widthIn(max = 444.dp),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Text(
-                        stringResource(Res.string.onboarding_notifications_title),
-                        style = MaterialTheme.typography.headlineLarge,
-                        modifier = Modifier.padding(bottom = Spacing.md),
+                Text(
+                    stringResource(Res.string.onboarding_notifications_title),
+                    style = MaterialTheme.typography.headlineLarge,
+                    modifier = Modifier.padding(bottom = Spacing.md),
+                )
+                Text(
+                    bodyText,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotificationsActionsPane(
+    primaryActionLabel: String,
+    onPrimaryAction: () -> Unit,
+    onSkip: () -> Unit,
+    isSaving: Boolean,
+    errorMessage: String?,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.padding(Spacing.lg),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.widthIn(max = 444.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Button(
+                onClick = onPrimaryAction,
+                modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_NOTIFICATIONS_PRIMARY_TAG),
+                enabled = !isSaving,
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
                     )
-                    Text(
-                        bodyText,
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
+                } else {
+                    Text(primaryActionLabel)
                 }
+            }
+            TextButton(onClick = onSkip, modifier = Modifier.testTag(ONBOARDING_NOTIFICATIONS_SKIP_TAG)) {
+                Text(stringResource(Res.string.onboarding_notifications_not_now))
+            }
+            errorMessage?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         }
     }
