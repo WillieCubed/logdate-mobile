@@ -17,6 +17,7 @@ import app.logdate.ui.foldable.provideFoldableLayoutInfo
 import com.android.tools.screenshot.PreviewTest
 
 private const val BOOK_FOLDABLE = "spec:width=1440dp,height=900dp"
+private const val TABLETOP_FOLDABLE = "spec:width=1440dp,height=900dp"
 
 private val bookPostureLayoutInfo =
     FoldableLayoutInfo(
@@ -40,6 +41,28 @@ private val bookPostureLayoutInfo =
             ),
     )
 
+private val tabletopPostureLayoutInfo =
+    FoldableLayoutInfo(
+        isFoldable = true,
+        posture = FoldablePosture.Tabletop,
+        hinge =
+            FoldableHingeInfo(
+                orientation = FoldableHingeOrientation.Horizontal,
+                state = FoldableHingeState.HalfOpened,
+                occlusionType = FoldableOcclusionType.Full,
+                bounds =
+                    FoldableHingeBounds(
+                        left = 0.dp,
+                        top = 438.dp,
+                        right = 1440.dp,
+                        bottom = 462.dp,
+                        width = 1440.dp,
+                        height = 24.dp,
+                    ),
+                isSeparating = true,
+            ),
+    )
+
 @PreviewTest
 @Preview(name = "Rewind overview book posture", showBackground = true, device = BOOK_FOLDABLE)
 @Composable
@@ -54,9 +77,40 @@ fun A35_PastRewindsBookPosture() {
     BookPostureRewindScene(SharedScreenshotSceneId.PastRewinds)
 }
 
+@PreviewTest
+@Preview(name = "Rewind detail book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A38_RewindDetailBookPosture() {
+    FoldableRewindScene(
+        sceneId = SharedScreenshotSceneId.RewindDetailPopulated,
+        foldableLayoutInfo = bookPostureLayoutInfo,
+    )
+}
+
+@PreviewTest
+@Preview(name = "Rewind detail tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A39_RewindDetailTabletopPosture() {
+    FoldableRewindScene(
+        sceneId = SharedScreenshotSceneId.RewindDetailPopulated,
+        foldableLayoutInfo = tabletopPostureLayoutInfo,
+    )
+}
+
 @Composable
 private fun BookPostureRewindScene(sceneId: SharedScreenshotSceneId) {
-    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+    FoldableRewindScene(
+        sceneId = sceneId,
+        foldableLayoutInfo = bookPostureLayoutInfo,
+    )
+}
+
+@Composable
+private fun FoldableRewindScene(
+    sceneId: SharedScreenshotSceneId,
+    foldableLayoutInfo: FoldableLayoutInfo,
+) {
+    provideFoldableLayoutInfo(foldableLayoutInfo) {
         ScreenshotTheme {
             SharedScreenshotScene(sceneId)
         }
