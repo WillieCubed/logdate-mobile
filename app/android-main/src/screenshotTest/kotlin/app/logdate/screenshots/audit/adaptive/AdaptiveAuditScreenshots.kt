@@ -15,6 +15,7 @@ import app.logdate.feature.journals.ui.JournalLayoutMode
 import app.logdate.feature.journals.ui.JournalListItemUiState
 import app.logdate.feature.journals.ui.JournalSortOption
 import app.logdate.feature.journals.ui.JournalsOverviewScreenContent
+import app.logdate.feature.journals.ui.creation.JournalCreationScreenContent
 import app.logdate.feature.journals.ui.detail.EntryDisplayData
 import app.logdate.feature.journals.ui.detail.JournalDetailScreenContent
 import app.logdate.feature.journals.ui.detail.JournalDetailUiState
@@ -304,6 +305,23 @@ fun A43_EmptyJournalsResponsiveStates() {
             onSortOptionSelected = {},
             onToggleFilter = {},
         )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Journal creation book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A44_JournalCreationBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            JournalCreationScreenContent(
+                onGoBack = {},
+                onNewJournal = {},
+                initialTitle = "Route Screenshot Rollout",
+                selectedNoteIds = setOf(Uuid.parse("00000000-0000-0000-0000-000000000141")),
+                selectedMediaUris = listOf("content://logdate/audit-cover.jpg"),
+            )
+        }
     }
 }
 

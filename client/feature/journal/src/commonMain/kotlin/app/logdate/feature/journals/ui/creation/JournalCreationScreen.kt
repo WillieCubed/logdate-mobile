@@ -46,6 +46,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.platform.rememberLogDateHaptics
 import app.logdate.ui.theme.Spacing
@@ -110,7 +112,6 @@ fun JournalCreationScreenContent(
     val mediaPickerState = rememberMediaPickerLauncher(onMediaSelected = onMediaSelected)
 
     val canFinish = title.isNotBlank()
-    val focusManager = LocalFocusManager.current
     val titleFocusRequester = remember { FocusRequester() }
     val descriptionFocusRequester = remember { FocusRequester() }
 
@@ -135,107 +136,54 @@ fun JournalCreationScreenContent(
             )
         },
     ) { paddingValues ->
-        Column(
+        FoldableBookLayout(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(Spacing.lg),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-            ) {
-                OutlinedTextField(
-                    textStyle = MaterialTheme.typography.headlineMedium,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .focusRequester(titleFocusRequester),
-                    value = title,
-                    label = { Text(stringResource(Res.string.add_a_title)) },
-                    onValueChange = { title = it },
-                    singleLine = false,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                    .padding(paddingValues),
+            minPaneWidth = 320.dp,
+            startPane = {
+                JournalCreationTextFields(
+                    title = title,
+                    onTitleChange = { title = it },
+                    contentDescription = contentDescription,
+                    onDescriptionChange = { contentDescription = it },
+                    canFinish = canFinish,
+                    onFinish = ::handleNewJournal,
+                    titleFocusRequester = titleFocusRequester,
+                    descriptionFocusRequester = descriptionFocusRequester,
+                    modifier = Modifier.fillMaxSize().padding(Spacing.lg),
                 )
-                Column {
-                    Text(stringResource(Res.string.what_is_this_for), style = MaterialTheme.typography.bodyMedium)
-                    OutlinedTextField(
-                        textStyle = MaterialTheme.typography.bodyLarge,
-                        minLines = 3,
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .focusRequester(descriptionFocusRequester),
-                        value = contentDescription,
-                        placeholder = { Text(stringResource(Res.string.description)) },
-                        label = { },
-                        onValueChange = { contentDescription = it },
-                        singleLine = false,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions =
-                            KeyboardActions(
-                                onDone = {
-                                    focusManager.clearFocus()
-                                    if (canFinish) handleNewJournal()
-                                },
-                            ),
-                    )
-                }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Text(stringResource(Res.string.add_memories), style = MaterialTheme.typography.labelMedium)
-                    ContainerButton(
-                        onClick = { mediaPickerState.launchPicker() },
-                        icon = {
-                            if (selectedMediaUris.isNotEmpty()) {
-                                Icon(Icons.Default.Check, contentDescription = null)
-                            } else {
-                                Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
-                            }
-                        },
-                        label =
-                            if (selectedMediaUris.isNotEmpty()) {
-                                stringResource(Res.string.media_selection_count, selectedMediaUris.size)
-                            } else {
-                                stringResource(Res.string.add_media_label)
-                            },
-                        description = stringResource(Res.string.add_media_description),
-                    )
-                    ContainerButton(
-                        onClick = { showNotePicker = true },
-                        icon = {
-                            if (selectedNoteIds.isNotEmpty()) {
-                                Icon(Icons.Default.Check, contentDescription = null)
-                            } else {
-                                Icon(painterResource(Res.drawable.note_stack_add), contentDescription = null)
-                            }
-                        },
-                        label =
-                            if (selectedNoteIds.isNotEmpty()) {
-                                stringResource(Res.string.notes_selected, selectedNoteIds.size)
-                            } else {
-                                stringResource(Res.string.add_text_notes_label)
-                            },
-                        description = stringResource(Res.string.add_text_notes_description),
-                    )
-                }
-            }
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = ::handleNewJournal,
-                enabled = canFinish,
-            ) {
-                Text(stringResource(Res.string.finish))
-            }
-        }
+            },
+            endPane = {
+                JournalCreationMemoryAndFinishPane(
+                    selectedNoteIds = selectedNoteIds,
+                    selectedMediaUris = selectedMediaUris,
+                    onAddMedia = { mediaPickerState.launchPicker() },
+                    onSelectNotes = { showNotePicker = true },
+                    canFinish = canFinish,
+                    onFinish = ::handleNewJournal,
+                    modifier = Modifier.fillMaxSize().padding(Spacing.lg),
+                )
+            },
+            standardContent = {
+                JournalCreationStandardContent(
+                    title = title,
+                    onTitleChange = { title = it },
+                    contentDescription = contentDescription,
+                    onDescriptionChange = { contentDescription = it },
+                    selectedNoteIds = selectedNoteIds,
+                    selectedMediaUris = selectedMediaUris,
+                    onAddMedia = { mediaPickerState.launchPicker() },
+                    onSelectNotes = { showNotePicker = true },
+                    canFinish = canFinish,
+                    onFinish = ::handleNewJournal,
+                    titleFocusRequester = titleFocusRequester,
+                    descriptionFocusRequester = descriptionFocusRequester,
+                    modifier = Modifier.fillMaxSize().padding(Spacing.lg),
+                )
+            },
+        )
     }
 
     if (showNotePicker) {
@@ -245,6 +193,207 @@ fun JournalCreationScreenContent(
             onToggleSelection = onToggleNoteSelection,
             onDismiss = { showNotePicker = false },
         )
+    }
+}
+
+@Composable
+private fun JournalCreationStandardContent(
+    title: String,
+    onTitleChange: (String) -> Unit,
+    contentDescription: String,
+    onDescriptionChange: (String) -> Unit,
+    selectedNoteIds: Set<Uuid>,
+    selectedMediaUris: List<String>,
+    onAddMedia: () -> Unit,
+    onSelectNotes: () -> Unit,
+    canFinish: Boolean,
+    onFinish: () -> Unit,
+    titleFocusRequester: FocusRequester,
+    descriptionFocusRequester: FocusRequester,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            JournalCreationTextFields(
+                title = title,
+                onTitleChange = onTitleChange,
+                contentDescription = contentDescription,
+                onDescriptionChange = onDescriptionChange,
+                canFinish = canFinish,
+                onFinish = onFinish,
+                titleFocusRequester = titleFocusRequester,
+                descriptionFocusRequester = descriptionFocusRequester,
+            )
+            JournalCreationMemorySection(
+                selectedNoteIds = selectedNoteIds,
+                selectedMediaUris = selectedMediaUris,
+                onAddMedia = onAddMedia,
+                onSelectNotes = onSelectNotes,
+            )
+        }
+        FinishJournalButton(
+            canFinish = canFinish,
+            onFinish = onFinish,
+        )
+    }
+}
+
+@Composable
+private fun JournalCreationTextFields(
+    title: String,
+    onTitleChange: (String) -> Unit,
+    contentDescription: String,
+    onDescriptionChange: (String) -> Unit,
+    canFinish: Boolean,
+    onFinish: () -> Unit,
+    titleFocusRequester: FocusRequester,
+    descriptionFocusRequester: FocusRequester,
+    modifier: Modifier = Modifier,
+) {
+    val focusManager = LocalFocusManager.current
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        OutlinedTextField(
+            textStyle = MaterialTheme.typography.headlineMedium,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .focusRequester(titleFocusRequester),
+            value = title,
+            label = { Text(stringResource(Res.string.add_a_title)) },
+            onValueChange = onTitleChange,
+            singleLine = false,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+        )
+        Column {
+            Text(stringResource(Res.string.what_is_this_for), style = MaterialTheme.typography.bodyMedium)
+            OutlinedTextField(
+                textStyle = MaterialTheme.typography.bodyLarge,
+                minLines = 3,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .focusRequester(descriptionFocusRequester),
+                value = contentDescription,
+                placeholder = { Text(stringResource(Res.string.description)) },
+                label = { },
+                onValueChange = onDescriptionChange,
+                singleLine = false,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions =
+                    KeyboardActions(
+                        onDone = {
+                            focusManager.clearFocus()
+                            if (canFinish) onFinish()
+                        },
+                    ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun JournalCreationMemoryAndFinishPane(
+    selectedNoteIds: Set<Uuid>,
+    selectedMediaUris: List<String>,
+    onAddMedia: () -> Unit,
+    onSelectNotes: () -> Unit,
+    canFinish: Boolean,
+    onFinish: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        JournalCreationMemorySection(
+            selectedNoteIds = selectedNoteIds,
+            selectedMediaUris = selectedMediaUris,
+            onAddMedia = onAddMedia,
+            onSelectNotes = onSelectNotes,
+        )
+        FinishJournalButton(
+            canFinish = canFinish,
+            onFinish = onFinish,
+        )
+    }
+}
+
+@Composable
+private fun JournalCreationMemorySection(
+    selectedNoteIds: Set<Uuid>,
+    selectedMediaUris: List<String>,
+    onAddMedia: () -> Unit,
+    onSelectNotes: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Text(stringResource(Res.string.add_memories), style = MaterialTheme.typography.labelMedium)
+        ContainerButton(
+            onClick = onAddMedia,
+            icon = {
+                if (selectedMediaUris.isNotEmpty()) {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                } else {
+                    Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
+                }
+            },
+            label =
+                if (selectedMediaUris.isNotEmpty()) {
+                    stringResource(Res.string.media_selection_count, selectedMediaUris.size)
+                } else {
+                    stringResource(Res.string.add_media_label)
+                },
+            description = stringResource(Res.string.add_media_description),
+        )
+        ContainerButton(
+            onClick = onSelectNotes,
+            icon = {
+                if (selectedNoteIds.isNotEmpty()) {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                } else {
+                    Icon(painterResource(Res.drawable.note_stack_add), contentDescription = null)
+                }
+            },
+            label =
+                if (selectedNoteIds.isNotEmpty()) {
+                    stringResource(Res.string.notes_selected, selectedNoteIds.size)
+                } else {
+                    stringResource(Res.string.add_text_notes_label)
+                },
+            description = stringResource(Res.string.add_text_notes_description),
+        )
+    }
+}
+
+@Composable
+private fun FinishJournalButton(
+    canFinish: Boolean,
+    onFinish: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Button(
+        modifier = modifier.fillMaxWidth(),
+        onClick = onFinish,
+        enabled = canFinish,
+    ) {
+        Text(stringResource(Res.string.finish))
     }
 }
 
