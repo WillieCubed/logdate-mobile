@@ -4,8 +4,11 @@ package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -20,8 +23,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.recommendation.AmbientPromptTime
 import app.logdate.client.domain.recommendation.MemoriesSettings
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.PrimaryTogglePill
 import app.logdate.ui.common.SettingsScaffold
@@ -120,140 +125,76 @@ fun RecommendationSettingsContent(
 ) {
     var editingPromptTime by remember { mutableStateOf<PromptTimeSelection?>(null) }
 
-    SettingsScaffold(
-        title = stringResource(Res.string.recommendations),
-        onBack = onBack,
-        modifier = modifier,
-    ) {
-        // Description
-        item {
-            Text(
-                text = stringResource(Res.string.recommendations_detail_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
-
-        // Primary toggle in a colored pill
-        item {
-            PrimaryTogglePill(
-                label = stringResource(Res.string.use_recommendations),
-                checked = settings.contextualRecommendationsEnabled,
-                onCheckedChange = onToggleContextualRecommendations,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
-
-        // Sub-options (only meaningful when recommendations are enabled)
-        if (settings.contextualRecommendationsEnabled) {
-            item {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Spacing.lg),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Text(
-                        text = stringResource(Res.string.ambient_prompts),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(vertical = Spacing.sm),
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                RecommendationOverviewSection(
+                    settings = settings,
+                    onToggleContextualRecommendations = onToggleContextualRecommendations,
+                )
+            }
+        },
+        endPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+            ) {
+                RecommendationOptionsSection(
+                    settings = settings,
+                    onToggleAmbientPrompts = onToggleAmbientPrompts,
+                    onToggleCaptureNudges = onToggleCaptureNudges,
+                    onToggleDraftRescue = onToggleDraftRescue,
+                    onToggleMemoryRecallNotifications = onToggleMemoryRecallNotifications,
+                    onToggleMorningPrompt = onToggleMorningPrompt,
+                    onToggleEveningPrompt = onToggleEveningPrompt,
+                    onEditPromptTime = { editingPromptTime = it },
+                    onToggleSmartRecall = onToggleSmartRecall,
+                )
+            }
+        },
+        standardContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.recommendations),
+                onBack = onBack,
+                modifier = modifier,
+            ) {
+                item {
+                    RecommendationOverviewSection(
+                        settings = settings,
+                        onToggleContextualRecommendations = onToggleContextualRecommendations,
                     )
+                }
 
-                    MaterialContainer {
-                        ToggleSettingsItem(
-                            title = stringResource(Res.string.ambient_prompts),
-                            description = stringResource(Res.string.ambient_prompts_description),
-                            checked = settings.ambientPromptsEnabled,
-                            onCheckedChange = onToggleAmbientPrompts,
-                        )
-
-                        if (settings.ambientPromptsEnabled) {
-                            ToggleSettingsItem(
-                                title = stringResource(Res.string.capture_nudges),
-                                description = stringResource(Res.string.capture_nudges_description),
-                                checked = settings.captureNudgesEnabled,
-                                onCheckedChange = onToggleCaptureNudges,
-                            )
-                            ToggleSettingsItem(
-                                title = stringResource(Res.string.draft_rescue),
-                                description = stringResource(Res.string.draft_rescue_description),
-                                checked = settings.draftRescueEnabled,
-                                onCheckedChange = onToggleDraftRescue,
-                            )
-                            ToggleSettingsItem(
-                                title = stringResource(Res.string.memory_recall_notifications),
-                                description = stringResource(Res.string.memory_recall_notifications_description),
-                                checked = settings.memoryRecallNotificationsEnabled,
-                                onCheckedChange = onToggleMemoryRecallNotifications,
-                            )
-                        }
-                    }
-
-                    if (settings.ambientPromptsEnabled && settings.captureNudgesEnabled) {
-                        Text(
-                            text = stringResource(Res.string.prompt_schedule),
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(vertical = Spacing.sm),
-                        )
-
-                        MaterialContainer {
-                            ToggleSettingsItem(
-                                title = stringResource(Res.string.morning_prompt),
-                                description = stringResource(Res.string.morning_prompt_description),
-                                checked = settings.morningPromptEnabled,
-                                onCheckedChange = onToggleMorningPrompt,
-                            )
-                            SimpleSettingsItem(
-                                title = stringResource(Res.string.morning_prompt_time),
-                                description = stringResource(Res.string.morning_prompt_time_description),
-                                onClick = { editingPromptTime = PromptTimeSelection.MORNING },
-                            ) {
-                                Text(
-                                    text = formatPromptTime(settings.morningPromptTime),
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
-                            }
-
-                            ToggleSettingsItem(
-                                title = stringResource(Res.string.evening_prompt),
-                                description = stringResource(Res.string.evening_prompt_description),
-                                checked = settings.eveningPromptEnabled,
-                                onCheckedChange = onToggleEveningPrompt,
-                            )
-                            SimpleSettingsItem(
-                                title = stringResource(Res.string.evening_prompt_time),
-                                description = stringResource(Res.string.evening_prompt_time_description),
-                                onClick = { editingPromptTime = PromptTimeSelection.EVENING },
-                            ) {
-                                Text(
-                                    text = formatPromptTime(settings.eveningPromptTime),
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
-                            }
-                        }
-                    }
-
-                    Text(
-                        text = stringResource(Res.string.recall_options),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(vertical = Spacing.sm),
-                    )
-
-                    MaterialContainer {
-                        ToggleSettingsItem(
-                            title = stringResource(Res.string.smart_recall),
-                            description =
-                                stringResource(Res.string.smart_recall_description),
-                            checked = settings.aiRecallEnabled,
-                            onCheckedChange = onToggleSmartRecall,
+                if (settings.contextualRecommendationsEnabled) {
+                    item {
+                        RecommendationOptionsSection(
+                            settings = settings,
+                            onToggleAmbientPrompts = onToggleAmbientPrompts,
+                            onToggleCaptureNudges = onToggleCaptureNudges,
+                            onToggleDraftRescue = onToggleDraftRescue,
+                            onToggleMemoryRecallNotifications = onToggleMemoryRecallNotifications,
+                            onToggleMorningPrompt = onToggleMorningPrompt,
+                            onToggleEveningPrompt = onToggleEveningPrompt,
+                            onEditPromptTime = { editingPromptTime = it },
+                            onToggleSmartRecall = onToggleSmartRecall,
                         )
                     }
                 }
             }
-        }
-    }
+        },
+    )
 
     val selectedTime =
         when (editingPromptTime) {
@@ -275,6 +216,153 @@ fun RecommendationSettingsContent(
             },
             onDismiss = { editingPromptTime = null },
         )
+    }
+}
+
+@Composable
+private fun RecommendationOverviewSection(
+    settings: MemoriesSettings,
+    onToggleContextualRecommendations: (Boolean) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        Text(
+            text = stringResource(Res.string.recommendations_detail_description),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        PrimaryTogglePill(
+            label = stringResource(Res.string.use_recommendations),
+            checked = settings.contextualRecommendationsEnabled,
+            onCheckedChange = onToggleContextualRecommendations,
+        )
+    }
+}
+
+@Composable
+private fun RecommendationOptionsSection(
+    settings: MemoriesSettings,
+    onToggleAmbientPrompts: (Boolean) -> Unit,
+    onToggleCaptureNudges: (Boolean) -> Unit,
+    onToggleDraftRescue: (Boolean) -> Unit,
+    onToggleMemoryRecallNotifications: (Boolean) -> Unit,
+    onToggleMorningPrompt: (Boolean) -> Unit,
+    onToggleEveningPrompt: (Boolean) -> Unit,
+    onEditPromptTime: (PromptTimeSelection) -> Unit,
+    onToggleSmartRecall: (Boolean) -> Unit,
+) {
+    if (!settings.contextualRecommendationsEnabled) {
+        return
+    }
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Text(
+            text = stringResource(Res.string.ambient_prompts),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(vertical = Spacing.sm),
+        )
+
+        MaterialContainer {
+            ToggleSettingsItem(
+                title = stringResource(Res.string.ambient_prompts),
+                description = stringResource(Res.string.ambient_prompts_description),
+                checked = settings.ambientPromptsEnabled,
+                onCheckedChange = onToggleAmbientPrompts,
+            )
+
+            if (settings.ambientPromptsEnabled) {
+                ToggleSettingsItem(
+                    title = stringResource(Res.string.capture_nudges),
+                    description = stringResource(Res.string.capture_nudges_description),
+                    checked = settings.captureNudgesEnabled,
+                    onCheckedChange = onToggleCaptureNudges,
+                )
+                ToggleSettingsItem(
+                    title = stringResource(Res.string.draft_rescue),
+                    description = stringResource(Res.string.draft_rescue_description),
+                    checked = settings.draftRescueEnabled,
+                    onCheckedChange = onToggleDraftRescue,
+                )
+                ToggleSettingsItem(
+                    title = stringResource(Res.string.memory_recall_notifications),
+                    description = stringResource(Res.string.memory_recall_notifications_description),
+                    checked = settings.memoryRecallNotificationsEnabled,
+                    onCheckedChange = onToggleMemoryRecallNotifications,
+                )
+            }
+        }
+
+        if (settings.ambientPromptsEnabled && settings.captureNudgesEnabled) {
+            Text(
+                text = stringResource(Res.string.prompt_schedule),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(vertical = Spacing.sm),
+            )
+
+            MaterialContainer {
+                ToggleSettingsItem(
+                    title = stringResource(Res.string.morning_prompt),
+                    description = stringResource(Res.string.morning_prompt_description),
+                    checked = settings.morningPromptEnabled,
+                    onCheckedChange = onToggleMorningPrompt,
+                )
+                SimpleSettingsItem(
+                    title = stringResource(Res.string.morning_prompt_time),
+                    description = stringResource(Res.string.morning_prompt_time_description),
+                    onClick = { onEditPromptTime(PromptTimeSelection.MORNING) },
+                ) {
+                    Text(
+                        text = formatPromptTime(settings.morningPromptTime),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+
+                ToggleSettingsItem(
+                    title = stringResource(Res.string.evening_prompt),
+                    description = stringResource(Res.string.evening_prompt_description),
+                    checked = settings.eveningPromptEnabled,
+                    onCheckedChange = onToggleEveningPrompt,
+                )
+                SimpleSettingsItem(
+                    title = stringResource(Res.string.evening_prompt_time),
+                    description = stringResource(Res.string.evening_prompt_time_description),
+                    onClick = { onEditPromptTime(PromptTimeSelection.EVENING) },
+                ) {
+                    Text(
+                        text = formatPromptTime(settings.eveningPromptTime),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+            }
+        }
+
+        Text(
+            text = stringResource(Res.string.recall_options),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(vertical = Spacing.sm),
+        )
+
+        MaterialContainer {
+            ToggleSettingsItem(
+                title = stringResource(Res.string.smart_recall),
+                description =
+                    stringResource(Res.string.smart_recall_description),
+                checked = settings.aiRecallEnabled,
+                onCheckedChange = onToggleSmartRecall,
+            )
+        }
     }
 }
 

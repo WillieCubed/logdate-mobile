@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CloudDone
@@ -34,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
@@ -122,50 +125,117 @@ fun SyncSettingsContent(
     quotaUsage: StorageQuotaUi,
     isQuotaAvailable: Boolean,
     snackbarHostState: SnackbarHostState,
+    modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(
-        title = stringResource(Res.string.sync_and_backup),
-        onBack = onBack,
-        snackbarHostState = snackbarHostState,
-    ) {
-        if (!isAuthenticated) {
-            item {
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            if (!isAuthenticated) {
                 SyncPromoContent(
                     onCreateAccount = onNavigateToCloudAccountCreation,
                     onSignIn = onNavigateToSignIn,
-                    modifier = Modifier.fillParentMaxHeight(),
+                    modifier = Modifier.fillMaxSize(),
                 )
-            }
-        } else {
-            if (isQuotaAvailable) {
-                item {
-                    QuotaUsageBlock(
-                        quotaUsage = quotaUsage,
+            } else {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(vertical = Spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+                ) {
+                    if (isQuotaAvailable) {
+                        QuotaUsageBlock(
+                            quotaUsage = quotaUsage,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+
+                    CloudSyncSection(
+                        syncStatus = syncStatus,
+                        onSyncNow = onSyncNow,
+                        isBackgroundSyncEnabled = isBackgroundSyncEnabled,
+                        onBackgroundSyncEnabledChange = onBackgroundSyncEnabledChange,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
             }
-
-            item {
-                CloudSyncSection(
-                    syncStatus = syncStatus,
-                    onSyncNow = onSyncNow,
-                    isBackgroundSyncEnabled = isBackgroundSyncEnabled,
-                    onBackgroundSyncEnabledChange = onBackgroundSyncEnabledChange,
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
+        },
+        endPane = {
+            if (!isAuthenticated) {
+                SyncFeatureList(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
                 )
+            } else {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(vertical = Spacing.lg),
+                ) {
+                    SyncConflictsSection(
+                        conflictsState = conflictsState,
+                        onClearConflicts = onClearConflicts,
+                        onRefreshConflicts = onRefreshConflicts,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
             }
+        },
+        standardContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.sync_and_backup),
+                onBack = onBack,
+                snackbarHostState = snackbarHostState,
+                modifier = modifier,
+            ) {
+                if (!isAuthenticated) {
+                    item {
+                        SyncPromoContent(
+                            onCreateAccount = onNavigateToCloudAccountCreation,
+                            onSignIn = onNavigateToSignIn,
+                            modifier = Modifier.fillParentMaxHeight(),
+                        )
+                    }
+                } else {
+                    if (isQuotaAvailable) {
+                        item {
+                            QuotaUsageBlock(
+                                quotaUsage = quotaUsage,
+                                modifier = Modifier.padding(horizontal = Spacing.lg),
+                            )
+                        }
+                    }
 
-            item {
-                SyncConflictsSection(
-                    conflictsState = conflictsState,
-                    onClearConflicts = onClearConflicts,
-                    onRefreshConflicts = onRefreshConflicts,
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                )
+                    item {
+                        CloudSyncSection(
+                            syncStatus = syncStatus,
+                            onSyncNow = onSyncNow,
+                            isBackgroundSyncEnabled = isBackgroundSyncEnabled,
+                            onBackgroundSyncEnabledChange = onBackgroundSyncEnabledChange,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+
+                    item {
+                        SyncConflictsSection(
+                            conflictsState = conflictsState,
+                            onClearConflicts = onClearConflicts,
+                            onRefreshConflicts = onRefreshConflicts,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+                }
             }
-        }
-    }
+        },
+    )
 }
 
 @Composable
@@ -200,20 +270,7 @@ private fun SyncPromoContent(
 
         Spacer(modifier = Modifier.height(Spacing.xl))
 
-        SyncFeatureRow(
-            icon = Icons.Rounded.CloudDone,
-            text = stringResource(Res.string.sync_feature_backup),
-        )
-        Spacer(modifier = Modifier.height(Spacing.md))
-        SyncFeatureRow(
-            icon = Icons.Rounded.Devices,
-            text = stringResource(Res.string.sync_feature_access),
-        )
-        Spacer(modifier = Modifier.height(Spacing.md))
-        SyncFeatureRow(
-            icon = Icons.Rounded.Sync,
-            text = stringResource(Res.string.sync_feature_sync),
-        )
+        SyncFeatureList()
 
         Spacer(modifier = Modifier.height(Spacing.xl))
 
@@ -233,6 +290,27 @@ private fun SyncPromoContent(
                 Text(stringResource(Res.string.sign_in))
             }
         }
+    }
+}
+
+@Composable
+private fun SyncFeatureList(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        SyncFeatureRow(
+            icon = Icons.Rounded.CloudDone,
+            text = stringResource(Res.string.sync_feature_backup),
+        )
+        SyncFeatureRow(
+            icon = Icons.Rounded.Devices,
+            text = stringResource(Res.string.sync_feature_access),
+        )
+        SyncFeatureRow(
+            icon = Icons.Rounded.Sync,
+            text = stringResource(Res.string.sync_feature_sync),
+        )
     }
 }
 

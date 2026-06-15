@@ -9,12 +9,16 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.Celebration
@@ -42,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.core.profile.ui.ProfileViewModel
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.SimpleSettingsItem
@@ -119,130 +124,71 @@ fun BirthdaySettingsContent(
         }
     }
 
-    SettingsScaffold(
-        title = stringResource(Res.string.birthday),
-        onBack = onBack,
-        modifier = modifier,
-    ) {
-        // Hero graphic
-        item {
-            Box(
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(
                 modifier =
                     Modifier
-                        .fillMaxWidth()
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
                         .padding(vertical = Spacing.lg),
-                contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(96.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.tertiary,
-                                    ),
-                                ),
-                            ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Cake,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(48.dp),
+                BirthdayHero()
+                BirthdayDescription()
+            }
+        },
+        endPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+            ) {
+                BirthdaySettingSection(
+                    formattedBirthday = formattedBirthday,
+                    onOpenDatePicker = { showDatePicker = true },
+                )
+                BirthdayAgeMessage(
+                    hasBirthday = hasBirthday,
+                    ageMessage = ageMessage,
+                )
+            }
+        },
+        standardContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.birthday),
+                onBack = onBack,
+                modifier = modifier,
+            ) {
+                item {
+                    BirthdayHero()
+                }
+
+                item {
+                    BirthdayDescription()
+                }
+
+                item {
+                    BirthdaySettingSection(
+                        formattedBirthday = formattedBirthday,
+                        onOpenDatePicker = { showDatePicker = true },
                     )
                 }
-            }
-        }
 
-        // Description
-        item {
-            Text(
-                text = stringResource(Res.string.birthday_detail_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
-
-        // Birthday setting
-        item {
-            SettingsSection(
-                title = stringResource(Res.string.your_birthday),
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            ) {
-                val birthdayDescription =
-                    formattedBirthday
-                        ?: stringResource(Res.string.birthday_not_set)
-                SimpleSettingsItem(
-                    title = stringResource(Res.string.birthday),
-                    description = birthdayDescription,
-                    onClick = { showDatePicker = true },
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DateRange,
-                        contentDescription = null,
-                    )
-                }
-            }
-        }
-
-        // Age message (only when birthday is set)
-        if (hasBirthday) {
-            item {
-                AnimatedVisibility(
-                    visible = ageMessage.isNotEmpty(),
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically(),
-                ) {
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = Spacing.lg),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        Brush.linearGradient(
-                                            listOf(
-                                                MaterialTheme.colorScheme.primary,
-                                                MaterialTheme.colorScheme.tertiary,
-                                            ),
-                                        ),
-                                    ),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Celebration,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.size(Spacing.md))
-
-                        Text(
-                            text = ageMessage,
-                            style =
-                                MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                ),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                if (hasBirthday) {
+                    item {
+                        BirthdayAgeMessage(
+                            hasBirthday = hasBirthday,
+                            ageMessage = ageMessage,
                         )
                     }
                 }
             }
-        }
-    }
+        },
+    )
 
     // Date picker dialog
     if (showDatePicker) {
@@ -272,6 +218,129 @@ fun BirthdaySettingsContent(
             },
         ) {
             DatePicker(state = datePickerState)
+        }
+    }
+}
+
+@Composable
+private fun BirthdayHero() {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = Spacing.lg),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(96.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.tertiary,
+                            ),
+                        ),
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Cake,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(48.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun BirthdayDescription() {
+    Text(
+        text = stringResource(Res.string.birthday_detail_description),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = Spacing.lg),
+    )
+}
+
+@Composable
+private fun BirthdaySettingSection(
+    formattedBirthday: String?,
+    onOpenDatePicker: () -> Unit,
+) {
+    SettingsSection(
+        title = stringResource(Res.string.your_birthday),
+        modifier = Modifier.padding(horizontal = Spacing.lg),
+    ) {
+        val birthdayDescription =
+            formattedBirthday
+                ?: stringResource(Res.string.birthday_not_set)
+        SimpleSettingsItem(
+            title = stringResource(Res.string.birthday),
+            description = birthdayDescription,
+            onClick = onOpenDatePicker,
+        ) {
+            Icon(
+                imageVector = Icons.Default.DateRange,
+                contentDescription = null,
+            )
+        }
+    }
+}
+
+@Composable
+private fun BirthdayAgeMessage(
+    hasBirthday: Boolean,
+    ageMessage: String,
+) {
+    AnimatedVisibility(
+        visible = hasBirthday && ageMessage.isNotEmpty(),
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically(),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.lg),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.primary,
+                                    MaterialTheme.colorScheme.tertiary,
+                                ),
+                            ),
+                        ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Celebration,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+
+            Spacer(modifier = Modifier.size(Spacing.md))
+
+            Text(
+                text = ageMessage,
+                style =
+                    MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                    ),
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
         }
     }
 }
