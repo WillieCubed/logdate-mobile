@@ -52,6 +52,8 @@ import app.logdate.client.domain.dayboundary.HealthConnectMissingRequirement
 import app.logdate.client.domain.dayboundary.HealthConnectStatus
 import app.logdate.client.domain.dayboundary.reduceHealthConnectGateState
 import app.logdate.client.permissions.rememberHealthConnectPermissionState
+import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import io.github.aakira.napier.Napier
@@ -276,6 +278,252 @@ fun OnboardingDayBoundariesContent(
             else -> stringResource(Res.string.onboarding_day_boundaries_status_checking_description)
         }
 
+    DayBoundariesAdaptiveContent(
+        gateState = gateState,
+        onBack = onBack,
+        onEnable = onEnable,
+        onSkip = onSkip,
+        isSaving = isSaving,
+        isRequestInFlight = isRequestInFlight,
+        errorMessage = errorMessage,
+        statusTitle = statusTitle,
+        statusDescription = statusDescription,
+        primaryActionLabel = primaryActionLabel,
+    )
+}
+
+@Composable
+private fun DayBoundariesAdaptiveContent(
+    gateState: HealthConnectGateState,
+    onBack: () -> Unit,
+    onEnable: () -> Unit,
+    onSkip: () -> Unit,
+    isSaving: Boolean,
+    isRequestInFlight: Boolean,
+    errorMessage: String?,
+    statusTitle: String,
+    statusDescription: String,
+    primaryActionLabel: String,
+) {
+    FoldableTabletopLayout(
+        modifier = Modifier.fillMaxSize().testTag(ONBOARDING_DAY_BOUNDARIES_ROOT_TAG),
+        minPaneHeight = 260.dp,
+        topPane = {
+            DayBoundariesInfoPane(
+                onBack = onBack,
+                statusTitle = statusTitle,
+                statusDescription = statusDescription,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        bottomPane = {
+            DayBoundariesActionPane(
+                gateState = gateState,
+                onEnable = onEnable,
+                onSkip = onSkip,
+                isSaving = isSaving,
+                isRequestInFlight = isRequestInFlight,
+                errorMessage = errorMessage,
+                primaryActionLabel = primaryActionLabel,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        fallback = {
+            FoldableBookLayout(
+                modifier = Modifier.fillMaxSize().testTag(ONBOARDING_DAY_BOUNDARIES_ROOT_TAG),
+                minPaneWidth = 320.dp,
+                startPane = {
+                    DayBoundariesInfoPane(
+                        onBack = onBack,
+                        statusTitle = statusTitle,
+                        statusDescription = statusDescription,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+                endPane = {
+                    DayBoundariesActionPane(
+                        gateState = gateState,
+                        onEnable = onEnable,
+                        onSkip = onSkip,
+                        isSaving = isSaving,
+                        isRequestInFlight = isRequestInFlight,
+                        errorMessage = errorMessage,
+                        primaryActionLabel = primaryActionLabel,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+                standardContent = {
+                    DayBoundariesCompactContent(
+                        onBack = onBack,
+                        onEnable = onEnable,
+                        onSkip = onSkip,
+                        isSaving = isSaving,
+                        isRequestInFlight = isRequestInFlight,
+                        errorMessage = errorMessage,
+                        statusTitle = statusTitle,
+                        statusDescription = statusDescription,
+                        primaryActionLabel = primaryActionLabel,
+                    )
+                },
+            )
+        },
+    )
+}
+
+@Composable
+private fun DayBoundariesInfoPane(
+    onBack: () -> Unit,
+    statusTitle: String,
+    statusDescription: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
+            horizontalArrangement = Arrangement.Start,
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
+            }
+        }
+        Column(
+            modifier = Modifier.widthIn(max = 444.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text(
+                stringResource(Res.string.onboarding_day_boundaries_title),
+                style = MaterialTheme.typography.headlineLarge,
+                modifier = Modifier.padding(bottom = Spacing.md),
+            )
+            Text(
+                stringResource(Res.string.onboarding_day_boundaries_body),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            OverviewItem(
+                title = stringResource(Res.string.onboarding_day_boundaries_card_title),
+                description = stringResource(Res.string.onboarding_day_boundaries_card_description),
+                icon = {
+                    Icon(Icons.Rounded.Bedtime, contentDescription = null)
+                },
+            )
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            ) {
+                Column(modifier = Modifier.padding(Spacing.lg)) {
+                    Text(
+                        text = statusTitle,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    Text(
+                        text = statusDescription,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            ) {
+                Column(modifier = Modifier.padding(Spacing.lg)) {
+                    Text(
+                        text = stringResource(Res.string.onboarding_day_boundaries_privacy_title),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    Text(
+                        text = stringResource(Res.string.onboarding_day_boundaries_privacy),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DayBoundariesActionPane(
+    gateState: HealthConnectGateState,
+    onEnable: () -> Unit,
+    onSkip: () -> Unit,
+    isSaving: Boolean,
+    isRequestInFlight: Boolean,
+    errorMessage: String?,
+    primaryActionLabel: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Button(
+            onClick = onEnable,
+            modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_DAY_BOUNDARIES_ENABLE_TAG),
+            enabled = !isSaving && !isRequestInFlight && gateState.kind != HealthConnectGateKind.CHECKING,
+        ) {
+            if (isSaving || isRequestInFlight) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Text(primaryActionLabel)
+            }
+        }
+        TextButton(
+            onClick = onSkip,
+            modifier = Modifier.testTag(ONBOARDING_DAY_BOUNDARIES_SKIP_TAG),
+            enabled = !isSaving,
+        ) {
+            Text(stringResource(Res.string.onboarding_day_boundaries_not_now))
+        }
+        errorMessage?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DayBoundariesCompactContent(
+    onBack: () -> Unit,
+    onEnable: () -> Unit,
+    onSkip: () -> Unit,
+    isSaving: Boolean,
+    isRequestInFlight: Boolean,
+    errorMessage: String?,
+    statusTitle: String,
+    statusDescription: String,
+    primaryActionLabel: String,
+) {
     Scaffold(
         bottomBar = {
             Box(
@@ -290,7 +538,7 @@ fun OnboardingDayBoundariesContent(
                     Button(
                         onClick = onEnable,
                         modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_DAY_BOUNDARIES_ENABLE_TAG),
-                        enabled = !isSaving && !isRequestInFlight && gateState.kind != HealthConnectGateKind.CHECKING,
+                        enabled = !isSaving && !isRequestInFlight,
                     ) {
                         if (isSaving || isRequestInFlight) {
                             CircularProgressIndicator(

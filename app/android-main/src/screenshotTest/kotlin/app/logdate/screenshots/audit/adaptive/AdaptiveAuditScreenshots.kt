@@ -27,6 +27,8 @@ import app.logdate.feature.core.settings.ui.ServerSelectionState
 import app.logdate.feature.core.profile.ui.ProfileEditState
 import app.logdate.feature.core.profile.ui.ProfileScreenContent
 import app.logdate.feature.core.profile.ui.ProfileUiState
+import app.logdate.client.domain.dayboundary.HealthConnectGateKind
+import app.logdate.client.domain.dayboundary.HealthConnectGateState
 import app.logdate.feature.editor.audio.AudioContext
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
@@ -67,9 +69,13 @@ import app.logdate.feature.journals.ui.share.ShareJournalUiState
 import app.logdate.feature.library.ui.detail.MediaDetailContent
 import app.logdate.feature.library.ui.detail.MediaDetailUiState
 import app.logdate.feature.onboarding.ui.CloudAccountSetupContent
+import app.logdate.feature.onboarding.ui.OnboardingBirthdayContent
 import app.logdate.feature.onboarding.ui.OnboardingCompletionContent
+import app.logdate.feature.onboarding.ui.OnboardingDayBoundariesContent
 import app.logdate.feature.onboarding.ui.OnboardingNotificationsContent
 import app.logdate.feature.onboarding.ui.OnboardingOverviewScreen
+import app.logdate.feature.onboarding.ui.OnboardingLocationContent
+import app.logdate.feature.onboarding.ui.OnboardingRecommendationsContent
 import app.logdate.feature.onboarding.ui.OnboardingStartScreenContent
 import app.logdate.feature.onboarding.ui.PersonalIntroContent
 import app.logdate.feature.onboarding.ui.PersonalIntroStep
@@ -648,6 +654,178 @@ fun A81_OnboardingNotificationsTabletopPosture() {
                 recommendationsEnabled = true,
                 hasDecision = false,
                 hasPermission = false,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun A82_OnboardingBirthdayDefault() {
+    ScreenshotTheme {
+        OnboardingBirthdayContent(
+            onBack = {},
+            onBirthdaySelected = {},
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Onboarding birthday book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A83_OnboardingBirthdayBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            OnboardingBirthdayContent(
+                onBack = {},
+                onBirthdaySelected = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Onboarding birthday tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A84_OnboardingBirthdayTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            OnboardingBirthdayContent(
+                onBack = {},
+                onBirthdaySelected = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun A85_OnboardingRecommendationsDefault() {
+    ScreenshotTheme {
+        OnboardingRecommendationsContent(
+            onBack = {},
+            onKeepOn = {},
+            onTurnOff = {},
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Onboarding recommendations book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A86_OnboardingRecommendationsBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            OnboardingRecommendationsContent(
+                onBack = {},
+                onKeepOn = {},
+                onTurnOff = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Onboarding recommendations tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A87_OnboardingRecommendationsTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            OnboardingRecommendationsContent(
+                onBack = {},
+                onKeepOn = {},
+                onTurnOff = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun A88_OnboardingDayBoundariesDefault() {
+    ScreenshotTheme {
+        OnboardingDayBoundariesContent(
+            gateState = HealthConnectGateState(kind = HealthConnectGateKind.READY),
+            onBack = {},
+            onEnable = {},
+            onSkip = {},
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Onboarding day boundaries book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A89_OnboardingDayBoundariesBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            OnboardingDayBoundariesContent(
+                gateState = HealthConnectGateState(kind = HealthConnectGateKind.READY),
+                onBack = {},
+                onEnable = {},
+                onSkip = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Onboarding day boundaries tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A90_OnboardingDayBoundariesTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            OnboardingDayBoundariesContent(
+                gateState = HealthConnectGateState(kind = HealthConnectGateKind.READY),
+                onBack = {},
+                onEnable = {},
+                onSkip = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun A91_OnboardingLocationDefault() {
+    ScreenshotTheme {
+        OnboardingLocationContent(
+            onBack = {},
+            onEnable = {},
+            onSkip = {},
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Onboarding location book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A92_OnboardingLocationBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            OnboardingLocationContent(
+                onBack = {},
+                onEnable = {},
+                onSkip = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Onboarding location tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A93_OnboardingLocationTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            OnboardingLocationContent(
+                onBack = {},
+                onEnable = {},
+                onSkip = {},
             )
         }
     }
