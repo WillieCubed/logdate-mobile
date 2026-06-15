@@ -38,6 +38,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.onboarding.flow.OnboardingStep
+import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.platform.rememberLogDateHaptics
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
@@ -138,49 +140,121 @@ private fun CompletionStreakContent(onContinue: () -> Unit) {
         modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) { contentPadding ->
-        Box(
+        FoldableTabletopLayout(
             modifier =
                 Modifier
                     .padding(contentPadding)
                     .fillMaxSize(),
-            contentAlignment = Alignment.Center,
+            minPaneHeight = 220.dp,
+            topPane = {
+                CompletionMessagePane(modifier = Modifier.fillMaxSize())
+            },
+            bottomPane = {
+                CompletionActionPane(
+                    onContinue = onContinue,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            },
+            fallback = {
+                FoldableBookLayout(
+                    modifier = Modifier.fillMaxSize(),
+                    minPaneWidth = 320.dp,
+                    startPane = {
+                        CompletionMessagePane(modifier = Modifier.fillMaxSize())
+                    },
+                    endPane = {
+                        CompletionActionPane(
+                            onContinue = onContinue,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    },
+                    standardContent = {
+                        CompletionStreakStandardContent(onContinue = onContinue)
+                    },
+                )
+            },
+        )
+    }
+}
+
+@Composable
+private fun CompletionStreakStandardContent(onContinue: () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        CompletionMessageContent()
+        Button(
+            onContinue,
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(Spacing.lg)
+                    .fillMaxWidth()
+                    .testTag(ONBOARDING_COMPLETION_CONTINUE_TAG),
         ) {
-            Column(
-                modifier =
-                    Modifier
-                        .padding(Spacing.lg)
-                        .widthIn(max = 444.dp),
-                verticalArrangement = Arrangement.spacedBy(48.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(stringResource(Res.string.one_more_thing), style = MaterialTheme.typography.headlineMedium)
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(Spacing.xl),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(
-                        stringResource(Res.string.onboarding_completion_streak_begins),
-                        style = MaterialTheme.typography.headlineMedium,
-                    )
-                    StreakCounterBox()
-                    Text(
-                        stringResource(Res.string.onboarding_completion_streak_encouragement),
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-            Button(
-                onContinue,
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(Spacing.lg)
-                        .fillMaxWidth()
-                        .testTag(ONBOARDING_COMPLETION_CONTINUE_TAG),
-            ) {
-                Text(stringResource(Res.string.action_onboarding_continue))
-            }
+            Text(stringResource(Res.string.action_onboarding_continue))
+        }
+    }
+}
+
+@Composable
+private fun CompletionMessagePane(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.padding(Spacing.lg),
+        contentAlignment = Alignment.Center,
+    ) {
+        CompletionMessageContent()
+    }
+}
+
+@Composable
+private fun CompletionActionPane(
+    onContinue: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.padding(Spacing.lg),
+        contentAlignment = Alignment.Center,
+    ) {
+        Button(
+            onClick = onContinue,
+            modifier =
+                Modifier
+                    .widthIn(max = 444.dp)
+                    .fillMaxWidth()
+                    .testTag(ONBOARDING_COMPLETION_CONTINUE_TAG),
+        ) {
+            Text(stringResource(Res.string.action_onboarding_continue))
+        }
+    }
+}
+
+@Composable
+private fun CompletionMessageContent() {
+    Column(
+        modifier =
+            Modifier
+                .padding(Spacing.lg)
+                .widthIn(max = 444.dp),
+        verticalArrangement = Arrangement.spacedBy(48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(stringResource(Res.string.one_more_thing), style = MaterialTheme.typography.headlineMedium)
+        Column(
+            verticalArrangement = Arrangement.spacedBy(Spacing.xl),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                stringResource(Res.string.onboarding_completion_streak_begins),
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            StreakCounterBox()
+            Text(
+                stringResource(Res.string.onboarding_completion_streak_encouragement),
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }

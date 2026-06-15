@@ -67,6 +67,7 @@ import app.logdate.feature.journals.ui.share.ShareJournalUiState
 import app.logdate.feature.library.ui.detail.MediaDetailContent
 import app.logdate.feature.library.ui.detail.MediaDetailUiState
 import app.logdate.feature.onboarding.ui.CloudAccountSetupContent
+import app.logdate.feature.onboarding.ui.OnboardingCompletionContent
 import app.logdate.feature.onboarding.ui.OnboardingOverviewScreen
 import app.logdate.feature.onboarding.ui.OnboardingStartScreenContent
 import app.logdate.feature.onboarding.ui.PersonalIntroContent
@@ -548,6 +549,52 @@ fun A75_PersonalIntroTabletopPosture() {
                 modifier = Modifier.fillMaxSize(),
                 autoFocusInputs = false,
                 animateStepTransitions = false,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun A76_OnboardingCompletionStreak() {
+    ScreenshotTheme {
+        OnboardingCompletionContent(
+            shouldShowFinish = false,
+            onContinue = {},
+            onFinish = {},
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Onboarding completion book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A77_OnboardingCompletionBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            OnboardingCompletionContent(
+                shouldShowFinish = false,
+                onContinue = {},
+                onFinish = {},
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Onboarding completion tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A78_OnboardingCompletionTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            OnboardingCompletionContent(
+                shouldShowFinish = false,
+                onContinue = {},
+                onFinish = {},
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }
