@@ -55,6 +55,7 @@ kotlin {
             implementation(projects.client.feature.search)
             implementation(projects.client.media)
             implementation(projects.client.repository)
+            implementation(projects.client.sync)
             implementation(projects.client.ui)
 
             implementation(libs.compose.runtime)

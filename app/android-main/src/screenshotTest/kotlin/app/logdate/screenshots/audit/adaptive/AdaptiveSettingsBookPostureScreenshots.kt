@@ -166,6 +166,27 @@ fun A26_AdvancedSettingsBookPosture() {
     BookPostureSettingsScene(SharedScreenshotSceneId.AdvancedSettings)
 }
 
+@PreviewTest
+@Preview(name = "Voice notes settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A27_VoiceNotesSettingsBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.VoiceNotesSettings)
+}
+
+@PreviewTest
+@Preview(name = "Sync settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A28_SyncSettingsBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.SyncSettings)
+}
+
+@PreviewTest
+@Preview(name = "Sync issues book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A29_SyncIssuesBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.SyncIssues)
+}
+
 @Composable
 private fun BookPostureSettingsScene(sceneId: SharedScreenshotSceneId) {
     provideFoldableLayoutInfo(bookPostureLayoutInfo) {

@@ -23,8 +23,12 @@ import app.logdate.client.domain.streak.StreakData
 import app.logdate.client.domain.watch.WatchNotificationSettings
 import app.logdate.client.domain.watch.WatchSyncSettings
 import app.logdate.client.media.MediaObject
+import app.logdate.client.media.audio.download.ModelDownloadStatus
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
+import app.logdate.client.sync.SyncStatus
+import app.logdate.client.sync.conflict.SyncConflictRecord
+import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.feature.core.account.CloudAccountSignInContent
 import app.logdate.feature.core.account.CloudAccountWelcomeContent
 import app.logdate.feature.core.account.PasskeyAccountCreationFinalContent
@@ -49,8 +53,11 @@ import app.logdate.feature.core.settings.ui.SettingsOverviewContent
 import app.logdate.feature.core.settings.ui.StorageCategory
 import app.logdate.feature.core.settings.ui.StorageQuotaUi
 import app.logdate.feature.core.settings.ui.StreakSettingsContent
+import app.logdate.feature.core.settings.ui.SyncSettingsContent
 import app.logdate.feature.core.settings.ui.TimelineSettingsContent
 import app.logdate.feature.core.settings.ui.UserProfile
+import app.logdate.feature.core.settings.ui.VoiceNotesSettingsContent
+import app.logdate.feature.core.settings.ui.VoiceNotesSettingsViewModel
 import app.logdate.feature.core.settings.ui.devices.DeviceInfoUiState
 import app.logdate.feature.core.settings.ui.devices.DevicesScreenContent
 import app.logdate.feature.core.settings.ui.devices.DevicesUiState
@@ -61,6 +68,7 @@ import app.logdate.feature.core.settings.ui.watch.WatchSyncSettingsContent
 import app.logdate.feature.core.settings.ui.watch.WatchTroubleshootingContent
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
+import app.logdate.feature.core.sync.SyncIssuesContent
 import app.logdate.feature.onboarding.ui.MemoriesImportInfoScreen
 import app.logdate.feature.onboarding.ui.MemorySelectionScreen
 import app.logdate.feature.onboarding.ui.MemorySelectionUiState
@@ -137,6 +145,9 @@ enum class SharedScreenshotSceneId(
     PrivacySettings("privacy-settings"),
     DataSettings("data-settings"),
     MemoriesSettings("memories-settings"),
+    VoiceNotesSettings("voice-notes-settings"),
+    SyncSettings("sync-settings"),
+    SyncIssues("sync-issues"),
     DevicesSettings("devices-settings"),
     StreakSettings("streak-settings"),
     TimelineSettings("timeline-settings"),
@@ -711,6 +722,125 @@ object SharedScreenshotCatalog {
                     onAddWidgetToHomeScreen = {},
                     widgetContentTypes = setOf(WidgetContentType.TEXT, WidgetContentType.PHOTOS),
                     onToggleContentType = { _, _ -> },
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.VoiceNotesSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                VoiceNotesSettingsContent(
+                    state =
+                        VoiceNotesSettingsViewModel.UiState(
+                            transcription =
+                                VoiceNotesSettingsViewModel.ModelRowState(
+                                    status = ModelDownloadStatus.Completed,
+                                ),
+                            tagging =
+                                VoiceNotesSettingsViewModel.ModelRowState(
+                                    status =
+                                        ModelDownloadStatus.Downloading(
+                                            bytesDownloaded = 64_000_000,
+                                            totalBytes = 100_000_000,
+                                        ),
+                                ),
+                        ),
+                    onDownloadTranscription = {},
+                    onDownloadTagging = {},
+                    onBack = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.SyncSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                SyncSettingsContent(
+                    onBack = {},
+                    syncStatus =
+                        SyncStatus(
+                            isEnabled = true,
+                            lastSyncTime = baseInstant,
+                            pendingUploads = 2,
+                            isSyncing = false,
+                            hasErrors = true,
+                        ),
+                    isAuthenticated = true,
+                    onSyncNow = {},
+                    isBackgroundSyncEnabled = true,
+                    onBackgroundSyncEnabledChange = {},
+                    onNavigateToCloudAccountCreation = {},
+                    onNavigateToSignIn = {},
+                    conflictsState =
+                        ConflictsState(
+                            conflicts =
+                                listOf(
+                                    SyncConflictRecord(
+                                        id = "conflict-1",
+                                        entityType = "NOTE",
+                                        entityId = "note-2026-06-14",
+                                        localVersion = 4,
+                                        remoteVersion = 5,
+                                        localUpdatedAt = baseInstant.toEpochMilliseconds(),
+                                        remoteUpdatedAt = baseInstant.toEpochMilliseconds(),
+                                        reason = "Remote note changed while local edits were pending.",
+                                        detectedAt = baseInstant.toEpochMilliseconds(),
+                                    ),
+                                    SyncConflictRecord(
+                                        id = "conflict-2",
+                                        entityType = "JOURNAL",
+                                        entityId = "journal-family",
+                                        localVersion = 2,
+                                        remoteVersion = 3,
+                                        localUpdatedAt = baseInstant.toEpochMilliseconds(),
+                                        remoteUpdatedAt = baseInstant.toEpochMilliseconds(),
+                                        reason = "Journal metadata needs review before upload can continue.",
+                                        detectedAt = baseInstant.toEpochMilliseconds(),
+                                    ),
+                                ),
+                        ),
+                    onClearConflicts = {},
+                    onRefreshConflicts = {},
+                    quotaUsage =
+                        StorageQuotaUi(
+                            totalBytes = 5_000_000_000,
+                            usedBytes = 2_650_000_000,
+                            usagePercentage = 0.53f,
+                            categories = emptyList(),
+                            formattedTotal = "5.0 GB",
+                            formattedUsed = "2.65 GB",
+                        ),
+                    isQuotaAvailable = true,
+                    snackbarHostState = remember { SnackbarHostState() },
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.SyncIssues, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                SyncIssuesContent(
+                    records =
+                        listOf(
+                            SyncDeadLetterRecord(
+                                id = "dead-letter-1",
+                                entityType = "NOTE",
+                                entityId = "note-2026-06-14",
+                                operation = "UPLOAD",
+                                retryCount = 3,
+                                lastError = "Server rejected the encrypted payload after the local note was edited offline.",
+                                failedAt = baseInstant.toEpochMilliseconds(),
+                            ),
+                            SyncDeadLetterRecord(
+                                id = "dead-letter-2",
+                                entityType = "MEDIA",
+                                entityId = "media-summer-video",
+                                operation = "DOWNLOAD",
+                                retryCount = 2,
+                                lastError = "Network timed out while fetching the original video attachment.",
+                                failedAt = baseInstant.toEpochMilliseconds(),
+                            ),
+                            SyncDeadLetterRecord(
+                                id = "dead-letter-3",
+                                entityType = "JOURNAL",
+                                entityId = "journal-family",
+                                operation = "UPLOAD",
+                                retryCount = 1,
+                                lastError = "Remote journal version changed before this update could be committed.",
+                                failedAt = baseInstant.toEpochMilliseconds(),
+                            ),
+                        ),
+                    onRetry = {},
+                    onDiscard = {},
+                    onGoBack = {},
                 )
             },
             sharedScene(SharedScreenshotSceneId.DevicesSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {

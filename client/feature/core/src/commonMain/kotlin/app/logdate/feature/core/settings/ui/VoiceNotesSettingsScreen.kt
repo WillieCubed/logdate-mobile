@@ -65,7 +65,7 @@ fun VoiceNotesSettingsScreen(
 }
 
 @Composable
-internal fun VoiceNotesSettingsContent(
+fun VoiceNotesSettingsContent(
     state: VoiceNotesSettingsViewModel.UiState,
     onDownloadTranscription: () -> Unit,
     onDownloadTagging: () -> Unit,
