@@ -72,6 +72,7 @@ import app.logdate.feature.onboarding.ui.PersonalIntroStep
 import app.logdate.feature.onboarding.ui.PersonalIntroUiState
 import app.logdate.feature.search.ui.SearchScreenContent
 import app.logdate.feature.search.ui.SearchScreenState
+import app.logdate.feature.timeline.ui.details.TimelineDayDetailPanel
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.screenshots.components.library.LibraryScreenshotData
@@ -89,7 +90,15 @@ import app.logdate.ui.foldable.provideFoldableLayoutInfo
 import app.logdate.ui.audio.AudioPlaybackDisplayInfo
 import app.logdate.ui.audio.AudioPlaybackState
 import app.logdate.ui.audio.LocalAudioPlaybackState
+import app.logdate.ui.location.PlaceUiState
+import app.logdate.ui.timeline.AudioNoteUiState
+import app.logdate.ui.timeline.DayEventUiState
+import app.logdate.ui.timeline.ImageNoteUiState
+import app.logdate.ui.timeline.TextNoteUiState
+import app.logdate.ui.timeline.TimelineDayUiState
+import app.logdate.ui.timeline.VideoNoteUiState
 import com.android.tools.screenshot.PreviewTest
+import kotlinx.datetime.LocalDate
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
@@ -260,6 +269,69 @@ private val auditAudioPlaybackState =
                 title = "Audio note",
                 subtitle = "3:02",
                 accentColor = 0xFFE8A044,
+            ),
+    )
+
+private val auditTimelineDayState =
+    TimelineDayUiState(
+        summary =
+            "Closed the adaptive audit gaps that were still assuming a phone-width canvas, then reviewed " +
+                "the foldable screenshots before recording a short follow-up note.",
+        date = LocalDate(2025, 2, 20),
+        notes =
+            listOf(
+                TextNoteUiState(
+                    noteId = Uuid.parse("00000000-0000-0000-0000-000000000301"),
+                    text =
+                        "Timeline detail needs room for a readable daily summary and the mixed notes " +
+                            "that explain what happened. Book posture keeps those jobs on separate panes.",
+                    timestamp = ScreenshotTestData.baseInstant,
+                ),
+                ImageNoteUiState(
+                    noteId = Uuid.parse("00000000-0000-0000-0000-000000000302"),
+                    uri = SAMPLE_IMAGE_URI,
+                    timestamp = ScreenshotTestData.baseInstant - 28.minutes,
+                    caption = "Reference capture for the layout pass.",
+                ),
+                AudioNoteUiState(
+                    noteId = Uuid.parse("00000000-0000-0000-0000-000000000303"),
+                    uri = "preview://audio",
+                    timestamp = ScreenshotTestData.baseInstant - 48.minutes,
+                    duration = 93_000L,
+                ),
+                VideoNoteUiState(
+                    noteId = Uuid.parse("00000000-0000-0000-0000-000000000304"),
+                    uri = SAMPLE_VIDEO_URI,
+                    thumbnailUri = SAMPLE_IMAGE_URI,
+                    timestamp = ScreenshotTestData.baseInstant - 67.minutes,
+                    duration = 61_000L,
+                    caption = "Playback review",
+                ),
+            ),
+        events =
+            listOf(
+                DayEventUiState(
+                    eventId = "adaptive-review",
+                    title = "Adaptive QA review",
+                    description = "Checked the timeline, editor, media, and rewind surfaces against the foldable audit.",
+                    start = ScreenshotTestData.baseInstant - 2.hours,
+                    end = ScreenshotTestData.baseInstant - 1.hours,
+                ),
+            ),
+        placesVisited =
+            listOf(
+                PlaceUiState(
+                    id = "mission-office",
+                    title = "Mission office",
+                    latitude = 37.7596,
+                    longitude = -122.4269,
+                ),
+                PlaceUiState(
+                    id = "ferry-building",
+                    title = "Ferry Building",
+                    latitude = 37.7955,
+                    longitude = -122.3937,
+                ),
             ),
     )
 
@@ -755,6 +827,40 @@ fun A64_AudioTranscriptBookPosture() {
                         isRefining = true,
                     ),
                 onRequestTranscription = {},
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Timeline day detail book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A65_TimelineDayDetailBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            TimelineDayDetailPanel(
+                uiState = auditTimelineDayState,
+                onExit = {},
+                onOpenEvent = {},
+                onOpenLocations = {},
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Timeline day detail tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A66_TimelineDayDetailTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            TimelineDayDetailPanel(
+                uiState = auditTimelineDayState,
+                onExit = {},
+                onOpenEvent = {},
+                onOpenLocations = {},
                 modifier = Modifier.fillMaxSize(),
             )
         }

@@ -4,7 +4,9 @@ package app.logdate.feature.timeline.ui.details
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -20,7 +22,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
-import app.logdate.ui.common.plus
+import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.common.scrollToTop
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.profiles.PersonUiState
@@ -57,7 +61,6 @@ fun TimelineDayDetailPanel(
     scrollToEntryId: String? = null,
     modifier: Modifier = Modifier,
 ) {
-    val summary = uiState.summary
     val timestamp = uiState.date
     val people = uiState.people
     val resolvedVisitedLocations =
@@ -116,56 +119,181 @@ fun TimelineDayDetailPanel(
         },
         containerColor = Color.Transparent,
     ) { contentPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth(),
-            state = scrollState,
-            contentPadding = contentPadding + PaddingValues(vertical = Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-        ) {
-            if (summary.isNotBlank()) {
-                item(
-                    contentType = "tldr",
-                ) {
-                    TldrSection(summary)
-                }
-            }
-            if (people.isNotEmpty()) {
-                item(
-                    contentType = "people",
-                ) {
-                    PeopleEncounteredSection(
+        TimelineDayDetailAdaptiveContent(
+            uiState = uiState,
+            people = people,
+            resolvedVisitedLocations = resolvedVisitedLocations,
+            onOpenEvent = onOpenEvent,
+            onAttachNoteToEvent = onAttachNoteToEvent,
+            onOpenLocations = onOpenLocations,
+            onJournalClick = onJournalClick,
+            scrollState = scrollState,
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(contentPadding),
+        )
+    }
+}
+
+@Composable
+private fun TimelineDayDetailAdaptiveContent(
+    uiState: TimelineDayUiState,
+    people: List<PersonUiState>,
+    resolvedVisitedLocations: List<DayLocation>,
+    onOpenEvent: (eventId: String) -> Unit,
+    onAttachNoteToEvent: (noteId: String, eventId: String) -> Unit,
+    onOpenLocations: (() -> Unit)?,
+    onJournalClick: (Uuid) -> Unit,
+    scrollState: LazyListState,
+    modifier: Modifier = Modifier,
+) {
+    val listContentPadding = PaddingValues(vertical = Spacing.lg)
+
+    FoldableTabletopLayout(
+        modifier = modifier,
+        minPaneHeight = 260.dp,
+        topPane = {
+            TimelineDayDetailList(
+                uiState = uiState,
+                people = people,
+                resolvedVisitedLocations = resolvedVisitedLocations,
+                onOpenEvent = onOpenEvent,
+                onAttachNoteToEvent = onAttachNoteToEvent,
+                onOpenLocations = onOpenLocations,
+                onJournalClick = onJournalClick,
+                contentPadding = listContentPadding,
+                includeNotesAndEvents = false,
+            )
+        },
+        bottomPane = {
+            TimelineDayDetailList(
+                uiState = uiState,
+                people = people,
+                resolvedVisitedLocations = resolvedVisitedLocations,
+                onOpenEvent = onOpenEvent,
+                onAttachNoteToEvent = onAttachNoteToEvent,
+                onOpenLocations = onOpenLocations,
+                onJournalClick = onJournalClick,
+                contentPadding = listContentPadding,
+                includeSummaryContext = false,
+                includeLocations = false,
+            )
+        },
+        fallback = {
+            FoldableBookLayout(
+                minPaneWidth = 320.dp,
+                startPane = {
+                    TimelineDayDetailList(
+                        uiState = uiState,
                         people = people,
-                    )
-                }
-            }
-            if (uiState.notes.isNotEmpty()) {
-                item(
-                    contentType = "notes",
-                ) {
-                    NotesListSection(
-                        notes = uiState.notes,
-                        onJournalClick = onJournalClick,
-                    )
-                }
-            }
-            if (uiState.events.isNotEmpty()) {
-                item(contentType = "events") {
-                    EventsSection(
-                        events = uiState.events,
+                        resolvedVisitedLocations = resolvedVisitedLocations,
                         onOpenEvent = onOpenEvent,
                         onAttachNoteToEvent = onAttachNoteToEvent,
-                    )
-                }
-            }
-            if (resolvedVisitedLocations.isNotEmpty()) {
-                item(
-                    contentType = "locations",
-                ) {
-                    LocationsSection(
-                        locations = resolvedVisitedLocations,
                         onOpenLocations = onOpenLocations,
+                        onJournalClick = onJournalClick,
+                        contentPadding = listContentPadding,
+                        includeNotesAndEvents = false,
                     )
-                }
+                },
+                endPane = {
+                    TimelineDayDetailList(
+                        uiState = uiState,
+                        people = people,
+                        resolvedVisitedLocations = resolvedVisitedLocations,
+                        onOpenEvent = onOpenEvent,
+                        onAttachNoteToEvent = onAttachNoteToEvent,
+                        onOpenLocations = onOpenLocations,
+                        onJournalClick = onJournalClick,
+                        contentPadding = listContentPadding,
+                        includeSummaryContext = false,
+                        includeLocations = false,
+                    )
+                },
+                standardContent = {
+                    TimelineDayDetailList(
+                        uiState = uiState,
+                        people = people,
+                        resolvedVisitedLocations = resolvedVisitedLocations,
+                        onOpenEvent = onOpenEvent,
+                        onAttachNoteToEvent = onAttachNoteToEvent,
+                        onOpenLocations = onOpenLocations,
+                        onJournalClick = onJournalClick,
+                        scrollState = scrollState,
+                        contentPadding = listContentPadding,
+                    )
+                },
+            )
+        },
+    )
+}
+
+@Composable
+private fun TimelineDayDetailList(
+    uiState: TimelineDayUiState,
+    people: List<PersonUiState>,
+    resolvedVisitedLocations: List<DayLocation>,
+    onOpenEvent: (eventId: String) -> Unit,
+    onAttachNoteToEvent: (noteId: String, eventId: String) -> Unit,
+    onOpenLocations: (() -> Unit)?,
+    onJournalClick: (Uuid) -> Unit,
+    scrollState: LazyListState = rememberLazyListState(),
+    contentPadding: PaddingValues,
+    includeSummaryContext: Boolean = true,
+    includeNotesAndEvents: Boolean = true,
+    includeLocations: Boolean = true,
+) {
+    val summary = uiState.summary
+
+    LazyColumn(
+        modifier = Modifier.fillMaxWidth(),
+        state = scrollState,
+        contentPadding = contentPadding,
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        if (includeSummaryContext && summary.isNotBlank()) {
+            item(
+                contentType = "tldr",
+            ) {
+                TldrSection(summary)
+            }
+        }
+        if (includeSummaryContext && people.isNotEmpty()) {
+            item(
+                contentType = "people",
+            ) {
+                PeopleEncounteredSection(
+                    people = people,
+                )
+            }
+        }
+        if (includeNotesAndEvents && uiState.notes.isNotEmpty()) {
+            item(
+                contentType = "notes",
+            ) {
+                NotesListSection(
+                    notes = uiState.notes,
+                    onJournalClick = onJournalClick,
+                )
+            }
+        }
+        if (includeNotesAndEvents && uiState.events.isNotEmpty()) {
+            item(contentType = "events") {
+                EventsSection(
+                    events = uiState.events,
+                    onOpenEvent = onOpenEvent,
+                    onAttachNoteToEvent = onAttachNoteToEvent,
+                )
+            }
+        }
+        if (includeLocations && resolvedVisitedLocations.isNotEmpty()) {
+            item(
+                contentType = "locations",
+            ) {
+                LocationsSection(
+                    locations = resolvedVisitedLocations,
+                    onOpenLocations = onOpenLocations,
+                )
             }
         }
     }
