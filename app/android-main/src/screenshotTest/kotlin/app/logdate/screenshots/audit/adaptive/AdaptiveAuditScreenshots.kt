@@ -256,6 +256,58 @@ fun A40_JournalsOverviewBookPosture() {
 }
 
 @PreviewTest
+@Preview(name = "Empty journals book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A42_EmptyJournalsBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            JournalsOverviewScreenContent(
+                journals = emptyList(),
+                layoutMode = JournalLayoutMode.CAROUSEL,
+                sortOption = JournalSortOption.LAST_UPDATED,
+                activeFilters = emptySet(),
+                searchQuery = "",
+                entryResults = emptyList(),
+                onOpenJournal = {},
+                onBrowseJournals = {},
+                onCreateJournal = {},
+                onNavigateToDay = {},
+                onNavigationClick = {},
+                onQueryChange = {},
+                onToggleLayoutMode = {},
+                onSortOptionSelected = {},
+                onToggleFilter = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun A43_EmptyJournalsResponsiveStates() {
+    ScreenshotTheme {
+        JournalsOverviewScreenContent(
+            journals = emptyList(),
+            layoutMode = JournalLayoutMode.CAROUSEL,
+            sortOption = JournalSortOption.LAST_UPDATED,
+            activeFilters = emptySet(),
+            searchQuery = "",
+            entryResults = emptyList(),
+            onOpenJournal = {},
+            onBrowseJournals = {},
+            onCreateJournal = {},
+            onNavigateToDay = {},
+            onNavigationClick = {},
+            onQueryChange = {},
+            onToggleLayoutMode = {},
+            onSortOptionSelected = {},
+            onToggleFilter = {},
+        )
+    }
+}
+
+@PreviewTest
 @LargeScreenAuditPreviewMatrix
 @Composable
 fun A07_JournalDetail() {
