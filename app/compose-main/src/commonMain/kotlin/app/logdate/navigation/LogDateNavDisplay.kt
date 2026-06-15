@@ -49,6 +49,7 @@ import app.logdate.feature.core.settings.navigation.ExportSettingsRoute
 import app.logdate.feature.core.settings.navigation.PersonDetailRoute
 import app.logdate.feature.core.settings.navigation.SettingsRoute
 import app.logdate.feature.core.settings.navigation.SyncSettingsRoute
+import app.logdate.feature.core.settings.navigation.WatchNotificationSettingsRoute
 import app.logdate.feature.core.settings.navigation.WatchSettingsRoute
 import app.logdate.feature.core.settings.navigation.WatchTroubleshootingRoute
 import app.logdate.feature.core.settings.navigation.settingsEntries
@@ -295,7 +296,7 @@ fun LogDateNavDisplay(
                                         watchEntries(
                                             onBack = { backStack.removeLastOrNull() },
                                             onNavigateToSync = { backStack.add(SyncSettingsRoute) },
-                                            onNavigateToNotifications = { backStack.add(SettingsRoute()) },
+                                            onNavigateToNotifications = { backStack.add(WatchNotificationSettingsRoute) },
                                             onNavigateToTroubleshooting = { backStack.add(WatchTroubleshootingRoute) },
                                         )
                                     }

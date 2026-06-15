@@ -3,6 +3,7 @@ package app.logdate.feature.core.settings.navigation
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
+import app.logdate.feature.core.settings.ui.watch.WatchNotificationSettingsScreen
 import app.logdate.feature.core.settings.ui.watch.WatchSettingsScreen
 import app.logdate.feature.core.settings.ui.watch.WatchSettingsViewModel
 import app.logdate.feature.core.settings.ui.watch.WatchTroubleshootingScreen
@@ -32,6 +33,13 @@ fun EntryProviderScope<NavKey>.watchEntries(
             onNavigateToSync = onNavigateToSync,
             onNavigateToNotifications = onNavigateToNotifications,
             onNavigateToTroubleshooting = onNavigateToTroubleshooting,
+        )
+    }
+    taggedEntry<WatchNotificationSettingsRoute> {
+        val viewModel: WatchSettingsViewModel = koinViewModel()
+        WatchNotificationSettingsScreen(
+            onBack = onBack,
+            viewModel = viewModel,
         )
     }
     taggedEntry<WatchTroubleshootingRoute> {

@@ -115,4 +115,7 @@ data object LocationAdvancedRoute : NavKey
 data object WatchSettingsRoute : NavKey
 
 @Serializable
+data object WatchNotificationSettingsRoute : NavKey
+
+@Serializable
 data object WatchTroubleshootingRoute : NavKey
