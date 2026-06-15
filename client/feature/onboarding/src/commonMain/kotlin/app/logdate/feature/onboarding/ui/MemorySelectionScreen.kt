@@ -36,7 +36,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -71,6 +73,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.client.media.MediaObject
 import app.logdate.client.permissions.rememberMediaLibraryPermissionState
+import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
@@ -154,7 +158,7 @@ fun MemorySelectionScreen(
             ) { contentPadding ->
                 Box {
                     with(sharedTransitionScope) {
-                        MemorySelectionContent(
+                        MemorySelectionAdaptiveContent(
                             uiState = uiState,
                             onToggleMemorySelection = onToggleMemorySelection,
                             onLoadMoreMemories = onLoadMoreMemories,
@@ -193,6 +197,243 @@ fun MemorySelectionScreen(
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun SharedTransitionScope.MemorySelectionAdaptiveContent(
+    uiState: MemorySelectionUiState,
+    onToggleMemorySelection: (String) -> Unit,
+    onLoadMoreMemories: () -> Unit,
+    onContinue: () -> Unit,
+    hasMediaPermission: Boolean,
+    onRequestMediaPermission: () -> Unit,
+    onRetryLoad: () -> Unit,
+    onMemoryLongPress: (MediaObject) -> Unit,
+    onMemoryLongPressEnd: () -> Unit,
+    expandedMemory: MediaObject?,
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    modifier: Modifier = Modifier,
+) {
+    FoldableTabletopLayout(
+        modifier = modifier,
+        minPaneHeight = 260.dp,
+        topPane = {
+            MemorySelectionTopPane(
+                uiState = uiState,
+                hasMediaPermission = hasMediaPermission,
+                onRequestMediaPermission = onRequestMediaPermission,
+                onRetryLoad = onRetryLoad,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        bottomPane = {
+            MemorySelectionBottomPane(
+                uiState = uiState,
+                onToggleMemorySelection = onToggleMemorySelection,
+                onLoadMoreMemories = onLoadMoreMemories,
+                onContinue = onContinue,
+                onMemoryLongPress = onMemoryLongPress,
+                onMemoryLongPressEnd = onMemoryLongPressEnd,
+                expandedMemory = expandedMemory,
+                animatedVisibilityScope = animatedVisibilityScope,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        fallback = {
+            FoldableBookLayout(
+                modifier = Modifier.fillMaxSize(),
+                minPaneWidth = 320.dp,
+                startPane = {
+                    MemorySelectionTopPane(
+                        uiState = uiState,
+                        hasMediaPermission = hasMediaPermission,
+                        onRequestMediaPermission = onRequestMediaPermission,
+                        onRetryLoad = onRetryLoad,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+                endPane = {
+                    MemorySelectionBottomPane(
+                        uiState = uiState,
+                        onToggleMemorySelection = onToggleMemorySelection,
+                        onLoadMoreMemories = onLoadMoreMemories,
+                        onContinue = onContinue,
+                        onMemoryLongPress = onMemoryLongPress,
+                        onMemoryLongPressEnd = onMemoryLongPressEnd,
+                        expandedMemory = expandedMemory,
+                        animatedVisibilityScope = animatedVisibilityScope,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+                standardContent = {
+                    MemorySelectionContent(
+                        uiState = uiState,
+                        onToggleMemorySelection = onToggleMemorySelection,
+                        onLoadMoreMemories = onLoadMoreMemories,
+                        onContinue = onContinue,
+                        hasMediaPermission = hasMediaPermission,
+                        onRequestMediaPermission = onRequestMediaPermission,
+                        onRetryLoad = onRetryLoad,
+                        onMemoryLongPress = onMemoryLongPress,
+                        onMemoryLongPressEnd = onMemoryLongPressEnd,
+                        expandedMemory = expandedMemory,
+                        animatedVisibilityScope = animatedVisibilityScope,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+            )
+        },
+    )
+}
+
+@Composable
+private fun MemorySelectionTopPane(
+    uiState: MemorySelectionUiState,
+    hasMediaPermission: Boolean,
+    onRequestMediaPermission: () -> Unit,
+    onRetryLoad: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Text(
+            text = stringResource(Res.string.select_memories),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Medium,
+        )
+        Text(
+            text = stringResource(Res.string.onboarding_import_media_description),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        when {
+            !hasMediaPermission -> {
+                MemorySelectionStatusCard(
+                    title = stringResource(Res.string.memory_access_needed),
+                    body = stringResource(Res.string.memory_access_needed_body),
+                    actionLabel = stringResource(Res.string.enable),
+                    onAction = onRequestMediaPermission,
+                    actionTag = MEMORY_SELECTION_PERMISSION_ACTION_TAG,
+                )
+            }
+
+            uiState.loadFailed -> {
+                MemorySelectionStatusCard(
+                    title = stringResource(Res.string.select_memories),
+                    body = stringResource(Res.string.memory_load_failed_body),
+                    actionLabel = stringResource(UiRes.string.common_retry),
+                    onAction = onRetryLoad,
+                    actionTag = MEMORY_SELECTION_STATUS_ACTION_TAG,
+                )
+            }
+
+            uiState.aiCuratedMemories.isEmpty() && uiState.allMemories.isEmpty() -> {
+                MemorySelectionStatusCard(
+                    title = stringResource(Res.string.select_memories),
+                    body = stringResource(Res.string.memory_no_recent_items_body),
+                    actionLabel = stringResource(UiRes.string.common_retry),
+                    onAction = onRetryLoad,
+                    actionTag = MEMORY_SELECTION_STATUS_ACTION_TAG,
+                )
+            }
+
+            else -> {
+                Text(
+                    text = stringResource(Res.string.moments_that_might_matter_most),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = stringResource(Res.string.onboarding_import_smart_selection_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun SharedTransitionScope.MemorySelectionBottomPane(
+    uiState: MemorySelectionUiState,
+    onToggleMemorySelection: (String) -> Unit,
+    onLoadMoreMemories: () -> Unit,
+    onContinue: () -> Unit,
+    onMemoryLongPress: (MediaObject) -> Unit,
+    onMemoryLongPressEnd: () -> Unit,
+    expandedMemory: MediaObject?,
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        when {
+            uiState.isLoading -> {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xl),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+
+            uiState.aiCuratedMemories.isNotEmpty() || uiState.allMemories.isNotEmpty() -> {
+                if (uiState.aiCuratedMemories.isNotEmpty()) {
+                    with(this@MemorySelectionBottomPane) {
+                        AICuratedMemoriesSection(
+                            memories = uiState.aiCuratedMemories,
+                            selectedMemoryIds = uiState.selectedMemoryIds,
+                            onToggleMemorySelection = onToggleMemorySelection,
+                            onMemoryLongPress = onMemoryLongPress,
+                            onMemoryLongPressEnd = onMemoryLongPressEnd,
+                            expandedMemory = expandedMemory,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                        )
+                    }
+                }
+
+                if (uiState.allMemories.isNotEmpty()) {
+                    Text(
+                        text = stringResource(Res.string.all_memories),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    with(this@MemorySelectionBottomPane) {
+                        AllMemoriesStaggeredGrid(
+                            memories = uiState.allMemories,
+                            selectedMemoryIds = uiState.selectedMemoryIds,
+                            onToggleMemorySelection = onToggleMemorySelection,
+                            onMemoryLongPress = onMemoryLongPress,
+                            onMemoryLongPressEnd = onMemoryLongPressEnd,
+                            isLoadingMore = uiState.isLoadingMore,
+                            hasMoreMemories = uiState.hasMoreMemories,
+                            onLoadMoreMemories = onLoadMoreMemories,
+                            expandedMemory = expandedMemory,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                        )
+                    }
+                }
+            }
+        }
+
+        ContinueMemoryImportButton(
+            onContinue = onContinue,
+            selectedCount = uiState.selectedMemoryIds.size,
+        )
     }
 }
 

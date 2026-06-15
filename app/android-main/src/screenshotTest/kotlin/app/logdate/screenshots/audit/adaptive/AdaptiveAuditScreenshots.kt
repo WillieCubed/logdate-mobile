@@ -90,6 +90,8 @@ import app.logdate.screenshots.components.library.LibraryScreenshotData
 import app.logdate.screenshots.common.LargeScreenAuditPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTheme
+import app.logdate.screenshots.shared.SharedScreenshotScene
+import app.logdate.screenshots.shared.SharedScreenshotSceneId
 import app.logdate.ui.foldable.FoldableHingeBounds
 import app.logdate.ui.foldable.FoldableHingeInfo
 import app.logdate.ui.foldable.FoldableHingeOrientation
@@ -827,6 +829,50 @@ fun A93_OnboardingLocationTabletopPosture() {
                 onEnable = {},
                 onSkip = {},
             )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Memories import info book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A94_MemoriesImportInfoBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            SharedScreenshotScene(SharedScreenshotSceneId.MemoriesImportInfo)
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Memories import info tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A95_MemoriesImportInfoTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            SharedScreenshotScene(SharedScreenshotSceneId.MemoriesImportInfo)
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Memory selection book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A96_MemorySelectionBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            SharedScreenshotScene(SharedScreenshotSceneId.MemorySelectionEmpty)
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Memory selection tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A97_MemorySelectionTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            SharedScreenshotScene(SharedScreenshotSceneId.MemorySelectionEmpty)
         }
     }
 }

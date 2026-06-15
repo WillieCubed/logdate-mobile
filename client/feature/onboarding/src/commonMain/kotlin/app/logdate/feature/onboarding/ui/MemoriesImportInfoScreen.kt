@@ -30,6 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.onboarding.generated.resources.*
@@ -51,8 +53,139 @@ fun MemoriesImportInfoScreen(
     onContinue: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Scaffold(
+    MemoriesImportInfoAdaptiveContent(
+        onBack = onBack,
+        onContinue = onContinue,
         modifier = modifier,
+    )
+}
+
+@Composable
+private fun MemoriesImportInfoAdaptiveContent(
+    onBack: () -> Unit,
+    onContinue: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FoldableTabletopLayout(
+        modifier = modifier.fillMaxSize().testTag(MEMORIES_IMPORT_INFO_ROOT_TAG),
+        minPaneHeight = 260.dp,
+        topPane = {
+            MemoriesImportInfoIntroPane(
+                onBack = onBack,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        bottomPane = {
+            MemoriesImportInfoActionPane(
+                onContinue = onContinue,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        fallback = {
+            FoldableBookLayout(
+                modifier = Modifier.fillMaxSize().testTag(MEMORIES_IMPORT_INFO_ROOT_TAG),
+                minPaneWidth = 320.dp,
+                startPane = {
+                    MemoriesImportInfoIntroPane(
+                        onBack = onBack,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+                endPane = {
+                    MemoriesImportInfoActionPane(
+                        onContinue = onContinue,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+                standardContent = {
+                    MemoriesImportInfoCompactContent(
+                        onBack = onBack,
+                        onContinue = onContinue,
+                    )
+                },
+            )
+        },
+    )
+}
+
+@Composable
+private fun MemoriesImportInfoIntroPane(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
+            horizontalArrangement = Arrangement.Start,
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Default.ArrowBack,
+                    contentDescription = stringResource(UiRes.string.common_back),
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier.widthIn(max = 444.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Text(
+                text = stringResource(Res.string.now_lets_import_your_memories),
+                style = MaterialTheme.typography.headlineLarge,
+                modifier = Modifier.padding(bottom = Spacing.md),
+            )
+
+            Text(
+                text = stringResource(Res.string.onboarding_import_memories_description),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+
+            Text(
+                text = stringResource(Res.string.onboarding_import_photos_description),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MemoriesImportInfoActionPane(
+    onContinue: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
+        contentAlignment = Alignment.Center,
+    ) {
+        Button(
+            onClick = onContinue,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 444.dp)
+                    .testTag(MEMORIES_IMPORT_INFO_CONTINUE_TAG),
+        ) {
+            Text(stringResource(UiRes.string.common_continue))
+        }
+    }
+}
+
+@Composable
+private fun MemoriesImportInfoCompactContent(
+    onBack: () -> Unit,
+    onContinue: () -> Unit,
+) {
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
     ) { contentPadding ->
         Box(
             modifier =
@@ -69,7 +202,6 @@ fun MemoriesImportInfoScreen(
                         .padding(horizontal = Spacing.lg),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // Back arrow row
                 Row(
                     modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
                     horizontalArrangement = Arrangement.Start,
@@ -86,7 +218,6 @@ fun MemoriesImportInfoScreen(
                     modifier = Modifier.widthIn(max = 444.dp),
                     verticalArrangement = Arrangement.spacedBy(Spacing.md),
                 ) {
-                    // Inline headline per Figma
                     Text(
                         text = stringResource(Res.string.now_lets_import_your_memories),
                         style = MaterialTheme.typography.headlineLarge,
@@ -103,7 +234,6 @@ fun MemoriesImportInfoScreen(
                         style = MaterialTheme.typography.bodyLarge,
                     )
 
-                    // Button at end of scroll content so user reads the explanation first
                     Button(
                         onClick = onContinue,
                         modifier =
