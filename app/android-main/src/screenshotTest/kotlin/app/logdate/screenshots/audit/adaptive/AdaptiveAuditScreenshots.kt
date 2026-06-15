@@ -19,6 +19,8 @@ import app.logdate.feature.journals.ui.creation.JournalCreationScreenContent
 import app.logdate.feature.journals.ui.detail.EntryDisplayData
 import app.logdate.feature.journals.ui.detail.JournalDetailScreenContent
 import app.logdate.feature.journals.ui.detail.JournalDetailUiState
+import app.logdate.feature.journals.ui.settings.JournalSettingsScreenContent
+import app.logdate.feature.journals.ui.settings.JournalSettingsUiState
 import app.logdate.feature.onboarding.ui.CloudAccountSetupContent
 import app.logdate.feature.onboarding.ui.OnboardingStartScreenContent
 import app.logdate.feature.onboarding.ui.PersonalIntroContent
@@ -320,6 +322,46 @@ fun A44_JournalCreationBookPosture() {
                 initialTitle = "Route Screenshot Rollout",
                 selectedNoteIds = setOf(Uuid.parse("00000000-0000-0000-0000-000000000141")),
                 selectedMediaUris = listOf("content://logdate/audit-cover.jpg"),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Journal settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A45_JournalSettingsBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            JournalSettingsScreenContent(
+                uiState =
+                    JournalSettingsUiState.Loaded(
+                        journal = ScreenshotTestData.sampleJournal,
+                        editedName = "Route Screenshot Rollout",
+                        editedDescription = "A journal used to validate foldable settings flows.",
+                        hasUnsavedChanges = true,
+                    ),
+                onGoBack = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Journal settings delete book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A46_JournalSettingsDeleteBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            JournalSettingsScreenContent(
+                uiState =
+                    JournalSettingsUiState.Loaded(
+                        journal = ScreenshotTestData.sampleJournal,
+                        editedName = ScreenshotTestData.sampleJournal.title,
+                        editedDescription = "A journal used to validate foldable settings flows.",
+                    ),
+                onGoBack = {},
+                showDeleteConfirmation = true,
             )
         }
     }

@@ -14,6 +14,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -60,10 +61,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.journals.ui.JournalCover
 import app.logdate.shared.model.Journal
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
@@ -209,78 +212,288 @@ fun JournalSettingsScreenContent(
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
                 contentWindowInsets = WindowInsets.navigationBars,
             ) { paddingValues ->
-                LazyColumn(
+                FoldableBookLayout(
                     modifier =
                         Modifier
                             .fillMaxSize()
                             .padding(paddingValues),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-                ) {
-                    // Journal overview section
-                    item {
-                        JournalOverviewSection(
-                            journal = uiState.journal,
+                    minPaneWidth = 320.dp,
+                    startPane = {
+                        JournalSettingsOverviewPane(
+                            uiState = uiState,
                             onShareJournal = onShareJournal,
+                            modifier = Modifier.fillMaxSize(),
                         )
-                    }
-
-                    // Journal insights
-                    val insights = uiState.insights
-                    if (insights != null && insights.entryCount > 0) {
-                        item {
-                            JournalInsightsCard(
-                                insights = insights,
-                                modifier = Modifier.padding(horizontal = Spacing.lg),
-                            )
-                        }
-                    }
-
-                    // Journal name section
-                    item {
-                        JournalNameField(
-                            journalName = uiState.editedName,
+                    },
+                    endPane = {
+                        JournalSettingsEditPane(
+                            uiState = uiState,
                             onNameChange = onNameChange,
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
-                        )
-                    }
-
-                    // Journal description section
-                    item {
-                        JournalDescriptionField(
-                            description = uiState.editedDescription,
                             onDescriptionChange = onDescriptionChange,
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                            onRequestDelete = onRequestDelete,
+                            modifier = Modifier.fillMaxSize(),
                         )
-                    }
-
-                    // Journal privacy settings
-                    item {
-                        JournalPrivacySettings(
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                    },
+                    standardContent = {
+                        JournalSettingsStandardList(
+                            uiState = uiState,
+                            onShareJournal = onShareJournal,
+                            onNameChange = onNameChange,
+                            onDescriptionChange = onDescriptionChange,
+                            onRequestDelete = onRequestDelete,
+                            modifier = Modifier.fillMaxSize(),
                         )
-                    }
-
-                    // Danger zone
-                    item {
-                        JournalDangerZone(
-                            onDeleteClick = onRequestDelete,
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                        )
-                    }
-
-                    // Add bottom spacing
-                    item {
-                        Spacer(modifier = Modifier.padding(Spacing.lg))
-                    }
-                }
+                    },
+                )
             }
 
             if (showDeleteConfirmation) {
-                DeleteConfirmationDialog(
+                HingeAwareDeleteConfirmation(
                     onDismissRequest = onDismissDeleteConfirmation,
                     onConfirmation = onConfirmDelete,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun HingeAwareDeleteConfirmation(
+    onDismissRequest: () -> Unit,
+    onConfirmation: () -> Unit,
+) {
+    FoldableBookLayout(
+        modifier = Modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.32f)),
+            )
+        },
+        endPane = {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.32f))
+                        .padding(Spacing.lg),
+                contentAlignment = Alignment.Center,
+            ) {
+                DeleteConfirmationCard(
+                    onDismissRequest = onDismissRequest,
+                    onConfirmation = onConfirmation,
+                )
+            }
+        },
+        standardContent = {
+            DeleteConfirmationDialog(
+                onDismissRequest = onDismissRequest,
+                onConfirmation = onConfirmation,
+            )
+        },
+    )
+}
+
+@Composable
+private fun DeleteConfirmationCard(
+    onDismissRequest: () -> Unit,
+    onConfirmation: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ),
+    ) {
+        Column(
+            modifier = Modifier.padding(Spacing.xl),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            Icon(
+                imageVector = Icons.Default.WarningAmber,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = stringResource(Res.string.journal_delete_action),
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            Text(
+                text =
+                    "Are you sure you want to delete this journal? " +
+                        "This action cannot be undone and all entries in this journal will be permanently deleted.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onDismissRequest) {
+                    Text(stringResource(UiRes.string.common_cancel))
+                }
+                TextButton(
+                    onClick = onConfirmation,
+                    colors =
+                        ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error,
+                        ),
+                ) {
+                    Text(stringResource(UiRes.string.common_delete))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun JournalSettingsStandardList(
+    uiState: JournalSettingsUiState.Loaded,
+    onShareJournal: () -> Unit,
+    onNameChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit,
+    onRequestDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        item {
+            JournalOverviewSection(
+                journal = uiState.journal,
+                onShareJournal = onShareJournal,
+            )
+        }
+
+        val insights = uiState.insights
+        if (insights != null && insights.entryCount > 0) {
+            item {
+                JournalInsightsCard(
+                    insights = insights,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+            }
+        }
+
+        item {
+            JournalNameField(
+                journalName = uiState.editedName,
+                onNameChange = onNameChange,
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+            )
+        }
+
+        item {
+            JournalDescriptionField(
+                description = uiState.editedDescription,
+                onDescriptionChange = onDescriptionChange,
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+            )
+        }
+
+        item {
+            JournalPrivacySettings(
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+            )
+        }
+
+        item {
+            JournalDangerZone(
+                onDeleteClick = onRequestDelete,
+                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            )
+        }
+
+        item {
+            Spacer(modifier = Modifier.padding(Spacing.lg))
+        }
+    }
+}
+
+@Composable
+private fun JournalSettingsOverviewPane(
+    uiState: JournalSettingsUiState.Loaded,
+    onShareJournal: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        item {
+            JournalOverviewSection(
+                journal = uiState.journal,
+                onShareJournal = onShareJournal,
+            )
+        }
+
+        val insights = uiState.insights
+        if (insights != null && insights.entryCount > 0) {
+            item {
+                JournalInsightsCard(
+                    insights = insights,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.padding(Spacing.lg))
+        }
+    }
+}
+
+@Composable
+private fun JournalSettingsEditPane(
+    uiState: JournalSettingsUiState.Loaded,
+    onNameChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit,
+    onRequestDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        item {
+            JournalNameField(
+                journalName = uiState.editedName,
+                onNameChange = onNameChange,
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+            )
+        }
+
+        item {
+            JournalDescriptionField(
+                description = uiState.editedDescription,
+                onDescriptionChange = onDescriptionChange,
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+            )
+        }
+
+        item {
+            JournalPrivacySettings(
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+            )
+        }
+
+        item {
+            JournalDangerZone(
+                onDeleteClick = onRequestDelete,
+                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            )
+        }
+
+        item {
+            Spacer(modifier = Modifier.padding(Spacing.lg))
         }
     }
 }
