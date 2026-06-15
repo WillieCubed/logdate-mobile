@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.shared.model.Place
 import app.logdate.shared.model.displayLabel
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeRangeShort
@@ -59,7 +60,6 @@ import kotlin.uuid.Uuid
  * collapsing top app bar, sectioned scrollable body, sticky save bar that animates in once
  * the user has unsaved changes.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EventDetailScreen(
     eventId: Uuid,
@@ -68,11 +68,42 @@ fun EventDetailScreen(
     viewModel: EventDetailViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     LaunchedEffect(eventId) {
         viewModel.loadEvent(eventId)
     }
+
+    EventDetailContent(
+        uiState = uiState,
+        actions = viewModel,
+        onGoBack = onGoBack,
+        modifier = modifier,
+    )
+}
+
+/**
+ * Stateless body of the event detail / edit screen.
+ *
+ * Renders the large collapsing app bar, the sectioned editor body, the sticky save bar, and the
+ * place / attach pickers from an immutable [EventDetailUiState] plus an [EventDetailActions]
+ * handler. Hoisting all state and behavior out of [EventDetailScreen] keeps this composable
+ * previewable and lets foldable screenshot audits drive it with fake state.
+ *
+ * Foldable behavior: on a real separating vertical hinge the editor splits into two panes via
+ * [FoldableBookLayout] — the form/metadata fields on the start side and the attached captures on
+ * the end side. The sticky save bar deliberately stays in the [Scaffold] bottom bar so it spans
+ * beneath both panes rather than living inside one of them. On phones, tablets, and desktop the
+ * single-pane [LazyColumn] is preserved byte-for-byte; the split only renders on a hinge.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EventDetailContent(
+    uiState: EventDetailUiState,
+    actions: EventDetailActions,
+    onGoBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -86,7 +117,7 @@ fun EventDetailScreen(
                 },
                 actions = {
                     if (uiState is EventDetailUiState.Loaded) {
-                        IconButton(onClick = { viewModel.delete(onGoBack) }) {
+                        IconButton(onClick = { actions.delete(onGoBack) }) {
                             Icon(painter = PlatformIcons.delete(), contentDescription = "Delete event")
                         }
                     }
@@ -95,16 +126,16 @@ fun EventDetailScreen(
             )
         },
         bottomBar = {
-            EventDetailSaveBar(state = uiState, onSave = viewModel::save)
+            EventDetailSaveBar(state = uiState, onSave = actions::save)
         },
     ) { contentPadding ->
         when (val state = uiState) {
             EventDetailUiState.Loading -> CenteredProgress(contentPadding)
             EventDetailUiState.NotFound -> CenteredEmptyState(contentPadding, "Event not found")
             is EventDetailUiState.Loaded ->
-                EventDetailContent(
+                EventDetailLoadedBody(
                     state = state,
-                    actions = viewModel,
+                    actions = actions,
                     contentPadding = contentPadding,
                 )
         }
@@ -117,15 +148,15 @@ fun EventDetailScreen(
             EventPlacePicker(
                 availablePlaces = loaded.availablePlaces,
                 selectedPlaceId = loaded.event.placeId,
-                onPlaceSelected = viewModel::updatePlace,
-                onDismiss = viewModel::dismissPlacePicker,
+                onPlaceSelected = actions::updatePlace,
+                onDismiss = actions::dismissPlacePicker,
             )
         }
         if (loaded.isAttachSheetOpen) {
             AttachNoteToEventSheet(
                 attachableNotes = loaded.attachableNotes,
-                onAttach = viewModel::linkNote,
-                onDismiss = viewModel::dismissAttachSheet,
+                onAttach = actions::linkNote,
+                onDismiss = actions::dismissAttachSheet,
             )
         }
     }
@@ -159,12 +190,15 @@ private fun CenteredEmptyState(
 /**
  * Editable body for an event in the [EventDetailUiState.Loaded] state.
  *
- * Lays out cover, source chip (if grounded), title, time, place, description, original time
- * line, attached captures, and any error message — each as a separate LazyColumn item so the
- * editor stays cheap to scroll on long events with many attachments.
+ * On a real separating vertical hinge this splits via [FoldableBookLayout]: the form/metadata
+ * fields (cover, source chip, title, time, place, description, original-time line) sit in the
+ * start pane and the attached captures plus any error message sit in the end pane. Off a hinge
+ * the original single [LazyColumn] is preserved unchanged so phones, tablets, and desktop are
+ * unaffected. Both panes and the single-pane list share [EventDetailItemsList], gated by include
+ * flags, so the editor UI is defined in exactly one place.
  */
 @Composable
-private fun EventDetailContent(
+private fun EventDetailLoadedBody(
     state: EventDetailUiState.Loaded,
     actions: EventDetailActions,
     contentPadding: PaddingValues,
@@ -174,98 +208,153 @@ private fun EventDetailContent(
             if (picked != null) actions.updateCoverImage(picked)
         }
 
-    LazyColumn(
+    FoldableBookLayout(
         modifier =
             Modifier
                 .fillMaxSize()
                 .padding(contentPadding),
+        minPaneWidth = 320.dp,
+        startPane = {
+            EventDetailItemsList(
+                state = state,
+                actions = actions,
+                onPickCoverImage = launchPicker,
+                includeCaptures = false,
+            )
+        },
+        endPane = {
+            EventDetailItemsList(
+                state = state,
+                actions = actions,
+                onPickCoverImage = launchPicker,
+                includeForm = false,
+            )
+        },
+        standardContent = {
+            EventDetailItemsList(
+                state = state,
+                actions = actions,
+                onPickCoverImage = launchPicker,
+            )
+        },
+    )
+}
+
+/**
+ * The event editor's scrollable item list, reused by both foldable panes and the single-pane
+ * layout. Each section is a separate LazyColumn item so the editor stays cheap to scroll on long
+ * events with many attachments.
+ *
+ * @param includeForm renders the cover, source chip, title, time, place, description, and the
+ *   original-time line. Set to `false` in the captures-only end pane.
+ * @param includeCaptures renders the attached-captures section and any error message. Set to
+ *   `false` in the form-only start pane.
+ * @param onPickCoverImage launches the platform photo picker; hoisted so both panes share one
+ *   launcher instance.
+ */
+@Composable
+private fun EventDetailItemsList(
+    state: EventDetailUiState.Loaded,
+    actions: EventDetailActions,
+    onPickCoverImage: () -> Unit,
+    includeForm: Boolean = true,
+    includeCaptures: Boolean = true,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
-        item("cover") {
-            EventCoverImageCard(
-                coverImageUri = state.event.coverImageUri,
-                onPickImage = launchPicker,
-                onClearImage = { actions.updateCoverImage(null) },
-            )
-        }
+        if (includeForm) {
+            item("cover") {
+                EventCoverImageCard(
+                    coverImageUri = state.event.coverImageUri,
+                    onPickImage = onPickCoverImage,
+                    onClearImage = { actions.updateCoverImage(null) },
+                )
+            }
 
-        state.event.externalCalendarSource?.let { source ->
-            item("source-chip") {
-                AssistChip(
-                    onClick = {},
-                    enabled = false,
-                    label = { Text("From ${source.displayLabel()}") },
-                    colors = AssistChipDefaults.assistChipColors(),
+            state.event.externalCalendarSource?.let { source ->
+                item("source-chip") {
+                    AssistChip(
+                        onClick = {},
+                        enabled = false,
+                        label = { Text("From ${source.displayLabel()}") },
+                        colors = AssistChipDefaults.assistChipColors(),
+                    )
+                }
+            }
+
+            item("title") {
+                OutlinedTextField(
+                    value = state.event.title,
+                    onValueChange = actions::updateTitle,
+                    label = { Text("Title") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
+
+            item("when") {
+                EventTimeRangeSection(
+                    startTime = state.event.startTime,
+                    endTime = state.event.endTime,
+                    onStartTimeChange = actions::updateStartTime,
+                    onEndTimeChange = actions::updateEndTime,
+                    onTogglePointInTime = actions::togglePointInTime,
+                )
+            }
+
+            item("where") {
+                EventPlaceSection(
+                    resolvedPlace = state.resolvedPlace,
+                    hasPlace = state.event.placeId != null,
+                    onChoosePlace = actions::openPlacePicker,
+                )
+            }
+
+            item("description") {
+                OutlinedTextField(
+                    value = state.event.description.orEmpty(),
+                    onValueChange = actions::updateDescription,
+                    label = { Text("Description") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                )
+            }
+
+            item("original-time") {
+                Text(
+                    text = "Originally " + state.event.startTime.toReadableDateTimeRangeShort(state.event.endTime),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
 
-        item("title") {
-            OutlinedTextField(
-                value = state.event.title,
-                onValueChange = actions::updateTitle,
-                label = { Text("Title") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
+        if (includeForm && includeCaptures) {
+            item("divider") {
+                HorizontalDivider()
+            }
         }
 
-        item("when") {
-            EventTimeRangeSection(
-                startTime = state.event.startTime,
-                endTime = state.event.endTime,
-                onStartTimeChange = actions::updateStartTime,
-                onEndTimeChange = actions::updateEndTime,
-                onTogglePointInTime = actions::togglePointInTime,
-            )
-        }
-
-        item("where") {
-            EventPlaceSection(
-                resolvedPlace = state.resolvedPlace,
-                hasPlace = state.event.placeId != null,
-                onChoosePlace = actions::openPlacePicker,
-            )
-        }
-
-        item("description") {
-            OutlinedTextField(
-                value = state.event.description.orEmpty(),
-                onValueChange = actions::updateDescription,
-                label = { Text("Description") },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 3,
-            )
-        }
-
-        item("original-time") {
-            Text(
-                text = "Originally " + state.event.startTime.toReadableDateTimeRangeShort(state.event.endTime),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        item("divider") {
-            HorizontalDivider()
-        }
-
-        item("attached") {
-            EventLinkedNotesSection(
-                notes = state.linkedNotes,
-                onUnlink = actions::unlinkNote,
-                onAddCapture = actions::openAttachSheet,
-            )
-        }
-
-        state.errorMessage?.let { message ->
-            item("error") {
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
+        if (includeCaptures) {
+            item("attached") {
+                EventLinkedNotesSection(
+                    notes = state.linkedNotes,
+                    onUnlink = actions::unlinkNote,
+                    onAddCapture = actions::openAttachSheet,
                 )
+            }
+
+            state.errorMessage?.let { message ->
+                item("error") {
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             }
         }
     }

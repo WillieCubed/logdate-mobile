@@ -7,9 +7,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import app.logdate.client.calendar.DeviceCalendar
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
@@ -31,6 +35,9 @@ import logdate.client.feature.events.generated.resources.Res
 import logdate.client.feature.events.generated.resources.calendar_sync_calendars_default_label
 import logdate.client.feature.events.generated.resources.calendar_sync_calendars_empty
 import logdate.client.feature.events.generated.resources.calendar_sync_calendars_title
+import logdate.client.feature.events.generated.resources.calendar_sync_settings_calendars_row_subtitle_none
+import logdate.client.feature.events.generated.resources.calendar_sync_settings_calendars_row_subtitle_some
+import logdate.client.feature.events.generated.resources.calendar_sync_settings_grant_rationale
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -73,32 +80,129 @@ fun CalendarSyncCalendarsContent(
         remember(state.calendars) {
             state.calendars.groupBy { it.accountName }
         }
-    SettingsScaffold(
-        title = stringResource(Res.string.calendar_sync_calendars_title),
-        onBack = onBack,
-        modifier = modifier,
-    ) {
-        if (state.calendars.isEmpty() && !state.isLoading) {
-            item {
-                Text(
-                    text = stringResource(Res.string.calendar_sync_calendars_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                )
+    val isEmpty = state.calendars.isEmpty() && !state.isLoading
+
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                CalendarsSummaryHeader(state = state)
             }
-            return@SettingsScaffold
+        },
+        endPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                if (isEmpty) {
+                    Text(
+                        text = stringResource(Res.string.calendar_sync_calendars_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                } else {
+                    for ((accountName, calendars) in groupedByAccount) {
+                        AccountSection(
+                            accountName = accountName,
+                            calendars = calendars,
+                            selectedIds = state.selectedIds,
+                            onToggle = onToggle,
+                        )
+                    }
+                }
+            }
+        },
+        standardContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.calendar_sync_calendars_title),
+                onBack = onBack,
+                modifier = modifier,
+            ) {
+                if (isEmpty) {
+                    item {
+                        Text(
+                            text = stringResource(Res.string.calendar_sync_calendars_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+                    return@SettingsScaffold
+                }
+
+                for ((accountName, calendars) in groupedByAccount) {
+                    item(key = "account:$accountName") {
+                        AccountSection(
+                            accountName = accountName,
+                            calendars = calendars,
+                            selectedIds = state.selectedIds,
+                            onToggle = onToggle,
+                        )
+                    }
+                }
+            }
+        },
+    )
+}
+
+/**
+ * Context summary shown in the start pane of the book-posture split: how many calendars
+ * the device exposed, how many the user already mirrors, and a short reassurance line
+ * about read-only access. Carries no controls — the picker in the end pane owns every
+ * toggle — so the two panes stay cleanly divided into "what is this" and "choose".
+ */
+@Composable
+private fun CalendarsSummaryHeader(state: CalendarSyncCalendarsUiState) {
+    val total = state.calendars.size
+    val selectedCount = state.calendars.count { it.id in state.selectedIds }
+    val selectionLabel =
+        if (selectedCount == 0) {
+            stringResource(Res.string.calendar_sync_settings_calendars_row_subtitle_none)
+        } else {
+            stringResource(
+                Res.string.calendar_sync_settings_calendars_row_subtitle_some,
+                selectedCount,
+                total,
+            )
         }
 
-        for ((accountName, calendars) in groupedByAccount) {
-            item(key = "account:$accountName") {
-                AccountSection(
-                    accountName = accountName,
-                    calendars = calendars,
-                    selectedIds = state.selectedIds,
-                    onToggle = onToggle,
-                )
-            }
+    MaterialContainer(
+        modifier = Modifier.padding(horizontal = Spacing.lg),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text(
+                text = stringResource(Res.string.calendar_sync_calendars_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = selectionLabel,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = stringResource(Res.string.calendar_sync_settings_grant_rationale),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

@@ -17,7 +17,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ChevronLeft
@@ -39,6 +41,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.logdate.shared.model.Event
+import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeRangeShort
 import kotlinx.datetime.DateTimeUnit
@@ -66,7 +70,6 @@ import kotlin.uuid.Uuid
  * the grid refreshes whenever the inference or calendar import worker materializes a
  * new event without the user having to pull-to-refresh.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EventsCalendarScreen(
     onBack: () -> Unit,
@@ -76,6 +79,41 @@ fun EventsCalendarScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    EventsCalendarContent(
+        uiState = uiState,
+        onBack = onBack,
+        onNavigateToEvent = onNavigateToEvent,
+        onPreviousMonth = viewModel::showPreviousMonth,
+        onNextMonth = viewModel::showNextMonth,
+        onSelectDay = viewModel::selectDay,
+        modifier = modifier,
+    )
+}
+
+/**
+ * Stateless month-grid calendar surface.
+ *
+ * Hoisting the screen body away from [EventsCalendarViewModel] lets previews and
+ * screenshot tests render the calendar with deterministic state, and lets the screen
+ * adapt to foldable postures.
+ *
+ * On a foldable with a separating hinge the month grid and the selected-day event list
+ * split into two physical panes — a vertical hinge places the grid on the left and the
+ * list on the right (book posture), while a horizontal hinge stacks the grid above the
+ * list (tabletop posture). On every other form factor the original single-column layout
+ * renders unchanged.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EventsCalendarContent(
+    uiState: EventsCalendarUiState,
+    onBack: () -> Unit,
+    onNavigateToEvent: (Uuid) -> Unit,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onSelectDay: (LocalDate) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -92,33 +130,119 @@ fun EventsCalendarScreen(
             )
         },
     ) { padding ->
-        Column(
+        FoldableTabletopLayout(
             modifier =
                 Modifier
                     .padding(padding)
                     .fillMaxSize(),
-        ) {
-            MonthHeader(
-                displayedMonth = uiState.displayedMonth,
-                onPrevious = viewModel::showPreviousMonth,
-                onNext = viewModel::showNextMonth,
-            )
-            WeekdayHeaderRow()
-            MonthGrid(
-                displayedMonth = uiState.displayedMonth,
-                today = uiState.today,
-                selectedDay = uiState.selectedDay,
-                eventsByDay = uiState.eventsByDay,
-                onSelectDay = viewModel::selectDay,
-            )
-            Spacer(modifier = Modifier.height(Spacing.lg))
-            DayEventsList(
-                selectedDay = uiState.selectedDay,
-                events = uiState.selectedDay?.let { uiState.eventsByDay[it] }.orEmpty(),
-                onNavigateToEvent = onNavigateToEvent,
-            )
-        }
+            minPaneHeight = 220.dp,
+            topPane = {
+                MonthGridSection(
+                    uiState = uiState,
+                    onPreviousMonth = onPreviousMonth,
+                    onNextMonth = onNextMonth,
+                    onSelectDay = onSelectDay,
+                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                )
+            },
+            bottomPane = {
+                SelectedDaySection(
+                    uiState = uiState,
+                    onNavigateToEvent = onNavigateToEvent,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            },
+            standardContent = {
+                FoldableBookLayout(
+                    minPaneWidth = 320.dp,
+                    startPane = {
+                        MonthGridSection(
+                            uiState = uiState,
+                            onPreviousMonth = onPreviousMonth,
+                            onNextMonth = onNextMonth,
+                            onSelectDay = onSelectDay,
+                            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                        )
+                    },
+                    endPane = {
+                        SelectedDaySection(
+                            uiState = uiState,
+                            onNavigateToEvent = onNavigateToEvent,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    },
+                    standardContent = {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            MonthGridSection(
+                                uiState = uiState,
+                                onPreviousMonth = onPreviousMonth,
+                                onNextMonth = onNextMonth,
+                                onSelectDay = onSelectDay,
+                            )
+                            Spacer(modifier = Modifier.height(Spacing.lg))
+                            SelectedDaySection(
+                                uiState = uiState,
+                                onNavigateToEvent = onNavigateToEvent,
+                            )
+                        }
+                    },
+                )
+            },
+        )
     }
+}
+
+/**
+ * Month-navigation header, weekday labels, and the 7-column day grid.
+ *
+ * Reused verbatim in the single-column layout, the book-posture start pane, and the
+ * tabletop-posture top pane so the grid never drifts between form factors.
+ */
+@Composable
+private fun MonthGridSection(
+    uiState: EventsCalendarUiState,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onSelectDay: (LocalDate) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        MonthHeader(
+            displayedMonth = uiState.displayedMonth,
+            onPrevious = onPreviousMonth,
+            onNext = onNextMonth,
+        )
+        WeekdayHeaderRow()
+        MonthGrid(
+            displayedMonth = uiState.displayedMonth,
+            today = uiState.today,
+            selectedDay = uiState.selectedDay,
+            eventsByDay = uiState.eventsByDay,
+            onSelectDay = onSelectDay,
+        )
+    }
+}
+
+/**
+ * Event list for the currently selected day.
+ *
+ * Reused verbatim in the single-column layout, the book-posture end pane, and the
+ * tabletop-posture bottom pane.
+ */
+@Composable
+private fun SelectedDaySection(
+    uiState: EventsCalendarUiState,
+    onNavigateToEvent: (Uuid) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    DayEventsList(
+        selectedDay = uiState.selectedDay,
+        events = uiState.selectedDay?.let { uiState.eventsByDay[it] }.orEmpty(),
+        onNavigateToEvent = onNavigateToEvent,
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -275,6 +399,7 @@ private fun DayEventsList(
     selectedDay: LocalDate?,
     events: List<Event>,
     onNavigateToEvent: (Uuid) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     if (selectedDay == null) return
     if (events.isEmpty()) {
@@ -282,11 +407,11 @@ private fun DayEventsList(
             text = stringResource(Res.string.events_calendar_empty_day),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            modifier = modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
         )
         return
     }
-    LazyColumn(modifier = Modifier.fillMaxWidth()) {
+    LazyColumn(modifier = modifier.fillMaxWidth()) {
         items(items = events, key = { event -> event.id.toString() }) { event ->
             ListItem(
                 headlineContent = { Text(event.title) },
