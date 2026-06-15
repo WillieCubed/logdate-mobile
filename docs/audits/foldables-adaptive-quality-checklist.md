@@ -321,14 +321,22 @@ high-risk groups that should be expanded or duplicated as evidence is collected.
 
 | Feature or flow | Folded | Unfolded | Tabletop | Book | Portrait | Landscape | Multi-window | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Search results screen | `[todo]` | `[todo]` | `[todo]` | `[complete]` | `[todo]` | `[todo]` | `[todo]` | `AdaptiveSearchBookPostureScreenshots.kt`; `A30_SearchIdleBookPosture` through `A33_SearchResultsBookPosture`. |
+| Search result sharing and return | `[todo]` | `[todo]` | `[n/a]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | Share-sheet launch/return evidence remains open. |
+| Sync issues screen | `[todo]` | `[todo]` | `[todo]` | `[complete]` | `[todo]` | `[todo]` | `[todo]` | `AdaptiveSettingsBookPostureScreenshots.kt`; `A29_SyncIssuesBookPosture`. |
+| Journals overview | `[todo]` | `[todo]` | `[todo]` | `[complete]` | `[todo]` | `[todo]` | `[todo]` | `AdaptiveAuditScreenshots.kt`; `A40_JournalsOverviewBookPosture`. |
 | Timeline and day detail | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | Add evidence. |
 | Note editor and separate editor windows | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | Add evidence. |
 | Journal detail and note viewer | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | Add evidence. |
 | Library media viewer | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | Add evidence. |
 | Audio recording and playback | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | Add evidence. |
-| Rewind detail | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | Add evidence. |
+| Rewind overview and past rewinds | `[todo]` | `[todo]` | `[n/a]` | `[complete]` | `[todo]` | `[todo]` | `[todo]` | `AdaptiveRewindBookPostureScreenshots.kt`; `A34_RewindOverviewBookPosture`, `A35_PastRewindsBookPosture`. |
+| Rewind detail story | `[todo]` | `[todo]` | `[complete]` | `[complete]` | `[todo]` | `[todo]` | `[todo]` | `AdaptiveRewindBookPostureScreenshots.kt`; `A38_RewindDetailBookPosture`, `A39_RewindDetailTabletopPosture`. |
+| Rewind notification detail entry | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | Notification tap and route-restoration evidence remains open. |
 | Incoming share and attachment entry | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | Add evidence. |
-| Settings and onboarding | `[todo]` | `[todo]` | `[todo]` | `[partial]` | `[todo]` | `[todo]` | `[todo]` | Book-posture settings evidence: `AdaptiveSettingsBookPostureScreenshots.kt`, `app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/audit/adaptive/AdaptiveSettingsBookPostureScreenshotsKt/`, and `./gradlew :app:android-main:validateDebugScreenshotTest --tests '*AdaptiveSettingsBookPosture*' --console=plain --no-build-cache` covering settings, location settings, events settings, calendar sync settings, and sync issues. Onboarding remains open. |
+| Settings screens | `[todo]` | `[todo]` | `[todo]` | `[complete]` | `[todo]` | `[todo]` | `[todo]` | `AdaptiveSettingsBookPostureScreenshots.kt`; `A09` through `A33`, plus `A36` and `A37`, cover settings, location settings, events settings, calendar sync settings, and sync issues. |
+| Settings handoffs and dialogs | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | System settings handoff, recovery phrase, passkey, export/restore, destructive confirmation, device actions, and preference dialog return evidence remains open. |
+| Onboarding | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | `[todo]` | Add evidence. |
 
 ## Audit Notes
 
