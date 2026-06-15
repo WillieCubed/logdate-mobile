@@ -4,13 +4,16 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -23,13 +26,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.client.media.audio.transcription.TranscriptionFailure
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.convert_to_text
 import logdate.client.feature.editor.generated.resources.error
 import logdate.client.feature.editor.generated.resources.transcribing_audio
+import logdate.client.feature.editor.generated.resources.transcription_improving
+import logdate.client.feature.editor.generated.resources.transcription_improving_description
 import logdate.client.feature.editor.generated.resources.transcription_queued
+import logdate.client.feature.editor.generated.resources.transcription_ready
+import logdate.client.feature.editor.generated.resources.transcription_ready_description
 import logdate.client.feature.editor.generated.resources.we_couldnt_convert_this_recording_to_text
 import logdate.client.ui.generated.resources.common_try_again
 import org.jetbrains.compose.resources.stringResource
@@ -171,10 +179,44 @@ private fun TranscriptionSuccessUi(
     isRefining: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    FoldableBookLayout(
+        modifier = modifier.fillMaxWidth(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            TranscriptCard(
+                text = text,
+                isRefining = isRefining,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        endPane = {
+            TranscriptionStatusCard(
+                isRefining = isRefining,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        standardContent = {
+            TranscriptCard(
+                text = text,
+                isRefining = isRefining,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+    )
+}
+
+@Suppress("ktlint:standard:function-naming")
+@Composable
+private fun TranscriptCard(
+    text: String,
+    isRefining: Boolean,
+    modifier: Modifier = Modifier,
+) {
     OutlinedCard(
         modifier =
             modifier
                 .fillMaxWidth()
+                .widthIn(max = 720.dp)
                 .padding(Spacing.sm),
     ) {
         AnimatedContent(
@@ -189,11 +231,59 @@ private fun TranscriptionSuccessUi(
                 color =
                     if (isRefining) {
                         // Soften while refinement is still rewriting parts of the
-                        // text — telegraphs upcoming change without a spinner.
+                        // text, telegraphing upcoming change without a spinner.
                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
                     } else {
                         MaterialTheme.colorScheme.onSurface
                     },
+            )
+        }
+    }
+}
+
+@Suppress("ktlint:standard:function-naming")
+@Composable
+private fun TranscriptionStatusCard(
+    isRefining: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedCard(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(Spacing.sm),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(Spacing.md),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text =
+                    stringResource(
+                        if (isRefining) {
+                            Res.string.transcription_improving
+                        } else {
+                            Res.string.transcription_ready
+                        },
+                    ),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text =
+                    stringResource(
+                        if (isRefining) {
+                            Res.string.transcription_improving_description
+                        } else {
+                            Res.string.transcription_ready_description
+                        },
+                    ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

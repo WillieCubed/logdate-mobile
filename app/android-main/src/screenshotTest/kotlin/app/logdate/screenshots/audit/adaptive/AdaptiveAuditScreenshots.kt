@@ -33,6 +33,8 @@ import app.logdate.feature.editor.audio.model.SegmentType
 import app.logdate.feature.editor.ui.MainEditorContent
 import app.logdate.feature.editor.ui.audio.ActiveRecordingDisplay
 import app.logdate.feature.editor.ui.audio.AudioRecordingControls
+import app.logdate.feature.editor.ui.audio.AudioTranscriptionUi
+import app.logdate.feature.editor.ui.audio.AudioUiState
 import app.logdate.feature.editor.ui.common.NoteEditorToolbar
 import app.logdate.feature.editor.ui.content.EditorBottomContent
 import app.logdate.feature.editor.ui.editor.BlockType
@@ -734,6 +736,29 @@ fun A62_EntryEditorMixedContentBookPosture() {
 @Composable
 fun A63_EntryEditorMixedContentTabletopPosture() {
     FoldableEntryEditorScene(tabletopPostureLayoutInfo)
+}
+
+@PreviewTest
+@Preview(name = "Audio transcript book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A64_AudioTranscriptBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            AudioTranscriptionUi(
+                transcriptionState =
+                    AudioUiState.TranscriptionState.Success(
+                        text =
+                            "We walked through the adaptive audit and captured the places where the " +
+                                "editor still assumed a phone-sized canvas. The transcript reader keeps " +
+                                "long-form generated text constrained to a readable pane while status " +
+                                "context stays on the adjacent side of the fold.",
+                        isRefining = true,
+                    ),
+                onRequestTranscription = {},
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
 }
 
 @PreviewTest

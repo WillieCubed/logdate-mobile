@@ -100,8 +100,12 @@
     <string name="tap_to_enable_camera">Tap to enable camera</string>
     <string name="tap_to_start_recording">Tap to start recording</string>
     <string name="text_00_00">00:00</string>
+    <string name="transcription_improving">Improving transcript</string>
+    <string name="transcription_improving_description">Text may update while the refinement pass finishes.</string>
     <string name="transcribing_audio">Transcribing audio...</string>
     <string name="transcription_queued">Transcription queued...</string>
+    <string name="transcription_ready">Transcript ready</string>
+    <string name="transcription_ready_description">Text is ready to save with this recording.</string>
     <string name="use_photo">Use Photo</string>
     <string name="use_video">Use Video</string>
     <string name="undo">Undo</string>
