@@ -55,6 +55,7 @@ import app.logdate.feature.editor.audio.model.AudioSegment
 import app.logdate.feature.editor.ui.audio.AnimatedPlayPauseButton
 import app.logdate.feature.editor.ui.audio.waveform.BezierAudioWaveform
 import app.logdate.feature.editor.ui.formatMediaDuration
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.platform.PlatformIcons
@@ -205,52 +206,106 @@ fun ImmersiveAudioScreen(
                 )
             },
             fallback = {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 32.dp)
-                            .statusBarsPadding()
-                            .navigationBarsPadding(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    ImmersiveAudioContextPane(
-                        amplitudes = amplitudes,
-                        progress = progress,
-                        palette = palette,
-                        daylightPeriod = daylightPeriod,
-                        durationMs = durationMs,
-                        createdAt = createdAt,
-                        segments = segments,
-                        detectedSounds = detectedSounds,
-                        onBackgroundColor = onBackgroundColor,
-                        onSeek = onSeek,
-                        onDragStart = {
-                            controlsVisible = true
-                            onDragStart()
-                        },
-                        onDragEnd = onDragEnd,
-                        onCrossSegment = onCrossSegment,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(modifier = Modifier.height(32.dp))
-                    ImmersiveAudioControlsPane(
-                        progress = progress,
-                        isPlaying = isPlaying,
-                        palette = palette,
-                        durationMs = durationMs,
-                        onBackgroundColor = onBackgroundColor,
-                        controlsVisible = controlsVisible,
-                        outputSelection = outputSelection,
-                        onPlayPause = onPlayPause,
-                        onSeek = onSeek,
-                        onSkipBack = onSkipBack,
-                        onSkipForward = onSkipForward,
-                        onOutputDeviceSelected = onOutputDeviceSelected,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+                FoldableBookLayout(
+                    modifier = Modifier.fillMaxSize(),
+                    minPaneWidth = 320.dp,
+                    startPane = {
+                        ImmersiveAudioContextPane(
+                            amplitudes = amplitudes,
+                            progress = progress,
+                            palette = palette,
+                            daylightPeriod = daylightPeriod,
+                            durationMs = durationMs,
+                            createdAt = createdAt,
+                            segments = segments,
+                            detectedSounds = detectedSounds,
+                            onBackgroundColor = onBackgroundColor,
+                            onSeek = onSeek,
+                            onDragStart = {
+                                controlsVisible = true
+                                onDragStart()
+                            },
+                            onDragEnd = onDragEnd,
+                            onCrossSegment = onCrossSegment,
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 32.dp)
+                                    .statusBarsPadding()
+                                    .navigationBarsPadding(),
+                        )
+                    },
+                    endPane = {
+                        ImmersiveAudioControlsPane(
+                            progress = progress,
+                            isPlaying = isPlaying,
+                            palette = palette,
+                            durationMs = durationMs,
+                            onBackgroundColor = onBackgroundColor,
+                            controlsVisible = controlsVisible,
+                            outputSelection = outputSelection,
+                            onPlayPause = onPlayPause,
+                            onSeek = onSeek,
+                            onSkipBack = onSkipBack,
+                            onSkipForward = onSkipForward,
+                            onOutputDeviceSelected = onOutputDeviceSelected,
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 32.dp)
+                                    .statusBarsPadding()
+                                    .navigationBarsPadding(),
+                        )
+                    },
+                    standardContent = {
+                        Column(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 32.dp)
+                                    .statusBarsPadding()
+                                    .navigationBarsPadding(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            ImmersiveAudioContextPane(
+                                amplitudes = amplitudes,
+                                progress = progress,
+                                palette = palette,
+                                daylightPeriod = daylightPeriod,
+                                durationMs = durationMs,
+                                createdAt = createdAt,
+                                segments = segments,
+                                detectedSounds = detectedSounds,
+                                onBackgroundColor = onBackgroundColor,
+                                onSeek = onSeek,
+                                onDragStart = {
+                                    controlsVisible = true
+                                    onDragStart()
+                                },
+                                onDragEnd = onDragEnd,
+                                onCrossSegment = onCrossSegment,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Spacer(modifier = Modifier.height(32.dp))
+                            ImmersiveAudioControlsPane(
+                                progress = progress,
+                                isPlaying = isPlaying,
+                                palette = palette,
+                                durationMs = durationMs,
+                                onBackgroundColor = onBackgroundColor,
+                                controlsVisible = controlsVisible,
+                                outputSelection = outputSelection,
+                                onPlayPause = onPlayPause,
+                                onSeek = onSeek,
+                                onSkipBack = onSkipBack,
+                                onSkipForward = onSkipForward,
+                                onOutputDeviceSelected = onOutputDeviceSelected,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    },
+                )
             },
         )
     }

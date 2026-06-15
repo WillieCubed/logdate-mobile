@@ -1,24 +1,49 @@
 package app.logdate.screenshots.audit.adaptive
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.client.R
+import app.logdate.client.awareness.daylight.DaylightPeriod
+import app.logdate.client.repository.journals.NoteCoordinates
+import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.journals.NotePlace
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.feature.core.account.CloudAccountWelcomeContent
 import app.logdate.feature.core.settings.ui.ServerSelectionState
 import app.logdate.feature.core.profile.ui.ProfileScreenContent
 import app.logdate.feature.core.profile.ui.ProfileUiState
+import app.logdate.feature.editor.audio.AudioContext
+import app.logdate.feature.editor.audio.model.AudioPalette
+import app.logdate.feature.editor.audio.model.AudioSegment
+import app.logdate.feature.editor.audio.model.SegmentType
+import app.logdate.feature.editor.ui.video.VideoPlayerContent
 import app.logdate.feature.journals.ui.JournalLayoutMode
 import app.logdate.feature.journals.ui.JournalListItemUiState
 import app.logdate.feature.journals.ui.JournalSortOption
 import app.logdate.feature.journals.ui.JournalsOverviewScreenContent
 import app.logdate.feature.journals.ui.creation.JournalCreationScreenContent
+import app.logdate.feature.journals.ui.detail.AudioNoteViewerContent
+import app.logdate.feature.journals.ui.detail.AudioNoteViewerUiState
+import app.logdate.feature.journals.ui.detail.AudioPlaybackUiState
 import app.logdate.feature.journals.ui.detail.EntryDisplayData
 import app.logdate.feature.journals.ui.detail.JournalDetailScreenContent
 import app.logdate.feature.journals.ui.detail.JournalDetailUiState
+import app.logdate.feature.journals.ui.detail.JournalContext
+import app.logdate.feature.journals.ui.detail.NoteViewerScaffoldContent
+import app.logdate.feature.journals.ui.detail.NoteViewerShared
 import app.logdate.feature.journals.ui.settings.JournalSettingsScreenContent
 import app.logdate.feature.journals.ui.settings.JournalSettingsUiState
 import app.logdate.feature.journals.ui.share.ShareJournalScreenContent
@@ -43,11 +68,17 @@ import app.logdate.ui.foldable.FoldableLayoutInfo
 import app.logdate.ui.foldable.FoldableOcclusionType
 import app.logdate.ui.foldable.FoldablePosture
 import app.logdate.ui.foldable.provideFoldableLayoutInfo
+import app.logdate.ui.audio.AudioPlaybackDisplayInfo
+import app.logdate.ui.audio.AudioPlaybackState
+import app.logdate.ui.audio.LocalAudioPlaybackState
 import com.android.tools.screenshot.PreviewTest
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.uuid.Uuid
 
 private const val BOOK_FOLDABLE = "spec:width=1440dp,height=900dp"
+private const val TABLETOP_FOLDABLE = "spec:width=1440dp,height=900dp"
+private const val SAMPLE_VIDEO_URI = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher"
 
 private val bookPostureLayoutInfo =
     FoldableLayoutInfo(
@@ -66,6 +97,28 @@ private val bookPostureLayoutInfo =
                         bottom = 900.dp,
                         width = 24.dp,
                         height = 900.dp,
+                    ),
+                isSeparating = true,
+            ),
+    )
+
+private val tabletopPostureLayoutInfo =
+    FoldableLayoutInfo(
+        isFoldable = true,
+        posture = FoldablePosture.Tabletop,
+        hinge =
+            FoldableHingeInfo(
+                orientation = FoldableHingeOrientation.Horizontal,
+                state = FoldableHingeState.HalfOpened,
+                occlusionType = FoldableOcclusionType.Full,
+                bounds =
+                    FoldableHingeBounds(
+                        left = 0.dp,
+                        top = 438.dp,
+                        right = 1440.dp,
+                        bottom = 462.dp,
+                        width = 1440.dp,
+                        height = 24.dp,
                     ),
                 isSeparating = true,
             ),
@@ -120,6 +173,72 @@ private val auditAccount =
         username = "alex_j",
         displayName = "Alex Johnson",
         passkeyCredentialIds = listOf("credential-1"),
+    )
+
+private val auditNoteSiblingIds =
+    listOf(
+        Uuid.parse("00000000-0000-0000-0000-000000000191"),
+        Uuid.parse("00000000-0000-0000-0000-000000000192"),
+        Uuid.parse("00000000-0000-0000-0000-000000000193"),
+    )
+
+private val auditNoteShared =
+    NoteViewerShared(
+        noteId = auditNoteSiblingIds[1],
+        createdAt = ScreenshotTestData.baseInstant,
+        lastUpdated = ScreenshotTestData.baseInstant,
+        location =
+            NoteLocation(
+                coordinates = NoteCoordinates(latitude = 37.7749, longitude = -122.4194),
+                place =
+                    NotePlace(
+                        id = Uuid.parse("00000000-0000-0000-0000-000000000194"),
+                        name = "Mission District",
+                        latitude = 37.7749,
+                        longitude = -122.4194,
+                    ),
+            ),
+        journalContext =
+            JournalContext(
+                journalId = ScreenshotTestData.sampleJournal.id,
+                journalTitle = ScreenshotTestData.sampleJournal.title,
+                siblingNoteIds = auditNoteSiblingIds,
+                currentIndex = 1,
+            ),
+    )
+
+private val auditAudioContext =
+    AudioContext(
+        amplitudes = ScreenshotTestData.mockAmplitudes,
+        segments =
+            listOf(
+                AudioSegment(timestampMs = 8_000L, type = SegmentType.SPEECH_ONSET),
+                AudioSegment(timestampMs = 34_000L, type = SegmentType.VOLUME_PEAK),
+            ),
+        daylightPeriod = DaylightPeriod.GOLDEN_HOUR,
+        palette =
+            AudioPalette(
+                waveformGradientStart = 0xFFE8A044,
+                waveformGradientEnd = 0xFFD4603A,
+                playedFillColor = 0xFFE8A044,
+                accentColor = 0xFFE8A044,
+                immersiveBackground = 0xFF1A0F05,
+            ),
+    )
+
+private val auditAudioPlaybackState =
+    AudioPlaybackState(
+        currentlyPlayingId = Uuid.parse("00000000-0000-0000-0000-000000000195"),
+        currentUri = "preview://adaptive-audit/audio",
+        isPlaying = true,
+        progress = 0.38f,
+        duration = 182_000L.milliseconds,
+        displayInfo =
+            AudioPlaybackDisplayInfo(
+                title = "Audio note",
+                subtitle = "3:02",
+                accentColor = 0xFFE8A044,
+            ),
     )
 
 @PreviewTest
@@ -391,6 +510,84 @@ fun A47_ShareJournalBookPosture() {
 }
 
 @PreviewTest
+@Preview(name = "Note viewer text book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A48_NoteViewerTextBookPosture() {
+    BookPostureNoteViewerScene {
+        Text(
+            text =
+                "Captured the train ride home before the details blurred. The city felt quieter than usual, " +
+                    "so I wrote down the stops, the light through the windows, and the idea for tomorrow's entry.",
+            style = MaterialTheme.typography.bodyLarge,
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Note viewer image book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A49_NoteViewerImageBookPosture() {
+    BookPostureNoteViewerScene {
+        AuditNoteImage()
+    }
+}
+
+@PreviewTest
+@Preview(name = "Note viewer video book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A50_NoteViewerVideoBookPosture() {
+    BookPostureNoteViewerScene {
+        AuditNoteVideo()
+    }
+}
+
+@PreviewTest
+@Preview(name = "Note viewer audio book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A51_NoteViewerAudioBookPosture() {
+    FoldableAudioNoteViewerScene(bookPostureLayoutInfo)
+}
+
+@PreviewTest
+@Preview(name = "Note viewer text tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A52_NoteViewerTextTabletopPosture() {
+    TabletopPostureNoteViewerScene {
+        Text(
+            text =
+                "Captured the train ride home before the details blurred. The top pane keeps the note readable " +
+                    "while the lower pane keeps navigation and journal actions reachable.",
+            style = MaterialTheme.typography.bodyLarge,
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Note viewer image tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A53_NoteViewerImageTabletopPosture() {
+    TabletopPostureNoteViewerScene {
+        AuditNoteImage()
+    }
+}
+
+@PreviewTest
+@Preview(name = "Note viewer video tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A54_NoteViewerVideoTabletopPosture() {
+    TabletopPostureNoteViewerScene {
+        AuditNoteVideo()
+    }
+}
+
+@PreviewTest
+@Preview(name = "Note viewer audio tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A55_NoteViewerAudioTabletopPosture() {
+    FoldableAudioNoteViewerScene(tabletopPostureLayoutInfo)
+}
+
+@PreviewTest
 @LargeScreenAuditPreviewMatrix
 @Composable
 fun A07_JournalDetail() {
@@ -399,6 +596,83 @@ fun A07_JournalDetail() {
             uiState = auditJournalState,
             onGoBack = {},
         )
+    }
+}
+
+@Composable
+private fun BookPostureNoteViewerScene(noteContent: @Composable () -> Unit) {
+    FoldableNoteViewerScene(
+        foldableLayoutInfo = bookPostureLayoutInfo,
+        noteContent = noteContent,
+    )
+}
+
+@Composable
+private fun TabletopPostureNoteViewerScene(noteContent: @Composable () -> Unit) {
+    FoldableNoteViewerScene(
+        foldableLayoutInfo = tabletopPostureLayoutInfo,
+        noteContent = noteContent,
+    )
+}
+
+@Composable
+private fun FoldableNoteViewerScene(
+    foldableLayoutInfo: FoldableLayoutInfo,
+    noteContent: @Composable () -> Unit,
+) {
+    provideFoldableLayoutInfo(foldableLayoutInfo) {
+        ScreenshotTheme {
+            NoteViewerScaffoldContent(
+                shared = auditNoteShared,
+                onGoBack = {},
+                noteContent = noteContent,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AuditNoteImage() {
+    Image(
+        painter = painterResource(R.drawable.sample_note_photo),
+        contentDescription = null,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.large),
+        contentScale = ContentScale.Crop,
+    )
+}
+
+@Composable
+private fun AuditNoteVideo() {
+    VideoPlayerContent(
+        uri = SAMPLE_VIDEO_URI,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.large),
+    )
+}
+
+@Composable
+private fun FoldableAudioNoteViewerScene(foldableLayoutInfo: FoldableLayoutInfo) {
+    provideFoldableLayoutInfo(foldableLayoutInfo) {
+        ScreenshotTheme {
+            CompositionLocalProvider(LocalAudioPlaybackState provides auditAudioPlaybackState) {
+                AudioNoteViewerContent(
+                    uiState =
+                        AudioNoteViewerUiState.Ready(
+                            mediaRef = "preview://adaptive-audit/audio",
+                            durationMs = 182_000L,
+                            createdAt = ScreenshotTestData.baseInstant,
+                            context = auditAudioContext,
+                            playbackState = AudioPlaybackUiState(progress = 0.38f, isPlaying = true),
+                        ),
+                    onGoBack = {},
+                )
+            }
+        }
     }
 }
 
