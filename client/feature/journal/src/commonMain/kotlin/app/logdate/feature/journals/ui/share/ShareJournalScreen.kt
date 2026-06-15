@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.feature.journals.ui.JournalShape
 import app.logdate.feature.journals.ui.deriveCoverColor
 import app.logdate.shared.model.Journal
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyStandardContentWidth
@@ -172,10 +173,46 @@ fun ShareJournalContent(
     onShareJournal: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            ShareJournalPrimaryPane(
+                journal = journal,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        endPane = {
+            ShareJournalActionPane(
+                onShareToInstagram = onShareToInstagram,
+                onShareQrCode = onShareQrCode,
+                onShareJournal = onShareJournal,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        standardContent = {
+            ShareJournalStandardContent(
+                journal = journal,
+                onShareToInstagram = onShareToInstagram,
+                onShareQrCode = onShareQrCode,
+                onShareJournal = onShareJournal,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+    )
+}
+
+@Composable
+private fun ShareJournalStandardContent(
+    journal: Journal,
+    onShareToInstagram: () -> Unit,
+    onShareQrCode: () -> Unit,
+    onShareJournal: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier =
             modifier
-                .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(Spacing.lg)
                 .applyStandardContentWidth(),
@@ -187,27 +224,97 @@ fun ShareJournalContent(
             modifier = Modifier.widthIn(max = 240.dp),
         )
 
-        MaterialContainer {
-            SurfaceItem {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
-                ) {
-                    Icon(
-                        Icons.Rounded.Public,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = stringResource(Res.string.share_journal_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+        ShareJournalDescription()
+
+        ShareJournalActions(
+            onShareQrCode = onShareQrCode,
+            onShareJournal = onShareJournal,
+            onShareToInstagram = onShareToInstagram,
+        )
+
+        Spacer(modifier = Modifier.height(Spacing.lg))
+
+        NearbySharingInfo()
+    }
+}
+
+@Composable
+private fun ShareJournalPrimaryPane(
+    journal: Journal,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .verticalScroll(rememberScrollState())
+                .padding(Spacing.lg),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.xl),
+    ) {
+        ShareJournalCard(
+            journal = journal,
+            modifier = Modifier.widthIn(max = 360.dp),
+        )
+
+        ShareJournalDescription()
+    }
+}
+
+@Composable
+private fun ShareJournalActionPane(
+    onShareToInstagram: () -> Unit,
+    onShareQrCode: () -> Unit,
+    onShareJournal: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .verticalScroll(rememberScrollState())
+                .padding(Spacing.lg),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.xl),
+    ) {
+        ShareJournalActions(
+            onShareQrCode = onShareQrCode,
+            onShareJournal = onShareJournal,
+            onShareToInstagram = onShareToInstagram,
+        )
+
+        NearbySharingInfo()
+    }
+}
+
+@Composable
+private fun ShareJournalDescription() {
+    MaterialContainer {
+        SurfaceItem {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                Icon(
+                    Icons.Rounded.Public,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = stringResource(Res.string.share_journal_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
+    }
+}
 
-        // Share buttons — original layout preserved
+@Composable
+private fun ShareJournalActions(
+    onShareQrCode: () -> Unit,
+    onShareJournal: () -> Unit,
+    onShareToInstagram: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -263,31 +370,31 @@ fun ShareJournalContent(
         ) {
             Text(text = stringResource(Res.string.share_to_instagram))
         }
+    }
+}
 
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Bottom nearby sharing info
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Icon(
-                imageVector = Icons.Default.QrCode,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = stringResource(Res.string.also_sharing_to_nearby_logdate_contacts),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = stringResource(Res.string.journal_invite_description),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-        }
+@Composable
+private fun NearbySharingInfo() {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Icon(
+            imageVector = Icons.Default.QrCode,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = stringResource(Res.string.also_sharing_to_nearby_logdate_contacts),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = stringResource(Res.string.journal_invite_description),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

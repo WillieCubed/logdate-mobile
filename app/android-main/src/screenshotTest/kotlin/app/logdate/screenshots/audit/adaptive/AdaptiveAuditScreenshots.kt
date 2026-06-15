@@ -21,6 +21,8 @@ import app.logdate.feature.journals.ui.detail.JournalDetailScreenContent
 import app.logdate.feature.journals.ui.detail.JournalDetailUiState
 import app.logdate.feature.journals.ui.settings.JournalSettingsScreenContent
 import app.logdate.feature.journals.ui.settings.JournalSettingsUiState
+import app.logdate.feature.journals.ui.share.ShareJournalScreenContent
+import app.logdate.feature.journals.ui.share.ShareJournalUiState
 import app.logdate.feature.onboarding.ui.CloudAccountSetupContent
 import app.logdate.feature.onboarding.ui.OnboardingStartScreenContent
 import app.logdate.feature.onboarding.ui.PersonalIntroContent
@@ -362,6 +364,27 @@ fun A46_JournalSettingsDeleteBookPosture() {
                     ),
                 onGoBack = {},
                 showDeleteConfirmation = true,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Share journal book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A47_ShareJournalBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            ShareJournalScreenContent(
+                uiState =
+                    ShareJournalUiState.Success(
+                        journal = ScreenshotTestData.sampleJournal,
+                        lastUpdatedDisplay = "Last updated Feb 20, 2025",
+                    ),
+                onGoBack = {},
+                onShareToInstagram = {},
+                onShareQrCode = {},
+                onShareJournal = {},
             )
         }
     }
