@@ -6,10 +6,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Download
@@ -25,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
@@ -71,65 +75,113 @@ fun WatchTroubleshootingContent(
     onOpenOnWatch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(
-        title = stringResource(Res.string.watch_troubleshooting),
-        onBack = onBack,
-        modifier = modifier,
-    ) {
-        item {
-            SettingsSection(
-                title = stringResource(Res.string.watch_troubleshooting_watch_app),
-                modifier = Modifier.padding(horizontal = Spacing.lg),
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
             ) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    OutlinedButton(
-                        onClick = onBeginAssociation,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled =
-                            connectionState is WatchConnectionState.NeedsAssociation ||
-                                connectionState is WatchConnectionState.NoPairedWatch,
-                    ) {
-                        Icon(
-                            Icons.Default.Info,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(Spacing.sm))
-                        Text(stringResource(Res.string.watch_troubleshooting_pair))
-                    }
-                    OutlinedButton(
-                        onClick = onInstallOnWatch,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(
-                            Icons.Default.Download,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(Spacing.sm))
-                        Text(stringResource(Res.string.watch_troubleshooting_install))
-                    }
-                    OutlinedButton(
-                        onClick = onOpenOnWatch,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = connectionState is WatchConnectionState.Connected,
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.OpenInNew,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(Spacing.sm))
-                        Text(stringResource(Res.string.watch_troubleshooting_open))
-                    }
+                WatchTroubleshootingActions(
+                    connectionState = connectionState,
+                    onBeginAssociation = onBeginAssociation,
+                    onInstallOnWatch = onInstallOnWatch,
+                    onOpenOnWatch = onOpenOnWatch,
+                )
+            }
+        },
+        endPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+            ) {
+                TroubleshootingTips()
+            }
+        },
+        standardContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.watch_troubleshooting),
+                onBack = onBack,
+                modifier = modifier,
+            ) {
+                item {
+                    WatchTroubleshootingActions(
+                        connectionState = connectionState,
+                        onBeginAssociation = onBeginAssociation,
+                        onInstallOnWatch = onInstallOnWatch,
+                        onOpenOnWatch = onOpenOnWatch,
+                    )
+                }
+
+                item {
+                    TroubleshootingTips()
                 }
             }
-        }
+        },
+    )
+}
 
-        item {
-            TroubleshootingTips()
+@Composable
+private fun WatchTroubleshootingActions(
+    connectionState: WatchConnectionState,
+    onBeginAssociation: () -> Unit,
+    onInstallOnWatch: () -> Unit,
+    onOpenOnWatch: () -> Unit,
+) {
+    SettingsSection(
+        title = stringResource(Res.string.watch_troubleshooting_watch_app),
+        modifier = Modifier.padding(horizontal = Spacing.lg),
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            OutlinedButton(
+                onClick = onBeginAssociation,
+                modifier = Modifier.fillMaxWidth(),
+                enabled =
+                    connectionState is WatchConnectionState.NeedsAssociation ||
+                        connectionState is WatchConnectionState.NoPairedWatch,
+            ) {
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(Spacing.sm))
+                Text(stringResource(Res.string.watch_troubleshooting_pair))
+            }
+            OutlinedButton(
+                onClick = onInstallOnWatch,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(
+                    Icons.Default.Download,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(Spacing.sm))
+                Text(stringResource(Res.string.watch_troubleshooting_install))
+            }
+            OutlinedButton(
+                onClick = onOpenOnWatch,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = connectionState is WatchConnectionState.Connected,
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.OpenInNew,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(Spacing.sm))
+                Text(stringResource(Res.string.watch_troubleshooting_open))
+            }
         }
     }
 }

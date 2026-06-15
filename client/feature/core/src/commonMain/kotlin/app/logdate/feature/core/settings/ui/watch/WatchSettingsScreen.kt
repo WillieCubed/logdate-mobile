@@ -7,10 +7,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Download
@@ -31,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
@@ -104,96 +108,174 @@ fun WatchSettingsContent(
     onNavigateToTroubleshooting: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(
-        title = stringResource(Res.string.watch_settings),
-        onBack = onBack,
-        modifier = modifier,
-    ) {
-        item {
-            ConnectionStatusCard(
-                connectionState = connectionState,
-                onBeginAssociation = onBeginAssociation,
-                onInstallOnWatch = onInstallOnWatch,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
-
-        when (connectionState) {
-            is WatchConnectionState.Connected,
-            is WatchConnectionState.OutOfRange,
-            -> {
-                item {
-                    SettingsSection(
-                        title = stringResource(Res.string.watch_sync),
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    ) {
-                        SyncStatusRow(connectionState)
-
-                        OutlinedButton(
-                            onClick = onRequestSync,
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = Spacing.sm),
-                            enabled = connectionState is WatchConnectionState.Connected,
-                        ) {
-                            Icon(
-                                Icons.Default.Sync,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Spacer(Modifier.width(Spacing.sm))
-                            Text(stringResource(Res.string.watch_sync_now))
-                        }
-
-                        SettingsNavItem(
-                            title = stringResource(Res.string.watch_sync_settings),
-                            description = stringResource(Res.string.watch_sync_settings_description),
-                            onClick = onNavigateToSync,
-                        )
-                    }
-                }
-
-                item {
-                    SettingsSection(
-                        title = stringResource(Res.string.watch_notifications),
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    ) {
-                        SettingsNavItem(
-                            title = stringResource(Res.string.watch_notifications_title),
-                            description = stringResource(Res.string.watch_notifications_description),
-                            onClick = onNavigateToNotifications,
-                        )
-                    }
-                }
-            }
-
-            is WatchConnectionState.AppNotInstalled,
-            is WatchConnectionState.NeedsAssociation,
-            is WatchConnectionState.AssociationPending,
-            is WatchConnectionState.NoPairedWatch,
-            is WatchConnectionState.Loading,
-            -> {
-                // No sync/notification sections when watch isn't set up
-            }
-        }
-
-        item {
-            SettingsSection(
-                title = "",
-                modifier = Modifier.padding(horizontal = Spacing.lg),
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                SettingsNavItem(
-                    title = stringResource(Res.string.watch_troubleshooting),
-                    description = stringResource(Res.string.watch_troubleshooting_description),
-                    onClick = onNavigateToTroubleshooting,
+                ConnectionStatusCard(
+                    connectionState = connectionState,
+                    onBeginAssociation = onBeginAssociation,
+                    onInstallOnWatch = onInstallOnWatch,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
+                WatchPrivacyNote()
+            }
+        },
+        endPane = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                WatchConnectedSections(
+                    connectionState = connectionState,
+                    onRequestSync = onRequestSync,
+                    onNavigateToSync = onNavigateToSync,
+                    onNavigateToNotifications = onNavigateToNotifications,
+                )
+                WatchTroubleshootingSection(onNavigateToTroubleshooting)
+            }
+        },
+        standardContent = {
+            SettingsScaffold(
+                title = stringResource(Res.string.watch_settings),
+                onBack = onBack,
+                modifier = modifier,
+            ) {
+                item {
+                    ConnectionStatusCard(
+                        connectionState = connectionState,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                        onBeginAssociation = onBeginAssociation,
+                        onInstallOnWatch = onInstallOnWatch,
+                    )
+                }
+
+                when (connectionState) {
+                    is WatchConnectionState.Connected,
+                    is WatchConnectionState.OutOfRange,
+                    -> {
+                        item {
+                            WatchConnectedSections(
+                                connectionState = connectionState,
+                                onRequestSync = onRequestSync,
+                                onNavigateToSync = onNavigateToSync,
+                                onNavigateToNotifications = onNavigateToNotifications,
+                            )
+                        }
+                    }
+
+                    is WatchConnectionState.AppNotInstalled,
+                    is WatchConnectionState.NeedsAssociation,
+                    is WatchConnectionState.AssociationPending,
+                    is WatchConnectionState.NoPairedWatch,
+                    is WatchConnectionState.Loading,
+                    -> {
+                        // No sync/notification sections when watch isn't set up.
+                    }
+                }
+
+                item {
+                    WatchTroubleshootingSection(onNavigateToTroubleshooting)
+                }
+
+                item {
+                    WatchPrivacyNote()
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun WatchConnectedSections(
+    connectionState: WatchConnectionState,
+    onRequestSync: () -> Unit,
+    onNavigateToSync: () -> Unit,
+    onNavigateToNotifications: () -> Unit,
+) {
+    when (connectionState) {
+        is WatchConnectionState.Connected,
+        is WatchConnectionState.OutOfRange,
+        -> {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                SettingsSection(
+                    title = stringResource(Res.string.watch_sync),
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                ) {
+                    SyncStatusRow(connectionState)
+
+                    OutlinedButton(
+                        onClick = onRequestSync,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(top = Spacing.sm),
+                        enabled = connectionState is WatchConnectionState.Connected,
+                    ) {
+                        Icon(
+                            Icons.Default.Sync,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(Spacing.sm))
+                        Text(stringResource(Res.string.watch_sync_now))
+                    }
+
+                    SettingsNavItem(
+                        title = stringResource(Res.string.watch_sync_settings),
+                        description = stringResource(Res.string.watch_sync_settings_description),
+                        onClick = onNavigateToSync,
+                    )
+                }
+
+                SettingsSection(
+                    title = stringResource(Res.string.watch_notifications),
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                ) {
+                    SettingsNavItem(
+                        title = stringResource(Res.string.watch_notifications_title),
+                        description = stringResource(Res.string.watch_notifications_description),
+                        onClick = onNavigateToNotifications,
+                    )
+                }
             }
         }
 
-        item {
-            WatchPrivacyNote()
-        }
+        is WatchConnectionState.AppNotInstalled,
+        is WatchConnectionState.NeedsAssociation,
+        is WatchConnectionState.AssociationPending,
+        is WatchConnectionState.NoPairedWatch,
+        is WatchConnectionState.Loading,
+        -> Unit
+    }
+}
+
+@Composable
+private fun WatchTroubleshootingSection(onNavigateToTroubleshooting: () -> Unit) {
+    SettingsSection(
+        title = "",
+        modifier = Modifier.padding(horizontal = Spacing.lg),
+    ) {
+        SettingsNavItem(
+            title = stringResource(Res.string.watch_troubleshooting),
+            description = stringResource(Res.string.watch_troubleshooting_description),
+            onClick = onNavigateToTroubleshooting,
+        )
     }
 }
 
