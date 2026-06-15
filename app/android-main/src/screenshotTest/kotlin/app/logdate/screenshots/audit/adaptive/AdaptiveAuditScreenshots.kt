@@ -24,6 +24,7 @@ import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.feature.core.account.CloudAccountWelcomeContent
 import app.logdate.feature.core.settings.ui.ServerSelectionState
+import app.logdate.feature.core.profile.ui.ProfileEditState
 import app.logdate.feature.core.profile.ui.ProfileScreenContent
 import app.logdate.feature.core.profile.ui.ProfileUiState
 import app.logdate.feature.editor.audio.AudioContext
@@ -1041,5 +1042,32 @@ fun A08_ProfileDefault() {
             onNavigateToBirthday = {},
             snackbarHostState = snackbarHostState,
         )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Profile edit book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A67_ProfileEditBookPosture() {
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            ProfileScreenContent(
+                uiState =
+                    ProfileUiState(
+                        localProfile = auditProfile,
+                        account = auditAccount,
+                        userData = null,
+                        editState = ProfileEditState.DisplayName("Alex Johnson"),
+                    ),
+                onBack = {},
+                onStartEditingDisplayName = {},
+                onCancelEditing = {},
+                onSaveDisplayName = {},
+                onNavigateToBirthday = {},
+                snackbarHostState = snackbarHostState,
+            )
+        }
     }
 }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -50,6 +51,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +64,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.streak.StreakData
 import app.logdate.shared.model.profile.LogDateProfile
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.applyScreenStyles
@@ -199,140 +202,242 @@ fun ProfileScreenContent(
                 )
             }
 
+            ProfileAdaptiveContent(
+                profile = profile,
+                editState = uiState.editState,
+                streakData = streakData,
+                contentPadding = paddingValues,
+                onNavigateToBirthday = onNavigateToBirthday,
+                onStartEditingDisplayName = onStartEditingDisplayName,
+                onCancelEditing = onCancelEditing,
+                onSaveDisplayName = onSaveDisplayName,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileAdaptiveContent(
+    profile: ProfileDisplayModel,
+    editState: ProfileEditState,
+    streakData: StreakData,
+    contentPadding: PaddingValues,
+    onNavigateToBirthday: () -> Unit,
+    onStartEditingDisplayName: () -> Unit,
+    onCancelEditing: () -> Unit,
+    onSaveDisplayName: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FoldableBookLayout(
+        modifier = modifier.fillMaxSize(),
+        minPaneWidth = 320.dp,
+        startPane = {
+            ProfileContentList(
+                profile = profile,
+                editState = editState,
+                streakData = streakData,
+                contentPadding = contentPadding,
+                onNavigateToBirthday = onNavigateToBirthday,
+                onStartEditingDisplayName = onStartEditingDisplayName,
+                onCancelEditing = onCancelEditing,
+                onSaveDisplayName = onSaveDisplayName,
+                includeSections = false,
+            )
+        },
+        endPane = {
+            ProfileContentList(
+                profile = profile,
+                editState = editState,
+                streakData = streakData,
+                contentPadding = contentPadding,
+                onNavigateToBirthday = onNavigateToBirthday,
+                onStartEditingDisplayName = onStartEditingDisplayName,
+                onCancelEditing = onCancelEditing,
+                onSaveDisplayName = onSaveDisplayName,
+                includeHeader = false,
+            )
+        },
+        standardContent = {
             DefaultSettingsContentContainer {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = paddingValues,
-                    verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-                ) {
-                    // Profile header
-                    item {
-                        ProfileHeader(
-                            profile = profile,
-                            editState = uiState.editState,
-                            onStartEditingDisplayName = onStartEditingDisplayName,
-                            onCancelEditing = onCancelEditing,
-                            onSaveDisplayName = onSaveDisplayName,
-                            modifier =
-                                Modifier
-                                    .padding(horizontal = Spacing.lg)
-                                    .padding(vertical = Spacing.lg),
-                        )
-                    }
+                ProfileContentList(
+                    profile = profile,
+                    editState = editState,
+                    streakData = streakData,
+                    contentPadding = contentPadding,
+                    onNavigateToBirthday = onNavigateToBirthday,
+                    onStartEditingDisplayName = onStartEditingDisplayName,
+                    onCancelEditing = onCancelEditing,
+                    onSaveDisplayName = onSaveDisplayName,
+                )
+            }
+        },
+    )
+}
 
-                    // Personal Information Section
-                    item {
-                        SettingsSection(
-                            title = stringResource(Res.string.personal_information),
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
-                        ) {
-                            val formattedBirthday =
-                                if (profile.birthday == null || profile.birthday == Instant.DISTANT_PAST) {
-                                    "Not set"
-                                } else {
-                                    formatDateLocalized(
-                                        profile.birthday
-                                            .toLocalDateTime(TimeZone.UTC)
-                                            .date,
-                                    )
-                                }
-                            ListItem(
-                                headlineContent = { Text(stringResource(Res.string.birthday)) },
-                                supportingContent = { Text(formattedBirthday) },
-                                leadingContent = {
-                                    Icon(
-                                        imageVector = Icons.Default.DateRange,
-                                        contentDescription = null,
-                                    )
-                                },
-                                modifier = Modifier.clickable { onNavigateToBirthday() },
-                            )
-                        }
-                    }
+@Composable
+private fun ProfileContentList(
+    profile: ProfileDisplayModel,
+    editState: ProfileEditState,
+    streakData: StreakData,
+    contentPadding: PaddingValues,
+    onNavigateToBirthday: () -> Unit,
+    onStartEditingDisplayName: () -> Unit,
+    onCancelEditing: () -> Unit,
+    onSaveDisplayName: (String) -> Unit,
+    includeHeader: Boolean = true,
+    includeSections: Boolean = true,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = contentPadding,
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        if (includeHeader) {
+            item {
+                ProfileHeader(
+                    profile = profile,
+                    editState = editState,
+                    onStartEditingDisplayName = onStartEditingDisplayName,
+                    onCancelEditing = onCancelEditing,
+                    onSaveDisplayName = onSaveDisplayName,
+                    modifier =
+                        Modifier
+                            .padding(horizontal = Spacing.lg)
+                            .padding(vertical = Spacing.lg),
+                )
+            }
+        }
 
-                    // Journaling Stats Section (only show when streak tracking is enabled)
-                    if (streakData.isEnabled) {
-                        item {
-                            SettingsSection(
-                                title = stringResource(Res.string.journaling_stats),
-                                modifier = Modifier.padding(horizontal = Spacing.lg),
-                            ) {
-                                ProfileInfoItem(
-                                    icon = Icons.Default.LocalFireDepartment,
-                                    label = stringResource(Res.string.current_streak),
-                                    value = stringResource(Res.string.streak_day_count, streakData.currentStreak),
-                                )
-                            }
-                        }
-                    }
+        if (includeSections) {
+            item {
+                ProfilePersonalInformationSection(
+                    profile = profile,
+                    onNavigateToBirthday = onNavigateToBirthday,
+                )
+            }
 
-                    // Account Information Section (only show if user has cloud account)
-                    if (profile.hasCloudAccount) {
-                        item {
-                            SettingsSection(
-                                title = stringResource(Res.string.account_information),
-                                modifier = Modifier.padding(horizontal = Spacing.lg),
-                            ) {
-                                profile.username?.let { username ->
-                                    ProfileInfoItem(
-                                        icon = Icons.Default.Person,
-                                        label = "Username",
-                                        value = "@$username",
-                                    )
-                                }
+            if (streakData.isEnabled) {
+                item {
+                    ProfileJournalingStatsSection(streakData = streakData)
+                }
+            }
 
-                                profile.joinDate?.let { joinDate ->
-                                    ProfileInfoItem(
-                                        icon = Icons.Default.CalendarMonth,
-                                        label = "Member since",
-                                        value =
-                                            formatDateLocalized(
-                                                joinDate
-                                                    .toLocalDateTime(TimeZone.currentSystemDefault())
-                                                    .date,
-                                            ),
-                                    )
-                                }
-
-                                ListItem(
-                                    leadingContent = {
-                                        Icon(
-                                            imageVector = Icons.Default.AccountCircle,
-                                            contentDescription = null,
-                                            tint =
-                                                if (profile.isAuthenticated) {
-                                                    MaterialTheme.colorScheme.primary
-                                                } else {
-                                                    MaterialTheme.colorScheme.error
-                                                },
-                                        )
-                                    },
-                                    headlineContent = {
-                                        Text(stringResource(Res.string.authentication))
-                                    },
-                                    supportingContent = {
-                                        Text(
-                                            text =
-                                                if (profile.isAuthenticated) {
-                                                    "Authenticated"
-                                                } else {
-                                                    "Not authenticated"
-                                                },
-                                            color =
-                                                if (profile.isAuthenticated) {
-                                                    MaterialTheme.colorScheme.primary
-                                                } else {
-                                                    MaterialTheme.colorScheme.error
-                                                },
-                                        )
-                                    },
-                                )
-                            }
-                        }
-                    }
+            if (profile.hasCloudAccount) {
+                item {
+                    ProfileAccountInformationSection(profile = profile)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ProfilePersonalInformationSection(
+    profile: ProfileDisplayModel,
+    onNavigateToBirthday: () -> Unit,
+) {
+    SettingsSection(
+        title = stringResource(Res.string.personal_information),
+        modifier = Modifier.padding(horizontal = Spacing.lg),
+    ) {
+        val formattedBirthday =
+            if (profile.birthday == null || profile.birthday == Instant.DISTANT_PAST) {
+                "Not set"
+            } else {
+                formatDateLocalized(
+                    profile.birthday
+                        .toLocalDateTime(TimeZone.UTC)
+                        .date,
+                )
+            }
+        ListItem(
+            headlineContent = { Text(stringResource(Res.string.birthday)) },
+            supportingContent = { Text(formattedBirthday) },
+            leadingContent = {
+                Icon(
+                    imageVector = Icons.Default.DateRange,
+                    contentDescription = null,
+                )
+            },
+            modifier = Modifier.clickable { onNavigateToBirthday() },
+        )
+    }
+}
+
+@Composable
+private fun ProfileJournalingStatsSection(streakData: StreakData) {
+    SettingsSection(
+        title = stringResource(Res.string.journaling_stats),
+        modifier = Modifier.padding(horizontal = Spacing.lg),
+    ) {
+        ProfileInfoItem(
+            icon = Icons.Default.LocalFireDepartment,
+            label = stringResource(Res.string.current_streak),
+            value = stringResource(Res.string.streak_day_count, streakData.currentStreak),
+        )
+    }
+}
+
+@Composable
+private fun ProfileAccountInformationSection(profile: ProfileDisplayModel) {
+    SettingsSection(
+        title = stringResource(Res.string.account_information),
+        modifier = Modifier.padding(horizontal = Spacing.lg),
+    ) {
+        profile.username?.let { username ->
+            ProfileInfoItem(
+                icon = Icons.Default.Person,
+                label = "Username",
+                value = "@$username",
+            )
+        }
+
+        profile.joinDate?.let { joinDate ->
+            ProfileInfoItem(
+                icon = Icons.Default.CalendarMonth,
+                label = "Member since",
+                value =
+                    formatDateLocalized(
+                        joinDate
+                            .toLocalDateTime(TimeZone.currentSystemDefault())
+                            .date,
+                    ),
+            )
+        }
+
+        ListItem(
+            leadingContent = {
+                Icon(
+                    imageVector = Icons.Default.AccountCircle,
+                    contentDescription = null,
+                    tint =
+                        if (profile.isAuthenticated) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                )
+            },
+            headlineContent = {
+                Text(stringResource(Res.string.authentication))
+            },
+            supportingContent = {
+                Text(
+                    text =
+                        if (profile.isAuthenticated) {
+                            "Authenticated"
+                        } else {
+                            "Not authenticated"
+                        },
+                    color =
+                        if (profile.isAuthenticated) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                )
+            },
+        )
     }
 }
 
@@ -373,7 +478,7 @@ private fun ProfileHeader(
         // Display name with inline editing
         when (editState) {
             is ProfileEditState.DisplayName -> {
-                var editedName by remember { mutableStateOf(editState.currentValue) }
+                var editedName by rememberSaveable(editState.currentValue) { mutableStateOf(editState.currentValue) }
 
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
