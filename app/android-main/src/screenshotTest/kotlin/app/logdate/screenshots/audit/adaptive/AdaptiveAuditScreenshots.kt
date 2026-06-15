@@ -1,6 +1,7 @@
 package app.logdate.screenshots.audit.adaptive
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.MaterialTheme
@@ -29,7 +30,10 @@ import app.logdate.feature.editor.audio.AudioContext
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
 import app.logdate.feature.editor.audio.model.SegmentType
+import app.logdate.feature.editor.ui.audio.ActiveRecordingDisplay
+import app.logdate.feature.editor.ui.audio.AudioRecordingControls
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
+import app.logdate.feature.editor.ui.editor.RecordingState
 import app.logdate.feature.journals.ui.JournalLayoutMode
 import app.logdate.feature.journals.ui.JournalListItemUiState
 import app.logdate.feature.journals.ui.JournalSortOption
@@ -77,6 +81,8 @@ import app.logdate.ui.audio.LocalAudioPlaybackState
 import com.android.tools.screenshot.PreviewTest
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
 private const val BOOK_FOLDABLE = "spec:width=1440dp,height=900dp"
@@ -630,6 +636,47 @@ fun A59_MediaDetailVideoTabletopPosture() {
         foldableLayoutInfo = tabletopPostureLayoutInfo,
         state = LibraryScreenshotData.videoDetail.copy(mediaRef = SAMPLE_VIDEO_URI),
     )
+}
+
+@PreviewTest
+@Preview(name = "Audio recording controls tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A60_AudioRecordingControlsTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            AudioRecordingControls(
+                recordingState = RecordingState.RECORDING,
+                audioLevels = ScreenshotTestData.mockAudioLevels,
+                recordingDuration = 1.minutes + 23.seconds,
+                onStartRecording = {},
+                onStopRecording = {},
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Active recording tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A61_ActiveRecordingTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            ActiveRecordingDisplay(
+                audioLevels = ScreenshotTestData.mockAudioLevels,
+                recordingDuration = 2.minutes + 15.seconds,
+                onRestart = {},
+                onPause = {},
+                onFinish = {},
+                transcriptionText =
+                    "Started capturing notes for the adaptive audit. The active recording surface keeps the " +
+                        "live transcript readable while recording controls remain in the reachable lower pane.",
+                transcriptionIsRefining = true,
+                isPaused = false,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
 }
 
 @PreviewTest
