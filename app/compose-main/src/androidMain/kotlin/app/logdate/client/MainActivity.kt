@@ -77,10 +77,13 @@ import app.logdate.feature.core.BiometricGatekeeper
 import app.logdate.feature.core.GlobalAppUiLoadedState
 import app.logdate.feature.core.GlobalAppUiLoadingState
 import app.logdate.feature.core.GlobalAppUiState
+import app.logdate.feature.core.notifications.EXTRA_NAV_SOURCE as EXTRA_DATA_TRANSFER_NAV_SOURCE
+import app.logdate.feature.core.notifications.NAV_SOURCE_DATA_TRANSFER
 import app.logdate.feature.core.di.ActivityProvider
 import app.logdate.feature.core.export.AndroidExportLauncher
 import app.logdate.feature.core.isAppUnlocked
 import app.logdate.feature.core.restore.AndroidRestoreLauncher
+import app.logdate.feature.core.settings.navigation.ExportSettingsRoute
 import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
 import app.logdate.feature.editor.navigation.EntryEditorRoute
 import app.logdate.feature.events.navigation.EventDetailRoute
@@ -506,6 +509,10 @@ fun resolveMainActivityNavKey(intent: Intent?): NavKey? {
         intent.getStringExtra(EXTRA_REWIND_NOTIFICATION_TARGET) == REWIND_NOTIFICATION_TARGET_DETAIL -> {
             val rewindId = intent.getStringExtra(EXTRA_REWIND_NOTIFICATION_ID) ?: return null
             runCatching { RewindDetailRoute(Uuid.parse(rewindId)) }.getOrNull()
+        }
+
+        intent.getStringExtra(EXTRA_DATA_TRANSFER_NAV_SOURCE) == NAV_SOURCE_DATA_TRANSFER -> {
+            ExportSettingsRoute
         }
 
         // Deep link URIs: logdate://journal/{id}, logdate://day/{date}, etc.

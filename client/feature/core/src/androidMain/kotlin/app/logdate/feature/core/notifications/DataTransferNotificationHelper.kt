@@ -1,7 +1,9 @@
 package app.logdate.feature.core.notifications
 
+import android.app.PendingIntent
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ServiceInfo
 import androidx.annotation.StringRes
 import androidx.core.app.NotificationCompat
@@ -55,6 +57,7 @@ abstract class DataTransferNotificationHelper(
                 .Builder(context, channelId)
                 .setContentTitle(context.getString(progressTitleResId))
                 .setContentText(message)
+                .setContentIntent(createContentIntent())
                 .setSmallIcon(android.R.drawable.stat_sys_download)
                 .setProgress(100, progress, progress == 0)
                 .setOngoing(true)
@@ -84,6 +87,7 @@ abstract class DataTransferNotificationHelper(
                 .Builder(context, channelId)
                 .setContentTitle(context.getString(completeTitleResId))
                 .setContentText(contentText)
+                .setContentIntent(createContentIntent())
                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
                 .setAutoCancel(true)
                 .setSilent(true)
@@ -105,6 +109,7 @@ abstract class DataTransferNotificationHelper(
                 .Builder(context, channelId)
                 .setContentTitle(context.getString(failedTitleResId))
                 .setContentText(context.getString(R.string.error_with_message, errorMessage))
+                .setContentIntent(createContentIntent())
                 .setSmallIcon(android.R.drawable.stat_notify_error)
                 .setAutoCancel(true)
                 .setSilent(true)
@@ -114,6 +119,22 @@ abstract class DataTransferNotificationHelper(
             notificationId,
             notification,
             ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+        )
+    }
+
+    protected open fun createContentIntent(): PendingIntent? {
+        val launchIntent =
+            context.packageManager.getLaunchIntentForPackage(context.packageName)
+                ?: return null
+
+        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        launchIntent.putExtra(EXTRA_NAV_SOURCE, NAV_SOURCE_DATA_TRANSFER)
+
+        return PendingIntent.getActivity(
+            context,
+            notificationId,
+            launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }
 }

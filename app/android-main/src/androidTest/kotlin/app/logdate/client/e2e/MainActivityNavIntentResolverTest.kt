@@ -3,6 +3,7 @@ package app.logdate.client.e2e
 import android.content.Intent
 import android.net.Uri
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.core.app.ApplicationProvider
 import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_DRAFT
 import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_EVENT_DETAIL
 import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_MEMORY_RECALL
@@ -20,6 +21,12 @@ import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_ID
 import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_TARGET
 import app.logdate.client.rewind.REWIND_NOTIFICATION_TARGET_DETAIL
 import app.logdate.client.resolveMainActivityNavKey
+import app.logdate.feature.core.notifications.EXTRA_NAV_SOURCE as EXTRA_DATA_TRANSFER_NAV_SOURCE
+import app.logdate.feature.core.notifications.NAV_SOURCE_DATA_TRANSFER
+import app.logdate.feature.core.export.ExportNotificationHelper
+import app.logdate.feature.core.settings.navigation.ExportSettingsRoute
+import app.logdate.feature.core.restore.RestoreNotificationHelper
+import app.logdate.feature.core.restore.RestoreStage
 import app.logdate.client.ui.navigation.LocationTimelineRoute
 import app.logdate.client.ui.navigation.SearchRoute
 import app.logdate.feature.events.navigation.EventDetailRoute
@@ -30,7 +37,9 @@ import app.logdate.navigation.TimelineDetailRoute
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertNotNull
 import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
@@ -179,6 +188,36 @@ class MainActivityNavIntentResolverTest {
                     putExtra(EXTRA_REWIND_NOTIFICATION_ID, rewindId.toString())
                 },
             ),
+        )
+    }
+
+    @Test
+    fun dataTransferNotificationIntent_resolvesExportSettingsRoute() {
+        assertEquals(
+            ExportSettingsRoute,
+            resolveMainActivityNavKey(
+                Intent().apply {
+                    putExtra(EXTRA_DATA_TRANSFER_NAV_SOURCE, NAV_SOURCE_DATA_TRANSFER)
+                },
+            ),
+        )
+    }
+
+    @Test
+    fun dataTransferNotificationHelpers_includeLaunchIntents() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+        assertNotNull(
+            ExportNotificationHelper(context, Uuid.random().toJavaUuid())
+                .createForegroundInfo(10, "Exporting")
+                .notification
+                .contentIntent,
+        )
+        assertNotNull(
+            RestoreNotificationHelper(context, Uuid.random().toJavaUuid())
+                .createForegroundInfo(RestoreStage.PREPARING)
+                .notification
+                .contentIntent,
         )
     }
 
