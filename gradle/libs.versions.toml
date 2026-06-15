@@ -5,18 +5,17 @@ filekitCompose = "0.8.8"
 googleCloudStorage = "2.67.0"
 h2 = "2.4.240"
 jackson = "2.18.2"
-kotlin = "2.3.20"
+kotlin = "2.3.21"
 dokkaGradlePlugin = "2.2.0"
-compose-multiplatform = "1.11.0-beta02"
-compose-material3 = "1.11.0-alpha06"
+compose-multiplatform = "1.11.0"
+compose-material3 = "1.11.0-alpha07"
 compose-material-icons = "1.7.3"
-agp = "9.1.1"
+agp = "9.2.1"
 googleServicesPlugin = "4.4.4"
 crashlyticsPlugin = "3.0.6"
 gradlePlayPublisher = "4.0.0"
 buildConfigPlugin = "6.0.9"
 kover = "0.9.8"
-postgresSocketFactory = "1.28.2"
 screenshot = "0.0.1-alpha14"
 benManesVersions = "0.53.0"
 ktlint = "13.1.0"
@@ -37,29 +36,23 @@ androidx-test-orchestrator = "1.6.1"
 androidx-test-uiautomator = "2.3.0"
 
 # Common (Multiplatform) Dependencies
-ksp = "2.3.6"
+ksp = "2.3.7"
 junit = "4.13.2"
-kotlinx-coroutines = "1.10.2"
+kotlinx-coroutines = "1.11.0"
 kotlinx-serialization = "1.11.0"
 kotlinx-datetime = "0.7.1"
-ktor = "3.4.2"
+ktor = "3.4.3"
 ktor-swagger-ui = "5.6.0"
 logback = "1.5.32"
 androidx-navigation-compose = "2.9.2"
-nav3Core = "1.1.0"
 material3AdaptiveNav3 = "1.3.0-alpha10"
 # JetBrains-published Navigation 3 multiplatform — same API as androidx.navigation3 but
 # published under org.jetbrains.androidx.navigation3 with iOS / desktop / web targets.
-# NOT WIRED YET: navigation3-ui:1.1.1 declares a dep on navigation3-runtime:1.1.1, but
-# only dev builds of -runtime are published to the JetBrains compose dev repo, so the
-# resolution fails. Retry once JetBrains pushes a stable runtime that matches the UI
-# version, then wire from `app/compose-main/build.gradle.kts` and start the migration
-# from `androidx.navigation.compose`.
 jetbrains-navigation3 = "1.1.0-alpha04"
 jetbrains-lifecycleViewmodelNav3 = "2.10.0-alpha05"
 jetbrains-material3AdaptiveNav3Mp = "1.3.0-alpha02"
-# Google-published canonical Navigation 3. -runtime is KMP since 1.0.0-alpha08 (JVM,
-# Native, Web), -ui is Android-only. iOS/desktop need a custom NavDisplay.
+# Google-published canonical Navigation 3. -runtime is KMP (JVM, Native, Web),
+# -ui is Android-only — iOS/desktop need a custom NavDisplay.
 nav3 = "1.1.1"
 lifecycleViewmodelNav3 = "2.11.0-alpha03"
 
@@ -68,8 +61,7 @@ koin = "4.2.1"
 koin-annotations-bom = "4.2.1"
 
 material = "1.14.0-beta01"
-material3-adaptive = "1.3.0-alpha06"
-adaptiveNavigationSuite = "1.3.1"
+material3-adaptive = "1.3.0-alpha07"
 
 room = "2.8.4"
 sqlite = "2.6.2"
@@ -130,13 +122,13 @@ androidxCredentials = "1.7.0-alpha02"
 androidx-security-crypto = "1.1.0"
 
 accompanist = "0.37.3"
-firebase-bom = "34.12.0"
+firebase-bom = "34.13.0"
 firebase-perf-plugin = "2.0.2"
 
 # Others
 versioningPlugin = "2.2.0"
 playServicesWearable = "19.0.0"
-composeBom = "2026.03.01"
+composeBom = "2026.05.00"
 composeMaterial = "1.6.1"
 wearToolingPreview = "1.0.0"
 wearComposeMaterial3 = "1.6.1"
@@ -150,8 +142,7 @@ horologistComposeTools = "0.8.3-alpha"
 horologistTiles = "0.8.3-alpha"
 wearRemoteInteractions = "1.2.0"
 watchfaceComplicationsDataSourceKtx = "1.3.0"
-uiAndroid = "1.11.0-rc01"
-kotlinxUuid = "0.0.15"
+uiAndroid = "1.11.1"
 okio = "3.17.0"
 zxing = "3.5.4"
 
@@ -166,7 +157,6 @@ desugar_jdk_libs = { module = "com.android.tools:desugar_jdk_libs", version.ref 
 filekit-compose = { module = "io.github.vinceglb:filekit-compose", version.ref = "filekitCompose" }
 google-cloud-storage = { module = "com.google.cloud:google-cloud-storage", version.ref = "googleCloudStorage" }
 h2 = { module = "com.h2database:h2", version.ref = "h2" }
-postgres-socket-factory = { module = "com.google.cloud.sql:postgres-socket-factory", version.ref = "postgresSocketFactory" }
 screenshot-validation-api = { group = "com.android.tools.screenshot", name = "screenshot-validation-api", version.ref = "screenshot" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
@@ -191,16 +181,12 @@ material3-adaptive = { group = "org.jetbrains.compose.material3.adaptive", name 
 material3-adaptive-layout = { group = "org.jetbrains.compose.material3.adaptive", name = "adaptive-layout", version.ref = "material3-adaptive" }
 material3-adaptive-navigation = { group = "org.jetbrains.compose.material3.adaptive", name = "adaptive-navigation", version.ref = "material3-adaptive" }
 androidx-navigation-compose = { group = "org.jetbrains.androidx.navigation", name = "navigation-compose", version.ref = "androidx-navigation-compose" }
-# Core Navigation 3 libraries
-androidx-navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "nav3Core" }
-androidx-navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "nav3Core" }
 
 # Optional add-on libraries
 androidx-material3-adaptive-navigation3 = { group = "androidx.compose.material3.adaptive", name = "adaptive-navigation3", version.ref = "material3AdaptiveNav3" }
 androidx-lifecycle-viewmodel-navigation3 = { module = "androidx.lifecycle:lifecycle-viewmodel-navigation3", version.ref = "lifecycleViewmodelNav3" }
 
 # JetBrains Navigation 3 multiplatform (commonMain) — used by the cross-platform graph.
-jetbrains-navigation3-runtime = { module = "org.jetbrains.androidx.navigation3:navigation3-runtime", version.ref = "jetbrains-navigation3" }
 jetbrains-navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "jetbrains-navigation3" }
 jetbrains-lifecycle-viewmodel-navigation3 = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-navigation3", version.ref = "jetbrains-lifecycleViewmodelNav3" }
 jetbrains-material3-adaptive-navigation3-mp = { module = "org.jetbrains.compose.material3.adaptive:adaptive-navigation3", version.ref = "jetbrains-material3AdaptiveNav3Mp" }
@@ -220,9 +206,6 @@ kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.
 # Serialization
 kotlinx-serialization-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
-
-# UUID
-kotlinx-uuid-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-uuid-core", version.ref = "kotlinxUuid" }
 
 # Ktor
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
@@ -321,6 +304,7 @@ androidx-annotation = { group = "androidx.annotation", name = "annotation", vers
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidxCoreKtx" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "androidxCoreSplashScreen" }
 androidx-window = { group = "androidx.window", name = "window", version.ref = "androidx-window" }
+androidx-window-testing = { group = "androidx.window", name = "window-testing", version.ref = "androidx-window" }
 
 ## AndroidX Camera
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "androidxCamera" }
@@ -394,9 +378,6 @@ ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negoti
 ktor-server-cors = { module = "io.ktor:ktor-server-cors-jvm", version.ref = "ktor" }
 ktor-server-forwarded-header = { module = "io.ktor:ktor-server-forwarded-header-jvm", version.ref = "ktor" }
 ktor-server-http-redirect = { module = "io.ktor:ktor-server-http-redirect-jvm", version.ref = "ktor" }
-ktor-server-openapi = { module = "io.ktor:ktor-server-openapi-jvm", version.ref = "ktor" }
-ktor-server-routing-openapi = { module = "io.ktor:ktor-server-routing-openapi-jvm", version.ref = "ktor" }
-ktor-server-swagger = { module = "io.ktor:ktor-server-swagger-jvm", version.ref = "ktor" }
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
 ktor-swagger-ui = { module = "io.github.smiley4:ktor-swagger-ui", version.ref = "ktor-swagger-ui" }
 ktor-openapi = { module = "io.github.smiley4:ktor-openapi", version.ref = "ktor-swagger-ui" }

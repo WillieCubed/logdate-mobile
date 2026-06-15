@@ -9,6 +9,9 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import app.logdate.client.device.crypto.IdentityKeyManager
+import app.logdate.client.domain.backup.BackupProgress
+import app.logdate.client.domain.backup.CreateEncryptedBackupUseCase
 import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.export.ExportIssue
 import app.logdate.client.domain.export.ExportIssueCode
@@ -19,6 +22,7 @@ import app.logdate.client.domain.export.ExportStage
 import app.logdate.client.domain.export.ExportUserDataUseCase
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.catch
+import okio.Path.Companion.toPath
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.io.File
@@ -27,6 +31,7 @@ import java.io.InputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * WorkManager worker for exporting user data according to the LogDate export specification.
@@ -51,17 +56,24 @@ class ExportWorker(
         const val INCLUDE_DRAFTS_KEY = "include_drafts"
         const val INCLUDE_MEDIA_KEY = "include_media"
         const val DATE_CUTOFF_MILLIS_KEY = "date_cutoff_millis"
+        const val ARCHIVE_FORMAT_KEY = "archive_format"
     }
 
     private val exportUserDataUseCase: ExportUserDataUseCase by inject()
+    private val createEncryptedBackupUseCase: CreateEncryptedBackupUseCase by inject()
+    private val identityKeyManager: IdentityKeyManager by inject()
     private val exportLauncher: ExportLauncher by inject()
-    private val notificationHelper = ExportNotificationHelper(context, id)
+    private val notificationHelper = ExportNotificationHelper(context, Uuid.parse(id.toString()))
 
     private val destinationUri: Uri? = inputData.getString(DESTINATION_URI_KEY)?.toUri()
     private val includeJournals: Boolean = inputData.getBoolean(INCLUDE_JOURNALS_KEY, true)
     private val includeNotes: Boolean = inputData.getBoolean(INCLUDE_NOTES_KEY, true)
     private val includeDrafts: Boolean = inputData.getBoolean(INCLUDE_DRAFTS_KEY, true)
     private val includeMedia: Boolean = inputData.getBoolean(INCLUDE_MEDIA_KEY, true)
+    private val archiveFormat: ExportArchiveFormat =
+        runCatching {
+            ExportArchiveFormat.valueOf(inputData.getString(ARCHIVE_FORMAT_KEY) ?: ExportArchiveFormat.LegacyZip.name)
+        }.getOrDefault(ExportArchiveFormat.LegacyZip)
     private val dateRangeCutoff: Instant? =
         inputData
             .getLong(DATE_CUTOFF_MILLIS_KEY, -1L)
@@ -91,6 +103,10 @@ class ExportWorker(
         Napier.i("ExportWorker: Foreground service setup complete")
 
         return try {
+            if (archiveFormat == ExportArchiveFormat.EncryptedBackup) {
+                return createEncryptedBackup()
+            }
+
             var finalResult = Result.success()
             Napier.i("ExportWorker: About to call exportUserDataUseCase.exportUserData()")
 
@@ -176,6 +192,75 @@ class ExportWorker(
             trySetForeground(notificationHelper.createErrorInfo(WORKER_FAILED_MESSAGE))
             failureResult(WORKER_FAILED_MESSAGE)
         }
+    }
+
+    private suspend fun createEncryptedBackup(): Result {
+        val recoveryPhrase =
+            identityKeyManager.getStoredRecoveryPhrase()?.words
+                ?: return failureResult(
+                    "Recovery phrase is not available. Complete recovery phrase setup before creating an encrypted backup.",
+                )
+        val outputFile = File(context.cacheDir, generateEncryptedBackupFileName())
+
+        var finalResult = Result.success()
+        createEncryptedBackupUseCase(outputFile.absolutePath.toPath(), recoveryPhrase)
+            .collect { progress ->
+                when (progress) {
+                    BackupProgress.Starting -> emitProgress(0, "Starting encrypted backup...")
+                    BackupProgress.ExportingData -> emitProgress(20, "Collecting backup data...")
+                    BackupProgress.DerivingKeys -> emitProgress(45, "Preparing encryption...")
+                    BackupProgress.Encrypting -> emitProgress(70, "Encrypting backup...")
+                    is BackupProgress.Completed -> {
+                        val savedExport =
+                            if (destinationUri != null) {
+                                copyBackupToUri(outputFile, destinationUri)
+                            } else {
+                                copyBackupToDownloads(outputFile)
+                            }
+                        exportLauncher.updateProgress(
+                            ExportProgressInfo(
+                                isActive = false,
+                                progressPercent = 100,
+                                message = "Encrypted backup completed",
+                                completedFilePath = savedExport.path,
+                            ),
+                        )
+                        finalResult =
+                            Result.success(
+                                workDataOf(
+                                    PROGRESS_KEY to 100,
+                                    MESSAGE_KEY to "Encrypted backup completed",
+                                    FILE_PATH_KEY to savedExport.path,
+                                ),
+                            )
+                    }
+                    is BackupProgress.Failed -> {
+                        finalResult = failureResult(progress.error)
+                    }
+                }
+            }
+
+        outputFile.delete()
+        return finalResult
+    }
+
+    private fun copyBackupToUri(
+        source: File,
+        uri: Uri,
+    ): SavedExport {
+        context.contentResolver.openOutputStream(uri)?.use { output ->
+            source.inputStream().use { input -> input.copyTo(output) }
+        } ?: throw IllegalStateException("Could not open output stream for URI: $uri")
+        return SavedExport(path = uri.toString())
+    }
+
+    private fun copyBackupToDownloads(source: File): SavedExport {
+        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val file = File(downloadsDir, generateEncryptedBackupFileName())
+        source.inputStream().use { input ->
+            FileOutputStream(file).use { output -> input.copyTo(output) }
+        }
+        return SavedExport(path = file.absolutePath)
     }
 
     private fun failureResult(message: String): Result =

@@ -2,8 +2,8 @@ package app.logdate.client.e2e
 
 import android.content.Intent
 import android.net.Uri
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_DRAFT
 import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_EVENT_DETAIL
 import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_MEMORY_RECALL
@@ -39,7 +39,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertNotNull
 import kotlin.uuid.Uuid
-import kotlin.uuid.toJavaUuid
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
@@ -208,13 +207,13 @@ class MainActivityNavIntentResolverTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
         assertNotNull(
-            ExportNotificationHelper(context, Uuid.random().toJavaUuid())
+            ExportNotificationHelper(context, Uuid.random())
                 .createForegroundInfo(10, "Exporting")
                 .notification
                 .contentIntent,
         )
         assertNotNull(
-            RestoreNotificationHelper(context, Uuid.random().toJavaUuid())
+            RestoreNotificationHelper(context, Uuid.random())
                 .createForegroundInfo(RestoreStage.PREPARING)
                 .notification
                 .contentIntent,

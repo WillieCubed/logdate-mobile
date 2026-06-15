@@ -5,6 +5,7 @@ import androidx.work.ForegroundInfo
 import app.logdate.client.feature.core.R
 import app.logdate.client.notifications.LogDateNotificationChannelKey
 import app.logdate.feature.core.notifications.DataTransferNotificationHelper
+import kotlin.uuid.Uuid
 
 /**
  * Export-specific notification helper. Delegates all notification building
@@ -13,7 +14,7 @@ import app.logdate.feature.core.notifications.DataTransferNotificationHelper
  */
 class ExportNotificationHelper(
     context: Context,
-    workId: java.util.UUID,
+    workId: Uuid,
 ) : DataTransferNotificationHelper(context, workId) {
     override val channelId = LogDateNotificationChannelKey.DATA_EXPORT.id
     override val notificationId = LogDateNotificationChannelKey.DATA_EXPORT.notificationId ?: 1003

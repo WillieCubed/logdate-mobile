@@ -323,6 +323,7 @@ dependencies {
     androidTestImplementation("io.mockk:mockk-android:1.14.9")
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestUtil(libs.androidx.test.orchestrator)
+    androidTestImplementation(libs.androidx.window.testing)
     androidTestImplementation(libs.androidx.ui.test.junit4)
     androidTestImplementation(libs.androidx.activity.compose)
     androidTestImplementation(libs.compose.material3)

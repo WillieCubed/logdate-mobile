@@ -8,6 +8,10 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import app.logdate.client.device.crypto.IdentityKeyManager
+import app.logdate.client.domain.backup.EncryptedBackupFileFormat
+import app.logdate.client.domain.backup.RestoreFromEncryptedBackupUseCase
+import app.logdate.client.domain.backup.RestoreProgress
 import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.restore.MediaImporter
 import app.logdate.client.domain.restore.RestoreBundle
@@ -17,11 +21,15 @@ import app.logdate.client.media.MediaManager
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import okio.Path.Companion.toPath
+import okio.buffer
+import okio.source
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipFile
+import kotlin.uuid.Uuid
 
 /**
  * WorkManager worker for restoring user data from a LogDate export archive.
@@ -41,10 +49,12 @@ class RestoreWorker(
     }
 
     private val restoreUserDataUseCase: RestoreUserDataUseCase by inject()
+    private val restoreFromEncryptedBackupUseCase: RestoreFromEncryptedBackupUseCase by inject()
+    private val identityKeyManager: IdentityKeyManager by inject()
     private val mediaManager: MediaManager by inject()
     private val restoreLauncher: RestoreLauncher by inject()
     private val json = Json { ignoreUnknownKeys = true }
-    private val notificationHelper = RestoreNotificationHelper(context, id)
+    private val notificationHelper = RestoreNotificationHelper(context, Uuid.parse(id.toString()))
 
     private val sourceUri: Uri? = inputData.getString(SOURCE_URI_KEY)?.toUri()
     private val includeDrafts: Boolean = inputData.getBoolean(INCLUDE_DRAFTS_KEY, true)
@@ -68,6 +78,10 @@ class RestoreWorker(
                 ?: return failure("Unable to read restore archive")
 
         emitProgress(RestoreStage.OPENING_ARCHIVE, 10)
+        if (tempFile.isEncryptedBackup()) {
+            return restoreEncryptedBackup(tempFile, sourceLabel)
+        }
+
         val zipFile =
             runCatching { ZipFile(tempFile) }
                 .getOrElse { error ->
@@ -144,6 +158,61 @@ class RestoreWorker(
             tempFile.delete()
         }
     }
+
+    private suspend fun restoreEncryptedBackup(
+        file: File,
+        sourceLabel: String,
+    ): Result {
+        val recoveryPhrase =
+            identityKeyManager.getStoredRecoveryPhrase()?.words
+                ?: run {
+                    file.delete()
+                    restoreLauncher.completeRestore(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
+                    return failure("Recovery phrase is not available")
+                }
+
+        return try {
+            val result =
+                restoreFromEncryptedBackupUseCase.restore(
+                    backupFile = file.absolutePath.toPath(),
+                    recoveryPhrase = recoveryPhrase,
+                    onProgress = { progress ->
+                        when (progress) {
+                            RestoreProgress.Starting -> emitProgress(RestoreStage.PREPARING, 0)
+                            RestoreProgress.DerivingKeys -> emitProgress(RestoreStage.OPENING_ARCHIVE, 10)
+                            RestoreProgress.Decrypting -> emitProgress(RestoreStage.READING_CONTENTS, 20)
+                            RestoreProgress.RestoringData -> emitProgress(RestoreStage.RESTORING_JOURNALS, 40)
+                            RestoreProgress.Completed -> emitProgress(RestoreStage.IMPORTING_MEDIA, 98)
+                            is RestoreProgress.Failed -> Unit
+                        }
+                    },
+                ) ?: throw IllegalStateException("Encrypted restore did not return a result")
+
+            val summary = result.toSummary(source = sourceLabel)
+            trySetForeground(notificationHelper.createCompletionInfo())
+            restoreLauncher.completeRestore(RestoreOutcome.Success(summary))
+            Result.success(
+                workDataOf(
+                    SUMMARY_JSON_KEY to json.encodeToString(summary),
+                ),
+            )
+        } catch (e: Exception) {
+            Napier.e("Encrypted backup restore failed", e)
+            trySetForeground(notificationHelper.createErrorInfo(e.message ?: "Restore failed"))
+            restoreLauncher.completeRestore(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
+            failure(e.message ?: "Restore failed")
+        } finally {
+            restoreLauncher.updateProgress(RestoreProgressInfo.Idle)
+            file.delete()
+        }
+    }
+
+    private fun File.isEncryptedBackup(): Boolean =
+        runCatching {
+            source().buffer().use { source ->
+                EncryptedBackupFileFormat.isEncryptedBackup(source)
+            }
+        }.getOrDefault(false)
 
     private suspend fun emitProgress(
         stage: RestoreStage,

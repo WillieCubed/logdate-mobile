@@ -1,7 +1,7 @@
 package app.logdate.feature.core.notifications
 
-import android.app.PendingIntent
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -10,6 +10,8 @@ import androidx.core.app.NotificationCompat
 import androidx.work.ForegroundInfo
 import androidx.work.WorkManager
 import app.logdate.client.feature.core.R
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
 
 /**
  * Shared base for export and restore notification helpers.
@@ -20,7 +22,7 @@ import app.logdate.client.feature.core.R
  */
 abstract class DataTransferNotificationHelper(
     protected val context: Context,
-    protected val workId: java.util.UUID,
+    protected val workId: Uuid,
 ) {
     protected abstract val channelId: String
     protected abstract val notificationId: Int
@@ -50,7 +52,7 @@ abstract class DataTransferNotificationHelper(
         val cancelIntent =
             WorkManager
                 .getInstance(context)
-                .createCancelPendingIntent(workId)
+                .createCancelPendingIntent(workId.toJavaUuid())
 
         val notification =
             NotificationCompat
