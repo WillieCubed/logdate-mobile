@@ -9,8 +9,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -24,7 +27,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
@@ -71,26 +78,91 @@ fun WelcomeBackScreen(
             enter = fadeIn(animationSpec = tween(durationMillis = WELCOME_BACK_FADE_MILLIS)),
             exit = fadeOut(animationSpec = tween(durationMillis = WELCOME_BACK_FADE_MILLIS)),
         ) {
-            WelcomeBackScreenContent(name = name)
+            WelcomeBackScreenContent(name = name, modifier = Modifier.fillMaxSize())
         }
     }
 }
 
 @Composable
-fun WelcomeBackScreenContent(name: String) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(Spacing.xl, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
+fun WelcomeBackScreenContent(
+    name: String,
+    modifier: Modifier = Modifier,
+) {
+    FoldableTabletopLayout(
+        modifier = modifier,
+        minPaneHeight = 220.dp,
+        topPane = {
+            WelcomeBackTitlePane(name = name, modifier = Modifier.fillMaxSize())
+        },
+        bottomPane = {
+            WelcomeBackBodyPane(modifier = Modifier.fillMaxSize())
+        },
+        fallback = {
+            FoldableBookLayout(
+                modifier = Modifier.fillMaxSize(),
+                minPaneWidth = 320.dp,
+                startPane = {
+                    WelcomeBackTitlePane(name = name, modifier = Modifier.fillMaxSize())
+                },
+                endPane = {
+                    WelcomeBackBodyPane(modifier = Modifier.fillMaxSize())
+                },
+                standardContent = {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xl, Alignment.CenterVertically),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        WelcomeBackTitle(name = name)
+                        WelcomeBackBody()
+                    }
+                },
+            )
+        },
+    )
+}
+
+@Composable
+private fun WelcomeBackTitlePane(
+    name: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.padding(Spacing.xl),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(
-            stringResource(Res.string.onboarding_welcome_back_title, name),
-            style = MaterialTheme.typography.headlineMedium,
-        )
-        Text(
-            stringResource(Res.string.onboarding_welcome_back_description_streak_reset),
-            style = MaterialTheme.typography.bodyLarge,
-        )
+        WelcomeBackTitle(name = name)
     }
+}
+
+@Composable
+private fun WelcomeBackBodyPane(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.padding(Spacing.xl),
+        contentAlignment = Alignment.Center,
+    ) {
+        WelcomeBackBody()
+    }
+}
+
+@Composable
+private fun WelcomeBackTitle(name: String) {
+    Text(
+        text = stringResource(Res.string.onboarding_welcome_back_title, name),
+        modifier = Modifier.widthIn(max = 420.dp),
+        style = MaterialTheme.typography.headlineMedium,
+        textAlign = TextAlign.Center,
+    )
+}
+
+@Composable
+private fun WelcomeBackBody() {
+    Text(
+        text = stringResource(Res.string.onboarding_welcome_back_description_streak_reset),
+        modifier = Modifier.widthIn(max = 420.dp),
+        style = MaterialTheme.typography.bodyLarge,
+        textAlign = TextAlign.Center,
+    )
 }
 
 @Preview

@@ -71,6 +71,7 @@ import app.logdate.feature.onboarding.ui.OnboardingStartScreenContent
 import app.logdate.feature.onboarding.ui.PersonalIntroContent
 import app.logdate.feature.onboarding.ui.PersonalIntroStep
 import app.logdate.feature.onboarding.ui.PersonalIntroUiState
+import app.logdate.feature.onboarding.ui.WelcomeBackScreenContent
 import app.logdate.feature.search.ui.SearchScreenContent
 import app.logdate.feature.search.ui.SearchScreenState
 import app.logdate.feature.timeline.ui.details.TimelineDayDetailPanel
@@ -380,6 +381,68 @@ fun A01_OnboardingStartLanding() {
             onGetStarted = {},
             onStartFromBackup = {},
         )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Onboarding start book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A68_OnboardingStartBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            OnboardingStartScreenContent(
+                showLanding = true,
+                onGetStarted = {},
+                onStartFromBackup = {},
+                modifier = Modifier.fillMaxSize(),
+                animateContent = false,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Onboarding start tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A69_OnboardingStartTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            OnboardingStartScreenContent(
+                showLanding = true,
+                onGetStarted = {},
+                onStartFromBackup = {},
+                modifier = Modifier.fillMaxSize(),
+                animateContent = false,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Welcome back book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A70_WelcomeBackBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            WelcomeBackScreenContent(
+                name = "Alex",
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Welcome back tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A71_WelcomeBackTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            WelcomeBackScreenContent(
+                name = "Alex",
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.FilledTonalButton
@@ -32,6 +33,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
@@ -91,38 +94,217 @@ fun OnboardingStartScreenContent(
                 .padding(Spacing.lg),
         contentAlignment = Alignment.Center,
     ) {
-        Box(
+        if (animateContent) {
+            AnimatedContent(
+                targetState = showLanding,
+                transitionSpec = { onboardingFadeTransition() },
+                label = "Main Content",
+                modifier = Modifier.fillMaxSize(),
+            ) { target ->
+                if (target) {
+                    OnboardingLandingContent(
+                        onGetStarted = onGetStarted,
+                        onStartFromBackup = onStartFromBackup,
+                        useLargerTextSizes = useLargerTextSizes,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    OnboardingSplashPane()
+                }
+            }
+        } else if (showLanding) {
+            OnboardingLandingContent(
+                onGetStarted = onGetStarted,
+                onStartFromBackup = onStartFromBackup,
+                useLargerTextSizes = useLargerTextSizes,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            OnboardingSplashPane()
+        }
+    }
+}
+
+@Composable
+private fun OnboardingSplashPane() {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .widthIn(max = 520.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        OnboardingSplashContent()
+    }
+}
+
+@Composable
+private fun OnboardingLandingContent(
+    onGetStarted: () -> Unit,
+    onStartFromBackup: () -> Unit,
+    modifier: Modifier = Modifier,
+    useLargerTextSizes: Boolean = false,
+) {
+    FoldableTabletopLayout(
+        modifier = modifier,
+        minPaneHeight = 260.dp,
+        topPane = {
+            OnboardingLandingMessagePane(
+                useLargerTextSizes = useLargerTextSizes,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        bottomPane = {
+            OnboardingLandingActionPane(
+                onGetStarted = onGetStarted,
+                onStartFromBackup = onStartFromBackup,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        fallback = {
+            FoldableBookLayout(
+                modifier = Modifier.fillMaxSize(),
+                minPaneWidth = 320.dp,
+                startPane = {
+                    OnboardingLandingMessagePane(
+                        useLargerTextSizes = useLargerTextSizes,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+                endPane = {
+                    OnboardingLandingActionPane(
+                        onGetStarted = onGetStarted,
+                        onStartFromBackup = onStartFromBackup,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+                standardContent = {
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.primary),
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(96.dp, Alignment.CenterVertically),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            OnboardingLandingMessage(useLargerTextSizes = useLargerTextSizes)
+                            OnboardingLandingActions(
+                                onGetStarted = onGetStarted,
+                                onStartFromBackup = onStartFromBackup,
+                            )
+                        }
+                    }
+                },
+            )
+        },
+    )
+}
+
+@Composable
+private fun OnboardingLandingMessagePane(
+    useLargerTextSizes: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .background(MaterialTheme.colorScheme.primary)
+                .padding(Spacing.lg),
+        contentAlignment = Alignment.Center,
+    ) {
+        OnboardingLandingMessage(useLargerTextSizes = useLargerTextSizes)
+    }
+}
+
+@Composable
+private fun OnboardingLandingActionPane(
+    onGetStarted: () -> Unit,
+    onStartFromBackup: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .background(MaterialTheme.colorScheme.primary)
+                .padding(Spacing.lg),
+        contentAlignment = Alignment.Center,
+    ) {
+        OnboardingLandingActions(
+            onGetStarted = onGetStarted,
+            onStartFromBackup = onStartFromBackup,
+        )
+    }
+}
+
+@Composable
+private fun OnboardingLandingMessage(useLargerTextSizes: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxWidth().widthIn(max = 520.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            stringResource(Res.string.onboarding_start_welcome_title),
+            style =
+                if (useLargerTextSizes) {
+                    MaterialTheme.typography.displaySmall
+                } else {
+                    MaterialTheme.typography.headlineLarge
+                },
+            color = MaterialTheme.colorScheme.onPrimary,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            stringResource(Res.string.onboarding_start_welcome_subtitle),
+            style =
+                if (useLargerTextSizes) {
+                    MaterialTheme.typography.headlineSmall
+                } else {
+                    MaterialTheme.typography.headlineMedium
+                },
+            color = MaterialTheme.colorScheme.onPrimary,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun OnboardingLandingActions(
+    onGetStarted: () -> Unit,
+    onStartFromBackup: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .widthIn(max = 320.dp)
+                .heightIn(max = 220.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.CenterVertically),
+    ) {
+        FilledTonalButton(
+            onClick = onGetStarted,
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .widthIn(max = 520.dp),
-            contentAlignment = Alignment.Center,
+                    .testTag(ONBOARDING_START_GET_STARTED_TAG)
+                    .semantics {
+                        contentDescription = ONBOARDING_START_GET_STARTED_TAG
+                    },
         ) {
-            if (animateContent) {
-                AnimatedContent(
-                    showLanding,
-                    transitionSpec = { onboardingFadeTransition() },
-                    label = "Main Content",
-                ) { target ->
-                    if (target) {
-                        OnboardingLandingContent(
-                            onGetStarted = onGetStarted,
-                            onStartFromBackup = onStartFromBackup,
-                            useLargerTextSizes = useLargerTextSizes,
-                        )
-                    } else {
-                        OnboardingSplashContent()
-                    }
-                }
-            } else if (showLanding) {
-                OnboardingLandingContent(
-                    onGetStarted = onGetStarted,
-                    onStartFromBackup = onStartFromBackup,
-                    useLargerTextSizes = useLargerTextSizes,
-                )
-            } else {
-                OnboardingSplashContent()
-            }
+            Text(stringResource(UiRes.string.common_get_started))
+        }
+        OutlinedButton(
+            onClick = onStartFromBackup,
+            modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_START_FROM_BACKUP_TAG),
+        ) {
+            Text(
+                stringResource(Res.string.onboarding_action_sign_in),
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
         }
     }
 }
@@ -159,83 +341,6 @@ private fun OnboardingSplashContent() {
                     color = MaterialTheme.colorScheme.onPrimary,
                     textAlign = TextAlign.Center,
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun OnboardingLandingContent(
-    onGetStarted: () -> Unit,
-    onStartFromBackup: () -> Unit,
-    useLargerTextSizes: Boolean = false,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.primary),
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Column(
-            // TODO: Reduce spacing between buttons and title block on screens with less height
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(96.dp, Alignment.CenterVertically),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    stringResource(Res.string.onboarding_start_welcome_title),
-                    style =
-                        if (useLargerTextSizes) {
-                            MaterialTheme.typography.displaySmall
-                        } else {
-                            MaterialTheme.typography.headlineLarge
-                        },
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    stringResource(Res.string.onboarding_start_welcome_subtitle),
-                    style =
-                        if (useLargerTextSizes) {
-                            MaterialTheme.typography.headlineSmall
-                        } else {
-                            MaterialTheme.typography.headlineMedium
-                        },
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    textAlign = TextAlign.Center,
-                )
-            }
-            Column(
-                modifier = Modifier.widthIn(max = 240.dp),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                FilledTonalButton(
-                    onClick = onGetStarted,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .testTag(ONBOARDING_START_GET_STARTED_TAG)
-                            .semantics {
-                                contentDescription = ONBOARDING_START_GET_STARTED_TAG
-                            },
-                ) {
-                    Text(stringResource(UiRes.string.common_get_started))
-                }
-                OutlinedButton(
-                    onClick = onStartFromBackup,
-                    modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_START_FROM_BACKUP_TAG),
-                ) {
-                    Text(
-                        stringResource(Res.string.onboarding_action_sign_in),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                }
             }
         }
     }
