@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.HingeAwareOverlay
 
 /**
  * Surfaces the in-app update banner above the navigation graph when Play has reported an
@@ -59,30 +60,39 @@ fun AppUpdatePrompt(
     }
     if (message == null) return
 
-    Surface(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .widthIn(max = 560.dp)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        tonalElevation = 4.dp,
+    // Pin the banner to a single physical pane (aligned to the top of that pane) so a centered
+    // banner cannot straddle a foldable hinge. Non-foldable windows keep the intrinsic top banner
+    // (fillMaxSizeWhenFlat = false), preserving the caller's top-center alignment and insets.
+    HingeAwareOverlay(
+        modifier = modifier,
+        alignment = Alignment.TopCenter,
+        fillMaxSizeWhenFlat = false,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Surface(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 560.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            tonalElevation = 4.dp,
         ) {
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
-            )
-            if (actionLabel != null && onAction != null) {
-                TextButton(onClick = onAction) {
-                    Text(actionLabel)
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                if (actionLabel != null && onAction != null) {
+                    TextButton(onClick = onAction) {
+                        Text(actionLabel)
+                    }
                 }
             }
         }

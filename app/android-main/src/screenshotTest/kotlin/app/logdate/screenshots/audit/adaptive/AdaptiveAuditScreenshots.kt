@@ -22,6 +22,7 @@ import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.repository.search.SearchContentType
+import app.logdate.client.ui.LockableContent
 import app.logdate.feature.core.account.CloudAccountWelcomeContent
 import app.logdate.feature.core.account.CloudAccountSignInContent
 import app.logdate.feature.core.account.PasskeyAccountCreationFinalContent
@@ -37,6 +38,9 @@ import app.logdate.feature.core.settings.ui.ResetSettingsScreen
 import app.logdate.feature.core.settings.ui.ConflictsState
 import app.logdate.feature.core.settings.ui.IntegrityState
 import app.logdate.feature.core.settings.ui.StorageQuotaUi
+import app.logdate.feature.core.settings.updates.AppUpdatePrompt
+import app.logdate.feature.core.settings.updates.AppUpdateStatus
+import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.feature.core.profile.ui.ProfileEditState
 import app.logdate.feature.core.profile.ui.ProfileScreenContent
 import app.logdate.feature.core.profile.ui.ProfileUiState
@@ -2036,6 +2040,40 @@ fun A67_ProfileEditBookPosture() {
                 onSaveDisplayName = {},
                 onNavigateToBirthday = {},
                 snackbarHostState = snackbarHostState,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Lock screen book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A116_LockScreenBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            LockableContent(
+                isLocked = true,
+                displayName = "Alex Johnson",
+                onUsePasscode = {},
+            ) {}
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "App update prompt book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A117_AppUpdatePromptBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            AppUpdatePrompt(
+                uiState =
+                    AppUpdateUiState(
+                        status = AppUpdateStatus.Available,
+                        message = "LogDate 0.2.0 is ready to install.",
+                    ),
+                onLaunchUpdate = {},
+                onCompleteUpdate = {},
             )
         }
     }

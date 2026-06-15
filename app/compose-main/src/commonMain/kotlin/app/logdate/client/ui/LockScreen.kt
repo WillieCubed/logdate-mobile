@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.adaptive.HingeAwareOverlay
 import logdate.app.composemain.generated.resources.Res
 import logdate.app.composemain.generated.resources.ic_launcher_round_google_play
 import logdate.app.composemain.generated.resources.lock_screen_unlock_subtitle
@@ -72,36 +73,39 @@ private fun LockScreen(
             modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.primary),
-        contentAlignment = Alignment.Center,
     ) {
-        Column(
-            modifier = Modifier.windowInsetsPadding(WindowInsets.systemBars),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Image(
-                painter = painterResource(Res.drawable.ic_launcher_round_google_play),
-                contentDescription = null,
-                modifier =
-                    Modifier
-                        .size(96.dp)
-                        .clip(CircleShape),
-            )
-            Spacer(Modifier.height(24.dp))
-            Text(
-                text = greeting,
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onPrimary,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = stringResource(Res.string.lock_screen_unlock_subtitle),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onPrimary,
-            )
-            Spacer(Modifier.height(24.dp))
-            FilledTonalButton(onClick = onUsePasscode) {
-                Text(stringResource(Res.string.lock_screen_use_passcode))
+        // Keep the obscuring background full-screen, but pin the greeting and unlock action to a
+        // single physical pane so they stay reachable and clear of a foldable hinge.
+        HingeAwareOverlay {
+            Column(
+                modifier = Modifier.windowInsetsPadding(WindowInsets.systemBars),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Image(
+                    painter = painterResource(Res.drawable.ic_launcher_round_google_play),
+                    contentDescription = null,
+                    modifier =
+                        Modifier
+                            .size(96.dp)
+                            .clip(CircleShape),
+                )
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    text = greeting,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(Res.string.lock_screen_unlock_subtitle),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+                Spacer(Modifier.height(24.dp))
+                FilledTonalButton(onClick = onUsePasscode) {
+                    Text(stringResource(Res.string.lock_screen_use_passcode))
+                }
             }
         }
     }
