@@ -75,6 +75,11 @@ import app.logdate.feature.core.settings.ui.watch.WatchTroubleshootingContent
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.feature.core.sync.SyncIssuesContent
+import app.logdate.feature.events.ui.calendarsync.CalendarSyncOverviewUiState
+import app.logdate.feature.events.ui.calendarsync.CalendarSyncSettingsContent
+import app.logdate.feature.events.ui.calendarsync.PermissionState
+import app.logdate.feature.events.ui.settings.EventsSettingsContent
+import app.logdate.feature.events.ui.settings.EventsSettingsUiState
 import app.logdate.feature.onboarding.ui.MemoriesImportInfoScreen
 import app.logdate.feature.onboarding.ui.MemorySelectionScreen
 import app.logdate.feature.onboarding.ui.MemorySelectionUiState
@@ -170,6 +175,8 @@ enum class SharedScreenshotSceneId(
     WatchSyncSettings("watch-sync-settings"),
     WatchNotificationSettings("watch-notification-settings"),
     WatchTroubleshooting("watch-troubleshooting"),
+    EventsSettings("events-settings"),
+    CalendarSyncSettings("calendar-sync-settings"),
     SearchIdle("search-idle"),
     SearchSearching("search-searching"),
     SearchEmpty("search-empty"),
@@ -1053,6 +1060,36 @@ object SharedScreenshotCatalog {
                     onBeginAssociation = {},
                     onInstallOnWatch = {},
                     onOpenOnWatch = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.EventsSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                EventsSettingsContent(
+                    uiState =
+                        EventsSettingsUiState(
+                            isAutoEventsEnabled = true,
+                            isSmartNamingEnabled = true,
+                        ),
+                    onBack = {},
+                    onAutoEventsToggled = {},
+                    onSmartNamingToggled = {},
+                    onNavigateToCalendar = {},
+                    onNavigateToCalendarSync = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.CalendarSyncSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                CalendarSyncSettingsContent(
+                    uiState =
+                        CalendarSyncOverviewUiState(
+                            permissionState = PermissionState.Granted,
+                            isSyncEnabled = true,
+                            selectedCalendarCount = 3,
+                            totalCalendarCount = 5,
+                        ),
+                    onBack = {},
+                    onRequestPermission = {},
+                    onSyncEnabledToggled = {},
+                    onNavigateToCalendars = {},
+                    onNavigateToActivity = {},
                 )
             },
         )

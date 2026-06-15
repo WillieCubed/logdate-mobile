@@ -215,6 +215,20 @@ fun A33_LocationAdvancedBookPosture() {
     BookPostureSettingsScene(SharedScreenshotSceneId.LocationAdvanced)
 }
 
+@PreviewTest
+@Preview(name = "Events settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A36_EventsSettingsBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.EventsSettings)
+}
+
+@PreviewTest
+@Preview(name = "Calendar sync settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A37_CalendarSyncSettingsBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.CalendarSyncSettings)
+}
+
 @Composable
 private fun BookPostureSettingsScene(sceneId: SharedScreenshotSceneId) {
     provideFoldableLayoutInfo(bookPostureLayoutInfo) {
