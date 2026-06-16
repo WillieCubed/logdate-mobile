@@ -76,5 +76,11 @@ data class DeviceCalendarEvent(
     val description: String? = null,
     val startTime: Instant,
     val endTime: Instant? = null,
+    /**
+     * True when the source marks this as an all-day event. Readers normalize [startTime] (and
+     * [endTime]) for all-day events to UTC midnight of the date so downstream code can format
+     * them date-only without the time drifting across time zones.
+     */
+    val isAllDay: Boolean = false,
     val placeName: String? = null,
 )

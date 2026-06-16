@@ -44,13 +44,16 @@ sealed interface AmbientPromptPayload {
      *
      * @property eventId The id of the event the nudge points at.
      * @property title The event's display title, used as the notification title.
-     * @property startTime When the event starts; the notification body shows this in the
-     *   user's local time.
+     * @property startTime When the event starts. For timed events the notification body shows
+     *   this in the user's local time; for all-day events ([isAllDay]) it shows the date only.
+     * @property isAllDay True for all-day events, whose [startTime] is anchored to UTC midnight
+     *   and must be shown date-only so it doesn't read as a spurious clock time.
      */
     data class EventNudge(
         val eventId: Uuid,
         val title: String,
         val startTime: Instant,
+        val isAllDay: Boolean = false,
     ) : AmbientPromptPayload
 }
 

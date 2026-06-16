@@ -417,7 +417,7 @@ private fun DayEventsList(
                 headlineContent = { Text(event.title) },
                 supportingContent = {
                     Text(
-                        text = event.startTime.toReadableDateTimeRangeShort(event.endTime),
+                        text = event.startTime.toReadableDateTimeRangeShort(end = event.endTime, isAllDay = event.isAllDay),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 },

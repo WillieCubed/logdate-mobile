@@ -4,6 +4,9 @@ import io.github.aakira.napier.Napier
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toLocalDateTime
 import platform.EventKit.EKAuthorizationStatus
 import platform.EventKit.EKAuthorizationStatusAuthorized
 import platform.EventKit.EKCalendar
@@ -82,14 +85,18 @@ class IosDeviceCalendarReader : DeviceCalendarReader {
             val externalId = event.eventIdentifier ?: return@mapNotNull null
             val calendar = event.calendar ?: return@mapNotNull null
             val startDateValue = event.startDate ?: return@mapNotNull null
+            val isAllDay = event.allDay
             DeviceCalendarEvent(
                 externalId = externalId,
                 calendarId = calendar.calendarIdentifier,
                 accountName = calendar.source?.title ?: "Local",
                 title = event.title ?: "(untitled)",
                 description = event.notes,
-                startTime = startDateValue.toInstant(),
-                endTime = event.endDate?.toInstant(),
+                // EventKit reports all-day events at local midnight; re-anchor to UTC midnight of
+                // the same calendar date so storage matches Android and the date never drifts.
+                startTime = startDateValue.toInstant().normalizeForAllDay(isAllDay),
+                endTime = event.endDate?.toInstant()?.normalizeForAllDay(isAllDay),
+                isAllDay = isAllDay,
                 placeName = event.location,
             )
         }
@@ -111,4 +118,16 @@ class IosDeviceCalendarReader : DeviceCalendarReader {
         }
 
     private fun NSDate.toInstant(): Instant = Instant.fromEpochMilliseconds((timeIntervalSince1970 * 1000.0).toLong())
+
+    /**
+     * Re-anchors an all-day instant from EventKit's local-midnight representation to UTC midnight
+     * of the same calendar date, matching the canonical form LogDate stores. Timed events pass
+     * through unchanged.
+     */
+    private fun Instant.normalizeForAllDay(isAllDay: Boolean): Instant =
+        if (isAllDay) {
+            toLocalDateTime(TimeZone.currentSystemDefault()).date.atStartOfDayIn(TimeZone.UTC)
+        } else {
+            this
+        }
 }

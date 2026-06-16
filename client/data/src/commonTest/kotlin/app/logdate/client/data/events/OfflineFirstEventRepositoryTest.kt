@@ -45,6 +45,7 @@ class OfflineFirstEventRepositoryTest {
         title: String = "Recital",
         start: Instant = Instant.fromEpochSeconds(1_000_000),
         end: Instant? = Instant.fromEpochSeconds(1_003_600),
+        isAllDay: Boolean = false,
     ): Uuid {
         val now = Instant.fromEpochSeconds(2_000_000)
         dao.insert(
@@ -54,6 +55,7 @@ class OfflineFirstEventRepositoryTest {
                 description = null,
                 startTime = start,
                 endTime = end,
+                isAllDay = isAllDay,
                 placeId = null,
                 coverImageUri = null,
                 externalCalendarId = null,
@@ -64,6 +66,29 @@ class OfflineFirstEventRepositoryTest {
         )
         return id
     }
+
+    /**
+     * The all-day flag survives the entity↔domain mapping in both directions: a seeded all-day
+     * entity reads back as an all-day [Event], and an event created through the repository keeps
+     * the flag when fetched again. Guards the mapper wiring that the all-day display fix relies on.
+     */
+    @Test
+    fun isAllDay_round_trips_through_repository() =
+        runTest {
+            val (repo, dao, _) = newRepo()
+            val seededId = seed(dao, isAllDay = true)
+            assertTrue(repo.getEventById(seededId)!!.isAllDay)
+
+            val created =
+                Event(
+                    title = "Conference",
+                    startTime = Instant.fromEpochSeconds(1_500_000),
+                    endTime = null,
+                    isAllDay = true,
+                )
+            assertTrue(repo.createEvent(created).isSuccess)
+            assertTrue(repo.getEventById(created.id)!!.isAllDay)
+        }
 
     /**
      * After calling `updateEvent`, a subsequent fetch returns the new field values. Confirms

@@ -11,6 +11,7 @@ import app.logdate.client.domain.recommendation.AmbientPromptCandidate
 import app.logdate.client.domain.recommendation.AmbientPromptFamily
 import app.logdate.client.domain.recommendation.AmbientPromptPayload
 import app.logdate.client.notifications.LogDateNotificationChannelKey
+import app.logdate.util.toReadableDateAllDay
 import app.logdate.util.toReadableDateTimeShort
 import io.github.aakira.napier.Napier
 import app.logdate.client.notifications.R as NotificationResources
@@ -130,10 +131,17 @@ class AmbientPromptNotificationCoordinator(
                 AmbientNotificationContent(
                     title = payload.title,
                     body =
-                        context.getString(
-                            NotificationResources.string.ambient_prompt_event_nudge_body,
-                            payload.startTime.toReadableDateTimeShort(),
-                        ),
+                        if (payload.isAllDay) {
+                            context.getString(
+                                NotificationResources.string.ambient_prompt_event_nudge_all_day_body,
+                                payload.startTime.toReadableDateAllDay(),
+                            )
+                        } else {
+                            context.getString(
+                                NotificationResources.string.ambient_prompt_event_nudge_body,
+                                payload.startTime.toReadableDateTimeShort(),
+                            )
+                        },
                     category = NotificationCompat.CATEGORY_REMINDER,
                 )
         }

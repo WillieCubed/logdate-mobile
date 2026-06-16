@@ -325,7 +325,12 @@ private fun EventDetailItemsList(
 
             item("original-time") {
                 Text(
-                    text = "Originally " + state.event.startTime.toReadableDateTimeRangeShort(state.event.endTime),
+                    text =
+                        "Originally " +
+                            state.event.startTime.toReadableDateTimeRangeShort(
+                                end = state.event.endTime,
+                                isAllDay = state.event.isAllDay,
+                            ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

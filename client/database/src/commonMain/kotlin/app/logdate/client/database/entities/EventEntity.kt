@@ -40,6 +40,12 @@ data class EventEntity(
     val startTime: Instant,
     @ColumnInfo(name = "end_time")
     val endTime: Instant? = null,
+    /**
+     * True for all-day events. Their [startTime] is anchored to UTC midnight of the date so the
+     * date never drifts with the viewer's time zone; surfaces format them date-only.
+     */
+    @ColumnInfo(name = "is_all_day")
+    val isAllDay: Boolean = false,
     @ColumnInfo(name = "place_id")
     val placeId: Uuid? = null,
     @ColumnInfo(name = "cover_image_uri")

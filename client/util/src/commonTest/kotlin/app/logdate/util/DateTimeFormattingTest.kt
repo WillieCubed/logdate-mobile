@@ -3,9 +3,11 @@ package app.logdate.util
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -192,5 +194,47 @@ class DateTimeFormattingTest {
         } else {
             assertTrue(result.contains("2025"), "Non-current year dates should show year")
         }
+    }
+
+    /**
+     * Tests [Instant.toReadableDateAllDay].
+     *
+     * An all-day event is anchored to UTC midnight of its date. This reads the date back in UTC
+     * and renders it date-only — no clock time. This is the regression guard for the bug where an
+     * all-day event for a given date showed up as "5 p.m. the previous day": that happened because
+     * a UTC-midnight instant was formatted in a behind-UTC local zone. Reading in UTC keeps the
+     * date stable and drops the meaningless time.
+     */
+    @Test
+    fun testToReadableDateAllDay_rendersUtcDateWithoutTime() {
+        val allDayInstant = LocalDate(2026, 6, 17).atStartOfDayIn(TimeZone.UTC)
+
+        val result = allDayInstant.toReadableDateAllDay()
+
+        // Same date the calendar shows — not the previous day — and identical to formatting the
+        // bare date, so year-omission stays consistent with the rest of the app.
+        assertEquals(LocalDate(2026, 6, 17).toReadableDateShort(), result)
+        assertTrue(result.contains("17"), "Should keep the event's own day, not roll back to the 16th")
+        assertFalse(result.contains(":"), "All-day output must not include a time of day")
+    }
+
+    /**
+     * Tests [Instant.toReadableDateTimeRangeShort] with `isAllDay = true`.
+     *
+     * The all-day path collapses to the start date alone and ignores the end instant (calendar
+     * sources disagree on whether an all-day end is inclusive or exclusive), while the timed path
+     * still renders a time.
+     */
+    @Test
+    fun testToReadableDateTimeRangeShort_allDayCollapsesToDate() {
+        val start = LocalDate(2026, 6, 17).atStartOfDayIn(TimeZone.UTC)
+        val end = LocalDate(2026, 6, 19).atStartOfDayIn(TimeZone.UTC)
+
+        val allDay = start.toReadableDateTimeRangeShort(end = end, isAllDay = true)
+        assertEquals(start.toReadableDateAllDay(), allDay)
+        assertFalse(allDay.contains(":"), "All-day range must not include a time of day")
+
+        val timed = start.toReadableDateTimeRangeShort(end = end, isAllDay = false)
+        assertTrue(timed.contains(":"), "Timed range should still render a time of day")
     }
 }

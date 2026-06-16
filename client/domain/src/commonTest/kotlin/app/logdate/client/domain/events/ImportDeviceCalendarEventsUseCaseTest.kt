@@ -46,6 +46,58 @@ class ImportDeviceCalendarEventsUseCaseTest {
         }
 
     @Test
+    fun imports_all_day_events_with_the_all_day_flag_set() =
+        runTest {
+            val reader =
+                FakeCalendarReader(
+                    events = listOf(deviceEvent("evt-1", title = "Conference", isAllDay = true)),
+                )
+            val repo = RecordingEventRepository()
+            val useCase = ImportDeviceCalendarEventsUseCase(reader, repo, now = { NOW })
+
+            val result = useCase(selectedCalendarIds = setOf("cal-1"))
+
+            assertTrue(result is ImportResult.Success)
+            assertEquals(1, result.summary.created)
+            assertTrue(repo.created.single().isAllDay)
+        }
+
+    @Test
+    fun updates_event_when_only_the_all_day_flag_changed() =
+        runTest {
+            val existing =
+                Event(
+                    title = "Conference",
+                    startTime = NOW + 1.hours,
+                    endTime = NOW + 2.hours,
+                    isAllDay = false,
+                    externalCalendarId = "Google:evt-1",
+                    externalCalendarSource = ExternalCalendarSource.DEVICE_CALENDAR,
+                )
+            val reader =
+                FakeCalendarReader(
+                    events =
+                        listOf(
+                            deviceEvent(
+                                externalId = "evt-1",
+                                title = "Conference",
+                                startTime = NOW + 1.hours,
+                                endTime = NOW + 2.hours,
+                                isAllDay = true,
+                            ),
+                        ),
+                )
+            val repo = RecordingEventRepository(existingByExternalId = mapOf("Google:evt-1" to existing))
+            val useCase = ImportDeviceCalendarEventsUseCase(reader, repo, now = { NOW })
+
+            val result = useCase(selectedCalendarIds = setOf("cal-1"))
+
+            assertTrue(result is ImportResult.Success)
+            assertEquals(1, result.summary.updated)
+            assertTrue(repo.updated.single().isAllDay)
+        }
+
+    @Test
     fun updates_events_whose_title_or_time_changed() =
         runTest {
             val existing =
@@ -171,6 +223,7 @@ class ImportDeviceCalendarEventsUseCaseTest {
         description: String? = null,
         startTime: Instant = NOW + 1.hours,
         endTime: Instant? = NOW + 2.hours,
+        isAllDay: Boolean = false,
         placeName: String? = null,
     ): DeviceCalendarEvent =
         DeviceCalendarEvent(
@@ -181,6 +234,7 @@ class ImportDeviceCalendarEventsUseCaseTest {
             description = description,
             startTime = startTime,
             endTime = endTime,
+            isAllDay = isAllDay,
             placeName = placeName,
         )
 

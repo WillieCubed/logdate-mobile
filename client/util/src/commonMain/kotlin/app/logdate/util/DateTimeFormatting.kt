@@ -87,13 +87,35 @@ fun Instant.toReadableDateTimeShort(): String {
 }
 
 /**
+ * Converts an all-day [Instant] into a short readable **date** with no time of day.
+ *
+ * All-day events are anchored to UTC midnight of their date (see `Event.isAllDay`), so the date
+ * is read back in [TimeZone.UTC]. Reading it in the local zone would shift the date in any
+ * behind-UTC zone — the "5 p.m. the previous day" bug — and add a meaningless clock time.
+ *
+ * For example, "March 13".
+ */
+fun Instant.toReadableDateAllDay(): String = toLocalDateTime(TimeZone.UTC).date.toReadableDateShort()
+
+/**
  * Formats a time range as a single short string. Returns the start timestamp alone when
  * the range collapses to a single moment (no end, or end equal to start). Otherwise returns
  * `"start – end"` separated by an en-dash.
  *
  * Both bounds are converted to the device's local time zone via [toReadableDateTimeShort].
+ *
+ * When [isAllDay] is true the event has no time of day: the result is the start date alone via
+ * [toReadableDateAllDay]. The end is intentionally dropped — calendar sources disagree on whether
+ * an all-day end instant is inclusive or exclusive, so showing the start date keeps the output
+ * unambiguous and stable across time zones.
  */
-fun Instant.toReadableDateTimeRangeShort(end: Instant?): String {
+fun Instant.toReadableDateTimeRangeShort(
+    end: Instant?,
+    isAllDay: Boolean = false,
+): String {
+    if (isAllDay) {
+        return toReadableDateAllDay()
+    }
     val startText = toReadableDateTimeShort()
     return if (end == null || end == this) {
         startText

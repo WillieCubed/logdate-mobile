@@ -24,6 +24,16 @@ data class Event(
      * The end of the event, or `null` for point-in-time or open-ended events.
      */
     val endTime: Instant? = null,
+    /**
+     * True for all-day events, which have a calendar date but no meaningful time of day.
+     *
+     * All-day events are anchored to **UTC midnight** of their date so the date stays stable
+     * regardless of the viewer's time zone. Surfaces must format them date-only (interpreting
+     * [startTime] in [kotlinx.datetime.TimeZone.UTC]); treating the instant as a local time
+     * would shift an all-day event for tomorrow back to "5 p.m. the previous day" in any
+     * behind-UTC zone.
+     */
+    val isAllDay: Boolean = false,
     val placeId: Uuid? = null,
     val coverImageUri: String? = null,
     /**

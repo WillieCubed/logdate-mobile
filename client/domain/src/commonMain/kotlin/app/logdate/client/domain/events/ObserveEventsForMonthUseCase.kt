@@ -34,7 +34,11 @@ class ObserveEventsForMonthUseCase(
             .map { events ->
                 events
                     .groupBy { event ->
-                        event.startTime.toLocalDateTime(timezone).date
+                        // All-day events are anchored to UTC midnight, so read their date back in
+                        // UTC; using the local zone would drop them onto the previous day cell in
+                        // any behind-UTC zone. Timed events bucket by the local date as before.
+                        val bucketZone = if (event.isAllDay) TimeZone.UTC else timezone
+                        event.startTime.toLocalDateTime(bucketZone).date
                     }
             }
     }

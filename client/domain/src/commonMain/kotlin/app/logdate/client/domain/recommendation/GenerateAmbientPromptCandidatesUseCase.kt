@@ -128,6 +128,7 @@ class GenerateAmbientPromptCandidatesUseCase(
                                 eventId = event.id,
                                 title = event.title,
                                 startTime = event.startTime,
+                                isAllDay = event.isAllDay,
                             ),
                     )
             }

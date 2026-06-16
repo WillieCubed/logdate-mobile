@@ -111,6 +111,7 @@ class ImportDeviceCalendarEventsUseCase(
             description = description,
             startTime = startTime,
             endTime = endTime,
+            isAllDay = isAllDay,
             externalCalendarId = externalId,
             externalCalendarSource = ExternalCalendarSource.DEVICE_CALENDAR,
         )
@@ -121,6 +122,7 @@ class ImportDeviceCalendarEventsUseCase(
             description = deviceEvent.description ?: description,
             startTime = deviceEvent.startTime,
             endTime = deviceEvent.endTime,
+            isAllDay = deviceEvent.isAllDay,
         )
 
     /**
@@ -132,6 +134,7 @@ class ImportDeviceCalendarEventsUseCase(
         title != deviceEvent.title ||
             startTime != deviceEvent.startTime ||
             endTime != deviceEvent.endTime ||
+            isAllDay != deviceEvent.isAllDay ||
             (deviceEvent.description != null && description != deviceEvent.description)
 
     companion object {

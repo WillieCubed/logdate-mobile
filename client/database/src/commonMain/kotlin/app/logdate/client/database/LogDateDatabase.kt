@@ -124,6 +124,7 @@ import app.logdate.client.database.migrations.MIGRATION_40_41
 import app.logdate.client.database.migrations.MIGRATION_41_42
 import app.logdate.client.database.migrations.MIGRATION_42_43
 import app.logdate.client.database.migrations.MIGRATION_43_44
+import app.logdate.client.database.migrations.MIGRATION_44_45
 import app.logdate.client.database.migrations.MIGRATION_4_5
 import app.logdate.client.database.migrations.MIGRATION_5_6
 import app.logdate.client.database.migrations.MIGRATION_6_7
@@ -192,7 +193,7 @@ import kotlinx.coroutines.CoroutineDispatcher
         PersonLinkEntity::class,
         PersonResolutionDecisionEntity::class,
     ],
-    version = 44,
+    version = 45,
     exportSchema = true,
 )
 @TypeConverters(
@@ -353,6 +354,7 @@ fun getRoomDatabase(
                 MIGRATION_41_42,
                 MIGRATION_42_43,
                 MIGRATION_43_44,
+                MIGRATION_44_45,
             ).addCallback(FtsTableCallback)
             .fallbackToDestructiveMigration(destroyTablesOnUpgrade)
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)

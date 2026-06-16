@@ -100,6 +100,7 @@ class AndroidDeviceCalendarReader(
                     CalendarContract.Instances.DESCRIPTION,
                     CalendarContract.Instances.BEGIN,
                     CalendarContract.Instances.END,
+                    CalendarContract.Instances.ALL_DAY,
                     CalendarContract.Instances.EVENT_LOCATION,
                 )
             val placeholders = calendarIds.joinToString(",") { "?" }
@@ -119,12 +120,16 @@ class AndroidDeviceCalendarReader(
                         val descriptionColumn = cursor.getColumnIndexOrThrow(CalendarContract.Instances.DESCRIPTION)
                         val beginColumn = cursor.getColumnIndexOrThrow(CalendarContract.Instances.BEGIN)
                         val endColumn = cursor.getColumnIndexOrThrow(CalendarContract.Instances.END)
+                        val allDayColumn = cursor.getColumnIndexOrThrow(CalendarContract.Instances.ALL_DAY)
                         val locationColumn = cursor.getColumnIndexOrThrow(CalendarContract.Instances.EVENT_LOCATION)
                         while (cursor.moveToNext()) {
                             val eventId = cursor.getLong(eventIdColumn).toString()
                             val calendarId = cursor.getLong(calendarIdColumn).toString()
                             val begin = cursor.getLong(beginColumn)
                             val rawEnd = cursor.getLong(endColumn)
+                            // CalendarContract encodes all-day instances at UTC midnight of the
+                            // date, which is already the canonical anchor LogDate stores, so the
+                            // raw BEGIN/END pass through unchanged — only the flag is new.
                             events +=
                                 DeviceCalendarEvent(
                                     externalId = eventId,
@@ -134,6 +139,7 @@ class AndroidDeviceCalendarReader(
                                     description = cursor.getString(descriptionColumn),
                                     startTime = Instant.fromEpochMilliseconds(begin),
                                     endTime = if (rawEnd <= 0L) null else Instant.fromEpochMilliseconds(rawEnd),
+                                    isAllDay = cursor.getInt(allDayColumn) == 1,
                                     placeName = cursor.getString(locationColumn),
                                 )
                         }
