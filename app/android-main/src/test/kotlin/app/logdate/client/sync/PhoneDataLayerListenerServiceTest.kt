@@ -17,6 +17,8 @@ import app.logdate.client.sync.datalayer.HealthSnapshotSyncData
 import app.logdate.client.sync.datalayer.JournalDataMapper
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
+import app.logdate.client.media.device.MediaDeviceCategory
+import app.logdate.feature.editor.ui.camera.CameraRemoteCommand
 import app.logdate.shared.model.Journal
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -73,41 +75,110 @@ class PhoneDataLayerListenerServiceTest {
     }
 
     @Test
-    fun `camera capture message does not launch camera or sync work`() = runTest {
+    fun `camera capture message sends capture command and does not sync work`() = runTest {
         var launched = false
+        val cameraCommands = mutableListOf<CameraRemoteCommand>()
         val syncBridge = mockk<PhoneWearSyncBridge>(relaxed = true)
         val service =
             TestPhoneDataLayerListenerService(
                 serviceScope = this,
                 syncBridge = syncBridge,
                 onLaunchCamera = { launched = true },
+                onCameraCommand = { cameraCommands.add(it) },
             )
 
         service.onMessageReceived(message(path = "/logdate/camera/capture"))
         advanceUntilIdle()
 
         assertFalse(launched)
+        assertTrue(cameraCommands.contains(CameraRemoteCommand.Capture))
         coVerify(exactly = 0) { syncBridge.publishNotesToWatch(any()) }
         coVerify(exactly = 0) { syncBridge.streamAudioToWatch(any(), any()) }
     }
 
     @Test
-    fun `camera close message does not launch camera or sync work`() = runTest {
+    fun `camera close message sends close command and does not sync work`() = runTest {
         var launched = false
+        val cameraCommands = mutableListOf<CameraRemoteCommand>()
         val syncBridge = mockk<PhoneWearSyncBridge>(relaxed = true)
         val service =
             TestPhoneDataLayerListenerService(
                 serviceScope = this,
                 syncBridge = syncBridge,
                 onLaunchCamera = { launched = true },
+                onCameraCommand = { cameraCommands.add(it) },
             )
 
         service.onMessageReceived(message(path = "/logdate/camera/close"))
         advanceUntilIdle()
 
         assertFalse(launched)
+        assertTrue(cameraCommands.contains(CameraRemoteCommand.Close))
         coVerify(exactly = 0) { syncBridge.publishNotesToWatch(any()) }
         coVerify(exactly = 0) { syncBridge.streamAudioToWatch(any(), any()) }
+    }
+
+    @Test
+    fun `camera switch message sends switch command`() = runTest {
+        val cameraCommands = mutableListOf<CameraRemoteCommand>()
+        val service =
+            TestPhoneDataLayerListenerService(
+                serviceScope = this,
+                onCameraCommand = { cameraCommands.add(it) },
+            )
+
+        service.onMessageReceived(message(path = "/logdate/camera/switch"))
+        advanceUntilIdle()
+
+        assertTrue(cameraCommands.contains(CameraRemoteCommand.SwitchBuiltInCamera))
+    }
+
+    @Test
+    fun `camera select message sends built-in category command`() = runTest {
+        val cameraCommands = mutableListOf<CameraRemoteCommand>()
+        val service =
+            TestPhoneDataLayerListenerService(
+                serviceScope = this,
+                onCameraCommand = { cameraCommands.add(it) },
+            )
+
+        service.onMessageReceived(
+            message(
+                path = "/logdate/camera/select",
+                data = "front".encodeToByteArray(),
+            ),
+        )
+        advanceUntilIdle()
+
+        assertTrue(
+            cameraCommands.contains(
+                CameraRemoteCommand.SelectCameraCategory(MediaDeviceCategory.FRONT_CAMERA),
+            ),
+        )
+    }
+
+    @Test
+    fun `camera select message sends exact device command`() = runTest {
+        val cameraCommands = mutableListOf<CameraRemoteCommand>()
+        val service =
+            TestPhoneDataLayerListenerService(
+                serviceScope = this,
+                onCameraCommand = { cameraCommands.add(it) },
+            )
+
+        service.onMessageReceived(
+            message(
+                path = "/logdate/camera/select",
+                data = "device:usb-camera-1".encodeToByteArray(),
+            ),
+        )
+        advanceUntilIdle()
+
+        assertTrue(
+            cameraCommands.contains(
+                CameraRemoteCommand.SelectCameraDevice("usb-camera-1"),
+            ),
+        )
     }
 
     @Test
@@ -529,10 +600,12 @@ class PhoneDataLayerListenerServiceTest {
     private fun message(
         path: String,
         sourceNodeId: String = "watch-node",
+        data: ByteArray = ByteArray(0),
     ): MessageEvent =
         mockk {
             every { this@mockk.path } returns path
             every { this@mockk.sourceNodeId } returns sourceNodeId
+            every { this@mockk.data } returns data
         }
 
     private fun textNote(
@@ -631,6 +704,7 @@ class PhoneDataLayerListenerServiceTest {
         private val syncBridge: PhoneWearSyncBridge? = null,
         private val syncDependencies: PhoneDataLayerSyncDependencies? = null,
         private val onLaunchCamera: () -> Unit = {},
+        private val onCameraCommand: (CameraRemoteCommand) -> Unit = {},
     ) : PhoneDataLayerListenerService() {
         suspend fun processEvents(vararg events: PhoneDataLayerSnapshotEvent) {
             processSnapshotEvents(events.toList())
@@ -642,6 +716,11 @@ class PhoneDataLayerListenerServiceTest {
 
         override fun launchCamera() {
             onLaunchCamera()
+        }
+
+        override fun sendCameraCommand(command: CameraRemoteCommand): Boolean {
+            onCameraCommand(command)
+            return true
         }
     }
 }

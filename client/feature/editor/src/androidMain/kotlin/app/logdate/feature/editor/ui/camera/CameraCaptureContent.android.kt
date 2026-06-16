@@ -87,6 +87,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.client.media.device.MediaDeviceCategory
+import app.logdate.client.media.device.asSystemControlledSelection
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.media.MediaDeviceSelector
 import coil3.compose.AsyncImage
@@ -775,8 +776,13 @@ private fun InlineCameraCapture(
 
             if (uiState.captureMode == CaptureMode.VIDEO) {
                 MediaDeviceSelector(
-                    selection = inputSelection,
-                    onDeviceSelected = audioRouteRepository::selectInputDevice,
+                    selection =
+                        inputSelection.asSystemControlledSelection(
+                            routeControlMessage =
+                                "Camera video follows Android's active microphone route. " +
+                                    "Voice-note recording uses the microphone selected in LogDate.",
+                        ),
+                    onDeviceSelected = {},
                     label = "Microphone",
                     enabled = !uiState.isRecording,
                 )
@@ -911,7 +917,7 @@ private fun InlineCameraCapture(
                     ErrorMessage(modifier = Modifier.padding(top = 16.dp))
                 }
             },
-            fallback = {
+            standardContent = {
                 PreviewPane(modifier = Modifier.fillMaxSize())
                 CameraDeviceControls(
                     modifier =

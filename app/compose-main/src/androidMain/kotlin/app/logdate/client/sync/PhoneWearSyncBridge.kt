@@ -3,9 +3,13 @@ package app.logdate.client.sync
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.sync.datalayer.NoteDataMapper
+import app.logdate.client.sync.datalayer.RemoteCameraCaptureResult
+import app.logdate.client.sync.datalayer.RemoteCameraCaptureResultDataMapper
+import app.logdate.client.sync.datalayer.RemoteCameraDeviceDataMapper
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import com.google.android.gms.wearable.ChannelClient
 import com.google.android.gms.wearable.DataClient
@@ -22,6 +26,10 @@ import kotlin.uuid.Uuid
 
 interface PhoneWearSyncBridge {
     suspend fun publishNotesToWatch(sourceNodeId: String)
+
+    suspend fun publishRemoteCameraDevices(selection: MediaDeviceSelectionUiState)
+
+    suspend fun publishRemoteCameraCaptureResult(result: RemoteCameraCaptureResult)
 
     suspend fun streamAudioToWatch(
         noteId: Uuid,
@@ -97,6 +105,28 @@ class DefaultPhoneWearSyncBridge(
             )
         if (!sent) {
             Napier.w("Failed to stream audio note $noteId to watch")
+        }
+    }
+
+    override suspend fun publishRemoteCameraDevices(selection: MediaDeviceSelectionUiState) {
+        val sent =
+            transport.putDataItem(
+                path = RemoteCameraDeviceDataMapper.PATH_CAMERA_DEVICES,
+                data = RemoteCameraDeviceDataMapper.toDataMap(selection),
+            )
+        if (!sent) {
+            Napier.w("Failed to publish remote camera device list to watch")
+        }
+    }
+
+    override suspend fun publishRemoteCameraCaptureResult(result: RemoteCameraCaptureResult) {
+        val sent =
+            transport.putDataItem(
+                path = RemoteCameraCaptureResultDataMapper.PATH_CAMERA_CAPTURE_RESULT,
+                data = RemoteCameraCaptureResultDataMapper.toDataMap(result),
+            )
+        if (!sent) {
+            Napier.w("Failed to publish remote camera capture result to watch")
         }
     }
 }

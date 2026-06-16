@@ -1,11 +1,12 @@
 package app.logdate.client.sync
 
-import android.content.Intent
-import android.provider.MediaStore
 import app.logdate.client.database.dao.HealthSnapshotDao
 import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.entities.HealthSnapshotEntity
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
+import app.logdate.client.media.device.MediaDeviceCategory
+import app.logdate.client.remote.RemoteCameraActivity
+import app.logdate.client.remote.RemoteCameraSessionController
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.SyncableJournalContentRepository
@@ -16,6 +17,7 @@ import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
 import app.logdate.client.sync.datalayer.JournalDataMapper
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
+import app.logdate.feature.editor.ui.camera.CameraRemoteCommand
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
@@ -53,7 +55,12 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
     companion object {
         private const val PATH_CAMERA_OPEN = "/logdate/camera/open"
         private const val PATH_CAMERA_CAPTURE = "/logdate/camera/capture"
+        private const val PATH_CAMERA_SWITCH = "/logdate/camera/switch"
+        private const val PATH_CAMERA_SELECT = "/logdate/camera/select"
         private const val PATH_CAMERA_CLOSE = "/logdate/camera/close"
+        private const val CAMERA_SELECT_FRONT = "front"
+        private const val CAMERA_SELECT_BACK = "back"
+        private const val CAMERA_SELECT_DEVICE_PREFIX = "device:"
         private const val MAX_KOIN_RETRIES = 3
         private const val KOIN_RETRY_DELAY_MS = 500L
     }
@@ -72,10 +79,39 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
 
                 messageEvent.path == PATH_CAMERA_CAPTURE -> {
                     Napier.d("Watch requested photo capture")
+                    sendCameraCommand(CameraRemoteCommand.Capture)
+                }
+
+                messageEvent.path == PATH_CAMERA_SWITCH -> {
+                    Napier.d("Watch requested camera switch")
+                    sendCameraCommand(CameraRemoteCommand.SwitchBuiltInCamera)
+                }
+
+                messageEvent.path == PATH_CAMERA_SELECT -> {
+                    val selection = messageEvent.data.decodeToString()
+                    Napier.d("Watch requested camera selection: $selection")
+                    when {
+                        selection == CAMERA_SELECT_FRONT ->
+                            sendCameraCommand(
+                                CameraRemoteCommand.SelectCameraCategory(MediaDeviceCategory.FRONT_CAMERA),
+                            )
+                        selection == CAMERA_SELECT_BACK ->
+                            sendCameraCommand(
+                                CameraRemoteCommand.SelectCameraCategory(MediaDeviceCategory.BACK_CAMERA),
+                            )
+                        selection.startsWith(CAMERA_SELECT_DEVICE_PREFIX) ->
+                            sendCameraCommand(
+                                CameraRemoteCommand.SelectCameraDevice(
+                                    selection.removePrefix(CAMERA_SELECT_DEVICE_PREFIX),
+                                ),
+                            )
+                        else -> Napier.w("Unknown remote camera selection: $selection")
+                    }
                 }
 
                 messageEvent.path == PATH_CAMERA_CLOSE -> {
                     Napier.d("Watch requested camera close")
+                    sendCameraCommand(CameraRemoteCommand.Close)
                 }
 
                 messageEvent.path == WearAudioRequestPaths.SYNC_REQUEST_PATH -> {
@@ -352,12 +388,10 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
     protected open suspend fun resolvePhoneWearSyncBridge(): PhoneWearSyncBridge? = resolveKoin()?.get()
 
     protected open fun launchCamera() {
-        val cameraIntent =
-            Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        startActivity(cameraIntent)
+        startActivity(RemoteCameraActivity.createIntent(this))
     }
+
+    protected open fun sendCameraCommand(command: CameraRemoteCommand): Boolean = RemoteCameraSessionController.send(command)
 
     private fun extractStringMap(event: com.google.android.gms.wearable.DataEvent): Map<String, String> {
         val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap

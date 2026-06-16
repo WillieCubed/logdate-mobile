@@ -32,6 +32,7 @@ actual fun CameraCaptureContent(
     onMediaCaptured: (uri: String, mediaType: CapturedMediaType, durationMs: Long) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier,
+    remoteControl: CameraRemoteControl,
 ) {
     Card(
         modifier =

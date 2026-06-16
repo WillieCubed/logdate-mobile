@@ -1,5 +1,8 @@
 package app.logdate.feature.editor.ui.camera
 
+import app.logdate.client.media.device.DefaultMediaDevices
+import app.logdate.client.media.device.MediaDeviceKind
+import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -46,6 +49,11 @@ interface CameraCaptureManager {
     suspend fun switchCamera()
 
     /**
+     * Selects a camera from the available device list.
+     */
+    suspend fun selectCameraDevice(deviceId: String)
+
+    /**
      * Sets the capture mode (photo or video).
      */
     fun setCaptureMode(mode: CaptureMode)
@@ -80,7 +88,20 @@ data class CameraCaptureState(
     val recordingDurationMs: Long = 0L,
     val lastCapturedUri: String? = null,
     val error: CameraCaptureError? = null,
+    val cameraSelection: MediaDeviceSelectionUiState = defaultCameraSelection(cameraFacing),
 )
+
+fun defaultCameraSelection(facing: CameraFacing): MediaDeviceSelectionUiState =
+    MediaDeviceSelectionUiState(
+        kind = MediaDeviceKind.CAMERA,
+        devices = listOf(DefaultMediaDevices.backCamera, DefaultMediaDevices.frontCamera),
+        selectedDeviceId =
+            when (facing) {
+                CameraFacing.BACK -> DefaultMediaDevices.backCamera.id
+                CameraFacing.FRONT -> DefaultMediaDevices.frontCamera.id
+            },
+        routeControlMessage = "External camera detection is not available in this build yet.",
+    )
 
 /**
  * Camera facing direction.

@@ -35,6 +35,10 @@ class DesktopCameraCaptureManager : CameraCaptureManager {
         // No-op
     }
 
+    override suspend fun selectCameraDevice(deviceId: String) {
+        // No-op
+    }
+
     override fun setCaptureMode(mode: CaptureMode) {
         _state.value = _state.value.copy(captureMode = mode)
     }

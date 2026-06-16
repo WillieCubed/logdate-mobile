@@ -9,6 +9,10 @@ import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.client.sync.datalayer.AssociationDataMapper
 import app.logdate.client.sync.datalayer.JournalDataMapper
+import app.logdate.client.sync.datalayer.RemoteCameraCaptureResultDataMapper
+import app.logdate.client.sync.datalayer.RemoteCameraDeviceDataMapper
+import app.logdate.wear.presentation.camera.WearRemoteCameraCaptureResultStore
+import app.logdate.wear.presentation.camera.WearRemoteCameraDeviceStore
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.WearableListenerService
@@ -51,16 +55,28 @@ class WearDataLayerListenerService : WearableListenerService() {
         if (events.isEmpty()) return
 
         serviceScope.launch {
+            val syncEvents = mutableListOf<SnapshotDataEvent>()
+            for (event in events) {
+                when (event.path) {
+                    RemoteCameraDeviceDataMapper.PATH_CAMERA_DEVICES -> handleRemoteCameraDevices(event.data)
+                    RemoteCameraCaptureResultDataMapper.PATH_CAMERA_CAPTURE_RESULT -> {
+                        handleRemoteCameraCaptureResult(event.data)
+                    }
+                    else -> syncEvents.add(event)
+                }
+            }
+            if (syncEvents.isEmpty()) return@launch
+
             val koin = resolveKoin()
             if (koin == null) {
-                Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries, dropping ${events.size} data events")
+                Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries, dropping ${syncEvents.size} data events")
                 return@launch
             }
 
             val notesRepository = koin.get<JournalNotesRepository>()
             val journalRepository = koin.get<JournalRepository>()
 
-            for (event in events) {
+            for (event in syncEvents) {
                 processEvent(event, koin, notesRepository, journalRepository)
             }
         }
@@ -90,6 +106,14 @@ class WearDataLayerListenerService : WearableListenerService() {
         } catch (e: Exception) {
             Napier.e("Unhandled error processing sync event at path: $path", e)
         }
+    }
+
+    private fun handleRemoteCameraDevices(stringMap: Map<String, String>) {
+        WearRemoteCameraDeviceStore.update(RemoteCameraDeviceDataMapper.fromDataMap(stringMap))
+    }
+
+    private fun handleRemoteCameraCaptureResult(stringMap: Map<String, String>) {
+        WearRemoteCameraCaptureResultStore.publish(RemoteCameraCaptureResultDataMapper.fromDataMap(stringMap))
     }
 
     private suspend fun handleNoteDelete(

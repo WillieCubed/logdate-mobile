@@ -149,7 +149,14 @@
         </activity>
         
         <activity
+            android:name="app.logdate.client.remote.RemoteCameraActivity"
+            android:exported="false"
+            android:resizeableActivity="true"
+            android:screenOrientation="fullUser" />
+
+        <activity
             android:name="app.logdate.client.EditorActivity"
+            android:supportsPictureInPicture="true"
             android:exported="true"
             android:theme="@style/Theme.LogDate"
             android:enableOnBackInvokedCallback="true"

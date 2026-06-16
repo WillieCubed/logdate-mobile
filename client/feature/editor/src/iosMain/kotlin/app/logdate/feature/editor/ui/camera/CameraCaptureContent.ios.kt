@@ -58,6 +58,7 @@ actual fun CameraCaptureContent(
     onMediaCaptured: (uri: String, mediaType: CapturedMediaType, durationMs: Long) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier,
+    remoteControl: CameraRemoteControl,
 ) {
     val manager = koinInject<CameraCaptureManager>() as? IosCameraCaptureManager
     if (manager == null) {

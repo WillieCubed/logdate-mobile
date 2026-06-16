@@ -306,7 +306,7 @@ private fun AdaptiveEditorListContent(
                 )
             }
         },
-        fallback = {
+        standardContent = {
             FoldableBookLayout(
                 modifier = Modifier.fillMaxSize(),
                 minPaneWidth = 320.dp,

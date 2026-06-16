@@ -1,5 +1,6 @@
 package app.logdate.feature.editor.ui.camera
 
+import app.logdate.client.media.device.DefaultMediaDevices
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.test.Test
@@ -23,6 +24,7 @@ class CameraUiStateTest {
 
         assertFalse(state.isPreviewActive)
         assertEquals(CameraFacing.BACK, state.cameraFacing)
+        assertEquals(DefaultMediaDevices.backCamera.id, state.cameraSelection.selectedDeviceId)
         assertEquals(CaptureMode.PHOTO, state.captureMode)
         assertFalse(state.isCapturing)
         assertFalse(state.isRecording)
@@ -181,7 +183,22 @@ class FakeCameraCaptureManager : CameraCaptureManager {
                 CameraFacing.BACK -> CameraFacing.FRONT
                 CameraFacing.FRONT -> CameraFacing.BACK
             }
-        _state.value = _state.value.copy(cameraFacing = newFacing)
+        _state.value =
+            _state.value.copy(
+                cameraFacing = newFacing,
+                cameraSelection = defaultCameraSelection(newFacing),
+            )
+    }
+
+    override suspend fun selectCameraDevice(deviceId: String) {
+        val requestedFacing =
+            when (deviceId) {
+                DefaultMediaDevices.frontCamera.id -> CameraFacing.FRONT
+                DefaultMediaDevices.backCamera.id -> CameraFacing.BACK
+                else -> return
+            }
+        if (_state.value.cameraFacing == requestedFacing) return
+        switchCamera()
     }
 
     override fun setCaptureMode(mode: CaptureMode) {

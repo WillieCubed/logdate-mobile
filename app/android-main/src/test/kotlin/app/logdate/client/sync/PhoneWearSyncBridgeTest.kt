@@ -3,6 +3,8 @@ package app.logdate.client.sync
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.sync.datalayer.NoteDataMapper
+import app.logdate.client.sync.datalayer.RemoteCameraCaptureResult
+import app.logdate.client.sync.datalayer.RemoteCameraCaptureResultDataMapper
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import io.mockk.coEvery
 import io.mockk.every
@@ -133,6 +135,37 @@ class PhoneWearSyncBridgeTest {
         bridge.streamAudioToWatch(noteId = noteId, sourceNodeId = "watch-node")
 
         assertTrue(transport.streamRequests.isEmpty())
+    }
+
+    @Test
+    fun `publishRemoteCameraCaptureResult sends saved result through transport`() = runTest {
+        val transport = RecordingTransport()
+        val bridge =
+            DefaultPhoneWearSyncBridge(
+                notesRepository = notesRepository,
+                noteDataMapper = noteDataMapper,
+                transport = transport,
+                audioStreamOpener = UnusedAudioOpener,
+            )
+
+        bridge.publishRemoteCameraCaptureResult(
+            RemoteCameraCaptureResult(
+                isSaved = true,
+                message = "Remote photo saved",
+                mediaType = "photo",
+            ),
+        )
+
+        val request = transport.putRequests.single()
+        assertEquals(RemoteCameraCaptureResultDataMapper.PATH_CAMERA_CAPTURE_RESULT, request.path)
+        assertEquals(
+            RemoteCameraCaptureResult(
+                isSaved = true,
+                message = "Remote photo saved",
+                mediaType = "photo",
+            ),
+            RemoteCameraCaptureResultDataMapper.fromDataMap(request.data),
+        )
     }
 
     private object UnusedAudioOpener : PhoneAudioStreamOpener {

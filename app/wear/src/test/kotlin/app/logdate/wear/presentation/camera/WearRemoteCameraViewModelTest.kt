@@ -1,5 +1,10 @@
 package app.logdate.wear.presentation.camera
 
+import app.logdate.client.media.device.MediaDeviceCategory
+import app.logdate.client.media.device.MediaDeviceKind
+import app.logdate.client.media.device.MediaDeviceSelectionUiState
+import app.logdate.client.media.device.MediaDeviceUiState
+import app.logdate.client.sync.datalayer.RemoteCameraCaptureResult
 import app.logdate.wear.sync.WearDataLayerClient
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -7,6 +12,9 @@ import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -47,7 +55,15 @@ class WearRemoteCameraViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel(): WearRemoteCameraViewModel = WearRemoteCameraViewModel(dataLayerClient)
+    private fun createViewModel(
+        cameraDeviceStore: RemoteCameraDeviceStore = TestRemoteCameraDeviceStore(),
+        captureResultStore: RemoteCameraCaptureResultStore = TestRemoteCameraCaptureResultStore(),
+    ): WearRemoteCameraViewModel =
+        WearRemoteCameraViewModel(
+            dataLayerClient = dataLayerClient,
+            cameraDeviceStore = cameraDeviceStore,
+            captureResultStore = captureResultStore,
+        )
 
     // -----------------------------------------------------------------------
     // Initial state
@@ -194,7 +210,7 @@ class WearRemoteCameraViewModelTest {
         }
 
     @Test
-    fun `capture transitions to PREVIEW after message sent`() =
+    fun `capture remains CAPTURING until phone confirms save`() =
         runTest {
             val viewModel = createViewModel()
             viewModel.requestCamera()
@@ -203,7 +219,52 @@ class WearRemoteCameraViewModelTest {
             viewModel.capture()
             advanceUntilIdle()
 
+            assertEquals(RemoteCameraPhase.CAPTURING, viewModel.uiState.value.phase)
+        }
+
+    @Test
+    fun `capture transitions to PREVIEW when phone confirms save`() =
+        runTest {
+            val captureResultStore = TestRemoteCameraCaptureResultStore()
+            val viewModel = createViewModel(captureResultStore = captureResultStore)
+            viewModel.requestCamera()
+            advanceUntilIdle()
+            viewModel.capture()
+            advanceUntilIdle()
+
+            captureResultStore.publish(
+                RemoteCameraCaptureResult(
+                    isSaved = true,
+                    message = "Remote photo saved",
+                    mediaType = "photo",
+                ),
+            )
+            advanceUntilIdle()
+
             assertEquals(RemoteCameraPhase.PREVIEW, viewModel.uiState.value.phase)
+            assertEquals("Remote photo saved", viewModel.uiState.value.captureStatusMessage)
+        }
+
+    @Test
+    fun `capture transitions to ERROR when phone confirms failure`() =
+        runTest {
+            val captureResultStore = TestRemoteCameraCaptureResultStore()
+            val viewModel = createViewModel(captureResultStore = captureResultStore)
+            viewModel.requestCamera()
+            advanceUntilIdle()
+            viewModel.capture()
+            advanceUntilIdle()
+
+            captureResultStore.publish(
+                RemoteCameraCaptureResult(
+                    isSaved = false,
+                    message = "Could not save remote camera capture",
+                ),
+            )
+            advanceUntilIdle()
+
+            assertEquals(RemoteCameraPhase.ERROR, viewModel.uiState.value.phase)
+            assertEquals("Could not save remote camera capture", viewModel.uiState.value.errorMessage)
         }
 
     // -----------------------------------------------------------------------
@@ -247,10 +308,19 @@ class WearRemoteCameraViewModelTest {
     @Test
     fun `captureMore transitions back to READY`() =
         runTest {
-            val viewModel = createViewModel()
+            val captureResultStore = TestRemoteCameraCaptureResultStore()
+            val viewModel = createViewModel(captureResultStore = captureResultStore)
             viewModel.requestCamera()
             advanceUntilIdle()
             viewModel.capture()
+            advanceUntilIdle()
+            captureResultStore.publish(
+                RemoteCameraCaptureResult(
+                    isSaved = true,
+                    message = "Remote photo saved",
+                    mediaType = "photo",
+                ),
+            )
             advanceUntilIdle()
             assertEquals(RemoteCameraPhase.PREVIEW, viewModel.uiState.value.phase)
 
@@ -269,6 +339,162 @@ class WearRemoteCameraViewModelTest {
             advanceUntilIdle()
 
             assertEquals(RemoteCameraPhase.IDLE, viewModel.uiState.value.phase)
+        }
+
+    // -----------------------------------------------------------------------
+    // camera selection
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `selectFrontCamera sends front selection and updates label`() =
+        runTest {
+            var selectedPayload: ByteArray? = null
+            coEvery { dataLayerClient.sendMessage("/logdate/camera/select", any()) } coAnswers {
+                selectedPayload = secondArg()
+                true
+            }
+            val viewModel = createViewModel()
+            viewModel.requestCamera()
+            advanceUntilIdle()
+
+            viewModel.selectFrontCamera()
+            advanceUntilIdle()
+
+            coVerify { dataLayerClient.sendMessage("/logdate/camera/select", any()) }
+            assertEquals("front", selectedPayload?.decodeToString())
+            assertEquals("Front camera", viewModel.uiState.value.selectedCameraLabel)
+        }
+
+    @Test
+    fun `selectBackCamera sends back selection and updates label`() =
+        runTest {
+            var selectedPayload: ByteArray? = null
+            coEvery { dataLayerClient.sendMessage("/logdate/camera/select", any()) } coAnswers {
+                selectedPayload = secondArg()
+                true
+            }
+            val viewModel = createViewModel()
+            viewModel.requestCamera()
+            advanceUntilIdle()
+
+            viewModel.selectBackCamera()
+            advanceUntilIdle()
+
+            coVerify { dataLayerClient.sendMessage("/logdate/camera/select", any()) }
+            assertEquals("back", selectedPayload?.decodeToString())
+            assertEquals("Back camera", viewModel.uiState.value.selectedCameraLabel)
+        }
+
+    @Test
+    fun `selectCameraDevice sends exact phone camera device id and updates selected row`() =
+        runTest {
+            val cameraSelection =
+                MediaDeviceSelectionUiState(
+                    kind = MediaDeviceKind.CAMERA,
+                    devices =
+                        listOf(
+                            MediaDeviceUiState(
+                                id = "camera-back",
+                                label = "Back camera",
+                                kind = MediaDeviceKind.CAMERA,
+                                category = MediaDeviceCategory.BACK_CAMERA,
+                            ),
+                            MediaDeviceUiState(
+                                id = "usb-camera-1",
+                                label = "USB document camera",
+                                kind = MediaDeviceKind.CAMERA,
+                                category = MediaDeviceCategory.USB,
+                                isExternal = true,
+                            ),
+                        ),
+                    selectedDeviceId = "camera-back",
+                )
+            val cameraStore =
+                object : RemoteCameraDeviceStore {
+                    override val cameraSelection = MutableStateFlow(cameraSelection)
+                }
+            var selectedPayload: ByteArray? = null
+            coEvery { dataLayerClient.sendMessage("/logdate/camera/select", any()) } coAnswers {
+                selectedPayload = secondArg()
+                true
+            }
+            val viewModel = createViewModel(cameraDeviceStore = cameraStore)
+            viewModel.requestCamera()
+            advanceUntilIdle()
+
+            viewModel.selectCameraDevice("usb-camera-1")
+            advanceUntilIdle()
+
+            coVerify { dataLayerClient.sendMessage("/logdate/camera/select", any()) }
+            assertEquals("device:usb-camera-1", selectedPayload?.decodeToString())
+            assertEquals("USB document camera", viewModel.uiState.value.selectedCameraLabel)
+            assertEquals("usb-camera-1", viewModel.uiState.value.selectedCameraDeviceId)
+        }
+
+    @Test
+    fun `camera store updates selected label and available cameras`() =
+        runTest {
+            val cameraStore = TestRemoteCameraDeviceStore()
+            val viewModel = createViewModel(cameraDeviceStore = cameraStore)
+            viewModel.requestCamera()
+            advanceUntilIdle()
+
+            val externalSelection =
+                MediaDeviceSelectionUiState(
+                    kind = MediaDeviceKind.CAMERA,
+                    devices =
+                        listOf(
+                            MediaDeviceUiState(
+                                id = "camera-back",
+                                label = "Back camera",
+                                kind = MediaDeviceKind.CAMERA,
+                                category = MediaDeviceCategory.BACK_CAMERA,
+                            ),
+                            MediaDeviceUiState(
+                                id = "usb-camera-1",
+                                label = "USB document camera",
+                                kind = MediaDeviceKind.CAMERA,
+                                category = MediaDeviceCategory.USB,
+                                isExternal = true,
+                            ),
+                        ),
+                    selectedDeviceId = "usb-camera-1",
+                )
+
+            cameraStore.update(externalSelection)
+            advanceUntilIdle()
+
+            assertEquals("USB document camera", viewModel.uiState.value.selectedCameraLabel)
+            assertEquals("usb-camera-1", viewModel.uiState.value.selectedCameraDeviceId)
+            assertEquals(2, viewModel.uiState.value.availableCameras.size)
+            assertEquals("usb-camera-1", viewModel.uiState.value.availableCameras[1].id)
+        }
+
+    @Test
+    fun `switchCamera sends switch message and toggles label`() =
+        runTest {
+            val viewModel = createViewModel()
+            viewModel.requestCamera()
+            advanceUntilIdle()
+
+            viewModel.switchCamera()
+            advanceUntilIdle()
+
+            coVerify { dataLayerClient.sendMessage("/logdate/camera/switch", any()) }
+            assertEquals("Front camera", viewModel.uiState.value.selectedCameraLabel)
+        }
+
+    @Test
+    fun `camera selection is ignored when not ready`() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.selectFrontCamera()
+            viewModel.switchCamera()
+            advanceUntilIdle()
+
+            coVerify(exactly = 0) { dataLayerClient.sendMessage("/logdate/camera/select", any()) }
+            coVerify(exactly = 0) { dataLayerClient.sendMessage("/logdate/camera/switch", any()) }
         }
 
     // -----------------------------------------------------------------------
@@ -292,11 +518,21 @@ class WearRemoteCameraViewModelTest {
     @Test
     fun `dismiss from PREVIEW returns to IDLE`() =
         runTest {
-            val viewModel = createViewModel()
+            val captureResultStore = TestRemoteCameraCaptureResultStore()
+            val viewModel = createViewModel(captureResultStore = captureResultStore)
             viewModel.requestCamera()
             advanceUntilIdle()
             viewModel.capture()
             advanceUntilIdle()
+            captureResultStore.publish(
+                RemoteCameraCaptureResult(
+                    isSaved = true,
+                    message = "Remote photo saved",
+                    mediaType = "photo",
+                ),
+            )
+            advanceUntilIdle()
+            assertEquals(RemoteCameraPhase.PREVIEW, viewModel.uiState.value.phase)
 
             viewModel.dismiss()
             advanceUntilIdle()
@@ -366,4 +602,24 @@ class WearRemoteCameraViewModelTest {
 
             assertTrue(viewModel.uiState.value.navigateBack)
         }
+
+    private class TestRemoteCameraDeviceStore(
+        initialSelection: MediaDeviceSelectionUiState = defaultRemoteCameraSelection(),
+    ) : RemoteCameraDeviceStore {
+        private val state = MutableStateFlow(initialSelection)
+        override val cameraSelection = state
+
+        fun update(selection: MediaDeviceSelectionUiState) {
+            state.value = selection
+        }
+    }
+
+    private class TestRemoteCameraCaptureResultStore : RemoteCameraCaptureResultStore {
+        private val results = MutableSharedFlow<RemoteCameraCaptureResult>(extraBufferCapacity = 1)
+        override val captureResults = results.asSharedFlow()
+
+        fun publish(result: RemoteCameraCaptureResult) {
+            results.tryEmit(result)
+        }
+    }
 }

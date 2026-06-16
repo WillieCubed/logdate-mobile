@@ -2,6 +2,7 @@ package app.logdate.feature.editor.ui.camera
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.feature.editor.ui.formatMediaDuration
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
@@ -40,6 +41,7 @@ class CameraViewModel(
                         recordingDurationMs = captureState.recordingDurationMs,
                         capturedMediaUri = captureState.lastCapturedUri,
                         error = captureState.error?.toErrorMessage(),
+                        cameraSelection = captureState.cameraSelection,
                     )
                 }
             }
@@ -86,6 +88,15 @@ class CameraViewModel(
         previewJob =
             viewModelScope.launch {
                 cameraCaptureManager.switchCamera()
+            }
+        previewJob?.join()
+    }
+
+    suspend fun selectCameraDevice(deviceId: String) {
+        previewJob?.cancelAndJoin()
+        previewJob =
+            viewModelScope.launch {
+                cameraCaptureManager.selectCameraDevice(deviceId)
             }
         previewJob?.join()
     }
@@ -197,6 +208,7 @@ data class CameraUiState(
     val capturedMediaUri: String? = null,
     val capturedMediaType: CapturedMediaType? = null,
     val error: String? = null,
+    val cameraSelection: MediaDeviceSelectionUiState = defaultCameraSelection(cameraFacing),
 ) {
     /**
      * Returns a formatted duration string for video recording (MM:SS).

@@ -169,4 +169,5 @@ expect fun CameraCaptureContent(
     onMediaCaptured: (uri: String, mediaType: CapturedMediaType, durationMs: Long) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    remoteControl: CameraRemoteControl = CameraRemoteControl.None,
 )

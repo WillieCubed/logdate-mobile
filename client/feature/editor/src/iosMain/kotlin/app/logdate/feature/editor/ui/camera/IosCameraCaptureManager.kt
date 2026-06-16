@@ -2,6 +2,7 @@
 
 package app.logdate.feature.editor.ui.camera
 
+import app.logdate.client.media.device.DefaultMediaDevices
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -182,7 +183,23 @@ class IosCameraCaptureManager : CameraCaptureManager {
             ensureVideoInputForFacing(nextFacing)
             session.commitConfiguration()
         }
-        _state.update { it.copy(cameraFacing = nextFacing) }
+        _state.update {
+            it.copy(
+                cameraFacing = nextFacing,
+                cameraSelection = defaultCameraSelection(nextFacing),
+            )
+        }
+    }
+
+    override suspend fun selectCameraDevice(deviceId: String) {
+        val requestedFacing =
+            when (deviceId) {
+                DefaultMediaDevices.frontCamera.id -> CameraFacing.FRONT
+                DefaultMediaDevices.backCamera.id -> CameraFacing.BACK
+                else -> return
+            }
+        if (_state.value.cameraFacing == requestedFacing) return
+        switchCamera()
     }
 
     override fun setCaptureMode(mode: CaptureMode) {
