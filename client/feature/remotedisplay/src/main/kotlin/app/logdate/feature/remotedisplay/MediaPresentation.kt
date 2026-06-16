@@ -9,6 +9,7 @@ import android.view.Display
 import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.ImageView
+import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
