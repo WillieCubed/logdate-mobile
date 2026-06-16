@@ -34,10 +34,14 @@ class ObserveCloudQuotaUseCaseTest {
                 usedBytes = 0L,
                 categories = emptyList(),
             )
+        var getCurrentQuotaCalls = 0
 
         override fun observeQuota(): Flow<CloudStorageQuota> = observeQuotaResult
 
-        override suspend fun getCurrentQuota(): CloudStorageQuota = currentQuota
+        override suspend fun getCurrentQuota(): CloudStorageQuota {
+            getCurrentQuotaCalls += 1
+            return currentQuota
+        }
 
         override suspend fun recordObjectCreation(
             objectType: CloudObjectType,
@@ -87,6 +91,18 @@ class ObserveCloudQuotaUseCaseTest {
             val emittedValues = result.toList()
             assertEquals(1, emittedValues.size)
             assertEquals(expectedQuota, emittedValues.first())
+            assertEquals(1, mockQuotaManager.getCurrentQuotaCalls)
+        }
+
+    @Test
+    fun `invoke should request current quota when collection starts`() =
+        runTest {
+            val mockQuotaManager = MockCloudQuotaManager()
+            val useCase = ObserveCloudQuotaUseCase(mockQuotaManager)
+
+            useCase().toList()
+
+            assertEquals(1, mockQuotaManager.getCurrentQuotaCalls)
         }
 
     @Test
