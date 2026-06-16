@@ -180,7 +180,7 @@ private fun TimelineDayDetailAdaptiveContent(
                 includeLocations = false,
             )
         },
-        fallback = {
+        standardContent = {
             FoldableBookLayout(
                 minPaneWidth = 320.dp,
                 startPane = {

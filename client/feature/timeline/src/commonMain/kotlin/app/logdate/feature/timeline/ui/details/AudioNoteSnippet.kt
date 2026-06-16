@@ -4,11 +4,13 @@ package app.logdate.feature.timeline.ui.details
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -30,6 +32,7 @@ import app.logdate.ui.audio.AudioPlaybackDisplayInfo
 import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.audio.LocalTranscriptionState
 import app.logdate.ui.common.noteDragSource
+import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.AudioNoteUiState
@@ -121,64 +124,90 @@ fun AudioNoteSnippet(
             Column(
                 modifier = Modifier.padding(Spacing.md),
             ) {
-                // Audio note header with controls
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    // Play/pause button
-                    IconButton(
-                        onClick = {
-                            if (isThisPlaying) {
-                                audioPlaybackState.pause()
-                            } else {
-                                audioPlaybackState.play(uiState.noteId, uiState.uri, displayInfo)
-                            }
-                        },
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(
-                            painter = if (isThisPlaying) PlatformIcons.pause() else PlatformIcons.play(),
-                            contentDescription = if (isThisPlaying) "Pause" else "Play",
-                            modifier = Modifier.size(24.dp),
-                        )
-                    }
-
-                    Column(
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        // Audio note title
-                        Text(
-                            text = stringResource(Res.string.audio_recording),
-                            style = MaterialTheme.typography.titleSmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-
-                        // Duration and status
-                        Text(
-                            text =
-                                if (isThisPlaying) {
-                                    "Playing • ${duration.inWholeMinutes}:${(duration.inWholeSeconds % 60).toString().padStart(2, '0')}"
-                                } else {
-                                    "${duration.inWholeMinutes}:${(duration.inWholeSeconds % 60).toString().padStart(2, '0')}"
-                                },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-
-                    // Stop button (only show if this audio is current)
-                    if (isThisCurrent) {
-                        IconButton(
-                            onClick = { audioPlaybackState.stop() },
-                            modifier = Modifier.size(32.dp),
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val stackRouteControls = maxWidth < 360.dp && isThisCurrent
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Icon(
-                                painter = PlatformIcons.stop(),
-                                contentDescription = stringResource(Res.string.stop),
-                                modifier = Modifier.size(20.dp),
+                            IconButton(
+                                onClick = {
+                                    if (isThisPlaying) {
+                                        audioPlaybackState.pause()
+                                    } else {
+                                        audioPlaybackState.play(uiState.noteId, uiState.uri, displayInfo)
+                                    }
+                                },
+                                modifier = Modifier.size(40.dp),
+                            ) {
+                                Icon(
+                                    painter = if (isThisPlaying) PlatformIcons.pause() else PlatformIcons.play(),
+                                    contentDescription = if (isThisPlaying) "Pause" else "Play",
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+
+                            Column(
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(
+                                    text = stringResource(Res.string.audio_recording),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+
+                                Text(
+                                    text =
+                                        if (isThisPlaying) {
+                                            "Playing • ${duration.inWholeMinutes}:${
+                                                (duration.inWholeSeconds % 60)
+                                                    .toString()
+                                                    .padStart(2, '0')
+                                            }"
+                                        } else {
+                                            "${duration.inWholeMinutes}:${
+                                                (duration.inWholeSeconds % 60)
+                                                    .toString()
+                                                    .padStart(2, '0')
+                                            }"
+                                        },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+
+                            if (isThisCurrent && !stackRouteControls) {
+                                MediaDeviceSelector(
+                                    selection = audioPlaybackState.outputSelection,
+                                    onDeviceSelected = audioPlaybackState.selectOutputDevice,
+                                    label = "Audio output",
+                                    modifier = Modifier.widthIn(max = 160.dp),
+                                )
+                            }
+
+                            if (isThisCurrent) {
+                                IconButton(
+                                    onClick = { audioPlaybackState.stop() },
+                                    modifier = Modifier.size(32.dp),
+                                ) {
+                                    Icon(
+                                        painter = PlatformIcons.stop(),
+                                        contentDescription = stringResource(Res.string.stop),
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                            }
+                        }
+
+                        if (stackRouteControls) {
+                            MediaDeviceSelector(
+                                selection = audioPlaybackState.outputSelection,
+                                onDeviceSelected = audioPlaybackState.selectOutputDevice,
+                                label = "Audio output",
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
                     }
