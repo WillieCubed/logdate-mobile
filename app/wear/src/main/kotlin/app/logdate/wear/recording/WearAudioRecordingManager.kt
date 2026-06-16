@@ -9,14 +9,17 @@ import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.client.media.audio.AudioRecordingTarget
 import app.logdate.client.media.audio.AudioStorage
 import app.logdate.client.media.audio.transcription.TranscriptionService
+import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.wear.data.storage.StorageSpaceChecker
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration
@@ -35,6 +38,7 @@ class WearAudioRecordingManager(
     private val context: Context,
     private val storageChecker: StorageSpaceChecker,
     private val audioStorage: AudioStorage,
+    private val audioRouteRepository: AudioRouteRepository,
 ) : AudioRecordingManager {
     companion object {
         // Estimate size of 1-minute audio recording (AAC format, 128kbps)
@@ -57,6 +61,7 @@ class WearAudioRecordingManager(
     private var recordingService: WearAudioRecordingService? = null
     private var recordedAudioPath: String? = null
     private var recordingTarget: AudioRecordingTarget? = null
+    private var routeSyncJob: Job? = null
 
     // Service connection
     private val serviceConnection =
@@ -68,6 +73,16 @@ class WearAudioRecordingManager(
                 val binder = service as WearAudioRecordingService.AudioServiceBinder
                 recordingService = binder.getService()
                 serviceBound = true
+
+                routeSyncJob?.cancel()
+                routeSyncJob =
+                    scope.launch {
+                        audioRouteRepository.inputDevices.collect { selection ->
+                            if (recordingActive && serviceBound) {
+                                recordingService?.updatePreferredInputDevice(selection.selectedDeviceId)
+                            }
+                        }
+                    }
 
                 // Observe service state
                 scope.launch {
@@ -97,6 +112,8 @@ class WearAudioRecordingManager(
             override fun onServiceDisconnected(name: ComponentName?) {
                 recordingService = null
                 serviceBound = false
+                routeSyncJob?.cancel()
+                routeSyncJob = null
                 Napier.d("Disconnected from Wear OS audio recording service")
             }
         }
@@ -135,6 +152,8 @@ class WearAudioRecordingManager(
             try {
                 context.unbindService(serviceConnection)
                 serviceBound = false
+                routeSyncJob?.cancel()
+                routeSyncJob = null
                 Napier.d("Unbound from Wear OS audio recording service")
             } catch (e: Exception) {
                 Napier.e("Error unbinding from Wear OS recording service", e)
@@ -176,7 +195,10 @@ class WearAudioRecordingManager(
             recordingTarget = audioStorage.createRecordingTarget()
 
             // Start foreground service
-            context.startWearAudioRecordingService(recordingTarget?.path)
+            context.startWearAudioRecordingService(
+                outputFilePath = recordingTarget?.path,
+                inputDeviceId = audioRouteRepository.inputDevices.value.selectedDeviceId,
+            )
 
             // Bind to service
             bindToService()
@@ -216,12 +238,16 @@ class WearAudioRecordingManager(
             // Return audio path
             recordingActive = false
             recordingTarget = null
+            routeSyncJob?.cancel()
+            routeSyncJob = null
             filePath ?: recordedAudioPath
         } catch (e: Exception) {
             Napier.e("Error stopping Wear OS recording", e)
             recordingActive = false
             unbindFromService()
             recordingTarget = null
+            routeSyncJob?.cancel()
+            routeSyncJob = null
             null
         }
     }

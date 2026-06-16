@@ -18,6 +18,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.logdate.client.media.device.DefaultMediaDevices
+import app.logdate.client.media.device.MediaDeviceCategory
+import app.logdate.client.media.device.MediaDeviceKind
+import app.logdate.client.media.device.MediaDeviceSelectionUiState
+import app.logdate.client.media.device.MediaDeviceUiState
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.Icon
@@ -29,6 +34,7 @@ import app.logdate.wear.presentation.audio.AudioRecordingUiState
 import app.logdate.wear.presentation.audio.components.AudioWaveform
 import app.logdate.wear.presentation.audio.components.RecordButton
 import app.logdate.wear.presentation.audio.components.RecordingTimer
+import app.logdate.ui.media.MediaDeviceSelector
 import com.android.tools.screenshot.PreviewTest
 
 class AudioRecordingScreenshots {
@@ -39,6 +45,7 @@ class AudioRecordingScreenshots {
         MaterialTheme {
             AudioRecordingPreviewContent(
                 uiState = AudioRecordingUiState(),
+                selection = microphoneSelection("Watch microphone"),
             )
         }
     }
@@ -48,7 +55,7 @@ class AudioRecordingScreenshots {
     @Composable
     fun S02_AudioRecordingActive() {
         MaterialTheme {
-            AudioRecordingPreviewContent(
+                AudioRecordingPreviewContent(
                 uiState =
                     AudioRecordingUiState(
                         isRecording = true,
@@ -67,6 +74,7 @@ class AudioRecordingScreenshots {
                                 0.7f,
                             ),
                     ),
+                selection = microphoneSelection("Bluetooth headset"),
             )
         }
     }
@@ -76,7 +84,7 @@ class AudioRecordingScreenshots {
     @Composable
     fun S03_AudioRecordingPaused() {
         MaterialTheme {
-            AudioRecordingPreviewContent(
+                AudioRecordingPreviewContent(
                 uiState =
                     AudioRecordingUiState(
                         isRecording = true,
@@ -84,6 +92,7 @@ class AudioRecordingScreenshots {
                         durationMs = 34_000,
                         audioLevels = listOf(0.3f, 0.5f, 0.7f),
                     ),
+                selection = microphoneSelection("USB microphone"),
             )
         }
     }
@@ -93,14 +102,15 @@ class AudioRecordingScreenshots {
     @Composable
     fun S04_AudioRecordingError() {
         MaterialTheme {
-            AudioRecordingPreviewContent(
-                uiState =
-                    AudioRecordingUiState(
-                        errorMessage = "Not enough storage space for recording",
-                    ),
-            )
+                AudioRecordingPreviewContent(
+                    uiState =
+                        AudioRecordingUiState(
+                            errorMessage = "Not enough storage space for recording",
+                        ),
+                selection = microphoneSelection("Watch microphone", controllable = false),
+                )
+            }
         }
-    }
 }
 
 /**
@@ -110,7 +120,10 @@ class AudioRecordingScreenshots {
  * avoiding the need for a ViewModel or bound service.
  */
 @Composable
-private fun AudioRecordingPreviewContent(uiState: AudioRecordingUiState) {
+private fun AudioRecordingPreviewContent(
+    uiState: AudioRecordingUiState,
+    selection: MediaDeviceSelectionUiState,
+) {
     ScreenScaffold(
         timeText = { TimeText() },
     ) {
@@ -151,6 +164,21 @@ private fun AudioRecordingPreviewContent(uiState: AudioRecordingUiState) {
                         modifier = Modifier.padding(bottom = 8.dp),
                     )
                 }
+
+                Text(
+                    text = "Mic: ${selection.selectedDevice?.label ?: "System"}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+
+                MediaDeviceSelector(
+                    selection = selection,
+                    onDeviceSelected = {},
+                    label = "Microphone",
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
 
                 RecordButton(
                     isRecording = uiState.isRecording,
@@ -203,3 +231,38 @@ private fun AudioRecordingPreviewContent(uiState: AudioRecordingUiState) {
         }
     }
 }
+
+private fun microphoneSelection(
+    selectedLabel: String,
+    controllable: Boolean = true,
+): MediaDeviceSelectionUiState =
+    MediaDeviceSelectionUiState(
+        kind = MediaDeviceKind.AUDIO_INPUT,
+        devices =
+            listOf(
+                DefaultMediaDevices.systemMicrophone.copy(id = "watch-mic", label = "Watch microphone"),
+                MediaDeviceUiState(
+                    id = "usb-mic",
+                    label = "USB microphone",
+                    kind = MediaDeviceKind.AUDIO_INPUT,
+                    category = MediaDeviceCategory.USB,
+                    isExternal = true,
+                ),
+                MediaDeviceUiState(
+                    id = "bluetooth-mic",
+                    label = "Bluetooth headset",
+                    kind = MediaDeviceKind.AUDIO_INPUT,
+                    category = MediaDeviceCategory.BLUETOOTH,
+                    isExternal = true,
+                ),
+            ),
+        selectedDeviceId =
+            when (selectedLabel) {
+                "USB microphone" -> "usb-mic"
+                "Bluetooth headset" -> "bluetooth-mic"
+                else -> "watch-mic"
+            },
+        isSelectionControllable = controllable,
+        routeControlMessage =
+            if (controllable) null else "Microphone selection is currently controlled by the system.",
+    )

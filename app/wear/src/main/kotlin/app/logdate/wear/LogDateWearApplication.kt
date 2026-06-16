@@ -2,6 +2,8 @@ package app.logdate.wear
 
 import android.app.Application
 import app.logdate.client.database.LogDateDatabase
+import app.logdate.client.notifications.LogDateNotificationChannelKey
+import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.wear.di.wearAudioModule
 import app.logdate.wear.di.wearDataModule
 import app.logdate.wear.notification.WearPromptScheduler
@@ -34,6 +36,12 @@ class LogDateWearApplication : Application() {
                 wearDataModule,
                 wearAudioModule,
             )
+        }
+
+        runCatching {
+            LogDateNotificationRegistrar(this).registerChannel(LogDateNotificationChannelKey.AUDIO_PLAYBACK)
+        }.onFailure { error ->
+            Napier.w("Failed to register Wear playback notification channel on app startup", error)
         }
 
         // Schedule morning/evening journal prompt alarms.

@@ -17,11 +17,14 @@ import androidx.wear.compose.material.SwipeToDismissBox
 import androidx.wear.compose.material.SwipeToDismissValue
 import androidx.wear.compose.material.rememberSwipeToDismissBoxState
 import androidx.wear.compose.material3.*
+import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.wear.R
 import app.logdate.wear.presentation.audio.components.AudioWaveform
 import app.logdate.wear.presentation.audio.components.RecordButton
 import app.logdate.wear.presentation.audio.components.RecordingTimer
+import app.logdate.ui.media.MediaDeviceSelector
 import kotlinx.coroutines.delay
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -34,6 +37,8 @@ fun AudioRecordingScreen(
     onNavigateBack: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val audioRouteRepository: AudioRouteRepository = koinInject()
+    val inputSelection by audioRouteRepository.inputDevices.collectAsState()
     val swipeToDismissBoxState = rememberSwipeToDismissBoxState()
 
     // Handle swipe to dismiss
@@ -106,6 +111,21 @@ fun AudioRecordingScreen(
                             modifier = Modifier.padding(bottom = 8.dp),
                         )
                     }
+
+                    Text(
+                        text = "Mic: ${inputSelection.selectedDevice?.label ?: "System"}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+
+                    MediaDeviceSelector(
+                        selection = inputSelection,
+                        onDeviceSelected = audioRouteRepository::selectInputDevice,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                        label = "Microphone",
+                    )
 
                     // Record/Stop button - large touch target
                     RecordButton(

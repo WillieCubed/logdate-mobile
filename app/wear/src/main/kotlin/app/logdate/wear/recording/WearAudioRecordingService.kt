@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
+import app.logdate.client.media.device.AndroidAudioRouteDevices
 import app.logdate.wear.R
 import app.logdate.wear.haptic.WearHapticEngine
 import io.github.aakira.napier.Napier
@@ -31,12 +32,18 @@ import java.io.IOException
 /**
  * Extension function to start the recording service for Wear OS
  */
-fun Context.startWearAudioRecordingService(outputFilePath: String? = null) {
+fun Context.startWearAudioRecordingService(
+    outputFilePath: String? = null,
+    inputDeviceId: String? = null,
+) {
     val intent =
         Intent(this, WearAudioRecordingService::class.java).apply {
             action = WearAudioRecordingService.ACTION_START
             if (outputFilePath != null) {
                 putExtra(WearAudioRecordingService.EXTRA_OUTPUT_PATH, outputFilePath)
+            }
+            if (inputDeviceId != null) {
+                putExtra(WearAudioRecordingService.EXTRA_INPUT_DEVICE_ID, inputDeviceId)
             }
         }
     startForegroundService(intent)
@@ -72,6 +79,7 @@ class WearAudioRecordingService : Service() {
         const val ACTION_PAUSE = "app.logdate.wear.action.PAUSE_RECORDING"
         const val ACTION_RESUME = "app.logdate.wear.action.RESUME_RECORDING"
         const val EXTRA_OUTPUT_PATH = "app.logdate.wear.extra.OUTPUT_PATH"
+        const val EXTRA_INPUT_DEVICE_ID = "app.logdate.wear.extra.INPUT_DEVICE_ID"
     }
 
     // Binder for clients
@@ -115,7 +123,8 @@ class WearAudioRecordingService : Service() {
             ACTION_START -> {
                 Napier.d("Starting Wear OS audio recording service")
                 val outputPath = intent.getStringExtra(EXTRA_OUTPUT_PATH)
-                startForegroundRecording(outputPath)
+                val inputDeviceId = intent.getStringExtra(EXTRA_INPUT_DEVICE_ID)
+                startForegroundRecording(outputPath, inputDeviceId)
                 hapticEngine.startRecording()
             }
             ACTION_STOP -> {
@@ -172,7 +181,10 @@ class WearAudioRecordingService : Service() {
     /**
      * Starts foreground recording with notification
      */
-    private fun startForegroundRecording(outputPath: String?) {
+    private fun startForegroundRecording(
+        outputPath: String?,
+        inputDeviceId: String?,
+    ) {
         try {
             // Create a simple notification for the small screen
             val notification = createRecordingNotification()
@@ -191,7 +203,7 @@ class WearAudioRecordingService : Service() {
                 startForeground(NOTIFICATION_ID, notification)
             }
 
-            startRecording(outputPath)
+            startRecording(outputPath, inputDeviceId)
         } catch (e: Exception) {
             Napier.e("Error starting Wear OS foreground service", e)
             stopSelf()
@@ -219,7 +231,10 @@ class WearAudioRecordingService : Service() {
     /**
      * Starts the actual recording process
      */
-    private fun startRecording(outputPath: String?) {
+    private fun startRecording(
+        outputPath: String?,
+        inputDeviceId: String?,
+    ) {
         try {
             // Create output file in cache directory
             outputFile =
@@ -251,6 +266,7 @@ class WearAudioRecordingService : Service() {
                 setOutputFile(outputFile?.absolutePath)
                 setAudioEncodingBitRate(128000) // 128kbps for good quality
                 setAudioSamplingRate(44100) // 44.1kHz standard for audio
+                applyPreferredInputDevice(inputDeviceId)
 
                 try {
                     prepare()
@@ -412,6 +428,25 @@ class WearAudioRecordingService : Service() {
      * Checks if recording is currently paused
      */
     fun isRecordingPaused(): Boolean = isPaused && _recordingState.value.isRecording
+
+    /**
+     * Re-applies the preferred microphone route while recording is active.
+     */
+    fun updatePreferredInputDevice(inputDeviceId: String?) {
+        if (!_recordingState.value.isRecording) return
+        mediaRecorder?.applyPreferredInputDevice(inputDeviceId)
+    }
+
+    private fun MediaRecorder.applyPreferredInputDevice(inputDeviceId: String?) {
+        val preferredDevice = AndroidAudioRouteDevices.findPreferredInputDevice(this@WearAudioRecordingService, inputDeviceId)
+        if (preferredDevice == null) {
+            Napier.d("Using system microphone route for Wear OS recording")
+            return
+        }
+
+        val applied = setPreferredDevice(preferredDevice)
+        Napier.d("Preferred Wear OS recording microphone ${preferredDevice.productName} applied=$applied")
+    }
 
     /**
      * Acquires a wake lock to keep recording when screen is off

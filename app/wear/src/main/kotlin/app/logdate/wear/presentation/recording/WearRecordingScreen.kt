@@ -37,11 +37,14 @@ import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
+import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.wear.R
 import app.logdate.wear.presentation.audio.components.AudioWaveform
 import app.logdate.wear.presentation.audio.components.RecordingTimer
 import app.logdate.wear.presentation.common.SaveFeedback
+import app.logdate.ui.media.MediaDeviceSelector
 import kotlinx.coroutines.flow.collectLatest
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -50,6 +53,8 @@ fun WearRecordingScreen(
     viewModel: WearRecordingViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val audioRouteRepository: AudioRouteRepository = koinInject()
+    val inputSelection by audioRouteRepository.inputDevices.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.events.collectLatest { event ->
@@ -122,6 +127,28 @@ fun WearRecordingScreen(
                 )
             RecordingPhase.TOO_SHORT -> TooShortContent()
             RecordingPhase.ERROR -> RecordingErrorContent(message = uiState.errorMessage)
+        }
+
+        Column(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 12.dp, start = 12.dp, end = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = "Mic: ${inputSelection.selectedDevice?.label ?: "System"}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+
+            MediaDeviceSelector(
+                selection = inputSelection,
+                onDeviceSelected = audioRouteRepository::selectInputDevice,
+                label = "Microphone",
+            )
         }
     }
 }

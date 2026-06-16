@@ -90,8 +90,10 @@ dependencies {
     implementation(projects.client.device)
     implementation(projects.client.location)
     implementation(projects.client.logdateDatastore)
+    implementation(projects.client.notifications)
     implementation(projects.client.permissions)
     implementation(projects.client.sync)
+    implementation(projects.client.ui)
     implementation(projects.shared.config)
     implementation(projects.shared.model)
     implementation(projects.client.media)
@@ -100,8 +102,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     // Add navigation for Wear
-    implementation(libs.androidx.navigation3.runtime)
-    implementation(libs.androidx.navigation3.ui)
+    implementation(libs.nav3.runtime)
+    implementation(libs.nav3.ui)
     implementation(libs.androidx.compose.material.iconsExtended)
 
     // Additional Compose support

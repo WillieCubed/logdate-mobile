@@ -1,15 +1,22 @@
 package app.logdate.wear.e2e
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.wear.compose.material3.MaterialTheme
+import app.logdate.client.media.device.MediaDeviceCategory
+import app.logdate.client.media.device.MediaDeviceKind
+import app.logdate.client.media.device.MediaDeviceSelectionUiState
+import app.logdate.client.media.device.MediaDeviceUiState
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.wear.playback.AudioOutputState
 import app.logdate.wear.presentation.timeline.WearDayDetailContent
+import app.logdate.wear.presentation.timeline.WearDayDetailTags
 import app.logdate.wear.presentation.timeline.WearDayDetailUiState
 import app.logdate.wear.presentation.timeline.WearPlaybackUiState
 import kotlinx.datetime.LocalDate
@@ -60,6 +67,35 @@ class WearDayDetailPlaybackTest {
         WearDayDetailUiState(
             date = LocalDate(2024, 3, 9),
             entries = entries,
+        )
+
+    private fun outputSelection(isSelectionControllable: Boolean = true) =
+        MediaDeviceSelectionUiState(
+            kind = MediaDeviceKind.AUDIO_OUTPUT,
+            devices =
+                listOf(
+                    MediaDeviceUiState(
+                        id = "watch-speaker",
+                        label = "Watch speaker",
+                        kind = MediaDeviceKind.AUDIO_OUTPUT,
+                        category = MediaDeviceCategory.BUILT_IN,
+                    ),
+                    MediaDeviceUiState(
+                        id = "bluetooth-headphones",
+                        label = "Bluetooth headphones",
+                        kind = MediaDeviceKind.AUDIO_OUTPUT,
+                        category = MediaDeviceCategory.BLUETOOTH,
+                        isExternal = true,
+                    ),
+                ),
+            selectedDeviceId = "watch-speaker",
+            isSelectionControllable = isSelectionControllable,
+            routeControlMessage =
+                if (isSelectionControllable) {
+                    null
+                } else {
+                    "Use Wear OS Bluetooth settings to route playback."
+                },
         )
 
     // -----------------------------------------------------------------------
@@ -210,7 +246,10 @@ class WearDayDetailPlaybackTest {
             }
         }
 
-        composeRule.onNodeWithText("Connect headphones to listen").assertIsDisplayed()
+        composeRule
+            .onNodeWithTag(WearDayDetailTags.audioNote(testNoteId))
+            .assertIsDisplayed()
+            .assertTextContains("Connect headphones to listen")
     }
 
     @Test
@@ -228,8 +267,109 @@ class WearDayDetailPlaybackTest {
             }
         }
 
-        composeRule.onNodeWithText("Connect headphones to listen").performClick()
+        composeRule.onNodeWithTag(WearDayDetailTags.audioNote(testNoteId)).performClick()
         assertTrue("Tapping no-output card should open Bluetooth settings", opened)
+    }
+
+    @Test
+    fun outputSummary_tapShowsOutputPicker() {
+        var toggledPicker = false
+        composeRule.setContent {
+            MaterialTheme {
+                WearDayDetailContent(
+                    detail = dayDetail(),
+                    playbackState = WearPlaybackUiState.Idle,
+                    audioOutputState = AudioOutputState.SpeakerAndBluetooth,
+                    outputSelection = outputSelection(),
+                    onToggleOutputPicker = { toggledPicker = true },
+                    onToggleNote = {},
+                    onOpenBluetoothSettings = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(WearDayDetailTags.OUTPUT_SUMMARY).assertIsDisplayed()
+        composeRule.onNodeWithTag(WearDayDetailTags.OUTPUT_SUMMARY).performClick()
+        assertTrue("Tapping the Wear output summary should open output options", toggledPicker)
+    }
+
+    @Test
+    fun outputPicker_displaysBluetoothOutputRoute() {
+        composeRule.setContent {
+            MaterialTheme {
+                WearDayDetailContent(
+                    detail = dayDetail(),
+                    playbackState = WearPlaybackUiState.Idle,
+                    audioOutputState = AudioOutputState.SpeakerAndBluetooth,
+                    outputSelection = outputSelection(),
+                    isOutputPickerVisible = true,
+                    onToggleNote = {},
+                    onOpenBluetoothSettings = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(WearDayDetailTags.OUTPUT_PICKER).assertIsDisplayed()
+        composeRule.onNodeWithTag(WearDayDetailTags.outputDevice("bluetooth-headphones")).assertIsDisplayed()
+    }
+
+    @Test
+    fun outputPicker_controllableRouteSelectsBluetoothOutput() {
+        var selectedDeviceId: String? = null
+        composeRule.setContent {
+            MaterialTheme {
+                WearDayDetailContent(
+                    detail = dayDetail(),
+                    playbackState = WearPlaybackUiState.Idle,
+                    audioOutputState = AudioOutputState.SpeakerAndBluetooth,
+                    outputSelection = outputSelection(isSelectionControllable = true),
+                    isOutputPickerVisible = true,
+                    onSelectOutputDevice = { selectedDeviceId = it },
+                    onToggleNote = {},
+                    onOpenBluetoothSettings = {},
+                )
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule
+            .onNodeWithTag(WearDayDetailTags.outputDevice("bluetooth-headphones"))
+            .assertIsDisplayed()
+            .performClick()
+
+        assertTrue(
+            "Tapping an available controllable Wear output should select that device",
+            selectedDeviceId == "bluetooth-headphones",
+        )
+    }
+
+    @Test
+    fun outputPicker_systemControlledRouteOpensBluetoothSettings() {
+        var opened = false
+        composeRule.setContent {
+            MaterialTheme {
+                WearDayDetailContent(
+                    detail = dayDetail(),
+                    playbackState = WearPlaybackUiState.Idle,
+                    audioOutputState = AudioOutputState.SpeakerAndBluetooth,
+                    outputSelection = outputSelection(isSelectionControllable = false),
+                    isOutputPickerVisible = true,
+                    onToggleNote = {},
+                    onOpenBluetoothSettings = { opened = true },
+                )
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule
+            .onNodeWithTag(WearDayDetailTags.outputDevice("bluetooth-headphones"))
+            .assertIsDisplayed()
+            .performClick()
+
+        assertTrue(
+            "System-controlled Wear output routes should open Bluetooth settings",
+            opened,
+        )
     }
 
     // -----------------------------------------------------------------------

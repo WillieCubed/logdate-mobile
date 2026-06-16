@@ -8,6 +8,8 @@ import app.logdate.client.media.audio.AndroidAudioStorage
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackStatusProvider
 import app.logdate.client.media.audio.AudioStorage
+import app.logdate.client.media.device.AndroidAudioRouteRepository
+import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.client.sync.SyncManager
@@ -50,13 +52,14 @@ val wearAudioModule =
                     .getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
             WearHapticEngine(vibratorManager.defaultVibrator)
         }
-        single { WearAudioRecordingManager(get(), get(), get()) }
+        single { WearAudioRecordingManager(get(), get(), get(), get()) }
 
         // Audio playback — reuses the phone's AndroidAudioPlaybackManager + AudioPlaybackService
         single { WearAudioOutputMonitor(get()) }
         single { AndroidAudioPlaybackManager(get(), get()) }
         single<AudioPlaybackManager> { get<AndroidAudioPlaybackManager>() }
         single<AudioPlaybackStatusProvider> { get<AndroidAudioPlaybackManager>() }
+        single<AudioRouteRepository> { AndroidAudioRouteRepository(get()) }
         single<CoroutineDispatcher>(wearIoDispatcherQualifier) { Dispatchers.IO }
         single<WearSyncedAudioResolver> {
             PhoneSyncedAudioResolver(
