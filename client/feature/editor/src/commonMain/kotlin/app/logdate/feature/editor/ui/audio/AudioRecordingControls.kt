@@ -114,7 +114,7 @@ fun AudioRecordingControls(
                 )
             }
         },
-        fallback = {
+        standardContent = {
             AudioRecordingControlsColumn(
                 recordingState = recordingState,
                 audioLevels = audioLevels,

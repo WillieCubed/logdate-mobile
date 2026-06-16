@@ -98,7 +98,7 @@ fun ActiveRecordingDisplay(
                         .fillMaxWidth(),
             )
         },
-        fallback = {
+        standardContent = {
             Column(
                 modifier = Modifier.fillMaxSize(),
             ) {

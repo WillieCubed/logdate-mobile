@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import app.logdate.client.media.audio.AudioPlaybackMetadata
+import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.feature.editor.audio.AudioLabelResolver
 import app.logdate.feature.editor.audio.formatAudioLabel
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
@@ -18,6 +19,7 @@ import app.logdate.feature.editor.ui.editor.RecordingState
 import app.logdate.util.formatDateLocalized
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -54,8 +56,11 @@ fun AudioBlockEditor(
 
     // Get the ViewModel at this level, not in child composables
     val audioViewModel: AudioViewModel = koinViewModel()
+    val audioRouteRepository: AudioRouteRepository = koinInject()
     // Collect audio state from ViewModel
     val audioUiState by audioViewModel.uiState.collectAsState()
+    val inputSelection by audioRouteRepository.inputDevices.collectAsState()
+    val outputSelection by audioRouteRepository.outputDevices.collectAsState()
 
     // Determine if we're in recording mode or playback mode
     val existingAudioUri = block.uri
@@ -138,53 +143,59 @@ fun AudioBlockEditor(
         previousBlockId.value = block.id
     }
 
-    // Show appropriate audio UI based on the current state
-    // Use AudioPermissionWrapper to handle permissions
     Box(modifier = modifier) {
-        AudioPermissionWrapper {
-            if (existingAudioUri != null) {
-                AudioBlockContent(
-                    block = block,
-                    isExpanded = true,
-                    isPlaying = audioUiState.isPlaying,
-                    timedTranscript = audioUiState.timedTranscript,
-                    playbackProgress = audioUiState.playbackProgress,
-                    onPlayPauseClicked = {
-                        audioViewModel.togglePlayback(existingAudioUri, playbackMetadata)
-                    },
-                    onSeekPositionChanged = { position ->
-                        audioViewModel.seekTo(position)
-                    },
-                    onSeekTimestampClicked = { positionMs ->
-                        audioViewModel.seekToPositionMs(positionMs, block.duration)
-                    },
-                    onDeleteClicked = onDeleteRequested,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else if (isRecording) {
-                ActiveRecordingDisplay(
-                    audioLevels = audioLevels,
-                    recordingDuration = audioUiState.duration,
-                    transcriptionText = audioUiState.transcription,
-                    transcriptionIsFinal =
-                        (audioUiState.transcriptionState as? AudioUiState.TranscriptionState.Success)?.isFinal == true,
-                    transcriptionIsRefining =
-                        (audioUiState.transcriptionState as? AudioUiState.TranscriptionState.Success)?.isRefining == true,
-                    isPaused = audioUiState.isPaused,
-                    onRestart = { audioViewModel.restartRecording() },
-                    onPause = { audioViewModel.toggleRecordingPause() },
-                    onFinish = { audioViewModel.stopRecording() },
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                AudioRecordingControls(
-                    recordingState = recordingState,
-                    audioLevels = audioLevels,
-                    recordingDuration = audioUiState.duration,
-                    onStartRecording = { audioViewModel.startRecording(targetNoteId = block.id) },
-                    onStopRecording = { audioViewModel.stopRecording() },
-                    modifier = Modifier.fillMaxSize(),
-                )
+        if (existingAudioUri != null) {
+            AudioBlockContent(
+                block = block,
+                isExpanded = true,
+                isPlaying = audioUiState.isPlaying,
+                timedTranscript = audioUiState.timedTranscript,
+                playbackProgress = audioUiState.playbackProgress,
+                onPlayPauseClicked = {
+                    audioViewModel.togglePlayback(existingAudioUri, playbackMetadata)
+                },
+                onSeekPositionChanged = { position ->
+                    audioViewModel.seekTo(position)
+                },
+                onSeekTimestampClicked = { positionMs ->
+                    audioViewModel.seekToPositionMs(positionMs, block.duration)
+                },
+                onDeleteClicked = onDeleteRequested,
+                outputSelection = outputSelection,
+                onOutputDeviceSelected = audioRouteRepository::selectOutputDevice,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            AudioPermissionWrapper {
+                if (isRecording) {
+                    ActiveRecordingDisplay(
+                        audioLevels = audioLevels,
+                        recordingDuration = audioUiState.duration,
+                        transcriptionText = audioUiState.transcription,
+                        transcriptionIsFinal =
+                            (audioUiState.transcriptionState as? AudioUiState.TranscriptionState.Success)?.isFinal == true,
+                        transcriptionIsRefining =
+                            (audioUiState.transcriptionState as? AudioUiState.TranscriptionState.Success)?.isRefining == true,
+                        isPaused = audioUiState.isPaused,
+                        onRestart = { audioViewModel.restartRecording() },
+                        onPause = { audioViewModel.toggleRecordingPause() },
+                        onFinish = { audioViewModel.stopRecording() },
+                        modifier = Modifier.fillMaxSize(),
+                        inputSelection = inputSelection,
+                        onInputSelected = audioRouteRepository::selectInputDevice,
+                    )
+                } else {
+                    AudioRecordingControls(
+                        recordingState = recordingState,
+                        audioLevels = audioLevels,
+                        recordingDuration = audioUiState.duration,
+                        onStartRecording = { audioViewModel.startRecording(targetNoteId = block.id) },
+                        onStopRecording = { audioViewModel.stopRecording() },
+                        modifier = Modifier.fillMaxSize(),
+                        inputSelection = inputSelection,
+                        onInputSelected = audioRouteRepository::selectInputDevice,
+                    )
+                }
             }
         }
     }

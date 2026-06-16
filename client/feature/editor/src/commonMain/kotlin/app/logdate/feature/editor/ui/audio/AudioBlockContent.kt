@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -54,11 +55,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.client.media.audio.transcription.TimedTranscript
 import app.logdate.client.media.audio.transcription.TimedUtterance
+import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.feature.editor.audio.AudioContextProcessor
 import app.logdate.feature.editor.audio.AudioLabelResolver
 import app.logdate.feature.editor.audio.formatAudioLabel
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.formatMediaDuration
+import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.no_audio_recorded_yet
@@ -104,6 +107,8 @@ fun AudioBlockContent(
     onSeekPositionChanged: (Float) -> Unit,
     onSeekTimestampClicked: (Long) -> Unit,
     playbackProgress: Float = 0f,
+    outputSelection: MediaDeviceSelectionUiState? = null,
+    onOutputDeviceSelected: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val audioContextProcessor: AudioContextProcessor = koinInject()
@@ -196,6 +201,8 @@ fun AudioBlockContent(
                     onDeleteClicked = onDeleteClicked,
                     onProgressChanged = onSeekPositionChanged,
                     onSeekTimestampClicked = onSeekTimestampClicked,
+                    outputSelection = outputSelection,
+                    onOutputDeviceSelected = onOutputDeviceSelected,
                     playButtonScale = playButtonScale,
                     waveformAmplitudes = waveformAmplitudes,
                     animatedVisibilityScope = this@AnimatedContent,
@@ -317,6 +324,8 @@ private fun ExpandedAudioContent(
     onDeleteClicked: () -> Unit,
     onProgressChanged: (Float) -> Unit,
     onSeekTimestampClicked: (Long) -> Unit,
+    outputSelection: MediaDeviceSelectionUiState?,
+    onOutputDeviceSelected: (String) -> Unit,
     playButtonScale: Float,
     waveformAmplitudes: List<Float>,
     sharedTransitionScope: SharedTransitionScope,
@@ -367,6 +376,18 @@ private fun ExpandedAudioContent(
                         tint = MaterialTheme.colorScheme.error,
                     )
                 }
+            }
+
+            if (block.uri != null && outputSelection != null) {
+                MediaDeviceSelector(
+                    selection = outputSelection,
+                    onDeviceSelected = onOutputDeviceSelected,
+                    label = "Audio output",
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 360.dp),
+                )
             }
 
             // Large waveform visualization - fills remaining vertical space
