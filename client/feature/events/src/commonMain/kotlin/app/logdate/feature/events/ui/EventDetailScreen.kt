@@ -416,12 +416,10 @@ private fun EventPlaceSection(
                         .fillMaxWidth()
                         .padding(top = Spacing.sm),
             )
+            val placeButtonLabel =
+                if (hasPlace) Res.string.event_detail_change_place else Res.string.event_detail_choose_place
             FilledTonalButton(onClick = onChoosePlace) {
-                Text(
-                    stringResource(
-                        if (hasPlace) Res.string.event_detail_change_place else Res.string.event_detail_choose_place,
-                    ),
-                )
+                Text(stringResource(placeButtonLabel))
             }
         }
     }
@@ -458,15 +456,13 @@ private fun EventDetailSaveBar(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.md),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    val saveButtonLabel =
+                        if (loaded.isSaving) Res.string.event_detail_saving else Res.string.event_detail_save
                     Button(
                         onClick = onSave,
                         enabled = !loaded.isSaving && loaded.event.title.isNotBlank(),
                     ) {
-                        Text(
-                            stringResource(
-                                if (loaded.isSaving) Res.string.event_detail_saving else Res.string.event_detail_save,
-                            ),
-                        )
+                        Text(stringResource(saveButtonLabel))
                     }
                 }
             }
