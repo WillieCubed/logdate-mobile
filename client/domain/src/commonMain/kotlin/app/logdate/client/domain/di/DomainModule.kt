@@ -105,7 +105,6 @@ import app.logdate.client.domain.timeline.SummarizeJournalEntriesUseCase
 import app.logdate.client.intelligence.availability.RewindAIAvailability
 import app.logdate.client.intelligence.curation.CurationConfigProvider
 import app.logdate.client.intelligence.events.EventNamingExtractor
-import okio.FileSystem
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -128,8 +127,8 @@ val domainModule: Module =
         factory { ExportUserDataUseCase(get(), get(), get(), get(), get(), get(), get(), get()) }
         factory { GetExportCountsUseCase(get(), get()) }
         factory { RestoreUserDataUseCase(get(), get(), get(), get(), get(), get()) }
-        factory { CreateEncryptedBackupUseCase(get(), get(), FileSystem.SYSTEM, get()) }
-        factory { RestoreFromEncryptedBackupUseCase(get(), FileSystem.SYSTEM, get(), get()) }
+        factory { CreateEncryptedBackupUseCase(get(), get(), domainFileSystem, get()) }
+        factory { RestoreFromEncryptedBackupUseCase(get(), domainFileSystem, get(), get()) }
         factory { PreviewArchiveUseCase() }
 
         // Notes

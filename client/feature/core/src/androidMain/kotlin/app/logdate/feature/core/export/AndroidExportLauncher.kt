@@ -110,12 +110,20 @@ class AndroidExportLauncher(
 
     override fun startExport(options: ExportOptions) {
         pendingExportOptions = options
-        val defaultFileName = generateExportFileName()
+        val defaultFileName =
+            when (options.archiveFormat) {
+                ExportArchiveFormat.EncryptedBackup -> generateEncryptedBackupFileName()
+                ExportArchiveFormat.LegacyZip -> generateExportFileName()
+            }
 
         val intent =
             Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
-                type = ExportFormat.MIME_TYPE
+                type =
+                    when (options.archiveFormat) {
+                        ExportArchiveFormat.EncryptedBackup -> ExportFormat.ENCRYPTED_BACKUP_MIME_TYPE
+                        ExportArchiveFormat.LegacyZip -> ExportFormat.MIME_TYPE
+                    }
                 putExtra(Intent.EXTRA_TITLE, defaultFileName)
             }
 
@@ -195,6 +203,7 @@ class AndroidExportLauncher(
         val dataBuilder =
             Data
                 .Builder()
+                .putString(ExportWorker.ARCHIVE_FORMAT_KEY, pendingExportOptions.archiveFormat.name)
                 .putBoolean(ExportWorker.INCLUDE_JOURNALS_KEY, pendingExportOptions.includeJournals)
                 .putBoolean(ExportWorker.INCLUDE_NOTES_KEY, pendingExportOptions.includeNotes)
                 .putBoolean(ExportWorker.INCLUDE_DRAFTS_KEY, pendingExportOptions.includeDrafts)

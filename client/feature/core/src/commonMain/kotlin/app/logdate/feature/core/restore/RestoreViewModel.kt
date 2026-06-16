@@ -25,6 +25,10 @@ sealed class RestoreState {
         val options: ImportOptions = ImportOptions(),
     ) : RestoreState()
 
+    data class PreviewingEncryptedBackup(
+        val fileName: String,
+    ) : RestoreState()
+
     data class Restoring(
         val stage: RestoreStage = RestoreStage.PREPARING,
         val progressPercent: Int = 0,
@@ -76,7 +80,14 @@ class UserDataRestoreViewModel(
                 return@setFileSelectedCallback
             }
             try {
-                val preview = previewArchiveUseCase.preview(fileInfo.metadataJson)
+                if (fileInfo.archiveFormat == RestoreArchiveFormat.EncryptedBackup) {
+                    _restoreState.update {
+                        RestoreState.PreviewingEncryptedBackup(fileName = fileInfo.displayName)
+                    }
+                    return@setFileSelectedCallback
+                }
+                val metadataJson = fileInfo.metadataJson ?: throw IllegalArgumentException("Missing archive metadata")
+                val preview = previewArchiveUseCase.preview(metadataJson)
                 if (preview.version.major > ExportSchemaVersion.CURRENT.major) {
                     _restoreState.update {
                         RestoreState.Failed(RestoreError.UNSUPPORTED_VERSION)
@@ -123,6 +134,7 @@ class UserDataRestoreViewModel(
         if (current is RestoreState.Restoring ||
             current is RestoreState.Selecting ||
             current is RestoreState.Previewing ||
+            current is RestoreState.PreviewingEncryptedBackup ||
             current is RestoreState.Completed ||
             current is RestoreState.Failed
         ) {
@@ -150,6 +162,11 @@ class UserDataRestoreViewModel(
 
     fun confirmImport() {
         val current = _restoreState.value
+        if (current is RestoreState.PreviewingEncryptedBackup) {
+            _restoreState.update { RestoreState.Restoring() }
+            restoreLauncher.startRestore(ImportOptions())
+            return
+        }
         if (current !is RestoreState.Previewing) return
         _restoreState.update { RestoreState.Restoring() }
         restoreLauncher.startRestore(current.options)
@@ -165,6 +182,7 @@ class UserDataRestoreViewModel(
         when (current) {
             is RestoreState.Confirming,
             is RestoreState.Previewing,
+            is RestoreState.PreviewingEncryptedBackup,
             is RestoreState.Completed,
             is RestoreState.Failed,
             -> _restoreState.update { RestoreState.Idle }

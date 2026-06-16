@@ -6,7 +6,7 @@ import kotlinx.serialization.json.Json
 import okio.BufferedSink
 import okio.BufferedSource
 
-internal object EncryptedBackupFileFormat {
+object EncryptedBackupFileFormat {
     private val magic = byteArrayOf('L'.code.toByte(), 'D'.code.toByte(), 'B'.code.toByte(), 'K'.code.toByte())
     private const val VERSION: Byte = 1
 
@@ -39,6 +39,14 @@ internal object EncryptedBackupFileFormat {
         val manifestJson = source.readUtf8(manifestSize.toLong())
         json.decodeFromString<BackupManifest>(manifestJson)
         return Header(manifestJson)
+    }
+
+    fun isEncryptedBackup(source: BufferedSource): Boolean {
+        val peek = source.peek()
+        return runCatching {
+            val prefix = peek.readByteArray(magic.size.toLong())
+            prefix.contentEquals(magic)
+        }.getOrDefault(false)
     }
 
     data class Header(

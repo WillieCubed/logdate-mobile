@@ -150,6 +150,8 @@ data class ExportLocationHistoryItem(
 object ExportFormat {
     const val FILE_EXTENSION = "zip"
     const val MIME_TYPE = "application/zip"
+    const val ENCRYPTED_BACKUP_FILE_EXTENSION = "ldb"
+    const val ENCRYPTED_BACKUP_MIME_TYPE = "application/vnd.logdate.backup"
 
     /**
      * MIME types the import picker should accept.
@@ -159,6 +161,7 @@ object ExportFormat {
      */
     val ACCEPTED_IMPORT_MIME_TYPES =
         arrayOf(
+            ENCRYPTED_BACKUP_MIME_TYPE,
             MIME_TYPE,
             "application/x-zip-compressed",
             "application/json",

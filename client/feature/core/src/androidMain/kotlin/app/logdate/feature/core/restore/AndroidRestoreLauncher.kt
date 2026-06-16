@@ -11,6 +11,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import app.logdate.client.domain.backup.EncryptedBackupFileFormat
 import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.export.ExportFormat
 import io.github.aakira.napier.Napier
@@ -23,6 +24,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import okio.buffer
+import okio.source
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipInputStream
 
@@ -283,6 +286,17 @@ class AndroidRestoreLauncher(
         metadataExtractionJob?.cancel()
         metadataExtractionJob =
             launcherScope.launch {
+                if (isEncryptedBackup(uri)) {
+                    fileSelectedCallback?.invoke(
+                        ArchiveFileInfo(
+                            displayName = displayName,
+                            uri = uri.toString(),
+                            archiveFormat = RestoreArchiveFormat.EncryptedBackup,
+                        ),
+                    )
+                    return@launch
+                }
+
                 val metadataJson = extractMetadata(uri)
                 if (metadataJson == null) {
                     Napier.w("Could not extract metadata from selected archive")
@@ -296,10 +310,18 @@ class AndroidRestoreLauncher(
                         displayName = displayName,
                         uri = uri.toString(),
                         metadataJson = metadataJson,
+                        archiveFormat = RestoreArchiveFormat.LegacyZip,
                     ),
                 )
             }
     }
+
+    private fun isEncryptedBackup(uri: Uri): Boolean =
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.use { rawInput ->
+                EncryptedBackupFileFormat.isEncryptedBackup(rawInput.source().buffer())
+            } ?: false
+        }.getOrDefault(false)
 
     /**
      * Reads only the `metadata.json` entry from the archive for preview.

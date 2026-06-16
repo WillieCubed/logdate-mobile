@@ -1,8 +1,14 @@
 package app.logdate.client.domain.backup
 
 import app.logdate.client.device.crypto.CryptoManager
+import app.logdate.client.domain.restore.MediaImporter
+import app.logdate.client.domain.restore.RestoreResult
+import app.logdate.client.domain.restore.RestoreUserDataUseCase
+import app.logdate.client.media.MediaManager
+import app.logdate.client.media.MediaPayload
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.serialization.json.Json
 import okio.Buffer
 import okio.FileSystem
 import okio.Path
@@ -22,7 +28,14 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 class RestoreFromEncryptedBackupUseCase(
     private val cryptoManager: CryptoManager,
     private val fileSystem: FileSystem,
+    private val restoreUserDataUseCase: RestoreUserDataUseCase? = null,
+    private val mediaManager: MediaManager? = null,
 ) {
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+        }
+
     /**
      * Executes the restore process and streams progress updates.
      *
@@ -43,13 +56,36 @@ class RestoreFromEncryptedBackupUseCase(
                 val masterKey = deriveKeys(recoveryPhrase)
 
                 emit(RestoreProgress.Decrypting)
-                performRestore(backupFile, masterKey)
+                restoreWithKey(
+                    backupFile = backupFile,
+                    masterKey = masterKey,
+                    onRestoringData = { emit(RestoreProgress.RestoringData) },
+                )
 
                 emit(RestoreProgress.Completed)
             } catch (e: Exception) {
                 emit(RestoreProgress.Failed(e.message ?: "Restore failed"))
             }
         }
+
+    suspend fun restore(
+        backupFile: Path,
+        recoveryPhrase: List<String>,
+        onProgress: (suspend (RestoreProgress) -> Unit)? = null,
+    ): RestoreResult? {
+        onProgress?.invoke(RestoreProgress.Starting)
+        val masterKey = deriveKeys(recoveryPhrase)
+        onProgress?.invoke(RestoreProgress.DerivingKeys)
+        onProgress?.invoke(RestoreProgress.Decrypting)
+        val result =
+            restoreWithKey(
+                backupFile = backupFile,
+                masterKey = masterKey,
+                onRestoringData = { onProgress?.invoke(RestoreProgress.RestoringData) },
+            )
+        onProgress?.invoke(RestoreProgress.Completed)
+        return result
+    }
 
     /**
      * Derives the decryption key from the user's secret phrase.
@@ -59,11 +95,49 @@ class RestoreFromEncryptedBackupUseCase(
     /**
      * Connects the encrypted source to the restoration logic and performs integrity checks.
      */
-    private fun performRestore(
+    private suspend fun restoreWithKey(
         backupFile: Path,
         masterKey: ByteArray,
-    ) {
-        readPlaintext(backupFile, masterKey).close()
+        onRestoringData: suspend () -> Unit,
+    ): RestoreResult? {
+        val plaintext = readPlaintext(backupFile, masterKey)
+        if (restoreUserDataUseCase == null) {
+            plaintext.close()
+            return null
+        }
+
+        onRestoringData()
+        val payload = json.decodeFromString<EncryptedBackupPayload>(plaintext.readUtf8())
+        val mediaImporter = payload.toMediaImporter()
+        return restoreUserDataUseCase.restore(
+            bundle = payload.toRestoreBundle(),
+            mediaImporter = mediaImporter,
+        )
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun EncryptedBackupPayload.toMediaImporter(): MediaImporter? {
+        if (mediaFiles.isEmpty()) {
+            return null
+        }
+        val manager =
+            mediaManager
+                ?: throw IllegalStateException("Encrypted backup contains media but no media manager is available.")
+        val mediaByPath = mediaFiles.associateBy { it.exportPath.trimStart('/') }
+        return object : MediaImporter {
+            override suspend fun importMedia(exportPath: String): String? {
+                val media = mediaByPath[exportPath.trimStart('/')] ?: return null
+                val data = Base64.decode(media.base64Data)
+                return manager.saveMedia(
+                    MediaPayload(
+                        fileName = media.fileName,
+                        mimeType = media.mimeType,
+                        sizeBytes = media.sizeBytes,
+                        data = data,
+                    ),
+                )
+            }
+        }
     }
 
     @OptIn(ExperimentalEncodingApi::class)
@@ -104,6 +178,9 @@ sealed class RestoreProgress {
 
     /** Decrypting the stream and verifying data integrity via the GCM tag. */
     data object Decrypting : RestoreProgress()
+
+    /** Importing the decrypted backup payload into local app data. */
+    data object RestoringData : RestoreProgress()
 
     /** Restore completed successfully. Data is verified and available. */
     data object Completed : RestoreProgress()

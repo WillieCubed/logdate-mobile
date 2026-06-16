@@ -189,6 +189,33 @@ class UserDataRestoreViewModelTest {
         }
 
     @Test
+    fun `encrypted backup file selected previews without metadata and restores full backup`() =
+        testScope.runTest {
+            viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.showRestoreSheet()
+            viewModel.selectFile()
+            fakeRestoreLauncher.triggerFileSelected(
+                ArchiveFileInfo(
+                    displayName = "logdate_backup_20260320_100000.ldb",
+                    uri = "content://test/encrypted-backup",
+                    archiveFormat = RestoreArchiveFormat.EncryptedBackup,
+                ),
+            )
+
+            val previewState = viewModel.restoreState.value
+            assertIs<RestoreState.PreviewingEncryptedBackup>(previewState)
+            assertEquals("logdate_backup_20260320_100000.ldb", previewState.fileName)
+
+            viewModel.confirmImport()
+
+            assertIs<RestoreState.Restoring>(viewModel.restoreState.value)
+            assertEquals(1, fakeRestoreLauncher.startRestoreCallCount)
+            assertEquals(ImportOptions(), fakeRestoreLauncher.lastRestoreOptions)
+        }
+
+    @Test
     fun `file selection cancelled transitions to Idle`() =
         testScope.runTest {
             viewModel = createViewModel()

@@ -1,5 +1,8 @@
 package app.logdate.feature.core.export
 
+import app.logdate.client.device.crypto.IdentityKeyManager
+import app.logdate.client.domain.backup.BackupProgress
+import app.logdate.client.domain.backup.CreateEncryptedBackupUseCase
 import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.export.ExportIssue
 import app.logdate.client.domain.export.ExportIssueCode
@@ -17,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
+import okio.Path.Companion.toPath
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.awt.FileDialog
@@ -39,6 +43,8 @@ class DesktopExportLauncher :
     )
 
     private val exportUserDataUseCase: ExportUserDataUseCase by inject()
+    private val createEncryptedBackupUseCase: CreateEncryptedBackupUseCase by inject()
+    private val identityKeyManager: IdentityKeyManager by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var currentExportJob: Job? = null
     private var completionCallback: ((String?) -> Unit)? = null
@@ -62,7 +68,11 @@ class DesktopExportLauncher :
         currentExportJob =
             scope.launch {
                 try {
-                    val defaultFileName = generateExportFileName()
+                    val defaultFileName =
+                        when (options.archiveFormat) {
+                            ExportArchiveFormat.EncryptedBackup -> generateEncryptedBackupFileName()
+                            ExportArchiveFormat.LegacyZip -> generateExportFileName()
+                        }
 
                     // Show file save dialog on the main thread
                     val fileDialog = createSaveDialog(defaultFileName)
@@ -79,6 +89,11 @@ class DesktopExportLauncher :
                     }
 
                     Napier.i("Desktop: Starting export to ${selectedFile.absolutePath}")
+
+                    if (options.archiveFormat == ExportArchiveFormat.EncryptedBackup) {
+                        createEncryptedBackup(selectedFile)
+                        return@launch
+                    }
 
                     // Resolve date range cutoff
                     val dateRangeCutoff = options.dateRange.toCutoffInstant()
@@ -148,6 +163,45 @@ class DesktopExportLauncher :
                     Napier.e("Desktop: Export process failed", e)
                     showExportErrorDialog("Export could not be completed.")
                     completionCallback?.invoke(null)
+                }
+            }
+    }
+
+    private suspend fun createEncryptedBackup(file: File) {
+        val recoveryPhrase =
+            identityKeyManager.getStoredRecoveryPhrase()?.words
+                ?: throw IllegalStateException(
+                    "Recovery phrase is not available. Complete recovery phrase setup before creating an encrypted backup.",
+                )
+        val backupFile =
+            if (!file.name.endsWith(".${app.logdate.client.domain.export.ExportFormat.ENCRYPTED_BACKUP_FILE_EXTENSION}")) {
+                File(file.absolutePath + ".${app.logdate.client.domain.export.ExportFormat.ENCRYPTED_BACKUP_FILE_EXTENSION}")
+            } else {
+                file
+            }
+        createEncryptedBackupUseCase(backupFile.absolutePath.toPath(), recoveryPhrase)
+            .collect { progress ->
+                when (progress) {
+                    BackupProgress.Starting ->
+                        updateProgress(ExportProgressInfo(isActive = true, progressPercent = 0, message = "Starting encrypted backup"))
+                    BackupProgress.ExportingData ->
+                        updateProgress(ExportProgressInfo(isActive = true, progressPercent = 20, message = "Collecting backup data"))
+                    BackupProgress.DerivingKeys ->
+                        updateProgress(ExportProgressInfo(isActive = true, progressPercent = 45, message = "Preparing encryption"))
+                    BackupProgress.Encrypting ->
+                        updateProgress(ExportProgressInfo(isActive = true, progressPercent = 70, message = "Encrypting backup"))
+                    is BackupProgress.Completed -> {
+                        updateProgress(
+                            ExportProgressInfo(
+                                isActive = false,
+                                progressPercent = 100,
+                                message = "Encrypted backup completed",
+                                completedFilePath = backupFile.absolutePath,
+                            ),
+                        )
+                        completionCallback?.invoke(backupFile.absolutePath)
+                    }
+                    is BackupProgress.Failed -> throw IllegalStateException(progress.error)
                 }
             }
     }

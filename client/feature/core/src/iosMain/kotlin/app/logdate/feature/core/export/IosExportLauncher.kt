@@ -2,6 +2,9 @@
 
 package app.logdate.feature.core.export
 
+import app.logdate.client.device.crypto.IdentityKeyManager
+import app.logdate.client.domain.backup.BackupProgress
+import app.logdate.client.domain.backup.CreateEncryptedBackupUseCase
 import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.export.ExportIssue
 import app.logdate.client.domain.export.ExportIssueCode
@@ -49,6 +52,8 @@ class IosExportLauncher(
         val issue: ExportIssue? = null,
     )
 
+    private val createEncryptedBackupUseCase: CreateEncryptedBackupUseCase by inject()
+    private val identityKeyManager: IdentityKeyManager by inject()
     private val exportUserDataUseCase: ExportUserDataUseCase by inject()
     private val zipArchiveWriter = ZipArchiveWriter(FileSystem.SYSTEM)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -76,6 +81,11 @@ class IosExportLauncher(
             scope.launch {
                 try {
                     Napier.i("iOS: Starting export process")
+
+                    if (options.archiveFormat == ExportArchiveFormat.EncryptedBackup) {
+                        createEncryptedBackup()
+                        return@launch
+                    }
 
                     // Resolve date range cutoff
                     val dateRangeCutoff = options.dateRange.toCutoffInstant()
@@ -154,6 +164,41 @@ class IosExportLauncher(
             }
     }
 
+    private suspend fun createEncryptedBackup() {
+        val recoveryPhrase =
+            identityKeyManager.getStoredRecoveryPhrase()?.words
+                ?: throw IllegalStateException(
+                    "Recovery phrase is not available. Complete recovery phrase setup before creating an encrypted backup.",
+                )
+        val backupPath = createEncryptedBackupFilePath()
+        createEncryptedBackupUseCase(backupPath.toPath(), recoveryPhrase)
+            .collect { progress ->
+                when (progress) {
+                    BackupProgress.Starting ->
+                        updateProgress(ExportProgressInfo(isActive = true, progressPercent = 0, message = "Starting encrypted backup"))
+                    BackupProgress.ExportingData ->
+                        updateProgress(ExportProgressInfo(isActive = true, progressPercent = 20, message = "Collecting backup data"))
+                    BackupProgress.DerivingKeys ->
+                        updateProgress(ExportProgressInfo(isActive = true, progressPercent = 45, message = "Preparing encryption"))
+                    BackupProgress.Encrypting ->
+                        updateProgress(ExportProgressInfo(isActive = true, progressPercent = 70, message = "Encrypting backup"))
+                    is BackupProgress.Completed -> {
+                        presentShareSheet(backupPath)
+                        updateProgress(
+                            ExportProgressInfo(
+                                isActive = false,
+                                progressPercent = 100,
+                                message = "Encrypted backup completed",
+                                completedFilePath = backupPath,
+                            ),
+                        )
+                        completionCallback?.invoke(backupPath)
+                    }
+                    is BackupProgress.Failed -> throw IllegalStateException(progress.error)
+                }
+            }
+    }
+
     override fun cancelExport() {
         currentExportJob?.cancel()
         currentExportJob = null
@@ -164,6 +209,11 @@ class IosExportLauncher(
     private fun createExportFilePath(): String {
         val basePath = NSTemporaryDirectory().trimEnd('/')
         return "$basePath/${generateExportFileName()}"
+    }
+
+    private fun createEncryptedBackupFilePath(): String {
+        val basePath = NSTemporaryDirectory().trimEnd('/')
+        return "$basePath/${generateEncryptedBackupFileName()}"
     }
 
     private fun saveExportArchive(

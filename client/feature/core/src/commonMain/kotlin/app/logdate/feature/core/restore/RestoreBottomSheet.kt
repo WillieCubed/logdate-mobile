@@ -116,6 +116,13 @@ internal fun RestoreBottomSheet(
                             onDismiss = onDismiss,
                         )
                     }
+                    is RestoreState.PreviewingEncryptedBackup -> {
+                        RestoreEncryptedBackupContent(
+                            fileName = state.fileName,
+                            onConfirmImport = onConfirmImport,
+                            onDismiss = onDismiss,
+                        )
+                    }
                     is RestoreState.Restoring -> {
                         RestoreProgressCard(
                             progressPercent = state.progressPercent,
@@ -306,6 +313,83 @@ private fun RestorePreviewContent(
             )
             Text(
                 text = stringResource(Res.string.restore_merge_info),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(Spacing.xl))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(UiRes.string.common_cancel))
+            }
+            Button(
+                onClick = onConfirmImport,
+                modifier = Modifier.padding(start = Spacing.sm),
+            ) {
+                Text(stringResource(Res.string.restore_confirm_import))
+            }
+        }
+    }
+}
+
+@Composable
+private fun RestoreEncryptedBackupContent(
+    fileName: String,
+    onConfirmImport: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Column {
+        Text(
+            text = stringResource(Res.string.import_backup),
+            style = MaterialTheme.typography.headlineSmall,
+        )
+        Spacer(modifier = Modifier.height(Spacing.xs))
+        Text(
+            text = stringResource(Res.string.restore_preview_description),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Spacer(modifier = Modifier.height(Spacing.lg))
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            tonalElevation = 1.dp,
+        ) {
+            Column(modifier = Modifier.padding(Spacing.md)) {
+                Text(
+                    text = fileName,
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Text(
+                    text = "Encrypted LogDate backup",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(Spacing.lg))
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                painter = PlatformIcons.info(),
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "This backup will be decrypted locally with your recovery phrase and merged into this device.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

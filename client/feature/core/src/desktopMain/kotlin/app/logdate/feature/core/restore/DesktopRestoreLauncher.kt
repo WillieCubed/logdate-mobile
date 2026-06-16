@@ -1,5 +1,9 @@
 package app.logdate.feature.core.restore
 
+import app.logdate.client.device.crypto.IdentityKeyManager
+import app.logdate.client.domain.backup.EncryptedBackupFileFormat
+import app.logdate.client.domain.backup.RestoreFromEncryptedBackupUseCase
+import app.logdate.client.domain.backup.RestoreProgress
 import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.restore.MediaImporter
 import app.logdate.client.domain.restore.RestoreBundle
@@ -16,6 +20,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import okio.Path.Companion.toPath
+import okio.buffer
+import okio.source
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.awt.FileDialog
@@ -31,6 +38,8 @@ class DesktopRestoreLauncher :
     RestoreLauncher,
     KoinComponent {
     private val restoreUserDataUseCase: RestoreUserDataUseCase by inject()
+    private val restoreFromEncryptedBackupUseCase: RestoreFromEncryptedBackupUseCase by inject()
+    private val identityKeyManager: IdentityKeyManager by inject()
     private val mediaManager: MediaManager by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var currentRestoreJob: Job? = null
@@ -77,6 +86,17 @@ class DesktopRestoreLauncher :
                 }
 
                 selectedFile = file
+                if (file.isEncryptedBackup()) {
+                    fileSelectedCallback?.invoke(
+                        ArchiveFileInfo(
+                            displayName = file.name,
+                            uri = file.absolutePath,
+                            archiveFormat = RestoreArchiveFormat.EncryptedBackup,
+                        ),
+                    )
+                    return@launch
+                }
+
                 val metadataJson = extractMetadata(file)
                 if (metadataJson == null) {
                     fileSelectedCallback?.invoke(null)
@@ -91,6 +111,7 @@ class DesktopRestoreLauncher :
                         displayName = file.name,
                         uri = file.absolutePath,
                         metadataJson = metadataJson,
+                        archiveFormat = RestoreArchiveFormat.LegacyZip,
                     ),
                 )
             }
@@ -110,7 +131,12 @@ class DesktopRestoreLauncher :
                     completionCallback?.invoke(RestoreOutcome.Started)
                     _restoreProgress.value = RestoreProgressInfo.Idle
 
-                    val summary = restoreFromZip(file, options)
+                    val summary =
+                        if (file.isEncryptedBackup()) {
+                            restoreFromEncryptedBackup(file)
+                        } else {
+                            restoreFromZip(file, options)
+                        }
                     _restoreProgress.value = RestoreProgressInfo.Idle
                     completionCallback?.invoke(RestoreOutcome.Success(summary))
                 } catch (e: Exception) {
@@ -120,6 +146,35 @@ class DesktopRestoreLauncher :
                 }
             }
     }
+
+    private suspend fun restoreFromEncryptedBackup(file: File): RestoreSummary {
+        val recoveryPhrase =
+            identityKeyManager.getStoredRecoveryPhrase()?.words
+                ?: throw IllegalStateException("Recovery phrase is not available")
+        val result =
+            restoreFromEncryptedBackupUseCase.restore(
+                backupFile = file.absolutePath.toPath(),
+                recoveryPhrase = recoveryPhrase,
+                onProgress = { progress ->
+                    when (progress) {
+                        RestoreProgress.Starting -> updateProgress(RestoreStage.PREPARING.toProgressInfo())
+                        RestoreProgress.DerivingKeys -> updateProgress(RestoreStage.OPENING_ARCHIVE.toProgressInfo())
+                        RestoreProgress.Decrypting -> updateProgress(RestoreStage.READING_CONTENTS.toProgressInfo())
+                        RestoreProgress.RestoringData -> updateProgress(RestoreStage.RESTORING_JOURNALS.toProgressInfo())
+                        RestoreProgress.Completed -> updateProgress(RestoreStage.IMPORTING_MEDIA.toProgressInfo())
+                        is RestoreProgress.Failed -> Unit
+                    }
+                },
+            ) ?: throw IllegalStateException("Encrypted restore did not return a result")
+        return result.toSummary(source = file.name)
+    }
+
+    private fun File.isEncryptedBackup(): Boolean =
+        runCatching {
+            source().buffer().use { source ->
+                EncryptedBackupFileFormat.isEncryptedBackup(source)
+            }
+        }.getOrDefault(false)
 
     override fun cancelRestore() {
         currentRestoreJob?.cancel()
