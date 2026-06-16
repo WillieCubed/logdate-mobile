@@ -124,4 +124,122 @@ class BackupAndSyncJourneyE2ETest {
             assertEquals(HttpStatusCode.OK, download.status)
             assertTrue(download.body<ByteArray>().contentEquals(mediaBytes))
         }
+
+    @Test
+    fun `sync flow round trips text image video and audio entries`() =
+        testApplication {
+            val env = configureSyncTestApp()
+            val accountId = UUID.randomUUID().toString()
+            val authHeader = "Bearer ${env.tokenService.generateAccessToken(accountId)}"
+
+            val entries =
+                listOf(
+                    SyncEntryFixture(
+                        id = "entry-text",
+                        type = "TEXT",
+                        content = "plain text entry",
+                    ),
+                    SyncEntryFixture(
+                        id = "entry-image",
+                        type = "IMAGE",
+                        fileName = "photo.jpg",
+                        mimeType = "image/jpeg",
+                        bytes = byteArrayOf(1, 2, 3),
+                    ),
+                    SyncEntryFixture(
+                        id = "entry-video",
+                        type = "VIDEO",
+                        fileName = "clip.mp4",
+                        mimeType = "video/mp4",
+                        bytes = byteArrayOf(4, 5, 6, 7),
+                    ),
+                    SyncEntryFixture(
+                        id = "entry-audio",
+                        type = "AUDIO",
+                        fileName = "voice.m4a",
+                        mimeType = "audio/mp4",
+                        bytes = byteArrayOf(8, 9, 10),
+                    ),
+                )
+
+            val uploadedMedia =
+                entries
+                    .filter { it.bytes != null }
+                    .associate { entry ->
+                        val upload =
+                            client.post("/api/v1/media") {
+                                header(HttpHeaders.Authorization, authHeader)
+                                setBody(
+                                    mediaUploadMultipartContent(
+                                        contentId = entry.id,
+                                        fileName = entry.fileName!!,
+                                        mimeType = entry.mimeType!!,
+                                        data = entry.bytes!!,
+                                        deviceId = "device-a",
+                                    ),
+                                )
+                            }
+                        assertEquals(HttpStatusCode.Created, upload.status, upload.bodyAsText())
+                        val uploadPayload = json.decodeFromString<MediaUploadResponse>(upload.bodyAsText())
+                        entry.id to uploadPayload
+                    }
+
+            entries.forEachIndexed { index, entry ->
+                val upload =
+                    client.put("/api/v1/contents/${entry.id}") {
+                        header(HttpHeaders.Authorization, authHeader)
+                        contentType(ContentType.Application.Json)
+                        setBody(entry.contentUploadJson(index + 1, uploadedMedia[entry.id]?.mediaId))
+                    }
+                assertEquals(HttpStatusCode.Created, upload.status, upload.bodyAsText())
+            }
+
+            val changes =
+                client.get("/api/v1/contents?since=0") {
+                    header(HttpHeaders.Authorization, authHeader)
+                }
+            assertEquals(HttpStatusCode.OK, changes.status)
+            val changesPayload = json.decodeFromString<ContentChangesResponse>(changes.bodyAsText())
+            entries.forEach { entry ->
+                val change = changesPayload.changes.first { it.id == entry.id }
+                assertEquals(entry.type, change.type)
+                assertEquals(uploadedMedia[entry.id]?.mediaId, change.mediaUri)
+            }
+
+            entries.filter { it.bytes != null }.forEach { entry ->
+                val mediaId = uploadedMedia.getValue(entry.id).mediaId
+                val download =
+                    client.get("/api/v1/media/$mediaId/binary") {
+                        header(HttpHeaders.Authorization, authHeader)
+                    }
+                assertEquals(HttpStatusCode.OK, download.status)
+                assertTrue(download.body<ByteArray>().contentEquals(entry.bytes))
+            }
+        }
+
+    private data class SyncEntryFixture(
+        val id: String,
+        val type: String,
+        val content: String? = null,
+        val fileName: String? = null,
+        val mimeType: String? = null,
+        val bytes: ByteArray? = null,
+    ) {
+        fun contentUploadJson(
+            index: Int,
+            mediaId: String?,
+        ): String =
+            """
+            {
+              "id": "$id",
+              "type": "$type",
+              "content": ${content?.let { "\"$it\"" } ?: "null"},
+              "mediaUri": ${mediaId?.let { "\"$it\"" } ?: "null"},
+              "durationMs": ${if (type == "AUDIO" || type == "VIDEO") 1000L * index else 0L},
+              "createdAt": ${1000L * index},
+              "lastUpdated": ${1000L * index},
+              "deviceId": "device-a"
+            }
+            """.trimIndent()
+    }
 }

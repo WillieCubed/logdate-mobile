@@ -1,5 +1,6 @@
 package app.logdate.client.sync.cloud
 
+import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.sync.VersionConstraint
 import kotlin.time.Instant
@@ -62,12 +63,18 @@ data class JournalSyncResult(
  */
 class DefaultCloudJournalDataSource(
     private val cloudApiClient: CloudApiClient,
+    private val syncPayloadCipher: SyncPayloadCipher? = null,
 ) : CloudJournalDataSource {
     override suspend fun uploadJournal(
         accessToken: String,
         journal: Journal,
     ): Result<SyncUploadResult> {
-        val request = journal.toUploadRequest()
+        val request =
+            try {
+                journal.toUploadRequest()
+            } catch (error: Exception) {
+                return Result.failure(error)
+            }
         return cloudApiClient.uploadJournal(accessToken, request).map {
             SyncUploadResult(
                 serverVersion = it.serverVersion,
@@ -80,7 +87,12 @@ class DefaultCloudJournalDataSource(
         accessToken: String,
         journal: Journal,
     ): Result<SyncUploadResult> {
-        val request = journal.toUpdateRequest()
+        val request =
+            try {
+                journal.toUpdateRequest()
+            } catch (error: Exception) {
+                return Result.failure(error)
+            }
         return cloudApiClient.updateJournal(accessToken, journal.id.toString(), request).map {
             SyncUploadResult(
                 serverVersion = it.serverVersion,
@@ -99,29 +111,24 @@ class DefaultCloudJournalDataSource(
         since: Instant,
         limit: Int?,
     ): Result<JournalSyncResult> =
-        cloudApiClient.getJournalChanges(accessToken, since.toEpochMilliseconds(), limit).map { response ->
-            JournalSyncResult(
-                changes = response.changes.map { it.toJournal() },
-                deletions = response.deletions.map { Uuid.parse(it.id) },
-                lastSyncTimestamp = Instant.fromEpochMilliseconds(response.lastTimestamp),
-                hasMore = response.hasMore,
-            )
+        cloudApiClient.getJournalChanges(accessToken, since.toEpochMilliseconds(), limit).mapCatching { response ->
+            response.toJournalSyncResult()
         }
 
-    private fun Journal.toUploadRequest(): JournalUploadRequest =
+    private suspend fun Journal.toUploadRequest(): JournalUploadRequest =
         JournalUploadRequest(
             id = id.toString(),
-            title = title,
-            description = description,
+            title = encryptJournalField(id, "title", title),
+            description = encryptJournalField(id, "description", description),
             createdAt = created.toEpochMilliseconds(),
             lastUpdated = lastUpdated.toEpochMilliseconds(),
             syncVersion = syncVersion,
         )
 
-    private fun Journal.toUpdateRequest(): JournalUpdateRequest =
+    private suspend fun Journal.toUpdateRequest(): JournalUpdateRequest =
         JournalUpdateRequest(
-            title = title,
-            description = description,
+            title = encryptJournalField(id, "title", title),
+            description = encryptJournalField(id, "description", description),
             lastUpdated = lastUpdated.toEpochMilliseconds(),
             syncVersion = syncVersion,
             versionConstraint =
@@ -132,13 +139,38 @@ class DefaultCloudJournalDataSource(
                 },
         )
 
-    private fun JournalChange.toJournal(): Journal =
+    private suspend fun JournalChangesResponse.toJournalSyncResult(): JournalSyncResult =
+        JournalSyncResult(
+            changes = changes.map { it.toJournal() },
+            deletions = deletions.map { Uuid.parse(it.id) },
+            lastSyncTimestamp = Instant.fromEpochMilliseconds(lastTimestamp),
+            hasMore = hasMore,
+        )
+
+    private suspend fun JournalChange.toJournal(): Journal =
         Journal(
             id = Uuid.parse(id),
-            title = title,
-            description = description,
+            title = decryptJournalField(Uuid.parse(id), "title", title),
+            description = decryptJournalField(Uuid.parse(id), "description", description),
             created = Instant.fromEpochMilliseconds(createdAt),
             lastUpdated = Instant.fromEpochMilliseconds(lastUpdated),
             syncVersion = serverVersion,
         )
+
+    private suspend fun encryptJournalField(
+        journalId: Uuid,
+        fieldName: String,
+        value: String,
+    ): String = syncPayloadCipher?.encryptString(journalFieldId(journalId, fieldName), value) ?: value
+
+    private suspend fun decryptJournalField(
+        journalId: Uuid,
+        fieldName: String,
+        value: String,
+    ): String = syncPayloadCipher?.decryptString(journalFieldId(journalId, fieldName), value) ?: value
+
+    private fun journalFieldId(
+        journalId: Uuid,
+        fieldName: String,
+    ): String = "sync:journal:$journalId:$fieldName"
 }

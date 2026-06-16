@@ -1,6 +1,7 @@
 package app.logdate.client.sync.cloud
 
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.shared.model.sync.VersionConstraint
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -61,12 +62,18 @@ data class ContentSyncResult(
  */
 class DefaultCloudContentDataSource(
     private val cloudApiClient: CloudApiClient,
+    private val syncPayloadCipher: SyncPayloadCipher? = null,
 ) : CloudContentDataSource {
     override suspend fun uploadNote(
         accessToken: String,
         note: JournalNote,
     ): Result<SyncUploadResult> {
-        val request = note.toUploadRequest()
+        val request =
+            try {
+                note.toUploadRequest()
+            } catch (error: Exception) {
+                return Result.failure(error)
+            }
         return cloudApiClient.uploadContent(accessToken, request).map {
             SyncUploadResult(
                 serverVersion = it.serverVersion,
@@ -79,7 +86,12 @@ class DefaultCloudContentDataSource(
         accessToken: String,
         note: JournalNote,
     ): Result<SyncUploadResult> {
-        val request = note.toUpdateRequest()
+        val request =
+            try {
+                note.toUpdateRequest()
+            } catch (error: Exception) {
+                return Result.failure(error)
+            }
         return cloudApiClient.updateContent(accessToken, note.uid.toString(), request).map {
             SyncUploadResult(
                 serverVersion = it.serverVersion,
@@ -98,16 +110,11 @@ class DefaultCloudContentDataSource(
         since: Instant,
         limit: Int?,
     ): Result<ContentSyncResult> =
-        cloudApiClient.getContentChanges(accessToken, since.toEpochMilliseconds(), limit).map { response ->
-            ContentSyncResult(
-                changes = response.changes.map { it.toJournalNote() },
-                deletions = response.deletions.map { Uuid.parse(it.id) },
-                lastSyncTimestamp = Instant.fromEpochMilliseconds(response.lastTimestamp),
-                hasMore = response.hasMore,
-            )
+        cloudApiClient.getContentChanges(accessToken, since.toEpochMilliseconds(), limit).mapCatching { response ->
+            response.toContentSyncResult()
         }
 
-    private fun JournalNote.toUploadRequest(): ContentUploadRequest =
+    private suspend fun JournalNote.toUploadRequest(): ContentUploadRequest =
         ContentUploadRequest(
             id = uid.toString(),
             type =
@@ -119,7 +126,7 @@ class DefaultCloudContentDataSource(
                 },
             content =
                 when (this) {
-                    is JournalNote.Text -> content
+                    is JournalNote.Text -> encryptNoteText(uid, content)
                     else -> null
                 },
             mediaUri =
@@ -139,11 +146,11 @@ class DefaultCloudContentDataSource(
             syncVersion = syncVersion,
         )
 
-    private fun JournalNote.toUpdateRequest(): ContentUpdateRequest =
+    private suspend fun JournalNote.toUpdateRequest(): ContentUpdateRequest =
         ContentUpdateRequest(
             content =
                 when (this) {
-                    is JournalNote.Text -> content
+                    is JournalNote.Text -> encryptNoteText(uid, content)
                     else -> null
                 },
             mediaUri =
@@ -168,7 +175,15 @@ class DefaultCloudContentDataSource(
                 },
         )
 
-    private fun ContentChange.toJournalNote(): JournalNote {
+    private suspend fun ContentChangesResponse.toContentSyncResult(): ContentSyncResult =
+        ContentSyncResult(
+            changes = changes.map { it.toJournalNote() },
+            deletions = deletions.map { Uuid.parse(it.id) },
+            lastSyncTimestamp = Instant.fromEpochMilliseconds(lastTimestamp),
+            hasMore = hasMore,
+        )
+
+    private suspend fun ContentChange.toJournalNote(): JournalNote {
         val uid = Uuid.parse(id)
         val creationTimestamp = Instant.fromEpochMilliseconds(createdAt)
         val lastUpdated = Instant.fromEpochMilliseconds(lastUpdated)
@@ -179,7 +194,7 @@ class DefaultCloudContentDataSource(
                     uid = uid,
                     creationTimestamp = creationTimestamp,
                     lastUpdated = lastUpdated,
-                    content = content ?: "",
+                    content = decryptNoteText(uid, content ?: ""),
                     syncVersion = serverVersion,
                 )
             "IMAGE" ->
@@ -210,4 +225,16 @@ class DefaultCloudContentDataSource(
             else -> throw IllegalArgumentException("Unknown content type: $type")
         }
     }
+
+    private suspend fun encryptNoteText(
+        noteId: Uuid,
+        content: String,
+    ): String = syncPayloadCipher?.encryptString(noteTextFieldId(noteId), content) ?: content
+
+    private suspend fun decryptNoteText(
+        noteId: Uuid,
+        content: String,
+    ): String = syncPayloadCipher?.decryptString(noteTextFieldId(noteId), content) ?: content
+
+    private fun noteTextFieldId(noteId: Uuid): String = "sync:note:$noteId:text"
 }

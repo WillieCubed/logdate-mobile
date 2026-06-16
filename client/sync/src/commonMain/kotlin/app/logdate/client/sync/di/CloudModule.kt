@@ -15,6 +15,7 @@ import app.logdate.client.sync.cloud.LogDateCloudApiClient
 import app.logdate.client.sync.crypto.MediaPayloadCrypto
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
 import app.logdate.client.sync.crypto.StoredMediaPayloadCrypto
+import app.logdate.client.sync.crypto.SyncPayloadCipher
 import org.koin.dsl.module
 
 /**
@@ -34,10 +35,11 @@ val cloudModule =
         }
 
         // Cloud Data Sources
-        single<CloudContentDataSource> { DefaultCloudContentDataSource(get()) }
-        single<CloudJournalDataSource> { DefaultCloudJournalDataSource(get()) }
+        single { SyncPayloadCipher(get()) }
+        single<CloudContentDataSource> { DefaultCloudContentDataSource(get(), get()) }
+        single<CloudJournalDataSource> { DefaultCloudJournalDataSource(get(), get()) }
         single<CloudAssociationDataSource> { DefaultCloudAssociationDataSource(get()) }
-        single<CloudDraftDataSource> { DefaultCloudDraftDataSource(get()) }
+        single<CloudDraftDataSource> { DefaultCloudDraftDataSource(get(), get()) }
         single { MediaPayloadKeyProvider(get(), get()) }
         single<MediaPayloadCrypto> { StoredMediaPayloadCrypto(get()) }
         single<CloudMediaDataSource> { DefaultCloudMediaDataSource(get(), get()) }

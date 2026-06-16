@@ -75,6 +75,7 @@ kotlin {
             implementation(libs.ktor.client.mock)
             implementation(projects.client.logdateDatastore)
             implementation(projects.client.util)
+            implementation(libs.okio)
         }
         androidMain.dependencies {
             implementation(projects.client.database)

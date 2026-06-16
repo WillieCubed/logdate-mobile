@@ -16,6 +16,7 @@ import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
 import app.logdate.client.sync.cloud.JournalChange
 import app.logdate.client.sync.cloud.JournalChangesResponse
 import app.logdate.client.sync.cloud.JournalDeletion
+import app.logdate.client.sync.cloud.MediaDownloadResponse
 import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
@@ -54,6 +55,101 @@ import kotlin.uuid.Uuid
  * Tests that remote changes are automatically downloaded and applied locally.
  */
 class AutomaticDownloadIntegrationTest {
+    @Test
+    fun testDownloadRemoteMediaContentSavesLocalMediaForAllSupportedTypes() =
+        runTest {
+            val apiClient = fakeCloudApiClient()
+            val notesRepository = FakeJournalNotesRepository()
+            val now = Clock.System.now()
+            apiClient.downloadMediaResponse =
+                Result.success(
+                    MediaDownloadResponse(
+                        contentId = Uuid.random().toString(),
+                        fileName = "downloaded-media.bin",
+                        mimeType = "application/octet-stream",
+                        sizeBytes = 4,
+                        data = byteArrayOf(1, 2, 3, 4),
+                        downloadUrl = "https://example.com/media/downloaded-media",
+                    ),
+                )
+
+            apiClient.getContentChangesResponse =
+                Result.success(
+                    ContentChangesResponse(
+                        changes =
+                            listOf(
+                                ContentChange(
+                                    id = Uuid.random().toString(),
+                                    type = "IMAGE",
+                                    content = null,
+                                    mediaUri = "https://example.com/media/image-media",
+                                    createdAt = now.toEpochMilliseconds(),
+                                    lastUpdated = now.toEpochMilliseconds(),
+                                    serverVersion = 1,
+                                ),
+                                ContentChange(
+                                    id = Uuid.random().toString(),
+                                    type = "VIDEO",
+                                    content = null,
+                                    mediaUri = "https://example.com/media/video-media",
+                                    createdAt = now.toEpochMilliseconds(),
+                                    lastUpdated = now.toEpochMilliseconds(),
+                                    serverVersion = 1,
+                                ),
+                                ContentChange(
+                                    id = Uuid.random().toString(),
+                                    type = "AUDIO",
+                                    content = null,
+                                    mediaUri = "https://example.com/media/audio-media",
+                                    durationMs = 12_000,
+                                    createdAt = now.toEpochMilliseconds(),
+                                    lastUpdated = now.toEpochMilliseconds(),
+                                    serverVersion = 1,
+                                ),
+                            ),
+                        deletions = emptyList(),
+                        lastTimestamp = now.toEpochMilliseconds(),
+                    ),
+                )
+
+            val syncManager =
+                DefaultSyncManager(
+                    cloudContentDataSource = DefaultCloudContentDataSource(apiClient),
+                    cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
+                    cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
+                    cloudMediaDataSource = DefaultCloudMediaDataSource(apiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient),
+                    cloudAccountRepository = fakeAccountRepository(),
+                    sessionStorage = fakeSessionStorage(),
+                    mediaManager = InMemoryMediaManager(),
+                    mediaSyncRefStore = InMemoryMediaSyncRefStore(),
+                    journalRepository = FakeJournalRepository(),
+                    journalNotesRepository = notesRepository,
+                    journalContentRepository = FakeJournalContentRepository(),
+                    journalConflictResolver = lastWriteWinsResolver(),
+                    noteConflictResolver = lastWriteWinsResolver(),
+                    conflictStore = InMemorySyncConflictStore(),
+                    deadLetterStore = InMemorySyncDeadLetterStore(),
+                    retryScheduleStore = InMemorySyncRetryScheduleStore(),
+                    syncMetadataService = fakeSyncMetadataService(),
+                    transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
+                )
+
+            val result = syncManager.downloadRemoteChanges()
+            val storedNotes = notesRepository.allNotesObserved.first()
+
+            assertTrue(result.success, "Download should succeed")
+            assertEquals(
+                listOf("image-media", "video-media", "audio-media"),
+                apiClient.downloadMediaCalls.map { it.second },
+                "Each remote media note should download its binary payload",
+            )
+            assertTrue(storedNotes.any { it is JournalNote.Image && it.mediaRef.startsWith("file://") })
+            assertTrue(storedNotes.any { it is JournalNote.Video && it.mediaRef.startsWith("file://") })
+            assertTrue(storedNotes.any { it is JournalNote.Audio && it.mediaRef.startsWith("file://") })
+        }
+
     @Test
     fun testDownloadNewRemoteContent() =
         runTest {

@@ -36,6 +36,7 @@ class IdentityKeyManagerTest {
 
             assertEquals(12, phrase.words.size)
             assertTrue(manager.hasIdentityKey())
+            assertEquals(phrase, manager.getStoredRecoveryPhrase())
         }
 
     @Test
@@ -58,6 +59,7 @@ class IdentityKeyManagerTest {
 
             manager.recoverIdentity(phrase1.words)
             assertTrue(manager.hasIdentityKey())
+            assertEquals(phrase1, manager.getStoredRecoveryPhrase())
 
             val key2 = manager.getIdentityKey()
             assertTrue(key1.contentEquals(key2), "Same phrase should derive same key")
@@ -92,6 +94,7 @@ class IdentityKeyManagerTest {
 
             manager.clearIdentityKey()
             assertFalse(manager.hasIdentityKey())
+            assertEquals(null, manager.getStoredRecoveryPhrase())
         }
 }
 

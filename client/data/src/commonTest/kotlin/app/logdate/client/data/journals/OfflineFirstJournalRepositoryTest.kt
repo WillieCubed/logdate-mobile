@@ -4,6 +4,8 @@ import app.logdate.client.data.fakes.FakeDraftRepository
 import app.logdate.client.data.fakes.FakeJournalDao
 import app.logdate.client.data.fakes.FakeRemoteJournalDataSource
 import app.logdate.client.data.fakes.FakeSyncMetadataService
+import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.CoroutineScope
@@ -194,6 +196,19 @@ class OfflineFirstJournalRepositoryTest {
             assertEquals(draft.id, savedDraft.id)
         }
 
+    @Test
+    fun saveDraft_enqueuesDraftUpload() =
+        runTest(testDispatcher) {
+            val draft = createTestDraft()
+
+            repository.saveDraft(draft)
+
+            val pending = syncMetadataService.getPendingUploads(EntityType.DRAFT)
+            assertEquals(1, pending.size)
+            assertEquals(draft.id.toString(), pending.single().entityId)
+            assertEquals(PendingOperation.UPDATE, pending.single().operation)
+        }
+
     /**
      * Tests that the repository correctly retrieves the latest modified draft.
      *
@@ -302,6 +317,43 @@ class OfflineFirstJournalRepositoryTest {
 
             val retrievedDraft = draftRepository.getDraft(draft.id)
             assertNull(retrievedDraft)
+        }
+
+    @Test
+    fun deleteDraft_enqueuesDraftDeletion() =
+        runTest(testDispatcher) {
+            val draft = createTestDraft()
+            draftRepository.saveDraft(draft)
+
+            repository.deleteDraft(draft.id)
+
+            val pending = syncMetadataService.getPendingUploads(EntityType.DRAFT)
+            assertEquals(1, pending.size)
+            assertEquals(draft.id.toString(), pending.single().entityId)
+            assertEquals(PendingOperation.DELETE, pending.single().operation)
+        }
+
+    @Test
+    fun saveDraftFromSync_doesNotEnqueueDraftUpload() =
+        runTest(testDispatcher) {
+            val draft = createTestDraft()
+
+            repository.saveDraftFromSync(draft)
+
+            assertNotNull(draftRepository.getDraft(draft.id))
+            assertEquals(emptyList(), syncMetadataService.getPendingUploads(EntityType.DRAFT))
+        }
+
+    @Test
+    fun deleteDraftFromSync_doesNotEnqueueDraftDeletion() =
+        runTest(testDispatcher) {
+            val draft = createTestDraft()
+            draftRepository.saveDraft(draft)
+
+            repository.deleteDraftFromSync(draft.id)
+
+            assertNull(draftRepository.getDraft(draft.id))
+            assertEquals(emptyList(), syncMetadataService.getPendingUploads(EntityType.DRAFT))
         }
 
     /**

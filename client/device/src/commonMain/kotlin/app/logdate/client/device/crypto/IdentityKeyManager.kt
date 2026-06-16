@@ -25,7 +25,8 @@ class IdentityKeyManager(
      * Sets up a new identity for the first time.
      *
      * This generates a new recovery phrase and derives the identity key from it.
-     * The recovery phrase is NOT stored - the user must write it down.
+     * The recovery phrase is stored in [SecureStorage] so the user can reference it later from
+     * app settings without sending it to LogDate servers or regular app preferences.
      *
      * @return The recovery phrase the user must store safely
      */
@@ -36,6 +37,7 @@ class IdentityKeyManager(
         val identityKey = cryptoManager.deriveMasterKey(phrase)
 
         secureStorage.putBytes(KEY_IDENTITY_KEY, identityKey)
+        secureStorage.putString(KEY_RECOVERY_PHRASE, phrase.joinToString(" "))
         Napier.d("New identity established")
 
         return RecoveryPhrase(phrase)
@@ -56,7 +58,29 @@ class IdentityKeyManager(
 
         val identityKey = cryptoManager.deriveMasterKey(phrase)
         secureStorage.putBytes(KEY_IDENTITY_KEY, identityKey)
+        secureStorage.putString(KEY_RECOVERY_PHRASE, phrase.joinToString(" "))
         Napier.d("Identity recovered from recovery phrase")
+    }
+
+    /**
+     * Retrieves the user's recovery phrase from local secure storage.
+     *
+     * This is intentionally local-only. The server never receives the phrase and cannot use this
+     * method to decrypt user content.
+     */
+    suspend fun getStoredRecoveryPhrase(): RecoveryPhrase? {
+        val phrase =
+            secureStorage
+                .getString(KEY_RECOVERY_PHRASE)
+                ?.trim()
+                ?.split(Regex("\\s+"))
+                ?.filter { it.isNotBlank() }
+                ?: return null
+        if (phrase.size != RECOVERY_PHRASE_WORD_COUNT) {
+            Napier.w("Stored recovery phrase is malformed")
+            return null
+        }
+        return RecoveryPhrase(phrase)
     }
 
     /**
@@ -82,11 +106,14 @@ class IdentityKeyManager(
      */
     suspend fun clearIdentityKey() {
         secureStorage.remove(KEY_IDENTITY_KEY)
+        secureStorage.remove(KEY_RECOVERY_PHRASE)
         Napier.d("Identity key cleared from device")
     }
 
     companion object {
         private const val KEY_IDENTITY_KEY = "identity_key_v1"
+        private const val KEY_RECOVERY_PHRASE = "identity_recovery_phrase_v1"
+        private const val RECOVERY_PHRASE_WORD_COUNT = 12
     }
 }
 

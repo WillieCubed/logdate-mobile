@@ -3,6 +3,7 @@ package app.logdate.client.data.journals
 import app.logdate.client.database.dao.JournalDao
 import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.SyncableDraftRepository
 import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.client.sync.NoOpSyncManager
 import app.logdate.client.sync.SyncDebouncer
@@ -39,10 +40,15 @@ class OfflineFirstJournalRepository(
     private val dispatcher: CoroutineDispatcher = platformIODispatcher,
     private val externalScope: CoroutineScope = CoroutineScope(dispatcher),
 ) : JournalRepository,
+    SyncableDraftRepository,
     SyncableJournalRepository {
     private val syncDebouncer =
         SyncDebouncer(scope = externalScope) {
             syncManagerProvider().syncJournals()
+        }
+    private val draftSyncDebouncer =
+        SyncDebouncer(scope = externalScope) {
+            syncManagerProvider().syncDrafts()
         }
 
     override val allJournalsObserved: Flow<List<Journal>>
@@ -112,6 +118,12 @@ class OfflineFirstJournalRepository(
     override suspend fun saveDraft(draft: EditorDraft) =
         withContext(dispatcher) {
             draftRepository.saveDraft(draft)
+            syncMetadataService.enqueuePending(
+                entityId = draft.id.toString(),
+                entityType = EntityType.DRAFT,
+                operation = PendingOperation.UPDATE,
+            )
+            draftSyncDebouncer.trigger()
         }
 
     override suspend fun getLatestDraft(): EditorDraft? =
@@ -130,6 +142,22 @@ class OfflineFirstJournalRepository(
         }
 
     override suspend fun deleteDraft(id: Uuid) =
+        withContext(dispatcher) {
+            draftRepository.deleteDraft(id)
+            syncMetadataService.enqueuePending(
+                entityId = id.toString(),
+                entityType = EntityType.DRAFT,
+                operation = PendingOperation.DELETE,
+            )
+            draftSyncDebouncer.trigger()
+        }
+
+    override suspend fun saveDraftFromSync(draft: EditorDraft) =
+        withContext(dispatcher) {
+            draftRepository.saveDraft(draft)
+        }
+
+    override suspend fun deleteDraftFromSync(id: Uuid) =
         withContext(dispatcher) {
             draftRepository.deleteDraft(id)
         }

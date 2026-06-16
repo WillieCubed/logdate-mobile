@@ -56,6 +56,8 @@ actual val syncModule: Module =
                 syncMetadataService = get(),
                 transactionManager = get(),
                 dataUsagePolicy = get(),
+                deviceIdProvider = get(),
+                cloudQuotaManager = get(),
             )
         }
         single<SyncManager> { ForegroundSyncManager(get(), get(), get(), get(), get()) }
