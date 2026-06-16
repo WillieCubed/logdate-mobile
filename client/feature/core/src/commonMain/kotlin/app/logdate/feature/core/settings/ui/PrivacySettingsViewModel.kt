@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.domain.account.CreatePasskeyUseCase
 import app.logdate.client.domain.account.DeletePasskeyUseCase
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
@@ -29,6 +30,22 @@ data class PrivacySettingsState(
     val showSystemSearchVisibilityToggle: Boolean,
 )
 
+sealed class RecoveryPhraseRevealState {
+    data object Hidden : RecoveryPhraseRevealState()
+
+    data object Loading : RecoveryPhraseRevealState()
+
+    data class Revealed(
+        val words: List<String>,
+    ) : RecoveryPhraseRevealState()
+
+    data object Missing : RecoveryPhraseRevealState()
+
+    data class Error(
+        val message: String,
+    ) : RecoveryPhraseRevealState()
+}
+
 sealed class PasskeyRevocationState {
     data object Idle : PasskeyRevocationState()
 
@@ -49,6 +66,7 @@ class PrivacySettingsViewModel(
     private val createPasskeyUseCase: CreatePasskeyUseCase,
     private val deletePasskeyUseCase: DeletePasskeyUseCase,
     private val biometricGatekeeper: BiometricGatekeeper,
+    private val identityKeyManager: IdentityKeyManager,
     private val supportsSystemSearchVisibilityToggle: Boolean = false,
 ) : ViewModel() {
     private val _passkeyCreationState = MutableStateFlow<PasskeyCreationState>(PasskeyCreationState.Idle)
@@ -56,6 +74,9 @@ class PrivacySettingsViewModel(
 
     private val _passkeyRevocationState = MutableStateFlow<PasskeyRevocationState>(PasskeyRevocationState.Idle)
     val passkeyRevocationState: StateFlow<PasskeyRevocationState> = _passkeyRevocationState
+
+    private val _recoveryPhraseRevealState = MutableStateFlow<RecoveryPhraseRevealState>(RecoveryPhraseRevealState.Hidden)
+    val recoveryPhraseRevealState: StateFlow<RecoveryPhraseRevealState> = _recoveryPhraseRevealState
 
     private val currentAccountFlow: Flow<LogDateAccount?> =
         flow {
@@ -119,6 +140,44 @@ class PrivacySettingsViewModel(
         viewModelScope.launch {
             preferencesDataSource.setSystemSearchVisibilityEnabled(enabled)
         }
+    }
+
+    fun revealRecoveryPhrase() {
+        _recoveryPhraseRevealState.value = RecoveryPhraseRevealState.Loading
+        biometricGatekeeper.authenticate(
+            title = "Show recovery phrase",
+            subtitle = "Authenticate to view your recovery phrase",
+            description = "Anyone with this phrase can recover your encrypted LogDate data.",
+            onResult = { result ->
+                if (result == AppAuthState.AUTHENTICATED || result == AppAuthState.NO_PROMPT_NEEDED) {
+                    viewModelScope.launch {
+                        _recoveryPhraseRevealState.value =
+                            runCatching { identityKeyManager.getStoredRecoveryPhrase() }
+                                .fold(
+                                    onSuccess = { phrase ->
+                                        if (phrase == null) {
+                                            RecoveryPhraseRevealState.Missing
+                                        } else {
+                                            RecoveryPhraseRevealState.Revealed(phrase.words)
+                                        }
+                                    },
+                                    onFailure = { error ->
+                                        RecoveryPhraseRevealState.Error(
+                                            error.message ?: "Could not load recovery phrase",
+                                        )
+                                    },
+                                )
+                    }
+                } else {
+                    _recoveryPhraseRevealState.value =
+                        RecoveryPhraseRevealState.Error("Authentication is required to show your recovery phrase")
+                }
+            },
+        )
+    }
+
+    fun hideRecoveryPhrase() {
+        _recoveryPhraseRevealState.value = RecoveryPhraseRevealState.Hidden
     }
 
     fun createPasskey() {

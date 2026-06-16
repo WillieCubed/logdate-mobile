@@ -34,6 +34,10 @@
     <string name="settings_group_data_storage">Data &amp; Storage</string>
     <string name="settings_biometric_label">Require biometrics</string>
     <string name="settings_biometric_description">Require fingerprint or screen lock to open</string>
+    <string name="recovery_phrase_settings_title">Recovery phrase</string>
+    <string name="recovery_phrase_settings_description">View the 12 words needed to recover encrypted backups and synced data</string>
+    <string name="recovery_phrase_warning">Keep these words private. Anyone with this phrase can recover your encrypted data.</string>
+    <string name="recovery_phrase_missing">No recovery phrase is saved on this device. Use your original phrase during recovery to restore access and save it here.</string>
     <string name="settings_export_entries_label">Export data</string>
     <string name="settings_export_entries_description">Export all journal entries to a JSON file</string>
     <string name="settings_reset_app_title">Reset app</string>
