@@ -15,8 +15,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import app.logdate.client.awareness.daylight.DaylightClassifier
 import app.logdate.client.domain.events.LinkNoteToEventUseCase
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
@@ -188,7 +191,21 @@ fun HomeScreen(
                             .widthIn(max = 560.dp),
                 )
             }
+            val adaptiveInfo = currentWindowAdaptiveInfo()
+            val navLayoutType =
+                when {
+                    // Foldable laid flat (tabletop): keep navigation in the bottom/flat half rather
+                    // than spanning a rail across the hinge.
+                    adaptiveInfo.windowPosture.isTabletop -> NavigationSuiteType.NavigationBar
+                    // Wide enough (>= 600dp), including landscape phones: always use the side rail,
+                    // never a bottom bar. Material's default would drop to a bottom bar here because
+                    // the window height is compact.
+                    adaptiveInfo.windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND) ->
+                        NavigationSuiteType.NavigationRail
+                    else -> NavigationSuiteType.NavigationBar
+                }
             NavigationSuiteScaffold(
+                layoutType = navLayoutType,
                 containerColor = Color.Transparent,
                 navigationSuiteColors =
                     NavigationSuiteDefaults.colors(
