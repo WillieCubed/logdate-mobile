@@ -60,6 +60,22 @@ object LibraryScreenshotData {
                 ),
         )
 
+    val videoDetail =
+        MediaDetailUiState.VideoContent(
+            mediaId = Uuid.parse("00000000-0000-0000-0000-000000000103"),
+            mediaRef = "content://media/external/video/media/3",
+            createdAt = march2026,
+            location = null,
+            locationDisplayName = "San Francisco, CA",
+            journals =
+                listOf(
+                    JournalReference(
+                        id = Uuid.parse("00000000-0000-0000-0000-000000000102"),
+                        title = "Trip to California",
+                    ),
+                ),
+        )
+
     val presenterActive =
         PresenterState(
             isExternalDisplayAvailable = true,

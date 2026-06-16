@@ -118,3 +118,17 @@ fun MediaDetail_Presenting() {
         )
     }
 }
+
+@PreviewTest
+@Preview(showBackground = true, device = TABLET)
+@Composable
+fun MediaDetail_VideoPresenting_Expanded() {
+    ScreenshotTheme {
+        MediaDetailContent(
+            state = LibraryScreenshotData.videoDetail,
+            presenterState = LibraryScreenshotData.presenterActive,
+            isExpanded = true,
+            onBack = {},
+        )
+    }
+}

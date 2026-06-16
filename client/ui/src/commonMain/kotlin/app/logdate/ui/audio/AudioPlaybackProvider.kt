@@ -17,6 +17,10 @@ import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.media.audio.AudioPlaybackStatus
 import app.logdate.client.media.audio.AudioPlaybackStatusProvider
+import app.logdate.client.media.device.AudioRouteRepository
+import app.logdate.client.media.device.MediaDeviceKind
+import app.logdate.client.media.device.MediaDeviceSelectionUiState
+import app.logdate.client.media.device.systemControlledSelection
 import org.koin.compose.koinInject
 import kotlin.time.Duration
 import kotlin.uuid.Uuid
@@ -36,14 +40,18 @@ data class AudioPlaybackDisplayInfo(
  */
 data class AudioPlaybackState(
     val currentlyPlayingId: Uuid? = null,
+    val currentUri: String? = null,
     val isPlaying: Boolean = false,
     val progress: Float = 0f,
     val duration: Duration = Duration.ZERO,
     val displayInfo: AudioPlaybackDisplayInfo = AudioPlaybackDisplayInfo(),
+    val outputSelection: MediaDeviceSelectionUiState =
+        systemControlledSelection(MediaDeviceKind.AUDIO_OUTPUT),
     val play: (id: Uuid, uri: String, displayInfo: AudioPlaybackDisplayInfo?) -> Unit = { _, _, _ -> },
     val pause: () -> Unit = {},
     val stop: () -> Unit = {},
     val seekTo: (position: Float) -> Unit = {},
+    val selectOutputDevice: (String) -> Unit = {},
 )
 
 /**
@@ -61,6 +69,7 @@ val LocalAudioPlaybackState =
 @Composable
 fun AudioPlaybackProvider(content: @Composable () -> Unit) {
     val audioPlaybackManager: AudioPlaybackManager = koinInject()
+    val audioRouteRepository: AudioRouteRepository = koinInject()
     val statusProvider = audioPlaybackManager as? AudioPlaybackStatusProvider
 
     // State that will be managed at this level
@@ -74,12 +83,33 @@ fun AudioPlaybackProvider(content: @Composable () -> Unit) {
         statusProvider?.playbackStatus?.collectAsState(
             initial = AudioPlaybackStatus(),
         )
+    val outputSelection by audioRouteRepository.outputDevices.collectAsState()
 
     LaunchedEffect(playbackStatus?.value) {
         val statusValue = playbackStatus?.value ?: return@LaunchedEffect
         isPlaying = statusValue.isPlaying
         progress = statusValue.progress
         duration = statusValue.duration
+        val metadata = statusValue.metadata
+        val statusNoteId = metadata?.noteId
+        val statusUri = statusValue.currentUri
+        when {
+            statusNoteId != null && statusUri != null -> {
+                currentlyPlayingId = statusNoteId
+                currentAudioUri = statusUri
+                displayInfo =
+                    AudioPlaybackDisplayInfo(
+                        title = metadata.title,
+                        subtitle = metadata.subtitle,
+                        accentColor = metadata.accentColor,
+                    )
+            }
+            !statusValue.isPlaying && statusValue.progress == 0f && statusUri == null -> {
+                currentlyPlayingId = null
+                currentAudioUri = null
+                displayInfo = AudioPlaybackDisplayInfo()
+            }
+        }
     }
 
     // Functions to control playback
@@ -96,7 +126,13 @@ fun AudioPlaybackProvider(content: @Composable () -> Unit) {
 
         audioPlaybackManager.startPlayback(
             uri = uri,
-            metadata = AudioPlaybackMetadata(noteId = id),
+            metadata =
+                AudioPlaybackMetadata(
+                    title = info?.title,
+                    subtitle = info?.subtitle,
+                    noteId = id,
+                    accentColor = info?.accentColor,
+                ),
             onProgressUpdated = { newProgress ->
                 progress = newProgress
             },
@@ -126,6 +162,10 @@ fun AudioPlaybackProvider(content: @Composable () -> Unit) {
         audioPlaybackManager.seekTo(pos)
     }
 
+    val selectOutputDevice: (String) -> Unit = { deviceId ->
+        audioRouteRepository.selectOutputDevice(deviceId)
+    }
+
     // Clean up when the composition is disposed
     DisposableEffect(audioPlaybackManager) {
         onDispose {
@@ -137,14 +177,17 @@ fun AudioPlaybackProvider(content: @Composable () -> Unit) {
     val playbackState =
         AudioPlaybackState(
             currentlyPlayingId = currentlyPlayingId,
+            currentUri = currentAudioUri,
             isPlaying = isPlaying,
             progress = progress,
             duration = duration,
             displayInfo = displayInfo,
+            outputSelection = outputSelection,
             play = play,
             pause = pause,
             stop = stop,
             seekTo = seekTo,
+            selectOutputDevice = selectOutputDevice,
         )
 
     // Provide the state to all descendants

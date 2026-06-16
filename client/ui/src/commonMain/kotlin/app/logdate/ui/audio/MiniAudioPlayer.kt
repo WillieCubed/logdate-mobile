@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.theme.Spacing
 import kotlin.uuid.Uuid
 
@@ -100,9 +102,7 @@ private fun MiniAudioPlayerContent(
                 .clickable(onClick = onClick),
     ) {
         Column {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            BoxWithConstraints(
                 modifier =
                     Modifier
                         .fillMaxWidth()
@@ -113,62 +113,87 @@ private fun MiniAudioPlayerContent(
                             end = Spacing.xs,
                         ),
             ) {
-                // Play/Pause button
-                IconButton(
-                    onClick = {
-                        if (playbackState.isPlaying) {
-                            playbackState.pause()
-                        } else {
-                            val id = playbackState.currentlyPlayingId ?: return@IconButton
-                            playbackState.play(id, "", displayInfo)
-                        }
-                    },
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        imageVector =
-                            if (playbackState.isPlaying) {
-                                Icons.Rounded.Pause
-                            } else {
-                                Icons.Rounded.PlayArrow
+                val stackRouteControls = maxWidth < 360.dp
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        IconButton(
+                            onClick = {
+                                if (playbackState.isPlaying) {
+                                    playbackState.pause()
+                                } else {
+                                    val id = playbackState.currentlyPlayingId ?: return@IconButton
+                                    val uri = playbackState.currentUri ?: return@IconButton
+                                    playbackState.play(id, uri, displayInfo)
+                                }
                             },
-                        contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
-                        tint = accentColor,
-                    )
-                }
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                imageVector =
+                                    if (playbackState.isPlaying) {
+                                        Icons.Rounded.Pause
+                                    } else {
+                                        Icons.Rounded.PlayArrow
+                                    },
+                                contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
+                                tint = accentColor,
+                            )
+                        }
 
-                // Title and subtitle
-                Column(
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(
-                        text = displayInfo.title ?: displayInfo.subtitle ?: "",
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (displayInfo.subtitle != null) {
-                        Text(
-                            text = displayInfo.subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                        Column(
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(
+                                text = displayInfo.title ?: displayInfo.subtitle ?: "",
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (displayInfo.subtitle != null) {
+                                Text(
+                                    text = displayInfo.subtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+
+                        if (!stackRouteControls) {
+                            MediaDeviceSelector(
+                                selection = playbackState.outputSelection,
+                                onDeviceSelected = playbackState.selectOutputDevice,
+                                label = "Audio output",
+                                modifier = Modifier.widthIn(max = 180.dp),
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { playbackState.stop() },
+                            modifier = Modifier.size(36.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = "Stop playback",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    if (stackRouteControls) {
+                        MediaDeviceSelector(
+                            selection = playbackState.outputSelection,
+                            onDeviceSelected = playbackState.selectOutputDevice,
+                            label = "Audio output",
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                }
-
-                // Close button
-                IconButton(
-                    onClick = { playbackState.stop() },
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Close,
-                        contentDescription = "Stop playback",
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
 
