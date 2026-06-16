@@ -74,7 +74,11 @@ class AudioPlaybackBackgroundE2ETest {
 
     @Test
     fun playbackNotificationAndSessionStaySynchronizedAfterBackgroundAndLock() {
-        val audioFile = silentWavFile(durationSeconds = 90)
+        // The clip must outlast the entire test timeline: a 65s background sleep plus the
+        // notification-shade fallback search, which is slower on tablet emulators. A 90s clip
+        // finishes mid-test on slower devices, so the media notification flips to a "Play" action
+        // and the pause-action assertion times out. Five minutes leaves comfortable headroom.
+        val audioFile = silentWavFile(durationSeconds = 300)
         val noteId = Uuid.random()
 
         runOnMainSync {

@@ -79,7 +79,7 @@ manual emulator inspections and were not run by automation.
 | Step | Task / suite | Device(s) | Result |
 | --- | --- | --- | --- |
 | 1 | `MediaDeviceSelectorE2ETest` | `flagshipPhoneApi36` (Pixel 9 Pro, API 36) + `largeScreenTabletApi35` (Pixel Tablet, API 35) | Pass — 3/3 on both devices |
-| 2 | `AudioPlaybackBackgroundE2ETest` | `flagshipPhoneApi36` + `largeScreenTabletApi35` | Phone pass 2/2; tablet pass 1/2 — see note below |
+| 2 | `AudioPlaybackBackgroundE2ETest` | `flagshipPhoneApi36` + `largeScreenTabletApi35` | Pass — 2/2 on both devices (see note on the clip-length fix) |
 | 3 | `WearDayDetailPlaybackTest` | `wearSmallRoundApi34` (Wear OS small round, API 34) | Pass — 14/14 |
 | 4 | `:client:media:desktopTest`, `:client:media:testAndroidHostTest`, `:app:wear:testDebugUnitTest` | Host JVM (no device) | Pass |
 | 5 | Manual AVD camera-mapping inspection | Android emulator AVD | Manual — not run by automation |
@@ -87,15 +87,17 @@ manual emulator inspections and were not run by automation.
 
 Notes:
 
-- Step 2, tablet: `playbackContinuesWhenAppIsVisibleButNotFocusedInMultiWindow` passes, but
-  `playbackNotificationAndSessionStaySynchronizedAfterBackgroundAndLock` fails **reproducibly** on the
-  Pixel Tablet (API 35) emulator with `IllegalStateException: Timed out waiting for notification pause
-  action becomes available after wake` (`AudioPlaybackBackgroundE2ETest.kt:139`). The same case passes on
-  the phone emulator. This looks like a tablet keyguard / notification-shade modeling gap rather than a
-  product defect, but it currently contradicts the `T-Audio_Background_Playback` tablet `[pass]` claim in
-  `camera-audio-adaptive-quality-checklist.md`; the audio-playback workstream should reconcile it (treat
-  the lock/wake notification-sync case as phone-emulator-validated only, with the tablet pending hardware
-  confirmation).
+- Step 2, tablet: an earlier run had `playbackNotificationAndSessionStaySynchronizedAfterBackgroundAndLock`
+  failing **reproducibly** on the Pixel Tablet (API 35) emulator with `IllegalStateException: Timed out
+  waiting for notification pause action becomes available after wake`. Logcat analysis showed this was a
+  test-timing defect, not a tablet keyguard / notification-shade modeling gap: the 90-second silent clip
+  was too short to outlast the test's own timeline (a 65-second background sleep plus the
+  notification-shade fallback search, which runs slower on the tablet). Playback reached the end of the
+  clip and went `STOPPED` mid-test, so the media notification flipped to a "Play" action and the
+  pause-action assertion timed out. The phone passed only because its faster control-tap path finished
+  with ~16 seconds of clip to spare. The fix lengthens the clip to 300 seconds
+  (`AudioPlaybackBackgroundE2ETest.kt`), after which both devices pass 2/2. This is consistent with the
+  `T-Audio_Background_Playback` tablet `[pass]` claim in `camera-audio-adaptive-quality-checklist.md`.
 - Step 3: the `:app:wear` task does not honor `-Plogdate.androidTestClass`, so the whole Wear androidTest
   suite ran; `WearDayDetailPlaybackTest` passed all 14 cases. Unrelated Wear suites
   (`MoodCheckInScreenTest`, `WearRecordingScreenTest`) failed with the Wear round-emulator "Failed to
@@ -112,6 +114,6 @@ Notes:
   `WearDayDetailPlaybackTest` (Wear, output picker + Bluetooth-settings fallback). Manual hardware
   evidence is still required for USB/Bluetooth input and output devices.
 - `T-Audio_Background_Playback`: emulator-backed proof covers background playback continuation and
-  notification/session sync — executed via `AudioPlaybackBackgroundE2ETest` (full pass on the phone
-  emulator; the tablet lock/wake notification-sync case is open, see Execution results). Manual hardware
-  evidence is still required for real wired/USB/Bluetooth output devices.
+  notification/session sync — executed via `AudioPlaybackBackgroundE2ETest` (full pass on both the phone
+  and tablet emulators after the clip-length fix, see Execution results). Manual hardware evidence is
+  still required for real wired/USB/Bluetooth output devices.

@@ -5,5 +5,11 @@
             android:name="app.logdate.client.e2e.ShareEntryPointHostActivity"
             android:exported="false"
             android:theme="@style/Theme.LogDate" />
+        <activity
+            android:name="app.logdate.client.e2e.VideoPlaybackHostActivity"
+            android:exported="false"
+            android:resizeableActivity="true"
+            android:supportsPictureInPicture="true"
+            android:theme="@style/Theme.LogDate" />
     </application>
 </manifest>
