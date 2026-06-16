@@ -10,7 +10,6 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 /**
  * Tests for [CreatePasskeyAccountUseCase].
  *
@@ -18,6 +17,7 @@ import kotlin.uuid.Uuid
  * and handling of various repository responses such as successful creation,
  * username unavailability, and errors.
  */
+@OptIn(ExperimentalUuidApi::class)
 class CreatePasskeyAccountUseCaseTest {
     private val mockAccount =
         LogDateAccount(

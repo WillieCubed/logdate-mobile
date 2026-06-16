@@ -11,13 +11,13 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 /**
  * Tests for [AuthenticateWithPasskeyUseCase].
  *
  * Verifies the authentication flow using passkeys, including successful authentication,
  * usernameless authentication, and handling of various error scenarios from the repository.
  */
+@OptIn(ExperimentalUuidApi::class)
 class AuthenticateWithPasskeyUseCaseTest {
     private val mockAccount =
         LogDateAccount(

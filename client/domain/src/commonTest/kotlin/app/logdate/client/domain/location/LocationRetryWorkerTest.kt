@@ -21,7 +21,6 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.time.Instant
 
-@OptIn(ExperimentalCoroutinesApi::class)
 /**
  * Tests for [LocationRetryWorker].
  *
@@ -29,6 +28,7 @@ import kotlin.time.Instant
  * ensuring that the original observed metadata is preserved while updating the
  * logging timestamp.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class LocationRetryWorkerTest {
     @Test
     fun `retry preserves observed payload and only refreshes logged time`() =

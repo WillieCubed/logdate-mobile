@@ -12,13 +12,13 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 /**
  * Tests for [GetCurrentAccountUseCase].
  *
  * Verifies that the use case correctly interacts with [PasskeyAccountRepository] to retrieve
  * the current account flow, authentication status, and account state.
  */
+@OptIn(ExperimentalUuidApi::class)
 class GetCurrentAccountUseCaseTest {
     private val mockAccount =
         LogDateAccount(
