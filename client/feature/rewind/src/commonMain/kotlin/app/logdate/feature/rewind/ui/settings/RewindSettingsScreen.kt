@@ -22,13 +22,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.client.intelligence.curation.CurationConfig
 import app.logdate.ui.adaptive.FoldableBookLayout
-import app.logdate.ui.common.PrimaryTogglePill
+import app.logdate.ui.common.MasterFeatureToggle
+import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.SettingsFeatureGroup
 import app.logdate.ui.common.SettingsScaffold
+import app.logdate.ui.common.ToggleSettingsItem
+import app.logdate.ui.common.disabledAlpha
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.rewind.generated.resources.Res
 import logdate.client.feature.rewind.generated.resources.rewind_settings_auto_generation_helper
 import logdate.client.feature.rewind.generated.resources.rewind_settings_auto_generation_label
-import logdate.client.feature.rewind.generated.resources.rewind_settings_description
 import logdate.client.feature.rewind.generated.resources.rewind_settings_include_screenshots_helper
 import logdate.client.feature.rewind.generated.resources.rewind_settings_include_screenshots_label
 import logdate.client.feature.rewind.generated.resources.rewind_settings_notifications_helper
@@ -126,6 +129,7 @@ fun RewindSettingsContent(
                     includeScreenshots = includeScreenshots,
                     onCurationStrictnessChanged = onCurationStrictnessChanged,
                     onIncludeScreenshotsToggled = onIncludeScreenshotsToggled,
+                    enabled = autoGenerationEnabled,
                 )
             }
         },
@@ -156,6 +160,7 @@ fun RewindSettingsContent(
                         includeScreenshots = includeScreenshots,
                         onCurationStrictnessChanged = onCurationStrictnessChanged,
                         onIncludeScreenshotsToggled = onIncludeScreenshotsToggled,
+                        enabled = autoGenerationEnabled,
                     )
                 }
             }
@@ -166,7 +171,7 @@ fun RewindSettingsContent(
 @Composable
 private fun RewindDescription() {
     Text(
-        text = stringResource(Res.string.rewind_settings_description),
+        text = stringResource(Res.string.rewind_settings_auto_generation_helper),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = Spacing.lg),
@@ -189,25 +194,28 @@ private fun RewindGenerationSection(
                 .padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
-        RewindToggleBlock(
+        MasterFeatureToggle(
             label = stringResource(Res.string.rewind_settings_auto_generation_label),
-            helper = stringResource(Res.string.rewind_settings_auto_generation_helper),
             checked = autoGenerationEnabled,
             onCheckedChange = onAutoGenerationToggled,
         )
-        RewindToggleBlock(
-            label = stringResource(Res.string.rewind_settings_notifications_label),
-            helper = stringResource(Res.string.rewind_settings_notifications_helper),
-            checked = notificationsEnabled,
-            enabled = autoGenerationEnabled,
-            onCheckedChange = onNotificationsToggled,
-        )
-        RewindToggleBlock(
-            label = stringResource(Res.string.rewind_settings_replies_label),
-            helper = stringResource(Res.string.rewind_settings_replies_helper),
-            checked = reflectionRepliesEnabled,
-            onCheckedChange = onReflectionRepliesToggled,
-        )
+
+        SettingsFeatureGroup(enabled = autoGenerationEnabled) {
+            MaterialContainer {
+                ToggleSettingsItem(
+                    title = stringResource(Res.string.rewind_settings_notifications_label),
+                    description = stringResource(Res.string.rewind_settings_notifications_helper),
+                    checked = notificationsEnabled,
+                    onCheckedChange = onNotificationsToggled,
+                )
+                ToggleSettingsItem(
+                    title = stringResource(Res.string.rewind_settings_replies_label),
+                    description = stringResource(Res.string.rewind_settings_replies_helper),
+                    checked = reflectionRepliesEnabled,
+                    onCheckedChange = onReflectionRepliesToggled,
+                )
+            }
+        }
     }
 }
 
@@ -218,83 +226,69 @@ private fun RewindCurationSection(
     includeScreenshots: Boolean,
     onCurationStrictnessChanged: (CurationConfig.Strictness) -> Unit,
     onIncludeScreenshotsToggled: (Boolean) -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-    ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Text(
-                text = stringResource(Res.string.rewind_settings_strictness_label),
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-            SingleChoiceSegmentedButtonRow(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg),
-            ) {
-                val options =
-                    listOf(
-                        CurationConfig.Strictness.LENIENT to Res.string.rewind_settings_strictness_lenient,
-                        CurationConfig.Strictness.STANDARD to Res.string.rewind_settings_strictness_standard,
-                        CurationConfig.Strictness.STRICT to Res.string.rewind_settings_strictness_strict,
-                    )
-                options.forEachIndexed { index, (value, label) ->
-                    SegmentedButton(
-                        selected = curationStrictness == value,
-                        onClick = { onCurationStrictnessChanged(value) },
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
-                    ) {
-                        Text(stringResource(label))
-                    }
-                }
-            }
-            Text(
-                text = stringResource(Res.string.rewind_settings_strictness_helper),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
-
-        RewindToggleBlock(
-            label = stringResource(Res.string.rewind_settings_include_screenshots_label),
-            helper = stringResource(Res.string.rewind_settings_include_screenshots_helper),
-            checked = includeScreenshots,
-            onCheckedChange = onIncludeScreenshotsToggled,
-        )
-    }
-}
-
-@Composable
-private fun RewindToggleBlock(
-    label: String,
-    helper: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
     enabled: Boolean = true,
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        PrimaryTogglePill(
-            label = label,
-            checked = checked,
-            enabled = enabled,
-            onCheckedChange = onCheckedChange,
-        )
-        Text(
-            text = helper,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = Spacing.lg),
-        )
+    SettingsFeatureGroup(enabled = enabled) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Text(
+                    text = stringResource(Res.string.rewind_settings_strictness_label),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier =
+                        Modifier
+                            .disabledAlpha(enabled)
+                            .padding(horizontal = Spacing.lg),
+                )
+                SingleChoiceSegmentedButtonRow(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.lg),
+                ) {
+                    val options =
+                        listOf(
+                            CurationConfig.Strictness.LENIENT to Res.string.rewind_settings_strictness_lenient,
+                            CurationConfig.Strictness.STANDARD to Res.string.rewind_settings_strictness_standard,
+                            CurationConfig.Strictness.STRICT to Res.string.rewind_settings_strictness_strict,
+                        )
+                    options.forEachIndexed { index, (value, label) ->
+                        SegmentedButton(
+                            selected = curationStrictness == value,
+                            onClick = { onCurationStrictnessChanged(value) },
+                            enabled = enabled,
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                        ) {
+                            Text(stringResource(label))
+                        }
+                    }
+                }
+                Text(
+                    text = stringResource(Res.string.rewind_settings_strictness_helper),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier =
+                        Modifier
+                            .disabledAlpha(enabled)
+                            .padding(horizontal = Spacing.lg),
+                )
+            }
+
+            MaterialContainer {
+                ToggleSettingsItem(
+                    title = stringResource(Res.string.rewind_settings_include_screenshots_label),
+                    description = stringResource(Res.string.rewind_settings_include_screenshots_helper),
+                    checked = includeScreenshots,
+                    onCheckedChange = onIncludeScreenshotsToggled,
+                )
+            }
+        }
     }
 }

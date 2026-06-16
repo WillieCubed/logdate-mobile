@@ -38,8 +38,8 @@ import app.logdate.client.domain.dayboundary.HealthConnectStatus
 import app.logdate.client.domain.dayboundary.reduceHealthConnectGateState
 import app.logdate.client.permissions.rememberHealthConnectPermissionState
 import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.common.MasterFeatureToggle
 import app.logdate.ui.common.MaterialContainer
-import app.logdate.ui.common.PrimaryTogglePill
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.asTime
@@ -187,7 +187,7 @@ fun DayBoundarySettingsContent(
                 )
 
                 if (showSleepBasedToggle) {
-                    PrimaryTogglePill(
+                    MasterFeatureToggle(
                         label = stringResource(Res.string.use_sleep_schedule),
                         checked = sleepBasedPreferenceEnabled,
                         onCheckedChange = onToggleSleepBased,
@@ -267,7 +267,7 @@ fun DayBoundarySettingsContent(
 
                 if (showSleepBasedToggle) {
                     item {
-                        PrimaryTogglePill(
+                        MasterFeatureToggle(
                             label = stringResource(Res.string.use_sleep_schedule),
                             checked = sleepBasedPreferenceEnabled,
                             onCheckedChange = onToggleSleepBased,

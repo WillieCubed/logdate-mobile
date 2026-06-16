@@ -20,8 +20,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.common.MasterFeatureToggle
 import app.logdate.ui.common.MaterialContainer
-import app.logdate.ui.common.PrimaryTogglePill
+import app.logdate.ui.common.SettingsFeatureGroup
 import app.logdate.ui.common.SettingsNavigationItem
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
@@ -101,14 +102,14 @@ fun EventsSettingsContent(
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
 
-                PrimaryTogglePill(
+                MasterFeatureToggle(
                     label = stringResource(Res.string.events_hub_master_toggle),
                     checked = uiState.isAutoEventsEnabled,
                     onCheckedChange = onAutoEventsToggled,
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
 
-                if (uiState.isAutoEventsEnabled) {
+                SettingsFeatureGroup(enabled = uiState.isAutoEventsEnabled) {
                     MaterialContainer(
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     ) {
@@ -170,15 +171,15 @@ fun EventsSettingsContent(
                     )
                 }
                 item {
-                    PrimaryTogglePill(
+                    MasterFeatureToggle(
                         label = stringResource(Res.string.events_hub_master_toggle),
                         checked = uiState.isAutoEventsEnabled,
                         onCheckedChange = onAutoEventsToggled,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
-                if (uiState.isAutoEventsEnabled) {
-                    item {
+                item {
+                    SettingsFeatureGroup(enabled = uiState.isAutoEventsEnabled) {
                         MaterialContainer(
                             modifier = Modifier.padding(horizontal = Spacing.lg),
                         ) {

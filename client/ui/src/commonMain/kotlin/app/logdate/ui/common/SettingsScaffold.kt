@@ -3,6 +3,7 @@
 package app.logdate.ui.common
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
@@ -85,7 +86,14 @@ fun SettingsScaffold(
         DefaultSettingsContentContainer {
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = paddingValues,
+                // Add a margin on top of the scaffold inset so the first item keeps breathing
+                // room below the top bar — including when it is fully collapsed and would
+                // otherwise sit flush against the content.
+                contentPadding =
+                    PaddingValues(
+                        top = paddingValues.calculateTopPadding() + Spacing.md,
+                        bottom = paddingValues.calculateBottomPadding(),
+                    ),
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
                 content()

@@ -24,9 +24,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.streak.StreakData
 import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.common.MasterFeatureToggle
 import app.logdate.ui.common.MaterialContainer
-import app.logdate.ui.common.PrimaryTogglePill
 import app.logdate.ui.common.SettingsScaffold
+import app.logdate.ui.common.disabledAlpha
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.streak_day_count
@@ -84,7 +85,7 @@ fun StreakSettingsContent(
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
 
-                PrimaryTogglePill(
+                MasterFeatureToggle(
                     label = stringResource(Res.string.track_journaling_streak),
                     checked = streakData.isEnabled,
                     onCheckedChange = onToggleStreakTracking,
@@ -98,54 +99,53 @@ fun StreakSettingsContent(
                     Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
+                        .disabledAlpha(streakData.isEnabled)
                         .padding(vertical = Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (streakData.isEnabled) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(120.dp)
-                                .clip(MaterialTheme.shapes.extraLarge)
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = streakData.currentStreak.toString(),
-                            style = MaterialTheme.typography.displayLarge,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                    }
-
+                Box(
+                    modifier =
+                        Modifier
+                            .size(120.dp)
+                            .clip(MaterialTheme.shapes.extraLarge)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Text(
-                        text = stringResource(Res.string.streak_day_count, streakData.currentStreak),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-
-                    MaterialContainer(
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    ) {
-                        Text(
-                            text = stringResource(Res.string.streak_keep_it_up),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(Spacing.lg),
-                        )
-                    }
-
-                    Text(
-                        text = stringResource(Res.string.streak_milestones_info),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                        text = streakData.currentStreak.toString(),
+                        style = MaterialTheme.typography.displayLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }
+
+                Text(
+                    text = stringResource(Res.string.streak_day_count, streakData.currentStreak),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+
+                MaterialContainer(
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                ) {
+                    Text(
+                        text = stringResource(Res.string.streak_keep_it_up),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(Spacing.lg),
+                    )
+                }
+
+                Text(
+                    text = stringResource(Res.string.streak_milestones_info),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
             }
         },
         standardContent = {
@@ -163,68 +163,73 @@ fun StreakSettingsContent(
                     )
                 }
                 item {
-                    PrimaryTogglePill(
+                    MasterFeatureToggle(
                         label = stringResource(Res.string.track_journaling_streak),
                         checked = streakData.isEnabled,
                         onCheckedChange = onToggleStreakTracking,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
-                if (streakData.isEnabled) {
-                    item {
-                        Column(
+                item {
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .disabledAlpha(streakData.isEnabled)
+                                .padding(horizontal = Spacing.lg),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                    ) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .size(120.dp)
+                                    .clip(MaterialTheme.shapes.extraLarge)
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = streakData.currentStreak.toString(),
+                                style = MaterialTheme.typography.displayLarge,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                        }
+                        Text(
+                            text = stringResource(Res.string.streak_day_count, streakData.currentStreak),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+                item {
+                    MaterialContainer(
+                        modifier =
+                            Modifier
+                                .disabledAlpha(streakData.isEnabled)
+                                .padding(horizontal = Spacing.lg),
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.streak_keep_it_up),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = Spacing.lg),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                        ) {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .size(120.dp)
-                                        .clip(MaterialTheme.shapes.extraLarge)
-                                        .background(MaterialTheme.colorScheme.primaryContainer),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text = streakData.currentStreak.toString(),
-                                    style = MaterialTheme.typography.displayLarge,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                )
-                            }
-                            Text(
-                                text = stringResource(Res.string.streak_day_count, streakData.currentStreak),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    }
-                    item {
-                        MaterialContainer(
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
-                        ) {
-                            Text(
-                                text = stringResource(Res.string.streak_keep_it_up),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(Spacing.lg),
-                            )
-                        }
-                    }
-                    item {
-                        Text(
-                            text = stringResource(Res.string.streak_milestones_info),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                                    .padding(Spacing.lg),
                         )
                     }
+                }
+                item {
+                    Text(
+                        text = stringResource(Res.string.streak_milestones_info),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier =
+                            Modifier
+                                .disabledAlpha(streakData.isEnabled)
+                                .padding(horizontal = Spacing.lg),
+                    )
                 }
             }
         },

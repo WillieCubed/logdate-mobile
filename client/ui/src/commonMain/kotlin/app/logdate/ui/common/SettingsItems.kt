@@ -24,7 +24,6 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.style.TextOverflow
 import app.logdate.ui.theme.Spacing
 
@@ -44,7 +43,10 @@ fun SettingsSection(
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(vertical = Spacing.sm),
+            modifier =
+                Modifier
+                    .padding(vertical = Spacing.sm)
+                    .disabledAlpha(LocalSettingsEnabled.current),
         )
 
         MaterialContainer {
@@ -60,6 +62,7 @@ fun SettingsSection(
  * @param description The description text for the settings item
  * @param overline Optional overline text for additional context or grouping
  * @param onClick Callback when the item is clicked
+ * @param enabled Whether the item is interactive; when false it grays out and ignores taps
  */
 @Composable
 fun SimpleSettingsItem(
@@ -67,6 +70,7 @@ fun SimpleSettingsItem(
     description: String,
     overline: String? = null,
     onClick: () -> Unit = {},
+    enabled: Boolean = LocalSettingsEnabled.current,
     action: @Composable () -> Unit,
 ) {
     ListItem(
@@ -81,14 +85,21 @@ fun SimpleSettingsItem(
         },
         overlineContent = overline?.let { { Text(it) } },
         trailingContent = action,
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .disabledAlpha(enabled)
+                .clickable(enabled = enabled) { onClick() },
     )
 }
 
 /**
  * A [SimpleSettingsItem] that has a toggleable switch.
  *
- * Tapping anywhere on the row toggles the switch.
+ * Tapping anywhere on the row toggles the switch. When [enabled] is false the row grays out and
+ * stops responding — use this (not hiding) for a setting that depends on a feature's
+ * [MasterFeatureToggle] being on. Defaults to the surrounding [LocalSettingsEnabled], so a
+ * [SettingsFeatureGroup] disables it automatically.
  */
 @Composable
 fun ToggleSettingsItem(
@@ -97,16 +108,19 @@ fun ToggleSettingsItem(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     overline: String? = null,
+    enabled: Boolean = LocalSettingsEnabled.current,
 ) {
     SimpleSettingsItem(
         title = title,
         description = description,
         overline = overline,
         onClick = { onCheckedChange(!checked) },
+        enabled = enabled,
         action = {
             Switch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
+                enabled = enabled,
             )
         },
     )
@@ -127,16 +141,17 @@ fun LinkedToggleSettingsItem(
     onCheckedChange: (Boolean) -> Unit,
     onNavigate: () -> Unit,
     overline: String? = null,
+    enabled: Boolean = LocalSettingsEnabled.current,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).disabledAlpha(enabled),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(
             modifier =
                 Modifier
                     .weight(1f)
-                    .clickable(onClick = onNavigate)
+                    .clickable(enabled = enabled, onClick = onNavigate)
                     .padding(horizontal = Spacing.lg, vertical = Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
@@ -164,30 +179,37 @@ fun LinkedToggleSettingsItem(
         Box(
             modifier =
                 Modifier
-                    .clickable { onCheckedChange(!checked) }
+                    .clickable(enabled = enabled) { onCheckedChange(!checked) }
                     .padding(horizontal = Spacing.lg)
                     .fillMaxHeight(),
             contentAlignment = Alignment.Center,
         ) {
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
+            Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
         }
     }
 }
 
 /**
- * A prominent toggle row styled as a colored pill, used as the primary control
- * on settings detail screens (e.g., "Use recommendations").
+ * The master on/off switch for an entire feature, styled as a prominent
+ * `secondaryContainer` pill with `extraLarge` shape (the Pixel Settings detail-screen pattern).
  *
- * Follows the Pixel Settings detail-screen pattern where the primary toggle
- * sits in a `secondaryContainer`-colored pill with `extraLarge` shape.
+ * Use this **exactly once** per settings detail screen, as the switch that turns the whole feature
+ * (and the group of settings below it) on or off — e.g. "Use recommendations". It is **not** a
+ * generic switch: for an individual setting within a feature, use [ToggleSettingsItem] instead.
+ *
+ * When this master is off, keep the dependent settings **visible but disabled** rather than hiding
+ * them — render them and pass `enabled = checked` so they gray out (see [ToggleSettingsItem],
+ * [SettingsNavigationItem]). Reserve hiding for content that is genuinely unavailable, such as a
+ * setting blocked behind a missing OS permission.
  *
  * @param label The label for the toggle
- * @param checked Whether the toggle is currently enabled
+ * @param checked Whether the feature is currently enabled
  * @param onCheckedChange Callback when the toggle is changed
+ * @param enabled Whether the master toggle itself is interactive
  * @param modifier Modifier to be applied to the outer surface
  */
 @Composable
-fun PrimaryTogglePill(
+fun MasterFeatureToggle(
     label: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
@@ -195,7 +217,7 @@ fun PrimaryTogglePill(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier.alpha(if (enabled) 1f else 0.6f),
+        modifier = modifier.disabledAlpha(enabled),
         shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -232,7 +254,7 @@ fun SettingsNavigationItem(
     description: String,
     icon: @Composable () -> Unit,
     onClick: () -> Unit,
-    enabled: Boolean = true,
+    enabled: Boolean = LocalSettingsEnabled.current,
 ) {
     ListItem(
         headlineContent = { Text(text = title) },
@@ -253,7 +275,7 @@ fun SettingsNavigationItem(
         },
         modifier =
             Modifier
-                .alpha(if (enabled) 1f else 0.6f)
+                .disabledAlpha(enabled)
                 .clickable(enabled = enabled, onClick = onClick),
     )
 }

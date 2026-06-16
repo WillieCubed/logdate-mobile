@@ -5,7 +5,6 @@
 
     <!-- Rewind settings -->
     <string name="rewind_settings_title">Rewind</string>
-    <string name="rewind_settings_description">Choose how often LogDate puts together your weekly Rewind and whether you want to be told when one is ready.</string>
     <string name="rewind_settings_auto_generation_label">Generate weekly rewinds automatically</string>
     <string name="rewind_settings_auto_generation_helper">Each week, LogDate quietly stitches your entries into a story so it&apos;s waiting for you when you open the app. Turn this off and rewinds only get made when you ask for them.</string>
     <string name="rewind_settings_notifications_label">Notify me when a Rewind is ready</string>
