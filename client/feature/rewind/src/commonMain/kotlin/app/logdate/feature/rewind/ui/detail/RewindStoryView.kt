@@ -518,7 +518,7 @@ fun RewindStoryView(
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                 )
             },
-            fallback = {
+            standardContent = {
                 FoldableBookLayout(
                     modifier = Modifier.fillMaxSize(),
                     minPaneWidth = 320.dp,
