@@ -131,7 +131,7 @@ private fun CloudAccountWelcomeAdaptiveContent(
                 modifier = Modifier.fillMaxSize(),
             )
         },
-        fallback = {
+        standardContent = {
             FoldableBookLayout(
                 modifier = Modifier.fillMaxSize(),
                 minPaneWidth = 320.dp,
@@ -186,83 +186,12 @@ private fun CloudAccountWelcomeIntroPane(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.xl),
     ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.padding(top = Spacing.xxl),
-        ) {
-            Card(
-                colors =
-                    CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                    ),
-            ) {
-                Box(
-                    modifier = Modifier.padding(Spacing.lg),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Cloud,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                    )
-                }
-            }
-        }
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            Text(
-                text = stringResource(Res.string.welcome_to_logdate),
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                text =
-                    stringResource(
-                        Res.string
-                            .account_cloud_sync_promotion_description,
-                    ),
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        ServerSelectionCard(
+        CloudAccountWelcomeHero(
             serverSelectionState = serverSelectionState,
-            onSelectPreset = onSelectServerPreset,
-            onUpdateCustomUrl = onCustomServerUrlChange,
+            onSelectServerPreset = onSelectServerPreset,
+            onCustomServerUrlChange = onCustomServerUrlChange,
             onShowCustomServerInfo = onShowCustomServerInfo,
         )
-
-        Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            FeatureItem(
-                icon = Icons.Default.Sync,
-                title = "Sync across devices",
-                description = "Access your journals from any device that uses the same server.",
-            )
-            FeatureItem(
-                icon = Icons.Default.Key,
-                title = "Secure with passkeys",
-                description = "Use your device biometrics or screen lock instead of a password.",
-            )
-            FeatureItem(
-                icon = Icons.Default.Cloud,
-                title = "Server-based backup",
-                description = "Your selected server can keep your journals available across devices.",
-            )
-            FeatureItem(
-                icon = Icons.Default.Lock,
-                title = "Privacy first",
-                description = "Server policies come from the server you choose.",
-            )
-        }
     }
 }
 
@@ -343,88 +272,97 @@ private fun CloudAccountWelcomeCompactContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Spacing.xl),
+        CloudAccountWelcomeHero(
+            serverSelectionState = serverSelectionState,
+            onSelectServerPreset = onSelectServerPreset,
+            onCustomServerUrlChange = onCustomServerUrlChange,
+            onShowCustomServerInfo = onShowCustomServerInfo,
+        )
+    }
+}
+
+@Composable
+private fun CloudAccountWelcomeHero(
+    serverSelectionState: ServerSelectionState,
+    onSelectServerPreset: (ServerPreset) -> Unit,
+    onCustomServerUrlChange: (String) -> Unit,
+    onShowCustomServerInfo: () -> Unit,
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.padding(top = Spacing.xxl),
+    ) {
+        Card(
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                ),
         ) {
             Box(
+                modifier = Modifier.padding(Spacing.lg),
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.padding(top = Spacing.xxl),
             ) {
-                Card(
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                        ),
-                ) {
-                    Box(
-                        modifier = Modifier.padding(Spacing.lg),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Cloud,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    }
-                }
-            }
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                Text(
-                    text = stringResource(Res.string.welcome_to_logdate),
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    text =
-                        stringResource(
-                            Res.string
-                                .account_cloud_sync_promotion_description,
-                        ),
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            ServerSelectionCard(
-                serverSelectionState = serverSelectionState,
-                onSelectPreset = onSelectServerPreset,
-                onUpdateCustomUrl = onCustomServerUrlChange,
-                onShowCustomServerInfo = onShowCustomServerInfo,
-            )
-
-            Column(
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                FeatureItem(
-                    icon = Icons.Default.Sync,
-                    title = "Sync across devices",
-                    description = "Access your journals from any device that uses the same server.",
-                )
-                FeatureItem(
-                    icon = Icons.Default.Key,
-                    title = "Secure with passkeys",
-                    description = "Use your device biometrics or screen lock instead of a password.",
-                )
-                FeatureItem(
-                    icon = Icons.Default.Cloud,
-                    title = "Server-based backup",
-                    description = "Your selected server can keep your journals available across devices.",
-                )
-                FeatureItem(
-                    icon = Icons.Default.Lock,
-                    title = "Privacy first",
-                    description = "Server policies come from the server you choose.",
+                Icon(
+                    imageVector = Icons.Default.Cloud,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.onPrimary,
                 )
             }
         }
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Text(
+            text = stringResource(Res.string.welcome_to_logdate),
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text =
+                stringResource(
+                    Res.string.account_cloud_sync_promotion_description,
+                ),
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+
+    ServerSelectionCard(
+        serverSelectionState = serverSelectionState,
+        onSelectPreset = onSelectServerPreset,
+        onUpdateCustomUrl = onCustomServerUrlChange,
+        onShowCustomServerInfo = onShowCustomServerInfo,
+    )
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        FeatureItem(
+            icon = Icons.Default.Sync,
+            title = "Sync across devices",
+            description = "Access your journals from any device that uses the same server.",
+        )
+        FeatureItem(
+            icon = Icons.Default.Key,
+            title = "Secure with passkeys",
+            description = "Use your device biometrics or screen lock instead of a password.",
+        )
+        FeatureItem(
+            icon = Icons.Default.Cloud,
+            title = "Server-based backup",
+            description = "Your selected server can keep your journals available across devices.",
+        )
+        FeatureItem(
+            icon = Icons.Default.Lock,
+            title = "Privacy first",
+            description = "Server policies come from the server you choose.",
+        )
     }
 }
 
