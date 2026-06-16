@@ -12,6 +12,8 @@ import app.logdate.client.media.audio.sherpa.DesktopSherpaAudioTaggingService
 import app.logdate.client.media.audio.sherpa.DesktopSherpaTranscriptionService
 import app.logdate.client.media.audio.tagging.AudioTaggingService
 import app.logdate.client.media.audio.transcription.TranscriptionService
+import app.logdate.client.media.device.AudioRouteRepository
+import app.logdate.client.media.device.SystemControlledAudioRouteRepository
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -25,6 +27,7 @@ actual val audioModule: Module =
         single<AudioRecordingManager> { DesktopAudioRecordingManager(get()) }
         single<AudioPlaybackManager> { DesktopAudioPlaybackManager() }
         single<AudioDurationResolver> { DesktopAudioDurationResolver() }
+        single<AudioRouteRepository> { SystemControlledAudioRouteRepository() }
 
         // Real on-device Whisper transcription via Sherpa-ONNX JVM. The
         // service handles its own download lifecycle and degrades cleanly

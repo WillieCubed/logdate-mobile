@@ -1,7 +1,6 @@
 package app.logdate.client.media.audio
 
 import android.content.Context
-import android.content.Intent
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
@@ -47,6 +46,7 @@ class AndroidAudioPlaybackManagerTest {
         runTest {
             val currentPosition = PlaybackStateHolder(250L)
             val noteId = Uuid.random()
+            val serviceStarter = RecordingAudioPlaybackServiceStarter()
             val itemFactory = RecordingAudioPlaybackItemFactory()
             val metadata =
                 AudioPlaybackMetadata(
@@ -54,7 +54,13 @@ class AndroidAudioPlaybackManagerTest {
                     subtitle = "March 31",
                     noteId = noteId,
                 )
-            val manager = createManager(this, currentPosition = currentPosition, itemFactory = itemFactory)
+            val manager =
+                createManager(
+                    this,
+                    currentPosition = currentPosition,
+                    itemFactory = itemFactory,
+                    serviceStarter = serviceStarter,
+                )
 
             every { controller.isPlaying } returns true
 
@@ -65,14 +71,48 @@ class AndroidAudioPlaybackManagerTest {
                 onPlaybackCompleted = {},
             )
 
-            verify(exactly = 1) { context.startService(any<Intent>()) }
+            assertEquals(1, serviceStarter.startCount)
             verify(exactly = 1) { controller.setMediaItem(itemFactory.mediaItem) }
             verify(exactly = 1) { controller.prepare() }
             verify(exactly = 1) { controller.play() }
             assertTrue(manager.playbackStatus.value.isPlaying)
             assertEquals(0.25f, manager.playbackStatus.value.progress)
+            assertEquals("file:///tmp/voice-note.m4a", manager.playbackStatus.value.currentUri)
+            assertEquals(metadata, manager.playbackStatus.value.metadata)
             assertEquals("file:///tmp/voice-note.m4a", itemFactory.lastUri)
             assertEquals(metadata, itemFactory.lastMetadata)
+            manager.release()
+        }
+
+    @Test
+    fun `startPlayback starts playback service before controller playback`() =
+        runTest {
+            val events = mutableListOf<String>()
+            val serviceStarter = AudioPlaybackServiceStarter { events += "service" }
+            val itemFactory =
+                AudioPlaybackItemFactory { _, _ ->
+                    events += "item"
+                    mockk(relaxed = true)
+                }
+            val manager =
+                createManager(
+                    this,
+                    currentPosition = PlaybackStateHolder(0L),
+                    itemFactory = itemFactory,
+                    serviceStarter = serviceStarter,
+                )
+            every { controller.play() } answers {
+                events += "play"
+                Unit
+            }
+
+            manager.startPlayback(
+                uri = "file:///tmp/voice-note.m4a",
+                onProgressUpdated = {},
+                onPlaybackCompleted = {},
+            )
+
+            assertEquals(listOf("service", "item", "play"), events)
             manager.release()
         }
 
@@ -94,6 +134,49 @@ class AndroidAudioPlaybackManagerTest {
             verify(exactly = 1) { controller.seekTo(500L) }
             verify(exactly = 1) { controller.stop() }
             assertEquals(0f, manager.playbackStatus.value.progress)
+            manager.release()
+        }
+
+    @Test
+    fun `playback progress resumes after focus-style pause and refocus`() =
+        runTest {
+            val progressUpdates = mutableListOf<Float>()
+            val currentPosition = PlaybackStateHolder(100L)
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            var playing = true
+            val manager = createManager(this, dispatcher = dispatcher, currentPosition = currentPosition)
+
+            every { controller.isPlaying } answers { playing }
+
+            manager.startPlayback(
+                uri = "file:///tmp/voice-note.m4a",
+                onProgressUpdated = { progressUpdates += it },
+                onPlaybackCompleted = {},
+            )
+
+            controllerListener.captured.onIsPlayingChanged(true)
+            runCurrent()
+            currentPosition.value = 300L
+            advanceTimeBy(100)
+            runCurrent()
+
+            playing = false
+            controllerListener.captured.onIsPlayingChanged(false)
+            currentPosition.value = 600L
+            advanceTimeBy(300)
+            runCurrent()
+
+            assertEquals(0.3f, progressUpdates.last())
+
+            playing = true
+            controllerListener.captured.onIsPlayingChanged(true)
+            runCurrent()
+            currentPosition.value = 800L
+            advanceTimeBy(100)
+            runCurrent()
+
+            assertEquals(0.8f, progressUpdates.last())
+            assertTrue(manager.playbackStatus.value.isPlaying)
             manager.release()
         }
 
@@ -216,6 +299,7 @@ class AndroidAudioPlaybackManagerTest {
         dispatcher: CoroutineDispatcher = StandardTestDispatcher(scope.testScheduler),
         currentPosition: PlaybackStateHolder,
         itemFactory: AudioPlaybackItemFactory = RecordingAudioPlaybackItemFactory(),
+        serviceStarter: AudioPlaybackServiceStarter = RecordingAudioPlaybackServiceStarter(),
         controllerFutureFactory: MediaControllerFutureFactory =
             MediaControllerFutureFactory { Futures.immediateFuture(controller) },
     ): AndroidAudioPlaybackManager {
@@ -228,11 +312,11 @@ class AndroidAudioPlaybackManagerTest {
             controllerFactory = controllerFutureFactory,
             controllerExecutor = directExecutor,
             mediaItemFactory = itemFactory,
+            serviceStarter = serviceStarter,
         )
     }
 
     private fun stubController(currentPosition: PlaybackStateHolder) {
-        every { context.startService(any<Intent>()) } returns null
         every { controller.addListener(capture(controllerListener)) } just runs
         every { controller.removeListener(any<Player.Listener>()) } just runs
         every { controller.setMediaItem(any()) } just runs
@@ -264,6 +348,14 @@ class AndroidAudioPlaybackManagerTest {
             lastUri = uri
             lastMetadata = metadata
             return mediaItem
+        }
+    }
+
+    private class RecordingAudioPlaybackServiceStarter : AudioPlaybackServiceStarter {
+        var startCount: Int = 0
+
+        override fun start(context: Context) {
+            startCount += 1
         }
     }
 }

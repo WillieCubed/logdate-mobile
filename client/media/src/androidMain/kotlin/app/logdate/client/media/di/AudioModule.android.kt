@@ -12,6 +12,8 @@ import app.logdate.client.media.audio.tagging.AudioTaggingService
 import app.logdate.client.media.audio.tagging.OnDemandAudioTaggingService
 import app.logdate.client.media.audio.transcription.OnDemandTranscriptionService
 import app.logdate.client.media.audio.transcription.TranscriptionService
+import app.logdate.client.media.device.AndroidAudioRouteRepository
+import app.logdate.client.media.device.AudioRouteRepository
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -30,10 +32,12 @@ actual val audioModule: Module =
                 transcriptionRepository = get(),
                 audioTaggingService = get(),
                 audioTagRepository = get(),
+                audioRouteRepository = get(),
             )
         }
         single<AudioPlaybackManager> { AndroidAudioPlaybackManager(androidContext(), get()) }
         single<AudioDurationResolver> { AndroidAudioDurationResolver(androidContext()) }
+        single<AudioRouteRepository> { AndroidAudioRouteRepository(androidContext()) }
 
         // On-demand transcription: loads Sherpa-ONNX from dynamic module when available,
         // falls back to Android's built-in SpeechRecognizer otherwise

@@ -8,6 +8,7 @@ import android.media.MediaRecorder
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import app.logdate.client.media.device.AndroidAudioRouteDevices
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,12 +24,18 @@ import java.io.IOException
 /**
  * Extension function to start the recording service
  */
-fun Context.startAudioRecordingService(outputFilePath: String? = null) {
+fun Context.startAudioRecordingService(
+    outputFilePath: String? = null,
+    inputDeviceId: String? = null,
+) {
     val intent =
         Intent(this, AudioRecordingService::class.java).apply {
             action = AudioRecordingService.SERVICE_ACTION_START
             if (outputFilePath != null) {
                 putExtra(AudioRecordingService.EXTRA_OUTPUT_PATH, outputFilePath)
+            }
+            if (inputDeviceId != null) {
+                putExtra(AudioRecordingService.EXTRA_INPUT_DEVICE_ID, inputDeviceId)
             }
         }
     startForegroundService(intent)
@@ -59,6 +66,7 @@ class AudioRecordingService : Service() {
         const val SERVICE_ACTION_PAUSE = AndroidAudioNotificationHandler.ACTION_PAUSE
         const val SERVICE_ACTION_RESUME = AndroidAudioNotificationHandler.ACTION_RESUME
         const val EXTRA_OUTPUT_PATH = "app.logdate.extra.OUTPUT_PATH"
+        const val EXTRA_INPUT_DEVICE_ID = "app.logdate.extra.INPUT_DEVICE_ID"
     }
 
     // Service binder for clients
@@ -99,7 +107,8 @@ class AudioRecordingService : Service() {
             SERVICE_ACTION_START -> {
                 Napier.d("Starting audio recording service")
                 val outputPath = intent.getStringExtra(EXTRA_OUTPUT_PATH)
-                startForegroundRecording(outputPath)
+                val inputDeviceId = intent.getStringExtra(EXTRA_INPUT_DEVICE_ID)
+                startForegroundRecording(outputPath, inputDeviceId)
             }
             SERVICE_ACTION_STOP -> {
                 Napier.d("Stopping audio recording service")
@@ -133,7 +142,10 @@ class AudioRecordingService : Service() {
     /**
      * Starts foreground recording with notification
      */
-    private fun startForegroundRecording(outputPath: String?) {
+    private fun startForegroundRecording(
+        outputPath: String?,
+        inputDeviceId: String?,
+    ) {
         try {
             val notification = notificationHandler.createRecordingNotification(true, System.currentTimeMillis())
 
@@ -148,7 +160,7 @@ class AudioRecordingService : Service() {
                 startForeground(NOTIFICATION_ID, notification)
             }
 
-            startRecording(outputPath)
+            startRecording(outputPath, inputDeviceId)
 
             // Update recording state
             serviceScope.launch {
@@ -231,7 +243,10 @@ class AudioRecordingService : Service() {
     /**
      * Starts the actual recording process
      */
-    private fun startRecording(outputPath: String?) {
+    private fun startRecording(
+        outputPath: String?,
+        inputDeviceId: String?,
+    ) {
         try {
             // Create output file
             outputFile =
@@ -263,6 +278,7 @@ class AudioRecordingService : Service() {
                 setOutputFile(outputFile?.absolutePath)
                 setAudioEncodingBitRate(128000)
                 setAudioSamplingRate(44100)
+                applyPreferredInputDevice(inputDeviceId)
 
                 try {
                     prepare()
@@ -379,6 +395,28 @@ class AudioRecordingService : Service() {
      * Checks if recording is currently paused
      */
     fun isRecordingPaused(): Boolean = isPaused && _recordingState.value.isRecording
+
+    /**
+     * Re-applies the preferred microphone route while recording is active.
+     *
+     * This gives the service a chance to follow route changes or device hot-plugs
+     * after the recording session has already started.
+     */
+    fun updatePreferredInputDevice(inputDeviceId: String?) {
+        if (!_recordingState.value.isRecording) return
+        mediaRecorder?.applyPreferredInputDevice(inputDeviceId)
+    }
+
+    private fun MediaRecorder.applyPreferredInputDevice(inputDeviceId: String?) {
+        val preferredDevice = AndroidAudioRouteDevices.findPreferredInputDevice(this@AudioRecordingService, inputDeviceId)
+        if (preferredDevice == null) {
+            Napier.d("Using system microphone route for recording")
+            return
+        }
+
+        val applied = setPreferredDevice(preferredDevice)
+        Napier.d("Preferred recording microphone ${preferredDevice.productName} applied=$applied")
+    }
 }
 
 /**

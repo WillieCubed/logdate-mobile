@@ -37,6 +37,10 @@ fun interface AudioPlaybackItemFactory {
     ): MediaItem
 }
 
+fun interface AudioPlaybackServiceStarter {
+    fun start(context: Context)
+}
+
 class AndroidAudioPlaybackManager(
     private val context: Context,
     coroutineScope: CoroutineScope,
@@ -44,6 +48,7 @@ class AndroidAudioPlaybackManager(
     private val controllerFactory: MediaControllerFutureFactory = defaultMediaControllerFutureFactory,
     private val controllerExecutor: Executor = mainThreadExecutor(),
     private val mediaItemFactory: AudioPlaybackItemFactory = defaultMediaItemFactory,
+    private val serviceStarter: AudioPlaybackServiceStarter = defaultAudioPlaybackServiceStarter,
 ) : AudioPlaybackManager,
     AudioPlaybackStatusProvider {
     override val playbackStatus: StateFlow<AudioPlaybackStatus>
@@ -57,6 +62,8 @@ class AndroidAudioPlaybackManager(
     private var progressJob: Job? = null
     private var onProgressUpdated: ((Float) -> Unit)? = null
     private var onPlaybackCompleted: (() -> Unit)? = null
+    private var currentUri: String? = null
+    private var currentMetadata: AudioPlaybackMetadata? = null
 
     override fun startPlayback(
         uri: String,
@@ -66,10 +73,12 @@ class AndroidAudioPlaybackManager(
     ) {
         this.onProgressUpdated = onProgressUpdated
         this.onPlaybackCompleted = onPlaybackCompleted
+        currentUri = uri
+        currentMetadata = metadata
         // startService (not startForegroundService) ensures MediaSessionService.onStartCommand
         // fires so its MediaNotificationManager gets a valid startId. Without this, the service
         // is only bound via BIND_AUTO_CREATE and stops itself ~1s after the controller connects.
-        context.startService(Intent(context, AudioPlaybackService::class.java))
+        serviceStarter.start(context)
         withController { player ->
             val mediaItem = mediaItemFactory.create(uri, metadata)
             player.setMediaItem(mediaItem)
@@ -89,6 +98,8 @@ class AndroidAudioPlaybackManager(
     override fun stopPlayback() {
         withController { player ->
             player.stop()
+            currentUri = null
+            currentMetadata = null
             updateStatus(player, resetProgress = true)
         }
     }
@@ -207,6 +218,8 @@ class AndroidAudioPlaybackManager(
                 isPlaying = player.isPlaying,
                 progress = progress,
                 duration = duration,
+                currentUri = currentUri,
+                metadata = currentMetadata,
                 isSuppressedForUnsuitableOutput =
                     player.playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_UNSUITABLE_AUDIO_OUTPUT,
             )
@@ -231,6 +244,11 @@ class AndroidAudioPlaybackManager(
                     .setMediaId(metadata?.noteId?.toString() ?: uri)
                     .setMediaMetadata(buildMediaMetadata(metadata))
                     .build()
+            }
+
+        val defaultAudioPlaybackServiceStarter =
+            AudioPlaybackServiceStarter { context ->
+                context.startService(Intent(context, AudioPlaybackService::class.java))
             }
 
         private val artworkGenerator = AudioNotificationArtworkGenerator()

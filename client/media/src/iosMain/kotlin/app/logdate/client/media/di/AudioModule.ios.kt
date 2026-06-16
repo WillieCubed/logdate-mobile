@@ -12,6 +12,8 @@ import app.logdate.client.media.audio.tagging.AudioTaggingService
 import app.logdate.client.media.audio.tagging.IosSoundAnalysisTaggingService
 import app.logdate.client.media.audio.transcription.IosTranscriptionService
 import app.logdate.client.media.audio.transcription.TranscriptionService
+import app.logdate.client.media.device.AudioRouteRepository
+import app.logdate.client.media.device.SystemControlledAudioRouteRepository
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -24,6 +26,7 @@ actual val audioModule: Module =
         single<AudioRecordingManager> { IosAudioRecordingManager(get()) }
         single<AudioPlaybackManager> { IosAudioPlaybackManager() }
         single<AudioDurationResolver> { IosAudioDurationResolver() }
+        single<AudioRouteRepository> { SystemControlledAudioRouteRepository() }
 
         // On-device transcription via Apple's Speech Recognition framework.
         // The system model is always present — no download required.

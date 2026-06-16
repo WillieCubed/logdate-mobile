@@ -10,6 +10,7 @@ import app.logdate.client.media.audio.tagging.AudioTaggingService
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import app.logdate.client.media.audio.transcription.toTranscriptDocument
+import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.client.repository.audio.AudioTag
 import app.logdate.client.repository.audio.AudioTagRepository
 import app.logdate.client.repository.transcription.TranscriptDocumentStatus
@@ -42,6 +43,7 @@ class AndroidAudioRecordingManager(
     private val transcriptionRepository: TranscriptionRepository,
     private val audioTaggingService: AudioTaggingService,
     private val audioTagRepository: AudioTagRepository,
+    private val audioRouteRepository: AudioRouteRepository,
 ) : AudioRecordingManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val audioLevelFlow = MutableStateFlow(0f)
@@ -66,6 +68,7 @@ class AndroidAudioRecordingManager(
     private var serviceBound = false
     private var startRequested = false
     private var serviceStateJob: Job? = null
+    private var routeSyncJob: Job? = null
 
     private val recordingDurationFlow: Flow<Duration> = durationFlow.map { it.milliseconds }
 
@@ -79,6 +82,16 @@ class AndroidAudioRecordingManager(
                 val binder = service as AudioRecordingService.AudioServiceBinder
                 recordingService = binder.getService()
                 serviceBound = true
+
+                routeSyncJob?.cancel()
+                routeSyncJob =
+                    scope.launch {
+                        audioRouteRepository.inputDevices.collect { selection ->
+                            if (recordingActive && serviceBound) {
+                                recordingService?.updatePreferredInputDevice(selection.selectedDeviceId)
+                            }
+                        }
+                    }
 
                 serviceStateJob?.cancel()
                 serviceStateJob =
@@ -103,6 +116,8 @@ class AndroidAudioRecordingManager(
             override fun onServiceDisconnected(name: ComponentName?) {
                 serviceStateJob?.cancel()
                 serviceStateJob = null
+                routeSyncJob?.cancel()
+                routeSyncJob = null
                 recordingService = null
                 serviceBound = false
             }
@@ -268,7 +283,10 @@ class AndroidAudioRecordingManager(
             transcriptionFlow.value = null
             structuredTranscriptionFlow.value = null
             // Start foreground service for recording
-            context.startAudioRecordingService(recordingTarget?.path)
+            context.startAudioRecordingService(
+                outputFilePath = recordingTarget?.path,
+                inputDeviceId = audioRouteRepository.inputDevices.value.selectedDeviceId,
+            )
 
             // Bind to the service to get updates
             // recordingActive will be set true via onServiceConnected → service state flow
@@ -306,6 +324,8 @@ class AndroidAudioRecordingManager(
             try {
                 context.unbindService(serviceConnection)
                 serviceBound = false
+                routeSyncJob?.cancel()
+                routeSyncJob = null
             } catch (e: Exception) {
                 Napier.e("Error unbinding from service", e)
             }
@@ -330,6 +350,8 @@ class AndroidAudioRecordingManager(
 
             recordingActive = false
             recordingTarget = null
+            routeSyncJob?.cancel()
+            routeSyncJob = null
 
             // Stop live transcription
             transcriptionService?.let { service ->
@@ -449,6 +471,9 @@ class AndroidAudioRecordingManager(
                 context.stopAudioRecordingService()
                 recordingActive = false
             }
+
+            routeSyncJob?.cancel()
+            routeSyncJob = null
 
             // Unbind from service if we were previously recording
             if (wasRecording) {
