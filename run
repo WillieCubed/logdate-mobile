@@ -33,10 +33,10 @@ build|build:server|Build server JAR|./gradlew :server:build
 build|build:server:docker|Build server Docker image locally|docker build --target production -t logdate-server:local .
 build|build:all|Build all modules|./gradlew build
 
-run|run:android|Install and run on connected Android device|./gradlew :app:android-main:installDebug
+run|run:android|Install and run on connected Android device|./gradlew :app:android-main:installDebug && adb shell am start -n co.reasonabletech.logdate/app.logdate.client.MainActivity
 run|run:desktop|Run desktop app|./gradlew :app:compose-main:run
 run|run:server|Run server locally|./gradlew :server:run
-run|run:wear|Install and run on connected Wear device|./gradlew :app:wear:installDebug
+run|run:wear|Install and run on connected Wear device|./gradlew :app:wear:installDebug && adb shell am start -n app.logdate.wear/app.logdate.wear.presentation.MainActivity
 
 test|test|Run all unit tests|./gradlew test
 test|test:android|Run Android unit tests|./gradlew :app:android-main:testDebugUnitTest
