@@ -41,6 +41,7 @@ import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.search.EntrySearchResultItem
 import app.logdate.ui.search.EntrySearchResultUiState
 import app.logdate.ui.search.parseSnippetMarkers
+import app.logdate.ui.search.searchBarMaxWidth
 import app.logdate.util.toReadableDateTimeShort
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -103,7 +104,7 @@ fun JournalSearchToolbar(
                 leadingIcon = { Icon(painter = PlatformIcons.search(), contentDescription = null) },
             )
         },
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.searchBarMaxWidth(),
     )
 
     ExpandedFullScreenSearchBar(

@@ -3,7 +3,6 @@
 
 package app.logdate.feature.library.ui
 
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -16,6 +15,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import app.logdate.ui.platform.PlatformIcons
+import app.logdate.ui.search.searchBarMaxWidth
 import logdate.client.feature.library.generated.resources.Res
 import logdate.client.feature.library.generated.resources.cd_search
 import logdate.client.feature.library.generated.resources.search_library
@@ -52,6 +52,6 @@ fun LibraryTopBar(
                 },
             )
         },
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.searchBarMaxWidth(),
     )
 }

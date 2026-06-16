@@ -60,9 +60,11 @@ import app.logdate.client.repository.search.SearchResult
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.PlatformSheet
+import app.logdate.ui.search.SearchBarMaxWidth
 import app.logdate.ui.search.UniversalSearchResultItem
 import app.logdate.ui.search.UniversalSearchResultUiState
 import app.logdate.ui.search.rememberSearchHighlightStyle
+import app.logdate.ui.search.searchBarMaxWidth
 import app.logdate.ui.search.toUniversalSearchResultUiState
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.flow.collectLatest
@@ -240,7 +242,7 @@ fun SearchScreenContent(
                     },
                 )
             },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.searchBarMaxWidth(),
         )
 
         ExpandedFullScreenSearchBar(
@@ -523,7 +525,7 @@ private fun SearchStateContent(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .widthIn(max = 720.dp),
+                            .widthIn(max = SearchBarMaxWidth),
                 ) {
                     groupedRows.forEach { (bucket, bucketRows) ->
                         stickyHeader(key = "header_${bucket.name}") {
