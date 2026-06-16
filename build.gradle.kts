@@ -570,6 +570,8 @@ private data class ManagedVirtualDeviceConfig(
     val hardwareProfile: String,
     val apiLevel: Int,
     val systemImageSource: String,
+    val pageAlignment: ManagedVirtualDevice.PageAlignment =
+        ManagedVirtualDevice.PageAlignment.FORCE_16KB_PAGES,
 )
 
 private data class ManagedDeviceGroupConfig(
@@ -681,7 +683,8 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                             deviceName = "wearSmallRoundApi34",
                             hardwareProfile = "Wear OS Small Round",
                             apiLevel = 34,
-                            systemImageSource = "google",
+                            systemImageSource = "android-wear",
+                            pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_4KB_PAGES,
                         ),
                     ),
                 groups =
@@ -710,7 +713,7 @@ private fun ApplicationExtension.configureManagedDevices(project: Project) {
                                 device = deviceConfig.hardwareProfile
                                 apiLevel = deviceConfig.apiLevel
                                 systemImageSource = deviceConfig.systemImageSource
-                                pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_16KB_PAGES
+                                pageAlignment = deviceConfig.pageAlignment
                             }
                     deviceConfig.deviceName to managedDevice
                 }
