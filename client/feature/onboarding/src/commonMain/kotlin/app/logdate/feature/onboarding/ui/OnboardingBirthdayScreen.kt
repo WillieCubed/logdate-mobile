@@ -175,7 +175,7 @@ private fun BirthdayAdaptiveContent(
                 modifier = Modifier.fillMaxSize(),
             )
         },
-        fallback = {
+        standardContent = {
             FoldableBookLayout(
                 modifier = Modifier.fillMaxSize().testTag(ONBOARDING_BIRTHDAY_ROOT_TAG),
                 minPaneWidth = 320.dp,

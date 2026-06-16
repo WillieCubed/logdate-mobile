@@ -81,7 +81,7 @@ private fun MemoriesImportInfoAdaptiveContent(
                 modifier = Modifier.fillMaxSize(),
             )
         },
-        fallback = {
+        standardContent = {
             FoldableBookLayout(
                 modifier = Modifier.fillMaxSize().testTag(MEMORIES_IMPORT_INFO_ROOT_TAG),
                 minPaneWidth = 320.dp,

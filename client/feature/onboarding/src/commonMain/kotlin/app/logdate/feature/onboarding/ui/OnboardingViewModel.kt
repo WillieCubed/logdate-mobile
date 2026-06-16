@@ -3,6 +3,7 @@ package app.logdate.feature.onboarding.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.billing.model.LogDateBackupPlanOption
+import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
 import app.logdate.client.domain.dayboundary.HealthConnectStatus
 import app.logdate.client.domain.dayboundary.ObserveHealthConnectStatusUseCase
@@ -45,9 +46,11 @@ class OnboardingViewModel(
     observeUserIdentity: ObserveUserIdentityUseCase,
     private val onboardingDeviceStateRepository: OnboardingDeviceStateRepository,
     private val refreshStreakUseCase: RefreshStreakUseCase,
+    private val identityKeyManager: IdentityKeyManager,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(OnboardingUiState())
     private val _healthConnectStatus = MutableStateFlow(HealthConnectStatus.CHECKING)
+    private val hasIdentityKeyState = MutableStateFlow(false)
     private var healthStatusJob: Job? = null
 
     val uiState: StateFlow<OnboardingUiState> =
@@ -67,6 +70,7 @@ class OnboardingViewModel(
     val progressSnapshot: StateFlow<OnboardingProgressSnapshot> =
         combine(
             observeUserIdentity(),
+            hasIdentityKeyState,
             combine(
                 combine(
                     onboardingDeviceStateRepository.deviceState,
@@ -91,7 +95,7 @@ class OnboardingViewModel(
                     sleepBasedDayBoundariesEnabled = dayBoundarySettings.sleepBasedBoundariesEnabled,
                 )
             },
-        ) { identity, inputs ->
+        ) { identity, hasIdentityKey, inputs ->
             OnboardingProgressSnapshot(
                 hasPersonalIntro = identity.displayName.isNotBlank() && !identity.bio.isNullOrBlank(),
                 hasBirthday = identity.birthday != null,
@@ -99,6 +103,7 @@ class OnboardingViewModel(
                     identity.isAuthenticated ||
                         identity.cloudAccountId != null ||
                         !identity.username.isNullOrBlank(),
+                hasIdentityKey = hasIdentityKey,
                 recommendationsHandledOnThisDevice = inputs.deviceState.recommendationsHandledOnThisDevice,
                 contextualRecommendationsEnabled = inputs.recommendationsEnabled,
                 dayBoundariesHandledOnThisDevice = inputs.deviceState.dayBoundariesHandledOnThisDevice,
@@ -138,6 +143,7 @@ class OnboardingViewModel(
 
     init {
         refreshHealthStatus()
+        refreshIdentityKeyState()
     }
 
     /**
@@ -241,6 +247,17 @@ class OnboardingViewModel(
                     _healthConnectStatus.value = status
                 }
             }
+    }
+
+    fun refreshIdentityKeyState() {
+        viewModelScope.launch {
+            hasIdentityKeyState.value =
+                runCatching { identityKeyManager.hasIdentityKey() }
+                    .getOrElse { error ->
+                        Napier.w("Failed to read identity key state", error)
+                        false
+                    }
+        }
     }
 
     /**

@@ -54,6 +54,7 @@ kotlin {
             implementation(projects.client.ui)
             implementation(projects.client.repository)
             implementation(projects.client.domain)
+            implementation(projects.client.device)
             implementation(projects.client.logdateDatastore)
             implementation(projects.client.billing)
             implementation(projects.client.media)

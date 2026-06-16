@@ -13,6 +13,7 @@ enum class OnboardingStep {
     MEMORY_IMPORT,
     MEMORY_SELECTION,
     ACCOUNT,
+    RECOVERY_PHRASE,
     BIRTHDAY,
     RECOMMENDATIONS,
     DAY_BOUNDARIES,
@@ -26,6 +27,7 @@ data class OnboardingProgressSnapshot(
     val hasPersonalIntro: Boolean = false,
     val hasBirthday: Boolean = false,
     val hasCloudAccount: Boolean = false,
+    val hasIdentityKey: Boolean = false,
     val recommendationsHandledOnThisDevice: Boolean = false,
     val contextualRecommendationsEnabled: Boolean = true,
     val dayBoundariesHandledOnThisDevice: Boolean = false,
@@ -75,6 +77,7 @@ private fun onboardingStepOrderFor(
             add(OnboardingStep.MEMORY_SELECTION)
         }
         add(OnboardingStep.ACCOUNT)
+        add(OnboardingStep.RECOVERY_PHRASE)
         add(OnboardingStep.BIRTHDAY)
         add(OnboardingStep.RECOMMENDATIONS)
         if (healthConnectStatus != HealthConnectStatus.NOT_AVAILABLE) {
@@ -92,6 +95,7 @@ private fun shouldIncludeStep(
     when (step) {
         OnboardingStep.PERSONAL_INTRO -> !snapshot.hasPersonalIntro
         OnboardingStep.ACCOUNT -> !snapshot.hasCloudAccount
+        OnboardingStep.RECOVERY_PHRASE -> !snapshot.hasIdentityKey
         OnboardingStep.BIRTHDAY -> !snapshot.hasBirthday
         OnboardingStep.RECOMMENDATIONS -> !snapshot.hasResolvedRecommendations()
         OnboardingStep.DAY_BOUNDARIES -> !snapshot.hasResolvedDayBoundaries()
@@ -102,6 +106,7 @@ private fun shouldIncludeStep(
 
 fun OnboardingProgressSnapshot.canCompleteOnboarding(): Boolean =
     hasPersonalIntro &&
+        hasIdentityKey &&
         hasBirthday &&
         hasResolvedRecommendations() &&
         hasResolvedDayBoundaries() &&
@@ -111,6 +116,7 @@ fun OnboardingProgressSnapshot.canCompleteOnboarding(): Boolean =
 fun OnboardingProgressSnapshot.firstIncompleteRequiredOnboardingStep(): OnboardingStep? =
     when {
         !hasPersonalIntro -> OnboardingStep.PERSONAL_INTRO
+        !hasIdentityKey -> OnboardingStep.RECOVERY_PHRASE
         !hasBirthday -> OnboardingStep.BIRTHDAY
         !hasResolvedRecommendations() -> OnboardingStep.RECOMMENDATIONS
         !hasResolvedDayBoundaries() -> OnboardingStep.DAY_BOUNDARIES

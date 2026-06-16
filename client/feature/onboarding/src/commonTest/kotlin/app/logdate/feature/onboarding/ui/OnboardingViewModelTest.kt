@@ -2,6 +2,9 @@ package app.logdate.feature.onboarding.ui
 
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
+import app.logdate.client.device.crypto.CryptoManager
+import app.logdate.client.device.crypto.IdentityKeyManager
+import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.domain.dayboundary.DayBoundarySettings
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
 import app.logdate.client.domain.dayboundary.HealthConnectStatus
@@ -39,6 +42,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -77,6 +82,7 @@ class OnboardingViewModelTest {
     private lateinit var fakeSessionStorage: FakeSessionStorage
     private lateinit var fakeStreakSettingsRepository: FakeStreakSettingsRepository
     private lateinit var fakeOnboardingDeviceStateRepository: FakeOnboardingDeviceStateRepository
+    private lateinit var identityKeyManager: IdentityKeyManager
     private lateinit var viewModel: OnboardingViewModel
 
     @BeforeTest
@@ -93,6 +99,8 @@ class OnboardingViewModelTest {
         fakeSessionStorage = FakeSessionStorage()
         fakeStreakSettingsRepository = FakeStreakSettingsRepository()
         fakeOnboardingDeviceStateRepository = FakeOnboardingDeviceStateRepository()
+        identityKeyManager = IdentityKeyManager(InMemorySecureStorage(), FakeCryptoManager())
+        runBlocking { identityKeyManager.setupNewIdentity() }
         viewModel = createViewModel()
     }
 
@@ -117,6 +125,7 @@ class OnboardingViewModelTest {
                     calculateStreakUseCase = CalculateStreakUseCase(fakeNotesRepository),
                     streakSettingsRepository = fakeStreakSettingsRepository,
                 ),
+            identityKeyManager = identityKeyManager,
         )
 
     @AfterTest
@@ -257,6 +266,31 @@ class OnboardingViewModelTest {
             assertTrue(result.isFailure)
             assertEquals(false, fakeUserStateRepository.isOnboardingComplete)
             assertEquals(OnboardingStep.LOCATION, viewModel.firstIncompleteRequiredOnboardingStep())
+        }
+
+    @Test
+    fun completeOnboardingIfEligible_fails_when_identity_key_missing() =
+        runTest {
+            identityKeyManager.clearIdentityKey()
+            viewModel.refreshIdentityKeyState()
+            fakeProfileRepository.setProfile(
+                LogDateProfile(
+                    displayName = "Alex",
+                    bio = "Bio",
+                ),
+            )
+            fakeUserStateRepository.setBirthday(Instant.fromEpochMilliseconds(946684800000))
+            fakeOnboardingDeviceStateRepository.markRecommendationsHandled()
+            fakeOnboardingDeviceStateRepository.markLocationHandled()
+            fakeOnboardingDeviceStateRepository.markDayBoundariesHandled()
+            fakeOnboardingDeviceStateRepository.markNotificationsHandled()
+            advanceUntilIdle()
+
+            val result = viewModel.completeOnboardingIfEligible()
+
+            assertTrue(result.isFailure)
+            assertEquals(false, fakeUserStateRepository.isOnboardingComplete)
+            assertEquals(OnboardingStep.RECOVERY_PHRASE, viewModel.firstIncompleteRequiredOnboardingStep())
         }
 
     @Test
@@ -581,6 +615,79 @@ private class FakeLocalFirstHealthRepository : LocalFirstHealthRepository {
         timeZone: TimeZone,
         sleepBasedBoundariesEnabled: Boolean,
     ): DayBounds = error("Not used in onboarding tests")
+}
+
+private class InMemorySecureStorage : SecureStorage {
+    private val storage = MutableStateFlow<Map<String, String>>(emptyMap())
+
+    override suspend fun getString(key: String): String? = storage.value[key]
+
+    override suspend fun putString(
+        key: String,
+        value: String,
+    ) {
+        storage.value = storage.value + (key to value)
+    }
+
+    override suspend fun remove(key: String) {
+        storage.value = storage.value - key
+    }
+
+    override suspend fun clear() {
+        storage.value = emptyMap()
+    }
+
+    override fun observeString(key: String): Flow<String?> = storage.map { values -> values[key] }
+
+    override fun observeAll(): Flow<Map<String, String>> = storage
+
+    override suspend fun encrypt(data: ByteArray): ByteArray = data
+
+    override suspend fun decrypt(data: ByteArray): ByteArray? = data
+}
+
+private class FakeCryptoManager : CryptoManager {
+    override suspend fun generateRecoveryPhrase(): List<String> = (1..12).map { "word$it" }
+
+    override suspend fun deriveMasterKey(phrase: List<String>): ByteArray {
+        val phraseBytes = phrase.joinToString(" ").encodeToByteArray()
+        return ByteArray(32) { index -> phraseBytes[index % phraseBytes.size] }
+    }
+
+    override fun validateRecoveryPhrase(phrase: List<String>): Boolean = phrase.size == 12 && phrase.all { it.isNotBlank() }
+
+    override fun encryptSink(
+        sink: okio.Sink,
+        key: ByteArray,
+        iv: ByteArray,
+    ): okio.Sink = sink
+
+    override fun decryptSource(
+        source: okio.Source,
+        key: ByteArray,
+        iv: ByteArray,
+    ): okio.Source = source
+
+    override fun generateRandomBytes(size: Int): ByteArray = ByteArray(size) { it.toByte() }
+
+    override fun hmacSha256(
+        key: ByteArray,
+        data: ByteArray,
+    ): ByteArray = ByteArray(32)
+
+    override fun aesGcmEncrypt(
+        key: ByteArray,
+        iv: ByteArray,
+        aad: ByteArray,
+        plaintext: ByteArray,
+    ): ByteArray = plaintext
+
+    override fun aesGcmDecrypt(
+        key: ByteArray,
+        iv: ByteArray,
+        aad: ByteArray,
+        ciphertext: ByteArray,
+    ): ByteArray = ciphertext
 }
 
 // endregion

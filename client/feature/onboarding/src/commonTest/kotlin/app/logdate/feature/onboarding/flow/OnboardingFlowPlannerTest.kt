@@ -25,6 +25,7 @@ class OnboardingFlowPlannerTest {
                 OnboardingStep.MEMORY_IMPORT,
                 OnboardingStep.MEMORY_SELECTION,
                 OnboardingStep.ACCOUNT,
+                OnboardingStep.RECOVERY_PHRASE,
                 OnboardingStep.BIRTHDAY,
                 OnboardingStep.RECOMMENDATIONS,
                 OnboardingStep.DAY_BOUNDARIES,
@@ -60,6 +61,7 @@ class OnboardingFlowPlannerTest {
             OnboardingProgressSnapshot(
                 hasPersonalIntro = true,
                 hasBirthday = false,
+                hasIdentityKey = true,
                 notificationsHandledOnThisDevice = false,
                 recommendationsHandledOnThisDevice = true,
                 locationHandledOnThisDevice = true,
@@ -86,6 +88,7 @@ class OnboardingFlowPlannerTest {
             OnboardingProgressSnapshot(
                 hasPersonalIntro = true,
                 hasCloudAccount = true,
+                hasIdentityKey = true,
                 hasBirthday = true,
                 notificationsHandledOnThisDevice = true,
                 recommendationsHandledOnThisDevice = true,
@@ -121,6 +124,7 @@ class OnboardingFlowPlannerTest {
             OnboardingProgressSnapshot(
                 hasPersonalIntro = true,
                 hasBirthday = true,
+                hasIdentityKey = true,
                 recommendationsHandledOnThisDevice = true,
                 locationHandledOnThisDevice = true,
                 dayBoundariesHandledOnThisDevice = false,
@@ -132,6 +136,7 @@ class OnboardingFlowPlannerTest {
             OnboardingProgressSnapshot(
                 hasPersonalIntro = true,
                 hasBirthday = true,
+                hasIdentityKey = true,
                 recommendationsHandledOnThisDevice = true,
                 locationHandledOnThisDevice = true,
                 dayBoundariesHandledOnThisDevice = true,
@@ -180,6 +185,7 @@ class OnboardingFlowPlannerTest {
             OnboardingProgressSnapshot(
                 hasPersonalIntro = true,
                 hasBirthday = true,
+                hasIdentityKey = true,
                 healthConnectStatus = HealthConnectStatus.NOT_AVAILABLE,
             )
 
@@ -205,6 +211,7 @@ class OnboardingFlowPlannerTest {
             OnboardingProgressSnapshot(
                 hasPersonalIntro = true,
                 hasBirthday = true,
+                hasIdentityKey = true,
                 notificationsHandledOnThisDevice = true,
             ).firstIncompleteRequiredOnboardingStep(),
         )

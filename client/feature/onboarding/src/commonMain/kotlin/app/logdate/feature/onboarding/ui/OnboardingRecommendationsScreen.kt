@@ -161,7 +161,7 @@ private fun RecommendationsAdaptiveContent(
                 modifier = Modifier.fillMaxSize(),
             )
         },
-        fallback = {
+        standardContent = {
             FoldableBookLayout(
                 modifier = Modifier.fillMaxSize().testTag(ONBOARDING_RECOMMENDATIONS_ROOT_TAG),
                 minPaneWidth = 320.dp,

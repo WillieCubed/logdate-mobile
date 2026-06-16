@@ -142,7 +142,7 @@ private fun OverviewSplitLayout(
         bottomPane = {
             OverviewCardsPane(onNext = onNext, modifier = Modifier.fillMaxSize())
         },
-        fallback = {
+        standardContent = {
             FoldableBookLayout(
                 modifier = Modifier.fillMaxSize(),
                 minPaneWidth = 320.dp,

@@ -155,7 +155,7 @@ private fun CompletionStreakContent(onContinue: () -> Unit) {
                     modifier = Modifier.fillMaxSize(),
                 )
             },
-            fallback = {
+            standardContent = {
                 FoldableBookLayout(
                     modifier = Modifier.fillMaxSize(),
                     minPaneWidth = 320.dp,

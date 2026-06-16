@@ -328,7 +328,7 @@ private fun DayBoundariesAdaptiveContent(
                 modifier = Modifier.fillMaxSize(),
             )
         },
-        fallback = {
+        standardContent = {
             FoldableBookLayout(
                 modifier = Modifier.fillMaxSize().testTag(ONBOARDING_DAY_BOUNDARIES_ROOT_TAG),
                 minPaneWidth = 320.dp,

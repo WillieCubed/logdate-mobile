@@ -165,7 +165,7 @@ private fun LocationAdaptiveContent(
                 modifier = Modifier.fillMaxSize(),
             )
         },
-        fallback = {
+        standardContent = {
             FoldableBookLayout(
                 modifier = Modifier.fillMaxSize().testTag(ONBOARDING_LOCATION_ROOT_TAG),
                 minPaneWidth = 320.dp,

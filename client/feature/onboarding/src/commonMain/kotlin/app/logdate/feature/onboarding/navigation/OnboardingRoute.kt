@@ -31,6 +31,9 @@ import app.logdate.feature.onboarding.ui.OnboardingRecommendationsScreen
 import app.logdate.feature.onboarding.ui.OnboardingStartScreen
 import app.logdate.feature.onboarding.ui.OnboardingViewModel
 import app.logdate.feature.onboarding.ui.PersonalIntroScreen
+import app.logdate.feature.onboarding.ui.RecoveryPhraseEntryScreen
+import app.logdate.feature.onboarding.ui.RecoveryPhraseSetupScreen
+import app.logdate.feature.onboarding.ui.RecoveryPhraseViewModel
 import app.logdate.feature.onboarding.ui.WelcomeBackScreen
 import app.logdate.ui.navigation.taggedEntry
 import kotlinx.coroutines.launch
@@ -70,6 +73,9 @@ data object AccountCreation : OnboardingBaseRoute
 
 @Serializable
 data object SignIn : OnboardingBaseRoute
+
+@Serializable
+data object RecoveryPhrase : OnboardingBaseRoute
 
 @Serializable
 data object BirthdayIntro : OnboardingBaseRoute
@@ -296,6 +302,41 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
             },
         )
     }
+    taggedEntry<RecoveryPhrase> {
+        val flowViewModel = koinViewModel<OnboardingViewModel>()
+        val progressSnapshot by flowViewModel.progressSnapshot.collectAsState()
+        val entryMode by flowViewModel.activeEntryMode.collectAsState()
+        val recoveryViewModel = koinViewModel<RecoveryPhraseViewModel>()
+        val setupState by recoveryViewModel.setupState.collectAsState()
+
+        fun continueAfterRecovery() {
+            flowViewModel.refreshIdentityKeyState()
+            onGoToItem(
+                routeForStep(
+                    nextOnboardingStepAfter(
+                        currentStep = OnboardingStep.RECOVERY_PHRASE,
+                        entryMode = entryMode,
+                        snapshot = progressSnapshot.copy(hasIdentityKey = true),
+                    ) ?: terminalStepFor(entryMode),
+                ),
+            )
+        }
+
+        if (entryMode == OnboardingEntryMode.CONTINUE_SETUP) {
+            RecoveryPhraseEntryScreen(
+                onRecoverPhrase = recoveryViewModel::recoverIdentity,
+                onRecovered = ::continueAfterRecovery,
+            )
+        } else {
+            RecoveryPhraseSetupScreen(
+                words = setupState.words,
+                isLoading = setupState.isLoading,
+                errorMessage = setupState.errorMessage,
+                onRetry = recoveryViewModel::prepareRecoveryPhrase,
+                onPhraseContinue = { continueAfterRecovery() },
+            )
+        }
+    }
     taggedEntry<BirthdayIntro> {
         val flowViewModel = koinViewModel<OnboardingViewModel>()
         val progressSnapshot by flowViewModel.progressSnapshot.collectAsState()
@@ -500,6 +541,7 @@ private fun routeForStep(step: OnboardingStep): OnboardingBaseRoute =
         OnboardingStep.MEMORY_IMPORT -> MemoryImport
         OnboardingStep.MEMORY_SELECTION -> MemorySelection
         OnboardingStep.ACCOUNT -> AccountCreation
+        OnboardingStep.RECOVERY_PHRASE -> RecoveryPhrase
         OnboardingStep.BIRTHDAY -> BirthdayIntro
         OnboardingStep.RECOMMENDATIONS -> FeatureRecommendations
         OnboardingStep.DAY_BOUNDARIES -> FeatureDayBoundaries

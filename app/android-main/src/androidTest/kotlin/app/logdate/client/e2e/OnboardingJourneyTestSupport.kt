@@ -482,7 +482,7 @@ internal class OnboardingFakeMediaManager : MediaManager {
 
     override suspend fun exists(mediaId: String): Boolean = sampleMedia.any { it.uri == mediaId }
 
-    override suspend fun getRecentMedia(): Flow<List<MediaObject>> = flowOf(sampleMedia)
+    override suspend fun getRecentMedia(limit: Int): Flow<List<MediaObject>> = flowOf(sampleMedia.take(limit))
 
     override suspend fun queryMediaByDate(
         start: Instant,

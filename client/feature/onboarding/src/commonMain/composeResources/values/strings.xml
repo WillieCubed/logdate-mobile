@@ -70,10 +70,12 @@
     <string name="nice_to_meet_you_name">Nice to meet you, %1$s!</string>
     <string name="recovery_error_invalid_word_format">Recovery phrase words can only contain letters.</string>
     <string name="recovery_error_missing_words">Enter all 12 recovery words to continue.</string>
+    <string name="recovery_setup_retry">Try again</string>
     <string name="recovery_error_unexpected">Recovery failed. Please try again.</string>
     <string name="recovery_phrase_index">%1$d.</string>
     <string name="warning_recovery_phrase_never_share">Never share your recovery phrase with anyone</string>
     <string name="warning_recovery_phrase_store_safe">Store it in a safe place</string>
+    <string name="warning_recovery_phrase_store_securely">It will also be saved in this device&apos;s secure storage so you can view it later in Settings</string>
     <string name="warning_recovery_phrase_write_on_paper">Write it down on paper - don&apos;t save digitally</string>
 
     <!-- Birthday screen -->
