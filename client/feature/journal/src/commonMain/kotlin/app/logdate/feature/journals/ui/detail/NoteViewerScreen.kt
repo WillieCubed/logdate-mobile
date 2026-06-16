@@ -179,7 +179,7 @@ fun NoteViewerScreen(
                 onShare = viewModel::shareCurrentNote,
                 modifier = modifier.then(sharedBoundsModifier),
             ) {
-                VideoNoteViewer(mediaRef = state.mediaRef)
+                VideoNoteViewerContent(mediaRef = state.mediaRef)
             }
         }
     }
@@ -315,7 +315,7 @@ private fun ImageNoteViewer(
  * Video note rendered as a player filling the width.
  */
 @Composable
-private fun VideoNoteViewer(
+fun VideoNoteViewerContent(
     mediaRef: String,
     modifier: Modifier = Modifier,
 ) {
@@ -444,7 +444,7 @@ fun NoteViewerScaffoldContent(
                 )
             }
         },
-        fallback = {
+        standardContent = {
             FoldableBookLayout(
                 modifier = Modifier.fillMaxSize(),
                 minPaneWidth = 320.dp,

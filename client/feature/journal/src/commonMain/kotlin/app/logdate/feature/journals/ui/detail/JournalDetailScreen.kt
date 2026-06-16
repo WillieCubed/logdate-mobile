@@ -11,6 +11,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -93,6 +95,7 @@ import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.common.applyStandardContentWidth
 import app.logdate.ui.common.transitions.TransitionKeys
+import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.platform.rememberLogDateHaptics
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.localTime
@@ -950,55 +953,79 @@ private fun AudioEntryCard(
         modifier = modifier,
         cardModifier = cardModifier,
     ) {
-        AnimatedPlayPauseButton(
-            isPlaying = isEntryPlaying,
-            onClick = {
-                if (isEntryPlaying) {
-                    audioPlaybackState.pause()
-                } else {
-                    audioPlaybackState.play(
-                        entry.id,
-                        entry.mediaRef,
-                        AudioPlaybackDisplayInfo(
-                            title = resolvedTitle,
-                            subtitle = if (entry.durationMs > 0) formatAudioDuration(entry.durationMs) else null,
-                            accentColor = palette?.accentColor,
-                        ),
+        BoxWithConstraints(modifier = Modifier.weight(1f)) {
+            val stackRouteControls = maxWidth < 360.dp && isCurrentEntry
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AnimatedPlayPauseButton(
+                        isPlaying = isEntryPlaying,
+                        onClick = {
+                            if (isEntryPlaying) {
+                                audioPlaybackState.pause()
+                            } else {
+                                audioPlaybackState.play(
+                                    entry.id,
+                                    entry.mediaRef,
+                                    AudioPlaybackDisplayInfo(
+                                        title = resolvedTitle,
+                                        subtitle = if (entry.durationMs > 0) formatAudioDuration(entry.durationMs) else null,
+                                        accentColor = palette?.accentColor,
+                                    ),
+                                )
+                            }
+                        },
+                        modifier =
+                            Modifier
+                                .size(40.dp)
+                                .testTag("journal-audio-playback-button"),
+                        iconSize = 20.dp,
+                    )
+                    Spacer(Modifier.width(Spacing.sm))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = resolvedTitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        LinearProgressIndicator(
+                            progress = { animatedProgress },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp)),
+                            color = accentColor ?: MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            strokeCap = StrokeCap.Round,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        if (entry.durationMs > 0) {
+                            Text(
+                                text = formatAudioDuration(entry.durationMs),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    if (isCurrentEntry && !stackRouteControls) {
+                        Spacer(Modifier.width(Spacing.sm))
+                        MediaDeviceSelector(
+                            selection = audioPlaybackState.outputSelection,
+                            onDeviceSelected = audioPlaybackState.selectOutputDevice,
+                            label = "Audio output",
+                            modifier = Modifier.widthIn(max = 160.dp),
+                        )
+                    }
+                }
+                if (stackRouteControls) {
+                    MediaDeviceSelector(
+                        selection = audioPlaybackState.outputSelection,
+                        onDeviceSelected = audioPlaybackState.selectOutputDevice,
+                        label = "Audio output",
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
-            },
-            modifier =
-                Modifier
-                    .size(40.dp)
-                    .testTag("journal-audio-playback-button"),
-            iconSize = 20.dp,
-        )
-        Spacer(Modifier.width(Spacing.sm))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = resolvedTitle,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-            )
-            Spacer(Modifier.height(4.dp))
-            LinearProgressIndicator(
-                progress = { animatedProgress },
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp)),
-                color = accentColor ?: MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                strokeCap = StrokeCap.Round,
-            )
-            Spacer(Modifier.height(2.dp))
-            if (entry.durationMs > 0) {
-                Text(
-                    text = formatAudioDuration(entry.durationMs),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }

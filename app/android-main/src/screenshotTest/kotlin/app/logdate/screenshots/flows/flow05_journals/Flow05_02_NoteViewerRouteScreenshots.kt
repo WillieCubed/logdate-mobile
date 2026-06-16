@@ -17,6 +17,10 @@ import app.logdate.feature.editor.audio.AudioContext
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
 import app.logdate.client.awareness.daylight.DaylightPeriod
+import app.logdate.client.media.device.MediaDeviceCategory
+import app.logdate.client.media.device.MediaDeviceKind
+import app.logdate.client.media.device.MediaDeviceSelectionUiState
+import app.logdate.client.media.device.MediaDeviceUiState
 import app.logdate.feature.editor.audio.model.SegmentType
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
 import app.logdate.feature.journals.ui.detail.AudioNoteViewerContent
@@ -29,7 +33,12 @@ import app.logdate.feature.journals.ui.detail.NoteViewerShared
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTheme
+import app.logdate.ui.audio.AudioPlaybackDisplayInfo
+import app.logdate.ui.audio.AudioPlaybackState
+import app.logdate.ui.audio.LocalAudioPlaybackState
 import com.android.tools.screenshot.PreviewTest
+import androidx.compose.runtime.CompositionLocalProvider
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.uuid.Uuid
 
 private const val sampleMediaUri = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher"
@@ -69,6 +78,28 @@ private val audioContext =
                 accentColor = 0xFFE8A044,
                 immersiveBackground = 0xFF1A0F05,
             ),
+    )
+
+private val controllableOutputSelection =
+    MediaDeviceSelectionUiState(
+        kind = MediaDeviceKind.AUDIO_OUTPUT,
+        devices =
+            listOf(
+                MediaDeviceUiState(
+                    id = "speaker",
+                    label = "Phone speaker",
+                    kind = MediaDeviceKind.AUDIO_OUTPUT,
+                    category = MediaDeviceCategory.BUILT_IN,
+                ),
+                MediaDeviceUiState(
+                    id = "bluetooth",
+                    label = "Bluetooth headphones",
+                    kind = MediaDeviceKind.AUDIO_OUTPUT,
+                    category = MediaDeviceCategory.BLUETOOTH,
+                    isExternal = true,
+                ),
+            ),
+        selectedDeviceId = "speaker",
     )
 
 @PreviewTest
@@ -153,16 +184,34 @@ fun S05_NoteViewerVideo() {
 @Composable
 fun S06_NoteViewerAudio() {
     ScreenshotTheme {
-        AudioNoteViewerContent(
-            uiState =
-                AudioNoteViewerUiState.Ready(
-                    mediaRef = "preview://note-viewer/audio",
-                    durationMs = 182_000L,
-                    createdAt = ScreenshotTestData.baseInstant,
-                    context = audioContext,
-                    playbackState = AudioPlaybackUiState(progress = 0.38f, isPlaying = true),
+        CompositionLocalProvider(
+            LocalAudioPlaybackState provides
+                AudioPlaybackState(
+                    currentlyPlayingId = Uuid.parse("00000000-0000-0000-0000-000000000141"),
+                    currentUri = "preview://note-viewer/audio",
+                    isPlaying = true,
+                    progress = 0.38f,
+                    duration = 182_000L.milliseconds,
+                    displayInfo =
+                        AudioPlaybackDisplayInfo(
+                            title = "Audio note",
+                            subtitle = "3:02",
+                            accentColor = 0xFFE8A044,
+                        ),
+                    outputSelection = controllableOutputSelection,
                 ),
-            onGoBack = {},
-        )
+        ) {
+            AudioNoteViewerContent(
+                uiState =
+                    AudioNoteViewerUiState.Ready(
+                        mediaRef = "preview://note-viewer/audio",
+                        durationMs = 182_000L,
+                        createdAt = ScreenshotTestData.baseInstant,
+                        context = audioContext,
+                        playbackState = AudioPlaybackUiState(progress = 0.38f, isPlaying = true),
+                    ),
+                onGoBack = {},
+            )
+        }
     }
 }
