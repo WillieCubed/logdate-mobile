@@ -75,6 +75,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+import app.logdate.client.health.util.LogdatePreferencesDataSource as BoundaryPreferences
+import app.logdate.client.health.util.UserPreferences as BoundaryUserPreferences
 
 /**
  * Unit tests for [HomeViewModel].
@@ -298,6 +300,10 @@ class HomeViewModelTest {
                             dayBoundarySettingsRepository = dayBoundarySettingsRepository,
                         ),
                     dayBoundarySettingsRepository = dayBoundarySettingsRepository,
+                    preferencesDataSource =
+                        object : BoundaryPreferences {
+                            override suspend fun getPreferences() = BoundaryUserPreferences()
+                        },
                 ),
                 NoOpEventRepository,
                 TimelineDayBuilder { date, entries, events ->

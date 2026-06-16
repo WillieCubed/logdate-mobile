@@ -5,6 +5,7 @@ import app.logdate.client.domain.account.GetCurrentEntitlementUseCase
 import app.logdate.client.domain.app.GetAppInfoUseCase
 import app.logdate.client.domain.backup.CreateEncryptedBackupUseCase
 import app.logdate.client.domain.backup.RestoreFromEncryptedBackupUseCase
+import app.logdate.client.domain.dayboundary.DatastoreDayBoundaryPreferences
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
 import app.logdate.client.domain.dayboundary.DefaultDayBoundarySettingsRepository
 import app.logdate.client.domain.di.healthDomainModule
@@ -193,7 +194,12 @@ val domainModule: Module =
         // Timeline
         factory { GetJournalMembershipUseCase(get()) }
         factory { GetMediaUrisUseCase(get()) }
-        factory { GroupNotesByDayBoundsUseCase(get(), get()) }
+        // Adapts the persisted datastore preferences to the day-bounds engine's preference
+        // contract, so the user's configured day-start hour actually reaches timeline grouping.
+        single<app.logdate.client.health.util.LogdatePreferencesDataSource> {
+            DatastoreDayBoundaryPreferences(get())
+        }
+        factory { GroupNotesByDayBoundsUseCase(get(), get(), get()) }
         factory { GetTimelineUseCase(get(), get(), get(), get()) }
         factory { GetStreamingTimelineUseCase(get(), get(), get(), get()) }
         factory { GetTimelinePageUseCase(get(), get(), get(), get<GetTimelineDayUseCase>()) }

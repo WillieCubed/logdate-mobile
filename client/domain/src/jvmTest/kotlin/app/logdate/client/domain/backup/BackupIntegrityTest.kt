@@ -3,7 +3,6 @@ package app.logdate.client.domain.backup
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.crypto.CryptoManager
-import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.domain.export.ExportMediaFile
 import app.logdate.client.domain.export.ExportMetadata

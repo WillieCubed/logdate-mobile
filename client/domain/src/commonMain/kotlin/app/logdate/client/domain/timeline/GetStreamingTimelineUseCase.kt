@@ -12,8 +12,10 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
+import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
 
@@ -107,67 +109,70 @@ class GetStreamingTimelineUseCase(
             Timeline(sortedDays)
         }
 
-    private fun createBasicTimeline(
+    private suspend fun createBasicTimeline(
         notes: List<JournalNote>,
         sortOrder: TimelineSortOrder,
         events: List<Event>,
     ): Timeline {
-        val notesByDay =
-            notes.groupBy { note ->
-                note.creationTimestamp.toLocalDateTime(TimeZone.currentSystemDefault()).date
-            }
-
-        val basicDays =
-            notesByDay.map { (date, entries) ->
-                val places = extractPlacesVisited(entries)
-                TimelineDay(
-                    start = entries.minOf { it.creationTimestamp },
-                    end = entries.maxOf { it.creationTimestamp },
-                    tldr = "", // Empty - UI will show loading placeholder via isLoadingSummary
-                    date = date,
-                    people = emptyList(),
-                    events = events.overlapping(entries),
-                    placesVisited = places,
-                    moments = inferMomentsHeuristically(date, entries, places),
-                    parts = extractDayParts(entries),
-                    entries = entries.sortedByDescending { it.creationTimestamp },
-                )
-            }
-
+        val notesByDay = groupNotesByDayBoundsUseCase(notes)
+        val basicDays = notesByDay.map { (date, entries) -> buildBasicDay(date, entries, events) }
         return Timeline(applySorting(basicDays, sortOrder))
     }
 
+    /**
+     * Builds a summary-less [TimelineDay] for entries already assigned to [date]. Used for the
+     * immediate (pre-summary) render and as a fallback when enriched data isn't ready.
+     */
+    private fun buildBasicDay(
+        date: LocalDate,
+        entries: List<JournalNote>,
+        events: List<Event>,
+    ): TimelineDay {
+        val places = extractPlacesVisited(entries)
+        return TimelineDay(
+            start = entries.minOf { it.creationTimestamp },
+            end = entries.maxOf { it.creationTimestamp },
+            tldr = "", // Empty - UI will show loading placeholder via isLoadingSummary
+            date = date,
+            people = emptyList(),
+            events = events.overlapping(entries),
+            placesVisited = places,
+            moments = inferMomentsHeuristically(date, entries, places),
+            parts = extractDayParts(entries),
+            entries = entries.sortedByDescending { it.creationTimestamp },
+        )
+    }
+
     private suspend fun createEnrichedTimeline(
-        recentDates: Set<kotlinx.datetime.LocalDate>,
+        recentDates: Set<LocalDate>,
         allNotes: List<JournalNote>,
         fallbackNotes: List<JournalNote>,
         events: List<Event>,
         sortOrder: TimelineSortOrder,
     ): Timeline {
-        val recentNotesByDay =
-            fallbackNotes.groupBy { note ->
-                note.creationTimestamp.toLocalDateTime(TimeZone.currentSystemDefault()).date
-            }
-        val expandedDates =
-            recentDates +
-                recentDates.mapNotNull { date ->
-                    date.minus(1, DateTimeUnit.DAY).takeIf { it !in recentDates }
-                }
+        val timeZone = TimeZone.currentSystemDefault()
+        // A journaling day can pull in entries from the adjacent calendar dates (a 1 AM note
+        // belongs to the previous day under a 3 AM boundary), so widen the calendar window by a
+        // day on each side before regrouping by journaling day.
+        val windowDates =
+            recentDates
+                .flatMap { date ->
+                    listOf(date.minus(1, DateTimeUnit.DAY), date, date.plus(1, DateTimeUnit.DAY))
+                }.toSet()
         val relevantNotes =
             allNotes.filter { note ->
-                note.creationTimestamp.toLocalDateTime(TimeZone.currentSystemDefault()).date in expandedDates
+                note.creationTimestamp.toLocalDateTime(timeZone).date in windowDates
             }
         val allNotesByDay = groupNotesByDayBoundsUseCase(relevantNotes)
+        val fallbackByDay = groupNotesByDayBoundsUseCase(fallbackNotes)
 
         val days =
             recentDates.mapNotNull { date ->
-                val entries = allNotesByDay[date] ?: recentNotesByDay[date]
-                entries?.let { dayEntries ->
-                    if (allNotesByDay.containsKey(date)) {
-                        getTimelineDayUseCase(date, dayEntries, events.overlapping(dayEntries))
-                    } else {
-                        createBasicTimeline(dayEntries, sortOrder, events).days.firstOrNull()
-                    }
+                val enriched = allNotesByDay[date]
+                if (enriched != null) {
+                    getTimelineDayUseCase(date, enriched, events.overlapping(enriched))
+                } else {
+                    fallbackByDay[date]?.let { buildBasicDay(date, it, events) }
                 }
             }
 

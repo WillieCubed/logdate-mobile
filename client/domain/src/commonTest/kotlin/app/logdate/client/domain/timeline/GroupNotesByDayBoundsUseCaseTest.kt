@@ -83,6 +83,30 @@ class GroupNotesByDayBoundsUseCaseTest {
         }
 
     @Test
+    fun `fixed day-start hour groups a midnight note under the previous day when sleep disabled`() =
+        runTest {
+            val march14 = LocalDate(2025, 3, 14)
+            val march15 = LocalDate(2025, 3, 15)
+            val bounds =
+                mapOf(
+                    march14 to DayBounds(localInstant(2025, 3, 14, 3, 0), localInstant(2025, 3, 15, 3, 0)),
+                    march15 to DayBounds(localInstant(2025, 3, 15, 3, 0), localInstant(2025, 3, 16, 3, 0)),
+                )
+
+            // A note created just past midnight belongs to the previous day under a 3 AM boundary.
+            val midnightNote = textNote("Just past midnight", localInstant(2025, 3, 15, 0, 0))
+            val morningNote = textNote("Morning coffee", localInstant(2025, 3, 15, 10, 0))
+
+            // Sleep schedule is OFF, but the user explicitly set a 3 AM day-start hour.
+            val useCase = createUseCase(sleepEnabled = false, bounds = bounds, dayStartHour = 3)
+            val result = useCase(listOf(midnightNote, morningNote), timezone)
+
+            assertEquals(setOf(march14, march15), result.keys)
+            assertEquals("Just past midnight", (result[march14]?.single() as JournalNote.Text).content)
+            assertEquals("Morning coffee", (result[march15]?.single() as JournalNote.Text).content)
+        }
+
+    @Test
     fun `early morning note after wakeup assigned to current day`() =
         runTest {
             val march15 = LocalDate(2025, 3, 15)
@@ -270,7 +294,7 @@ class GroupNotesByDayBoundsUseCaseTest {
                     throwable = RuntimeException("Health Connect unavailable")
                 }
             val getDayBounds = GetDayBoundsUseCase(healthRepo, settingsRepo)
-            val useCase = GroupNotesByDayBoundsUseCase(getDayBounds, settingsRepo)
+            val useCase = GroupNotesByDayBoundsUseCase(getDayBounds, settingsRepo, FakeBoundaryPreferences())
 
             val result = useCase(listOf(note), timezone)
 
@@ -344,9 +368,14 @@ class GroupNotesByDayBoundsUseCaseTest {
     private fun createUseCase(
         sleepEnabled: Boolean,
         bounds: Map<LocalDate, DayBounds> = emptyMap(),
+        dayStartHour: Int? = null,
     ): GroupNotesByDayBoundsUseCase {
         val settingsRepo = FakeDayBoundarySettingsRepository(sleepEnabled)
         val healthRepo = FakeHealthRepository().apply { boundsByDate = bounds }
-        return GroupNotesByDayBoundsUseCase(GetDayBoundsUseCase(healthRepo, settingsRepo), settingsRepo)
+        return GroupNotesByDayBoundsUseCase(
+            GetDayBoundsUseCase(healthRepo, settingsRepo),
+            settingsRepo,
+            FakeBoundaryPreferences(dayStartHour),
+        )
     }
 }

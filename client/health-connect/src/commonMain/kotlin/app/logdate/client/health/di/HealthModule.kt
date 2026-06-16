@@ -5,8 +5,6 @@ import app.logdate.client.health.HealthDataRepository
 import app.logdate.client.health.LocalFirstHealthRepository
 import app.logdate.client.health.datasource.InMemoryLocalHealthDataSource
 import app.logdate.client.health.datasource.LocalHealthDataSource
-import app.logdate.client.health.util.LogdatePreferencesDataSource
-import app.logdate.client.health.util.UserPreferences
 import org.koin.dsl.module
 
 /**
@@ -27,12 +25,9 @@ val healthModule =
             InMemoryLocalHealthDataSource()
         }
 
-        // Default preferences data source
-        single<LogdatePreferencesDataSource> {
-            object : LogdatePreferencesDataSource {
-                override suspend fun getPreferences(): UserPreferences = UserPreferences(dayStartHour = 5, dayEndHour = 23)
-            }
-        }
+        // The day-boundary preference contract (LogdatePreferencesDataSource) is bound by the
+        // domain module, which adapts the persisted datastore preferences. This module cannot
+        // depend on the datastore directly.
 
         // Main repository
         single<LocalFirstHealthRepository> {

@@ -7,6 +7,8 @@ import app.logdate.client.health.LocalFirstHealthRepository
 import app.logdate.client.health.model.DayBounds
 import app.logdate.client.health.model.SleepSession
 import app.logdate.client.health.model.TimeOfDay
+import app.logdate.client.health.util.LogdatePreferencesDataSource
+import app.logdate.client.health.util.UserPreferences
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -29,6 +31,17 @@ class FakeDayBoundarySettingsRepository(
     override fun observeSettings() = flowOf(DayBoundarySettings(sleepBasedBoundariesEnabled = sleepEnabled))
 
     override suspend fun setSleepBasedBoundariesEnabled(enabled: Boolean) {}
+}
+
+/**
+ * A boundary-preference source for tests. A non-null [dayStartHour] means the user has
+ * explicitly configured a fixed day-start hour.
+ */
+class FakeBoundaryPreferences(
+    private val dayStartHour: Int? = null,
+    private val dayEndHour: Int? = null,
+) : LogdatePreferencesDataSource {
+    override suspend fun getPreferences() = UserPreferences(dayStartHour = dayStartHour, dayEndHour = dayEndHour)
 }
 
 /**
@@ -90,5 +103,9 @@ class FakeHealthRepository : LocalFirstHealthRepository {
 fun calendarDateGrouper(): GroupNotesByDayBoundsUseCase {
     val settingsRepo = FakeDayBoundarySettingsRepository(sleepEnabled = false)
     val healthRepo = FakeHealthRepository()
-    return GroupNotesByDayBoundsUseCase(GetDayBoundsUseCase(healthRepo, settingsRepo), settingsRepo)
+    return GroupNotesByDayBoundsUseCase(
+        GetDayBoundsUseCase(healthRepo, settingsRepo),
+        settingsRepo,
+        FakeBoundaryPreferences(),
+    )
 }

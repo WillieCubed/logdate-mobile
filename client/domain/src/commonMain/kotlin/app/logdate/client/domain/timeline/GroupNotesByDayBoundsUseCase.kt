@@ -2,6 +2,7 @@ package app.logdate.client.domain.timeline
 
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
 import app.logdate.client.health.model.DayBounds
+import app.logdate.client.health.util.LogdatePreferencesDataSource
 import app.logdate.client.repository.journals.JournalNote
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -14,9 +15,10 @@ import kotlinx.datetime.toLocalDateTime
  * not as the calendar defines them.
  *
  * A person who stays up until 2 AM considers that evening part of "today," not
- * "tomorrow." When sleep-based boundaries are enabled, each note is placed in
- * the day whose [DayBounds] interval contains it. When disabled, notes are
- * grouped by calendar date (midnight boundaries).
+ * "tomorrow." Each note is placed in the day whose [DayBounds] interval contains it
+ * whenever the user has a day boundary configured — either sleep-based boundaries are
+ * enabled, or they have explicitly set a day-start hour. Only when neither is configured
+ * do we group by calendar date (midnight boundaries).
  *
  * ## Why the previous day's bounds are fetched
  *
@@ -33,6 +35,7 @@ import kotlinx.datetime.toLocalDateTime
 class GroupNotesByDayBoundsUseCase(
     private val getDayBoundsUseCase: GetDayBoundsUseCase,
     private val dayBoundarySettingsRepository: DayBoundarySettingsRepository,
+    private val preferencesDataSource: LogdatePreferencesDataSource,
 ) {
     suspend operator fun invoke(
         notes: List<JournalNote>,
@@ -41,7 +44,8 @@ class GroupNotesByDayBoundsUseCase(
         if (notes.isEmpty()) return emptyMap()
 
         val settings = dayBoundarySettingsRepository.getSettings()
-        if (!settings.sleepBasedBoundariesEnabled) {
+        val hasExplicitDayStartHour = preferencesDataSource.getPreferences().dayStartHour != null
+        if (!settings.sleepBasedBoundariesEnabled && !hasExplicitDayStartHour) {
             return notes.groupBy { it.creationTimestamp.toLocalDateTime(timeZone).date }
         }
 

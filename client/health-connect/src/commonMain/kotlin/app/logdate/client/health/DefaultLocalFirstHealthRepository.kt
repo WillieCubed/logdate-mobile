@@ -271,7 +271,10 @@ class DefaultLocalFirstHealthRepository(
         val dayStart = LocalDateTime(date, LocalTime(startHour, 0)).toInstant(timeZone)
 
         if (endHour != null) {
-            val endDate = if (endHour < startHour) date.plus(1, DateTimeUnit.DAY) else date
+            // The end hour wraps to the next calendar day whenever it is at or before the start
+            // hour. `endHour == startHour` means a full 24-hour day (the common case, since the
+            // settings UI only configures a single day-start hour) — not a zero-length day.
+            val endDate = if (endHour <= startHour) date.plus(1, DateTimeUnit.DAY) else date
             val dayEnd = LocalDateTime(endDate, LocalTime(endHour, 0)).toInstant(timeZone)
             return DayBounds(start = dayStart, end = dayEnd)
         }
