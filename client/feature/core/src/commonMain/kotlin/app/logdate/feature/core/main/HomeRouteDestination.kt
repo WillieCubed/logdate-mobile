@@ -53,9 +53,12 @@ enum class HomeRouteDestination(
 
     companion object {
         /**
-         * Tabs visible by default. The Library tab is behind a feature flag.
+         * Tabs shown in the home navigation shell.
+         *
+         * The Library tab is gated behind the `library_enabled` user setting, so it only appears
+         * when [isLibraryEnabled] is true. Every other tab is always present.
          */
-        val visibleEntries: List<HomeRouteDestination> = entries.filter { it != Library }
+        fun visibleEntries(isLibraryEnabled: Boolean): List<HomeRouteDestination> = entries.filter { it != Library || isLibraryEnabled }
 
         val ALL = entries.toTypedArray()
     }

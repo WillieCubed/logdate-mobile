@@ -353,6 +353,7 @@ class HomeViewModelTest {
             linkNoteToEvent = LinkNoteToEventUseCase(NoOpEventRepository),
             getJournalMembership = GetJournalMembershipUseCase(journalContentRepository),
             transcriptionRepository = transcriptionRepository,
+            libraryEnabledFlow = flowOf(false),
         )
     }
 

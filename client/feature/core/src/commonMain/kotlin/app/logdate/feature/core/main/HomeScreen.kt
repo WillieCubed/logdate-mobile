@@ -20,6 +20,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaul
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import app.logdate.client.awareness.daylight.DaylightClassifier
+import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.domain.events.LinkNoteToEventUseCase
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.HomeRecommendation
@@ -130,8 +132,17 @@ fun HomeScreen(
     syncPresentationViewModel: SyncPresentationViewModel = koinViewModel(),
 ) {
     val syncPresentation by syncPresentationViewModel.presentation.collectAsStateWithLifecycle()
+    val isLibraryEnabled by viewModel.isLibraryEnabled.collectAsStateWithLifecycle()
+    val visibleDestinations = HomeRouteDestination.visibleEntries(isLibraryEnabled)
     var currentDestination: HomeRouteDestination by rememberSaveable {
         mutableStateOf(HomeRouteDestination.Timeline)
+    }
+    // Disabling Library while it's the open tab would otherwise leave the shell on a tab that's no
+    // longer in the bar; fall back to Timeline whenever the current tab drops out of the list.
+    LaunchedEffect(visibleDestinations) {
+        if (currentDestination !in visibleDestinations) {
+            currentDestination = HomeRouteDestination.Timeline
+        }
     }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -213,7 +224,7 @@ fun HomeScreen(
                         navigationBarContainerColor = Color.Transparent,
                     ),
                 navigationSuiteItems = {
-                    HomeRouteDestination.visibleEntries.forEach { destination ->
+                    visibleDestinations.forEach { destination ->
                         item(
                             selected = destination == currentDestination,
                             onClick = {
@@ -338,6 +349,7 @@ class HomeViewModel(
     private val linkNoteToEvent: LinkNoteToEventUseCase,
     private val getJournalMembership: GetJournalMembershipUseCase,
     private val transcriptionRepository: TranscriptionRepository,
+    private val libraryEnabledFlow: Flow<Boolean>,
 ) : ViewModel() {
     companion object {
         private const val RECENT_TIMELINE_PAGE_SIZE = 50
@@ -352,6 +364,7 @@ class HomeViewModel(
         linkNoteToEvent: LinkNoteToEventUseCase,
         getJournalMembership: GetJournalMembershipUseCase,
         transcriptionRepository: TranscriptionRepository,
+        preferencesDataSource: LogdatePreferencesDataSource,
     ) : this(
         recentTimelineFlow =
             getStreamingTimelineUseCase(
@@ -365,6 +378,7 @@ class HomeViewModel(
         linkNoteToEvent = linkNoteToEvent,
         getJournalMembership = getJournalMembership,
         transcriptionRepository = transcriptionRepository,
+        libraryEnabledFlow = preferencesDataSource.observeLibraryEnabled(),
     )
 
     private val selectedDayFlow = MutableStateFlow<LocalDate?>(null)
@@ -401,6 +415,17 @@ class HomeViewModel(
                 SharingStarted.WhileSubscribed(5_000),
                 TranscriptionState(requestTranscription = ::requestTranscription),
             )
+
+    /**
+     * Whether the Library tab should appear in the home navigation. Backed by the `library_enabled`
+     * user setting so toggling it in Settings reactively shows or hides the tab.
+     */
+    val isLibraryEnabled: StateFlow<Boolean> =
+        libraryEnabledFlow.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            false,
+        )
 
     init {
         viewModelScope.launch {
