@@ -43,12 +43,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.logdate.shared.model.Event
 import app.logdate.shared.model.Place
 import app.logdate.shared.model.displayLabel
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeRangeShort
+import logdate.client.feature.events.generated.resources.Res
+import logdate.client.feature.events.generated.resources.cd_event_detail_back
+import logdate.client.feature.events.generated.resources.cd_event_detail_delete
+import logdate.client.feature.events.generated.resources.event_detail_change_place
+import logdate.client.feature.events.generated.resources.event_detail_choose_place
+import logdate.client.feature.events.generated.resources.event_detail_description_label
+import logdate.client.feature.events.generated.resources.event_detail_no_place
+import logdate.client.feature.events.generated.resources.event_detail_not_found
+import logdate.client.feature.events.generated.resources.event_detail_original_time
+import logdate.client.feature.events.generated.resources.event_detail_place_heading
+import logdate.client.feature.events.generated.resources.event_detail_save
+import logdate.client.feature.events.generated.resources.event_detail_saving
+import logdate.client.feature.events.generated.resources.event_detail_source_chip
+import logdate.client.feature.events.generated.resources.event_detail_title
+import logdate.client.feature.events.generated.resources.event_detail_title_label
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 
@@ -109,16 +126,19 @@ fun EventDetailContent(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
-                title = { Text("Event") },
+                title = { Text(stringResource(Res.string.event_detail_title)) },
                 navigationIcon = {
                     IconButton(onClick = onGoBack) {
-                        Icon(painter = PlatformIcons.back(), contentDescription = "Back")
+                        Icon(painter = PlatformIcons.back(), contentDescription = stringResource(Res.string.cd_event_detail_back))
                     }
                 },
                 actions = {
                     if (uiState is EventDetailUiState.Loaded) {
                         IconButton(onClick = { actions.delete(onGoBack) }) {
-                            Icon(painter = PlatformIcons.delete(), contentDescription = "Delete event")
+                            Icon(
+                                painter = PlatformIcons.delete(),
+                                contentDescription = stringResource(Res.string.cd_event_detail_delete),
+                            )
                         }
                     }
                 },
@@ -131,7 +151,7 @@ fun EventDetailContent(
     ) { contentPadding ->
         when (val state = uiState) {
             EventDetailUiState.Loading -> CenteredProgress(contentPadding)
-            EventDetailUiState.NotFound -> CenteredEmptyState(contentPadding, "Event not found")
+            EventDetailUiState.NotFound -> CenteredEmptyState(contentPadding, stringResource(Res.string.event_detail_not_found))
             is EventDetailUiState.Loaded ->
                 EventDetailLoadedBody(
                     state = state,
@@ -279,7 +299,7 @@ private fun EventDetailItemsList(
                     AssistChip(
                         onClick = {},
                         enabled = false,
-                        label = { Text("From ${source.displayLabel()}") },
+                        label = { Text(stringResource(Res.string.event_detail_source_chip, source.displayLabel())) },
                         colors = AssistChipDefaults.assistChipColors(),
                     )
                 }
@@ -289,7 +309,7 @@ private fun EventDetailItemsList(
                 OutlinedTextField(
                     value = state.event.title,
                     onValueChange = actions::updateTitle,
-                    label = { Text("Title") },
+                    label = { Text(stringResource(Res.string.event_detail_title_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
@@ -317,7 +337,7 @@ private fun EventDetailItemsList(
                 OutlinedTextField(
                     value = state.event.description.orEmpty(),
                     onValueChange = actions::updateDescription,
-                    label = { Text("Description") },
+                    label = { Text(stringResource(Res.string.event_detail_description_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3,
                 )
@@ -325,12 +345,7 @@ private fun EventDetailItemsList(
 
             item("original-time") {
                 Text(
-                    text =
-                        "Originally " +
-                            state.event.startTime.toReadableDateTimeRangeShort(
-                                end = state.event.endTime,
-                                isAllDay = state.event.isAllDay,
-                            ),
+                    text = stringResource(Res.string.event_detail_original_time, state.event.originalTimeText()),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -365,6 +380,12 @@ private fun EventDetailItemsList(
     }
 }
 
+/**
+ * The event's original time bounds as a short readable string, respecting its all-day flag.
+ * All-day events render date-only; timed events render the date-time range.
+ */
+private fun Event.originalTimeText(): String = startTime.toReadableDateTimeRangeShort(end = endTime, isAllDay = isAllDay)
+
 @Composable
 private fun EventPlaceSection(
     resolvedPlace: Place.UserDefined?,
@@ -378,13 +399,13 @@ private fun EventPlaceSection(
     ) {
         Column(modifier = Modifier.padding(Spacing.lg)) {
             Text(
-                text = "Where",
+                text = stringResource(Res.string.event_detail_place_heading),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             ListItem(
                 headlineContent = {
-                    Text(resolvedPlace?.displayName ?: "No place set")
+                    Text(resolvedPlace?.displayName ?: stringResource(Res.string.event_detail_no_place))
                 },
                 supportingContent =
                     resolvedPlace?.description?.let { description ->
@@ -396,7 +417,11 @@ private fun EventPlaceSection(
                         .padding(top = Spacing.sm),
             )
             FilledTonalButton(onClick = onChoosePlace) {
-                Text(if (hasPlace) "Change place" else "Choose a place")
+                Text(
+                    stringResource(
+                        if (hasPlace) Res.string.event_detail_change_place else Res.string.event_detail_choose_place,
+                    ),
+                )
             }
         }
     }
@@ -437,7 +462,11 @@ private fun EventDetailSaveBar(
                         onClick = onSave,
                         enabled = !loaded.isSaving && loaded.event.title.isNotBlank(),
                     ) {
-                        Text(if (loaded.isSaving) "Saving…" else "Save")
+                        Text(
+                            stringResource(
+                                if (loaded.isSaving) Res.string.event_detail_saving else Res.string.event_detail_save,
+                            ),
+                        )
                     }
                 }
             }

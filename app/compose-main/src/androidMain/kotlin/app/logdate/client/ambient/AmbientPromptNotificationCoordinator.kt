@@ -130,20 +130,27 @@ class AmbientPromptNotificationCoordinator(
             is AmbientPromptPayload.EventNudge ->
                 AmbientNotificationContent(
                     title = payload.title,
-                    body =
-                        if (payload.isAllDay) {
-                            context.getString(
-                                NotificationResources.string.ambient_prompt_event_nudge_all_day_body,
-                                payload.startTime.toReadableDateAllDay(),
-                            )
-                        } else {
-                            context.getString(
-                                NotificationResources.string.ambient_prompt_event_nudge_body,
-                                payload.startTime.toReadableDateTimeShort(),
-                            )
-                        },
+                    body = eventNudgeBody(payload),
                     category = NotificationCompat.CATEGORY_REMINDER,
                 )
+        }
+
+    /**
+     * Builds the event-nudge body. All-day events show their date only (their start is anchored to
+     * UTC midnight, so a clock time would be meaningless and could read as the wrong day); timed
+     * events show the local start time.
+     */
+    private fun eventNudgeBody(payload: AmbientPromptPayload.EventNudge): String =
+        if (payload.isAllDay) {
+            context.getString(
+                NotificationResources.string.ambient_prompt_event_nudge_all_day_body,
+                payload.startTime.toReadableDateAllDay(),
+            )
+        } else {
+            context.getString(
+                NotificationResources.string.ambient_prompt_event_nudge_body,
+                payload.startTime.toReadableDateTimeShort(),
+            )
         }
 }
 

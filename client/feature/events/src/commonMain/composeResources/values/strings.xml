@@ -37,6 +37,22 @@
     <string name="calendar_sync_activity_title">Imported events</string>
     <string name="calendar_sync_activity_empty">Nothing imported yet. The next sync will pull events from the calendars you selected.</string>
 
+    <!-- Event detail / edit -->
+    <string name="event_detail_title">Event</string>
+    <string name="cd_event_detail_back">Back</string>
+    <string name="cd_event_detail_delete">Delete event</string>
+    <string name="event_detail_not_found">Event not found</string>
+    <string name="event_detail_source_chip">From %1$s</string>
+    <string name="event_detail_title_label">Title</string>
+    <string name="event_detail_description_label">Description</string>
+    <string name="event_detail_original_time">Originally %1$s</string>
+    <string name="event_detail_place_heading">Where</string>
+    <string name="event_detail_no_place">No place set</string>
+    <string name="event_detail_change_place">Change place</string>
+    <string name="event_detail_choose_place">Choose a place</string>
+    <string name="event_detail_saving">Saving…</string>
+    <string name="event_detail_save">Save</string>
+
     <!-- Calendar surface (month grid) -->
     <string name="events_calendar_title">Calendar</string>
     <string name="events_calendar_previous_month">Previous month</string>
