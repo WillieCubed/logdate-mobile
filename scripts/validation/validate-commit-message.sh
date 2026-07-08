@@ -87,12 +87,32 @@ is_footer_line() {
     [[ "$line" =~ ^(BREAKING[[:space:]]CHANGE:|[A-Za-z][A-Za-z-]*:|Fixes[[:space:]]#|Closes[[:space:]]#|Related[[:space:]]to[[:space:]]#|Co-Authored-By:|Co-authored-by:) ]]
 }
 
+is_fence_line() {
+    local line="$1"
+    local trimmed="${line#"${line%%[![:space:]]*}"}"
+    [[ "$trimmed" == '```'* || "$trimmed" == '~~~'* ]]
+}
+
 line_number=1
+in_fence=0
 while IFS= read -r line; do
     line_number=$((line_number + 1))
     line="${line%$'\r'}"
 
+    if is_fence_line "$line"; then
+        if [[ $in_fence -eq 0 ]]; then
+            in_fence=1
+        else
+            in_fence=0
+        fi
+        continue
+    fi
+
     if [[ -z "$line" ]] || [[ "$line" == \#* ]]; then
+        continue
+    fi
+
+    if [[ $in_fence -eq 1 ]]; then
         continue
     fi
 
