@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
-# format-commit-message.sh - Auto-formats commit message body lines.
+# Auto-format commit message body prose.
 #
 # Usage:
 #   format-commit-message.sh <commit_msg_file>
 #
-# Notes:
-# - Title line is left untouched.
-# - Body lines are wrapped to 72 characters.
-# - Footer/trailer lines are preserved as-is.
+# The title is left untouched. Plain body prose is wrapped to 72 columns.
+# Comments, trailers, blank lines, code fences, and structured lines are
+# preserved so the hook does not rewrite intentional message structure.
 
 set -euo pipefail
 
@@ -30,7 +29,13 @@ fi
 
 is_footer_line() {
     local line="$1"
-    [[ "$line" =~ ^(BREAKING[[:space:]]CHANGE:|[A-Za-z][A-Za-z-]*:|Fixes[[:space:]]#|Closes[[:space:]]#|Related[[:space:]]to[[:space:]]#|Co-Authored-By:|Co-authored-by:) ]]
+    [[ "$line" =~ ^(BREAKING[[:space:]]CHANGE:|[A-Za-z][A-Za-z-]*:|Fixes[[:space:]]#|Closes[[:space:]]#|Related[[:space:]]to[[:space:]]#|Refs:|Co-Authored-By:|Co-authored-by:|Signed-off-by:|Reviewed-by:|Acked-by:) ]]
+}
+
+is_fence_line() {
+    local line="$1"
+    local trimmed="${line#"${line%%[![:space:]]*}"}"
+    [[ "$trimmed" == '```'* || "$trimmed" == '~~~'* ]]
 }
 
 wrap_text() {
@@ -51,7 +56,8 @@ wrap_body_line() {
         return
     fi
 
-    if [[ "$line" =~ ^([[:space:]]*([-*]|[0-9]+\.)[[:space:]]+)(.*)$ ]]; then
+    local bullet_re='^([[:space:]]*([-*+]|[0-9]+[.)])[[:space:]]+)(.*)$'
+    if [[ "$line" =~ $bullet_re ]]; then
         local prefix="${BASH_REMATCH[1]}"
         local content="${BASH_REMATCH[3]}"
         local continuation_prefix
@@ -98,21 +104,21 @@ wrap_body_line() {
 
 lines=()
 while IFS= read -r line || [[ -n "$line" ]]; do
-    lines+=("$line")
+    lines+=("${line%$'\r'}")
 done < "$message_file"
 if [[ ${#lines[@]} -eq 0 ]]; then
     exit 0
 fi
 
-title="${lines[0]%$'\r'}"
-if [[ "$title" =~ ^Merge ]] || [[ "$title" =~ ^fixup! ]] || [[ "$title" =~ ^squash! ]]; then
+title="${lines[0]}"
+if [[ "$title" =~ ^(Merge|Revert[[:space:]]\"|fixup!|squash!) ]]; then
     exit 0
 fi
 
 footer_start=${#lines[@]}
 index=$((${#lines[@]} - 1))
 while [[ $index -ge 1 ]]; do
-    line="${lines[$index]%$'\r'}"
+    line="${lines[$index]}"
     if [[ -z "$line" ]]; then
         if [[ $footer_start -lt ${#lines[@]} ]]; then
             break
@@ -134,21 +140,27 @@ tmp_file="$(mktemp "${TMPDIR:-/tmp}/commit-msg-format.XXXXXX")"
 trap 'rm -f "$tmp_file"' EXIT
 
 printf '%s\n' "$title" > "$tmp_file"
+in_fence=0
 for ((index = 1; index < ${#lines[@]}; index++)); do
-    line="${lines[$index]%$'\r'}"
+    line="${lines[$index]}"
 
     if [[ $index -ge $footer_start ]]; then
         printf '%s\n' "$line" >> "$tmp_file"
         continue
     fi
 
-    if [[ "$line" == \#* ]]; then
+    if is_fence_line "$line"; then
         printf '%s\n' "$line" >> "$tmp_file"
+        if [[ $in_fence -eq 0 ]]; then
+            in_fence=1
+        else
+            in_fence=0
+        fi
         continue
     fi
 
-    if [[ -z "$line" ]]; then
-        printf '\n' >> "$tmp_file"
+    if [[ $in_fence -eq 1 || "$line" == \#* || -z "$line" ]]; then
+        printf '%s\n' "$line" >> "$tmp_file"
         continue
     fi
 
