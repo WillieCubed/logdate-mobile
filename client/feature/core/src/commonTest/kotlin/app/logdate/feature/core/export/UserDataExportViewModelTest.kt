@@ -351,6 +351,18 @@ class UserDataExportViewModelTest {
         }
 
     @Test
+    fun `default export launches with default options`() =
+        testScope.runTest {
+            viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.showExportOptions()
+            viewModel.confirmExport()
+
+            assertEquals(ExportOptions(), fakeExportLauncher.startExportCalls.single())
+        }
+
+    @Test
     fun `confirmExport calls exportLauncher startExport with saved options`() =
         testScope.runTest {
             viewModel = createViewModel()

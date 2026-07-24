@@ -3,8 +3,6 @@ package app.logdate.client.domain.di
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.domain.account.GetCurrentEntitlementUseCase
 import app.logdate.client.domain.app.GetAppInfoUseCase
-import app.logdate.client.domain.backup.CreateEncryptedBackupUseCase
-import app.logdate.client.domain.backup.RestoreFromEncryptedBackupUseCase
 import app.logdate.client.domain.dayboundary.DatastoreDayBoundaryPreferences
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
 import app.logdate.client.domain.dayboundary.DefaultDayBoundarySettingsRepository
@@ -128,8 +126,6 @@ val domainModule: Module =
         factory { ExportUserDataUseCase(get(), get(), get(), get(), get(), get(), get(), get()) }
         factory { GetExportCountsUseCase(get(), get()) }
         factory { RestoreUserDataUseCase(get(), get(), get(), get(), get(), get()) }
-        factory { CreateEncryptedBackupUseCase(get(), get(), domainFileSystem, get()) }
-        factory { RestoreFromEncryptedBackupUseCase(get(), domainFileSystem, get(), get()) }
         factory { PreviewArchiveUseCase() }
 
         // Notes

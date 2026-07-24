@@ -182,13 +182,7 @@ data class ArchiveFileInfo(
     val displayName: String,
     val uri: String,
     val metadataJson: String? = null,
-    val archiveFormat: RestoreArchiveFormat = RestoreArchiveFormat.LegacyZip,
 )
-
-enum class RestoreArchiveFormat {
-    EncryptedBackup,
-    LegacyZip,
-}
 
 @Serializable
 data class RestoreSummary(

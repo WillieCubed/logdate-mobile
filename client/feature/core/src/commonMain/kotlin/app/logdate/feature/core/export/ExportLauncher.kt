@@ -82,13 +82,7 @@ data class ExportOptions(
     val includeDrafts: Boolean = true,
     val includeMedia: Boolean = true,
     val dateRange: ExportDateRange = ExportDateRange.AllTime,
-    val archiveFormat: ExportArchiveFormat = ExportArchiveFormat.EncryptedBackup,
 )
-
-enum class ExportArchiveFormat {
-    EncryptedBackup,
-    LegacyZip,
-}
 
 /**
  * Date range filter for export operations.
