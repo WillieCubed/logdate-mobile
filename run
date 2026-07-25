@@ -31,7 +31,7 @@ build|build:desktop|Build desktop app for current OS|./gradlew :app:compose-main
 build|build:wear|Build Wear OS debug APK|./gradlew :app:wear:assembleDebug
 build|build:server|Build server JAR|./gradlew :server:build
 build|build:server:docker|Build server Docker image locally|docker build --target production -t logdate-server:local .
-build|build:all|Build all modules|./gradlew build
+build|build:all|Build all modules|./gradlew build --continue
 
 run|run:android|Install and run on connected Android device|./gradlew :app:android-main:installDebug && adb shell am start -n co.reasonabletech.logdate/app.logdate.client.MainActivity
 run|run:desktop|Run desktop app|./gradlew :app:compose-main:run
