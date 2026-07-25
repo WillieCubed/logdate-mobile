@@ -33,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.audio.AudioBlockEditor
 import app.logdate.feature.editor.ui.camera.CameraBlockEditor
-import app.logdate.feature.editor.ui.common.PlatformPredictiveBackHandler
 import app.logdate.feature.editor.ui.content.EditorContentFooter
 import app.logdate.feature.editor.ui.content.EmptyEditorStateContent
 import app.logdate.feature.editor.ui.content.matchingPickerTileIdsFor
@@ -51,6 +50,7 @@ import app.logdate.feature.editor.ui.text.TextBlockContent
 import app.logdate.feature.editor.ui.video.VideoBlockEditor
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
+import app.logdate.ui.platform.PlatformPredictiveBackHandler
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.utils.scrollToEnd
 import kotlinx.coroutines.flow.MutableStateFlow

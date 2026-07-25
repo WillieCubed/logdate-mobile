@@ -1,4 +1,4 @@
-package app.logdate.feature.editor.ui.common
+package app.logdate.ui.platform
 
 import androidx.compose.runtime.Composable
 
@@ -10,5 +10,6 @@ actual fun PlatformPredictiveBackHandler(
     onBack: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    // Desktop has no predictive back gesture; back is handled at the navigation layer.
+    // iOS handles back via swipe-from-edge navigation gestures at the navigation layer;
+    // no in-composable hook needed here.
 }

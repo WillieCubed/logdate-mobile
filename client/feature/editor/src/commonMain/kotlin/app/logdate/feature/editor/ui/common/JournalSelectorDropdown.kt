@@ -52,6 +52,7 @@ import app.logdate.feature.editor.ui.layout.LocalEditorIsCompact
 import app.logdate.shared.model.Journal
 import app.logdate.ui.content.JournalContentCover
 import app.logdate.ui.platform.PlatformIcons
+import app.logdate.ui.platform.PlatformPredictiveBackHandler
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
