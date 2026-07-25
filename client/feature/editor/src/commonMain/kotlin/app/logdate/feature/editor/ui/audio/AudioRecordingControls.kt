@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.feature.editor.ui.editor.RecordingState
 import app.logdate.ui.adaptive.FoldableTabletopLayout
+import app.logdate.ui.audio.AudioWaveformComponent
 import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.rememberLogDateHaptics

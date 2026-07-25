@@ -2,8 +2,6 @@ package app.logdate.feature.editor.di
 
 import app.logdate.feature.editor.audio.extraction.AmplitudeExtractor
 import app.logdate.feature.editor.audio.extraction.IosAmplitudeExtractor
-import app.logdate.feature.editor.audio.storage.IosWaveformStorage
-import app.logdate.feature.editor.audio.storage.WaveformStorage
 import app.logdate.feature.editor.ui.camera.CameraCaptureManager
 import app.logdate.feature.editor.ui.camera.IosCameraCaptureManager
 import org.koin.core.module.Module
@@ -23,8 +21,5 @@ actual val platformEditorModule: Module =
         // Audio waveform processing dependencies
         single<AmplitudeExtractor> {
             IosAmplitudeExtractor()
-        }
-        single<WaveformStorage> {
-            IosWaveformStorage()
         }
     }

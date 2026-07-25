@@ -1,4 +1,4 @@
-package app.logdate.feature.editor.audio.storage
+package app.logdate.ui.audio
 
 /**
  * Interface for persisting waveform amplitude data.

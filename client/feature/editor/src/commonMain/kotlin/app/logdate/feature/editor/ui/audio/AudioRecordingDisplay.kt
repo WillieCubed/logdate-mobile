@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.audio.AudioWaveformComponent
 import app.logdate.ui.common.MaterialCard
 import kotlin.time.Duration
 

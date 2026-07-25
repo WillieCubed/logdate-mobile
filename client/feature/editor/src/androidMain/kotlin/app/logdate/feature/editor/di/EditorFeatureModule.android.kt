@@ -2,8 +2,6 @@ package app.logdate.feature.editor.di
 
 import app.logdate.feature.editor.audio.extraction.AmplitudeExtractor
 import app.logdate.feature.editor.audio.extraction.AndroidAmplitudeExtractor
-import app.logdate.feature.editor.audio.storage.AndroidWaveformStorage
-import app.logdate.feature.editor.audio.storage.WaveformStorage
 import app.logdate.feature.editor.ui.camera.AndroidCameraCaptureManager
 import app.logdate.feature.editor.ui.camera.CameraCaptureManager
 import org.koin.android.ext.koin.androidContext
@@ -25,8 +23,5 @@ actual val platformEditorModule: Module =
         // Audio waveform processing dependencies
         single<AmplitudeExtractor> {
             AndroidAmplitudeExtractor(androidContext())
-        }
-        single<WaveformStorage> {
-            AndroidWaveformStorage(androidContext())
         }
     }

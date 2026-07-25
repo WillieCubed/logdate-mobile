@@ -61,6 +61,7 @@ import app.logdate.feature.editor.audio.AudioLabelResolver
 import app.logdate.feature.editor.audio.formatAudioLabel
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.formatMediaDuration
+import app.logdate.ui.audio.AudioWaveformComponent
 import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res

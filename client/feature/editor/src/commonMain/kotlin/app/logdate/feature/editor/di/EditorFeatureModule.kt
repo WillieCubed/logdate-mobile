@@ -12,6 +12,7 @@ import app.logdate.feature.editor.ui.editor.delegate.DefaultPendingAudioRecovere
 import app.logdate.feature.editor.ui.editor.delegate.DraftManager
 import app.logdate.feature.editor.ui.editor.delegate.PendingAudioRecoverer
 import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
+import app.logdate.ui.audio.di.audioUiModule
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.factoryOf
 import org.koin.core.module.dsl.viewModel
@@ -28,6 +29,7 @@ val editorFeatureModule: Module =
         includes(domainModule)
         includes(platformEditorModule)
         includes(audioModule)
+        includes(audioUiModule)
 
         factoryOf(::DraftManager)
         factoryOf(::ContentLoader)

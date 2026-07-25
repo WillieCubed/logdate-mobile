@@ -7,7 +7,7 @@ import app.logdate.feature.editor.audio.color.PaletteGenerator
 import app.logdate.feature.editor.audio.extraction.AmplitudeExtractor
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.audio.model.AudioSegment
-import app.logdate.feature.editor.audio.storage.WaveformStorage
+import app.logdate.ui.audio.WaveformStorage
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow

@@ -1,4 +1,4 @@
-package app.logdate.feature.editor.ui.audio
+package app.logdate.ui.audio
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box

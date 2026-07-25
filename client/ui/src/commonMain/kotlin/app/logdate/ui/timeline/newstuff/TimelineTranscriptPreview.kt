@@ -33,7 +33,7 @@ import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
 
 @Composable
-internal fun TimelineTranscriptPreview(
+fun TimelineTranscriptPreview(
     noteId: Uuid?,
     fallbackTranscript: String? = null,
     modifier: Modifier = Modifier,

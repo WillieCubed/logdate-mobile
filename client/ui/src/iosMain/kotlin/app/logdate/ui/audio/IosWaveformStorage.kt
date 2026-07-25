@@ -3,7 +3,7 @@
     kotlinx.cinterop.ExperimentalForeignApi::class,
 )
 
-package app.logdate.feature.editor.audio.storage
+package app.logdate.ui.audio
 
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned

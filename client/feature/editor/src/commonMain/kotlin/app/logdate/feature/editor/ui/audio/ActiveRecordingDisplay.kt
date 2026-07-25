@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.ui.adaptive.FoldableTabletopLayout
+import app.logdate.ui.audio.AudioWaveformComponent
 import app.logdate.ui.media.MediaDeviceSelector
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.finish
