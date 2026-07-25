@@ -24,6 +24,13 @@ class DataSaverImageInterceptor(
     private val dataUsagePolicy: DataUsagePolicy,
 ) : Interceptor {
     override suspend fun intercept(chain: Interceptor.Chain): ImageResult {
+        // Data Saver exists to cut network transfer, not to degrade files that already
+        // live on-device — capping those buys nothing and just makes local photos and
+        // videos look pixelated when rendered full-screen (e.g. in Rewind).
+        if (chain.request.data.isLocalMediaSource()) {
+            return chain.proceed()
+        }
+
         val mode = dataUsagePolicy.currentMode()
         val maxSize =
             when (mode) {
@@ -32,7 +39,6 @@ class DataSaverImageInterceptor(
                 is DataUsageMode.Unrestricted -> return chain.proceed()
             }
 
-        val request = chain.request
         val constrainedSize = chain.size.constrainTo(maxSize)
         if (constrainedSize == chain.size) {
             return chain.proceed()
@@ -43,9 +49,20 @@ class DataSaverImageInterceptor(
     }
 
     companion object {
-        private const val MAX_SIZE_RESTRICTED = 480
-        private const val MAX_SIZE_CONSERVATIVE = 1080
+        // Sized against modern phone screens rather than thumbnails: even the restricted
+        // ceiling should look sharp when a remote image fills most of the display, not just
+        // "visible." Both are still well below typical camera-original resolution, so the
+        // transfer savings versus [DataUsageMode.Unrestricted] remain substantial.
+        private const val MAX_SIZE_RESTRICTED = 960
+        private const val MAX_SIZE_CONSERVATIVE = 1600
     }
+}
+
+private val LOCAL_URI_SCHEMES = listOf("content://", "file://", "android.resource://")
+
+private fun Any?.isLocalMediaSource(): Boolean {
+    val uriString = this?.toString() ?: return false
+    return LOCAL_URI_SCHEMES.any { uriString.startsWith(it) }
 }
 
 private fun Size.constrainTo(maxDimension: Int): Size {
