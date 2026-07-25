@@ -5,8 +5,8 @@ package app.logdate.feature.rewind.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,6 +48,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -56,14 +57,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import app.logdate.feature.rewind.ui.components.CollapsingRewindAppBar
 import app.logdate.feature.rewind.ui.components.RewindCoverCard
+import app.logdate.feature.rewind.ui.detail.rewindAccentColor
 import app.logdate.feature.rewind.ui.overview.RewindHistoryUiState
 import app.logdate.feature.rewind.ui.overview.RewindOverviewScreenUiState
 import app.logdate.feature.rewind.ui.overview.RewindPreviewUiState
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.AspectRatios
+import app.logdate.ui.content.ImageScrimOverlay
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.getLocaleFirstDayOfWeek
+import coil3.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -335,19 +339,17 @@ private fun RewindCardScrollPane(
                 var visible by remember { mutableStateOf(!animateCards || alreadyAnimated) }
                 LaunchedEffect(animateCards) {
                     if (animateCards && !alreadyAnimated) {
-                        delay(index * 80L)
+                        delay((index * 80L).coerceAtMost(480L))
                         visible = true
                         animatedIndices += index
                     }
                 }
                 AnimatedVisibility(
                     visible = visible,
-                    enter =
-                        fadeIn(animationSpec = tween(300)) +
-                            slideInVertically(
-                                initialOffsetY = { it / 4 },
-                                animationSpec = tween(300),
-                            ),
+                    // Fade only — no vertical slide. With spacedBy gaps between cards, a
+                    // slide-up made each card look like it was materializing out of the
+                    // empty space beneath it as it scrolled into view.
+                    enter = fadeIn(animationSpec = tween(300)),
                 ) {
                     FloatingRewindCard(
                         rewind = rewind,
@@ -588,6 +590,9 @@ fun FloatingRewindCard(
 
     // No scaling or visual effects - keep cards at consistent size
 
+    val isMilestone = rewind.milestone != null
+    val shape = MaterialTheme.shapes.extraLarge
+
     Card(
         onClick = {
             if (rewind.rewindAvailable) {
@@ -596,7 +601,21 @@ fun FloatingRewindCard(
         },
         modifier =
             modifier
-                .height(cardHeight),
+                .height(cardHeight)
+                .then(
+                    // Milestone weeks get a visibly different frame — the "special pull"
+                    // of the set, not just a small badge bolted onto an ordinary card.
+                    if (isMilestone) {
+                        Modifier.border(
+                            width = 2.dp,
+                            brush = Brush.linearGradient(MilestoneBorderColors),
+                            shape = shape,
+                        )
+                    } else {
+                        Modifier
+                    },
+                ),
+        shape = shape,
         colors =
             CardDefaults.cardColors(
                 containerColor =
@@ -612,16 +631,65 @@ fun FloatingRewindCard(
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
             ),
+        elevation =
+            if (isMilestone) {
+                CardDefaults.cardElevation(defaultElevation = 8.dp)
+            } else {
+                CardDefaults.cardElevation()
+            },
     ) {
-        RewindCoverCard(
-            rewind = rewind,
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(Spacing.lg),
-        )
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Every available card is built from that week's real content — a real
+            // photo first, falling back to a per-rewind accent gradient (never flat
+            // decorative color as the primary treatment). Pending cards stay neutral.
+            if (rewind.rewindAvailable) {
+                if (rewind.heroImageUri != null) {
+                    AsyncImage(
+                        model = rewind.heroImageUri,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                    ImageScrimOverlay(topAlpha = 0.15f, bottomAlpha = 0.8f)
+                } else {
+                    val accent = rewindAccentColor(rewind.dominantActivity, rewind.rewindId.hashCode())
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors =
+                                            listOf(
+                                                accent,
+                                                accent.copy(
+                                                    red = accent.red * 0.7f,
+                                                    green = accent.green * 0.7f,
+                                                    blue = accent.blue * 0.7f,
+                                                ),
+                                            ),
+                                    ),
+                                ),
+                    )
+                }
+            }
+            RewindCoverCard(
+                rewind = rewind,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(Spacing.lg),
+            )
+        }
     }
 }
+
+private val MilestoneBorderColors =
+    listOf(
+        Color(0xFFE8C547), // honey gold
+        Color(0xFFF5E6A8), // pale shine
+        Color(0xFFE8C547),
+    )
 
 /**
  * A floating indicator that appears when more cards are available below the current view.
@@ -972,6 +1040,11 @@ private fun RewindHistoryUiState.toPreview(): RewindPreviewUiState =
         isViewed = isViewed,
         entryCount = entryCount,
         photoCount = photoCount,
+        audioCount = audioCount,
         peopleCount = peopleCount,
         primaryLocation = primaryLocation,
+        heroImageUri = heroImageUri,
+        highlightedQuote = highlightedQuote,
+        dominantActivity = dominantActivity,
+        milestone = milestone,
     )

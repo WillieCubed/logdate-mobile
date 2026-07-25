@@ -14,6 +14,7 @@ import app.logdate.client.domain.rewind.RewindQueryResult
 import app.logdate.client.intelligence.milestones.MilestoneKind
 import app.logdate.client.intelligence.milestones.parseMilestoneSignal
 import app.logdate.client.intelligence.rewind.RewindMessageGenerator
+import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
 import app.logdate.util.getLocaleFirstDayOfWeek
 import io.github.aakira.napier.Napier
@@ -85,6 +86,7 @@ class RewindOverviewViewModel(
                     val milestoneSignal = parseMilestoneSignal(rewind.metadata?.milestones?.firstOrNull())
                     val photoCount = rewind.content.count { it is RewindContent.Image }
                     val textCount = rewind.content.count { it is RewindContent.TextNote }
+                    val audioCount = rewind.content.count { it is RewindContent.AudioNote }
                     val peopleCount = rewind.metadata?.peopleHighlighted?.size ?: 0
                     val primaryLocation = rewind.metadata?.locationSummary?.primaryLocation
                     val themes =
@@ -109,6 +111,7 @@ class RewindOverviewViewModel(
                         isViewed = rewind.isViewed,
                         entryCount = textCount,
                         photoCount = photoCount,
+                        audioCount = audioCount,
                         peopleCount = peopleCount,
                         primaryLocation = primaryLocation,
                         milestone =
@@ -121,6 +124,9 @@ class RewindOverviewViewModel(
                                     summary = it.summary,
                                 )
                             },
+                        heroImageUri = rewind.heroImageUri(),
+                        highlightedQuote = rewind.highlightedQuote(),
+                        dominantActivity = rewind.metadata?.detectedActivities?.firstOrNull(),
                     )
                 }
             }.stateIn(
@@ -140,6 +146,7 @@ class RewindOverviewViewModel(
                     val rewind = rewindResult.rewind
                     val photoCount = rewind.content.count { it is RewindContent.Image }
                     val textCount = rewind.content.count { it is RewindContent.TextNote }
+                    val audioCount = rewind.content.count { it is RewindContent.AudioNote }
                     val peopleCount = rewind.metadata?.peopleHighlighted?.size ?: 0
                     val primaryLocation = rewind.metadata?.locationSummary?.primaryLocation
                     val themes =
@@ -174,8 +181,12 @@ class RewindOverviewViewModel(
                                 isViewed = rewind.isViewed,
                                 entryCount = textCount,
                                 photoCount = photoCount,
+                                audioCount = audioCount,
                                 peopleCount = peopleCount,
                                 primaryLocation = primaryLocation,
+                                heroImageUri = rewind.heroImageUri(),
+                                highlightedQuote = rewind.highlightedQuote(),
+                                dominantActivity = rewind.metadata?.detectedActivities?.firstOrNull(),
                             ),
                     )
                 }
@@ -314,3 +325,17 @@ class RewindOverviewViewModel(
         generateLastWeekRewind()
     }
 }
+
+/**
+ * A real photo from this rewind's week, preferring the most significant one, falling
+ * back to a narrative panel's background image — the card's primary background.
+ */
+private fun Rewind.heroImageUri(): String? =
+    content
+        .filterIsInstance<RewindContent.Image>()
+        .maxByOrNull { it.significanceScore ?: 0f }
+        ?.uri
+        ?: content.filterIsInstance<RewindContent.NarrativeContext>().firstNotNullOfOrNull { it.backgroundImage }
+
+/** A verbatim quote from this rewind's week, shown in place of the generic message. */
+private fun Rewind.highlightedQuote(): String? = metadata?.highlightedQuotes?.firstOrNull()?.text

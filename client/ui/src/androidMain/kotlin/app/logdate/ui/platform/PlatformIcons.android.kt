@@ -10,6 +10,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Camera
@@ -21,9 +22,11 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Drafts
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FilterAltOff
+import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
@@ -42,6 +45,7 @@ import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
@@ -50,6 +54,7 @@ import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.painter.Painter
@@ -155,4 +160,14 @@ actual object PlatformIcons {
     @Composable actual fun chevronRight(): Painter = rememberVectorPainter(Icons.AutoMirrored.Filled.KeyboardArrowRight)
 
     @Composable actual fun checkCircle(): Painter = rememberVectorPainter(Icons.Filled.CheckCircle)
+
+    @Composable actual fun travel(): Painter = rememberVectorPainter(Icons.Filled.Flight)
+
+    @Composable actual fun focusedWork(): Painter = rememberVectorPainter(Icons.Filled.Work)
+
+    @Composable actual fun quiet(): Painter = rememberVectorPainter(Icons.Filled.SelfImprovement)
+
+    @Composable actual fun milestone(): Painter = rememberVectorPainter(Icons.Filled.EmojiEvents)
+
+    @Composable actual fun mixed(): Painter = rememberVectorPainter(Icons.Filled.AutoAwesome)
 }

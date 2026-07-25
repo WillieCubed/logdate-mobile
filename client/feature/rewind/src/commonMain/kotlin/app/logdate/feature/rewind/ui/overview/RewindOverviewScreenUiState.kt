@@ -1,5 +1,6 @@
 package app.logdate.feature.rewind.ui.overview
 
+import app.logdate.shared.model.ActivityType
 import app.logdate.shared.model.ActivityUpdate
 import kotlinx.datetime.LocalDate
 import kotlin.uuid.Uuid
@@ -169,10 +170,20 @@ data class RewindPreviewUiState(
     val entryCount: Int = 0,
     /** Number of photos in this rewind. */
     val photoCount: Int = 0,
+    /** Number of audio journal entries in this rewind. */
+    val audioCount: Int = 0,
     /** Number of people mentioned in this rewind. */
     val peopleCount: Int = 0,
     /** Primary location name, if available. */
     val primaryLocation: String? = null,
+    /** A real photo from the week, when one exists — the card's primary background. */
+    val heroImageUri: String? = null,
+    /** A verbatim quote from the week, shown in place of [message] when present. */
+    val highlightedQuote: String? = null,
+    /** The week's dominant activity, driving the type badge and the accent-color fallback. */
+    val dominantActivity: ActivityType? = null,
+    /** Present when this rewind marks a detected milestone — drives the rarity treatment. */
+    val milestone: MilestoneSummaryUiState? = null,
 )
 
 /**

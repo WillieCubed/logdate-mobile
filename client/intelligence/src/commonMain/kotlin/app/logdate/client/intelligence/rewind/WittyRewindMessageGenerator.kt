@@ -18,8 +18,9 @@ class WittyRewindMessageGenerator : RewindMessageGenerator {
                 "Quite the adventurous one, are you?",
                 "What a week it's been",
                 "Time flies when you're journaling",
-                "Your week, captured",
                 "Moments worth remembering",
+                "Plot twist: it was a good week",
+                "This one's a keeper",
             )
 
         /**
@@ -28,9 +29,10 @@ class WittyRewindMessageGenerator : RewindMessageGenerator {
         private val PHOTO_HEAVY_MESSAGES =
             listOf(
                 "Quite the photographer this week 📸",
-                "Living through the lens",
                 "A picture is worth a thousand words, and you've got plenty",
                 "Say cheese! Actually, you already did",
+                "Camera roll's doing the heavy lifting this week",
+                "Evidence you had a great time: extensive",
             )
 
         /**

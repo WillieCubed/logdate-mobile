@@ -20,9 +20,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.overview.RewindPreviewUiState
+import app.logdate.shared.model.ActivityType
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.formatDateLocalized
@@ -39,6 +42,11 @@ import org.jetbrains.compose.resources.stringResource
  * - **Viewed**: Bold title, primary label, no badge
  * - **Pending**: Medium-weight title, muted label with a status dot
  *
+ * Available cards render over a photo or accent-gradient background (drawn by the
+ * caller, [app.logdate.feature.rewind.ui.FloatingRewindCard]), so their text uses a
+ * white palette; pending cards have no background art and keep the neutral theme
+ * palette.
+ *
  * @param rewind The rewind data to display
  * @param modifier Modifier for customizing the content container
  */
@@ -48,6 +56,7 @@ fun RewindCoverCard(
     modifier: Modifier = Modifier,
 ) {
     val isNew = rewind.rewindAvailable && !rewind.isViewed
+    val onBackground = if (rewind.rewindAvailable) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
 
     Box(modifier = modifier) {
         // Date range at top start
@@ -56,19 +65,18 @@ fun RewindCoverCard(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.align(Alignment.TopStart),
         ) {
-            val dateColor =
-                if (rewind.rewindAvailable) {
-                    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
+            val dateColor = onBackground.copy(alpha = if (rewind.rewindAvailable) 0.85f else 1f)
+            val dominantActivity = rewind.dominantActivity
+            if (rewind.rewindAvailable && dominantActivity != null) {
+                Icon(
+                    painter = activityTypeIcon(dominantActivity),
+                    contentDescription = null,
+                    tint = dateColor,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
             Text(
                 text = rewind.start.toReadableDateShort(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = dateColor,
-            )
-            Text(
-                text = stringResource(Res.string.text_3),
                 style = MaterialTheme.typography.bodyMedium,
                 color = dateColor,
             )
@@ -79,9 +87,12 @@ fun RewindCoverCard(
             )
         }
 
-        // "NEW" badge at top end for unviewed rewinds
-        if (isNew) {
-            NewRewindBadge(modifier = Modifier.align(Alignment.TopEnd))
+        // Milestone badge takes priority over "NEW" in the top-end slot — it's the
+        // rarer, more special signal.
+        when {
+            rewind.milestone != null ->
+                MilestoneBadge(summary = rewind.milestone.summary, modifier = Modifier.align(Alignment.TopEnd))
+            isNew -> NewRewindBadge(modifier = Modifier.align(Alignment.TopEnd))
         }
 
         // Title and subtitle at bottom start
@@ -97,12 +108,7 @@ fun RewindCoverCard(
                 Text(
                     text = rewind.label,
                     style = MaterialTheme.typography.labelLarge,
-                    color =
-                        if (rewind.rewindAvailable) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.outline
-                        },
+                    color = if (rewind.rewindAvailable) onBackground else MaterialTheme.colorScheme.outline,
                 )
                 if (!rewind.rewindAvailable) {
                     Surface(
@@ -118,77 +124,91 @@ fun RewindCoverCard(
                 text = rewind.title,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = if (rewind.rewindAvailable) FontWeight.Bold else FontWeight.Medium,
-                color =
-                    if (rewind.rewindAvailable) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
+                color = onBackground,
             )
 
             if (rewind.rewindAvailable && hasMetadata(rewind)) {
-                RewindStatChipsRow(rewind = rewind)
+                RewindStatChipsRow(rewind = rewind, color = onBackground.copy(alpha = 0.85f))
             }
 
-            // Message/subtitle
+            // A real quote from the week reads as far more alive than a generic
+            // message — prefer it when one exists.
+            val quote = rewind.highlightedQuote
             Text(
-                text = rewind.message,
+                text = if (quote != null) "“$quote”" else rewind.message,
                 style = MaterialTheme.typography.bodyLarge,
-                color =
-                    if (rewind.rewindAvailable) {
-                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
+                fontStyle = if (quote != null) FontStyle.Italic else FontStyle.Normal,
+                color = onBackground.copy(alpha = if (rewind.rewindAvailable) 0.9f else 1f),
             )
         }
     }
 }
 
 /**
+ * Maps a rewind's dominant activity to the same icon language used for the
+ * accent-color fallback, so the badge and the color always agree.
+ */
+@Composable
+private fun activityTypeIcon(activityType: ActivityType): Painter =
+    when (activityType) {
+        ActivityType.TRAVEL -> PlatformIcons.travel()
+        ActivityType.SOCIAL -> PlatformIcons.people()
+        ActivityType.FOCUSED_WORK -> PlatformIcons.focusedWork()
+        ActivityType.QUIET -> PlatformIcons.quiet()
+        ActivityType.MILESTONE -> PlatformIcons.milestone()
+        ActivityType.MIXED -> PlatformIcons.mixed()
+    }
+
+/**
  * Returns true when the rewind has at least one piece of metadata worth rendering
- * as a chip (entries, photos, people, or a primary location).
+ * as a chip (entries, photos, audio notes, people, or a primary location).
  *
  * When false, the chips row is omitted entirely to avoid a distracting empty slot.
  */
 private fun hasMetadata(rewind: RewindPreviewUiState): Boolean =
-    rewind.entryCount > 0 || rewind.photoCount > 0 || rewind.peopleCount > 0 || rewind.primaryLocation != null
+    rewind.entryCount > 0 ||
+        rewind.photoCount > 0 ||
+        rewind.audioCount > 0 ||
+        rewind.peopleCount > 0 ||
+        rewind.primaryLocation != null
 
 /**
- * A row of small icon+count indicators showing at-a-glance metadata for a rewind.
- *
- * Uses subtle, secondary-emphasis styling so the chips inform without competing
- * with the title or message.
+ * A row of icon+count indicators showing at-a-glance metadata for a rewind.
  */
 @Composable
 private fun RewindStatChipsRow(
     rewind: RewindPreviewUiState,
+    color: Color,
     modifier: Modifier = Modifier,
 ) {
-    val chipColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
     Row(
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier,
     ) {
         if (rewind.entryCount > 0) {
-            RewindStatChip(label = "${rewind.entryCount}", color = chipColor) {
-                Icon(painter = PlatformIcons.note(), contentDescription = null, modifier = Modifier.size(14.dp))
+            RewindStatChip(label = "${rewind.entryCount}", color = color) {
+                Icon(painter = PlatformIcons.note(), contentDescription = null, modifier = Modifier.size(20.dp))
             }
         }
         if (rewind.photoCount > 0) {
-            RewindStatChip(label = "${rewind.photoCount}", color = chipColor) {
-                Icon(painter = PlatformIcons.camera(), contentDescription = null, modifier = Modifier.size(14.dp))
+            RewindStatChip(label = "${rewind.photoCount}", color = color) {
+                Icon(painter = PlatformIcons.camera(), contentDescription = null, modifier = Modifier.size(20.dp))
+            }
+        }
+        if (rewind.audioCount > 0) {
+            RewindStatChip(label = "${rewind.audioCount}", color = color) {
+                Icon(painter = PlatformIcons.mic(), contentDescription = null, modifier = Modifier.size(20.dp))
             }
         }
         if (rewind.peopleCount > 0) {
-            RewindStatChip(label = "${rewind.peopleCount}", color = chipColor) {
-                Icon(painter = PlatformIcons.people(), contentDescription = null, modifier = Modifier.size(14.dp))
+            RewindStatChip(label = "${rewind.peopleCount}", color = color) {
+                Icon(painter = PlatformIcons.people(), contentDescription = null, modifier = Modifier.size(20.dp))
             }
         }
         if (rewind.primaryLocation != null) {
-            RewindStatChip(label = rewind.primaryLocation, color = chipColor) {
-                Icon(painter = PlatformIcons.location(), contentDescription = null, modifier = Modifier.size(14.dp))
+            RewindStatChip(label = rewind.primaryLocation, color = color) {
+                Icon(painter = PlatformIcons.location(), contentDescription = null, modifier = Modifier.size(20.dp))
             }
         }
     }
@@ -197,9 +217,8 @@ private fun RewindStatChipsRow(
 /**
  * A single icon+label pair rendered inline for the metadata chip row.
  *
- * Deliberately unbordered and low-contrast — this is a glance-level affordance,
- * not a tap target. For a standalone, bordered chip see
- * [app.logdate.ui.common.MetadataChip].
+ * Deliberately unbordered — this is a glance-level affordance, not a tap target. For
+ * a standalone, bordered chip see [app.logdate.ui.common.MetadataChip].
  */
 @Composable
 private fun RewindStatChip(
@@ -209,7 +228,7 @@ private fun RewindStatChip(
     icon: @Composable () -> Unit,
 ) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier,
     ) {
@@ -220,7 +239,7 @@ private fun RewindStatChip(
         }
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = color,
         )
     }
@@ -229,7 +248,7 @@ private fun RewindStatChip(
 /**
  * A small pill badge that signals an unviewed rewind.
  *
- * Uses the tertiary color family to stand out against the primary-container card
+ * Uses the tertiary color family to stand out against the card's photo/gradient
  * background while staying within the Material 3 palette.
  */
 @Composable
@@ -246,5 +265,35 @@ private fun NewRewindBadge(modifier: Modifier = Modifier) {
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
         )
+    }
+}
+
+/**
+ * A pill badge marking a milestone rewind — the "special pull" of the set. Takes
+ * priority over [NewRewindBadge] in the same corner slot when both would apply.
+ */
+@Composable
+private fun MilestoneBadge(
+    summary: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        color = Color(0xFFE8C547), // honey gold — matches the milestone card border
+        contentColor = Color(0xFF3D2E00),
+        shape = RoundedCornerShape(50),
+        modifier = modifier,
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+        ) {
+            Icon(painter = PlatformIcons.milestone(), contentDescription = null, modifier = Modifier.size(14.dp))
+            Text(
+                text = summary,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+            )
+        }
     }
 }

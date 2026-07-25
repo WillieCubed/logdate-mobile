@@ -112,4 +112,14 @@ expect object PlatformIcons {
     @Composable fun chevronRight(): Painter
 
     @Composable fun checkCircle(): Painter
+
+    @Composable fun travel(): Painter
+
+    @Composable fun focusedWork(): Painter
+
+    @Composable fun quiet(): Painter
+
+    @Composable fun milestone(): Painter
+
+    @Composable fun mixed(): Painter
 }

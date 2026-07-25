@@ -28,10 +28,20 @@ import kotlin.math.abs
  * The function is intentionally pure and synchronous so it can be called from a
  * composable without needing a remember-key beyond the rewind itself.
  */
-fun Rewind.accentColor(): Color {
-    val seed = uid.hashCode()
+fun Rewind.accentColor(): Color = rewindAccentColor(metadata?.detectedActivities?.firstOrNull(), uid.hashCode())
+
+/**
+ * The core of [Rewind.accentColor], callable from UI state that only has the
+ * dominant activity and a stable seed (e.g. the rewind id's hash) rather than a full
+ * domain [Rewind] — used by the overview list's cards so the "no photo" fallback
+ * background matches the same per-rewind identity the detail view's chrome uses.
+ */
+fun rewindAccentColor(
+    activityType: ActivityType?,
+    seed: Int,
+): Color {
     val baseHue =
-        when (metadata?.detectedActivities?.firstOrNull()) {
+        when (activityType) {
             ActivityType.TRAVEL -> TRAVEL_HUE
             ActivityType.SOCIAL -> SOCIAL_HUE
             ActivityType.FOCUSED_WORK -> FOCUSED_WORK_HUE
