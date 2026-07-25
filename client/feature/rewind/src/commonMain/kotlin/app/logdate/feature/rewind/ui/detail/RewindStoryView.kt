@@ -16,6 +16,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
@@ -53,6 +55,7 @@ import app.logdate.feature.rewind.ui.RewindPanelUiState
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.platform.PlatformIcons
+import app.logdate.ui.platform.rememberScreenCornerRadius
 import app.logdate.ui.platform.rememberSystemReduceMotion
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -142,6 +145,20 @@ fun RewindStoryView(
     var navigatingForward by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
+
+    // Vertical drag-to-dismiss: mirrors the swipe-down gesture the media viewer uses to
+    // close a full-screen photo, so closing a Rewind feels the same across the app.
+    var storyContainerHeight by remember { mutableIntStateOf(1) }
+    var dismissOffsetY by remember { mutableFloatStateOf(0f) }
+
+    // Panel corners are concentric with the physical display: the same center point as the
+    // screen's own rounded corners, so the small inset reads as reveal rather than an
+    // arbitrarily-chosen radius sitting inside a squared-off screen.
+    val screenCornerRadius = rememberScreenCornerRadius()
+    val storyPanelShape =
+        remember(screenCornerRadius) {
+            RoundedCornerShape((screenCornerRadius - rewindStoryPanelInset).coerceAtLeast(0.dp))
+        }
 
     // First-view entrance animation: scale up from 0.92 with a spring, then settle.
     // Only plays once when the story first mounts, and only for unviewed rewinds.
@@ -271,7 +288,10 @@ fun RewindStoryView(
                 }
             },
             label = "PanelTransition",
-            modifier = modifier,
+            modifier =
+                modifier
+                    .padding(rewindStoryPanelInset)
+                    .clip(storyPanelShape),
         ) { panelIndex ->
             content(panels[panelIndex])
         }
@@ -442,11 +462,36 @@ fun RewindStoryView(
     Box(
         modifier =
             modifier
+                .onSizeChanged { storyContainerHeight = it.height.coerceAtLeast(1) }
                 .graphicsLayer {
-                    scaleX = entranceScale.value
-                    scaleY = entranceScale.value
+                    translationY = dismissOffsetY
+                    val dismissProgress = (dismissOffsetY / storyContainerHeight.toFloat()).coerceIn(0f, 1f)
+                    val combinedScale = entranceScale.value * (1f - dismissProgress * 0.08f)
+                    scaleX = combinedScale
+                    scaleY = combinedScale
+                    alpha = 1f - (dismissProgress * 0.35f)
                 }.background(Color.Black)
                 .statusBarsPadding()
+                // Swipe-down-to-dismiss: slides the whole story off the bottom of the
+                // screen, matching the media viewer's adaptive-back gesture.
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures(
+                        onDragEnd = {
+                            if (dismissOffsetY > storyContainerHeight * 0.18f) {
+                                onExit()
+                            } else {
+                                dismissOffsetY = 0f
+                            }
+                        },
+                        onDragCancel = { dismissOffsetY = 0f },
+                    ) { change, dragAmount ->
+                        val newOffset = (dismissOffsetY + dragAmount).coerceAtLeast(0f)
+                        if (newOffset != dismissOffsetY) {
+                            change.consume()
+                            dismissOffsetY = newOffset
+                        }
+                    }
+                }
                 // Swipe gesture with accumulated drag distance
                 .pointerInput(Unit) {
                     var accumulatedDrag = 0f
@@ -526,7 +571,8 @@ fun RewindStoryView(
                         Box(
                             modifier =
                                 Modifier
-                                    .fillMaxSize(),
+                                    .fillMaxSize()
+                                    .navigationBarsPadding(),
                             contentAlignment = Alignment.Center,
                         ) {
                             StoryPanel(
@@ -552,7 +598,10 @@ fun RewindStoryView(
                     },
                     standardContent = {
                         Box(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .navigationBarsPadding(),
                             contentAlignment = Alignment.Center,
                         ) {
                             StoryPanel(
@@ -562,6 +611,10 @@ fun RewindStoryView(
                                         .fillMaxSize(),
                             )
                         }
+                        // Tap layer must render below the chrome buttons, otherwise its
+                        // full-screen tap catcher intercepts taps meant for share/reply/
+                        // delete/close before they reach the icons drawn on top of it.
+                        TapNavigationLayer(modifier = Modifier.fillMaxSize())
                         StoryChrome(
                             showNavigationButtons = false,
                             modifier =
@@ -571,7 +624,6 @@ fun RewindStoryView(
                                     .widthIn(max = maxRewindStoryWidth)
                                     .padding(horizontal = 16.dp, vertical = 12.dp),
                         )
-                        TapNavigationLayer(modifier = Modifier.fillMaxSize())
                     },
                 )
             },
@@ -580,6 +632,10 @@ fun RewindStoryView(
 }
 
 private val maxRewindStoryWidth = 1200.dp
+
+// Small enough to keep the story feeling edge-to-edge and immersive; just enough for the
+// concentric-corner reveal at the panel's edges to register.
+private val rewindStoryPanelInset = 4.dp
 
 /**
  * Progress indicators showing the current position in the story sequence.

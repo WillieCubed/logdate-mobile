@@ -71,7 +71,7 @@ fun ImageNotePanel(
                 Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-            contentAlignment = Alignment.TopEnd,
+            contentAlignment = Alignment.TopStart,
         ) {
             Text(
                 text = dateFormatted,
