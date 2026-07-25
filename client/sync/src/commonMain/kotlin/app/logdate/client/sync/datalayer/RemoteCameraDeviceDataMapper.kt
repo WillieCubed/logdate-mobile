@@ -10,11 +10,12 @@ object RemoteCameraDeviceDataMapper {
 
     private const val KEY_COUNT = "count"
     private const val KEY_SELECTED_DEVICE_ID = "selectedDeviceId"
-    private const val KEY_DEVICE_ID = "device_%d_id"
-    private const val KEY_DEVICE_LABEL = "device_%d_label"
-    private const val KEY_DEVICE_CATEGORY = "device_%d_category"
-    private const val KEY_DEVICE_AVAILABLE = "device_%d_available"
-    private const val KEY_DEVICE_EXTERNAL = "device_%d_external"
+
+    private fun keyDeviceId(index: Int) = "device_${index}_id"
+    private fun keyDeviceLabel(index: Int) = "device_${index}_label"
+    private fun keyDeviceCategory(index: Int) = "device_${index}_category"
+    private fun keyDeviceAvailable(index: Int) = "device_${index}_available"
+    private fun keyDeviceExternal(index: Int) = "device_${index}_external"
 
     fun toDataMap(selection: MediaDeviceSelectionUiState): Map<String, String> {
         val data = mutableMapOf<String, String>()
@@ -22,11 +23,11 @@ object RemoteCameraDeviceDataMapper {
         data[KEY_COUNT] = cameraDevices.size.toString()
         selection.selectedDeviceId?.let { data[KEY_SELECTED_DEVICE_ID] = it }
         cameraDevices.forEachIndexed { index, device ->
-            data[KEY_DEVICE_ID.format(index)] = device.id
-            data[KEY_DEVICE_LABEL.format(index)] = device.label
-            data[KEY_DEVICE_CATEGORY.format(index)] = device.category.name
-            data[KEY_DEVICE_AVAILABLE.format(index)] = device.isAvailable.toString()
-            data[KEY_DEVICE_EXTERNAL.format(index)] = device.isExternal.toString()
+            data[keyDeviceId(index)] = device.id
+            data[keyDeviceLabel(index)] = device.label
+            data[keyDeviceCategory(index)] = device.category.name
+            data[keyDeviceAvailable(index)] = device.isAvailable.toString()
+            data[keyDeviceExternal(index)] = device.isExternal.toString()
         }
         return data
     }
@@ -35,10 +36,10 @@ object RemoteCameraDeviceDataMapper {
         val count = data[KEY_COUNT]?.toIntOrNull()?.coerceAtLeast(0) ?: 0
         val devices =
             (0 until count).mapNotNull { index ->
-                val id = data[KEY_DEVICE_ID.format(index)] ?: return@mapNotNull null
-                val label = data[KEY_DEVICE_LABEL.format(index)] ?: id
+                val id = data[keyDeviceId(index)] ?: return@mapNotNull null
+                val label = data[keyDeviceLabel(index)] ?: id
                 val category =
-                    data[KEY_DEVICE_CATEGORY.format(index)]
+                    data[keyDeviceCategory(index)]
                         ?.let { runCatching { MediaDeviceCategory.valueOf(it) }.getOrNull() }
                         ?: MediaDeviceCategory.EXTERNAL
                 MediaDeviceUiState(
@@ -46,8 +47,8 @@ object RemoteCameraDeviceDataMapper {
                     label = label,
                     kind = MediaDeviceKind.CAMERA,
                     category = category,
-                    isAvailable = data[KEY_DEVICE_AVAILABLE.format(index)]?.toBooleanStrictOrNull() ?: true,
-                    isExternal = data[KEY_DEVICE_EXTERNAL.format(index)]?.toBooleanStrictOrNull() ?: false,
+                    isAvailable = data[keyDeviceAvailable(index)]?.toBooleanStrictOrNull() ?: true,
+                    isExternal = data[keyDeviceExternal(index)]?.toBooleanStrictOrNull() ?: false,
                 )
             }
         return MediaDeviceSelectionUiState(
