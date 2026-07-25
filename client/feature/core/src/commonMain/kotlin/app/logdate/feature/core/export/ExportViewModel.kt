@@ -39,6 +39,8 @@ sealed class ExportState {
     ) : ExportState()
 }
 
+private const val DEFAULT_FAILURE_REASON = "Export failed. Please try again."
+
 class UserDataExportViewModel(
     private val exportLauncher: ExportLauncher,
     private val getExportCountsUseCase: GetExportCountsUseCase,
@@ -52,27 +54,27 @@ class UserDataExportViewModel(
     private var lastExportOptions: ExportOptions = ExportOptions()
 
     init {
-        // The callback only fires on cancellation/failure (path == null).
-        // Success completion is handled by the exportProgress flow, which carries stats.
-        // Guard against late callbacks overwriting terminal states.
-        exportLauncher.setExportCompletionCallback { path ->
-            if (path == null) {
-                val current = _exportState.value
-                when (current) {
-                    is ExportState.Exporting -> {
-                        // Export was in progress when failure occurred
-                        _exportState.update { ExportState.Failed("Export was cancelled or failed") }
-                        _isSheetVisible.value = true
-                    }
-                    is ExportState.Selecting -> {
-                        // File picker was cancelled or never started
-                        _exportState.update { ExportState.Idle }
-                        _isSheetVisible.value = false
-                    }
-                    is ExportState.Completed, is ExportState.Failed -> {
-                        // Already in a terminal state, don't overwrite
-                    }
-                    else -> Unit
+        // The callback fires only for the non-success outcomes; successful completion is
+        // handled by the exportProgress flow, which carries stats. Cancellation and failure
+        // are handled distinctly so a cancelled export returns to idle quietly while a real
+        // failure surfaces its reason.
+        exportLauncher.setExportCompletionCallback { outcome ->
+            val current = _exportState.value
+            // Guard against late callbacks overwriting a terminal state.
+            if (current is ExportState.Completed || current is ExportState.Failed) {
+                return@setExportCompletionCallback
+            }
+            if (current !is ExportState.Exporting && current !is ExportState.Selecting) {
+                return@setExportCompletionCallback
+            }
+            when (outcome) {
+                is ExportOutcome.Cancelled -> {
+                    _exportState.update { ExportState.Idle }
+                    _isSheetVisible.value = false
+                }
+                is ExportOutcome.Failed -> {
+                    _exportState.update { ExportState.Failed(outcome.reason ?: DEFAULT_FAILURE_REASON) }
+                    _isSheetVisible.value = true
                 }
             }
         }

@@ -54,7 +54,7 @@ class IosExportLauncher(
     private val zipArchiveWriter = ZipArchiveWriter(FileSystem.SYSTEM)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var currentExportJob: Job? = null
-    private var completionCallback: ((String?) -> Unit)? = null
+    private var completionCallback: ((ExportOutcome) -> Unit)? = null
 
     private val _exportProgress = MutableStateFlow(ExportProgressInfo())
     override val exportProgress: StateFlow<ExportProgressInfo> = _exportProgress.asStateFlow()
@@ -63,7 +63,7 @@ class IosExportLauncher(
         _exportProgress.value = info
     }
 
-    override fun setExportCompletionCallback(callback: (String?) -> Unit) {
+    override fun setExportCompletionCallback(callback: (ExportOutcome) -> Unit) {
         completionCallback = callback
     }
 
@@ -94,7 +94,7 @@ class IosExportLauncher(
                                 title = "Export Failed",
                                 message = "Export could not be completed.",
                             )
-                            completionCallback?.invoke(null)
+                            completionCallback?.invoke(ExportOutcome.Failed("Export could not be completed."))
                         }.collect { progress ->
                             when (progress) {
                                 is ExportProgress.Starting -> {
@@ -122,14 +122,14 @@ class IosExportLauncher(
                                                 stats = progress.result.stats,
                                             ),
                                         )
-                                        completionCallback?.invoke(exportFilePath)
+                                        // Success is delivered via the progress flow above.
                                     } catch (e: Exception) {
                                         Napier.e("iOS: Failed to save or share export", e)
                                         showAlert(
                                             title = "Export Failed",
                                             message = "Could not write the export archive.",
                                         )
-                                        completionCallback?.invoke(null)
+                                        completionCallback?.invoke(ExportOutcome.Failed("Could not write the export archive."))
                                     }
                                 }
 
@@ -140,7 +140,7 @@ class IosExportLauncher(
                                         title = "Export Failed",
                                         message = errorMessage,
                                     )
-                                    completionCallback?.invoke(null)
+                                    completionCallback?.invoke(ExportOutcome.Failed(errorMessage))
                                 }
                             }
                         }
@@ -150,7 +150,7 @@ class IosExportLauncher(
                         title = "Export Failed",
                         message = "Export could not be completed.",
                     )
-                    completionCallback?.invoke(null)
+                    completionCallback?.invoke(ExportOutcome.Failed("Export could not be completed."))
                 }
             }
     }
@@ -158,7 +158,7 @@ class IosExportLauncher(
     override fun cancelExport() {
         currentExportJob?.cancel()
         currentExportJob = null
-        completionCallback?.invoke(null)
+        completionCallback?.invoke(ExportOutcome.Cancelled)
         Napier.i("iOS: Export cancelled")
     }
 

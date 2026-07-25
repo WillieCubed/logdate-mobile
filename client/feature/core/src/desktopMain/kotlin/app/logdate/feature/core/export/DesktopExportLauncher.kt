@@ -44,7 +44,7 @@ class DesktopExportLauncher :
     private val exportUserDataUseCase: ExportUserDataUseCase by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var currentExportJob: Job? = null
-    private var completionCallback: ((String?) -> Unit)? = null
+    private var completionCallback: ((ExportOutcome) -> Unit)? = null
 
     private val _exportProgress = MutableStateFlow(ExportProgressInfo())
     override val exportProgress: StateFlow<ExportProgressInfo> = _exportProgress.asStateFlow()
@@ -53,7 +53,7 @@ class DesktopExportLauncher :
         _exportProgress.value = info
     }
 
-    override fun setExportCompletionCallback(callback: (String?) -> Unit) {
+    override fun setExportCompletionCallback(callback: (ExportOutcome) -> Unit) {
         completionCallback = callback
     }
 
@@ -77,7 +77,7 @@ class DesktopExportLauncher :
 
                     if (selectedFile == null) {
                         Napier.i("Desktop: Export cancelled by user")
-                        completionCallback?.invoke(null)
+                        completionCallback?.invoke(ExportOutcome.Cancelled)
                         return@launch
                     }
 
@@ -97,7 +97,7 @@ class DesktopExportLauncher :
                         ).catch { exception ->
                             Napier.e("Desktop: Export failed", exception)
                             showExportErrorDialog("Export could not be completed.")
-                            completionCallback?.invoke(null)
+                            completionCallback?.invoke(ExportOutcome.Failed("Export could not be completed."))
                         }.collect { progress ->
                             when (progress) {
                                 is ExportProgress.Starting -> {
@@ -122,6 +122,7 @@ class DesktopExportLauncher :
                                             }
                                         Napier.i("Desktop: Export completed successfully to $zipPath")
                                         showExportSuccessDialog(zipPath)
+                                        // Success is delivered via the progress flow below.
                                         updateProgress(
                                             ExportProgressInfo(
                                                 isActive = false,
@@ -131,11 +132,10 @@ class DesktopExportLauncher :
                                                 stats = progress.result.stats,
                                             ),
                                         )
-                                        completionCallback?.invoke(zipPath)
                                     } catch (e: Exception) {
                                         Napier.e("Desktop: Failed to save file", e)
                                         showExportErrorDialog("Could not write the export archive.")
-                                        completionCallback?.invoke(null)
+                                        completionCallback?.invoke(ExportOutcome.Failed("Could not write the export archive."))
                                     }
                                 }
 
@@ -143,14 +143,14 @@ class DesktopExportLauncher :
                                     val errorMessage = progress.error.defaultMessage
                                     Napier.e("Desktop: Export failed: $errorMessage")
                                     showExportErrorDialog(errorMessage)
-                                    completionCallback?.invoke(null)
+                                    completionCallback?.invoke(ExportOutcome.Failed(errorMessage))
                                 }
                             }
                         }
                 } catch (e: Exception) {
                     Napier.e("Desktop: Export process failed", e)
                     showExportErrorDialog("Export could not be completed.")
-                    completionCallback?.invoke(null)
+                    completionCallback?.invoke(ExportOutcome.Failed("Export could not be completed."))
                 }
             }
     }
@@ -158,7 +158,7 @@ class DesktopExportLauncher :
     override fun cancelExport() {
         currentExportJob?.cancel()
         currentExportJob = null
-        completionCallback?.invoke(null)
+        completionCallback?.invoke(ExportOutcome.Cancelled)
         Napier.i("Desktop: Export cancelled")
     }
 

@@ -23,11 +23,14 @@ interface ExportLauncher {
     fun cancelExport()
 
     /**
-     * Sets a callback to be notified of export completion with a path.
+     * Sets a callback notified when an export ends without success.
      *
-     * @param callback Function that receives the export path or null if export failed/was cancelled
+     * Success is signaled separately via [ExportProgressInfo.completedFilePath] on
+     * [exportProgress] (which also carries stats); this callback only reports the two
+     * non-success outcomes — [ExportOutcome.Cancelled] and [ExportOutcome.Failed] — so the
+     * UI can distinguish a user cancellation from a genuine failure.
      */
-    fun setExportCompletionCallback(callback: (String?) -> Unit)
+    fun setExportCompletionCallback(callback: (ExportOutcome) -> Unit)
 
     /**
      * Updates the export progress directly. Called by platform-specific workers
@@ -39,6 +42,23 @@ interface ExportLauncher {
      * Observable progress stream for the current export operation.
      */
     val exportProgress: StateFlow<ExportProgressInfo>
+}
+
+/**
+ * Terminal outcome of an export attempt that did not succeed.
+ *
+ * Success is not modeled here — it is delivered through [ExportProgressInfo.completedFilePath].
+ * Cancellation and failure are kept distinct so the UI can message them differently rather than
+ * collapsing both into a single ambiguous "cancelled or failed" state.
+ */
+sealed interface ExportOutcome {
+    /** The user cancelled the export (dismissed the file picker or tapped cancel). */
+    data object Cancelled : ExportOutcome
+
+    /** The export failed. [reason] is a human-readable message when one is available. */
+    data class Failed(
+        val reason: String? = null,
+    ) : ExportOutcome
 }
 
 /**

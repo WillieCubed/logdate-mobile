@@ -30,8 +30,9 @@ import java.util.UUID
  *   [ExportProgressInfo.completedFilePath]. The ViewModel observes [exportProgress],
  *   which carries the full stats. The WorkManager observer takes no action on `SUCCEEDED`.
  * - **Failure / cancellation** — The WorkManager LiveData observer fires [completionCallback]
- *   with `null`. WorkManager's terminal state is the only signal; there is no direct worker
- *   call for these cases.
+ *   with [ExportOutcome.Failed] (carrying the worker's error message) or
+ *   [ExportOutcome.Cancelled], depending on the terminal state. This is the only signal for
+ *   these cases; there is no direct worker call.
  *
  * This asymmetry keeps success single-path (flow only) and failure single-path (observer
  * only), avoiding the need for a once-fire guard.
@@ -44,7 +45,7 @@ class AndroidExportLauncher(
     private var workInfoObserver: Observer<List<WorkInfo>>? = null
     private var pendingExportOptions: ExportOptions = ExportOptions()
 
-    @Volatile private var completionCallback: ((String?) -> Unit)? = null
+    @Volatile private var completionCallback: ((ExportOutcome) -> Unit)? = null
 
     /**
      * Id of the export [androidx.work.WorkRequest] this launcher most recently started.
@@ -101,15 +102,18 @@ class AndroidExportLauncher(
                         currentWorkId = null
                         Napier.i("Export work succeeded")
                     }
-                    WorkInfo.State.FAILED, WorkInfo.State.CANCELLED -> {
+                    WorkInfo.State.FAILED -> {
                         currentWorkId = null
                         _exportProgress.value = ExportProgressInfo()
                         val reason = workInfo.outputData.getString(ExportWorker.ERROR_KEY)
-                        Napier.i(
-                            "Export terminal: state=${workInfo.state} " +
-                                "stopReason=${workInfo.stopReason} error=$reason",
-                        )
-                        completionCallback?.invoke(null)
+                        Napier.i("Export terminal: state=FAILED stopReason=${workInfo.stopReason} error=$reason")
+                        completionCallback?.invoke(ExportOutcome.Failed(reason))
+                    }
+                    WorkInfo.State.CANCELLED -> {
+                        currentWorkId = null
+                        _exportProgress.value = ExportProgressInfo()
+                        Napier.i("Export terminal: state=CANCELLED stopReason=${workInfo.stopReason}")
+                        completionCallback?.invoke(ExportOutcome.Cancelled)
                     }
                     else -> Unit
                 }
@@ -126,7 +130,7 @@ class AndroidExportLauncher(
         _exportProgress.value = info
     }
 
-    override fun setExportCompletionCallback(callback: (String?) -> Unit) {
+    override fun setExportCompletionCallback(callback: (ExportOutcome) -> Unit) {
         completionCallback = callback
     }
 
@@ -147,7 +151,7 @@ class AndroidExportLauncher(
                     startExportWorker(lastSelectedUri!!)
                 } else {
                     Napier.w("No URI selected for export")
-                    completionCallback?.invoke(null)
+                    completionCallback?.invoke(ExportOutcome.Cancelled)
                 }
             }
 
@@ -165,7 +169,7 @@ class AndroidExportLauncher(
         pendingExportCallback = null
         WorkManager.getInstance(context).cancelUniqueWork(ExportWorker.WORK_NAME)
         _exportProgress.value = ExportProgressInfo()
-        completionCallback?.invoke(null)
+        completionCallback?.invoke(ExportOutcome.Cancelled)
         Napier.i("Export cancelled")
     }
 
@@ -188,11 +192,11 @@ class AndroidExportLauncher(
                 pendingExportCallback?.invoke()
             } catch (e: Exception) {
                 Napier.e("Failed to take persistent URI permission", e)
-                completionCallback?.invoke(null)
+                completionCallback?.invoke(ExportOutcome.Failed("Could not access the selected location."))
             }
         } else {
             Napier.i("User cancelled export destination selection")
-            completionCallback?.invoke(null)
+            completionCallback?.invoke(ExportOutcome.Cancelled)
         }
 
         pendingExportCallback = null

@@ -38,7 +38,7 @@ private class FakeExportLauncher : ExportLauncher {
     val startExportCalls = mutableListOf<ExportOptions>()
     var cancelExportCallCount = 0
         private set
-    private var completionCallback: ((String?) -> Unit)? = null
+    private var completionCallback: ((ExportOutcome) -> Unit)? = null
 
     override fun startExport(options: ExportOptions) {
         startExportCalls.add(options)
@@ -52,12 +52,12 @@ private class FakeExportLauncher : ExportLauncher {
         _exportProgress.value = info
     }
 
-    override fun setExportCompletionCallback(callback: (String?) -> Unit) {
+    override fun setExportCompletionCallback(callback: (ExportOutcome) -> Unit) {
         completionCallback = callback
     }
 
-    fun triggerCompletion(path: String?) {
-        completionCallback?.invoke(path)
+    fun triggerCompletion(outcome: ExportOutcome) {
+        completionCallback?.invoke(outcome)
     }
 
     fun emitProgress(info: ExportProgressInfo) {
@@ -402,12 +402,12 @@ class UserDataExportViewModelTest {
             viewModel.updateExportOptions(customOptions)
             viewModel.confirmExport()
 
-            // Simulate entering Exporting state then failure via null completion
+            // Simulate entering Exporting state then a failure outcome
             fakeExportLauncher.emitProgress(
                 ExportProgressInfo(isActive = true, progressPercent = 50),
             )
             advanceUntilIdle()
-            fakeExportLauncher.triggerCompletion(null)
+            fakeExportLauncher.triggerCompletion(ExportOutcome.Failed("Export could not be completed."))
             assertIs<ExportState.Failed>(viewModel.exportState.value)
 
             fakeExportLauncher.startExportCalls.clear()
@@ -454,7 +454,7 @@ class UserDataExportViewModelTest {
                 ExportProgressInfo(isActive = true, progressPercent = 10),
             )
             advanceUntilIdle()
-            fakeExportLauncher.triggerCompletion(null)
+            fakeExportLauncher.triggerCompletion(ExportOutcome.Failed("Could not write the export archive."))
 
             assertIs<ExportState.Failed>(viewModel.exportState.value)
 
@@ -485,7 +485,7 @@ class UserDataExportViewModelTest {
         }
 
     @Test
-    fun `completion callback with null during Exporting transitions to Failed`() =
+    fun `failed outcome during Exporting transitions to Failed with the reported reason`() =
         testScope.runTest {
             viewModel = createViewModel()
             advanceUntilIdle()
@@ -500,16 +500,16 @@ class UserDataExportViewModelTest {
             advanceUntilIdle()
             assertIs<ExportState.Exporting>(viewModel.exportState.value)
 
-            fakeExportLauncher.triggerCompletion(null)
+            fakeExportLauncher.triggerCompletion(ExportOutcome.Failed("Could not write the export archive."))
 
             val state = viewModel.exportState.value
             assertIs<ExportState.Failed>(state)
-            assertEquals("Export was cancelled or failed", state.reason)
+            assertEquals("Could not write the export archive.", state.reason)
             assertTrue(state.canRetry)
         }
 
     @Test
-    fun `completion callback with null during non-Exporting transitions to Idle`() =
+    fun `cancelled outcome during Selecting transitions to Idle without an error`() =
         testScope.runTest {
             viewModel = createViewModel()
             advanceUntilIdle()
@@ -520,7 +520,7 @@ class UserDataExportViewModelTest {
             // State is Selecting, not Exporting
             assertIs<ExportState.Selecting>(viewModel.exportState.value)
 
-            fakeExportLauncher.triggerCompletion(null)
+            fakeExportLauncher.triggerCompletion(ExportOutcome.Cancelled)
 
             assertIs<ExportState.Idle>(viewModel.exportState.value)
         }
@@ -619,7 +619,7 @@ class UserDataExportViewModelTest {
             assertIs<ExportState.Completed>(viewModel.exportState.value)
 
             // Late WorkManager callback should be ignored
-            fakeExportLauncher.triggerCompletion(null)
+            fakeExportLauncher.triggerCompletion(ExportOutcome.Failed("late failure"))
             assertIs<ExportState.Completed>(viewModel.exportState.value)
         }
 
