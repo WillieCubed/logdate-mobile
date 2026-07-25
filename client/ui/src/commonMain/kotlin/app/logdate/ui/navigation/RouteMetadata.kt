@@ -19,10 +19,16 @@ const val ROUTE_CLASS_METADATA_KEY: String = "logdate.routeClass"
  * Drop-in replacement for `EntryProviderScope.entry<T>` that also stamps the `T::class` into
  * the entry's metadata under [ROUTE_CLASS_METADATA_KEY]. Use this everywhere an entry needs to
  * be visible to the scene strategy classifier.
+ *
+ * @param metadata Additional entry metadata (e.g. `NavDisplay.PredictivePopTransitionKey` to
+ *   override the default predictive-back transition) merged alongside the route-class tag.
  */
-inline fun <reified T : NavKey> EntryProviderScope<NavKey>.taggedEntry(noinline content: @Composable (T) -> Unit) {
+inline fun <reified T : NavKey> EntryProviderScope<NavKey>.taggedEntry(
+    metadata: Map<String, Any> = emptyMap(),
+    noinline content: @Composable (T) -> Unit,
+) {
     entry<T>(
-        metadata = mapOf(ROUTE_CLASS_METADATA_KEY to T::class),
+        metadata = metadata + (ROUTE_CLASS_METADATA_KEY to T::class),
         content = content,
     )
 }

@@ -70,6 +70,7 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.nav3.runtime)
+            implementation(libs.jetbrains.navigation3.ui)
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.material3.adaptive.layout)
             implementation(libs.material3.adaptive.navigation)

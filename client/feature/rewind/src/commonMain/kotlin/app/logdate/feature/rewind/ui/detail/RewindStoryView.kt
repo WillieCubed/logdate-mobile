@@ -4,6 +4,8 @@ package app.logdate.feature.rewind.ui.detail
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -16,7 +18,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,6 +56,7 @@ import app.logdate.feature.rewind.ui.RewindPanelUiState
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.platform.PlatformIcons
+import app.logdate.ui.platform.PlatformPredictiveBackHandler
 import app.logdate.ui.platform.rememberScreenCornerRadius
 import app.logdate.ui.platform.rememberSystemReduceMotion
 import kotlinx.coroutines.delay
@@ -146,10 +148,26 @@ fun RewindStoryView(
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
 
-    // Vertical drag-to-dismiss: mirrors the swipe-down gesture the media viewer uses to
-    // close a full-screen photo, so closing a Rewind feels the same across the app.
+    // Predictive back drives this screen's dismissal: [dismissProgress] tracks the live
+    // gesture (0f = fully open, 1f = fully dismissed) and only the story panel itself
+    // translates off the bottom of the screen — the backdrop stays put and just dims,
+    // so the card reads as physically leaving rather than the whole screen sliding away.
     var storyContainerHeight by remember { mutableIntStateOf(1) }
-    var dismissOffsetY by remember { mutableFloatStateOf(0f) }
+    val dismissProgress = remember { Animatable(0f) }
+
+    // Disabled while external chrome (reply sheet, delete dialog) is open so back presses
+    // dismiss that chrome first instead of starting to drag this screen out from under it.
+    PlatformPredictiveBackHandler(
+        enabled = !externalPause,
+        onProgress = { fraction -> scope.launch { dismissProgress.snapTo(fraction) } },
+        onBack = {
+            scope.launch { dismissProgress.snapTo(1f) }
+            onExit()
+        },
+        onCancel = {
+            scope.launch { dismissProgress.animateTo(0f, tween(300, easing = FastOutSlowInEasing)) }
+        },
+    )
 
     // Panel corners are concentric with the physical display: the same center point as the
     // screen's own rounded corners, so the small inset reads as reveal rather than an
@@ -290,7 +308,17 @@ fun RewindStoryView(
             label = "PanelTransition",
             modifier =
                 modifier
-                    .padding(rewindStoryPanelInset)
+                    .graphicsLayer {
+                        // A little scale-down and fade alongside the translation, the way
+                        // iOS's own interactive dismiss transitions read — not just a flat
+                        // slide.
+                        val eased = easeDismiss(dismissProgress.value)
+                        translationY = eased * storyContainerHeight
+                        val scale = 1f - eased * DISMISS_CARD_MAX_SCALE_DOWN
+                        scaleX = scale
+                        scaleY = scale
+                        alpha = 1f - eased * DISMISS_CARD_MAX_FADE
+                    }.padding(rewindStoryPanelInset)
                     .clip(storyPanelShape),
         ) { panelIndex ->
             content(panels[panelIndex])
@@ -302,7 +330,7 @@ fun RewindStoryView(
         showNavigationButtons: Boolean,
         modifier: Modifier = Modifier,
     ) {
-        Column(modifier = modifier) {
+        Column(modifier = modifier.graphicsLayer { alpha = 1f - easeDismiss(dismissProgress.value) }) {
             StoryProgressIndicators(
                 totalPanels = panels.size,
                 currentPanelIndex = currentPanelIndex,
@@ -464,34 +492,14 @@ fun RewindStoryView(
             modifier
                 .onSizeChanged { storyContainerHeight = it.height.coerceAtLeast(1) }
                 .graphicsLayer {
-                    translationY = dismissOffsetY
-                    val dismissProgress = (dismissOffsetY / storyContainerHeight.toFloat()).coerceIn(0f, 1f)
-                    val combinedScale = entranceScale.value * (1f - dismissProgress * 0.08f)
-                    scaleX = combinedScale
-                    scaleY = combinedScale
-                    alpha = 1f - (dismissProgress * 0.35f)
+                    // Only the entrance animation scales this container. Dismiss never
+                    // translates or scales it — the backdrop stays fixed and just dims,
+                    // while the story panel above carries all of the dismiss motion.
+                    scaleX = entranceScale.value
+                    scaleY = entranceScale.value
+                    alpha = 1f - easeDismiss(dismissProgress.value)
                 }.background(Color.Black)
                 .statusBarsPadding()
-                // Swipe-down-to-dismiss: slides the whole story off the bottom of the
-                // screen, matching the media viewer's adaptive-back gesture.
-                .pointerInput(Unit) {
-                    detectVerticalDragGestures(
-                        onDragEnd = {
-                            if (dismissOffsetY > storyContainerHeight * 0.18f) {
-                                onExit()
-                            } else {
-                                dismissOffsetY = 0f
-                            }
-                        },
-                        onDragCancel = { dismissOffsetY = 0f },
-                    ) { change, dragAmount ->
-                        val newOffset = (dismissOffsetY + dragAmount).coerceAtLeast(0f)
-                        if (newOffset != dismissOffsetY) {
-                            change.consume()
-                            dismissOffsetY = newOffset
-                        }
-                    }
-                }
                 // Swipe gesture with accumulated drag distance
                 .pointerInput(Unit) {
                     var accumulatedDrag = 0f
@@ -636,6 +644,14 @@ private val maxRewindStoryWidth = 1200.dp
 // Small enough to keep the story feeling edge-to-edge and immersive; just enough for the
 // concentric-corner reveal at the panel's edges to register.
 private val rewindStoryPanelInset = 4.dp
+
+// A mild ease-in: the gesture reads as slightly softened rather than raw 1:1 finger
+// tracking, without the long dead zone a stronger curve gives at the very start.
+private val dismissEasing = CubicBezierEasing(0.2f, 0f, 1f, 1f)
+private const val DISMISS_CARD_MAX_SCALE_DOWN = 0.14f
+private const val DISMISS_CARD_MAX_FADE = 0.15f
+
+private fun easeDismiss(progress: Float): Float = dismissEasing.transform(progress.coerceIn(0f, 1f))
 
 /**
  * Progress indicators showing the current position in the story sequence.

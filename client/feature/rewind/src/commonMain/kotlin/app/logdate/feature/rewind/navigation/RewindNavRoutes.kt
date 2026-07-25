@@ -1,8 +1,13 @@
 package app.logdate.feature.rewind.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.togetherWith
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.metadata
+import androidx.navigation3.ui.NavDisplay
 import app.logdate.feature.rewind.ui.RewindOpenCallback
 import app.logdate.feature.rewind.ui.RewindOverviewScreen
 import app.logdate.feature.rewind.ui.detail.RewindDetailScreen
@@ -49,7 +54,19 @@ fun EntryProviderScope<NavKey>.rewindOverviewEntry(onOpenRewind: RewindOpenCallb
 
 /** Registers the Rewind detail entry. */
 fun EntryProviderScope<NavKey>.rewindDetailEntry(onExitRewind: () -> Unit) {
-    taggedEntry<RewindDetailRoute> { route ->
+    taggedEntry<RewindDetailRoute>(
+        // RewindStoryView owns its own predictive-back animation — the story panel
+        // translates itself off-screen while the backdrop just dims in place. Without
+        // this, NavDisplay's own default predictive-pop preview also shrinks/slides the
+        // *entire* screen at the same time, so the whole thing looks like it's moving
+        // instead of just the card.
+        metadata =
+            metadata {
+                put(NavDisplay.PredictivePopTransitionKey) {
+                    EnterTransition.None togetherWith ExitTransition.None
+                }
+            },
+    ) { route ->
         RewindDetailScreen(
             rewindId = Uuid.parse(route.id),
             onExitRewind = onExitRewind,
