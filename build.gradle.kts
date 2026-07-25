@@ -7,6 +7,8 @@ import org.gradle.api.Project
 import org.gradle.api.tasks.testing.Test
 import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
 import org.gradle.testing.jacoco.tasks.JacocoReport
+import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnPlugin
+import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnRootExtension
 
 plugins {
     // this is necessary to avoid the plugins to be loaded multiple times
@@ -28,6 +30,14 @@ plugins {
     alias(libs.plugins.kover)
     alias(libs.plugins.benManesVersions)
     jacoco
+}
+
+// Pins the npm `ws` package pulled in transitively by the wasmJs() browser() targets
+// (shared/model, shared/config, client/util, client/networking) to a version without the
+// known memory-exhaustion/uninitialized-memory-disclosure advisories. Kotlin/Wasm's default
+// resolution otherwise settles on whatever `karma`/`webpack-dev-server` last pinned.
+plugins.withType<WasmYarnPlugin> {
+    the<WasmYarnRootExtension>().resolution("ws", "8.21.0")
 }
 
 subprojects {
