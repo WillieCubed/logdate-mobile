@@ -23,6 +23,7 @@ kotlin {
                 .get()
                 .toInt()
 
+        withHostTestBuilder {}
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
