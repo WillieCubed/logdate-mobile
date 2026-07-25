@@ -440,6 +440,7 @@ private val auditEditorUiState =
         onDeleteBlock = {},
     )
 
+
 @PreviewTest
 @LargeScreenAuditPreviewMatrix
 @Composable
@@ -450,6 +451,568 @@ fun A01_OnboardingStartLanding() {
             onGetStarted = {},
             onStartFromBackup = {},
         )
+    }
+}
+
+@PreviewTest
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun A02_PersonalIntroBioStep() {
+    ScreenshotTheme {
+        PersonalIntroContent(
+            uiState =
+                PersonalIntroUiState(
+                    currentStep = PersonalIntroStep.Bio,
+                    name = "Alex",
+                    bio = "Runner, photographer, and obsessive note-taker who likes seeing context stay visible.",
+                ),
+            onNameChanged = {},
+            onBioChanged = {},
+            onProceedToBio = {},
+            onGoBackToName = {},
+            onProcessWithLlm = {},
+            onBack = {},
+        )
+    }
+}
+
+@PreviewTest
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun A03_CloudAccountSetup() {
+    ScreenshotTheme {
+        CloudAccountSetupContent(
+            useCompactLayout = false,
+            onBack = {},
+            onContinue = {},
+            onSkip = {},
+            onPlanSelected = {},
+            selectedOption = null,
+            onOptionSelected = {},
+        )
+    }
+}
+
+@PreviewTest
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun A04_CloudAccountIntro() {
+    ScreenshotTheme {
+        CloudAccountWelcomeContent(
+            onContinue = {},
+            onSignIn = {},
+            onSkip = {},
+            serverSelectionState = ServerSelectionState(),
+            onSelectServerPreset = {},
+            onCustomServerUrlChange = {},
+            onShowCustomServerInfo = {},
+        )
+    }
+}
+
+@PreviewTest
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun A05_SearchWithResults() {
+    ScreenshotTheme {
+        SearchScreenContent(
+            searchState = SearchScreenState.Results(query = "train", results = auditSearchResults),
+            onQueryChange = {},
+            onCommitSearch = {},
+            onResultClick = {},
+            onResultOpenDay = {},
+            onGoBack = {},
+            queryText = "train",
+        )
+    }
+}
+
+@PreviewTest
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun A06_JournalsOverview() {
+    ScreenshotTheme {
+        JournalsOverviewScreenContent(
+            journals = auditJournals,
+            layoutMode = JournalLayoutMode.CAROUSEL,
+            sortOption = JournalSortOption.LAST_UPDATED,
+            activeFilters = emptySet(),
+            searchQuery = "audit",
+            entryResults = auditSearchResults,
+            onOpenJournal = {},
+            onBrowseJournals = {},
+            onCreateJournal = {},
+            onNavigateToDay = {},
+            onNavigationClick = {},
+            onQueryChange = {},
+            onToggleLayoutMode = {},
+            onSortOptionSelected = {},
+            onToggleFilter = {},
+        )
+    }
+}
+
+@PreviewTest
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun A07_JournalDetail() {
+    ScreenshotTheme {
+        JournalDetailScreenContent(
+            uiState = auditJournalState,
+            onGoBack = {},
+        )
+    }
+}
+
+@PreviewTest
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun A08_ProfileDefault() {
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    ScreenshotTheme {
+        ProfileScreenContent(
+            uiState =
+                ProfileUiState(
+                    localProfile = auditProfile,
+                    account = auditAccount,
+                    userData = null,
+                ),
+            onBack = {},
+            onStartEditingDisplayName = {},
+            onCancelEditing = {},
+            onSaveDisplayName = {},
+            onNavigateToBirthday = {},
+            snackbarHostState = snackbarHostState,
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Journals overview book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A40_JournalsOverviewBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            JournalsOverviewScreenContent(
+                journals = auditJournals,
+                layoutMode = JournalLayoutMode.CAROUSEL,
+                sortOption = JournalSortOption.LAST_UPDATED,
+                activeFilters = emptySet(),
+                searchQuery = "audit",
+                entryResults = auditSearchResults,
+                onOpenJournal = {},
+                onBrowseJournals = {},
+                onCreateJournal = {},
+                onNavigateToDay = {},
+                onNavigationClick = {},
+                onQueryChange = {},
+                onToggleLayoutMode = {},
+                onSortOptionSelected = {},
+                onToggleFilter = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Journal detail book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A41_JournalDetailBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            JournalDetailScreenContent(
+                uiState = auditJournalState,
+                onGoBack = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Empty journals book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A42_EmptyJournalsBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            JournalsOverviewScreenContent(
+                journals = emptyList(),
+                layoutMode = JournalLayoutMode.CAROUSEL,
+                sortOption = JournalSortOption.LAST_UPDATED,
+                activeFilters = emptySet(),
+                searchQuery = "",
+                entryResults = emptyList(),
+                onOpenJournal = {},
+                onBrowseJournals = {},
+                onCreateJournal = {},
+                onNavigateToDay = {},
+                onNavigationClick = {},
+                onQueryChange = {},
+                onToggleLayoutMode = {},
+                onSortOptionSelected = {},
+                onToggleFilter = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@LargeScreenAuditPreviewMatrix
+@Composable
+fun A43_EmptyJournalsResponsiveStates() {
+    ScreenshotTheme {
+        JournalsOverviewScreenContent(
+            journals = emptyList(),
+            layoutMode = JournalLayoutMode.CAROUSEL,
+            sortOption = JournalSortOption.LAST_UPDATED,
+            activeFilters = emptySet(),
+            searchQuery = "",
+            entryResults = emptyList(),
+            onOpenJournal = {},
+            onBrowseJournals = {},
+            onCreateJournal = {},
+            onNavigateToDay = {},
+            onNavigationClick = {},
+            onQueryChange = {},
+            onToggleLayoutMode = {},
+            onSortOptionSelected = {},
+            onToggleFilter = {},
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Journal creation book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A44_JournalCreationBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            JournalCreationScreenContent(
+                onGoBack = {},
+                onNewJournal = {},
+                initialTitle = "Route Screenshot Rollout",
+                selectedNoteIds = setOf(Uuid.parse("00000000-0000-0000-0000-000000000141")),
+                selectedMediaUris = listOf("content://logdate/audit-cover.jpg"),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Journal settings book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A45_JournalSettingsBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            JournalSettingsScreenContent(
+                uiState =
+                    JournalSettingsUiState.Loaded(
+                        journal = ScreenshotTestData.sampleJournal,
+                        editedName = "Route Screenshot Rollout",
+                        editedDescription = "A journal used to validate foldable settings flows.",
+                        hasUnsavedChanges = true,
+                    ),
+                onGoBack = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Journal settings delete book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A46_JournalSettingsDeleteBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            JournalSettingsScreenContent(
+                uiState =
+                    JournalSettingsUiState.Loaded(
+                        journal = ScreenshotTestData.sampleJournal,
+                        editedName = ScreenshotTestData.sampleJournal.title,
+                        editedDescription = "A journal used to validate foldable settings flows.",
+                    ),
+                onGoBack = {},
+                showDeleteConfirmation = true,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Share journal book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A47_ShareJournalBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            ShareJournalScreenContent(
+                uiState =
+                    ShareJournalUiState.Success(
+                        journal = ScreenshotTestData.sampleJournal,
+                        lastUpdatedDisplay = "Last updated Feb 20, 2025",
+                    ),
+                onGoBack = {},
+                onShareToInstagram = {},
+                onShareQrCode = {},
+                onShareJournal = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Note viewer text book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A48_NoteViewerTextBookPosture() {
+    BookPostureNoteViewerScene {
+        Text(
+            text =
+                "Captured the train ride home before the details blurred. The city felt quieter than usual, " +
+                    "so I wrote down the stops, the light through the windows, and the idea for tomorrow's entry.",
+            style = MaterialTheme.typography.bodyLarge,
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Note viewer image book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A49_NoteViewerImageBookPosture() {
+    BookPostureNoteViewerScene {
+        AuditNoteImage()
+    }
+}
+
+@PreviewTest
+@Preview(name = "Note viewer video book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A50_NoteViewerVideoBookPosture() {
+    BookPostureNoteViewerScene {
+        AuditNoteVideo()
+    }
+}
+
+@PreviewTest
+@Preview(name = "Note viewer audio book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A51_NoteViewerAudioBookPosture() {
+    FoldableAudioNoteViewerScene(bookPostureLayoutInfo)
+}
+
+@PreviewTest
+@Preview(name = "Note viewer text tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A52_NoteViewerTextTabletopPosture() {
+    TabletopPostureNoteViewerScene {
+        Text(
+            text =
+                "Captured the train ride home before the details blurred. The top pane keeps the note readable " +
+                    "while the lower pane keeps navigation and journal actions reachable.",
+            style = MaterialTheme.typography.bodyLarge,
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Note viewer image tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A53_NoteViewerImageTabletopPosture() {
+    TabletopPostureNoteViewerScene {
+        AuditNoteImage()
+    }
+}
+
+@PreviewTest
+@Preview(name = "Note viewer video tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A54_NoteViewerVideoTabletopPosture() {
+    TabletopPostureNoteViewerScene {
+        AuditNoteVideo()
+    }
+}
+
+@PreviewTest
+@Preview(name = "Note viewer audio tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A55_NoteViewerAudioTabletopPosture() {
+    FoldableAudioNoteViewerScene(tabletopPostureLayoutInfo)
+}
+
+@PreviewTest
+@Preview(name = "Media detail image book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A56_MediaDetailImageBookPosture() {
+    FoldableMediaDetailScene(
+        foldableLayoutInfo = bookPostureLayoutInfo,
+        state = LibraryScreenshotData.imageDetail.copy(mediaRef = SAMPLE_IMAGE_URI),
+    )
+}
+
+@PreviewTest
+@Preview(name = "Media detail video book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A57_MediaDetailVideoBookPosture() {
+    FoldableMediaDetailScene(
+        foldableLayoutInfo = bookPostureLayoutInfo,
+        state = LibraryScreenshotData.videoDetail.copy(mediaRef = SAMPLE_VIDEO_URI),
+    )
+}
+
+@PreviewTest
+@Preview(name = "Media detail image tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A58_MediaDetailImageTabletopPosture() {
+    FoldableMediaDetailScene(
+        foldableLayoutInfo = tabletopPostureLayoutInfo,
+        state = LibraryScreenshotData.imageDetail.copy(mediaRef = SAMPLE_IMAGE_URI),
+    )
+}
+
+@PreviewTest
+@Preview(name = "Media detail video tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A59_MediaDetailVideoTabletopPosture() {
+    FoldableMediaDetailScene(
+        foldableLayoutInfo = tabletopPostureLayoutInfo,
+        state = LibraryScreenshotData.videoDetail.copy(mediaRef = SAMPLE_VIDEO_URI),
+    )
+}
+
+@PreviewTest
+@Preview(name = "Audio recording controls tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A60_AudioRecordingControlsTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            AudioRecordingControls(
+                recordingState = RecordingState.RECORDING,
+                audioLevels = ScreenshotTestData.mockAudioLevels,
+                recordingDuration = 1.minutes + 23.seconds,
+                onStartRecording = {},
+                onStopRecording = {},
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Active recording tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A61_ActiveRecordingTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            ActiveRecordingDisplay(
+                audioLevels = ScreenshotTestData.mockAudioLevels,
+                recordingDuration = 2.minutes + 15.seconds,
+                onRestart = {},
+                onPause = {},
+                onFinish = {},
+                transcriptionText =
+                    "Started capturing notes for the adaptive audit. The active recording surface keeps the " +
+                        "live transcript readable while recording controls remain in the reachable lower pane.",
+                transcriptionIsRefining = true,
+                isPaused = false,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Entry editor mixed content book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A62_EntryEditorMixedContentBookPosture() {
+    FoldableEntryEditorScene(bookPostureLayoutInfo)
+}
+
+@PreviewTest
+@Preview(name = "Entry editor mixed content tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A63_EntryEditorMixedContentTabletopPosture() {
+    FoldableEntryEditorScene(tabletopPostureLayoutInfo)
+}
+
+@PreviewTest
+@Preview(name = "Audio transcript book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A64_AudioTranscriptBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            AudioTranscriptionUi(
+                transcriptionState =
+                    AudioUiState.TranscriptionState.Success(
+                        text =
+                            "We walked through the adaptive audit and captured the places where the " +
+                                "editor still assumed a phone-sized canvas. The transcript reader keeps " +
+                                "long-form generated text constrained to a readable pane while status " +
+                                "context stays on the adjacent side of the fold.",
+                        isRefining = true,
+                    ),
+                onRequestTranscription = {},
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Timeline day detail book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A65_TimelineDayDetailBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            TimelineDayDetailPanel(
+                uiState = auditTimelineDayState,
+                onExit = {},
+                onOpenEvent = {},
+                onOpenLocations = {},
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Timeline day detail tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A66_TimelineDayDetailTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            TimelineDayDetailPanel(
+                uiState = auditTimelineDayState,
+                onExit = {},
+                onOpenEvent = {},
+                onOpenLocations = {},
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Profile edit book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A67_ProfileEditBookPosture() {
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            ProfileScreenContent(
+                uiState =
+                    ProfileUiState(
+                        localProfile = auditProfile,
+                        account = auditAccount,
+                        userData = null,
+                        editState = ProfileEditState.DisplayName("Alex Johnson"),
+                    ),
+                onBack = {},
+                onStartEditingDisplayName = {},
+                onCancelEditing = {},
+                onSaveDisplayName = {},
+                onNavigateToBirthday = {},
+                snackbarHostState = snackbarHostState,
+            )
+        }
     }
 }
 
@@ -542,28 +1105,6 @@ fun A73_OnboardingOverviewTabletopPosture() {
                 useSplitScreen = true,
             )
         }
-    }
-}
-
-@PreviewTest
-@LargeScreenAuditPreviewMatrix
-@Composable
-fun A02_PersonalIntroBioStep() {
-    ScreenshotTheme {
-        PersonalIntroContent(
-            uiState =
-                PersonalIntroUiState(
-                    currentStep = PersonalIntroStep.Bio,
-                    name = "Alex",
-                    bio = "Runner, photographer, and obsessive note-taker who likes seeing context stay visible.",
-                ),
-            onNameChanged = {},
-            onBioChanged = {},
-            onProceedToBio = {},
-            onGoBackToName = {},
-            onProcessWithLlm = {},
-            onBack = {},
-        )
     }
 }
 
@@ -1379,495 +1920,41 @@ fun A115_ResetAppSettingsBookPosture() {
 }
 
 @PreviewTest
-@LargeScreenAuditPreviewMatrix
+@Preview(name = "Lock screen book posture", showBackground = true, device = BOOK_FOLDABLE)
 @Composable
-fun A03_CloudAccountSetup() {
-    ScreenshotTheme {
-        CloudAccountSetupContent(
-            useCompactLayout = false,
-            onBack = {},
-            onContinue = {},
-            onSkip = {},
-            onPlanSelected = {},
-            selectedOption = null,
-            onOptionSelected = {},
-        )
-    }
-}
-
-@PreviewTest
-@LargeScreenAuditPreviewMatrix
-@Composable
-fun A04_CloudAccountIntro() {
-    ScreenshotTheme {
-        CloudAccountWelcomeContent(
-            onContinue = {},
-            onSignIn = {},
-            onSkip = {},
-            serverSelectionState = ServerSelectionState(),
-            onSelectServerPreset = {},
-            onCustomServerUrlChange = {},
-            onShowCustomServerInfo = {},
-        )
-    }
-}
-
-@PreviewTest
-@LargeScreenAuditPreviewMatrix
-@Composable
-fun A05_SearchWithResults() {
-    ScreenshotTheme {
-        SearchScreenContent(
-            searchState = SearchScreenState.Results(query = "train", results = auditSearchResults),
-            onQueryChange = {},
-            onCommitSearch = {},
-            onResultClick = {},
-            onResultOpenDay = {},
-            onGoBack = {},
-            queryText = "train",
-        )
-    }
-}
-
-@PreviewTest
-@LargeScreenAuditPreviewMatrix
-@Composable
-fun A06_JournalsOverview() {
-    ScreenshotTheme {
-        JournalsOverviewScreenContent(
-            journals = auditJournals,
-            layoutMode = JournalLayoutMode.CAROUSEL,
-            sortOption = JournalSortOption.LAST_UPDATED,
-            activeFilters = emptySet(),
-            searchQuery = "audit",
-            entryResults = auditSearchResults,
-            onOpenJournal = {},
-            onBrowseJournals = {},
-            onCreateJournal = {},
-            onNavigateToDay = {},
-            onNavigationClick = {},
-            onQueryChange = {},
-            onToggleLayoutMode = {},
-            onSortOptionSelected = {},
-            onToggleFilter = {},
-        )
-    }
-}
-
-@PreviewTest
-@Preview(name = "Journals overview book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A40_JournalsOverviewBookPosture() {
+fun A116_LockScreenBookPosture() {
     provideFoldableLayoutInfo(bookPostureLayoutInfo) {
         ScreenshotTheme {
-            JournalsOverviewScreenContent(
-                journals = auditJournals,
-                layoutMode = JournalLayoutMode.CAROUSEL,
-                sortOption = JournalSortOption.LAST_UPDATED,
-                activeFilters = emptySet(),
-                searchQuery = "audit",
-                entryResults = auditSearchResults,
-                onOpenJournal = {},
-                onBrowseJournals = {},
-                onCreateJournal = {},
-                onNavigateToDay = {},
-                onNavigationClick = {},
-                onQueryChange = {},
-                onToggleLayoutMode = {},
-                onSortOptionSelected = {},
-                onToggleFilter = {},
-            )
+            LockableContent(
+                isLocked = true,
+                displayName = "Alex Johnson",
+                onUsePasscode = {},
+            ) {}
         }
     }
 }
 
 @PreviewTest
-@Preview(name = "Empty journals book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Preview(name = "App update prompt book posture", showBackground = true, device = BOOK_FOLDABLE)
 @Composable
-fun A42_EmptyJournalsBookPosture() {
+fun A117_AppUpdatePromptBookPosture() {
     provideFoldableLayoutInfo(bookPostureLayoutInfo) {
         ScreenshotTheme {
-            JournalsOverviewScreenContent(
-                journals = emptyList(),
-                layoutMode = JournalLayoutMode.CAROUSEL,
-                sortOption = JournalSortOption.LAST_UPDATED,
-                activeFilters = emptySet(),
-                searchQuery = "",
-                entryResults = emptyList(),
-                onOpenJournal = {},
-                onBrowseJournals = {},
-                onCreateJournal = {},
-                onNavigateToDay = {},
-                onNavigationClick = {},
-                onQueryChange = {},
-                onToggleLayoutMode = {},
-                onSortOptionSelected = {},
-                onToggleFilter = {},
-            )
-        }
-    }
-}
-
-@PreviewTest
-@LargeScreenAuditPreviewMatrix
-@Composable
-fun A43_EmptyJournalsResponsiveStates() {
-    ScreenshotTheme {
-        JournalsOverviewScreenContent(
-            journals = emptyList(),
-            layoutMode = JournalLayoutMode.CAROUSEL,
-            sortOption = JournalSortOption.LAST_UPDATED,
-            activeFilters = emptySet(),
-            searchQuery = "",
-            entryResults = emptyList(),
-            onOpenJournal = {},
-            onBrowseJournals = {},
-            onCreateJournal = {},
-            onNavigateToDay = {},
-            onNavigationClick = {},
-            onQueryChange = {},
-            onToggleLayoutMode = {},
-            onSortOptionSelected = {},
-            onToggleFilter = {},
-        )
-    }
-}
-
-@PreviewTest
-@Preview(name = "Journal creation book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A44_JournalCreationBookPosture() {
-    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
-        ScreenshotTheme {
-            JournalCreationScreenContent(
-                onGoBack = {},
-                onNewJournal = {},
-                initialTitle = "Route Screenshot Rollout",
-                selectedNoteIds = setOf(Uuid.parse("00000000-0000-0000-0000-000000000141")),
-                selectedMediaUris = listOf("content://logdate/audit-cover.jpg"),
-            )
-        }
-    }
-}
-
-@PreviewTest
-@Preview(name = "Journal settings book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A45_JournalSettingsBookPosture() {
-    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
-        ScreenshotTheme {
-            JournalSettingsScreenContent(
+            AppUpdatePrompt(
                 uiState =
-                    JournalSettingsUiState.Loaded(
-                        journal = ScreenshotTestData.sampleJournal,
-                        editedName = "Route Screenshot Rollout",
-                        editedDescription = "A journal used to validate foldable settings flows.",
-                        hasUnsavedChanges = true,
+                    AppUpdateUiState(
+                        status = AppUpdateStatus.Available,
+                        message = "LogDate 0.2.0 is ready to install.",
                     ),
-                onGoBack = {},
+                onLaunchUpdate = {},
+                onCompleteUpdate = {},
             )
         }
-    }
-}
-
-@PreviewTest
-@Preview(name = "Journal settings delete book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A46_JournalSettingsDeleteBookPosture() {
-    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
-        ScreenshotTheme {
-            JournalSettingsScreenContent(
-                uiState =
-                    JournalSettingsUiState.Loaded(
-                        journal = ScreenshotTestData.sampleJournal,
-                        editedName = ScreenshotTestData.sampleJournal.title,
-                        editedDescription = "A journal used to validate foldable settings flows.",
-                    ),
-                onGoBack = {},
-                showDeleteConfirmation = true,
-            )
-        }
-    }
-}
-
-@PreviewTest
-@Preview(name = "Share journal book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A47_ShareJournalBookPosture() {
-    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
-        ScreenshotTheme {
-            ShareJournalScreenContent(
-                uiState =
-                    ShareJournalUiState.Success(
-                        journal = ScreenshotTestData.sampleJournal,
-                        lastUpdatedDisplay = "Last updated Feb 20, 2025",
-                    ),
-                onGoBack = {},
-                onShareToInstagram = {},
-                onShareQrCode = {},
-                onShareJournal = {},
-            )
-        }
-    }
-}
-
-@PreviewTest
-@Preview(name = "Note viewer text book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A48_NoteViewerTextBookPosture() {
-    BookPostureNoteViewerScene {
-        Text(
-            text =
-                "Captured the train ride home before the details blurred. The city felt quieter than usual, " +
-                    "so I wrote down the stops, the light through the windows, and the idea for tomorrow's entry.",
-            style = MaterialTheme.typography.bodyLarge,
-        )
-    }
-}
-
-@PreviewTest
-@Preview(name = "Note viewer image book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A49_NoteViewerImageBookPosture() {
-    BookPostureNoteViewerScene {
-        AuditNoteImage()
-    }
-}
-
-@PreviewTest
-@Preview(name = "Note viewer video book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A50_NoteViewerVideoBookPosture() {
-    BookPostureNoteViewerScene {
-        AuditNoteVideo()
-    }
-}
-
-@PreviewTest
-@Preview(name = "Note viewer audio book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A51_NoteViewerAudioBookPosture() {
-    FoldableAudioNoteViewerScene(bookPostureLayoutInfo)
-}
-
-@PreviewTest
-@Preview(name = "Note viewer text tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
-@Composable
-fun A52_NoteViewerTextTabletopPosture() {
-    TabletopPostureNoteViewerScene {
-        Text(
-            text =
-                "Captured the train ride home before the details blurred. The top pane keeps the note readable " +
-                    "while the lower pane keeps navigation and journal actions reachable.",
-            style = MaterialTheme.typography.bodyLarge,
-        )
-    }
-}
-
-@PreviewTest
-@Preview(name = "Note viewer image tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
-@Composable
-fun A53_NoteViewerImageTabletopPosture() {
-    TabletopPostureNoteViewerScene {
-        AuditNoteImage()
-    }
-}
-
-@PreviewTest
-@Preview(name = "Note viewer video tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
-@Composable
-fun A54_NoteViewerVideoTabletopPosture() {
-    TabletopPostureNoteViewerScene {
-        AuditNoteVideo()
-    }
-}
-
-@PreviewTest
-@Preview(name = "Note viewer audio tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
-@Composable
-fun A55_NoteViewerAudioTabletopPosture() {
-    FoldableAudioNoteViewerScene(tabletopPostureLayoutInfo)
-}
-
-@PreviewTest
-@Preview(name = "Media detail image book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A56_MediaDetailImageBookPosture() {
-    FoldableMediaDetailScene(
-        foldableLayoutInfo = bookPostureLayoutInfo,
-        state = LibraryScreenshotData.imageDetail.copy(mediaRef = SAMPLE_IMAGE_URI),
-    )
-}
-
-@PreviewTest
-@Preview(name = "Media detail video book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A57_MediaDetailVideoBookPosture() {
-    FoldableMediaDetailScene(
-        foldableLayoutInfo = bookPostureLayoutInfo,
-        state = LibraryScreenshotData.videoDetail.copy(mediaRef = SAMPLE_VIDEO_URI),
-    )
-}
-
-@PreviewTest
-@Preview(name = "Media detail image tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
-@Composable
-fun A58_MediaDetailImageTabletopPosture() {
-    FoldableMediaDetailScene(
-        foldableLayoutInfo = tabletopPostureLayoutInfo,
-        state = LibraryScreenshotData.imageDetail.copy(mediaRef = SAMPLE_IMAGE_URI),
-    )
-}
-
-@PreviewTest
-@Preview(name = "Media detail video tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
-@Composable
-fun A59_MediaDetailVideoTabletopPosture() {
-    FoldableMediaDetailScene(
-        foldableLayoutInfo = tabletopPostureLayoutInfo,
-        state = LibraryScreenshotData.videoDetail.copy(mediaRef = SAMPLE_VIDEO_URI),
-    )
-}
-
-@PreviewTest
-@Preview(name = "Audio recording controls tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
-@Composable
-fun A60_AudioRecordingControlsTabletopPosture() {
-    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
-        ScreenshotTheme {
-            AudioRecordingControls(
-                recordingState = RecordingState.RECORDING,
-                audioLevels = ScreenshotTestData.mockAudioLevels,
-                recordingDuration = 1.minutes + 23.seconds,
-                onStartRecording = {},
-                onStopRecording = {},
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-    }
-}
-
-@PreviewTest
-@Preview(name = "Active recording tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
-@Composable
-fun A61_ActiveRecordingTabletopPosture() {
-    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
-        ScreenshotTheme {
-            ActiveRecordingDisplay(
-                audioLevels = ScreenshotTestData.mockAudioLevels,
-                recordingDuration = 2.minutes + 15.seconds,
-                onRestart = {},
-                onPause = {},
-                onFinish = {},
-                transcriptionText =
-                    "Started capturing notes for the adaptive audit. The active recording surface keeps the " +
-                        "live transcript readable while recording controls remain in the reachable lower pane.",
-                transcriptionIsRefining = true,
-                isPaused = false,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-    }
-}
-
-@PreviewTest
-@Preview(name = "Entry editor mixed content book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A62_EntryEditorMixedContentBookPosture() {
-    FoldableEntryEditorScene(bookPostureLayoutInfo)
-}
-
-@PreviewTest
-@Preview(name = "Entry editor mixed content tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
-@Composable
-fun A63_EntryEditorMixedContentTabletopPosture() {
-    FoldableEntryEditorScene(tabletopPostureLayoutInfo)
-}
-
-@PreviewTest
-@Preview(name = "Audio transcript book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A64_AudioTranscriptBookPosture() {
-    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
-        ScreenshotTheme {
-            AudioTranscriptionUi(
-                transcriptionState =
-                    AudioUiState.TranscriptionState.Success(
-                        text =
-                            "We walked through the adaptive audit and captured the places where the " +
-                                "editor still assumed a phone-sized canvas. The transcript reader keeps " +
-                                "long-form generated text constrained to a readable pane while status " +
-                                "context stays on the adjacent side of the fold.",
-                        isRefining = true,
-                    ),
-                onRequestTranscription = {},
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-    }
-}
-
-@PreviewTest
-@Preview(name = "Timeline day detail book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A65_TimelineDayDetailBookPosture() {
-    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
-        ScreenshotTheme {
-            TimelineDayDetailPanel(
-                uiState = auditTimelineDayState,
-                onExit = {},
-                onOpenEvent = {},
-                onOpenLocations = {},
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-    }
-}
-
-@PreviewTest
-@Preview(name = "Timeline day detail tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
-@Composable
-fun A66_TimelineDayDetailTabletopPosture() {
-    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
-        ScreenshotTheme {
-            TimelineDayDetailPanel(
-                uiState = auditTimelineDayState,
-                onExit = {},
-                onOpenEvent = {},
-                onOpenLocations = {},
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-    }
-}
-
-@PreviewTest
-@LargeScreenAuditPreviewMatrix
-@Composable
-fun A07_JournalDetail() {
-    ScreenshotTheme {
-        JournalDetailScreenContent(
-            uiState = auditJournalState,
-            onGoBack = {},
-        )
     }
 }
 
 @Composable
 private fun FoldableMediaDetailScene(
-    foldableLayoutInfo: FoldableLayoutInfo,
-    state: MediaDetailUiState,
-) {
-    provideFoldableLayoutInfo(foldableLayoutInfo) {
-        ScreenshotTheme {
-            MediaDetailContent(
-                state = state,
-                isExpanded = true,
-                onBack = {},
-            )
-        }
-    }
-}
 
 @Composable
 private fun FoldableEntryEditorScene(foldableLayoutInfo: FoldableLayoutInfo) {
@@ -1921,19 +2008,6 @@ private fun TabletopPostureNoteViewerScene(noteContent: @Composable () -> Unit) 
 
 @Composable
 private fun FoldableNoteViewerScene(
-    foldableLayoutInfo: FoldableLayoutInfo,
-    noteContent: @Composable () -> Unit,
-) {
-    provideFoldableLayoutInfo(foldableLayoutInfo) {
-        ScreenshotTheme {
-            NoteViewerScaffoldContent(
-                shared = auditNoteShared,
-                onGoBack = {},
-                noteContent = noteContent,
-            )
-        }
-    }
-}
 
 @Composable
 private fun AuditNoteImage() {
@@ -1976,105 +2050,6 @@ private fun FoldableAudioNoteViewerScene(foldableLayoutInfo: FoldableLayoutInfo)
                     onGoBack = {},
                 )
             }
-        }
-    }
-}
-
-@PreviewTest
-@Preview(name = "Journal detail book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A41_JournalDetailBookPosture() {
-    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
-        ScreenshotTheme {
-            JournalDetailScreenContent(
-                uiState = auditJournalState,
-                onGoBack = {},
-            )
-        }
-    }
-}
-
-@PreviewTest
-@LargeScreenAuditPreviewMatrix
-@Composable
-fun A08_ProfileDefault() {
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    ScreenshotTheme {
-        ProfileScreenContent(
-            uiState =
-                ProfileUiState(
-                    localProfile = auditProfile,
-                    account = auditAccount,
-                    userData = null,
-                ),
-            onBack = {},
-            onStartEditingDisplayName = {},
-            onCancelEditing = {},
-            onSaveDisplayName = {},
-            onNavigateToBirthday = {},
-            snackbarHostState = snackbarHostState,
-        )
-    }
-}
-
-@PreviewTest
-@Preview(name = "Profile edit book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A67_ProfileEditBookPosture() {
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
-        ScreenshotTheme {
-            ProfileScreenContent(
-                uiState =
-                    ProfileUiState(
-                        localProfile = auditProfile,
-                        account = auditAccount,
-                        userData = null,
-                        editState = ProfileEditState.DisplayName("Alex Johnson"),
-                    ),
-                onBack = {},
-                onStartEditingDisplayName = {},
-                onCancelEditing = {},
-                onSaveDisplayName = {},
-                onNavigateToBirthday = {},
-                snackbarHostState = snackbarHostState,
-            )
-        }
-    }
-}
-
-@PreviewTest
-@Preview(name = "Lock screen book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A116_LockScreenBookPosture() {
-    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
-        ScreenshotTheme {
-            LockableContent(
-                isLocked = true,
-                displayName = "Alex Johnson",
-                onUsePasscode = {},
-            ) {}
-        }
-    }
-}
-
-@PreviewTest
-@Preview(name = "App update prompt book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A117_AppUpdatePromptBookPosture() {
-    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
-        ScreenshotTheme {
-            AppUpdatePrompt(
-                uiState =
-                    AppUpdateUiState(
-                        status = AppUpdateStatus.Available,
-                        message = "LogDate 0.2.0 is ready to install.",
-                    ),
-                onLaunchUpdate = {},
-                onCompleteUpdate = {},
-            )
         }
     }
 }

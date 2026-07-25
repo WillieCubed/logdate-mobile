@@ -102,14 +102,18 @@ class ScreenshotOrganizationTest {
                 .sorted()
                 .forEach { file ->
                     val previewNames =
-                        Regex("""fun\s+(A\d{2}_[A-Za-z0-9]+)\s*\(""")
+                        Regex("""fun\s+(A\d{2,3}_[A-Za-z0-9]+)\s*\(""")
                             .findAll(file.readText())
                             .map { it.groupValues[1] }
                             .toList()
 
                     assertTrue(previewNames.isNotEmpty(), "Expected adaptive audit previews in $file")
+                    val numericOrder =
+                        previewNames.sortedBy { name ->
+                            Regex("""^A(\d+)_""").find(name)?.groupValues?.get(1)?.toInt() ?: Int.MAX_VALUE
+                        }
                     assertTrue(
-                        previewNames == previewNames.sorted(),
+                        previewNames == numericOrder,
                         "Adaptive audit previews must sort in review order: $file",
                     )
                 }
