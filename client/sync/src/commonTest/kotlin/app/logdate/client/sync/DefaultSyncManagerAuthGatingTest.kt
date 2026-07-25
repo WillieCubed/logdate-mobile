@@ -1,14 +1,14 @@
 package app.logdate.client.sync
 
-import app.logdate.client.datastore.UserSession
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.datastore.UserSession
 import app.logdate.client.sync.test.fakeSessionStorage
 import app.logdate.client.sync.test.fakeSyncMetadataService
 import app.logdate.client.sync.test.testDefaultSyncManager
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

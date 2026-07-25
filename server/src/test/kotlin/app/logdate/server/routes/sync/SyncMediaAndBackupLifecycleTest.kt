@@ -3,8 +3,8 @@ package app.logdate.server.routes.sync
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.crypto.EncryptionService
 import app.logdate.server.crypto.ProcessedPayload
-import app.logdate.server.logdate.LogDateBlobNamespace
 import app.logdate.server.logdate.LogDateBackupRepository
+import app.logdate.server.logdate.LogDateBlobNamespace
 import app.logdate.server.logdate.LogDateMediaBlobRepository
 import app.logdate.server.logdate.asLogDateBackupRepository
 import app.logdate.server.logdate.asLogDateCollectionsRepository
@@ -13,11 +13,11 @@ import app.logdate.server.logdate.asLogDateMediaRepository
 import app.logdate.server.routes.support.backupMultipartWithFields
 import app.logdate.server.routes.support.mediaMultipartWithFields
 import app.logdate.server.routes.syncRoutes
+import app.logdate.server.sync.BackupRecord
 import app.logdate.server.sync.GcsMediaStorage
 import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.MediaAccessPolicy
 import app.logdate.server.sync.MediaRecord
-import app.logdate.server.sync.BackupRecord
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.shared.model.sync.DeviceId
 import io.ktor.client.request.delete

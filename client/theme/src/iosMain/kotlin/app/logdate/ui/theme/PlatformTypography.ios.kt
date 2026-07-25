@@ -199,8 +199,7 @@ private fun rememberDynamicTypeScale(): State<Float> {
     return state
 }
 
-private fun currentDynamicTypeScale(): Float =
-    dynamicTypeScaleFor(UIApplication.sharedApplication.preferredContentSizeCategory)
+private fun currentDynamicTypeScale(): Float = dynamicTypeScaleFor(UIApplication.sharedApplication.preferredContentSizeCategory)
 
 /**
  * Maps a [UIContentSizeCategory] name to the body-style scale factor used by the Apple HIG.

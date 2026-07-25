@@ -12,9 +12,13 @@ object RemoteCameraDeviceDataMapper {
     private const val KEY_SELECTED_DEVICE_ID = "selectedDeviceId"
 
     private fun keyDeviceId(index: Int) = "device_${index}_id"
+
     private fun keyDeviceLabel(index: Int) = "device_${index}_label"
+
     private fun keyDeviceCategory(index: Int) = "device_${index}_category"
+
     private fun keyDeviceAvailable(index: Int) = "device_${index}_available"
+
     private fun keyDeviceExternal(index: Int) = "device_${index}_external"
 
     fun toDataMap(selection: MediaDeviceSelectionUiState): Map<String, String> {
