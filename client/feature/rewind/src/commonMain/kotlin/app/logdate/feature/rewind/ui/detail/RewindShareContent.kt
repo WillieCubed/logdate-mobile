@@ -1,5 +1,6 @@
 package app.logdate.feature.rewind.ui.detail
 
+import app.logdate.feature.rewind.ui.AudioNoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.BasicTextRewindPanelUiState
 import app.logdate.feature.rewind.ui.BigStatisticRewindPanelUiState
 import app.logdate.feature.rewind.ui.HighlightedQuoteRewindPanelUiState
@@ -158,4 +159,10 @@ fun RewindPanelUiState.toShareContent(): RewindShareContent? =
             // Location maps don't have a useful share format yet — sharing the canvas would
             // require rasterizing on demand. Skip the share path entirely until that ships.
             null
+        is AudioNoteRewindPanelUiState ->
+            RewindShareContent(
+                text = transcriptionText ?: dateFormatted,
+                visual = RewindShareVisual.ExistingMedia(uri),
+                dateFormatted = dateFormatted,
+            )
     }

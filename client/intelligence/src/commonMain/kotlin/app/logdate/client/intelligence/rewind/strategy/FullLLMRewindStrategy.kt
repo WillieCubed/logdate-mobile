@@ -39,6 +39,7 @@ class FullLLMRewindStrategy(
                 weekId = input.weekId,
                 textEntries = input.textEntries,
                 media = input.media,
+                audio = input.audioEntries,
                 people = input.people,
                 primaryLocation = primaryLocation,
                 periodStart = input.periodStart,
@@ -83,6 +84,7 @@ class FullLLMRewindStrategy(
                         .distinct()
                         .size,
                 distinctPeople = input.people.size,
+                audioNoteCount = input.audioEntries.size,
             )
 
         val content =
@@ -90,6 +92,7 @@ class FullLLMRewindStrategy(
                 narrative = narrative,
                 curation = curation,
                 textEntries = input.textEntries,
+                audioEntries = input.audioEntries,
                 people = input.people,
                 weather = narrative.weatherContext,
                 locationPath = mapPoints,

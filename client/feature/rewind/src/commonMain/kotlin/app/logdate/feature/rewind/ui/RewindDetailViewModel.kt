@@ -10,6 +10,7 @@ import app.logdate.client.domain.rewind.GetRewindUseCase
 import app.logdate.client.domain.rewind.MarkRewindViewedUseCase
 import app.logdate.client.domain.rewind.ObserveReflectionPromptResponsesUseCase
 import app.logdate.client.domain.rewind.SaveReflectionPromptResponseUseCase
+import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.sharing.RewindQuote
 import app.logdate.client.sharing.RewindQuoteCardRenderer
 import app.logdate.client.sharing.RewindStatsSummary
@@ -28,6 +29,7 @@ import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
 import app.logdate.shared.model.WeatherCategory
 import app.logdate.shared.model.WeatherContext
+import app.logdate.ui.audio.WaveformStorage
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -74,6 +76,10 @@ import kotlin.uuid.Uuid
  * @param markRewindViewed Records that the user has opened this rewind; bumps the
  *   view count and stamps the first-viewed timestamp on the first call
  * @param preferences User preferences data source, read for the replies-enabled toggle
+ * @param audioPlaybackManager Plays back audio-note panels; at most one plays at a time
+ * @param waveformStorage Reads cached waveform amplitudes for audio-note panels, keyed
+ *   by audio URI. Misses (older recordings, or storage never populated) resolve to
+ *   null — the panel falls back to a placeholder waveform rather than blocking.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RewindDetailViewModel(
@@ -86,10 +92,21 @@ class RewindDetailViewModel(
     private val deleteRewindUseCase: DeleteRewindUseCase,
     private val markRewindViewed: MarkRewindViewedUseCase,
     private val preferences: LogdatePreferencesDataSource,
+    private val audioPlaybackManager: AudioPlaybackManager,
+    private val waveformStorage: WaveformStorage,
 //    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val rewindIdState = MutableStateFlow<Uuid?>(null)
     private val latestRewind = MutableStateFlow<Rewind?>(null)
+
+    private val audioPlaybackStateFlow = MutableStateFlow(AudioPanelPlaybackUiState())
+
+    /**
+     * Playback progress for whichever audio-note panel is currently playing, or the
+     * default (nothing playing) state. At most one audio panel plays at a time — starting
+     * a new one implicitly stops the previous.
+     */
+    val audioPlaybackState: StateFlow<AudioPanelPlaybackUiState> = audioPlaybackStateFlow.asStateFlow()
 
     /**
      * The most recently loaded rewind, or null before [loadRewind] resolves. The composable
@@ -197,6 +214,40 @@ class RewindDetailViewModel(
      */
     fun onFirstViewConsumed() {
         isFirstViewFlow.value = false
+    }
+
+    /**
+     * Starts or pauses playback for an audio-note panel. Tapping the panel that's
+     * already playing pauses it; tapping a different one stops whatever was playing
+     * and starts the new one.
+     */
+    fun toggleAudioPlayback(
+        sourceId: Uuid,
+        uri: String,
+    ) {
+        val currentlyPlaying = audioPlaybackStateFlow.value.playingSourceId
+        if (currentlyPlaying == sourceId) {
+            audioPlaybackManager.pausePlayback()
+            audioPlaybackStateFlow.value = AudioPanelPlaybackUiState()
+            return
+        }
+        audioPlaybackManager.startPlayback(
+            uri = uri,
+            onProgressUpdated = { progress ->
+                audioPlaybackStateFlow.value = AudioPanelPlaybackUiState(sourceId, progress)
+            },
+            onPlaybackCompleted = {
+                audioPlaybackStateFlow.value = AudioPanelPlaybackUiState()
+            },
+        )
+        audioPlaybackStateFlow.value = AudioPanelPlaybackUiState(playingSourceId = sourceId)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        if (audioPlaybackStateFlow.value.playingSourceId != null) {
+            audioPlaybackManager.stopPlayback()
+        }
     }
 
     /**
@@ -311,7 +362,7 @@ class RewindDetailViewModel(
      *   prompt panels still render but the chip and inline preview are suppressed.
      * @return List of UI panel states in presentation order
      */
-    private fun transformRewindToStoryPanels(
+    private suspend fun transformRewindToStoryPanels(
         rewind: Rewind,
         responses: Map<ReflectionPromptKey, ReflectionPromptResponse>,
         repliesEnabled: Boolean,
@@ -398,6 +449,18 @@ class RewindDetailViewModel(
                             imageUri = content.uri,
                             caption = content.caption,
                             dateFormatted = formatTimestamp(content.timestamp),
+                        )
+                    }
+
+                    is RewindContent.AudioNote -> {
+                        AudioNoteRewindPanelUiState(
+                            sourceId = content.sourceId,
+                            timestamp = content.timestamp,
+                            uri = content.uri,
+                            durationMs = content.durationMs,
+                            transcriptionText = content.transcriptionText,
+                            dateFormatted = formatTimestamp(content.timestamp),
+                            cachedAmplitudes = runCatching { waveformStorage.load(content.uri) }.getOrNull(),
                         )
                     }
 

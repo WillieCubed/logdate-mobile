@@ -57,6 +57,7 @@ kotlin {
             implementation(projects.client.intelligence)
             implementation(projects.client.sharing)
             implementation(projects.client.util)
+            implementation(projects.client.media)
             // Compose plugin dependencies
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)

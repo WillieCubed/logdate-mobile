@@ -4,6 +4,7 @@ import app.logdate.client.domain.media.IndexMediaForPeriodUseCase
 import app.logdate.client.domain.notes.FetchNotesForDayUseCase
 import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.entity.people.PeopleExtractor
+import app.logdate.client.intelligence.rewind.strategy.AudioEntryWithTranscript
 import app.logdate.client.intelligence.rewind.strategy.RewindInput
 import app.logdate.client.intelligence.rewind.strategy.RewindStrategySelector
 import app.logdate.client.repository.journals.JournalNote
@@ -11,6 +12,7 @@ import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.repository.rewind.RewindGenerationManager
 import app.logdate.client.repository.rewind.RewindRepository
+import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindGenerationRequest
 import io.github.aakira.napier.Napier
@@ -45,6 +47,7 @@ class GenerateBasicRewindUseCase(
     private val strategySelector: RewindStrategySelector,
     private val peopleExtractor: PeopleExtractor,
     private val locationHistoryRepository: LocationHistoryRepository,
+    private val transcriptionRepository: TranscriptionRepository,
 ) {
     private companion object {
         private val DEFAULT_WAIT_TIMEOUT = 5.seconds
@@ -98,6 +101,7 @@ class GenerateBasicRewindUseCase(
             }
 
             val allTextEntries = mutableListOf<JournalNote.Text>()
+            val allAudioEntries = mutableListOf<JournalNote.Audio>()
             val timezone = TimeZone.currentSystemDefault()
             var currentDate = startTime.toLocalDateTime(timezone).date
             if (startTime < endTime) {
@@ -109,13 +113,14 @@ class GenerateBasicRewindUseCase(
                 while (currentDate <= lastIncludedDate) {
                     val notesForDay = fetchNotesForDay(currentDate).firstOrNull() ?: emptyList()
                     allTextEntries.addAll(notesForDay.filterIsInstance<JournalNote.Text>())
+                    allAudioEntries.addAll(notesForDay.filterIsInstance<JournalNote.Audio>())
                     currentDate = currentDate.plus(1, DateTimeUnit.DAY)
                 }
             }
 
             val mediaItems = indexedMediaRepository.getForPeriod(startTime, endTime).firstOrNull() ?: emptyList()
 
-            if (allTextEntries.isEmpty() && mediaItems.isEmpty()) {
+            if (allTextEntries.isEmpty() && mediaItems.isEmpty() && allAudioEntries.isEmpty()) {
                 updateGenerationStatus(
                     request.id,
                     RewindGenerationRequest.Status.FAILED,
@@ -123,6 +128,19 @@ class GenerateBasicRewindUseCase(
                 )
                 return GenerateBasicRewindResult.NoContent
             }
+
+            // Transcription is eventual, not guaranteed — capture whatever's available
+            // right now (COMPLETED text, or null if still PENDING/IN_PROGRESS/failed)
+            // rather than waiting. An audio entry with no transcript yet still counts
+            // as a moment that happened; it just can't be quoted.
+            val audioEntriesWithTranscripts =
+                allAudioEntries.map { audio ->
+                    val transcription = runCatching { transcriptionRepository.getTranscription(audio.uid) }.getOrNull()
+                    AudioEntryWithTranscript(
+                        audio = audio,
+                        transcriptionText = transcription?.text?.takeUnless { it.isBlank() },
+                    )
+                }
 
             // Extract people for narrative + curation signals.
             val people =
@@ -150,6 +168,7 @@ class GenerateBasicRewindUseCase(
                     periodStart = startTime,
                     periodEnd = endTime,
                     textEntries = allTextEntries,
+                    audioEntries = audioEntriesWithTranscripts,
                     media = mediaItems,
                     people = people,
                     locationHistory = locationHistory,

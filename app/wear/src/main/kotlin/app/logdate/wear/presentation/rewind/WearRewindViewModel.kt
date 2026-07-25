@@ -88,11 +88,11 @@ class WearRewindViewModel(
     }
 
     /**
-     * Filters out Image and Video panels since the watch screen is too small
-     * for meaningful media viewing.
+     * Filters out Image, Video, and AudioNote panels since the watch screen is too small
+     * for meaningful media viewing and has no audio playback UI here.
      */
     private fun filterPanelsForWear(content: List<RewindContent>): List<RewindContent> =
         content.filter { panel ->
-            panel !is RewindContent.Image && panel !is RewindContent.Video
+            panel !is RewindContent.Image && panel !is RewindContent.Video && panel !is RewindContent.AudioNote
         }
 }

@@ -38,10 +38,24 @@ data class RewindInput(
     val periodStart: Instant,
     val periodEnd: Instant,
     val textEntries: List<JournalNote.Text>,
+    val audioEntries: List<AudioEntryWithTranscript> = emptyList(),
     val media: List<IndexedMedia>,
     val people: List<Person>,
     val locationHistory: List<LocationHistoryItem>,
     val weekId: String,
+)
+
+/**
+ * An audio journal entry paired with whatever transcript is available right now.
+ *
+ * Transcription is eventual, not guaranteed, by the time a week's Rewind generates —
+ * [transcriptionText] is null when the transcript is still pending, in progress, or
+ * failed. Every consumer of this type must treat that as a normal case: the entry is
+ * still a real moment worth citing, it just can't be quoted.
+ */
+data class AudioEntryWithTranscript(
+    val audio: JournalNote.Audio,
+    val transcriptionText: String?,
 )
 
 /**

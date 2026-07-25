@@ -10,6 +10,7 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
 import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
 import app.logdate.client.intelligence.generativeai.GenerativeAIResponseFormat
+import app.logdate.client.intelligence.rewind.strategy.AudioEntryWithTranscript
 import app.logdate.client.intelligence.structured.JsonStructuredOutputParser
 import app.logdate.client.intelligence.structured.StructuredOutputResult
 import app.logdate.client.intelligence.unavailableReason
@@ -339,6 +340,10 @@ Respond ONLY with valid JSON in this format. No additional text."""
      * @param weekId Unique identifier for log correlation (e.g., "2024-W42")
      * @param textEntries Journal text entries from the week
      * @param media Photos and videos from the week
+     * @param audio Audio entries from the week, paired with whatever transcript is
+     *   available right now. Entries without a transcript are still listed (by
+     *   timestamp and duration) so the model knows a moment happened there even when
+     *   it can't be quoted.
      * @param people People mentioned across entries (from PeopleExtractor)
      * @param primaryLocation Optional lat/lon for weather lookup; null skips the fetch.
      * @param periodStart Optional period start, required for the weather lookup.
@@ -350,6 +355,7 @@ Respond ONLY with valid JSON in this format. No additional text."""
         weekId: String,
         textEntries: List<JournalNote.Text>,
         media: List<IndexedMedia>,
+        audio: List<AudioEntryWithTranscript> = emptyList(),
         people: List<Person> = emptyList(),
         primaryLocation: WeatherFetchLocation? = null,
         periodStart: Instant? = null,
@@ -380,7 +386,7 @@ Respond ONLY with valid JSON in this format. No additional text."""
                         null
                     }
 
-                val narrativeResult = synthesizeNarrative(weekId, textEntries, media, people, useCached)
+                val narrativeResult = synthesizeNarrative(weekId, textEntries, media, audio, people, useCached)
                 val weather = weatherDeferred?.await()
                 narrativeResult.attachWeather(weather)
             }
@@ -390,13 +396,14 @@ Respond ONLY with valid JSON in this format. No additional text."""
         weekId: String,
         textEntries: List<JournalNote.Text>,
         media: List<IndexedMedia>,
+        audio: List<AudioEntryWithTranscript>,
         people: List<Person>,
         useCached: Boolean,
     ): AIResult<WeekNarrative> {
         val cacheRequest =
             GenerativeAICacheRequest(
                 contentType = GenerativeAICacheContentType.Narrative,
-                inputText = buildContentSummary(textEntries, media, people),
+                inputText = buildContentSummary(textEntries, media, audio, people),
                 providerId = genAIClient.providerId,
                 model = genAIClient.defaultModel,
                 promptVersion = PROMPT_VERSION,
@@ -486,6 +493,7 @@ Analyze this content and provide the narrative structure in JSON format as speci
     private fun buildContentSummary(
         textEntries: List<JournalNote.Text>,
         media: List<IndexedMedia>,
+        audio: List<AudioEntryWithTranscript>,
         people: List<Person>,
     ): String {
         val summary =
@@ -511,6 +519,27 @@ Analyze this content and provide the narrative structure in JSON format as speci
                     }
                 }
 
+                // Audio entries are listed even without a transcript yet — transcription
+                // is eventual, not guaranteed, by the time a week's Rewind generates. A
+                // moment the model can't quote is still a moment worth acknowledging.
+                if (audio.isNotEmpty()) {
+                    appendLine("\n=== AUDIO TRANSCRIPTS ===")
+                    audio.forEach { entry ->
+                        val durationSeconds = entry.audio.durationMs / 1000
+                        appendLine(
+                            "\n[${entry.audio.creationTimestamp}] Audio (ID: ${entry.audio.uid}) - " +
+                                "Duration: ${durationSeconds}s",
+                        )
+                        val transcript = entry.transcriptionText
+                        if (transcript != null) {
+                            appendLine(transcript.take(500))
+                            if (transcript.length > 500) appendLine("... [truncated]")
+                        } else {
+                            appendLine("[transcript not yet available]")
+                        }
+                    }
+                }
+
                 if (people.isNotEmpty()) {
                     appendLine("\n=== PEOPLE MENTIONED ===")
                     appendLine(people.joinToString(", ") { it.name })
@@ -519,6 +548,7 @@ Analyze this content and provide the narrative structure in JSON format as speci
                 appendLine("\n=== SUMMARY STATS ===")
                 appendLine("Total entries: ${textEntries.size}")
                 appendLine("Total media: ${media.size}")
+                appendLine("Total audio: ${audio.size}")
                 appendLine("People mentioned: ${people.size}")
             }
 

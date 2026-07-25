@@ -184,10 +184,11 @@ private fun PanelContent(panel: RewindContent) {
         }
 
         // Visual-heavy panels that don't translate to the watch's screen size are
-        // filtered out — Image/Video and the structural map/weather/personality/top-list
-        // cards live in the phone-side Rewind UI.
+        // filtered out — Image/Video/AudioNote playback and the structural
+        // map/weather/personality/top-list cards live in the phone-side Rewind UI.
         is RewindContent.Image,
         is RewindContent.Video,
+        is RewindContent.AudioNote,
         is RewindContent.MapPanel,
         is RewindContent.WeatherPanel,
         is RewindContent.PersonalityCard,

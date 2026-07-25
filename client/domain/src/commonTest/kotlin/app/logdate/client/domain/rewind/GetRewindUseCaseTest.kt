@@ -40,6 +40,9 @@ import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.repository.rewind.RewindGenerationManager
 import app.logdate.client.repository.rewind.RewindRepository
+import app.logdate.client.repository.transcription.TranscriptionData
+import app.logdate.client.repository.transcription.TranscriptionRepository
+import app.logdate.client.repository.transcription.TranscriptionStatus
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindGenerationRequest
@@ -141,6 +144,7 @@ class GetRewindUseCaseTest {
                 strategySelector = strategySelector,
                 peopleExtractor = peopleExtractor,
                 locationHistoryRepository = FakeLocationHistoryRepository(),
+                transcriptionRepository = FakeTranscriptionRepository(),
             )
         useCase =
             GetRewindUseCase(
@@ -603,5 +607,24 @@ class GetRewindUseCaseTest {
         ): Result<Unit> = Result.success(Unit)
 
         override suspend fun getLocationCount(): Int = 0
+    }
+
+    private class FakeTranscriptionRepository : TranscriptionRepository {
+        override suspend fun requestTranscription(noteId: Uuid): Boolean = true
+
+        override suspend fun getTranscription(noteId: Uuid): TranscriptionData? = null
+
+        override fun observeTranscription(noteId: Uuid): Flow<TranscriptionData?> = flowOf(null)
+
+        override suspend fun getPendingTranscriptions(): List<TranscriptionData> = emptyList()
+
+        override suspend fun updateTranscription(
+            noteId: Uuid,
+            text: String?,
+            status: TranscriptionStatus,
+            errorMessage: String?,
+        ): Boolean = true
+
+        override suspend fun deleteTranscription(noteId: Uuid): Boolean = true
     }
 }

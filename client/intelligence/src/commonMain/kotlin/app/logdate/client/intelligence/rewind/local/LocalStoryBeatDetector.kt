@@ -1,5 +1,6 @@
 package app.logdate.client.intelligence.rewind.local
 
+import app.logdate.client.intelligence.rewind.strategy.AudioEntryWithTranscript
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.location.LocationHistoryItem
 import app.logdate.client.repository.media.IndexedMedia
@@ -30,34 +31,44 @@ class LocalStoryBeatDetector(
     /**
      * @param textEntries text entries from the period.
      * @param media media items from the period (used only for evidence-id grouping).
+     * @param audio audio entries from the period, paired with whatever transcript is
+     *   available right now. Included with the same no-judgment inclusion as text and
+     *   media — an audio-only day still produces a beat, transcript or not.
      * @param locationHistory recorded GPS points from the period. When a single day
      *   shows visits to >=2 places more than [LOCATION_SPLIT_DISTANCE_METERS] apart,
      *   the detector subdivides that day into multiple beats — so trip days don't
      *   flatten into one undifferentiated entry.
      * @param periodStart inclusive start of the period.
      * @param periodEnd exclusive end of the period.
-     * @return 0–[maxBeats] story beats. Empty when neither text nor media exists.
+     * @return 0–[maxBeats] story beats. Empty when no text, media, or audio exists.
      */
     fun detect(
         textEntries: List<JournalNote.Text>,
         periodStart: Instant,
         periodEnd: Instant,
         media: List<IndexedMedia> = emptyList(),
+        audio: List<AudioEntryWithTranscript> = emptyList(),
         locationHistory: List<LocationHistoryItem> = emptyList(),
     ): List<StoryBeat> {
-        if (textEntries.isEmpty() && media.isEmpty()) return emptyList()
+        if (textEntries.isEmpty() && media.isEmpty() && audio.isEmpty()) return emptyList()
         val tz = TimeZone.currentSystemDefault()
 
-        // Bucket entries + media by calendar date.
+        // Bucket entries + media + audio by calendar date.
         val textByDay = textEntries.groupBy { it.creationTimestamp.toLocalDateTime(tz).date }
         val mediaByDay = media.groupBy { it.timestamp.toLocalDateTime(tz).date }
+        val audioByDay =
+            audio.groupBy {
+                it.audio.creationTimestamp
+                    .toLocalDateTime(tz)
+                    .date
+            }
         val locationsByDay =
             locationHistory.groupBy { it.timestamp.toLocalDateTime(tz).date }
 
         // Set + Set deduplicates (Set semantics), .sorted() yields a List in
         // natural date order; both available cross-platform unlike toSortedSet.
         val daysWithContent =
-            (textByDay.keys + mediaByDay.keys).sorted()
+            (textByDay.keys + mediaByDay.keys + audioByDay.keys).sorted()
 
         // Step 1: per-day, subdivide into segments by location cluster when the
         // user travelled meaningfully. Each segment becomes a candidate beat.
@@ -67,6 +78,7 @@ class LocalStoryBeatDetector(
                     day = day,
                     dayEntries = textByDay[day].orEmpty(),
                     dayMedia = mediaByDay[day].orEmpty(),
+                    dayAudio = audioByDay[day].orEmpty(),
                     dayLocations = locationsByDay[day].orEmpty(),
                 )
             }
@@ -87,7 +99,8 @@ class LocalStoryBeatDetector(
             val days = group.flatMap { it.days }.distinct()
             val entries = group.flatMap { it.entries }
             val media = group.flatMap { it.media }
-            buildBeat(days, entries, media)
+            val audioForBeat = group.flatMap { it.audio }
+            buildBeat(days, entries, media, audioForBeat)
         }
     }
 
@@ -100,18 +113,20 @@ class LocalStoryBeatDetector(
         day: LocalDate,
         dayEntries: List<JournalNote.Text>,
         dayMedia: List<IndexedMedia>,
+        dayAudio: List<AudioEntryWithTranscript>,
         dayLocations: List<LocationHistoryItem>,
     ): List<DaySegment> {
         if (dayLocations.size < 2) {
-            return listOf(DaySegment(listOf(day), dayEntries, dayMedia))
+            return listOf(DaySegment(listOf(day), dayEntries, dayMedia, dayAudio))
         }
 
         val clusters = clusterByDistance(dayLocations.sortedBy { it.timestamp })
         if (clusters.size < 2) {
-            return listOf(DaySegment(listOf(day), dayEntries, dayMedia))
+            return listOf(DaySegment(listOf(day), dayEntries, dayMedia, dayAudio))
         }
 
-        // Assign each entry / media to the cluster whose timestamp range it falls within.
+        // Assign each entry / media / audio entry to the cluster whose timestamp range
+        // it falls within.
         val perCluster =
             clusters.map { cluster ->
                 val clusterStart = cluster.first().timestamp
@@ -124,15 +139,20 @@ class LocalStoryBeatDetector(
                     dayMedia.filter {
                         it.timestamp >= clusterStart && it.timestamp <= clusterEnd
                     }
+                val matchingAudio =
+                    dayAudio.filter {
+                        it.audio.creationTimestamp >= clusterStart && it.audio.creationTimestamp <= clusterEnd
+                    }
                 DaySegment(
                     days = listOf(day),
                     entries = matchingEntries,
                     media = matchingMedia,
+                    audio = matchingAudio,
                 )
             }
-        val nonEmpty = perCluster.filter { it.entries.isNotEmpty() || it.media.isNotEmpty() }
+        val nonEmpty = perCluster.filter { it.entries.isNotEmpty() || it.media.isNotEmpty() || it.audio.isNotEmpty() }
         // If filtering wiped everything, keep the whole-day segment.
-        return nonEmpty.ifEmpty { listOf(DaySegment(listOf(day), dayEntries, dayMedia)) }
+        return nonEmpty.ifEmpty { listOf(DaySegment(listOf(day), dayEntries, dayMedia, dayAudio)) }
     }
 
     /**
@@ -163,18 +183,21 @@ class LocalStoryBeatDetector(
         val days: List<LocalDate>,
         val entries: List<JournalNote.Text>,
         val media: List<IndexedMedia>,
+        val audio: List<AudioEntryWithTranscript> = emptyList(),
     )
 
     private fun buildBeat(
         dayBucket: List<LocalDate>,
         entries: List<JournalNote.Text>,
         media: List<IndexedMedia>,
+        audio: List<AudioEntryWithTranscript>,
     ): StoryBeat {
         val evidenceIds =
             entries.map { it.uid.toString() } +
-                media.map { it.uid.toString() }
-        val moment = pickMoment(entries, dayBucket)
-        val emotionalWeight = classifyEmotion(entries)
+                media.map { it.uid.toString() } +
+                audio.map { it.audio.uid.toString() }
+        val moment = pickMoment(entries, audio, dayBucket)
+        val emotionalWeight = classifyEmotion(entries, audio)
         return StoryBeat(
             moment = moment,
             context = "",
@@ -185,11 +208,15 @@ class LocalStoryBeatDetector(
 
     private fun pickMoment(
         entries: List<JournalNote.Text>,
+        audio: List<AudioEntryWithTranscript>,
         dayBucket: List<LocalDate>,
     ): String {
-        // Concatenate entry text, split sentences, take the first that fits the
-        // headline window.
-        val combined = entries.joinToString(separator = " ") { it.content.trim() }
+        // Concatenate entry text and available transcripts, split sentences, take the
+        // first that fits the headline window — a spoken moment is as headline-worthy
+        // as a written one.
+        val combined =
+            (entries.map { it.content } + audio.mapNotNull { it.transcriptionText })
+                .joinToString(separator = " ") { it.trim() }
         val sentence =
             splitSentences(combined)
                 .map { it.trim() }
@@ -224,9 +251,13 @@ class LocalStoryBeatDetector(
         return out
     }
 
-    private fun classifyEmotion(entries: List<JournalNote.Text>): String {
-        if (entries.isEmpty()) return "quiet"
-        val joined = entries.joinToString(separator = " ") { it.content }.lowercase()
+    private fun classifyEmotion(
+        entries: List<JournalNote.Text>,
+        audio: List<AudioEntryWithTranscript>,
+    ): String {
+        val transcripts = audio.mapNotNull { it.transcriptionText }
+        if (entries.isEmpty() && transcripts.isEmpty()) return "quiet"
+        val joined = (entries.map { it.content } + transcripts).joinToString(separator = " ").lowercase()
         var positive = 0
         var negative = 0
         for (word in POSITIVE_WORDS) {

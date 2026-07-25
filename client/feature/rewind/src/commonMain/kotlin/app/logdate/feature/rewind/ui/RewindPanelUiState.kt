@@ -137,6 +137,44 @@ data class ImageRewindPanelUiState(
 ) : RewindPanelUiState
 
 /**
+ * UI state for a panel displaying an audio journal entry.
+ *
+ * Transcript text is null when the recording hadn't been transcribed yet by the time
+ * this rewind was generated — the panel must render fine either way. [cachedAmplitudes]
+ * is null when no waveform data was ever cached for this recording (older entries
+ * predate [app.logdate.ui.audio.WaveformStorage] or transcription is still pending);
+ * the renderer falls back to a static placeholder waveform in that case.
+ *
+ * @property sourceId Unique identifier of the original audio note
+ * @property timestamp When the recording was made
+ * @property uri Playable URI of the audio file
+ * @property durationMs Recording length in milliseconds
+ * @property transcriptionText The transcript, or null if not yet available
+ * @property dateFormatted Formatted date string showing when the recording was made
+ * @property cachedAmplitudes Cached waveform amplitudes (0.0–1.0), or null if uncached
+ */
+data class AudioNoteRewindPanelUiState(
+    val sourceId: Uuid,
+    val timestamp: Instant,
+    val uri: String,
+    val durationMs: Long,
+    val transcriptionText: String?,
+    val dateFormatted: String,
+    val cachedAmplitudes: List<Float>? = null,
+) : RewindPanelUiState
+
+/**
+ * Playback state for the audio panel currently being listened to in a rewind story.
+ *
+ * At most one audio panel plays at a time. [playingSourceId] is null when nothing is
+ * playing; [progress] is only meaningful while it's set.
+ */
+data class AudioPanelPlaybackUiState(
+    val playingSourceId: Uuid? = null,
+    val progress: Float = 0f,
+)
+
+/**
  * UI state for a narrative context panel.
  *
  * Sets the scene and provides context for the rewind story. Used to establish

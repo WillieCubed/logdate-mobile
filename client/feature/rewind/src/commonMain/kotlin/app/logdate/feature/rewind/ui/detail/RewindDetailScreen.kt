@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.logdate.feature.rewind.ui.AudioPanelPlaybackUiState
 import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindDetailUiState
 import app.logdate.feature.rewind.ui.RewindDetailViewModel
@@ -92,6 +93,7 @@ fun RewindDetailScreen(
     val replySheetState by viewModel.replySheetState.collectAsStateWithLifecycle()
     val deletePromptVisible by viewModel.deletePromptVisible.collectAsStateWithLifecycle()
     val isFirstView by viewModel.isFirstView.collectAsStateWithLifecycle()
+    val audioPlaybackState by viewModel.audioPlaybackState.collectAsStateWithLifecycle()
 
     val onSharePanel: (RewindPanelUiState) -> Unit = { panel ->
         val shareContent = panel.toShareContent()
@@ -147,6 +149,8 @@ fun RewindDetailScreen(
         onShareRewindStats = onShareRewindStats,
         onReplyToPrompt = viewModel::onReplyRequested,
         onDeleteRewind = viewModel::onDeleteRequested,
+        audioPlaybackState = audioPlaybackState,
+        onToggleAudioPlayback = viewModel::toggleAudioPlayback,
     )
 
     val openSheet = replySheetState as? ReflectionReplySheetState.Open
@@ -215,6 +219,8 @@ fun RewindDetailScreenContent(
     onShareRewindStats: (() -> Unit)? = null,
     onReplyToPrompt: ((panel: ReflectionPromptRewindPanelUiState) -> Unit)? = null,
     onDeleteRewind: (() -> Unit)? = null,
+    audioPlaybackState: AudioPanelPlaybackUiState = AudioPanelPlaybackUiState(),
+    onToggleAudioPlayback: (Uuid, String) -> Unit = { _, _ -> },
 ) {
     var showPostViewingSheet by rememberSaveable { mutableStateOf(false) }
     var restartKey by rememberSaveable { mutableStateOf(0) }
@@ -240,7 +246,11 @@ fun RewindDetailScreenContent(
                 onReplyToPrompt = onReplyToPrompt,
                 onDeleteRewind = onDeleteRewind,
                 content = { panel ->
-                    RewindStoryContent(panel = panel)
+                    RewindStoryContent(
+                        panel = panel,
+                        audioPlaybackState = audioPlaybackState,
+                        onToggleAudioPlayback = onToggleAudioPlayback,
+                    )
                 },
             )
         }

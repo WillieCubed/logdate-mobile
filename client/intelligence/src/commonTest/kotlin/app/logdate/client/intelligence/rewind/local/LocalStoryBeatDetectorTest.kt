@@ -1,5 +1,6 @@
 package app.logdate.client.intelligence.rewind.local
 
+import app.logdate.client.intelligence.rewind.strategy.AudioEntryWithTranscript
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.location.LocationCapturePipeline
 import app.logdate.client.repository.location.LocationCaptureSource
@@ -27,6 +28,21 @@ class LocalStoryBeatDetectorTest {
             creationTimestamp = at,
             lastUpdated = at,
             content = content,
+        )
+
+    private fun audioEntry(
+        at: Instant = day0,
+        transcriptionText: String? = null,
+    ): AudioEntryWithTranscript =
+        AudioEntryWithTranscript(
+            audio =
+                JournalNote.Audio(
+                    mediaRef = "file://recording.m4a",
+                    durationMs = 30_000,
+                    creationTimestamp = at,
+                    lastUpdated = at,
+                ),
+            transcriptionText = transcriptionText,
         )
 
     private fun locationPoint(
@@ -186,5 +202,38 @@ class LocalStoryBeatDetectorTest {
         assertEquals(2, beats.size)
         assertEquals("joyful", beats[0].emotionalWeight)
         assertEquals("heavy", beats[1].emotionalWeight)
+    }
+
+    @Test
+    fun `produces a beat for an audio-only day with no transcript`() {
+        val audio = audioEntry(at = day0 + 1.hours, transcriptionText = null)
+        val beats =
+            detector.detect(
+                textEntries = emptyList(),
+                periodStart = day0,
+                periodEnd = day0 + 2.days,
+                audio = listOf(audio),
+            )
+        // An audio-only week must not vanish — it's still a real moment, transcript or not.
+        assertEquals(1, beats.size)
+        assertTrue(beats[0].evidenceIds.contains(audio.audio.uid.toString()))
+    }
+
+    @Test
+    fun `picks the moment headline from an audio transcript when there's no text`() {
+        val audio =
+            audioEntry(
+                at = day0 + 1.hours,
+                transcriptionText = "I finally finished the project I've been putting off for weeks.",
+            )
+        val beats =
+            detector.detect(
+                textEntries = emptyList(),
+                periodStart = day0,
+                periodEnd = day0 + 2.days,
+                audio = listOf(audio),
+            )
+        assertEquals(1, beats.size)
+        assertEquals("I finally finished the project I've been putting off for weeks.", beats[0].moment)
     }
 }

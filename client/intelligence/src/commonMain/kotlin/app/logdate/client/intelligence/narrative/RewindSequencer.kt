@@ -2,6 +2,7 @@ package app.logdate.client.intelligence.narrative
 
 import app.logdate.client.intelligence.curation.CurationResult
 import app.logdate.client.intelligence.curation.MediaCandidate
+import app.logdate.client.intelligence.rewind.strategy.AudioEntryWithTranscript
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.shared.model.ActivityType
@@ -42,6 +43,9 @@ class RewindSequencer {
      *   for in-beat panels and [CurationResult.freeAgents] for structural decorations.
      * @param textEntries All text journal entries from the period — used to attach text
      *   quotes cited by story beats' `evidenceIds`.
+     * @param audioEntries All audio entries from the period, paired with whatever
+     *   transcript is available — used to attach audio moments cited by story beats'
+     *   `evidenceIds`, the same way text entries are.
      * @param people People extracted from the period — used to build a [TopListKind.PEOPLE]
      *   card when the count is high enough.
      * @param weather Atmospheric context for the period, or null when unavailable.
@@ -55,6 +59,7 @@ class RewindSequencer {
         narrative: WeekNarrative,
         curation: CurationResult,
         textEntries: List<JournalNote.Text>,
+        audioEntries: List<AudioEntryWithTranscript> = emptyList(),
         people: List<Person>,
         weather: WeatherContext?,
         locationPath: List<MapPoint>,
@@ -65,6 +70,7 @@ class RewindSequencer {
 
         val allTimestamps =
             textEntries.map { it.creationTimestamp } +
+                audioEntries.map { it.audio.creationTimestamp } +
                 curation.perBeat.values
                     .flatten()
                     .map { it.media.timestamp } +
@@ -83,7 +89,7 @@ class RewindSequencer {
                 val transition = createTransition(beat, narrative.storyBeats[index - 1])
                 transition?.let { panels.add(it) }
             }
-            panels.addAll(createBeatPanels(beat, index, textEntries, curation))
+            panels.addAll(createBeatPanels(beat, index, textEntries, audioEntries, curation))
         }
 
         // 3. Structural decorations from the free-agent pool — map, weather, top lists.
@@ -190,6 +196,7 @@ class RewindSequencer {
         beat: StoryBeat,
         beatIndex: Int,
         textEntries: List<JournalNote.Text>,
+        audioEntries: List<AudioEntryWithTranscript>,
         curation: CurationResult,
     ): List<RewindContent> {
         val panels = mutableListOf<RewindContent>()
@@ -204,6 +211,23 @@ class RewindSequencer {
                         timestamp = entry.creationTimestamp,
                         sourceId = entry.uid,
                         content = entry.content,
+                    ),
+                )
+            }
+
+        // Audio evidence — same citation mechanism as text. A transcript is text, so
+        // an audio entry's moment is cited the same way a written one is; playback
+        // works whether or not a transcript was ready by generation time.
+        audioEntries
+            .filter { it.audio.uid.toString() in evidenceIds }
+            .forEach { entry ->
+                panels.add(
+                    RewindContent.AudioNote(
+                        timestamp = entry.audio.creationTimestamp,
+                        sourceId = entry.audio.uid,
+                        uri = entry.audio.mediaRef,
+                        durationMs = entry.audio.durationMs,
+                        transcriptionText = entry.transcriptionText,
                     ),
                 )
             }

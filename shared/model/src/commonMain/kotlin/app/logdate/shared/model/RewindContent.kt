@@ -69,6 +69,24 @@ sealed class RewindContent {
     ) : RewindContent()
 
     /**
+     * An audio journal entry in a Rewind.
+     *
+     * [transcriptionText] is null when the transcript wasn't ready by the time this
+     * Rewind generated — transcription is eventual, not guaranteed. The panel this
+     * renders as must not assume transcript text exists; playback (via [uri]) always
+     * does.
+     */
+    data class AudioNote(
+        override val timestamp: Instant,
+        override val sourceId: Uuid,
+        val uri: String,
+        val durationMs: Long,
+        val transcriptionText: String? = null,
+        val caption: String? = null,
+        override val significanceScore: Float? = null,
+    ) : RewindContent()
+
+    /**
      * Narrative context panel - sets the scene and tells what the week was about.
      *
      * Example: "You finally made it to the California coast"
@@ -190,4 +208,5 @@ data class WeekStatsSnapshot(
     val distinctLocations: Int,
     val distinctPeople: Int,
     val newPlaces: Int = 0,
+    val audioNoteCount: Int = 0,
 )

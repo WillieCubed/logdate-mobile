@@ -40,6 +40,9 @@ import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.repository.rewind.RewindGenerationManager
 import app.logdate.client.repository.rewind.RewindRepository
+import app.logdate.client.repository.transcription.TranscriptionData
+import app.logdate.client.repository.transcription.TranscriptionRepository
+import app.logdate.client.repository.transcription.TranscriptionStatus
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
 import app.logdate.shared.model.RewindGenerationRequest
@@ -96,6 +99,39 @@ class GenerateBasicRewindUseCaseTest {
         }
 
     @Test
+    fun `generates a rewind for a week with only audio entries`() =
+        runTest {
+            val timezone = TimeZone.currentSystemDefault()
+            val start = LocalDate(2026, 4, 1).atStartOfDayIn(timezone)
+            val end = LocalDate(2026, 4, 2).atStartOfDayIn(timezone)
+            val audioNote =
+                JournalNote.Audio(
+                    mediaRef = "file://recording.m4a",
+                    durationMs = 45_000,
+                    creationTimestamp = start,
+                    lastUpdated = start,
+                )
+            val rewindRepository = RecordingRewindRepository()
+            val useCase =
+                createUseCase(
+                    rewindRepository = rewindRepository,
+                    notesRepository = FakeJournalNotesRepository(listOf(audioNote)),
+                    indexedMediaRepository = ConfigurableIndexedMediaRepository(flowOf(emptyList())),
+                    transcriptionRepository =
+                        FakeTranscriptionRepository(
+                            transcriptions = mapOf(audioNote.uid to "This is what I said out loud."),
+                        ),
+                )
+
+            val result = useCase(start, end)
+
+            // An audio-only week must not silently fail generation — the whole point
+            // is that audio entries count as real content, the same as text or photos.
+            assertIs<GenerateBasicRewindResult.Success>(result)
+            assertNotNull(rewindRepository.savedRewind)
+        }
+
+    @Test
     fun `excludes notes on the exclusive end day`() =
         runTest {
             val timezone = TimeZone.currentSystemDefault()
@@ -138,6 +174,7 @@ class GenerateBasicRewindUseCaseTest {
         generationManager: FakeRewindGenerationManager = FakeRewindGenerationManager(),
         notesRepository: FakeJournalNotesRepository = FakeJournalNotesRepository(),
         indexedMediaRepository: ConfigurableIndexedMediaRepository = ConfigurableIndexedMediaRepository(flowOf(emptyList())),
+        transcriptionRepository: TranscriptionRepository = FakeTranscriptionRepository(),
     ): GenerateBasicRewindUseCase {
         val fetchNotesForDay = FetchNotesForDayUseCase(notesRepository)
         val indexMediaForPeriod =
@@ -204,6 +241,7 @@ class GenerateBasicRewindUseCaseTest {
             strategySelector = strategySelector,
             peopleExtractor = peopleExtractor,
             locationHistoryRepository = FakeLocationHistoryRepository(),
+            transcriptionRepository = transcriptionRepository,
         )
     }
 }
@@ -407,6 +445,37 @@ private class FakeMediaManager : MediaManager {
         fileName: String,
         mimeType: String,
     ): String = "file://test/$fileName"
+}
+
+private class FakeTranscriptionRepository(
+    private val transcriptions: Map<Uuid, String> = emptyMap(),
+) : TranscriptionRepository {
+    override suspend fun requestTranscription(noteId: Uuid): Boolean = true
+
+    override suspend fun getTranscription(noteId: Uuid): TranscriptionData? =
+        transcriptions[noteId]?.let { text ->
+            TranscriptionData(
+                noteId = noteId,
+                text = text,
+                status = TranscriptionStatus.COMPLETED,
+                created = Clock.System.now(),
+                lastUpdated = Clock.System.now(),
+                id = Uuid.random(),
+            )
+        }
+
+    override fun observeTranscription(noteId: Uuid): Flow<TranscriptionData?> = flowOf(null)
+
+    override suspend fun getPendingTranscriptions(): List<TranscriptionData> = emptyList()
+
+    override suspend fun updateTranscription(
+        noteId: Uuid,
+        text: String?,
+        status: TranscriptionStatus,
+        errorMessage: String?,
+    ): Boolean = true
+
+    override suspend fun deleteTranscription(noteId: Uuid): Boolean = true
 }
 
 private class FakeLocationHistoryRepository : LocationHistoryRepository {

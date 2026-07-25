@@ -370,6 +370,7 @@ class OfflineFirstRewindRepository(
                                 distinctLocations = payload.distinctLocations,
                                 distinctPeople = payload.distinctPeople,
                                 newPlaces = payload.newPlaces,
+                                audioNoteCount = payload.audioNoteCount,
                             ),
                         dominantActivity = payload.dominantActivity,
                     )
@@ -404,6 +405,29 @@ class OfflineFirstRewindRepository(
                     )
                 }.getOrElse {
                     Napier.w("Failed to decode top list payload for rewind text content", it)
+                    RewindContent.TextNote(
+                        timestamp = timestamp,
+                        sourceId = sourceId,
+                        content = content,
+                    )
+                }
+            }
+            content.startsWith(AUDIO_NOTE_PREFIX) -> {
+                runCatching {
+                    contentJson.decodeFromString<AudioNotePayload>(
+                        content.removePrefix(AUDIO_NOTE_PREFIX),
+                    )
+                }.map { payload ->
+                    RewindContent.AudioNote(
+                        timestamp = timestamp,
+                        sourceId = sourceId,
+                        uri = payload.uri,
+                        durationMs = payload.durationMs,
+                        transcriptionText = payload.transcriptionText,
+                        caption = payload.caption,
+                    )
+                }.getOrElse {
+                    Napier.w("Failed to decode audio note payload for rewind text content", it)
                     RewindContent.TextNote(
                         timestamp = timestamp,
                         sourceId = sourceId,
@@ -467,6 +491,7 @@ class OfflineFirstRewindRepository(
                 is RewindContent.WeatherPanel -> textEntities.add(content.toWeatherPanelEntity(rewindId))
                 is RewindContent.PersonalityCard -> textEntities.add(content.toPersonalityCardEntity(rewindId))
                 is RewindContent.TopList -> textEntities.add(content.toTopListEntity(rewindId))
+                is RewindContent.AudioNote -> textEntities.add(content.toAudioNoteEntity(rewindId))
             }
         }
 
@@ -538,6 +563,7 @@ class OfflineFirstRewindRepository(
                 distinctPeople = stats.distinctPeople,
                 newPlaces = stats.newPlaces,
                 dominantActivity = dominantActivity,
+                audioNoteCount = stats.audioNoteCount,
             )
         return RewindTextContentEntity(
             id = sourceId,
@@ -568,6 +594,23 @@ class OfflineFirstRewindRepository(
             sourceId = sourceId,
             timestamp = timestamp,
             content = TOP_LIST_PREFIX + contentJson.encodeToString(payload),
+        )
+    }
+
+    private fun RewindContent.AudioNote.toAudioNoteEntity(rewindId: Uuid): RewindTextContentEntity {
+        val payload =
+            AudioNotePayload(
+                uri = uri,
+                durationMs = durationMs,
+                transcriptionText = transcriptionText,
+                caption = caption,
+            )
+        return RewindTextContentEntity(
+            id = sourceId,
+            rewindId = rewindId,
+            sourceId = sourceId,
+            timestamp = timestamp,
+            content = AUDIO_NOTE_PREFIX + contentJson.encodeToString(payload),
         )
     }
 
@@ -627,6 +670,15 @@ class OfflineFirstRewindRepository(
         val distinctPeople: Int,
         val newPlaces: Int,
         val dominantActivity: ActivityType,
+        val audioNoteCount: Int = 0,
+    )
+
+    @Serializable
+    private data class AudioNotePayload(
+        val uri: String,
+        val durationMs: Long,
+        val transcriptionText: String?,
+        val caption: String?,
     )
 
     @Serializable
@@ -712,5 +764,6 @@ class OfflineFirstRewindRepository(
         private const val WEATHER_PANEL_PREFIX = "LD_WEATHER_PANEL:"
         private const val PERSONALITY_CARD_PREFIX = "LD_PERSONALITY_CARD:"
         private const val TOP_LIST_PREFIX = "LD_TOP_LIST:"
+        private const val AUDIO_NOTE_PREFIX = "LD_AUDIO_NOTE:"
     }
 }

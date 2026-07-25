@@ -70,6 +70,7 @@ class LocalRewindStrategy(
                 narrative = narrative,
                 curation = curation,
                 textEntries = input.textEntries,
+                audioEntries = input.audioEntries,
                 people = input.people,
                 weather = narrative.weatherContext,
                 locationPath = mapPoints,
@@ -119,10 +120,11 @@ class LocalRewindStrategy(
                 periodStart = input.periodStart,
                 periodEnd = input.periodEnd,
                 media = input.media,
+                audio = input.audioEntries,
                 locationHistory = input.locationHistory,
             )
-        // Fallback to a single catch-all beat when the period has neither text nor
-        // media — keeps the sequencer happy without special-casing.
+        // Fallback to a single catch-all beat when the period has neither text, media,
+        // nor audio — keeps the sequencer happy without special-casing.
         val storyBeats =
             detectedBeats.ifEmpty {
                 listOf(
@@ -132,7 +134,8 @@ class LocalRewindStrategy(
                         emotionalWeight = "varied",
                         evidenceIds =
                             input.media.map { it.uid.toString() } +
-                                input.textEntries.map { it.uid.toString() },
+                                input.textEntries.map { it.uid.toString() } +
+                                input.audioEntries.map { it.audio.uid.toString() },
                     ),
                 )
             }
@@ -163,6 +166,7 @@ class LocalRewindStrategy(
             textNoteCount = input.textEntries.size,
             distinctLocations = distinctLocations,
             distinctPeople = input.people.size,
+            audioNoteCount = input.audioEntries.size,
         )
     }
 

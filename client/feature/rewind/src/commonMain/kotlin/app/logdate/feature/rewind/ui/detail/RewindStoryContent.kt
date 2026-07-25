@@ -22,6 +22,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.rewind.ui.AudioNoteRewindPanelUiState
+import app.logdate.feature.rewind.ui.AudioPanelPlaybackUiState
 import app.logdate.feature.rewind.ui.BasicTextRewindPanelUiState
 import app.logdate.feature.rewind.ui.BigStatisticRewindPanelUiState
 import app.logdate.feature.rewind.ui.HighlightedQuoteRewindPanelUiState
@@ -39,6 +41,7 @@ import coil3.compose.AsyncImage
 import logdate.client.feature.rewind.generated.resources.*
 import logdate.client.feature.rewind.generated.resources.Res
 import org.jetbrains.compose.resources.stringResource
+import kotlin.uuid.Uuid
 
 /**
  * Main content renderer for rewind story panels.
@@ -65,6 +68,8 @@ import org.jetbrains.compose.resources.stringResource
 fun RewindStoryContent(
     panel: RewindPanelUiState,
     modifier: Modifier = Modifier,
+    audioPlaybackState: AudioPanelPlaybackUiState = AudioPanelPlaybackUiState(),
+    onToggleAudioPlayback: (Uuid, String) -> Unit = { _, _ -> },
 ) {
     when (panel) {
         is BasicTextRewindPanelUiState -> {
@@ -157,6 +162,21 @@ fun RewindStoryContent(
                 title = panel.title,
                 subtitle = panel.subtitle,
                 accentSeed = panel.accentSeed,
+                modifier = modifier,
+            )
+        }
+
+        is AudioNoteRewindPanelUiState -> {
+            AudioNotePanel(
+                sourceId = panel.sourceId,
+                uri = panel.uri,
+                durationMs = panel.durationMs,
+                transcriptionText = panel.transcriptionText,
+                dateFormatted = panel.dateFormatted,
+                cachedAmplitudes = panel.cachedAmplitudes,
+                isPlaying = audioPlaybackState.playingSourceId == panel.sourceId,
+                playbackProgress = if (audioPlaybackState.playingSourceId == panel.sourceId) audioPlaybackState.progress else 0f,
+                onTogglePlayback = onToggleAudioPlayback,
                 modifier = modifier,
             )
         }

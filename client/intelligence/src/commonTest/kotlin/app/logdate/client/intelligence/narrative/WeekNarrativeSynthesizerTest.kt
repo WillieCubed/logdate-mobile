@@ -7,6 +7,7 @@ import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
 import app.logdate.client.intelligence.fakes.FakeDataUsagePolicy
 import app.logdate.client.intelligence.fakes.FakeGenerativeAICache
 import app.logdate.client.intelligence.fakes.FakeGenerativeAIChatClient
+import app.logdate.client.intelligence.rewind.strategy.AudioEntryWithTranscript
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.media.IndexedMedia
@@ -57,6 +58,7 @@ class WeekNarrativeSynthesizerTest {
         textEntries: List<JournalNote.Text>,
         media: List<IndexedMedia>,
         people: List<Person>,
+        audio: List<AudioEntryWithTranscript> = emptyList(),
     ): GenerativeAICacheRequest {
         val summary =
             buildString {
@@ -81,6 +83,24 @@ class WeekNarrativeSynthesizerTest {
                     }
                 }
 
+                if (audio.isNotEmpty()) {
+                    appendLine("\n=== AUDIO TRANSCRIPTS ===")
+                    audio.forEach { entry ->
+                        val durationSeconds = entry.audio.durationMs / 1000
+                        appendLine(
+                            "\n[${entry.audio.creationTimestamp}] Audio (ID: ${entry.audio.uid}) - " +
+                                "Duration: ${durationSeconds}s",
+                        )
+                        val transcript = entry.transcriptionText
+                        if (transcript != null) {
+                            appendLine(transcript.take(500))
+                            if (transcript.length > 500) appendLine("... [truncated]")
+                        } else {
+                            appendLine("[transcript not yet available]")
+                        }
+                    }
+                }
+
                 if (people.isNotEmpty()) {
                     appendLine("\n=== PEOPLE MENTIONED ===")
                     appendLine(people.joinToString(", ") { it.name })
@@ -89,6 +109,7 @@ class WeekNarrativeSynthesizerTest {
                 appendLine("\n=== SUMMARY STATS ===")
                 appendLine("Total entries: ${textEntries.size}")
                 appendLine("Total media: ${media.size}")
+                appendLine("Total audio: ${audio.size}")
                 appendLine("People mentioned: ${people.size}")
             }
 
@@ -507,6 +528,67 @@ class WeekNarrativeSynthesizerTest {
             assertTrue(userMessage.content.contains("Video"))
             assertTrue(userMessage.content.contains("Cooking adventure"))
             assertTrue(userMessage.content.contains("MEDIA"))
+        }
+
+    @Test
+    fun synthesize_includesAudioTranscriptsInContentSummary() =
+        runTest(testDispatcher) {
+            setup()
+            val weekId = "2024-W38"
+
+            val transcribed =
+                AudioEntryWithTranscript(
+                    audio =
+                        JournalNote.Audio(
+                            mediaRef = "file:///recording1.m4a",
+                            durationMs = 42_000,
+                            creationTimestamp = Instant.parse("2024-09-16T09:00:00Z"),
+                            lastUpdated = Instant.parse("2024-09-16T09:00:00Z"),
+                        ),
+                    transcriptionText = "I finally finished the project I've been putting off.",
+                )
+            val pending =
+                AudioEntryWithTranscript(
+                    audio =
+                        JournalNote.Audio(
+                            mediaRef = "file:///recording2.m4a",
+                            durationMs = 15_000,
+                            creationTimestamp = Instant.parse("2024-09-17T09:00:00Z"),
+                            lastUpdated = Instant.parse("2024-09-17T09:00:00Z"),
+                        ),
+                    transcriptionText = null,
+                )
+
+            val narrativeResponse =
+                """
+                {
+                  "themes": ["reflection"],
+                  "emotionalTone": "accomplished",
+                  "storyBeats": [],
+                  "overallNarrative": "A week of spoken reflection."
+                }
+                """.trimIndent()
+
+            fakeAIClient.defaultResponse = narrativeResponse
+
+            synthesizer.synthesize(
+                weekId = weekId,
+                textEntries = emptyList(),
+                media = emptyList(),
+                audio = listOf(transcribed, pending),
+                useCached = false,
+            )
+
+            val lastSubmission = fakeAIClient.getLastSubmission()
+            assertNotNull(lastSubmission)
+
+            val userMessage = lastSubmission.find { it.role == "user" }
+            assertNotNull(userMessage)
+            assertTrue(userMessage.content.contains("AUDIO TRANSCRIPTS"))
+            assertTrue(userMessage.content.contains("I finally finished the project I've been putting off."))
+            // A still-pending transcript is listed too — not silently dropped — just
+            // without content to quote.
+            assertTrue(userMessage.content.contains("[transcript not yet available]"))
         }
 
     private fun assertSuccess(result: AIResult<app.logdate.shared.model.WeekNarrative>): app.logdate.shared.model.WeekNarrative {
