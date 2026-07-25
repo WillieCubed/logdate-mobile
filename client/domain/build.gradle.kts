@@ -69,6 +69,7 @@ kotlin {
             // External dependencies
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.core)
+            implementation(libs.kotlinx.serialization.json.okio)
             implementation(libs.kotlinx.datetime)
             implementation(libs.okio)
             implementation(libs.napier)

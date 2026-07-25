@@ -67,6 +67,39 @@ class ZipArchiveWriterTest {
         }
     }
 
+    @Test
+    fun `writer streams a large generated entry without buffering it whole`() {
+        val tempDir = Files.createTempDirectory("zip-archive-writer-streaming")
+        try {
+            val archivePath = tempDir.resolve("export.zip")
+            // Write a large entry incrementally, the way export streams big JSON
+            // categories (e.g. location history) so they never materialize as one
+            // String. A wrong streamed CRC/size would make ZipFile throw on read.
+            val chunk = """{"lat":37.7749,"lng":-122.4194}""".repeat(1_000)
+            val chunkCount = 200
+            writer.write(
+                archivePath.toString().toPath(),
+                listOf(
+                    ZipArchiveEntry.Streaming("location_history.json") { sink ->
+                        repeat(chunkCount) { sink.writeUtf8(chunk) }
+                    },
+                ),
+            )
+
+            ZipFile(archivePath.toFile()).use { zipFile ->
+                val entry = zipFile.getEntry("location_history.json")
+                assertEquals(chunk.length.toLong() * chunkCount, entry.size)
+                val content =
+                    zipFile
+                        .getInputStream(entry)
+                        .use { it.readBytes().decodeToString() }
+                assertEquals(chunk.repeat(chunkCount), content)
+            }
+        } finally {
+            tempDir.toFile().deleteRecursively()
+        }
+    }
+
     @Test(expected = IllegalStateException::class)
     fun `writer fails when a referenced source file is missing`() {
         val tempDir = Files.createTempDirectory("zip-archive-writer-missing-file")

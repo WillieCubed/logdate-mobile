@@ -26,9 +26,12 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.okio.encodeToBufferedSink
+import okio.BufferedSink
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -51,7 +54,10 @@ class ExportUserDataUseCase(
 
     private val json =
         Json {
-            prettyPrint = true
+            // Compact (not pretty-printed): a machine-readable export doesn't need
+            // whitespace, and pretty-printing multiplied the in-memory size of large
+            // categories (location history) enough to exhaust the heap.
+            prettyPrint = false
             encodeDefaults = true
         }
 
@@ -538,6 +544,55 @@ class ExportResult(
 
     fun serializeMediaManifest(files: List<ExportMediaFile> = mediaFiles): String? =
         files.takeIf { it.isNotEmpty() }?.let { json.encodeToString(ExportMediaManifest(it)) }
+
+    // Streaming encoders: write JSON directly to the archive sink instead of
+    // materializing a full String (+ its byte-array copy). Peak memory for a
+    // category becomes the okio buffer size rather than the whole category, which
+    // is what keeps large exports (e.g. extensive location history) off the heap.
+
+    @OptIn(ExperimentalSerializationApi::class)
+    fun writeMetadata(sink: BufferedSink) = json.encodeToBufferedSink(exportMetadata, sink)
+
+    @OptIn(ExperimentalSerializationApi::class)
+    fun writeJournals(sink: BufferedSink) = json.encodeToBufferedSink(mapOf("journals" to journals), sink)
+
+    @OptIn(ExperimentalSerializationApi::class)
+    fun writeNotes(sink: BufferedSink) = json.encodeToBufferedSink(mapOf("notes" to exportNotes), sink)
+
+    @OptIn(ExperimentalSerializationApi::class)
+    fun writeJournalNotes(sink: BufferedSink) = json.encodeToBufferedSink(mapOf("journal_notes" to exportRelations), sink)
+
+    @OptIn(ExperimentalSerializationApi::class)
+    fun writeDrafts(sink: BufferedSink) = json.encodeToBufferedSink(mapOf("drafts" to exportDrafts), sink)
+
+    val hasProfile: Boolean get() = profilePayload != null
+
+    @OptIn(ExperimentalSerializationApi::class)
+    fun writeProfile(sink: BufferedSink) {
+        profilePayload?.let { json.encodeToBufferedSink(it, sink) }
+    }
+
+    val hasPlaces: Boolean get() = placesPayload != null
+
+    @OptIn(ExperimentalSerializationApi::class)
+    fun writePlaces(sink: BufferedSink) {
+        placesPayload?.let { json.encodeToBufferedSink(it, sink) }
+    }
+
+    val hasLocationHistory: Boolean get() = locationHistoryPayload != null
+
+    @OptIn(ExperimentalSerializationApi::class)
+    fun writeLocationHistory(sink: BufferedSink) {
+        locationHistoryPayload?.let { json.encodeToBufferedSink(it, sink) }
+    }
+
+    fun hasMediaManifest(files: List<ExportMediaFile> = mediaFiles): Boolean = files.isNotEmpty()
+
+    @OptIn(ExperimentalSerializationApi::class)
+    fun writeMediaManifest(
+        sink: BufferedSink,
+        files: List<ExportMediaFile> = mediaFiles,
+    ) = json.encodeToBufferedSink(ExportMediaManifest(files), sink)
 
     fun renderIssuesText(additionalIssues: List<ExportIssue> = emptyList()): String? {
         val allIssues = (issues + additionalIssues).distinct()

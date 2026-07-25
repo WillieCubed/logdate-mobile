@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
+import okio.BufferedSink
 import okio.FileSystem
 import okio.Path.Companion.toPath
 import org.koin.core.component.KoinComponent
@@ -172,14 +173,16 @@ class IosExportLauncher(
     ) {
         val entries =
             buildList {
-                addJsonEntry(ExportFileStructure.METADATA_FILE, result.serializeMetadata())
-                addJsonEntry(ExportFileStructure.JOURNALS_FILE, result.serializeJournals())
-                addJsonEntry(ExportFileStructure.NOTES_FILE, result.serializeNotes())
-                addJsonEntry(ExportFileStructure.JOURNAL_NOTES_FILE, result.serializeJournalNotes())
-                addJsonEntry(ExportFileStructure.DRAFTS_FILE, result.serializeDrafts())
-                result.serializeProfile()?.let { addJsonEntry(ExportFileStructure.PROFILE_FILE, it) }
-                result.serializePlaces()?.let { addJsonEntry(ExportFileStructure.PLACES_FILE, it) }
-                result.serializeLocationHistory()?.let { addJsonEntry(ExportFileStructure.LOCATION_HISTORY_FILE, it) }
+                addStreamedEntry(ExportFileStructure.METADATA_FILE) { result.writeMetadata(it) }
+                addStreamedEntry(ExportFileStructure.JOURNALS_FILE) { result.writeJournals(it) }
+                addStreamedEntry(ExportFileStructure.NOTES_FILE) { result.writeNotes(it) }
+                addStreamedEntry(ExportFileStructure.JOURNAL_NOTES_FILE) { result.writeJournalNotes(it) }
+                addStreamedEntry(ExportFileStructure.DRAFTS_FILE) { result.writeDrafts(it) }
+                if (result.hasProfile) addStreamedEntry(ExportFileStructure.PROFILE_FILE) { result.writeProfile(it) }
+                if (result.hasPlaces) addStreamedEntry(ExportFileStructure.PLACES_FILE) { result.writePlaces(it) }
+                if (result.hasLocationHistory) {
+                    addStreamedEntry(ExportFileStructure.LOCATION_HISTORY_FILE) { result.writeLocationHistory(it) }
+                }
                 val exportedMediaFiles = mutableListOf<ExportMediaFile>()
                 val archiveIssues = mutableListOf<ExportIssue>()
                 result.mediaFiles.forEach { mediaFile ->
@@ -190,14 +193,23 @@ class IosExportLauncher(
                     }
                     mediaEntry.issue?.let(archiveIssues::add)
                 }
-                result.serializeMediaManifest(exportedMediaFiles)?.let { addJsonEntry(ExportFileStructure.MEDIA_MANIFEST_FILE, it) }
-                result.renderIssuesText(archiveIssues)?.let { addJsonEntry(ExportFileStructure.EXPORT_ISSUES_FILE, it) }
+                if (result.hasMediaManifest(exportedMediaFiles)) {
+                    addStreamedEntry(ExportFileStructure.MEDIA_MANIFEST_FILE) { result.writeMediaManifest(it, exportedMediaFiles) }
+                }
+                result.renderIssuesText(archiveIssues)?.let { addTextEntry(ExportFileStructure.EXPORT_ISSUES_FILE, it) }
             }
 
         zipArchiveWriter.write(exportFilePath.toPath(), entries)
     }
 
-    private fun MutableList<ZipArchiveEntry>.addJsonEntry(
+    private fun MutableList<ZipArchiveEntry>.addStreamedEntry(
+        fileName: String,
+        write: (BufferedSink) -> Unit,
+    ) {
+        add(ZipArchiveEntry.Streaming(path = fileName, writeTo = write))
+    }
+
+    private fun MutableList<ZipArchiveEntry>.addTextEntry(
         fileName: String,
         contents: String,
     ) {

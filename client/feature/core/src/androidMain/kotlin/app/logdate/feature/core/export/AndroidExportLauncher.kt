@@ -17,6 +17,7 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.UUID
 
 /**
  * Android-specific [ExportLauncher] backed by Storage Access Framework and WorkManager.
@@ -44,6 +45,15 @@ class AndroidExportLauncher(
     private var pendingExportOptions: ExportOptions = ExportOptions()
 
     @Volatile private var completionCallback: ((String?) -> Unit)? = null
+
+    /**
+     * Id of the export [androidx.work.WorkRequest] this launcher most recently started.
+     * The WorkManager LiveData replays the last persisted terminal [WorkInfo] whenever the
+     * observer (re-)attaches, so a failure from an earlier session would otherwise be
+     * reported again on every screen open. Guarding on this id makes the observer act only
+     * on the current export's terminal transition.
+     */
+    @Volatile private var currentWorkId: UUID? = null
 
     private val _exportProgress = MutableStateFlow(ExportProgressInfo())
     override val exportProgress: StateFlow<ExportProgressInfo> = _exportProgress.asStateFlow()
@@ -78,15 +88,27 @@ class AndroidExportLauncher(
                 if (workInfoList.isEmpty()) return@Observer
                 val workInfo = workInfoList[0]
 
+                // Ignore terminal WorkInfos that aren't from the export this launcher
+                // started (stale results replayed on observer re-attach).
+                if (workInfo.state.isFinished && workInfo.id != currentWorkId) {
+                    return@Observer
+                }
+
                 when (workInfo.state) {
                     WorkInfo.State.SUCCEEDED -> {
                         // Success is signaled via updateProgress() by the worker.
                         // The exportProgress flow is the source of truth for success.
+                        currentWorkId = null
                         Napier.i("Export work succeeded")
                     }
                     WorkInfo.State.FAILED, WorkInfo.State.CANCELLED -> {
+                        currentWorkId = null
                         _exportProgress.value = ExportProgressInfo()
-                        Napier.i("Export failed or was cancelled")
+                        val reason = workInfo.outputData.getString(ExportWorker.ERROR_KEY)
+                        Napier.i(
+                            "Export terminal: state=${workInfo.state} " +
+                                "stopReason=${workInfo.stopReason} error=$reason",
+                        )
                         completionCallback?.invoke(null)
                     }
                     else -> Unit
@@ -215,6 +237,8 @@ class AndroidExportLauncher(
                 .setInputData(inputData)
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .build()
+
+        currentWorkId = workRequest.id
 
         WorkManager
             .getInstance(context)

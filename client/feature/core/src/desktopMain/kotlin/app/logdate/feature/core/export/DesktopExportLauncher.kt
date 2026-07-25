@@ -17,6 +17,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
+import okio.BufferedSink
+import okio.buffer
+import okio.sink
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.awt.FileDialog
@@ -181,14 +184,20 @@ class DesktopExportLauncher :
 
         // Create zip output stream
         ZipOutputStream(FileOutputStream(zipFile)).use { zipOutputStream ->
-            addZipEntry(zipOutputStream, ExportFileStructure.METADATA_FILE, exportResult.serializeMetadata())
-            addZipEntry(zipOutputStream, ExportFileStructure.JOURNALS_FILE, exportResult.serializeJournals())
-            addZipEntry(zipOutputStream, ExportFileStructure.NOTES_FILE, exportResult.serializeNotes())
-            addZipEntry(zipOutputStream, ExportFileStructure.JOURNAL_NOTES_FILE, exportResult.serializeJournalNotes())
-            addZipEntry(zipOutputStream, ExportFileStructure.DRAFTS_FILE, exportResult.serializeDrafts())
-            exportResult.serializeProfile()?.let { addZipEntry(zipOutputStream, ExportFileStructure.PROFILE_FILE, it) }
-            exportResult.serializePlaces()?.let { addZipEntry(zipOutputStream, ExportFileStructure.PLACES_FILE, it) }
-            exportResult.serializeLocationHistory()?.let { addZipEntry(zipOutputStream, ExportFileStructure.LOCATION_HISTORY_FILE, it) }
+            addStreamedEntry(zipOutputStream, ExportFileStructure.METADATA_FILE) { exportResult.writeMetadata(it) }
+            addStreamedEntry(zipOutputStream, ExportFileStructure.JOURNALS_FILE) { exportResult.writeJournals(it) }
+            addStreamedEntry(zipOutputStream, ExportFileStructure.NOTES_FILE) { exportResult.writeNotes(it) }
+            addStreamedEntry(zipOutputStream, ExportFileStructure.JOURNAL_NOTES_FILE) { exportResult.writeJournalNotes(it) }
+            addStreamedEntry(zipOutputStream, ExportFileStructure.DRAFTS_FILE) { exportResult.writeDrafts(it) }
+            if (exportResult.hasProfile) {
+                addStreamedEntry(zipOutputStream, ExportFileStructure.PROFILE_FILE) { exportResult.writeProfile(it) }
+            }
+            if (exportResult.hasPlaces) {
+                addStreamedEntry(zipOutputStream, ExportFileStructure.PLACES_FILE) { exportResult.writePlaces(it) }
+            }
+            if (exportResult.hasLocationHistory) {
+                addStreamedEntry(zipOutputStream, ExportFileStructure.LOCATION_HISTORY_FILE) { exportResult.writeLocationHistory(it) }
+            }
 
             val exportedMediaFiles = mutableListOf<ExportMediaFile>()
             val archiveIssues = mutableListOf<ExportIssue>()
@@ -200,14 +209,29 @@ class DesktopExportLauncher :
                 outcome.issue?.let(archiveIssues::add)
             }
 
-            exportResult.serializeMediaManifest(exportedMediaFiles)?.let { manifest ->
-                addZipEntry(zipOutputStream, ExportFileStructure.MEDIA_MANIFEST_FILE, manifest)
+            if (exportResult.hasMediaManifest(exportedMediaFiles)) {
+                addStreamedEntry(zipOutputStream, ExportFileStructure.MEDIA_MANIFEST_FILE) {
+                    exportResult.writeMediaManifest(it, exportedMediaFiles)
+                }
             }
-            exportResult.renderIssuesText(archiveIssues)?.let { addZipEntry(zipOutputStream, ExportFileStructure.EXPORT_ISSUES_FILE, it) }
+            exportResult.renderIssuesText(archiveIssues)?.let { addTextEntry(zipOutputStream, ExportFileStructure.EXPORT_ISSUES_FILE, it) }
         }
     }
 
-    private fun addZipEntry(
+    /** Streams a JSON category directly into a ZIP entry via an okio sink (no full-String buffering). */
+    private fun addStreamedEntry(
+        zipOutputStream: ZipOutputStream,
+        entryName: String,
+        write: (BufferedSink) -> Unit,
+    ) {
+        zipOutputStream.putNextEntry(ZipEntry(entryName))
+        val bufferedSink = zipOutputStream.sink().buffer()
+        write(bufferedSink)
+        bufferedSink.flush()
+        zipOutputStream.closeEntry()
+    }
+
+    private fun addTextEntry(
         zipOutputStream: ZipOutputStream,
         entryName: String,
         content: String,

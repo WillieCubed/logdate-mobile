@@ -4,6 +4,8 @@ import okio.Buffer
 import okio.BufferedSink
 import okio.FileSystem
 import okio.Path
+import okio.Sink
+import okio.Timeout
 import okio.buffer
 
 /**
@@ -48,6 +50,10 @@ class ZipArchiveWriter(
 
                         is ZipArchiveEntry.File -> {
                             writeFileContents(sink, entry.sourcePath, checksum)
+                        }
+
+                        is ZipArchiveEntry.Streaming -> {
+                            writeStreamedContents(sink, entry.writeTo, checksum)
                         }
                     }
                 requireZip32Limit(sizeBytes, "Entry size exceeds ZIP32 limit: $normalizedPath")
@@ -116,6 +122,25 @@ class ZipArchiveWriter(
         }
 
         return totalBytes
+    }
+
+    /**
+     * Streams generated content (e.g. serialized JSON) into the archive without
+     * materializing it. Bytes pass through a forwarding sink that computes the CRC
+     * and running size as they are written, so peak memory stays at the buffer size.
+     * The archive uses data descriptors, so the size/CRC need not be known up front.
+     */
+    private fun writeStreamedContents(
+        sink: BufferedSink,
+        writeTo: (BufferedSink) -> Unit,
+        checksum: Crc32,
+    ): Long {
+        val countingSink = CountingCrcSink(sink, checksum)
+        val entrySink = countingSink.buffer()
+        writeTo(entrySink)
+        // Flush (not close) so the streamed bytes land in this entry without closing `sink`.
+        entrySink.flush()
+        return countingSink.size
     }
 
     private fun writeLocalHeader(
@@ -244,6 +269,46 @@ sealed interface ZipArchiveEntry {
         override val path: String,
         val sourcePath: Path,
     ) : ZipArchiveEntry
+
+    /**
+     * An entry whose contents are generated on demand and streamed into the archive.
+     * [writeTo] receives a buffered sink to write to; nothing is materialized in memory.
+     */
+    class Streaming(
+        override val path: String,
+        val writeTo: (BufferedSink) -> Unit,
+    ) : ZipArchiveEntry
+}
+
+/**
+ * A [Sink] that updates [checksum] and tracks the running [size] as bytes pass through
+ * to [delegate], so streamed archive entries can compute their CRC/size without buffering
+ * the whole entry. [close] is a no-op because this sink does not own [delegate].
+ */
+private class CountingCrcSink(
+    private val delegate: BufferedSink,
+    private val checksum: Crc32,
+) : Sink {
+    var size: Long = 0L
+        private set
+
+    override fun write(
+        source: Buffer,
+        byteCount: Long,
+    ) {
+        val bytes = source.readByteArray(byteCount)
+        checksum.update(bytes)
+        size += byteCount
+        delegate.write(bytes)
+    }
+
+    override fun flush() = delegate.flush()
+
+    override fun timeout(): Timeout = delegate.timeout()
+
+    override fun close() {
+        // Intentionally does not close the underlying archive sink.
+    }
 }
 
 private class Crc32 {

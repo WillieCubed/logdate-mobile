@@ -19,6 +19,9 @@ import app.logdate.client.domain.export.ExportStage
 import app.logdate.client.domain.export.ExportUserDataUseCase
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.catch
+import okio.BufferedSink
+import okio.buffer
+import okio.sink
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.io.File
@@ -26,6 +29,7 @@ import java.io.FileOutputStream
 import java.io.InputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -154,7 +158,12 @@ class ExportWorker(
                                             FILE_PATH_KEY to savedExport.path,
                                         ),
                                     )
-                            } catch (e: Exception) {
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Throwable) {
+                                // Throwable (not just Exception) so an OutOfMemoryError while
+                                // writing the archive fails the export with a real reason instead
+                                // of escaping uncaught as a bare, reasonless failure.
                                 Napier.e("Failed to save file", e)
                                 trySetForeground(notificationHelper.createErrorInfo(ARCHIVE_WRITE_FAILED_MESSAGE))
                                 finalResult = failureResult(ARCHIVE_WRITE_FAILED_MESSAGE)
@@ -172,7 +181,9 @@ class ExportWorker(
 
             Napier.i("ExportWorker: doWork() finishing with result: $finalResult")
             finalResult
-        } catch (exception: Exception) {
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Throwable) {
             Napier.e("Worker execution failed", exception)
             trySetForeground(notificationHelper.createErrorInfo(WORKER_FAILED_MESSAGE))
             failureResult(WORKER_FAILED_MESSAGE)
@@ -257,14 +268,20 @@ class ExportWorker(
         zipOut: ZipOutputStream,
         exportData: ExportResult,
     ) {
-        writeJsonEntry(zipOut, ExportFileStructure.METADATA_FILE, exportData.serializeMetadata())
-        writeJsonEntry(zipOut, ExportFileStructure.JOURNALS_FILE, exportData.serializeJournals())
-        writeJsonEntry(zipOut, ExportFileStructure.NOTES_FILE, exportData.serializeNotes())
-        writeJsonEntry(zipOut, ExportFileStructure.JOURNAL_NOTES_FILE, exportData.serializeJournalNotes())
-        writeJsonEntry(zipOut, ExportFileStructure.DRAFTS_FILE, exportData.serializeDrafts())
-        exportData.serializeProfile()?.let { writeJsonEntry(zipOut, ExportFileStructure.PROFILE_FILE, it) }
-        exportData.serializePlaces()?.let { writeJsonEntry(zipOut, ExportFileStructure.PLACES_FILE, it) }
-        exportData.serializeLocationHistory()?.let { writeJsonEntry(zipOut, ExportFileStructure.LOCATION_HISTORY_FILE, it) }
+        writeStreamedEntry(zipOut, ExportFileStructure.METADATA_FILE) { exportData.writeMetadata(it) }
+        writeStreamedEntry(zipOut, ExportFileStructure.JOURNALS_FILE) { exportData.writeJournals(it) }
+        writeStreamedEntry(zipOut, ExportFileStructure.NOTES_FILE) { exportData.writeNotes(it) }
+        writeStreamedEntry(zipOut, ExportFileStructure.JOURNAL_NOTES_FILE) { exportData.writeJournalNotes(it) }
+        writeStreamedEntry(zipOut, ExportFileStructure.DRAFTS_FILE) { exportData.writeDrafts(it) }
+        if (exportData.hasProfile) {
+            writeStreamedEntry(zipOut, ExportFileStructure.PROFILE_FILE) { exportData.writeProfile(it) }
+        }
+        if (exportData.hasPlaces) {
+            writeStreamedEntry(zipOut, ExportFileStructure.PLACES_FILE) { exportData.writePlaces(it) }
+        }
+        if (exportData.hasLocationHistory) {
+            writeStreamedEntry(zipOut, ExportFileStructure.LOCATION_HISTORY_FILE) { exportData.writeLocationHistory(it) }
+        }
 
         val exportedMediaFiles = mutableListOf<ExportMediaFile>()
         val archiveIssues = mutableListOf<ExportIssue>()
@@ -276,15 +293,34 @@ class ExportWorker(
             outcome.issue?.let(archiveIssues::add)
         }
 
-        exportData.serializeMediaManifest(exportedMediaFiles)?.let { manifest ->
-            writeJsonEntry(zipOut, ExportFileStructure.MEDIA_MANIFEST_FILE, manifest)
+        if (exportData.hasMediaManifest(exportedMediaFiles)) {
+            writeStreamedEntry(zipOut, ExportFileStructure.MEDIA_MANIFEST_FILE) {
+                exportData.writeMediaManifest(it, exportedMediaFiles)
+            }
         }
         exportData.renderIssuesText(archiveIssues)?.let { issuesText ->
-            writeJsonEntry(zipOut, ExportFileStructure.EXPORT_ISSUES_FILE, issuesText)
+            writeTextEntry(zipOut, ExportFileStructure.EXPORT_ISSUES_FILE, issuesText)
         }
     }
 
-    private fun writeJsonEntry(
+    /**
+     * Streams a JSON category directly into a ZIP entry via an okio sink, so the
+     * category is never fully materialized as a String. The buffered sink is flushed
+     * (not closed) so its bytes land in the current entry without closing [zipOut].
+     */
+    private fun writeStreamedEntry(
+        zipOut: ZipOutputStream,
+        entryName: String,
+        write: (BufferedSink) -> Unit,
+    ) {
+        zipOut.putNextEntry(ZipEntry(entryName))
+        val bufferedSink = zipOut.sink().buffer()
+        write(bufferedSink)
+        bufferedSink.flush()
+        zipOut.closeEntry()
+    }
+
+    private fun writeTextEntry(
         zipOut: ZipOutputStream,
         entryName: String,
         content: String,
