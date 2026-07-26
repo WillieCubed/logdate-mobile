@@ -16,6 +16,7 @@ import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.serverModule
 import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.entitlements.EntitlementService
+import app.logdate.server.entitlements.PlanCatalogService
 import app.logdate.server.entitlements.UsageCalculator
 import app.logdate.server.entitlements.entitlementsModule
 import app.logdate.server.identity.AtprotoIdentityConfig
@@ -44,6 +45,7 @@ import app.logdate.server.routes.identityApiRoutes
 import app.logdate.server.routes.identityRoutes
 import app.logdate.server.routes.oauthRoutes
 import app.logdate.server.routes.passkeyRoutes
+import app.logdate.server.routes.planRoutes
 import app.logdate.server.routes.quotaRoutes
 import app.logdate.server.routes.resourceRoutes
 import app.logdate.server.routes.serverInfoRoutes
@@ -283,6 +285,7 @@ fun Application.module(
     val authMetrics by inject<AuthMetricsRegistry>()
     val accountDeletionService by inject<AccountDeletionService>()
     val entitlementService by inject<EntitlementService>()
+    val planCatalogService by inject<PlanCatalogService>()
     val emailVerificationService by inject<app.logdate.server.auth.EmailVerificationService>()
     val syncRepository by inject<SyncRepository>()
     val syncMetrics by inject<SyncMetricsRegistry>()
@@ -436,6 +439,7 @@ fun Application.module(
 
         route("/api/v1") {
             serverInfoRoutes(serverDescriptor)
+            planRoutes(planCatalogService)
             authV1Routes(
                 accountRepository = accountRepository,
                 identityRepository = accountIdentityRepository,

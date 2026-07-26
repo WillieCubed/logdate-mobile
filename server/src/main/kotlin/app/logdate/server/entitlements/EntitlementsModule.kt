@@ -28,6 +28,7 @@ fun entitlementsModule(
         if (provider == BillingProvider.Disabled || !databaseAvailable) {
             single<EntitlementService> { UnlimitedEntitlementService() }
             single<UsageCalculator> { UnlimitedUsageCalculator }
+            single<PlanCatalogService> { EmptyPlanCatalogService }
         } else {
             // Exposed's TransactionManager tracks the default Database set by Database.connect()
             // during DatabaseConfig.initializeDatabase — the rest of the server's Postgres repos
@@ -36,6 +37,7 @@ fun entitlementsModule(
             single<Database> { TransactionManager.defaultDatabase!! }
             single<EntitlementService> { StoredEntitlementService(database = get()) }
             single<UsageCalculator> { DatabaseUsageCalculator(database = get()) }
+            single<PlanCatalogService> { StoredPlanCatalogService(database = get()) }
         }
         single { EntitlementEnforcer(entitlementService = get(), usageCalculator = get()) }
     }
