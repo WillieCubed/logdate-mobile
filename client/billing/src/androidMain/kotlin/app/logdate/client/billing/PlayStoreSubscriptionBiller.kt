@@ -2,9 +2,7 @@
 
 package app.logdate.client.billing
 
-import android.app.Activity
 import android.content.Context
-import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import app.logdate.client.billing.model.LogDateBackupPlanOption
@@ -43,6 +41,11 @@ class PlayStoreSubscriptionBiller
         private val context: Context,
         private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     ) : SubscriptionBiller {
+        /**
+         * Play Billing must be launched from a foreground Activity. The injected context is the
+         * application, so it is tracked separately rather than unwrapped.
+         */
+        private val foregroundActivityTracker = trackerFor(context)
         override val isSubscribed: Flow<Boolean>
             get() =
                 flow {
@@ -75,7 +78,8 @@ class PlayStoreSubscriptionBiller
                         ?.offerToken
                         ?: error("Play Billing product '${plan.sku}' has no subscription offer.")
                 val activity =
-                    context.findActivity()
+                    foregroundActivityTracker?.current()
+                        ?: context.unwrapActivity()
                         ?: error("A foreground Activity is required to launch Play Billing.")
                 val billingResult =
                     billingClient.launchBillingFlow(
@@ -202,11 +206,4 @@ class PlayStoreSubscriptionBiller
                 purchase.purchaseState == Purchase.PurchaseState.PURCHASED
             }
         }
-    }
-
-private tailrec fun Context.findActivity(): Activity? =
-    when (this) {
-        is Activity -> this
-        is ContextWrapper -> baseContext.findActivity()
-        else -> null
     }
