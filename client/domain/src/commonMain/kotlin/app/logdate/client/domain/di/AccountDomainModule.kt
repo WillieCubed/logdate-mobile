@@ -10,6 +10,7 @@ import app.logdate.client.domain.account.CreateRemoteAccountUseCase
 import app.logdate.client.domain.account.DeletePasskeyUseCase
 import app.logdate.client.domain.account.EmailVerificationAvailability
 import app.logdate.client.domain.account.GetAccountSetupDataUseCase
+import app.logdate.client.domain.account.GetAvailablePlansUseCase
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
 import app.logdate.client.domain.account.GetCurrentEntitlementUseCase
 import app.logdate.client.domain.account.HasLogDateCloudAccountUseCase
@@ -53,6 +54,7 @@ val accountDomainModule: Module =
             )
         }
         factory { GetCurrentEntitlementUseCase(sessionStorage = get(), apiClient = get()) }
+        factory { GetAvailablePlansUseCase(planCatalogClient = get()) }
         factory { VerifyEmailUseCase(sessionStorage = get(), manager = get()) }
         factory { EmailVerificationAvailability(manager = get(), getCurrentEntitlement = get()) }
 
