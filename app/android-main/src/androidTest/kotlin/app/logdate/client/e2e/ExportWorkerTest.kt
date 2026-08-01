@@ -14,6 +14,7 @@ import app.logdate.client.domain.export.ExportStats
 import app.logdate.client.domain.export.ExportUserDataUseCase
 import app.logdate.feature.core.export.ExportLauncher
 import app.logdate.feature.core.export.ExportOptions
+import app.logdate.feature.core.export.ExportOutcome
 import app.logdate.feature.core.export.ExportProgressInfo
 import app.logdate.feature.core.export.ExportWorker
 import io.mockk.every
@@ -166,7 +167,7 @@ private class RecordingExportLauncher : ExportLauncher {
 
     override fun cancelExport() {}
 
-    override fun setExportCompletionCallback(callback: (String?) -> Unit) {}
+    override fun setExportCompletionCallback(callback: (ExportOutcome) -> Unit) {}
 
     override fun updateProgress(info: ExportProgressInfo) {
         progressUpdates += info

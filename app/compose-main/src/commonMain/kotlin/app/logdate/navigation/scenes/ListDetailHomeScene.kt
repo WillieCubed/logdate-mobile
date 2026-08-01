@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
@@ -42,6 +43,7 @@ class ListDetailHomeScene<T : NavKey>(
                     modifier =
                         Modifier
                             .fillMaxSize()
+                            .testTag(HOME_TWO_PANE_LAYOUT_TEST_TAG)
                             .statusBarsPadding()
                             .padding(top = Spacing.sm),
                 ) {
@@ -84,6 +86,7 @@ class ListDetailHomeScene<T : NavKey>(
                     modifier =
                         Modifier
                             .fillMaxSize()
+                            .testTag(HOME_TWO_PANE_LAYOUT_TEST_TAG)
                             .statusBarsPadding()
                             .padding(top = Spacing.sm)
                             .padding(horizontal = 8.dp),
@@ -118,6 +121,8 @@ class ListDetailHomeScene<T : NavKey>(
         }
     }
 }
+
+private const val HOME_TWO_PANE_LAYOUT_TEST_TAG = "home_two_pane_layout"
 
 internal fun <T : NavKey> createTwoPaneHomeScene(
     mainEntry: NavEntry<T>,

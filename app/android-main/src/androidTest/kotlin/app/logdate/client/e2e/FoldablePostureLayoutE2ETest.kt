@@ -1,10 +1,13 @@
 package app.logdate.client.e2e
 
 import android.content.Intent
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -13,15 +16,23 @@ import app.logdate.client.MainActivity
 import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_MEMORY_RECALL
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_RECALL_DATE
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_TARGET
+import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.testing.onboarding.OnboardingTestFixture
 import app.logdate.client.testing.onboarding.putOnboardingTestFixture
+import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.RuleChain
+import org.junit.rules.TestRule
+import org.junit.runner.Description
 import org.junit.runner.RunWith
+import org.junit.runners.model.Statement
+import org.koin.core.context.GlobalContext
 import org.koin.dsl.module
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * Instrumented E2E coverage for the hinge-aware Home layout.
@@ -30,16 +41,12 @@ import org.koin.dsl.module
  * timeline) on top of Home, and asserts that the layout responds to posture publishes:
  *
  * - BOOK posture (separating vertical hinge): `LogDateNavDisplay` selects the two-pane
- *   `ListDetailHomeScene`, so the Home (list) pane and the detail pane render simultaneously.
- *   The Home "Create new entry" FAB is therefore visible alongside the day detail's "Close"
- *   affordance — a state that only ever occurs in two-pane mode.
+ *   `ListDetailHomeScene`, which exposes the stable `home_two_pane_layout` semantics tag while
+ *   the day detail's "Close" affordance remains visible.
  * - FLAT posture (no separating hinge): the scene falls back to single-pane, so the detail
- *   takes the full screen and the Home FAB is no longer displayed.
+ *   takes the full screen and the two-pane tag is absent.
  * - TABLETOP posture (separating horizontal hinge): the Home two-pane scene is vertical-hinge
- *   only, so a horizontal hinge must keep Home single-pane (the FAB stays hidden).
- *
- * The FAB / detail-affordance pairing is used as the discriminator because the production
- * `ListDetailHomeScene` panes carry no dedicated test tags (see this suite's reported risks).
+ *   only, so a horizontal hinge must keep Home single-pane (the tag stays absent).
  *
  * This suite runs on the `smokeDevices` group (a ~411dp phone and a ~1280dp tablet), but the
  * production two-pane gate is width-sensitive, so each test self-selects the devices it can pass
@@ -54,23 +61,14 @@ import org.koin.dsl.module
  *   yet flat must collapse — which only holds in the medium width band (640dp ≤ width < 840dp).
  *   Neither smoke device sits there, so it skips on both but stays correct for a medium foldable.
  *
- * Disabled: discriminating two-pane from single-pane Home at runtime requires a stable marker the
- * production UI does not yet expose — the Home new-entry affordance uses a null content description
- * and `ListDetailHomeScene` panes carry no test tags, so the book-posture assertion has nothing
- * deterministic to wait for. The window-testing posture plumbing this suite exercises is already
- * proven green by [FoldableStateContinuityE2ETest] and [NotificationAttachmentEntryRestorationE2ETest];
- * Home two-pane posture itself is covered by screenshot evidence and the Manual Foldable Evidence
- * Log. Re-enable once the Home list/detail panes expose stable test tags.
+ * The production two-pane scene root owns the discriminator tag, so the test does not depend on
+ * localized copy, content descriptions, or incidental child controls.
  */
-@Ignore(
-    "Needs a stable test tag on the Home new-entry affordance / ListDetailHomeScene panes to " +
-        "discriminate two-pane vs single-pane at runtime; Home posture is covered by screenshots " +
-        "and the Manual Foldable Evidence Log.",
-)
 @RunWith(AndroidJUnit4::class)
 class FoldablePostureLayoutE2ETest {
     private val postureSupport = FoldablePostureTestSupport()
     private val koinRule = OnboardingKoinModuleOverrideRule(module {})
+    private val timelineSeedRule = FoldableTimelineSeedRule()
     private val activityRule = ActivityScenarioRule<MainActivity>(createDayDetailLaunchIntent())
     private val composeRule = AndroidComposeTestRule(activityRule, ::foldableLayoutActivity)
 
@@ -78,6 +76,7 @@ class FoldablePostureLayoutE2ETest {
     val ruleChain: RuleChain =
         RuleChain
             .outerRule(koinRule)
+            .around(timelineSeedRule)
             .around(postureSupport.publisherRule)
             .around(composeRule)
 
@@ -94,9 +93,8 @@ class FoldablePostureLayoutE2ETest {
         }
         composeRule.waitForIdle()
 
-        // Two-pane: the Home (list) pane renders its FAB next to the detail pane.
-        waitForContentDescription(HOME_NEW_ENTRY_DESCRIPTION)
-        composeRule.onNodeWithContentDescription(HOME_NEW_ENTRY_DESCRIPTION).assertIsDisplayed()
+        waitForTag(HOME_TWO_PANE_LAYOUT_TAG)
+        composeRule.onNodeWithTag(HOME_TWO_PANE_LAYOUT_TAG).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(DAY_DETAIL_CLOSE_DESCRIPTION).assertIsDisplayed()
     }
 
@@ -113,8 +111,8 @@ class FoldablePostureLayoutE2ETest {
         }
         composeRule.waitForIdle()
 
-        // Single-pane: the detail fills the screen and the Home FAB is gone.
-        waitForContentDescription(HOME_NEW_ENTRY_DESCRIPTION, shouldExist = false)
+        waitForTag(HOME_TWO_PANE_LAYOUT_TAG, shouldExist = false)
+        composeRule.onAllNodesWithTag(HOME_TWO_PANE_LAYOUT_TAG).assertCountEquals(0)
         composeRule.onNodeWithContentDescription(DAY_DETAIL_CLOSE_DESCRIPTION).assertIsDisplayed()
     }
 
@@ -122,7 +120,7 @@ class FoldablePostureLayoutE2ETest {
     fun tabletopPosture_keepsHomeSinglePane() {
         // The Home two-pane scene is vertical-hinge only. Gating to the narrow phone (< 600dp)
         // removes the width-based two-pane path so the horizontal hinge is the only signal, and
-        // it must keep Home single-pane (no FAB).
+        // it must keep Home single-pane (no two-pane tag).
         assumeTrue(windowWidthDp() < SINGLE_PANE_MAX_WIDTH_DP)
 
         waitForContentDescription(DAY_DETAIL_CLOSE_DESCRIPTION)
@@ -132,9 +130,8 @@ class FoldablePostureLayoutE2ETest {
         }
         composeRule.waitForIdle()
 
-        // A horizontal (tabletop) hinge never produces the vertical two-pane split, so the Home
-        // FAB stays hidden while the detail keeps the full screen.
-        waitForContentDescription(HOME_NEW_ENTRY_DESCRIPTION, shouldExist = false)
+        waitForTag(HOME_TWO_PANE_LAYOUT_TAG, shouldExist = false)
+        composeRule.onAllNodesWithTag(HOME_TWO_PANE_LAYOUT_TAG).assertCountEquals(0)
         composeRule.onNodeWithContentDescription(DAY_DETAIL_CLOSE_DESCRIPTION).assertIsDisplayed()
     }
 
@@ -152,27 +149,41 @@ class FoldablePostureLayoutE2ETest {
             postureSupport.publishBookPosture(activity)
         }
         composeRule.waitForIdle()
-        waitForContentDescription(HOME_NEW_ENTRY_DESCRIPTION)
+        waitForTag(HOME_TWO_PANE_LAYOUT_TAG)
+        composeRule.onNodeWithTag(HOME_TWO_PANE_LAYOUT_TAG).assertIsDisplayed()
 
         composeRule.activityRule.scenario.onActivity { _ ->
             postureSupport.publishFlat()
         }
         composeRule.waitForIdle()
-        waitForContentDescription(HOME_NEW_ENTRY_DESCRIPTION, shouldExist = false)
+        waitForTag(HOME_TWO_PANE_LAYOUT_TAG, shouldExist = false)
+        composeRule.onAllNodesWithTag(HOME_TWO_PANE_LAYOUT_TAG).assertCountEquals(0)
     }
 
-    private fun waitForContentDescription(
-        description: String,
+    private fun waitForTag(
+        tag: String,
         shouldExist: Boolean = true,
         timeoutMillis: Long = 10_000,
     ) {
         composeRule.waitUntil(timeoutMillis = timeoutMillis) {
             val exists =
                 composeRule
-                    .onAllNodesWithContentDescription(description)
+                    .onAllNodesWithTag(tag)
                     .fetchSemanticsNodes()
                     .isNotEmpty()
             if (shouldExist) exists else !exists
+        }
+    }
+
+    private fun waitForContentDescription(
+        description: String,
+        timeoutMillis: Long = 10_000,
+    ) {
+        composeRule.waitUntil(timeoutMillis = timeoutMillis) {
+            composeRule
+                .onAllNodesWithContentDescription(description)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
         }
     }
 
@@ -191,7 +202,7 @@ class FoldablePostureLayoutE2ETest {
     }
 
     private companion object {
-        const val HOME_NEW_ENTRY_DESCRIPTION = "Create new entry"
+        const val HOME_TWO_PANE_LAYOUT_TAG = "home_two_pane_layout"
         const val DAY_DETAIL_CLOSE_DESCRIPTION = "Close"
 
         /** Each two-pane column needs ≥ 320dp, so the window must clear ~640dp to split. */
@@ -206,6 +217,35 @@ class FoldablePostureLayoutE2ETest {
 }
 
 private const val FOLDABLE_LAYOUT_RECALL_DATE = "2026-06-15"
+private val FOLDABLE_LAYOUT_NOTE_TIMESTAMP = Instant.parse("2026-06-15T18:00:00Z")
+
+private class FoldableTimelineSeedRule : TestRule {
+    override fun apply(
+        base: Statement,
+        description: Description,
+    ): Statement =
+        object : Statement() {
+            override fun evaluate() {
+                val notesRepository = GlobalContext.get().get<JournalNotesRepository>()
+                val noteId = Uuid.random()
+                runBlocking {
+                    notesRepository.create(
+                        JournalNote.Text(
+                            uid = noteId,
+                            creationTimestamp = FOLDABLE_LAYOUT_NOTE_TIMESTAMP,
+                            lastUpdated = FOLDABLE_LAYOUT_NOTE_TIMESTAMP,
+                            content = "Foldable posture layout fixture",
+                        ),
+                    )
+                }
+                try {
+                    base.evaluate()
+                } finally {
+                    runBlocking { notesRepository.removeById(noteId) }
+                }
+            }
+        }
+}
 
 private fun createDayDetailLaunchIntent(): Intent =
     Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java).apply {
