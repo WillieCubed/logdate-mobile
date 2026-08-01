@@ -141,6 +141,16 @@ resource "google_project_iam_member" "github_deploy_roles" {
   member  = "serviceAccount:${google_service_account.github_deploy[0].email}"
 }
 
+resource "google_project_iam_member" "github_cloud_sql_client" {
+  for_each = local.github_oidc_enabled && var.create_cloud_sql_instance ? toset([
+    "roles/cloudsql.client",
+  ]) : toset([])
+
+  project = var.project_id
+  role    = each.key
+  member  = "serviceAccount:${google_service_account.github_deploy[0].email}"
+}
+
 resource "google_service_account_iam_member" "github_deploy_wif" {
   count              = local.github_oidc_enabled ? 1 : 0
   service_account_id = google_service_account.github_deploy[0].name

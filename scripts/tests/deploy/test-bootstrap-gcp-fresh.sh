@@ -21,6 +21,8 @@ OUTPUT_FILE="$TMP_DIR/bootstrap.out"
 INTERACTIVE_LOG_DIR="$TMP_DIR/logs-interactive"
 INTERACTIVE_OUTPUT_FILE="$TMP_DIR/bootstrap-interactive.out"
 DATABASE_PASSWORD_SENTINEL="DATABASE_PASSWORD_SENTINEL_DO_NOT_LEAK"
+DATABASE_USER_PERSISTED_SENTINEL="DATABASE_USER_PERSISTED_SENTINEL_DO_NOT_LEAK"
+DATABASE_USER_AMBIENT_SENTINEL="DATABASE_USER_AMBIENT_SENTINEL_DO_NOT_LEAK"
 
 cleanup() {
     rm -rf "$TMP_DIR"
@@ -450,11 +452,36 @@ flag_value() {
     done
 }
 
-url="$(flag_value --url "$@")"
-method="$(flag_value --request "$@")"
-header_arg="$(flag_value --header "$@")"
-body_arg="$(flag_value --data-binary "$@")"
-output_file="$(flag_value --output "$@")"
+config_file="$(flag_value --config "$@")"
+[[ -n "$config_file" && -f "$config_file" ]] || {
+    echo "Unexpected curl invocation" >&2
+    exit 1
+}
+config_mode="$(stat -f '%Lp' "$config_file" 2>/dev/null || stat -c '%a' "$config_file")"
+[[ "$config_mode" == "600" ]] || exit 1
+
+{
+    IFS= read -r method
+    IFS= read -r header_arg
+    IFS= read -r body_arg
+    IFS= read -r output_file
+    IFS= read -r url
+} < <(python3 - "$config_file" <<'PY'
+import pathlib
+import sys
+
+values = {}
+for raw_line in pathlib.Path(sys.argv[1]).read_text().splitlines():
+    if " = " not in raw_line:
+        continue
+    key, raw_value = raw_line.split(" = ", 1)
+    if len(raw_value) >= 2 and raw_value[0] == raw_value[-1] == '"':
+        raw_value = raw_value[1:-1].replace('\\"', '"').replace("\\\\", "\\")
+    values[key] = raw_value
+for key in ("request", "header", "data-binary", "output", "url"):
+    print(values.get(key, ""))
+PY
+)
 header_file="${header_arg#@}"
 body_file="${body_arg#@}"
 
@@ -463,9 +490,23 @@ if [[ "$url" == https://sqladmin.googleapis.com/sql/v1beta4/projects/*/instances
     header_mode="$(stat -f '%Lp' "$header_file" 2>/dev/null || stat -c '%a' "$header_file")"
     body_mode="$(stat -f '%Lp' "$body_file" 2>/dev/null || stat -c '%a' "$body_file")"
     [[ "$header_mode" == "600" && "$body_mode" == "600" ]] || exit 1
-    printf '%s\n%s\n%s\n' "$header_file" "$body_file" "$(dirname "$header_file")/cloud-sql-access-token" >>"$LOG_DIR/sensitive-paths"
-    grep -q '"name": "logdate"' "$body_file"
+    printf '%s\n%s\n%s\n%s\n%s\n' \
+        "$config_file" \
+        "$header_file" \
+        "$body_file" \
+        "$output_file" \
+        "$(dirname "$header_file")/cloud-sql-access-token" >>"$LOG_DIR/sensitive-paths"
+    python3 - "$body_file" "$LOG_DIR/secret-logdate-db-user" <<'PY'
+import json
+import pathlib
+import sys
+
+body_path, user_path = sys.argv[1:]
+if json.loads(pathlib.Path(body_path).read_text())["name"] != pathlib.Path(user_path).read_text():
+    raise SystemExit("Cloud SQL user did not match persisted DATABASE_USER secret")
+PY
     grep -q "${DATABASE_PASSWORD_SENTINEL:-DATABASE_PASSWORD_SENTINEL_DO_NOT_LEAK}" "$body_file"
+    printf '%s\n' "$method" >>"$LOG_DIR/cloud-sql-methods"
     printf '{}\n' >"$output_file"
     if [[ "$method" == "PUT" && ! -f "$LOG_DIR/cloud-sql-user" ]]; then
         printf '404'
@@ -482,7 +523,7 @@ if [[ "$url" == https://sqladmin.googleapis.com/sql/v1beta4/projects/*/instances
     fi
 fi
 
-echo "Unexpected curl invocation: $*" >&2
+echo "Unexpected curl invocation" >&2
 exit 1
 EOF
 chmod +x "$FAKE_BIN/curl"
@@ -562,8 +603,11 @@ assert_contains '"INSTANCE_CONNECTION_NAME": "logdate-bootstrap-test:us-central1
 assert_contains '"DATABASE_PASSWORD": { "secret_id": "logdate-db-password", "version": "1" }' "$(cat "$INSTANCE_DIR/deployment-contract.json")"
 assert_contains 'serviceusage.googleapis.com' "$(cat "$LOG_DIR/gcloud.log")"
 assert_contains 'secrets versions add logdate-jwt-secret' "$(cat "$LOG_DIR/gcloud.log")"
-assert_contains '/sql/v1beta4/projects/logdate-bootstrap-test/instances/logdate-db/users' "$(cat "$LOG_DIR/curl.log")"
-assert_contains '--request POST' "$(cat "$LOG_DIR/curl.log")"
+assert_contains '--config' "$(cat "$LOG_DIR/curl.log")"
+assert_contains 'POST' "$(cat "$LOG_DIR/cloud-sql-methods")"
+assert_not_contains '/sql/v1beta4/' "$(cat "$LOG_DIR/curl.log")"
+assert_not_contains '--request' "$(cat "$LOG_DIR/curl.log")"
+assert_not_contains '--url' "$(cat "$LOG_DIR/curl.log")"
 assert_not_contains 'sql users create' "$(cat "$LOG_DIR/gcloud.log")"
 assert_not_contains 'sql users set-password' "$(cat "$LOG_DIR/gcloud.log")"
 assert_contains 'secret GCP_WORKLOAD_IDENTITY_PROVIDER=projects/123456/locations/global/workloadIdentityPools/logdate-github-pool/providers/github-provider' "$(cat "$LOG_DIR/gh-values.log")"
@@ -576,7 +620,6 @@ assert_contains 'run deploy logdate-server' "$(cat "$LOG_DIR/gcloud.log")"
 security_evidence="$(cat "$OUTPUT_FILE" "$LOG_DIR"/*.log "$INSTANCE_DIR"/*.json "$INSTANCE_DIR"/*.hcl)"
 assert_not_contains "$DATABASE_PASSWORD_SENTINEL" "$security_evidence"
 assert_not_contains 'resource "google_sql_user"' "$(cat infra/terraform/main.tf)"
-assert_contains 'roles/cloudsql.client' "$(cat infra/terraform/main.tf)"
 assert_contains 'google_secret_manager_secret_iam_member" "github_migration_access' "$(cat infra/terraform/main.tf)"
 while IFS= read -r sensitive_path; do
     [[ ! -e "$sensitive_path" ]] || {
@@ -587,10 +630,13 @@ while IFS= read -r sensitive_path; do
 done <"$LOG_DIR/sensitive-paths"
 
 secret_adds_before="$(grep -c 'secrets versions add' "$LOG_DIR/gcloud.log")"
+printf '%s' "$DATABASE_USER_PERSISTED_SENTINEL" >"$LOG_DIR/secret-logdate-db-user"
 
 set +e
 PATH="$FAKE_BIN:$PATH" \
 TEST_LOG_DIR="$LOG_DIR" \
+DATABASE_PASSWORD_SENTINEL="$DATABASE_PASSWORD_SENTINEL" \
+CLOUD_SQL_USER_NAME="$DATABASE_USER_AMBIENT_SENTINEL" \
 GH_FORCE_FAIL="true" \
 GITHUB_REPO="acme/logdate" \
 INSTANCE_NAME="$INSTANCE_PROJECT" \
@@ -599,18 +645,28 @@ BILLING_ACCOUNT="ABC123" \
 REGION="us-central1" \
 IMAGE_TAG="bootstrap-test" \
 USER="tester" \
-./scripts/bootstrap-gcp-fresh.sh --yes >"$OUTPUT_FILE" 2>&1
+bash -x ./scripts/bootstrap-gcp-fresh.sh --yes >"$OUTPUT_FILE" 2>&1
 status=$?
 set -e
 
 output="$(cat "$OUTPUT_FILE")"
+if [[ "$status" != "0" ]]; then
+    echo "$output"
+fi
 assert_equals "0" "$status"
 assert_contains 'GitHub deploy wiring needs manual follow-up:' "$output"
 assert_contains "gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER --repo acme/logdate --body 'projects/123456/locations/global/workloadIdentityPools/logdate-github-pool/providers/github-provider'" "$output"
 assert_contains "gh variable set LOGDATE_DEPLOY_SOURCE --repo acme/logdate --body 'repo_vars'" "$output"
 secret_adds_after="$(grep -c 'secrets versions add' "$LOG_DIR/gcloud.log")"
 assert_equals "$secret_adds_before" "$secret_adds_after"
-assert_contains '--request PUT' "$(cat "$LOG_DIR/curl.log")"
+assert_contains 'PUT' "$(cat "$LOG_DIR/cloud-sql-methods")"
+rerun_security_evidence="$(cat "$OUTPUT_FILE" "$LOG_DIR"/*.log "$INSTANCE_DIR"/*.json "$INSTANCE_DIR"/*.hcl)"
+assert_not_contains "$DATABASE_USER_PERSISTED_SENTINEL" "$rerun_security_evidence"
+assert_not_contains "$DATABASE_USER_AMBIENT_SENTINEL" "$rerun_security_evidence"
+assert_contains '"env_vars": {' "$(cat "$INSTANCE_DIR/deployment-contract.json")"
+assert_contains '"secret_env": {' "$(cat "$INSTANCE_DIR/deployment-contract.json")"
+assert_not_contains '"cloud_run_env": {' "$(cat "$INSTANCE_DIR/deployment-contract.json")"
+assert_not_contains '"cloud_run_secret_env": {' "$(cat "$INSTANCE_DIR/deployment-contract.json")"
 
 reset_fake_state "$INTERACTIVE_LOG_DIR"
 set +e

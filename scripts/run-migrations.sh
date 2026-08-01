@@ -299,8 +299,8 @@ def require_string(value, label):
 
 environment = require_string(contract.get("environment"), "contract environment")
 project_id = require_string(contract.get("project_id"), "contract project_id")
-plain_env = contract.get("cloud_run_env") or {}
-secret_env = contract.get("cloud_run_secret_env") or {}
+plain_env = contract.get("env_vars") or {}
+secret_env = contract.get("secret_env") or {}
 connection_name = require_string(plain_env.get("INSTANCE_CONNECTION_NAME"), "INSTANCE_CONNECTION_NAME")
 database_name = require_string(plain_env.get("DB_NAME"), "DB_NAME")
 

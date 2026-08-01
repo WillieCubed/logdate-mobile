@@ -19,7 +19,6 @@ STATE_BUCKET="${TF_STATE_BUCKET:-}"
 GITHUB_REPO="${GITHUB_REPO:-}"
 CLOUD_SQL_INSTANCE_NAME="${CLOUD_SQL_INSTANCE_NAME:-logdate-db}"
 CLOUD_SQL_DATABASE_NAME="${CLOUD_SQL_DATABASE_NAME:-logdate}"
-CLOUD_SQL_USER_NAME="${CLOUD_SQL_USER_NAME:-logdate}"
 DEPLOY_SOURCE_MODE="repo_vars"
 declare -a GITHUB_MANUAL_STEPS=()
 GITHUB_WIRING_STATUS="not_attempted"
@@ -561,6 +560,10 @@ generate_health_token() {
     openssl rand -hex 32 | tr -d '\n'
 }
 
+generate_database_user() {
+    printf 'logdate'
+}
+
 ensure_secret_file() {
     local secret_id="$1" generator="$2" output_file="$3"
     if gcloud secrets versions access latest \
@@ -610,13 +613,14 @@ secret_numeric_version() {
 }
 
 ensure_cloud_sql_user() {
-    local password_file="$1"
+    local username_file="$1"
+    local password_file="$2"
     local token_file="$SENSITIVE_WORKDIR/cloud-sql-access-token"
     local header_file="$SENSITIVE_WORKDIR/cloud-sql-header"
     local body_file="$SENSITIVE_WORKDIR/cloud-sql-user.json"
     local response_file="$SENSITIVE_WORKDIR/cloud-sql-response.json"
-    local users_url="https://sqladmin.googleapis.com/sql/v1beta4/projects/${PROJECT_ID}/instances/${CLOUD_SQL_INSTANCE_NAME}/users"
-    local update_url="${users_url}?name=${CLOUD_SQL_USER_NAME}&host=%25"
+    local update_config_file="$SENSITIVE_WORKDIR/cloud-sql-update.curl"
+    local create_config_file="$SENSITIVE_WORKDIR/cloud-sql-create.curl"
     local http_status
 
     gcloud auth print-access-token >"$token_file"
@@ -625,37 +629,89 @@ ensure_cloud_sql_user() {
         cat "$token_file"
         printf '\nContent-Type: application/json\n'
     } >"$header_file"
-    python3 - "$CLOUD_SQL_USER_NAME" "$password_file" "$body_file" <<'PY'
+    python3 - \
+        "$PROJECT_ID" \
+        "$CLOUD_SQL_INSTANCE_NAME" \
+        "$username_file" \
+        "$password_file" \
+        "$header_file" \
+        "$body_file" \
+        "$response_file" \
+        "$update_config_file" \
+        "$create_config_file" <<'PY'
 import json
 import os
 import pathlib
 import sys
+import urllib.parse
 
-username, password_path, output_path = sys.argv[1:]
-password = pathlib.Path(password_path).read_text()
-pathlib.Path(output_path).write_text(json.dumps({"name": username, "password": password}))
-os.chmod(output_path, 0o600)
+(
+    project,
+    instance,
+    username_path,
+    password_path,
+    header_path,
+    body_path,
+    response_path,
+    update_config_path,
+    create_config_path,
+) = sys.argv[1:]
+
+
+def read_single_line(path: str, label: str) -> str:
+    value = pathlib.Path(path).read_text()
+    if not value or "\n" in value or "\r" in value:
+        raise SystemExit(f"{label} must be a non-empty single-line value")
+    return value
+
+
+def curl_config_value(value: str) -> str:
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+username = read_single_line(username_path, "database username")
+password = read_single_line(password_path, "database password")
+body = pathlib.Path(body_path)
+body.write_text(json.dumps({"name": username, "password": password}))
+
+quoted_project = urllib.parse.quote(project, safe="")
+quoted_instance = urllib.parse.quote(instance, safe="")
+users_url = (
+    "https://sqladmin.googleapis.com/sql/v1beta4/projects/"
+    f"{quoted_project}/instances/{quoted_instance}/users"
+)
+update_url = users_url + "?" + urllib.parse.urlencode({"name": username, "host": "%"})
+
+
+def write_curl_config(path: str, method: str, url: str) -> None:
+    config = pathlib.Path(path)
+    config.write_text(
+        "silent\n"
+        "show-error\n"
+        f"request = {curl_config_value(method)}\n"
+        f"header = {curl_config_value('@' + header_path)}\n"
+        f"data-binary = {curl_config_value('@' + body_path)}\n"
+        f"output = {curl_config_value(response_path)}\n"
+        'write-out = "%{http_code}"\n'
+        f"url = {curl_config_value(url)}\n"
+    )
+    os.chmod(config, 0o600)
+
+
+write_curl_config(update_config_path, "PUT", update_url)
+write_curl_config(create_config_path, "POST", users_url)
+for path in (body_path, header_path, response_path):
+    pathlib.Path(path).touch()
+    os.chmod(path, 0o600)
 PY
-    chmod 600 "$token_file" "$header_file" "$body_file" "$response_file" 2>/dev/null || true
+    chmod 600 "$token_file" "$header_file" "$body_file" "$response_file" "$update_config_file" "$create_config_file"
 
     http_status="$(
-        curl --silent --show-error \
-            --request PUT \
-            --header "@$header_file" \
-            --data-binary "@$body_file" \
-            --output "$response_file" \
-            --write-out '%{http_code}' \
-            --url "$update_url"
+        curl --config "$update_config_file"
     )"
     if [[ "$http_status" == "404" ]]; then
         http_status="$(
-            curl --silent --show-error \
-                --request POST \
-                --header "@$header_file" \
-                --data-binary "@$body_file" \
-                --output "$response_file" \
-                --write-out '%{http_code}' \
-                --url "$users_url"
+            curl --config "$create_config_file"
         )"
     fi
     if [[ "$http_status" != "200" && "$http_status" != "201" ]]; then
@@ -670,7 +726,7 @@ bootstrap_runtime_secrets() {
 
     local db_user_file="$SENSITIVE_WORKDIR/database-user"
     local db_password_file="$SENSITIVE_WORKDIR/database-password"
-    ensure_literal_secret_file "logdate-db-user" "$CLOUD_SQL_USER_NAME" "$db_user_file"
+    ensure_secret_file "logdate-db-user" generate_database_user "$db_user_file"
     ensure_secret_file "logdate-db-password" generate_password_secret "$db_password_file"
     ensure_secret_file "logdate-jwt-secret" generate_base64_secret "$SENSITIVE_WORKDIR/jwt-secret"
     ensure_secret_file "logdate-server-encryption-key" generate_base64_secret "$SENSITIVE_WORKDIR/encryption-key"
@@ -679,7 +735,7 @@ bootstrap_runtime_secrets() {
 
     DATABASE_USER_VERSION="$(secret_numeric_version "logdate-db-user")"
     DATABASE_PASSWORD_VERSION="$(secret_numeric_version "logdate-db-password")"
-    ensure_cloud_sql_user "$db_password_file"
+    ensure_cloud_sql_user "$db_user_file" "$db_password_file"
 }
 
 write_backend_config() {
@@ -778,11 +834,11 @@ write_deployment_contract() {
 {
   "environment": "bootstrap",
   "project_id": "${PROJECT_ID}",
-  "cloud_run_env": {
+  "env_vars": {
     "INSTANCE_CONNECTION_NAME": "${connection_name}",
     "DB_NAME": "${CLOUD_SQL_DATABASE_NAME}"
   },
-  "cloud_run_secret_env": {
+  "secret_env": {
     "DATABASE_USER": { "secret_id": "logdate-db-user", "version": "${DATABASE_USER_VERSION}" },
     "DATABASE_PASSWORD": { "secret_id": "logdate-db-password", "version": "${DATABASE_PASSWORD_VERSION}" }
   }

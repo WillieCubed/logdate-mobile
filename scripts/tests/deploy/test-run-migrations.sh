@@ -28,15 +28,22 @@ mkdir -p "$FAKE_BIN" "$LOG_DIR" "$LEGACY_LOG_DIR"
 cat >"$CONTRACT_FILE" <<'EOF'
 {
   "environment": "staging",
+  "release_sha": "0123456789abcdef0123456789abcdef01234567",
   "project_id": "logdate-contract-test",
-  "cloud_run_env": {
+  "region": "us-central1",
+  "service_name": "logdate-server-staging",
+  "canonical_origin": "https://cloud-staging.logdate.app",
+  "runtime_service_account": "logdate-runtime@logdate-contract-test.iam.gserviceaccount.com",
+  "image": "us-central1-docker.pkg.dev/logdate-contract-test/logdate/logdate-server:0123456789abcdef0123456789abcdef01234567",
+  "env_vars": {
     "INSTANCE_CONNECTION_NAME": "logdate-contract-test:us-central1:logdate-db",
     "DB_NAME": "logdate"
   },
-  "cloud_run_secret_env": {
+  "secret_env": {
     "DATABASE_USER": { "secret_id": "logdate-db-user", "version": "7" },
     "DATABASE_PASSWORD": { "secret_id": "logdate-db-password", "version": "11" }
-  }
+  },
+  "runtime": {}
 }
 EOF
 
@@ -346,6 +353,15 @@ invalid_version_status=$?
 set -e
 assert_exit_code 1 "$invalid_version_status"
 assert_contains 'DATABASE_PASSWORD secret version must be an exact numeric version' "$invalid_version_output"
+
+ALTERNATE_SHAPE_CONTRACT="$TMP_DIR/private-alternate-shape-contract.json"
+sed -e 's/"env_vars"/"cloud_run_env"/' -e 's/"secret_env"/"cloud_run_secret_env"/' "$CONTRACT_FILE" >"$ALTERNATE_SHAPE_CONTRACT"
+set +e
+alternate_shape_output="$(TEST_LOG_DIR="$LOG_DIR" PATH="$FAKE_BIN:$PATH" "$SCRIPT" --contract-file "$ALTERNATE_SHAPE_CONTRACT" --environment staging 2>&1)"
+alternate_shape_status=$?
+set -e
+assert_exit_code 1 "$alternate_shape_status"
+assert_contains 'INSTANCE_CONNECTION_NAME must be a non-empty single-line string' "$alternate_shape_output"
 
 help_output="$("$SCRIPT" --help)"
 assert_contains '--contract-file PATH' "$help_output"
