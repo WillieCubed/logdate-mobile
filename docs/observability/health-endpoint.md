@@ -18,7 +18,8 @@ server):
 {
     "status": "healthy",
     "timestamp": "2026-05-04T22:43:57.841778716Z",
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "release": "logdate-server@0123456789abcdef0123456789abcdef01234567"
 }
 ```
 
@@ -30,6 +31,7 @@ server):
     "status": "healthy",
     "timestamp": "2026-05-04T22:43:57.841778716Z",
     "version": "1.0.0",
+    "release": "logdate-server@0123456789abcdef0123456789abcdef01234567",
     "db_connected": true
 }
 ```
@@ -38,6 +40,11 @@ server):
 port 8080" from "actually serving requests against Postgres". Without it, a
 `status: 200` check stays green when the database is unreachable but the
 server is still answering its own liveness probe.
+
+`release` is the immutable deployment identity (`RELEASE_VERSION`), while
+`version` remains the API contract version. They deliberately change on
+different schedules: clients use `version` to understand API compatibility and
+operators use `release` to identify the exact deployed server source.
 
 ## Why the header instead of a separate `/health/internal` route
 
@@ -80,11 +87,11 @@ shape, internal callers see exactly one URL.
    `logdate`. Same secret name (`logdate-health-internal-token`), distinct
    contents.
 
-5. **Token is purely opt-in for the server.** If `HEALTH_INTERNAL_TOKEN`
-   isn't set in the Cloud Run environment, the server still boots, `/health`
-   still works, and no caller can ever unlock the internal payload. There's
-   no boot-time fail-fast on this — losing the token means losing depth of
-   monitoring, not losing the server.
+5. **Production requires the token; non-production stays permissive.** A
+   production-profile server refuses startup without `HEALTH_INTERNAL_TOKEN`,
+   so a managed deployment cannot silently lose database readiness monitoring.
+   Development and test profiles retain the public-only behavior when the token
+   is unset. The token itself is never returned by the endpoint or logged.
 
 6. **Token is short-lived in the working tree.** The actual secret never
    appears in any source-controlled file — it lives only in GCP Secret

@@ -2,6 +2,7 @@ package app.logdate.server.config
 
 import io.github.aakira.napier.Napier
 import java.net.URI
+import java.util.Base64
 
 /**
  * Refuses to start the server in [RuntimeProfile.PRODUCTION] if required secrets are missing or
@@ -14,6 +15,10 @@ object ProductionConfigValidator {
     private const val MIN_JWT_SECRET_LENGTH = 32
 
     private const val ANDROID_ORIGIN_PREFIX = "android:apk-key-hash:"
+
+    private val RELEASE_VERSION_PATTERN = Regex("^logdate-server@[0-9a-fA-F]{40}$")
+    private val ANDROID_ORIGIN_PATTERN = Regex("^android:apk-key-hash:[A-Za-z0-9_-]{43}$")
+    private val ANDROID_CERT_FINGERPRINT_PATTERN = Regex("^(?:[A-Fa-f0-9]{2}:){31}[A-Fa-f0-9]{2}$")
 
     private val INSECURE_JWT_SECRETS =
         setOf(
@@ -44,26 +49,20 @@ object ProductionConfigValidator {
 
         val failures = mutableListOf<String>()
 
-        val jwtSecret = readEnv("JWT_SECRET")?.trim().orEmpty()
-        when {
-            jwtSecret.isEmpty() ->
-                failures += "JWT_SECRET is required in production (generate with: openssl rand -base64 32)."
-            jwtSecret.length < MIN_JWT_SECRET_LENGTH ->
-                failures += "JWT_SECRET must be at least $MIN_JWT_SECRET_LENGTH characters (got ${jwtSecret.length})."
-            jwtSecret.lowercase() in INSECURE_JWT_SECRETS ->
-                failures += "JWT_SECRET is set to a known placeholder value — rotate it before deploying."
-        }
-
-        val dbPassword = readEnv("DATABASE_PASSWORD")?.trim().orEmpty()
-        val dbUrlHasCredentials = readEnv("DATABASE_URL")?.contains("@") == true
-        when {
-            dbPassword.isEmpty() && !dbUrlHasCredentials ->
-                failures += "DATABASE_PASSWORD is required in production (or embed credentials in DATABASE_URL)."
-            dbPassword.lowercase() in INSECURE_DB_PASSWORDS ->
-                failures += "DATABASE_PASSWORD is set to a known default — use a real secret."
-        }
-
+        validateJwtSecret(readEnv, failures)
+        validateDatabase(readEnv, failures)
+        validateBlobStorage(readEnv, failures)
+        val publicOrigin = validatePublicOrigin(readEnv, failures)
+        validateAtprotoServiceUrl(readEnv, publicOrigin, failures)
+        validateHealthToken(readEnv, failures)
+        validateReleaseVersion(readEnv, failures)
+        validateServerEncryption(readEnv, failures)
+        validateSignedMediaUrls(readEnv, failures)
         validateWebAuthn(readEnv, failures)
+
+        if (readEnv("LOGDATE_EXPECT_FIRST_PARTY").isEnabled()) {
+            validateFirstPartyConfig(readEnv, failures)
+        }
 
         if (failures.isNotEmpty()) {
             val message =
@@ -74,6 +73,170 @@ object ProductionConfigValidator {
                 }
             throw InsecureProductionConfigException(message)
         }
+    }
+
+    private fun validateJwtSecret(
+        readEnv: (String) -> String?,
+        failures: MutableList<String>,
+    ) {
+        val jwtSecret = readEnv("JWT_SECRET")?.trim().orEmpty()
+        when {
+            jwtSecret.isEmpty() ->
+                failures += "JWT_SECRET is required in production (generate with: openssl rand -base64 32)."
+            jwtSecret.length < MIN_JWT_SECRET_LENGTH ->
+                failures += "JWT_SECRET must be at least $MIN_JWT_SECRET_LENGTH characters (got ${jwtSecret.length})."
+            jwtSecret.lowercase() in INSECURE_JWT_SECRETS ->
+                failures += "JWT_SECRET is set to a known placeholder value — rotate it before deploying."
+        }
+    }
+
+    private fun validateDatabase(
+        readEnv: (String) -> String?,
+        failures: MutableList<String>,
+    ) {
+        val dbPassword = readEnv("DATABASE_PASSWORD")?.trim().orEmpty()
+        val databaseUrl = readEnv("DATABASE_URL")?.trim().orEmpty()
+        val dbUrlHasCredentials = databaseUrl.contains("@")
+        when {
+            dbPassword.isEmpty() && !dbUrlHasCredentials ->
+                failures += "DATABASE_PASSWORD is required in production (or embed credentials in DATABASE_URL)."
+            dbPassword.lowercase() in INSECURE_DB_PASSWORDS ->
+                failures += "DATABASE_PASSWORD is set to a known default — use a real secret."
+        }
+
+        val hasCloudSqlContract =
+            readEnv("INSTANCE_CONNECTION_NAME")?.trim().isNullOrEmpty().not() &&
+                readEnv("DB_NAME")?.trim().isNullOrEmpty().not()
+        if (databaseUrl.isEmpty() && !hasCloudSqlContract) {
+            failures += "DATABASE_URL or INSTANCE_CONNECTION_NAME and DB_NAME are required in production."
+        }
+    }
+
+    private fun validateBlobStorage(
+        readEnv: (String) -> String?,
+        failures: MutableList<String>,
+    ) {
+        val hasGcsBucket = readEnv("GCS_BUCKET_NAME")?.trim().isNullOrEmpty().not()
+        val hasFilesystemStorage = readEnv("LOGDATE_BLOB_STORAGE_DIR")?.trim().isNullOrEmpty().not()
+        if (!hasGcsBucket && !hasFilesystemStorage) {
+            failures += "GCS_BUCKET_NAME or LOGDATE_BLOB_STORAGE_DIR must be configured for durable media storage."
+        }
+    }
+
+    private fun validatePublicOrigin(
+        readEnv: (String) -> String?,
+        failures: MutableList<String>,
+    ): String? {
+        val origin = readEnv("LOGDATE_PUBLIC_ORIGIN")?.trim().orEmpty()
+        val normalized = origin.toNormalizedHttpsUrl()
+        if (normalized == null) {
+            failures += "LOGDATE_PUBLIC_ORIGIN must be an https:// URL in production."
+        }
+        return normalized
+    }
+
+    private fun validateAtprotoServiceUrl(
+        readEnv: (String) -> String?,
+        publicOrigin: String?,
+        failures: MutableList<String>,
+    ) {
+        val serviceUrl = readEnv("ATPROTO_PDS_SERVICE_URL")?.trim().orEmpty().toNormalizedHttpsUrl()
+        if (publicOrigin != null && serviceUrl != publicOrigin) {
+            failures += "ATPROTO_PDS_SERVICE_URL must equal LOGDATE_PUBLIC_ORIGIN in production."
+        }
+    }
+
+    private fun validateHealthToken(
+        readEnv: (String) -> String?,
+        failures: MutableList<String>,
+    ) {
+        if (readEnv("HEALTH_INTERNAL_TOKEN")?.trim().isNullOrEmpty()) {
+            failures += "HEALTH_INTERNAL_TOKEN is required in production."
+        }
+    }
+
+    private fun validateReleaseVersion(
+        readEnv: (String) -> String?,
+        failures: MutableList<String>,
+    ) {
+        val releaseVersion = readEnv("RELEASE_VERSION")?.trim().orEmpty()
+        if (!RELEASE_VERSION_PATTERN.matches(releaseVersion)) {
+            failures += "RELEASE_VERSION must match logdate-server@<40-hex-sha> in production."
+        }
+    }
+
+    private fun validateServerEncryption(
+        readEnv: (String) -> String?,
+        failures: MutableList<String>,
+    ) {
+        if (!readEnv("SERVER_ENCRYPTION_ENABLED").isEnabled()) {
+            failures += "SERVER_ENCRYPTION_ENABLED must be true in production."
+        }
+
+        val encodedKey = readEnv("SERVER_ENCRYPTION_KEY")?.trim().orEmpty()
+        if (encodedKey.isEmpty()) {
+            failures += "SERVER_ENCRYPTION_KEY is required in production."
+        } else {
+            val decoded = runCatching { Base64.getDecoder().decode(encodedKey) }.getOrNull()
+            when {
+                decoded == null -> failures += "SERVER_ENCRYPTION_KEY must be valid base64."
+                decoded.size !in setOf(16, 24, 32) ->
+                    failures += "SERVER_ENCRYPTION_KEY must decode to 16, 24, or 32 bytes (AES-128/192/256)."
+            }
+        }
+
+        if (readEnv("SERVER_ENCRYPTION_KEY_ID")?.trim().isNullOrEmpty()) {
+            failures += "SERVER_ENCRYPTION_KEY_ID is required in production."
+        }
+    }
+
+    private fun validateSignedMediaUrls(
+        readEnv: (String) -> String?,
+        failures: MutableList<String>,
+    ) {
+        if (!readEnv("SYNC_MEDIA_SIGNED_URLS").isEnabled()) {
+            failures += "SYNC_MEDIA_SIGNED_URLS must be true in production."
+        }
+    }
+
+    private fun validateFirstPartyConfig(
+        readEnv: (String) -> String?,
+        failures: MutableList<String>,
+    ) {
+        val deploymentKind = readEnv("LOGDATE_DEPLOYMENT_KIND")?.trim()?.lowercase()
+        if (deploymentKind !in setOf("first_party", "first-party", "firstparty")) {
+            failures += "LOGDATE_DEPLOYMENT_KIND must be first_party when LOGDATE_EXPECT_FIRST_PARTY=true."
+        }
+        if (readEnv("BILLING_PROVIDER")?.trim()?.lowercase().let { it.isNullOrEmpty() || it == "disabled" }) {
+            failures += "BILLING_PROVIDER must not be disabled when LOGDATE_EXPECT_FIRST_PARTY=true."
+        }
+
+        val allowedOrigins = readEnv("WEBAUTHN_ALLOWED_ORIGINS").splitEnvironmentValues()
+        if (allowedOrigins.none { ANDROID_ORIGIN_PATTERN.matches(it) }) {
+            failures +=
+                "WEBAUTHN_ALLOWED_ORIGINS must include a valid android:apk-key-hash origin when LOGDATE_EXPECT_FIRST_PARTY=true."
+        }
+
+        val fingerprints = readEnv("ANDROID_CERT_FINGERPRINTS").splitEnvironmentValues()
+        if (fingerprints.isEmpty() || fingerprints.any { !ANDROID_CERT_FINGERPRINT_PATTERN.matches(it) }) {
+            failures +=
+                "ANDROID_CERT_FINGERPRINTS must include colon-hex SHA-256 fingerprints when LOGDATE_EXPECT_FIRST_PARTY=true."
+        }
+    }
+
+    private fun String?.isEnabled(): Boolean = this?.trim()?.equals("true", ignoreCase = true) == true
+
+    private fun String?.splitEnvironmentValues(): List<String> =
+        this
+            ?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
+            .orEmpty()
+
+    private fun String.toNormalizedHttpsUrl(): String? {
+        val uri = runCatching { URI(this) }.getOrNull() ?: return null
+        if (!uri.scheme.equals("https", ignoreCase = true) || uri.host.isNullOrBlank()) return null
+        return uri.toString().removeSuffix("/")
     }
 
     private fun validateWebAuthn(

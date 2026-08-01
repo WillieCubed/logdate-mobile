@@ -65,13 +65,18 @@ class ApplicationTest {
     fun testHealthOmitsInternalDetailsWithoutToken() =
         testApplication {
             application {
-                module(isDatabaseAvailable = true, healthInternalToken = "shh-secret")
+                module(
+                    isDatabaseAvailable = true,
+                    healthInternalToken = "shh-secret",
+                    releaseVersion = HEALTH_RELEASE,
+                )
             }
 
             client.get("/health").apply {
                 assertEquals(HttpStatusCode.OK, status)
                 val payload = json.parseToJsonElement(bodyAsText()).jsonObject
                 assertEquals("healthy", payload["status"]?.jsonPrimitive?.content)
+                assertEquals(HEALTH_RELEASE, payload["release"]?.jsonPrimitive?.content)
                 assertNull(
                     payload["db_connected"],
                     "public /health must not leak deployment internals",
@@ -83,7 +88,11 @@ class ApplicationTest {
     fun testHealthOmitsInternalDetailsWithWrongToken() =
         testApplication {
             application {
-                module(isDatabaseAvailable = true, healthInternalToken = "shh-secret")
+                module(
+                    isDatabaseAvailable = true,
+                    healthInternalToken = "shh-secret",
+                    releaseVersion = HEALTH_RELEASE,
+                )
             }
 
             client
@@ -100,7 +109,11 @@ class ApplicationTest {
     fun testHealthOmitsInternalDetailsWhenTokenUnconfigured() =
         testApplication {
             application {
-                module(isDatabaseAvailable = true, healthInternalToken = "")
+                module(
+                    isDatabaseAvailable = true,
+                    healthInternalToken = "",
+                    releaseVersion = HEALTH_RELEASE,
+                )
             }
 
             // No token configured = even a header-bearing caller stays public.
@@ -118,7 +131,11 @@ class ApplicationTest {
     fun testHealthIncludesDbConnectedWithCorrectToken() =
         testApplication {
             application {
-                module(isDatabaseAvailable = true, healthInternalToken = "shh-secret")
+                module(
+                    isDatabaseAvailable = true,
+                    healthInternalToken = "shh-secret",
+                    releaseVersion = HEALTH_RELEASE,
+                )
             }
 
             client
@@ -128,6 +145,7 @@ class ApplicationTest {
                     assertEquals(HttpStatusCode.OK, status)
                     val payload = json.parseToJsonElement(bodyAsText()).jsonObject
                     assertEquals("healthy", payload["status"]?.jsonPrimitive?.content)
+                    assertEquals(HEALTH_RELEASE, payload["release"]?.jsonPrimitive?.content)
                     assertEquals(true, payload["db_connected"]?.jsonPrimitive?.content?.toBoolean())
                 }
         }
@@ -222,4 +240,8 @@ class ApplicationTest {
                 assertTrue(responseBody.contains("swagger-ui-bundle.js"))
             }
         }
+
+    companion object {
+        private const val HEALTH_RELEASE = "logdate-server@0123456789abcdef0123456789abcdef01234567"
+    }
 }

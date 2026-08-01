@@ -27,8 +27,16 @@
 - **Example**: `LOGDATE_ENV=production`
 - **Required**: No (but must be `production` for real deployments)
 - **Notes**:
-  - When set to `production`, the server refuses to start if `JWT_SECRET` or `DATABASE_PASSWORD` are missing, too short, or set to known placeholder values.
+  - When set to `production`, the server refuses to start if durable storage, database, public identity, encryption, signed-media, health, release, JWT, or WebAuthn configuration is incomplete or unsafe.
   - Development and test profiles skip this validation so local runs and the test suite work without extra setup.
+
+### `LOGDATE_EXPECT_FIRST_PARTY`
+- **Description**: Asserts that this production deployment is LogDate Cloud rather than a self-hosted server.
+- **Type**: Boolean
+- **Default**: `false`
+- **Example**: `LOGDATE_EXPECT_FIRST_PARTY=true`
+- **Required**: Set to `true` for managed staging and production; leave unset for self-hosting.
+- **Notes**: When enabled, startup requires `LOGDATE_DEPLOYMENT_KIND=first_party`, an enabled billing provider, Android passkey origins, and valid Android certificate fingerprints. This is intentionally opt-in so secure self-hosted deployments may use durable filesystem storage and disabled billing.
 
 ---
 
@@ -82,6 +90,27 @@
 - **Example**: `HOST=127.0.0.1`
 - **Required**: No
 
+### `LOGDATE_PUBLIC_ORIGIN`
+- **Description**: Canonical public HTTPS origin for the server.
+- **Type**: HTTPS URL
+- **Example**: `LOGDATE_PUBLIC_ORIGIN=https://cloud.logdate.app`
+- **Required**: Yes in production.
+- **Notes**: Must match `ATPROTO_PDS_SERVICE_URL` exactly after an optional trailing slash is removed.
+
+### `RELEASE_VERSION`
+- **Description**: Immutable deployment identity returned by `/health`.
+- **Type**: String, `logdate-server@<40-hex-sha>`
+- **Example**: `RELEASE_VERSION=logdate-server@0123456789abcdef0123456789abcdef01234567`
+- **Required**: Yes in production.
+- **Notes**: This is a deployment release identifier, not the API contract `version` field.
+
+### `HEALTH_INTERNAL_TOKEN`
+- **Description**: Secret that unlocks `db_connected` in the internal `/health` response.
+- **Type**: Secret string
+- **Default**: None
+- **Required**: Yes in production.
+- **Security**: Store only in the deployment secret manager; never include it in source or logs.
+
 ---
 
 ## Database Configuration
@@ -95,7 +124,7 @@ The server supports two sets of database environment variables for flexibility:
 - **Type**: String (JDBC URL)
 - **Default**: None
 - **Example**: `jdbc:postgresql://localhost:5432/logdate`
-- **Required**: Yes (if database is enabled)
+- **Required**: Yes in production, unless both `INSTANCE_CONNECTION_NAME` and `DB_NAME` are present for the platform connector contract.
 
 ### `DATABASE_USER`
 - **Description**: PostgreSQL username
@@ -115,6 +144,12 @@ The server supports two sets of database environment variables for flexibility:
 ### `CLOUD_SQL_INSTANCE_CONNECTION_NAME` (removed)
 - **Status**: No longer supported. The dedicated Cloud SQL socket-factory integration was removed in favor of a single `DATABASE_URL` path. LogDate now runs on serverless Postgres (Neon) and connects over standard TLS.
 - **Migration**: Set `DATABASE_URL` to a standard `jdbc:postgresql://HOST/DB?sslmode=require` connection string (Neon, Supabase, Cloud SQL via its public IP / Auth Proxy, or any Postgres). Credentials may be embedded in the URL or supplied via `DATABASE_USER` / `DATABASE_PASSWORD`.
+
+### `INSTANCE_CONNECTION_NAME`
+- **Description**: Cloud SQL instance connection name used with `DB_NAME` as the managed connector contract.
+- **Type**: String
+- **Example**: `INSTANCE_CONNECTION_NAME=logdate-prod:us-central1:logdate`
+- **Required**: Only when `DATABASE_URL` is absent in production.
 
 ### Alternative Database Variables
 
@@ -313,6 +348,14 @@ These can be used instead of `DATABASE_URL`:
 - **Default**: None
 - **Example**: `GCS_BUCKET_NAME=logdate-media-prod`
 - **Required**: Yes (if using GCS)
+- **Notes**: Production requires this or a durable `LOGDATE_BLOB_STORAGE_DIR`; a container-local temporary directory is not durable storage.
+
+### `SYNC_MEDIA_SIGNED_URLS`
+- **Description**: Return signed, time-limited media download URLs.
+- **Type**: Boolean
+- **Default**: `false`
+- **Example**: `SYNC_MEDIA_SIGNED_URLS=true`
+- **Required**: Yes in production.
 
 ### `GCS_MEDIA_KMS_KEY`
 - **Description**: GCS KMS key for media encryption at rest (Google-managed)
@@ -419,6 +462,19 @@ AUTO_MIGRATE=false
 # Auth
 JWT_SECRET=${JWT_SECRET_FROM_SECRET_MANAGER}
 
+# Public identity, release, and internal health
+LOGDATE_PUBLIC_ORIGIN=https://cloud.logdate.app
+ATPROTO_PDS_SERVICE_URL=https://cloud.logdate.app
+LOGDATE_EXPECT_FIRST_PARTY=true
+LOGDATE_DEPLOYMENT_KIND=first_party
+RELEASE_VERSION=logdate-server@${FULL_GIT_SHA}
+HEALTH_INTERNAL_TOKEN=${HEALTH_INTERNAL_TOKEN_FROM_SECRET_MANAGER}
+BILLING_PROVIDER=stripe
+
+# Android passkeys
+WEBAUTHN_ALLOWED_ORIGINS=https://cloud.logdate.app,android:apk-key-hash:${ANDROID_CERT_SHA256_BASE64URL}
+ANDROID_CERT_FINGERPRINTS=${ANDROID_CERT_SHA256_COLON_HEX}
+
 # Encryption
 SERVER_ENCRYPTION_KEY=${ENCRYPTION_KEY_FROM_SECRET_MANAGER}
 SERVER_ENCRYPTION_KEY_ID=prod-key-2026-01
@@ -430,6 +486,7 @@ ALLOW_PASSTHROUGH_CLIENT_CIPHERTEXT=true
 GCS_PROJECT_ID=logdate-prod
 GCS_BUCKET_NAME=logdate-media-prod
 GCS_MEDIA_KMS_KEY=projects/logdate-prod/locations/us/keyRings/media/cryptoKeys/media-encryption
+SYNC_MEDIA_SIGNED_URLS=true
 SYNC_MEDIA_SIGNED_URL_TTL_HOURS=1
 
 # Maintenance

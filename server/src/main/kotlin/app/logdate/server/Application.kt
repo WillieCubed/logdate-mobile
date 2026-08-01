@@ -186,6 +186,7 @@ private fun buildMainServer(
 fun Application.module(
     isDatabaseAvailable: Boolean = false,
     healthInternalToken: String = System.getenv(HEALTH_TOKEN_ENV).orEmpty(),
+    releaseVersion: String = System.getenv("RELEASE_VERSION").orEmpty(),
 ) {
     val profile = RuntimeProfile.fromEnvironment()
     // Captured once at module init so the per-request token check doesn't allocate a new
@@ -365,6 +366,7 @@ fun Application.module(
                             .toString(),
                     )
                     put("version", "1.0.0")
+                    put("release", releaseVersion)
                     if (tokenMatches) {
                         put("db_connected", isDatabaseAvailable)
                     }
