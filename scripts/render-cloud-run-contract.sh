@@ -107,10 +107,8 @@ done <<<"$COMMITTED_TERRAFORM_PATHS"
 SELECTED_TFVARS="infra/terraform/${ENVIRONMENT}.tfvars"
 git -C "$REPO_ROOT" show "$RELEASE_SHA:$SELECTED_TFVARS" >"$PRIVATE_CONFIG_DIR/${ENVIRONMENT}.tfvars" 2>/dev/null ||
     die "release commit does not contain selected Terraform variables."
-if git -C "$REPO_ROOT" cat-file -e "$RELEASE_SHA:infra/terraform/.terraform.lock.hcl" 2>/dev/null; then
-    git -C "$REPO_ROOT" show "$RELEASE_SHA:infra/terraform/.terraform.lock.hcl" >"$PRIVATE_CONFIG_DIR/.terraform.lock.hcl" 2>/dev/null ||
-        die "could not isolate the committed Terraform dependency lockfile."
-fi
+git -C "$REPO_ROOT" show "$RELEASE_SHA:infra/terraform/.terraform.lock.hcl" >"$PRIVATE_CONFIG_DIR/.terraform.lock.hcl" 2>/dev/null ||
+    die "release commit does not contain the Terraform dependency lockfile."
 
 terraform -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false >"$TERRAFORM_INIT_LOG" 2>&1 ||
     die "Terraform backend-free initialization failed."
@@ -320,8 +318,9 @@ try:
         expected_origin = "android:apk-key-hash:" + base64.urlsafe_b64encode(digest).decode().rstrip("=")
         if origin != expected_origin:
             fail("Android certificate fingerprints and apk-key-hash origins must match exactly")
-        is_sequential = digest == bytes(range(32)) or digest == bytes(range(32, 64))
-        is_placeholder = len(set(digest)) == 1 or is_sequential
+        is_ascending = all(next_byte == (byte + 1) % 256 for byte, next_byte in zip(digest, digest[1:]))
+        is_descending = all(next_byte == (byte - 1) % 256 for byte, next_byte in zip(digest, digest[1:]))
+        is_placeholder = len(set(digest)) == 1 or is_ascending or is_descending
         if fingerprint == known_debug_fingerprint:
             if environment == "production":
                 fail("production certificate sets may not contain the known debug certificate")

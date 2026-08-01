@@ -34,16 +34,86 @@ trap cleanup EXIT
 mkdir -p "$FAKE_BIN" "$FIXTURE_DIR" "$LOG_DIR"
 
 snapshot_operator_sources() {
-    local output_file="$1"
-    (
-        cd "$OPERATOR_ROOT"
-        find infra/terraform -maxdepth 1 -type f \
-            \( -name '*.tf' -o -name '*.tfvars' -o -name '.terraform.lock.hcl' -o -name 'terraform.tfstate' \) \
-            -print0 |
-            sort -z |
-            xargs -0 shasum -a 256
-        shasum -a 256 scripts/render-cloud-run-contract.sh
-    ) >"$output_file"
+    local output_file="$1" source_root="${2:-$OPERATOR_ROOT}"
+    python3 - "$source_root" >"$output_file" <<'PY'
+import hashlib
+import os
+import pathlib
+import stat
+import sys
+
+source_root = pathlib.Path(sys.argv[1])
+terraform_root = source_root / "infra" / "terraform"
+
+
+def relative(path: pathlib.Path) -> str:
+    return path.relative_to(source_root).as_posix()
+
+
+def record(path: pathlib.Path) -> None:
+    path_stat = path.lstat()
+    mode = oct(stat.S_IMODE(path_stat.st_mode))
+    if path.is_symlink():
+        print(f"L {relative(path)} {mode} {os.readlink(path)}")
+    elif path.is_dir():
+        print(f"D {relative(path)} {mode} {path_stat.st_mtime_ns}")
+        for child in sorted(path.iterdir(), key=lambda item: item.name):
+            record(child)
+    elif path.is_file():
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        print(f"F {relative(path)} {mode} {path_stat.st_size} {path_stat.st_mtime_ns} {digest.hexdigest()}")
+    else:
+        print(f"O {relative(path)} {mode} {path_stat.st_mtime_ns}")
+
+
+def is_root_snapshot_file(path: pathlib.Path) -> bool:
+    name = path.name
+    return (
+        name.endswith(".tf")
+        or name.endswith(".tfvars")
+        or name == ".terraform.lock.hcl"
+        or name == ".terraform.tfstate.lock.info"
+        or name == "terraform.tfstate"
+        or name.startswith("terraform.tfstate.")
+        or name.endswith(".tfstate")
+        or ".tfstate." in name
+        or name == "crash.log"
+        or (name.startswith("crash.") and name.endswith(".log"))
+    )
+
+
+for anchor_name in (".terraform", "terraform.tfstate.d"):
+    anchor = terraform_root / anchor_name
+    if anchor.exists() or anchor.is_symlink():
+        record(anchor)
+    else:
+        print(f"A {relative(anchor)} absent")
+
+if terraform_root.is_dir():
+    for child in sorted(terraform_root.iterdir(), key=lambda item: item.name):
+        if child.name not in {".terraform", "terraform.tfstate.d"} and is_root_snapshot_file(child):
+            record(child)
+
+record(source_root / "scripts" / "render-cloud-run-contract.sh")
+PY
+}
+
+assert_runtime_snapshot_detects_mutation() {
+    local probe_root="$TMP_DIR/runtime-snapshot-probe"
+    local before="$TMP_DIR/runtime-snapshot-probe.before"
+    local after="$TMP_DIR/runtime-snapshot-probe.after"
+    mkdir -p "$probe_root/infra/terraform" "$probe_root/scripts"
+    printf 'variable "probe" {}\n' >"$probe_root/infra/terraform/variables.tf"
+    printf '#!/usr/bin/env bash\n' >"$probe_root/scripts/render-cloud-run-contract.sh"
+    snapshot_operator_sources "$before" "$probe_root"
+    mkdir -p "$probe_root/infra/terraform/terraform.tfstate.d/reviewer-workspace"
+    printf 'mutation\n' >"$probe_root/infra/terraform/terraform.tfstate.d/reviewer-workspace/terraform.tfstate.backup"
+    snapshot_operator_sources "$after" "$probe_root"
+    cmp -s "$before" "$after" && fail "runtime snapshot did not detect a nested workspace state mutation"
+    pass
 }
 
 snapshot_synthetic_sources() {
@@ -57,6 +127,7 @@ snapshot_synthetic_sources() {
 }
 
 snapshot_operator_sources "$OPERATOR_SOURCE_HASHES_BEFORE"
+assert_runtime_snapshot_detects_mutation
 
 assert_equals() {
     local expected="$1" actual="$2"
@@ -326,6 +397,13 @@ cloud_run_secret_env = {
 EOF
 RELEASE_SHA="$(commit_synthetic_repo "$SOURCE_REPO" 'test: create valid renderer release')"
 NON_COMMIT_SHA="$(printf 'not a commit\n' | git -C "$SOURCE_REPO" hash-object -w --stdin)"
+
+# Create a release commit that omits the dependency lockfile without changing the checkout.
+git -C "$SOURCE_REPO" update-index --force-remove -- infra/terraform/.terraform.lock.hcl
+MISSING_LOCK_TREE="$(git -C "$SOURCE_REPO" write-tree)"
+MISSING_LOCK_SHA="$(printf '%s\n' 'test: create lockfile-free renderer release' |
+    git -C "$SOURCE_REPO" commit-tree "$MISSING_LOCK_TREE" -p "$RELEASE_SHA")"
+git -C "$SOURCE_REPO" update-index --add -- infra/terraform/.terraform.lock.hcl
 
 # Create a second commit whose renderer does not match the executable under test.
 printf '\n# mismatched committed renderer\n' >>"$SOURCE_REPO/$SCRIPT"
@@ -751,6 +829,7 @@ expect_failure invalid-sha staging ABCDEF staging-source.json "release SHA must 
 expect_failure nonexistent-release staging 0000000000000000000000000000000000000001 staging-source.json "release SHA must resolve to a commit"
 expect_failure non-commit-release staging "$NON_COMMIT_SHA" staging-source.json "release SHA must resolve to a commit"
 expect_failure mismatched-renderer staging "$MISMATCH_SHA" staging-source.json "executed renderer does not match the release commit"
+expect_failure missing-lockfile staging "$MISSING_LOCK_SHA" staging-source.json "release commit does not contain the Terraform dependency lockfile"
 
 FAIL_TERRAFORM_INIT="true" expect_failure \
     terraform-init-failure staging "$RELEASE_SHA" staging-source.json "Terraform backend-free initialization failed"
@@ -908,6 +987,18 @@ expect_failure placeholder-production-set production "$RELEASE_SHA" placeholder-
 
 jq '.android_signing_certificates.upload = {"fingerprint":"00:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F:10:11:12:13:14:15:16:17:18:19:1A:1B:1C:1D:1E:1F","apk_key_hash_origin":"android:apk-key-hash:AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"}' "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/sequential-production-set.json"
 expect_failure sequential-production-set production "$RELEASE_SHA" sequential-production-set.json "production certificate sets may not contain placeholder certificates"
+
+jq '.android_signing_certificates.upload = {"fingerprint":"01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F:10:11:12:13:14:15:16:17:18:19:1A:1B:1C:1D:1E:1F:20","apk_key_hash_origin":"android:apk-key-hash:AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA"}' "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/offset-sequential-production-set.json"
+expect_failure offset-sequential-production-set production "$RELEASE_SHA" offset-sequential-production-set.json "production certificate sets may not contain placeholder certificates"
+
+jq '.android_signing_certificates.upload = {"fingerprint":"E0:E1:E2:E3:E4:E5:E6:E7:E8:E9:EA:EB:EC:ED:EE:EF:F0:F1:F2:F3:F4:F5:F6:F7:F8:F9:FA:FB:FC:FD:FE:FF","apk_key_hash_origin":"android:apk-key-hash:4OHi4-Tl5ufo6err7O3u7_Dx8vP09fb3-Pn6-_z9_v8"}' "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/high-sequential-production-set.json"
+expect_failure high-sequential-production-set production "$RELEASE_SHA" high-sequential-production-set.json "production certificate sets may not contain placeholder certificates"
+
+jq '.android_signing_certificates.upload = {"fingerprint":"20:1F:1E:1D:1C:1B:1A:19:18:17:16:15:14:13:12:11:10:0F:0E:0D:0C:0B:0A:09:08:07:06:05:04:03:02:01","apk_key_hash_origin":"android:apk-key-hash:IB8eHRwbGhkYFxYVFBMSERAPDg0MCwoJCAcGBQQDAgE"}' "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/descending-production-set.json"
+expect_failure descending-production-set production "$RELEASE_SHA" descending-production-set.json "production certificate sets may not contain placeholder certificates"
+
+jq '.android_signing_certificates.upload = {"fingerprint":"F0:F1:F2:F3:F4:F5:F6:F7:F8:F9:FA:FB:FC:FD:FE:FF:00:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F","apk_key_hash_origin":"android:apk-key-hash:8PHy8_T19vf4-fr7_P3-_wABAgMEBQYHCAkKCwwNDg8"}' "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/wrapping-sequential-production-set.json"
+expect_failure wrapping-sequential-production-set production "$RELEASE_SHA" wrapping-sequential-production-set.json "production certificate sets may not contain placeholder certificates"
 
 jq '.android_signing_certificates.upload = .android_signing_certificates.staging' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/unexpected-staging-role.json"
 expect_failure unexpected-staging-role staging "$RELEASE_SHA" unexpected-staging-role.json "staging requires exactly the staging signing certificate"

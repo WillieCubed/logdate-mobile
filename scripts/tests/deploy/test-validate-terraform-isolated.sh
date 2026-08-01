@@ -24,15 +24,83 @@ cleanup() {
 trap cleanup EXIT
 
 snapshot_operator_sources() {
-    local output_file="$1"
-    (
-        cd "$OPERATOR_ROOT"
-        find infra/terraform -maxdepth 1 -type f \
-            \( -name '*.tf' -o -name '*.tfvars' -o -name '.terraform.lock.hcl' -o -name 'terraform.tfstate' \) \
-            -print0 |
-            sort -z |
-            xargs -0 shasum -a 256
-    ) >"$output_file"
+    local output_file="$1" source_root="${2:-$OPERATOR_ROOT}"
+    python3 - "$source_root" >"$output_file" <<'PY'
+import hashlib
+import os
+import pathlib
+import stat
+import sys
+
+source_root = pathlib.Path(sys.argv[1])
+terraform_root = source_root / "infra" / "terraform"
+
+
+def relative(path: pathlib.Path) -> str:
+    return path.relative_to(source_root).as_posix()
+
+
+def record(path: pathlib.Path) -> None:
+    path_stat = path.lstat()
+    mode = oct(stat.S_IMODE(path_stat.st_mode))
+    if path.is_symlink():
+        print(f"L {relative(path)} {mode} {os.readlink(path)}")
+    elif path.is_dir():
+        print(f"D {relative(path)} {mode} {path_stat.st_mtime_ns}")
+        for child in sorted(path.iterdir(), key=lambda item: item.name):
+            record(child)
+    elif path.is_file():
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        print(f"F {relative(path)} {mode} {path_stat.st_size} {path_stat.st_mtime_ns} {digest.hexdigest()}")
+    else:
+        print(f"O {relative(path)} {mode} {path_stat.st_mtime_ns}")
+
+
+def is_root_snapshot_file(path: pathlib.Path) -> bool:
+    name = path.name
+    return (
+        name.endswith(".tf")
+        or name.endswith(".tfvars")
+        or name == ".terraform.lock.hcl"
+        or name == ".terraform.tfstate.lock.info"
+        or name == "terraform.tfstate"
+        or name.startswith("terraform.tfstate.")
+        or name.endswith(".tfstate")
+        or ".tfstate." in name
+        or name == "crash.log"
+        or (name.startswith("crash.") and name.endswith(".log"))
+    )
+
+
+for anchor_name in (".terraform", "terraform.tfstate.d"):
+    anchor = terraform_root / anchor_name
+    if anchor.exists() or anchor.is_symlink():
+        record(anchor)
+    else:
+        print(f"A {relative(anchor)} absent")
+
+if terraform_root.is_dir():
+    for child in sorted(terraform_root.iterdir(), key=lambda item: item.name):
+        if child.name not in {".terraform", "terraform.tfstate.d"} and is_root_snapshot_file(child):
+            record(child)
+PY
+}
+
+assert_runtime_snapshot_detects_mutation() {
+    local probe_root="$TMP_DIR/runtime-snapshot-probe"
+    local before="$TMP_DIR/runtime-snapshot-probe.before"
+    local after="$TMP_DIR/runtime-snapshot-probe.after"
+    mkdir -p "$probe_root/infra/terraform"
+    printf 'variable "probe" {}\n' >"$probe_root/infra/terraform/variables.tf"
+    snapshot_operator_sources "$before" "$probe_root"
+    mkdir -p "$probe_root/infra/terraform/.terraform/providers"
+    printf 'mutation\n' >"$probe_root/infra/terraform/.terraform/providers/reviewer-marker"
+    snapshot_operator_sources "$after" "$probe_root"
+    cmp -s "$before" "$after" && fail "runtime snapshot did not detect a nested .terraform mutation"
+    pass
 }
 
 snapshot_synthetic_sources() {
@@ -57,6 +125,7 @@ assert_zero_bytes() {
 }
 
 snapshot_operator_sources "$OPERATOR_SOURCE_HASHES_BEFORE"
+assert_runtime_snapshot_detects_mutation
 mkdir -p "$SOURCE_REPO/infra/terraform" "$SOURCE_REPO/scripts" "$FAKE_BIN" "$LOG_DIR"
 cp "$OPERATOR_ROOT/scripts/validate-terraform-isolated.sh" "$SOURCE_REPO/scripts/validate-terraform-isolated.sh"
 chmod +x "$SOURCE_REPO/scripts/validate-terraform-isolated.sh"
