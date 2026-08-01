@@ -107,6 +107,25 @@ variable "cloud_run_secret_env" {
   default     = {}
 }
 
+variable "android_signing_certificates" {
+  type = object({
+    staging = optional(object({
+      fingerprint         = string
+      apk_key_hash_origin = string
+    }))
+    upload = optional(object({
+      fingerprint         = string
+      apk_key_hash_origin = string
+    }))
+    play_app_signing = optional(object({
+      fingerprint         = string
+      apk_key_hash_origin = string
+    }))
+  })
+  description = "Public Android certificate fingerprints and matching apk-key-hash origins by signing role."
+  default     = {}
+}
+
 variable "create_secrets" {
   type        = bool
   description = "Whether to create Secret Manager secrets declared in secret_env."
