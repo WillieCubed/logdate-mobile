@@ -47,24 +47,24 @@ Each user has one canonical LogDate identity. A Cloud account or compatible
 server session is an authentication and replication binding for that identity,
 not a second persona or a separate library.
 
-A new offline installation begins with exactly one local identity state so it can
-create content before authentication. Cloud signup binds that same identity.
-Signing in to an existing Cloud identity may replace the local-only identity only
-through the atomic adoption state machine defined below. A recovered identity may
-be staged and verified, but it is never active or usable for content before the
-single cutover transaction. At no point does the app have two active identities or
-two libraries.
+A fresh installation begins `UNCLAIMED`, which is the absence of an identity, not a
+temporary local persona. It remains unclaimed until the user explicitly chooses
+New Library or Restore Existing Library. Either choice establishes exactly one
+identity entirely offline before profile, content, Cloud, deep-link, share, or
+shortcut work may proceed. Cloud signup binds that same identity. Once an owner
+exists, a different recovered or server identity is rejected; it cannot replace,
+adopt, merge with, or remap the local identity or library.
 
 - Signing out removes the active remote session while preserving the identity,
   local library, pending work, and readable data.
 - Signing in restores or verifies the same identity.
 - Changing servers changes the replication endpoint for the same identity.
-- Once a canonical identity is established, a server response that identifies a
+- Once any local identity is established, a server response that identifies a
   different user must be rejected instead of silently replacing the identity or
   uploading the local library.
-- Replacing the canonical identity is a separate, explicit, destructive
-  reset/recovery operation with clear data consequences. It is not an account
-  switcher.
+- Using a different identity requires a separate, explicit, destructive reset
+  with clear data consequences, followed from `UNCLAIMED` by create or recovery.
+  It is not an identity-replacement API or an account switcher.
 
 Multiple authentication methods or passkeys may prove the same identity. The app
 does not expose simultaneous identities, account profiles, or parallel account
@@ -136,48 +136,107 @@ test-first plan before code changes begin.
 ### Identity, authentication, and server selection
 
 The identity model has one authoritative slot, not a collection of profiles. A
-singleton `library_owner` record contains `activeIdentityId`, lifecycle kind,
-public signing key, and active encryption-keyset ID. Content refers to the stable
-owner slot rather than copying changeable identity IDs into every row. Database
-constraints permit exactly one owner record, and all repositories require it
-before the first content transaction.
+singleton `library_owner` record contains `activeIdentityId`, public signing key,
+identity-key version, and active encryption-keyset ID. One row means owned and
+database constraints forbid more than one. Zero rows means `UNCLAIMED` only when
+the vault has no active or pending bundle, no reset/recovery marker exists, and no
+legacy library evidence exists. Otherwise bootstrap reports `ESTABLISHING`,
+`RESETTING`, `RecoveryRequired`, `LegacyRecoveryRequired`, or
+`IdentityIntegrityFailure` as appropriate. Content refers to the stable owner slot
+rather than copying changeable identity IDs into every row, and all profile/content
+repositories require a verified matching owner and active vault bundle.
 
-Initialization creates a random P-256 root identity keypair, a root-certified
-device signing key, and 256-bit encryption root with the platform cryptographic
-random source before first-run navigation. The canonical ID is the versioned
-SHA-256 digest of the canonical root public key. Root, device, and encryption
-private material is immediately wrapped by an Android Keystore key. It is never
-derived from a UUID, username, server response, or other non-secret value.
+Opening the database, constructing a ViewModel, receiving a deep link, or starting
+the app never creates an identity. New Library generates a 12-word BIP-39 recovery
+phrase and derives its canonical identity entirely offline. Restore Existing
+Library validates and derives the entered phrase without first generating any
+random identity. Canonical identity version 1 is frozen as follows:
+
+1. Normalize and validate the phrase, then derive the existing 32-byte recovery
+   master.
+2. For counter `0..31`, compute
+   `HMAC-SHA256(recoveryMaster, UTF8("logdate.identity.root.p256.v1:<counter>"))`
+   and select the first valid NIST P-256 private scalar.
+3. Derive the compressed SEC1 public key and encode the existing P-256 multikey.
+4. SHA-256 the decoded canonical multikey bytes, including the multicodec prefix,
+   encode the digest as unpadded base64url, and format `ldid:v1:<digest>`.
+
+Cross-platform golden vectors freeze the phrase, recovery master, scalar, public
+multikey, and ID before any server binding is accepted. The LogDate identity
+derivation context is distinct from PLC recovery. The ID is never derived from a
+UUID, username, device ID, account row, endpoint, passkey, server response, or
+other non-secret identifier. Version 1 preserves the existing recovery master as
+the `recovery-master-v1` content keyset so legacy ciphertext remains decryptable.
+Private material remains in platform secure storage, protected by Android
+Keystore on Android, and is never logged or serialized into Room.
 
 The normative identity state machine is:
 
 | Current state | Event | Committed result |
 | --- | --- | --- |
-| No owner | First database initialization, including concurrent attempts | One `LOCAL` active identity; uniqueness makes every later initializer read the winner. |
-| `LOCAL` | Create Cloud account | The selected server verifies an origin-bound challenge signature and binds the same ID; one atomic transaction marks the owner `CANONICAL`, installs the session, and retargets unsent outbox work. |
-| `LOCAL` | Sign in to an existing Cloud account | The recovered candidate is staged, authenticated, unwrapped, and verified while `LOCAL` remains the sole active identity; after explicit adoption consent, the transaction replaces the one active ID and retargets the library and outbox atomically. |
-| `CANONICAL`, signed out | Reauthenticate | The returned ID and recovered public key must equal `activeIdentityId`; only the session changes. |
-| `CANONICAL`, signed in or out | Bind a compatible server | The server proves a binding to the same identity; one transaction changes only the active replication origin and session. |
-| Any active state | Candidate mismatch, failed proof, crash before cutover, or canceled flow | No owner, content, outbox, cursor, keyset, or active-origin change. |
-| Any active state | Explicit destructive reset | After confirmation and any requested export, local content, sessions, keys, and the owner are removed together; the next initialization creates one new local identity. This is not account switching. |
+| `UNCLAIMED` | Open first-run landing | No identity key, owner, profile, library content, session, endpoint mutation, or network request. External payload intake may use the separate encrypted ownerless quarantine defined below. Only New Library and Restore Existing Library can establish an owner. |
+| `UNCLAIMED` | Choose New Library | Generate one recovery phrase and derive one canonical identity entirely offline; durably establish its secret bundle and singleton `OWNED` owner before navigating to profile, content, or Cloud. |
+| `UNCLAIMED` | Choose Restore Existing Library | Validate and derive the entered phrase entirely offline; durably establish that exact identity and singleton `OWNED` owner before Cloud authentication. No random identity is generated first. |
+| `ESTABLISHING` | Startup after interrupted identity publication | Resume only the matching pending-vault/owner protocol to `OWNED`, or report the typed recovery/integrity failure. Never show the unclaimed landing or generate another candidate. |
+| `OWNED` | Create LogDate Cloud authorization | The server verifies an origin-bound proof and creates a separate grant bound to the exact active ID. Only grant, binding, session, and origin-scoped delivery state may change. A network failure preserves the identity and work for retry. |
+| Any owned state | Authenticate to an existing Cloud authorization | Stage the grant separately. The returned owner and proved public root must equal `activeIdentityId`; on equality only the grant changes, while mismatch discards it with zero local mutation or sync. |
+| Any owned state | Connect a compatible server | The server proves a binding to the exact active ID. Only origin-specific authorization and delivery state may change. |
+| Any owned state | Candidate mismatch, wrong authenticator, failed proof, cancellation, or malicious response | Owner, recovery root, content key, phrase, content, drafts, mutation log, cursors, media, endpoint, and prior grant remain byte-for-byte unchanged; no download or upload runs. |
+| Any owned state | Disconnect LogDate Cloud | Revoke, or durably queue revocation, and deactivate only the remote grant. Preserve identity and every local datum. |
+| Any owned state | Explicit destructive reset | After confirmation and any requested export, erase the entire local library, grants, sessions, pending work, keys, and owner together. Only after returning to `UNCLAIMED` may a different identity be created or restored. This is not account switching. |
+| `RESETTING` | Startup after interrupted destructive reset | Keep identity, content, and remote gates closed and resume the exact idempotent erasure until verified `UNCLAIMED`; never expose a partial library or create an identity. |
 
-`pending_identity_transition` may hold a sealed candidate, recovery progress, and
-idempotency token. It is never queried as an owner and cannot authorize reads,
-writes, sync, or UI. During existing-account adoption, local capture continues
-against the current owner. Key rewrapping is staged and repeats until current;
-the final short local transaction covers the remaining delta, swaps the owner,
-retargets unsent operations, and records the idempotency token. A crash either
-observes the complete old state or the complete new state. After a committed
-cutover, the superseded local secret is securely discarded and its identifier is
-retained only as a non-authoritative migration alias for deduplication and audit.
+Room and platform secure storage do not share a transaction. Identity publication
+therefore uses an idempotent two-phase roll-forward protocol under a process mutex
+and the database singleton constraint: derive in memory; reject any authoritative
+mismatch before writing; durably write one versioned vault record with a
+non-authoritative `pending` bundle; `insertIfAbsent` the public owner row; read and
+verify the winner; then durably promote the matching bundle to `active` and clear
+`pending`. Pending material cannot unlock content, enable navigation, name a
+system account, or open remote access. Startup resumes every matching partial
+state. Conflicting IDs or keys produce `IdentityIntegrityFailure`; an owner without
+its active secret produces `RecoveryRequired(expectedId)`. Neither state generates
+a new identity, deletes data, chooses a winner, or opens remote access.
 
-Authentication alone never authorizes adoption. Before cutover, the UI names the
-destination account and origin, counts the local entries and media that will join
-it, explains that the current local identity will be retired, and offers Cancel
-and encrypted export. The user gives a separate confirmation. An empty-library
-fast path still shows the destination and identity consequence but has no content
-migration. Canceling leaves the local owner and candidate-isolated session
-unchanged.
+Before normal navigation or any remote work, bootstrap classifies legacy state:
+
+- no owner, no legacy key, and no library/onboarding evidence remains
+  `UNCLAIMED`;
+- an exact legacy `identity_key_v1` deterministically establishes the matching
+  public owner without changing those content-key bytes; a stored phrase must
+  reproduce them before it is carried forward;
+- content, onboarding, outbox, cursor, or session evidence without a recoverable
+  key becomes `LegacyRecoveryRequired`, preserving every byte and accepting only
+  explicit matching recovery or later destructive reset;
+- an owner without its secret becomes `RecoveryRequired(expectedId)`, and
+  conflicting owner/key/public records become `IdentityIntegrityFailure`; and
+- legacy endpoint-scoped sessions or Android accounts never select an owner and
+  remain quarantined until a verified same-identity grant replaces them.
+
+The legacy-evidence query covers journals, every text/media note table, real and
+legacy drafts, mutation/outbox rows, cursors, onboarding state, and remote grants.
+No migration infers emptiness from one preference, invents an owner for ownerless
+content whose key is missing, or opens Cloud signup/sign-in/sync. Remote access is
+default-closed until the active owner has a verified same-identity binding; local
+recovery and all safely attributable offline data remain available.
+
+On an owned installation, authentication responses are checked against the active
+identity before any recovery material, session, endpoint, or outbox state is
+persisted. A mismatch is cleared and the UI explains that using a different
+identity requires explicit full reset, with encrypted export offered before
+destructive confirmation.
+
+Remote-bound state never changes the owner record or creates a Cloud flavor of the
+identity. A separate origin-scoped grant contains the same-identity binding
+receipt, server-local account key, endpoint, credential/session state, and delivery
+watermarks. Creating, authenticating, disconnecting, or moving a grant leaves the
+one owner byte-for-byte unchanged.
+
+Destructive reset is likewise a crash-safe logical operation, not a cross-store
+transaction. A durable reset marker closes content and remote gates while exact
+library, grant, session, owner, and vault erasure rolls forward idempotently.
+Only verified completion removes the marker and exposes `UNCLAIMED`; interruption
+never exposes a mixed owner/key state or generates a replacement identity.
 
 Cloud signup binds the root public key and current root-certified device key to
 the account with both the WebAuthn session and an origin-bound identity challenge.
@@ -189,10 +248,10 @@ is never presented as a LogDate identity, and cannot own or namespace
 synchronized content independently of the canonical ID.
 
 Remote credentials are server-specific, but only one server session is active.
-A token created while testing a transition is sealed with that transition and
-cannot be used by normal repositories. Every response carrying identity data is
-checked against the active ID, except for the isolated candidate-recovery step;
-the final cutover still requires verified key ownership.
+A provisional grant cannot be used by normal repositories and is discarded on
+failure. Every response carrying identity data is checked against the already
+active local ID. Cloud authentication is unreachable while `UNCLAIMED`; clean
+device recovery establishes the local owner from the phrase first.
 
 Changing to a compatible server is a beta requirement because the product must
 support a user-selected production backend. LogDate Compatible Server Protocol
@@ -240,17 +299,19 @@ sign-out never deletes journal data, replaces the identity, or discards pending
 content work.
 
 This contract intentionally supersedes the current identity document's
-dual-ID/background-remapping model, ID-derived key material, and unrestricted
-identity replacement APIs. Slice 2 must replace those sections and remove or
-constrain the corresponding implementation interfaces in the same shippable
-commit.
+dual-ID/background-remapping model, ID-derived key material, adoption flows, and
+unrestricted identity replacement APIs. Slice 2 must replace those sections and
+remove or constrain the corresponding implementation interfaces in the same
+shippable commit.
 
 ### Durable entry aggregate
 
 Introduce a `JournalEntry` aggregate with:
 
 - a stable `entryId`;
-- canonical `identityId` ownership;
+- ownership through the immutable singleton owner-slot relationship, which
+  resolves logically to the canonical `identityId` without duplicating that ID in
+  each aggregate row;
 - draft or published lifecycle state;
 - creation, update, publication, and optional deletion timestamps;
 - ordered blocks with stable `blockId`, block type, position, metadata, and
@@ -367,15 +428,28 @@ recreation cannot replay it.
 
 At the Activity boundary, every initial or `onNewIntent` delivery receives a
 generated delivery token before dispatch. The token is injected into the current
-intent, copied into saved state, and written with the normalized payload to a
-durable `intent_delivery` ledger. Recreation reuses the saved token when the
-payload fingerprint matches; a genuinely new external delivery without saved
-state gets a new token. Any content mutation uses that token as its idempotency
-key and commits the result plus `APPLIED` ledger state together. Navigation-only
-delivery restores or focuses the same route. Repeated delivery after recreation,
-process death, or cold task restoration therefore cannot duplicate an import,
-entry, or route-stack side effect. Completed ledger entries expire only after the
-corresponding durable operation is no longer replayable.
+intent and copied into saved state. A durable `intent_delivery` ledger stores the
+token with either an owner-bound normalized payload or an encrypted quarantine
+reference. Recreation reuses the saved token when the payload fingerprint matches;
+a genuinely new external delivery without saved state gets a new token. After an
+owner exists, any content mutation uses that token as its idempotency key and
+commits the result plus `APPLIED` ledger state together. Navigation-only delivery
+restores or focuses the same route only after the owner gate opens. Repeated
+delivery after recreation, process death, or cold task restoration therefore
+cannot duplicate an import, entry, or route-stack side effect. Completed ledger
+entries expire only after the corresponding durable operation is no longer
+replayable.
+
+While identity state is not `OWNED`, the Activity may accept an external payload
+only into a device-local quarantine encrypted with a non-identity Android
+Keystore-backed staging key. The ledger records `WAITING_FOR_OWNER`; the payload is
+not library content, cannot be displayed, indexed, decrypted by repositories,
+uploaded, or used to select an identity, and no network call runs. URI-backed
+media bytes are copied while the external grant is valid, so process death does
+not depend on a transient provider permission. After explicit New Library or
+Restore succeeds, the exact delivery token drives one transaction that adopts the
+payload under that owner and marks it `APPLIED`, then deletes staged bytes. A
+failure remains retryable; reset or integrity failure keeps the quarantine sealed.
 
 ViewModels own screen business state across configuration changes. Saved state
 stores only compact restoration keys such as `entryId`, selected block ID, cursor
@@ -408,31 +482,33 @@ stores an append-only change sequence long enough for every supported offline
 window; a cursor older than retention starts the snapshot/high-water
 reconciliation protocol above rather than returning empty or partial success.
 
-The identity secret bundle contains the P-256 root identity private key, current
-root-certified device keys, and a random 256-bit content root. Cloud recovery uses
-a separate random 256-bit recovery key. Its checksummed code and QR payload encode
-the protocol version, canonical identity ID, and key; they never encode journal
-plaintext. HKDF-SHA-256 derives an AES-256-GCM wrapping key. The envelope version,
+The version-1 identity secret bundle contains the phrase-derived P-256 root identity
+private key, current root-certified device keys, and the exact existing 32-byte
+recovery master as content keyset `recovery-master-v1`. HKDF-SHA-256 derives
+domain-separated AES-256-GCM wrapping and content keys. The envelope version,
 canonical identity ID, root public key, delegated-key certificates, content-key
-IDs, and algorithm suite are authenticated data. The client uploads only the
+IDs, and algorithm suite are authenticated data. The client uploads only a
 root-signed encrypted envelope and verifies byte-for-byte readback. The user must
-confirm the recovery code before Cloud backup is reported as recoverable.
+confirm the recovery phrase before Cloud backup is reported as recoverable. A
+future random content-root migration may wrap that root under a recovery-master
+derived key, but it cannot change the canonical identity or break legacy decrypts.
 
-On a clean device, normal recovery combines the server passkey ceremony with the
-recovery code. If every passkey is lost, the identity ID in the code may retrieve
-only the rate-limited opaque envelope; after local decryption, an origin-bound
-root-key challenge authorizes registering a replacement passkey. If the code is
-lost but an authenticated device remains, that device can rotate the recovery key
-and confirm a new code. A passkey without the code cannot decrypt a clean-device
-backup; a code without the matching envelope or root proof cannot claim a
-different identity. Losing all initialized devices and the recovery code is
-unrecoverable. These cases are explained before backup is enabled and exercised
-in recovery tests.
+On a clean device, recovery begins offline: the user chooses Restore Existing
+Library and enters the phrase, which derives and publishes the sole local owner
+before any Cloud authentication or download. A subsequent passkey ceremony must
+return and prove that exact identity before the client may fetch its opaque
+envelope and backup. If every passkey is lost, an origin-bound root-key proof may
+authorize registering a replacement passkey and retrieving only that identity's
+rate-limited opaque envelope. A passkey without the phrase cannot decrypt a
+clean-device backup; a phrase without matching server data cannot claim another
+identity. Losing all initialized devices and the phrase is unrecoverable. These
+cases are explained before backup is enabled and exercised in recovery tests.
 
 Recovery verifies the envelope signature, decrypts locally, validates every
-certificate, and confirms that the recovered root public key hashes to the
-canonical identity ID. A wrong code, corrupt envelope, wrong identity, expired
-challenge, or server substitution fails before changing the owner or library.
+certificate, and confirms that the envelope root public key and server binding
+equal the already-active phrase-derived identity. A wrong phrase, corrupt
+envelope, wrong identity, expired challenge, or server substitution fails without
+changing the owner or library and before any sync.
 
 The envelope is a versioned keyring. Content-root rotation creates a new random
 root, uploads and verifies the rewrapped keyring before marking the new key ID
@@ -488,26 +564,62 @@ uploadable. Cancellation or process death releases leases only after the durable
 backup worker resumes or discards its staging record.
 
 Android can create, list, download, verify, and restore Cloud backups through the
-server backup API. Restore is supported only into an empty library at beta launch;
-it never overwrites or merges a non-empty library. Download and verification use
-resumable checkpoints in an isolated staging area. No restored row or file is
-visible until the complete manifest, identity, key IDs, lengths, and digests pass,
-after which verified media moves into an immutable content-addressed local store
-and is fsynced before one database transaction publishes every reference and
-records the applied backup ID. A crash before that transaction can leave only
-unreferenced objects, which deterministic cleanup removes; a crash after it finds
-every referenced object already durable. Process death before publication resumes
-or safely discards staging, and replay of an applied backup ID is a no-op.
-Corrupt/truncated payloads, wrong keys or identity, missing media, and failed
-finalization leave the active empty library unchanged and expose a retry or
-discard action. The published dataset is fully usable offline before any
-subsequent synchronization.
+server backup API. General restore is supported only into an empty library at beta
+launch and never overwrites or merges an arbitrary non-empty library. There is one
+narrow exception for offline-first clean-device recovery: choosing Restore
+Existing Library creates a same-identity `restore_lineage` before capture is
+enabled. Until a remote base is published, every local create/update/delete and
+adopted ownerless-intent payload commits normally for immediate offline use and
+also appends to an immutable `post_recovery_pending` operation chain. It has no
+remote base version and cannot upload before backup resolution.
+
+Download and verification use resumable checkpoints in an isolated staging area.
+No restored base row or file is visible until the complete manifest, identity,
+key IDs, lengths, and digests pass. The client reconstructs the backup base in
+staging, then deterministically replays the matching lineage's local operations
+over it. A local create absent from the base remains unchanged; an unexpected ID
+collision or incompatible edit is preserved as the standard deterministic
+recovered copy; deletes remain tombstones. Arbitrary pre-existing rows, another
+identity, a prior remote base, or an untagged mutation still reject restore.
+
+Verified media moves into an immutable content-addressed local store and is
+fsynced before one database transaction publishes the restored base plus rebased
+local chain, records the applied backup ID, advances the lineage base, and keeps
+every newer local operation pending for later sync. The already-visible local
+rows never disappear while staging. A crash before publication leaves them
+unchanged and can leave only unreferenced staged objects, which deterministic
+cleanup removes; a crash after publication finds every referenced object already
+durable. Process death resumes or safely discards only remote staging, and replay
+of an applied backup ID is a no-op. Corrupt/truncated payloads, wrong keys or
+identity, missing media, and failed finalization preserve the local recovery
+lineage byte-for-byte and expose retry or discard-download actions. Offline
+capture remains available throughout, and the combined published dataset is fully
+usable offline before any subsequent synchronization.
+
+`restore_lineage` has three terminal resolution paths, all requiring a verified
+same-identity grant: apply a verified backup; accept an authenticated `NO_BACKUP`
+result together with the server's empty/current snapshot high-water; or, after an
+explicit warning, skip available/unusable backups and use the server's verified
+live-sync snapshot/high-water as the base. The expired-cursor snapshot protocol
+must make the latter complete rather than retention-dependent. In one database
+transaction the client publishes that base (which may be empty), deterministically
+replays the post-recovery chain, marks the lineage `RESOLVED`, and releases the
+remaining operations for normal upload. A newly created Cloud authorization for
+the exact identity proves an empty base through the same path.
+
+Process death before that transaction resumes the chosen resolution; after it,
+replay is a no-op. A missing permission, unavailable server, incomplete snapshot,
+identity mismatch, or unconfirmed skip never resolves the lineage and never
+uploads it, but the visible local library and continued offline capture remain
+fully usable and retryable. Discarding a corrupt download discards only staged
+remote bytes, not the identity, lineage, or local operations.
 
 After restore, a same-origin client resumes from the captured cursor/high-water
-while retaining restored pending operation chains. Newer remote edits and deletes
-then apply through the normal incremental or expired-cursor snapshot protocol; an
-old backup cannot resurrect an absent remote entity without producing the defined
-pending-operation conflict. A different-origin restore ignores origin-specific
+while retaining restored and post-recovery pending operation chains. Newer remote
+edits and deletes then apply through the normal incremental or expired-cursor
+snapshot protocol; an old backup cannot resurrect an absent remote entity without
+producing the defined pending-operation conflict. A different-origin restore
+ignores origin-specific
 cursors and performs full reconciliation. Restore-then-sync convergence is
 compared against the canonical remote set for both recent and beyond-retention
 backups.
@@ -559,7 +671,13 @@ Staging and production remain isolated:
 | Project/service | `logdate-dev` / `logdate-server-staging` | `logdate` / `logdate-server` |
 | Media bucket | `logdate-media-staging` | `logdate-media-logdate` |
 | Migrations | Automatic only where explicitly configured | Explicit before candidate smoke |
-| Android certificate | Debug certificate | Upload and Play app-signing certificates |
+| Android certificate | Dedicated staging-validation and Play app-signing certificates | Upload and Play app-signing certificates |
+
+The staging RP-domain Digital Asset Links document and origin allowlist include
+both the dedicated non-production staging-validation signer used by CI/dev proof
+and the Play app-signing certificate used by Play-delivered launch candidates.
+Ordinary per-machine debug certificates are never accepted for staging Cloud
+passkeys merely because the build is debuggable.
 
 `logdate.backendUrl` is the one build-time Cloud endpoint property consumed by
 the shared configuration repository and every Cloud client. Android debug and CI
@@ -588,14 +706,17 @@ verification is a deployment failure.
 #### First run and Cloud offer
 
 1. The user installs and launches LogDate with or without connectivity.
-2. The singleton local identity and local storage initialize atomically without a
-   server before any content can be written.
-3. Onboarding explains LogDate Cloud as optional backup/sync and offers Create
-   account, Sign in, Continue offline, and recovery where applicable.
-4. Offline users can finish onboarding; the Cloud action remains available in
-   Settings later.
-5. Connected users create or recover their one canonical identity through a real
-   passkey ceremony and return to Home without a compact-layout dead end.
+2. Local storage initializes `UNCLAIMED` without creating a key, owner, profile,
+   session, endpoint mutation, or network request.
+3. The landing page offers New Library and Restore Existing Library. New Library
+   generates and confirms one phrase; Restore validates an entered phrase. Both
+   establish the sole identity entirely offline before any other onboarding step.
+4. Personal setup follows, then onboarding explains LogDate Cloud as optional
+   backup/sync and offers Create account, Sign in, and Continue offline.
+5. Offline users finish onboarding and capture normally; Cloud remains available
+   in Settings. Connected users bind or authenticate only the already-active exact
+   identity through a real passkey ceremony and return to Home without a
+   compact-layout dead end.
 
 Plan and pricing cards come from the selected server's authoritative catalog.
 Unconfigured billing or entitlement behavior is not presented as purchasable.
@@ -704,23 +825,24 @@ as required by repository device-safety policy.
 
 ### Identity-transition evidence matrix
 
-Every row asserts exactly one `library_owner`, one active identity ID, one visible
-library, ownership of every local row through that owner, and identical entry and
-media digests before and after the transition unless the row explicitly starts
-empty.
+Every owned-state row asserts exactly one `library_owner`, one active identity ID,
+one visible library, ownership of every local row through that owner, and identical
+entry and media digests before and after the transition unless the row explicitly
+starts empty. `UNCLAIMED` and completed destructive reset assert zero owners and
+zero identity material.
 
 | Transition | Required interruption and rejection proof |
 | --- | --- |
-| Concurrent first launch | Race multiple initializers and kill between key generation and database commit; one owner wins and no content can be created unowned. |
+| Concurrent New Library action | Start `UNCLAIMED`, race repeated explicit actions, and kill at every vault/Room boundary; one owner wins, startup rolls matching partial state forward, and no losing identity material becomes authoritative. |
 | Local identity to new Cloud account | Exercise empty and populated libraries; the server binds the existing ID, never creates a replacement, and restart preserves it. |
-| Local identity to existing Cloud account | Exercise empty and populated libraries, verify destination/count/consequence review plus cancel/export paths, capture concurrently during staging, and kill before each durable boundary; only the old or new complete state is observable and adoption is idempotent. |
-| Duplicate offline installations target one existing account | A second create attempt cannot bind a new ID to the existing account; sign-in recovers the account identity and uses the adoption flow. |
+| Owned installation targets a different existing Cloud account | Exercise empty and populated libraries; identity mismatch rejects and clears the provisional session/material without changing owner, content, outbox, keys, or origin. The UI offers cancel, encrypted export, and a separately confirmed full reset, never adoption. |
+| Duplicate offline installations target one existing account | A second create attempt cannot bind a new ID to the existing account. A still-unclaimed installation may recover the account identity; an installation that already created a different offline identity rejects it and requires explicit full reset before clean recovery. |
 | Sign-out while online and offline | Online revocation succeeds; offline local disconnect preserves identity/library/outbox, persists one revocation retry through reboot, and never activates another account. |
 | Same-identity reauthentication | Exact identity and key proof restore the session; mismatched server ID, public key, recovery envelope, or stale challenge is rejected without state change. |
 | Compatible-server change | Success preserves the exact identity and digests; failure, cancellation, process death, and rollback retain one active origin and one identity. |
 | Cloud account deletion and recreation | Server deletion removes remote credentials/data as promised but leaves the local identity/library; rebinding that same identity does not create a new local identity. |
-| Recovery on a clean installation | Starting from the automatically initialized `LOCAL` owner and an empty library, passkey plus recovery code performs the atomic adoption into the exact recovered identity before backup publication; wrong identity or key preserves the local owner and empty library. Passkey-loss and recovery-code-loss cases follow the documented matrix. |
-| Explicit destructive reset | Confirmation names all local consequences; interruption is atomic; after completion the old library and keys are absent before one new local identity may initialize. |
+| Recovery on a clean installation | Starting `UNCLAIMED`, a malformed phrase leaves the device unclaimed; a valid phrase establishes its exact local identity offline before passkey authentication. The server must then prove that same identity before envelope/backup download; mismatch preserves the restored local owner byte-for-byte. Passkey-loss and phrase-loss cases follow the documented matrix. |
+| Explicit destructive reset | Confirmation names all local consequences; interruption resumes the durable reset with every local/remote gate closed and never exposes mixed ownership. Only after verified completion are the old library, pending work, grants, and keys absent and the device `UNCLAIMED`. |
 
 ### Offline and lifecycle evidence matrix
 
@@ -743,7 +865,7 @@ results rather than screenshots alone.
 | Sync outbox | Create/update/delete while offline, kill/reboot, reconnect with valid and expired authentication, reauthenticate the same identity, and drain each immutable operation exactly once without user re-entry. |
 | Quota and Cloud status | Lose connectivity before and during refresh; local capture remains available and the UI shows timestamped cached, pending, unavailable, or error state without a fabricated value. |
 | Backup | Create the encrypted artifact locally offline and retain its upload operation across kill/reboot; uploading waits for connectivity without blocking capture. |
-| Restore | Network is required only until the selected artifact and recovery envelope are fully downloaded; after verified staging, final publication and all restored reading/playback succeed offline through kill/restart. |
+| Restore | Recover the phrase offline, capture/import before authentication, and retain that visible post-recovery chain through kill/reboot. Prove backup, no-backup, explicit-skip/live-snapshot, corrupt-only, offline, and interrupted resolution paths; a verified base rebases/preserves and releases the chain, while every unresolved path keeps it local and usable. |
 
 ### Requirement-to-evidence matrix
 
@@ -751,7 +873,7 @@ results rather than screenshots alone.
 | --- | --- |
 | Download from `logdate.app` | Public download page exposes a working closed-test opt-in/listing; signed Play-delivered artifact is available to enrolled testers and its certificate passes live Digital Asset Links verification. |
 | Start onboarding offline | First-run row of the offline/lifecycle matrix passes and retains the one identity after restart. |
-| Cloud offer and signup | Compact phone/tablet UI journey plus real staging Credential Manager signup, identity challenge, recovery-code confirmation, restart, and sign-in. |
+| Cloud offer and signup | Compact phone/tablet UI journey plus real staging Credential Manager signup, identity challenge, recovery-phrase confirmation, restart, and sign-in. |
 | Text with inline Markdown | Parser/editor host tests, cursor/undo tests, editing/detail screenshots, and managed-device save/reopen journey. |
 | Audio entry | Audio offline/lifecycle row plus real emulator recording, playback, Library, sync, and restored-media digest proof. |
 | Photo entry | Photo/video offline/lifecycle row plus camera-without-microphone, thumbnail/detail, Library, sync, and restored-media digest proof. |
@@ -765,7 +887,7 @@ results rather than screenshots alone.
 | Sign-out and same-identity reauthentication | Every applicable identity-transition row passes, including failed revocation retry and mismatch rejection. |
 | Compatible server | Identity-transition server-change row plus protocol-v1 conformance, descriptor pin/rotation, exact installed-certificate Digital Asset Links, recovery-envelope independence, and complete sync/backup/restore/quota suites against the separately hosted reference server. User-entered URLs receive only preflight verification, not a blanket compatibility claim. |
 | Sync | Two independent emulators create/update/delete offline, including several causal mutations to one entity, survive kill/reboot and auth expiry, reconnect, paginate beyond 200 with same-sequence-boundary changes and page replay, expire a cursor into crash-injected snapshot reconciliation, exercise every cross-device conflict type, and compare canonical entry/media digests. |
-| Backup/restore | Versioned Cloud artifact round-trips byte-for-byte; clean second installation authenticates and recovers the same identity, restores, verifies every entry/block/media digest, and works fully offline. Tests also cover corrupt/truncated artifact, wrong key/identity, missing media, process death at each checkpoint, repeated restore, rollback, and restore-then-sync. |
+| Backup/restore | Versioned Cloud artifact round-trips byte-for-byte; a clean second installation restores the identity phrase offline, captures mixed local content before authentication, proves the same Cloud identity, resolves through verified backup or no-backup/skip plus complete live snapshot, preserves/rebases every post-recovery operation, verifies all entry/block/media digests, and works fully offline. Tests also cover corrupt-only artifacts, wrong key/identity, missing media, unresolved offline state, process death at each checkpoint, repeated resolution, rollback, and restore-then-sync. |
 | Staging-to-production switch | Same client SHA built with staging and production configuration through one documented property; server descriptor asserts exact environment. |
 | MD3 polish | Compiling screenshot matrix, nonblank sanity gate, contact-sheet review, semantics tests, and focused managed-device journeys. |
 
@@ -795,7 +917,10 @@ list so Play signing, Play delivery, installed-artifact behavior, and Digital
 Asset Links can be validated. The Play-delivered bundle is installed from Play on
 safe emulators and reruns the local/offline, visual, accessibility, lifecycle,
 staging two-installation sync/backup/restore/quota, and custom-server suites. It
-then uses disposable generated content for a real production passkey, encrypted
+selects staging through the same user-level, same-identity compatible-server flow
+shipped to users; staging discovery must accept the exact Play signer before
+Credential Manager opens. It then returns to the production endpoint and uses
+disposable generated content for a real production passkey, encrypted
 mixed-entry sync, backup/clean-restore, delete, and quota-accounting round trip.
 No private journal content is used. The same bundle/version is promoted to closed
 testing only after those checks pass; only then are the public opt-in link and
