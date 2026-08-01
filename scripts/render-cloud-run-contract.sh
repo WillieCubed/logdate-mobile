@@ -4,9 +4,9 @@
 set -euo pipefail
 umask 077
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TF_DIR="$REPO_ROOT/infra/terraform"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SCRIPT_PATH="$SCRIPT_DIR/${BASH_SOURCE[0]##*/}"
+REPO_CANDIDATE="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 ENVIRONMENT=""
 RELEASE_SHA=""
 PRIVATE_WORK_DIR=""
@@ -49,6 +49,23 @@ done
 command -v terraform >/dev/null 2>&1 || die "terraform is required."
 command -v jq >/dev/null 2>&1 || die "jq is required."
 command -v python3 >/dev/null 2>&1 || die "python3 is required."
+command -v git >/dev/null 2>&1 || die "git is required."
+command -v cmp >/dev/null 2>&1 || die "cmp is required."
+
+while IFS= read -r environment_name; do
+    case "$environment_name" in
+        TF_* | GIT_*) unset "$environment_name" ;;
+    esac
+done < <(compgen -e)
+unset TF_WORKSPACE TF_LOG TF_LOG_PATH
+export TF_INPUT=0
+
+REPO_ROOT="$(git -C "$REPO_CANDIDATE" rev-parse --show-toplevel 2>/dev/null)" ||
+    die "renderer must execute from a Git repository."
+[[ "$SCRIPT_PATH" == "$REPO_ROOT/scripts/render-cloud-run-contract.sh" ]] ||
+    die "renderer must execute from its canonical repository path."
+[[ "$(git -C "$REPO_ROOT" cat-file -t "$RELEASE_SHA" 2>/dev/null || true)" == "commit" ]] ||
+    die "release SHA must resolve to a commit."
 
 PRIVATE_WORK_DIR="$(mktemp -d)"
 chmod 700 "$PRIVATE_WORK_DIR"
@@ -62,35 +79,38 @@ SORTED_JSON="$PRIVATE_WORK_DIR/sorted.json"
 TERRAFORM_INIT_LOG="$PRIVATE_WORK_DIR/terraform-init.log"
 TERRAFORM_CONSOLE_LOG="$PRIVATE_WORK_DIR/terraform-console.log"
 JQ_SORT_LOG="$PRIVATE_WORK_DIR/jq-sort.log"
+COMMITTED_RENDERER="$PRIVATE_WORK_DIR/committed-renderer.sh"
 mkdir -p "$ISOLATED_TF_DATA_DIR" "$PRIVATE_CONFIG_DIR"
 chmod 700 "$ISOLATED_TF_DATA_DIR" "$PRIVATE_CONFIG_DIR"
 
-while IFS= read -r environment_name; do
-    if [[ "$environment_name" == TF_CLI_ARGS* || "$environment_name" == TF_VAR_* ]]; then
-        unset "$environment_name"
-    fi
-done < <(compgen -e)
-unset TF_WORKSPACE TF_LOG TF_LOG_PATH
-export TF_INPUT=0
 export TF_DATA_DIR="$ISOLATED_TF_DATA_DIR"
 
-TRACKED_TF_FILES="$(git -C "$REPO_ROOT" ls-files -- ':(top,glob)infra/terraform/*.tf')" ||
-    die "could not enumerate tracked Terraform configuration."
-[[ -n "$TRACKED_TF_FILES" ]] || die "no tracked Terraform configuration was found."
-while IFS= read -r tracked_file; do
-    cp "$REPO_ROOT/$tracked_file" "$PRIVATE_CONFIG_DIR/${tracked_file##*/}" ||
-        die "could not isolate tracked Terraform configuration."
-done <<<"$TRACKED_TF_FILES"
+git -C "$REPO_ROOT" show "$RELEASE_SHA:scripts/render-cloud-run-contract.sh" >"$COMMITTED_RENDERER" 2>/dev/null ||
+    die "release commit does not contain the renderer."
+cmp -s "$SCRIPT_PATH" "$COMMITTED_RENDERER" ||
+    die "executed renderer does not match the release commit."
+
+COMMITTED_TERRAFORM_PATHS="$(
+    git -C "$REPO_ROOT" ls-tree -r --name-only "$RELEASE_SHA" -- infra/terraform 2>/dev/null |
+        while IFS= read -r committed_path; do
+            if [[ "$committed_path" =~ ^infra/terraform/[^/]+\.tf$ ]]; then
+                printf '%s\n' "$committed_path"
+            fi
+        done
+)" || die "could not enumerate committed Terraform configuration."
+[[ -n "$COMMITTED_TERRAFORM_PATHS" ]] || die "release commit contains no Terraform configuration."
+while IFS= read -r committed_path; do
+    git -C "$REPO_ROOT" show "$RELEASE_SHA:$committed_path" >"$PRIVATE_CONFIG_DIR/${committed_path##*/}" 2>/dev/null ||
+        die "could not isolate committed Terraform configuration."
+done <<<"$COMMITTED_TERRAFORM_PATHS"
 
 SELECTED_TFVARS="infra/terraform/${ENVIRONMENT}.tfvars"
-git -C "$REPO_ROOT" ls-files --error-unmatch -- "$SELECTED_TFVARS" >/dev/null 2>&1 ||
-    die "selected Terraform variables are not tracked."
-git -C "$REPO_ROOT" ls-files --error-unmatch -- 'infra/terraform/.terraform.lock.hcl' >/dev/null 2>&1 ||
-    die "Terraform dependency lockfile is not tracked."
-cp "$REPO_ROOT/$SELECTED_TFVARS" "$PRIVATE_CONFIG_DIR/${ENVIRONMENT}.tfvars" ||
-    die "could not isolate selected Terraform variables."
-cp "$TF_DIR/.terraform.lock.hcl" "$PRIVATE_CONFIG_DIR/.terraform.lock.hcl" ||
-    die "could not isolate the Terraform dependency lockfile."
+git -C "$REPO_ROOT" show "$RELEASE_SHA:$SELECTED_TFVARS" >"$PRIVATE_CONFIG_DIR/${ENVIRONMENT}.tfvars" 2>/dev/null ||
+    die "release commit does not contain selected Terraform variables."
+if git -C "$REPO_ROOT" cat-file -e "$RELEASE_SHA:infra/terraform/.terraform.lock.hcl" 2>/dev/null; then
+    git -C "$REPO_ROOT" show "$RELEASE_SHA:infra/terraform/.terraform.lock.hcl" >"$PRIVATE_CONFIG_DIR/.terraform.lock.hcl" 2>/dev/null ||
+        die "could not isolate the committed Terraform dependency lockfile."
+fi
 
 terraform -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false >"$TERRAFORM_INIT_LOG" 2>&1 ||
     die "Terraform backend-free initialization failed."
@@ -103,6 +123,7 @@ jsonencode({
   cloud_run_image               = var.cloud_run_image,
   runtime_service_account_name  = var.runtime_service_account_name,
   artifact_registry_repo        = var.artifact_registry_repo,
+  artifact_registry_image_name  = var.artifact_registry_image_name,
   domains                       = var.domains,
   domain                        = var.domain,
   android_signing_certificates = {
@@ -237,6 +258,7 @@ try:
         "cloud_run_image",
         "runtime_service_account_name",
         "artifact_registry_repo",
+        "artifact_registry_image_name",
         "domains",
         "domain",
         "android_signing_certificates",
@@ -254,19 +276,24 @@ try:
         source["runtime_service_account_name"], "runtime_service_account_name"
     )
     artifact_registry_repo = required_string(source["artifact_registry_repo"], "artifact_registry_repo")
+    artifact_registry_image_name = required_string(
+        source["artifact_registry_image_name"], "artifact_registry_image_name"
+    )
     if not re.fullmatch(r"[a-z][a-z0-9-]{4,28}[a-z0-9]", project_id):
         fail("project_id must be a valid lowercase GCP project ID")
     if not re.fullmatch(r"[a-z][a-z0-9-]{0,61}[a-z0-9]", runtime_service_account_name):
         fail("runtime_service_account_name must be a valid service account name")
+    if artifact_registry_image_name != "logdate-server":
+        fail("artifact_registry_image_name must be logdate-server")
 
     domains = source["domains"]
-    if not isinstance(domains, list) or not domains:
-        fail("domains must contain the canonical domain first")
-    first_domain = required_string(domains[0], "domains[0]").lower()
+    expected_domain = "cloud-staging.logdate.app" if environment == "staging" else "cloud.logdate.app"
+    if domains != [expected_domain]:
+        fail(f"environment domains must contain exactly {expected_domain}")
     legacy_domain = source["domain"]
-    if not isinstance(legacy_domain, str):
-        fail("domain must be a string")
-    canonical_domain = legacy_domain.strip().lower() or first_domain
+    if legacy_domain != "":
+        fail("legacy domain shim must be blank")
+    canonical_domain = expected_domain
     canonical_origin = f"https://{canonical_domain}"
 
     signing = source["android_signing_certificates"]
@@ -295,10 +322,14 @@ try:
             fail("Android certificate fingerprints and apk-key-hash origins must match exactly")
         is_sequential = digest == bytes(range(32)) or digest == bytes(range(32, 64))
         is_placeholder = len(set(digest)) == 1 or is_sequential
-        if environment == "production" and fingerprint == known_debug_fingerprint:
-            fail("production certificate sets may not contain the known debug certificate")
-        if environment == "production" and is_placeholder:
-            fail("production certificate sets may not contain placeholder certificates")
+        if fingerprint == known_debug_fingerprint:
+            if environment == "production":
+                fail("production certificate sets may not contain the known debug certificate")
+            fail("staging certificate set may not contain the known debug certificate")
+        if is_placeholder:
+            if environment == "production":
+                fail("production certificate sets may not contain placeholder certificates")
+            fail("staging certificate set may not contain placeholder certificates")
         fingerprints.append(fingerprint)
         android_origins.append(origin)
     if len(fingerprints) != len(set(fingerprints)) or len(android_origins) != len(set(android_origins)):
@@ -492,7 +523,7 @@ try:
         "service_name": service_name,
         "canonical_origin": canonical_origin,
         "runtime_service_account": f"{runtime_service_account_name}@{project_id}.iam.gserviceaccount.com",
-        "image": f"{region}-docker.pkg.dev/{project_id}/{artifact_registry_repo}/{service_name}:{release_sha}",
+        "image": f"{region}-docker.pkg.dev/{project_id}/{artifact_registry_repo}/{artifact_registry_image_name}:{release_sha}",
         "env_vars": rendered_env,
         "secret_env": normalized_secrets,
         "runtime": runtime,

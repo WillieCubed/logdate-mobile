@@ -216,6 +216,17 @@ variable "artifact_registry_repo" {
   default     = "logdate"
 }
 
+variable "artifact_registry_image_name" {
+  type        = string
+  description = "Shared Artifact Registry image name used by every first-party environment."
+  default     = "logdate-server"
+
+  validation {
+    condition     = var.artifact_registry_image_name == "logdate-server"
+    error_message = "First-party deployments must use the shared logdate-server image name."
+  }
+}
+
 variable "enable_artifact_registry" {
   type        = bool
   description = "Whether to create the Artifact Registry repository."

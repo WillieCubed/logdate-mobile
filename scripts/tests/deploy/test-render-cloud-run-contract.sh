@@ -3,91 +3,75 @@
 
 set -euo pipefail
 
+OPERATOR_ROOT="$(git rev-parse --show-toplevel)"
 # shellcheck source=scripts/tests/lib/assertions.sh
-source "$(git rev-parse --show-toplevel)/scripts/tests/lib/assertions.sh"
-enter_repo_root
+source "$OPERATOR_ROOT/scripts/tests/lib/assertions.sh"
 
 SCRIPT="scripts/render-cloud-run-contract.sh"
-RELEASE_SHA="0123456789abcdef0123456789abcdef01234567"
 CREDENTIAL_SENTINEL="CREDENTIAL_SENTINEL_MUST_NOT_LEAK"
 TMP_DIR="$(mktemp -d)"
+chmod 700 "$TMP_DIR"
+SOURCE_REPO="$TMP_DIR/source-repo"
+CURRENT_INPUTS_REPO="$TMP_DIR/current-inputs-repo"
 FAKE_BIN="$TMP_DIR/bin"
 FIXTURE_DIR="$TMP_DIR/fixtures"
 LOG_DIR="$TMP_DIR/logs"
 REAL_JQ="$(command -v jq)"
-CHECKOUT_STATE="infra/terraform/terraform.tfstate"
-CHECKOUT_STATE_CHECKSUM=""
-STAGING_TFVARS_CHECKSUM="$(shasum -a 256 infra/terraform/staging.tfvars | awk '{print $1}')"
-PRODUCTION_TFVARS_CHECKSUM="$(shasum -a 256 infra/terraform/production.tfvars | awk '{print $1}')"
-LOCKFILE_CHECKSUM="$(shasum -a 256 infra/terraform/.terraform.lock.hcl | awk '{print $1}')"
-CHECKOUT_PLUGIN_CANARY="infra/terraform/.terraform/task-1-renderer-canary"
-CHECKOUT_WORKSPACE_CANARY="infra/terraform/terraform.tfstate.d/production/task-1-renderer-canary"
-CHECKOUT_TFVARS_CANARY="infra/terraform/terraform.tfvars"
-CHECKOUT_AUTO_TFVARS_CANARY="infra/terraform/task-1-poison.auto.tfvars"
-WORKSPACE_PARENT_EXISTED="false"
-PLUGIN_PARENT_EXISTED="false"
-CREATED_CHECKOUT_STATE="false"
-CREATED_CHECKOUT_PLUGIN_CANARY="false"
-CREATED_CHECKOUT_WORKSPACE_CANARY="false"
-CREATED_CHECKOUT_TFVARS_CANARY="false"
-CREATED_CHECKOUT_AUTO_TFVARS_CANARY="false"
+REAL_TERRAFORM="$(command -v terraform)"
+STATUS_BEFORE="$(git -C "$OPERATOR_ROOT" status --short)"
+OPERATOR_SOURCE_HASHES_BEFORE="$TMP_DIR/operator-source-hashes.before"
+OPERATOR_SOURCE_HASHES_AFTER="$TMP_DIR/operator-source-hashes.after"
+SOURCE_REPO_HASHES_BEFORE="$TMP_DIR/source-repo-hashes.before"
+SOURCE_REPO_HASHES_AFTER="$TMP_DIR/source-repo-hashes.after"
+CURRENT_REPO_HASHES_BEFORE="$TMP_DIR/current-repo-hashes.before"
+CURRENT_REPO_HASHES_AFTER="$TMP_DIR/current-repo-hashes.after"
 
 cleanup() {
-    if [[ "$CREATED_CHECKOUT_PLUGIN_CANARY" == "true" ]]; then
-        rm -f "$CHECKOUT_PLUGIN_CANARY"
-    fi
-    if [[ "$CREATED_CHECKOUT_WORKSPACE_CANARY" == "true" ]]; then
-        rm -f "$CHECKOUT_WORKSPACE_CANARY"
-    fi
-    if [[ "$CREATED_CHECKOUT_TFVARS_CANARY" == "true" ]]; then
-        rm -f "$CHECKOUT_TFVARS_CANARY"
-    fi
-    if [[ "$CREATED_CHECKOUT_AUTO_TFVARS_CANARY" == "true" ]]; then
-        rm -f "$CHECKOUT_AUTO_TFVARS_CANARY"
-    fi
-    if [[ "$CREATED_CHECKOUT_STATE" == "true" ]]; then
-        rm -f "$CHECKOUT_STATE"
-    fi
-    if [[ "$WORKSPACE_PARENT_EXISTED" == "false" ]]; then
-        rmdir "$(dirname "$CHECKOUT_WORKSPACE_CANARY")" 2>/dev/null || true
-        rmdir "$(dirname "$(dirname "$CHECKOUT_WORKSPACE_CANARY")")" 2>/dev/null || true
-    fi
-    if [[ "$PLUGIN_PARENT_EXISTED" == "false" ]]; then
-        rmdir "$(dirname "$CHECKOUT_PLUGIN_CANARY")" 2>/dev/null || true
-    fi
     rm -rf "$TMP_DIR"
 }
 trap cleanup EXIT
 
 mkdir -p "$FAKE_BIN" "$FIXTURE_DIR" "$LOG_DIR"
-[[ ! -e "$CHECKOUT_TFVARS_CANARY" ]] || fail "$CHECKOUT_TFVARS_CANARY already exists; refusing to overwrite an operator file"
-[[ ! -e "$CHECKOUT_AUTO_TFVARS_CANARY" ]] || fail "$CHECKOUT_AUTO_TFVARS_CANARY already exists; refusing to overwrite an operator file"
-[[ ! -e "$CHECKOUT_PLUGIN_CANARY" ]] || fail "$CHECKOUT_PLUGIN_CANARY already exists; refusing to overwrite an operator file"
-[[ ! -e "$CHECKOUT_WORKSPACE_CANARY" ]] || fail "$CHECKOUT_WORKSPACE_CANARY already exists; refusing to overwrite an operator file"
-if [[ ! -e "$CHECKOUT_STATE" ]]; then
-    printf 'checkout-state-canary\n' >"$CHECKOUT_STATE"
-    CREATED_CHECKOUT_STATE="true"
-fi
-CHECKOUT_STATE_CHECKSUM="$(shasum -a 256 "$CHECKOUT_STATE" | awk '{print $1}')"
-if [[ -d "$(dirname "$CHECKOUT_WORKSPACE_CANARY")" ]]; then
-    WORKSPACE_PARENT_EXISTED="true"
-fi
-if [[ -d "$(dirname "$CHECKOUT_PLUGIN_CANARY")" ]]; then
-    PLUGIN_PARENT_EXISTED="true"
-fi
-mkdir -p "$(dirname "$CHECKOUT_PLUGIN_CANARY")" "$(dirname "$CHECKOUT_WORKSPACE_CANARY")"
-printf 'checkout-plugin-canary\n' >"$CHECKOUT_PLUGIN_CANARY"
-CREATED_CHECKOUT_PLUGIN_CANARY="true"
-printf 'checkout-workspace-canary\n' >"$CHECKOUT_WORKSPACE_CANARY"
-CREATED_CHECKOUT_WORKSPACE_CANARY="true"
-printf 'android_signing_certificates = "checkout-poison"\n' >"$CHECKOUT_TFVARS_CANARY"
-CREATED_CHECKOUT_TFVARS_CANARY="true"
-printf 'allow_unauthenticated = false\n' >"$CHECKOUT_AUTO_TFVARS_CANARY"
-CREATED_CHECKOUT_AUTO_TFVARS_CANARY="true"
+
+snapshot_operator_sources() {
+    local output_file="$1"
+    (
+        cd "$OPERATOR_ROOT"
+        find infra/terraform -maxdepth 1 -type f \
+            \( -name '*.tf' -o -name '*.tfvars' -o -name '.terraform.lock.hcl' -o -name 'terraform.tfstate' \) \
+            -print0 |
+            sort -z |
+            xargs -0 shasum -a 256
+        shasum -a 256 scripts/render-cloud-run-contract.sh
+    ) >"$output_file"
+}
+
+snapshot_synthetic_sources() {
+    local repo="$1" output_file="$2"
+    (
+        cd "$repo"
+        find infra scripts -type f -print0 |
+            sort -z |
+            xargs -0 shasum -a 256
+    ) >"$output_file"
+}
+
+snapshot_operator_sources "$OPERATOR_SOURCE_HASHES_BEFORE"
 
 assert_equals() {
     local expected="$1" actual="$2"
     [[ "$expected" == "$actual" ]] || fail "expected '$expected', got '$actual'"
+    pass
+}
+
+assert_zero_bytes() {
+    local file="$1"
+    assert_equals "0" "$(wc -c <"$file" | tr -d ' ')"
+}
+
+assert_exact_line() {
+    local expected="$1" file="$2"
+    cmp -s <(printf '%s\n' "$expected") "$file" || fail "$file did not contain the exact expected line"
     pass
 }
 
@@ -99,6 +83,7 @@ cat >"$FIXTURE_DIR/staging-source.json" <<'EOF'
   "cloud_run_image": "us-central1-docker.pkg.dev/logdate-dev/logdate/logdate-server:latest",
   "runtime_service_account_name": "logdate-runtime",
   "artifact_registry_repo": "logdate",
+  "artifact_registry_image_name": "logdate-server",
   "domains": ["cloud-staging.logdate.app"],
   "domain": "",
   "android_signing_certificates": {
@@ -158,6 +143,7 @@ cat >"$FIXTURE_DIR/production-source.json" <<'EOF'
   "cloud_run_image": "us-docker.pkg.dev/cloudrun/container/hello",
   "runtime_service_account_name": "logdate-runtime",
   "artifact_registry_repo": "logdate",
+  "artifact_registry_image_name": "logdate-server",
   "domains": ["cloud.logdate.app"],
   "domain": "",
   "android_signing_certificates": {
@@ -212,12 +198,154 @@ cat >"$FIXTURE_DIR/production-source.json" <<'EOF'
 }
 EOF
 
-cat >"$FIXTURE_DIR/current-staging-source.json" <<'EOF'
-{"project_id":"logdate-dev","region":"us-central1","service_name":"logdate-server-staging","cloud_run_image":"us-central1-docker.pkg.dev/logdate-dev/logdate/logdate-server:latest","runtime_service_account_name":"logdate-runtime","artifact_registry_repo":"logdate","domains":["cloud-staging.logdate.app"],"domain":"","android_signing_certificates":{},"env_vars":{"HOST":"0.0.0.0","GCS_PROJECT_ID":"logdate-dev","GCS_BUCKET_NAME":"logdate-media-staging","LOGDATE_ENV":"production","AUTO_MIGRATE":"true","WEBAUTHN_RP_ID":"cloud-staging.logdate.app","WEBAUTHN_ORIGIN":"https://cloud-staging.logdate.app","WEBAUTHN_ALLOWED_ORIGINS":"https://cloud-staging.logdate.app,android:apk-key-hash:3zJp1NzJxP5y_mFioPTp7l8EFEfcs472qSV2_DiQ28c","ANDROID_CERT_FINGERPRINTS":"DF:32:69:D4:DC:C9:C4:FE:72:FE:61:62:A0:F4:E9:EE:5F:04:14:47:DC:B3:8E:F6:A9:25:76:FC:38:90:DB:C7"},"secret_env":{"DATABASE_URL":{"secret_id":"logdate-db-url","version":"latest"}},"runtime":{}}
+initialize_synthetic_repo() {
+    local repo="$1"
+    mkdir -p "$repo/infra/terraform" "$repo/scripts"
+    cp "$OPERATOR_ROOT"/infra/terraform/*.tf "$repo/infra/terraform/"
+    cp "$OPERATOR_ROOT/infra/terraform/.terraform.lock.hcl" "$repo/infra/terraform/.terraform.lock.hcl"
+    cp "$OPERATOR_ROOT/$SCRIPT" "$repo/$SCRIPT"
+    chmod +x "$repo/$SCRIPT"
+    git -C "$repo" init -q
+    git -C "$repo" config user.name 'Task 1 Test'
+    git -C "$repo" config user.email 'task-1@example.invalid'
+}
+
+commit_synthetic_repo() {
+    local repo="$1" message="$2" parent="${3:-}" tree commit
+    git -C "$repo" update-index --add -- \
+        scripts/render-cloud-run-contract.sh \
+        infra/terraform/.terraform.lock.hcl \
+        infra/terraform/*.tf \
+        infra/terraform/staging.tfvars \
+        infra/terraform/production.tfvars
+    tree="$(git -C "$repo" write-tree)"
+    if [[ -n "$parent" ]]; then
+        commit="$(printf '%s\n' "$message" | git -C "$repo" commit-tree "$tree" -p "$parent")"
+    else
+        commit="$(printf '%s\n' "$message" | git -C "$repo" commit-tree "$tree")"
+    fi
+    git -C "$repo" update-ref HEAD "$commit"
+    printf '%s\n' "$commit"
+}
+
+initialize_synthetic_repo "$SOURCE_REPO"
+cat >"$SOURCE_REPO/infra/terraform/staging.tfvars" <<'EOF'
+# committed-valid-staging
+project_id                  = "logdate-dev"
+region                      = "us-central1"
+service_name                = "logdate-server-staging"
+artifact_registry_repo      = "logdate"
+artifact_registry_image_name = "logdate-server"
+cloud_run_image             = "mutable-placeholder"
+domains                     = ["cloud-staging.logdate.app"]
+domain                      = ""
+webauthn_rp_id              = "cloud-staging.logdate.app"
+webauthn_origin             = "https://cloud-staging.logdate.app"
+gcs_bucket_name             = "logdate-media-staging"
+create_cloud_sql_instance   = true
+cloud_sql_instance_name     = "logdate-db"
+cloud_sql_database_name     = "logdate"
+request_concurrency         = 16
+android_signing_certificates = {
+  staging = {
+    fingerprint         = "E1:6A:82:07:74:DE:F6:29:24:EB:E1:48:67:47:8C:72:9C:69:A0:CB:9D:01:8A:8C:E4:49:44:DA:00:15:E9:5A"
+    apk_key_hash_origin = "android:apk-key-hash:4WqCB3Te9ikk6-FIZ0eMcpxpoMudAYqM5ElE2gAV6Vo"
+  }
+}
+cloud_run_env = {
+  LOGDATE_ENV                      = "production"
+  LOGDATE_EXPECT_FIRST_PARTY       = "true"
+  LOGDATE_DEPLOYMENT_KIND          = "first_party"
+  LOGDATE_SERVER_DISPLAY_NAME      = "LogDate Cloud (Staging)"
+  LOGDATE_PUBLIC_ORIGIN            = "https://cloud-staging.logdate.app"
+  ATPROTO_PDS_SERVICE_URL          = "https://cloud-staging.logdate.app"
+  ATPROTO_HANDLE_DOMAIN            = "cloud-staging.logdate.app"
+  BILLING_PROVIDER                 = "play"
+  SERVER_ENCRYPTION_ENABLED        = "true"
+  SYNC_MEDIA_SIGNED_URLS           = "true"
+  SYNC_MEDIA_SIGNED_URL_TTL_HOURS  = "1"
+  AUTO_MIGRATE                     = "false"
+}
+cloud_run_secret_env = {
+  DATABASE_USER            = { secret_id = "logdate-db-user", version = "7" }
+  DATABASE_PASSWORD        = { secret_id = "logdate-db-password", version = "11" }
+  JWT_SECRET               = { secret_id = "logdate-jwt-secret", version = "3" }
+  SERVER_ENCRYPTION_KEY    = { secret_id = "logdate-server-encryption-key", version = "5" }
+  SERVER_ENCRYPTION_KEY_ID = { secret_id = "logdate-server-encryption-key-id", version = "2" }
+  HEALTH_INTERNAL_TOKEN    = { secret_id = "logdate-health-internal-token", version = "13" }
+}
 EOF
-cat >"$FIXTURE_DIR/current-production-source.json" <<'EOF'
-{"project_id":"logdate","region":"us-central1","service_name":"logdate-server","cloud_run_image":"us-docker.pkg.dev/cloudrun/container/hello","runtime_service_account_name":"logdate-runtime","artifact_registry_repo":"logdate","domains":["cloud.logdate.app"],"domain":"","android_signing_certificates":{},"env_vars":{"HOST":"0.0.0.0","GCS_PROJECT_ID":"logdate","GCS_BUCKET_NAME":"logdate-media-logdate","LOGDATE_ENV":"production","AUTO_MIGRATE":"false","WEBAUTHN_RP_ID":"logdate.app","WEBAUTHN_ORIGIN":"https://cloud.logdate.app"},"secret_env":{"DATABASE_URL":{"secret_id":"logdate-db-url","version":"latest"}},"runtime":{}}
+cat >"$SOURCE_REPO/infra/terraform/production.tfvars" <<'EOF'
+# committed-valid-production
+project_id                   = "logdate"
+region                       = "us-central1"
+service_name                 = "logdate-server"
+artifact_registry_repo       = "logdate"
+artifact_registry_image_name = "logdate-server"
+cloud_run_image              = "mutable-placeholder"
+domains                      = ["cloud.logdate.app"]
+domain                       = ""
+webauthn_rp_id               = "logdate.app"
+webauthn_origin              = "https://cloud.logdate.app"
+gcs_bucket_name              = "logdate-media-logdate"
+min_instances                = 1
+request_concurrency          = 16
+android_signing_certificates = {
+  upload = {
+    fingerprint         = "11:98:70:B8:78:F3:AB:5F:55:C0:DF:65:C7:87:89:C0:24:59:CA:9F:F3:22:A0:89:40:AE:43:A2:9D:1D:D5:AB"
+    apk_key_hash_origin = "android:apk-key-hash:EZhwuHjzq19VwN9lx4eJwCRZyp_zIqCJQK5Dop0d1as"
+  }
+  play_app_signing = {
+    fingerprint         = "F1:3E:F5:D0:EC:93:ED:B0:8C:6C:F2:1D:8A:12:84:99:42:C2:92:D8:ED:EC:26:C0:E4:46:0C:3C:71:BC:6E:5F"
+    apk_key_hash_origin = "android:apk-key-hash:8T710OyT7bCMbPIdihKEmULCktjt7CbA5EYMPHG8bl8"
+  }
+}
+cloud_run_env = {
+  LOGDATE_ENV                     = "production"
+  LOGDATE_EXPECT_FIRST_PARTY      = "true"
+  LOGDATE_DEPLOYMENT_KIND         = "first_party"
+  LOGDATE_SERVER_DISPLAY_NAME     = "LogDate Cloud"
+  LOGDATE_PUBLIC_ORIGIN           = "https://cloud.logdate.app"
+  ATPROTO_PDS_SERVICE_URL         = "https://cloud.logdate.app"
+  ATPROTO_HANDLE_DOMAIN           = "logdate.app"
+  BILLING_PROVIDER                = "play"
+  SERVER_ENCRYPTION_ENABLED       = "true"
+  SYNC_MEDIA_SIGNED_URLS          = "true"
+  SYNC_MEDIA_SIGNED_URL_TTL_HOURS = "1"
+  AUTO_MIGRATE                    = "false"
+}
+cloud_run_secret_env = {
+  DATABASE_URL             = { secret_id = "logdate-db-url", version = "17" }
+  DATABASE_USER            = { secret_id = "logdate-db-user", version = "7" }
+  DATABASE_PASSWORD        = { secret_id = "logdate-db-password", version = "11" }
+  JWT_SECRET               = { secret_id = "logdate-jwt-secret", version = "3" }
+  SERVER_ENCRYPTION_KEY    = { secret_id = "logdate-server-encryption-key", version = "5" }
+  SERVER_ENCRYPTION_KEY_ID = { secret_id = "logdate-server-encryption-key-id", version = "2" }
+  HEALTH_INTERNAL_TOKEN    = { secret_id = "logdate-health-internal-token", version = "13" }
+}
 EOF
+RELEASE_SHA="$(commit_synthetic_repo "$SOURCE_REPO" 'test: create valid renderer release')"
+NON_COMMIT_SHA="$(printf 'not a commit\n' | git -C "$SOURCE_REPO" hash-object -w --stdin)"
+
+# Create a second commit whose renderer does not match the executable under test.
+printf '\n# mismatched committed renderer\n' >>"$SOURCE_REPO/$SCRIPT"
+MISMATCH_SHA="$(commit_synthetic_repo "$SOURCE_REPO" 'test: create mismatched renderer release' "$RELEASE_SHA")"
+cp "$OPERATOR_ROOT/$SCRIPT" "$SOURCE_REPO/$SCRIPT"
+chmod +x "$SOURCE_REPO/$SCRIPT"
+git -C "$SOURCE_REPO" update-index --add -- "$SCRIPT"
+
+# Hostile uncommitted and staged inputs must not influence the release-bound projection.
+printf '\n# DIRTY_WORKTREE_POISON\n' >>"$SOURCE_REPO/infra/terraform/variables.tf"
+git -C "$SOURCE_REPO" update-index --add -- infra/terraform/variables.tf
+printf 'allow_unauthenticated = false\n' >"$SOURCE_REPO/infra/terraform/staging.tfvars"
+printf 'allow_unauthenticated = false\n' >"$SOURCE_REPO/infra/terraform/production.tfvars"
+printf 'allow_unauthenticated = false\n' >"$SOURCE_REPO/infra/terraform/terraform.tfvars"
+printf 'allow_unauthenticated = false\n' >"$SOURCE_REPO/infra/terraform/task-1-poison.auto.tfvars"
+mkdir -p "$SOURCE_REPO/infra/terraform/.terraform" "$SOURCE_REPO/infra/terraform/terraform.tfstate.d/production"
+printf 'synthetic checkout plugin metadata\n' >"$SOURCE_REPO/infra/terraform/.terraform/backend-marker"
+printf 'synthetic checkout state\n' >"$SOURCE_REPO/infra/terraform/terraform.tfstate"
+printf 'synthetic checkout workspace\n' >"$SOURCE_REPO/infra/terraform/terraform.tfstate.d/production/state-marker"
+snapshot_synthetic_sources "$SOURCE_REPO" "$SOURCE_REPO_HASHES_BEFORE"
 
 cat >"$FAKE_BIN/terraform" <<'EOF'
 #!/usr/bin/env bash
@@ -226,10 +354,12 @@ set -euo pipefail
 LOG_DIR="${TEST_LOG_DIR:?}"
 TF_DATA_DIR="${TF_DATA_DIR:?}"
 [[ -d "$TF_DATA_DIR" ]] || exit 91
-[[ "$TF_DATA_DIR" != "${CHECKOUT_TERRAFORM_DIR:?}" ]] || exit 92
 while IFS='=' read -r name _; do
-    [[ "$name" != TF_CLI_ARGS* ]] || { printf 'ambient variable remained: %s\n' "$name" >"$LOG_DIR/preflight-failure.log"; exit 93; }
-    [[ "$name" != TF_VAR_* ]] || { printf 'ambient variable remained: %s\n' "$name" >"$LOG_DIR/preflight-failure.log"; exit 93; }
+    case "$name" in
+        TF_DATA_DIR | TF_INPUT) ;;
+        TF_*) printf 'ambient Terraform variable remained: %s\n' "$name" >"$LOG_DIR/preflight-failure.log"; exit 93 ;;
+    esac
+    [[ "$name" != GIT_* ]] || { printf 'ambient Git variable remained: %s\n' "$name" >"$LOG_DIR/preflight-failure.log"; exit 93; }
 done < <(env)
 [[ -z "${TF_WORKSPACE:-}" ]] || { printf 'TF_WORKSPACE remained\n' >"$LOG_DIR/preflight-failure.log"; exit 93; }
 [[ -z "${TF_LOG:-}" && -z "${TF_LOG_PATH:-}" ]] || { printf 'Terraform logging remained\n' >"$LOG_DIR/preflight-failure.log"; exit 93; }
@@ -238,6 +368,8 @@ config_dir="${1#-chdir=}"
 [[ "$config_dir" != "${SOURCE_TFVARS_DIR:?}" ]] || { printf 'checkout config directory used\n' >"$LOG_DIR/preflight-failure.log"; exit 93; }
 [[ ! -e "$config_dir/terraform.tfvars" && ! -e "$config_dir/task-1-poison.auto.tfvars" ]] || { printf 'auto-loaded canary copied\n' >"$LOG_DIR/preflight-failure.log"; exit 93; }
 [[ -f "$config_dir/.terraform.lock.hcl" && -f "$config_dir/${EXPECTED_ENVIRONMENT:?}.tfvars" ]] || { printf 'required isolated inputs missing\n' >"$LOG_DIR/preflight-failure.log"; exit 93; }
+[[ "$(head -n 1 "$config_dir/${EXPECTED_ENVIRONMENT}.tfvars")" == "# committed-valid-${EXPECTED_ENVIRONMENT}" ]] || { printf 'selected tfvars did not come from release commit\n' >"$LOG_DIR/preflight-failure.log"; exit 93; }
+! grep -Rq 'DIRTY_WORKTREE_POISON' "$config_dir" || { printf 'dirty worktree configuration was copied\n' >"$LOG_DIR/preflight-failure.log"; exit 93; }
 config_files="$(find "$config_dir" -maxdepth 1 -type f -print | sed 's#.*/##' | sort | tr '\n' ' ')"
 [[ "$config_files" == ".terraform.lock.hcl main.tf outputs.tf ${EXPECTED_ENVIRONMENT}.tfvars variables.tf versions.tf " ]] || { printf 'unexpected isolated inputs: %s\n' "$config_files" >"$LOG_DIR/preflight-failure.log"; exit 93; }
 mode="$(stat -f '%Lp' "$TF_DATA_DIR" 2>/dev/null || stat -c '%a' "$TF_DATA_DIR")"
@@ -253,6 +385,7 @@ printf '%s\n' "$TF_DATA_DIR" >>"$LOG_DIR/data-dirs.log"
 case "${2:-}" in
     init)
         [[ "$#" == "4" && "$3" == "-backend=false" && "$4" == "-input=false" ]]
+        printf '# private lockfile rewrite\n' >"$config_dir/.terraform.lock.hcl"
         if [[ "${FAIL_TERRAFORM_INIT:-false}" == "true" ]]; then
             printf '%s\n' "${CREDENTIAL_SENTINEL:?}" >&2
             exit 31
@@ -262,8 +395,8 @@ case "${2:-}" in
         [[ "$#" == "4" ]]
         [[ "$3" == -state=* && "$4" == "-var-file=${EXPECTED_ENVIRONMENT:?}.tfvars" ]]
         state_path="${3#-state=}"
-        [[ "$state_path" == /tmp/* || "$state_path" == /private/* || "$state_path" == /var/* ]] || exit 95
-        [[ "$state_path" != "${SOURCE_TFVARS_DIR:?}/terraform.tfstate" ]] || exit 96
+        [[ ! -e "$state_path" ]] || exit 95
+        [[ "$(dirname "$state_path")" == "$(dirname "$TF_DATA_DIR")" ]] || exit 96
         state_parent_mode="$(stat -f '%Lp' "$(dirname "$state_path")" 2>/dev/null || stat -c '%a' "$(dirname "$state_path")")"
         [[ "$state_parent_mode" == "700" ]] || exit 97
         printf '%s\n' "$state_path" >>"$LOG_DIR/state-paths.log"
@@ -274,14 +407,6 @@ case "${2:-}" in
         [[ "$expression" != *"google_sql_"* && "$expression" != *"google_service_account"* && "$expression" != *"local.cloud_sql_env"* ]] || exit 99
         printf '%s\n' "$expression" >>"$LOG_DIR/console-expression.log"
         fixture="${FAKE_TERRAFORM_FIXTURE:?}"
-        case "$fixture" in
-            current-staging-source.json)
-                ! grep -q 'LOGDATE_EXPECT_FIRST_PARTY' "${SOURCE_TFVARS_DIR:?}/staging.tfvars" || exit 100
-                ;;
-            current-production-source.json)
-                ! grep -q 'ANDROID_CERT_FINGERPRINTS' "${SOURCE_TFVARS_DIR:?}/production.tfvars" || exit 101
-                ;;
-        esac
         case "${FAKE_CONSOLE_MODE:-valid}" in
             malformed) printf 'not-json\n'; exit 0 ;;
             null) printf 'null\n'; exit 0 ;;
@@ -324,26 +449,70 @@ chmod +x "$FAKE_BIN/jq"
 
 run_renderer() {
     local environment="$1" release_sha="$2" fixture="$3" stdout_file="$4" stderr_file="$5"
-    PATH="$FAKE_BIN:$PATH" \
-        TEST_LOG_DIR="$LOG_DIR" \
-        CHECKOUT_TERRAFORM_DIR="$PWD/infra/terraform/.terraform" \
-        SOURCE_TFVARS_DIR="$PWD/infra/terraform" \
-        FIXTURE_DIR="$FIXTURE_DIR" \
-        REAL_JQ="$REAL_JQ" \
-        CREDENTIAL_SENTINEL="$CREDENTIAL_SENTINEL" \
-        FAKE_TERRAFORM_FIXTURE="$fixture" \
-        EXPECTED_ENVIRONMENT="$environment" \
-        TF_WORKSPACE="production" \
-        TF_CLI_ARGS="-lock-timeout=1s" \
-        TF_CLI_ARGS_init="-backend-config=production.hcl" \
-        TF_CLI_ARGS_console="-var-file=wrong.tfvars" \
-        TF_CLI_ARGS_plan="-destroy" \
-        TF_VAR_android_signing_certificates='poison' \
-        TF_VAR_allow_unauthenticated='false' \
-        TF_LOG='TRACE' \
-        TF_LOG_PATH="$TMP_DIR/terraform-trace.log" \
-        TF_INPUT='1' \
-        "$SCRIPT" --environment "$environment" --release-sha "$release_sha" >"$stdout_file" 2>"$stderr_file"
+    (
+        cd "$SOURCE_REPO"
+        PATH="$FAKE_BIN:$PATH" \
+            TEST_LOG_DIR="$LOG_DIR" \
+            SOURCE_TFVARS_DIR="$SOURCE_REPO/infra/terraform" \
+            FIXTURE_DIR="$FIXTURE_DIR" \
+            REAL_JQ="$REAL_JQ" \
+            CREDENTIAL_SENTINEL="$CREDENTIAL_SENTINEL" \
+            FAKE_TERRAFORM_FIXTURE="$fixture" \
+            EXPECTED_ENVIRONMENT="$environment" \
+            TF_WORKSPACE="production" \
+            TF_CLI_ARGS="-lock-timeout=1s" \
+            TF_CLI_ARGS_init="-backend-config=production.hcl" \
+            TF_CLI_ARGS_console="-var-file=wrong.tfvars" \
+            TF_CLI_ARGS_plan="-destroy" \
+            TF_VAR_android_signing_certificates='poison' \
+            TF_VAR_allow_unauthenticated='false' \
+            TF_LOG='TRACE' \
+            TF_LOG_PATH="$TMP_DIR/terraform-trace.log" \
+            TF_CLI_CONFIG_FILE="$TMP_DIR/hostile-terraform.rc" \
+            TF_PLUGIN_CACHE_DIR="$TMP_DIR/hostile-plugin-cache" \
+            TF_INPUT='1' \
+            GIT_DIR="$TMP_DIR/hostile-git-dir" \
+            GIT_WORK_TREE="$TMP_DIR/hostile-work-tree" \
+            GIT_INDEX_FILE="$TMP_DIR/hostile-index" \
+            GIT_OBJECT_DIRECTORY="$TMP_DIR/hostile-object-directory" \
+            GIT_ALTERNATE_OBJECT_DIRECTORIES="$TMP_DIR/hostile-alternate-objects" \
+            GIT_COMMON_DIR="$TMP_DIR/hostile-common-dir" \
+            GIT_CEILING_DIRECTORIES="$SOURCE_REPO" \
+            GIT_CONFIG_COUNT="1" \
+            GIT_CONFIG_KEY_0="core.hooksPath" \
+            GIT_CONFIG_VALUE_0="$TMP_DIR/hostile-hooks" \
+            "$SCRIPT" --environment "$environment" --release-sha "$release_sha" >"$stdout_file" 2>"$stderr_file"
+    )
+}
+
+run_real_renderer() {
+    local repo="$1" environment="$2" release_sha="$3" stdout_file="$4" stderr_file="$5"
+    (
+        cd "$repo"
+        PATH="$(dirname "$REAL_TERRAFORM"):$(dirname "$REAL_JQ"):$PATH" \
+            TF_WORKSPACE="production" \
+            TF_CLI_ARGS="-lock-timeout=1s" \
+            TF_CLI_ARGS_init="-backend-config=production.hcl" \
+            TF_CLI_ARGS_console="-var-file=wrong.tfvars" \
+            TF_VAR_android_signing_certificates='poison' \
+            TF_VAR_allow_unauthenticated='false' \
+            TF_LOG='TRACE' \
+            TF_LOG_PATH="$TMP_DIR/real-terraform-trace.log" \
+            TF_CLI_CONFIG_FILE="$TMP_DIR/hostile-real-terraform.rc" \
+            TF_PLUGIN_CACHE_DIR="$TMP_DIR/hostile-real-plugin-cache" \
+            TF_INPUT='1' \
+            GIT_DIR="$TMP_DIR/hostile-real-git-dir" \
+            GIT_WORK_TREE="$TMP_DIR/hostile-real-work-tree" \
+            GIT_INDEX_FILE="$TMP_DIR/hostile-real-index" \
+            GIT_OBJECT_DIRECTORY="$TMP_DIR/hostile-real-object-directory" \
+            GIT_ALTERNATE_OBJECT_DIRECTORIES="$TMP_DIR/hostile-real-alternate-objects" \
+            GIT_COMMON_DIR="$TMP_DIR/hostile-real-common-dir" \
+            GIT_CEILING_DIRECTORIES="$repo" \
+            GIT_CONFIG_COUNT="1" \
+            GIT_CONFIG_KEY_0="core.hooksPath" \
+            GIT_CONFIG_VALUE_0="$TMP_DIR/hostile-real-hooks" \
+            "$SCRIPT" --environment "$environment" --release-sha "$release_sha" >"$stdout_file" 2>"$stderr_file"
+    )
 }
 
 cat >"$FIXTURE_DIR/staging-contract.json" <<EOF
@@ -374,7 +543,7 @@ cat >"$FIXTURE_DIR/staging-contract.json" <<EOF
     "WEBAUTHN_RP_ID": "cloud-staging.logdate.app"
   },
   "environment": "staging",
-  "image": "us-central1-docker.pkg.dev/logdate-dev/logdate/logdate-server-staging:$RELEASE_SHA",
+  "image": "us-central1-docker.pkg.dev/logdate-dev/logdate/logdate-server:$RELEASE_SHA",
   "project_id": "logdate-dev",
   "region": "us-central1",
   "release_sha": "$RELEASE_SHA",
@@ -421,10 +590,12 @@ fi
 assert_exit_code 0 "$staging_status"
 cmp -s "$FIXTURE_DIR/staging-contract.sorted.json" "$STAGING_OUT" || fail "staging contract did not match the hand-checked canonical fixture"
 pass
-assert_equals "" "$(cat "$STAGING_ERR")"
+assert_zero_bytes "$STAGING_ERR"
 
 DETERMINISTIC_OUT="$TMP_DIR/staging-second.out"
-run_renderer staging "$RELEASE_SHA" staging-source.json "$DETERMINISTIC_OUT" "$TMP_DIR/staging-second.err"
+DETERMINISTIC_ERR="$TMP_DIR/staging-second.err"
+run_renderer staging "$RELEASE_SHA" staging-source.json "$DETERMINISTIC_OUT" "$DETERMINISTIC_ERR"
+assert_zero_bytes "$DETERMINISTIC_ERR"
 cmp -s "$STAGING_OUT" "$DETERMINISTIC_OUT" || fail "renderer output was not deterministic"
 pass
 jq -S . "$STAGING_OUT" >"$TMP_DIR/staging-resorted.json"
@@ -432,7 +603,9 @@ cmp -s "$STAGING_OUT" "$TMP_DIR/staging-resorted.json" || fail "renderer output 
 pass
 
 PRODUCTION_OUT="$TMP_DIR/production.out"
-run_renderer production "$RELEASE_SHA" production-source.json "$PRODUCTION_OUT" "$TMP_DIR/production.err"
+PRODUCTION_ERR="$TMP_DIR/production.err"
+run_renderer production "$RELEASE_SHA" production-source.json "$PRODUCTION_OUT" "$PRODUCTION_ERR"
+assert_zero_bytes "$PRODUCTION_ERR"
 cat >"$FIXTURE_DIR/production-contract.json" <<EOF
 {
   "canonical_origin": "https://cloud.logdate.app",
@@ -503,6 +676,60 @@ assert_equals "false" "$(jq -r '.env_vars | has("INSTANCE_CONNECTION_NAME") or h
 assert_not_contains ':latest' "$(cat "$STAGING_OUT" "$PRODUCTION_OUT")"
 assert_not_contains 'us-docker.pkg.dev/cloudrun/container/hello' "$(cat "$STAGING_OUT" "$PRODUCTION_OUT")"
 
+REAL_STAGING_OUT="$TMP_DIR/real-staging.out"
+REAL_STAGING_ERR="$TMP_DIR/real-staging.err"
+run_real_renderer "$SOURCE_REPO" staging "$RELEASE_SHA" "$REAL_STAGING_OUT" "$REAL_STAGING_ERR"
+cmp -s "$FIXTURE_DIR/staging-contract.sorted.json" "$REAL_STAGING_OUT" || fail "real Terraform staging contract did not match the canonical fixture"
+pass
+assert_zero_bytes "$REAL_STAGING_ERR"
+
+REAL_STAGING_REPEAT_OUT="$TMP_DIR/real-staging-repeat.out"
+REAL_STAGING_REPEAT_ERR="$TMP_DIR/real-staging-repeat.err"
+run_real_renderer "$SOURCE_REPO" staging "$RELEASE_SHA" "$REAL_STAGING_REPEAT_OUT" "$REAL_STAGING_REPEAT_ERR"
+cmp -s "$REAL_STAGING_OUT" "$REAL_STAGING_REPEAT_OUT" || fail "real Terraform staging output was not deterministic"
+pass
+assert_zero_bytes "$REAL_STAGING_REPEAT_ERR"
+
+REAL_PRODUCTION_OUT="$TMP_DIR/real-production.out"
+REAL_PRODUCTION_ERR="$TMP_DIR/real-production.err"
+run_real_renderer "$SOURCE_REPO" production "$RELEASE_SHA" "$REAL_PRODUCTION_OUT" "$REAL_PRODUCTION_ERR"
+cmp -s "$FIXTURE_DIR/production-contract.sorted.json" "$REAL_PRODUCTION_OUT" || fail "real Terraform production contract did not match the canonical fixture"
+pass
+assert_zero_bytes "$REAL_PRODUCTION_ERR"
+
+initialize_synthetic_repo "$CURRENT_INPUTS_REPO"
+git -C "$OPERATOR_ROOT" show HEAD:infra/terraform/staging.tfvars >"$CURRENT_INPUTS_REPO/infra/terraform/staging.tfvars"
+git -C "$OPERATOR_ROOT" show HEAD:infra/terraform/production.tfvars >"$CURRENT_INPUTS_REPO/infra/terraform/production.tfvars"
+CURRENT_RELEASE_SHA="$(commit_synthetic_repo "$CURRENT_INPUTS_REPO" 'test: create current-input renderer release')"
+snapshot_synthetic_sources "$CURRENT_INPUTS_REPO" "$CURRENT_REPO_HASHES_BEFORE"
+assert_equals "$(git -C "$OPERATOR_ROOT" show HEAD:infra/terraform/staging.tfvars | shasum -a 256 | awk '{print $1}')" \
+    "$(shasum -a 256 "$CURRENT_INPUTS_REPO/infra/terraform/staging.tfvars" | awk '{print $1}')"
+assert_equals "$(git -C "$OPERATOR_ROOT" show HEAD:infra/terraform/production.tfvars | shasum -a 256 | awk '{print $1}')" \
+    "$(shasum -a 256 "$CURRENT_INPUTS_REPO/infra/terraform/production.tfvars" | awk '{print $1}')"
+
+CURRENT_STAGING_OUT="$TMP_DIR/current-staging.out"
+CURRENT_STAGING_ERR="$TMP_DIR/current-staging.err"
+set +e
+run_real_renderer "$CURRENT_INPUTS_REPO" staging "$CURRENT_RELEASE_SHA" "$CURRENT_STAGING_OUT" "$CURRENT_STAGING_ERR"
+current_staging_status=$?
+set -e
+[[ "$current_staging_status" != "0" ]] || fail "current committed staging inputs unexpectedly rendered"
+pass
+assert_zero_bytes "$CURRENT_STAGING_OUT"
+assert_exact_line "ERROR: staging requires exactly the staging signing certificate" "$CURRENT_STAGING_ERR"
+
+CURRENT_PRODUCTION_OUT="$TMP_DIR/current-production.out"
+CURRENT_PRODUCTION_ERR="$TMP_DIR/current-production.err"
+set +e
+run_real_renderer "$CURRENT_INPUTS_REPO" production "$CURRENT_RELEASE_SHA" "$CURRENT_PRODUCTION_OUT" "$CURRENT_PRODUCTION_ERR"
+current_production_status=$?
+set -e
+[[ "$current_production_status" != "0" ]] || fail "current committed production inputs unexpectedly rendered"
+pass
+assert_zero_bytes "$CURRENT_PRODUCTION_OUT"
+assert_exact_line "ERROR: production requires separately identified Android upload certificate fingerprints and origins" \
+    "$CURRENT_PRODUCTION_ERR"
+
 expect_failure() {
     local label="$1" environment="$2" release_sha="$3" fixture="$4" expected_error="$5"
     local output_file="$TMP_DIR/$label.out" error_file="$TMP_DIR/$label.err" status
@@ -512,7 +739,7 @@ expect_failure() {
     set -e
     [[ "$status" != "0" ]] || fail "$label unexpectedly succeeded"
     pass
-    assert_equals "" "$(cat "$output_file")"
+    assert_zero_bytes "$output_file"
     if ! grep -Fq -- "$expected_error" "$error_file"; then
         fail "$label expected stderr to contain '$expected_error'; got: $(cat "$error_file")"
     fi
@@ -521,6 +748,9 @@ expect_failure() {
 
 expect_failure invalid-environment preview "$RELEASE_SHA" staging-source.json "environment must be staging or production"
 expect_failure invalid-sha staging ABCDEF staging-source.json "release SHA must be 40 lowercase hexadecimal characters"
+expect_failure nonexistent-release staging 0000000000000000000000000000000000000001 staging-source.json "release SHA must resolve to a commit"
+expect_failure non-commit-release staging "$NON_COMMIT_SHA" staging-source.json "release SHA must resolve to a commit"
+expect_failure mismatched-renderer staging "$MISMATCH_SHA" staging-source.json "executed renderer does not match the release commit"
 
 FAIL_TERRAFORM_INIT="true" expect_failure \
     terraform-init-failure staging "$RELEASE_SHA" staging-source.json "Terraform backend-free initialization failed"
@@ -540,6 +770,33 @@ expect_failure http-origin staging "$RELEASE_SHA" http-origin.json "LOGDATE_PUBL
 
 jq '.android_signing_certificates.staging.apk_key_hash_origin = "android:apk-key-hash:ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8"' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/certificate-mismatch.json"
 expect_failure certificate-mismatch staging "$RELEASE_SHA" certificate-mismatch.json "Android certificate fingerprints and apk-key-hash origins must match exactly"
+
+jq '.artifact_registry_image_name = "logdate-server-staging"' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/wrong-image-name.json"
+expect_failure wrong-image-name staging "$RELEASE_SHA" wrong-image-name.json "artifact_registry_image_name must be logdate-server"
+
+jq '.domains += ["extra.logdate.app"]' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/extra-domain.json"
+expect_failure extra-domain staging "$RELEASE_SHA" extra-domain.json "environment domains must contain exactly cloud-staging.logdate.app"
+
+jq '.domains = ["other.logdate.app"]' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/wrong-domain.json"
+expect_failure wrong-domain staging "$RELEASE_SHA" wrong-domain.json "environment domains must contain exactly cloud-staging.logdate.app"
+
+jq '.domain = "cloud-staging.logdate.app"' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/equal-legacy-domain.json"
+expect_failure equal-legacy-domain staging "$RELEASE_SHA" equal-legacy-domain.json "legacy domain shim must be blank"
+
+jq '.domain = "conflict.logdate.app"' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/conflicting-legacy-domain.json"
+expect_failure conflicting-legacy-domain staging "$RELEASE_SHA" conflicting-legacy-domain.json "legacy domain shim must be blank"
+
+jq '.android_signing_certificates.staging = {"fingerprint":"DF:32:69:D4:DC:C9:C4:FE:72:FE:61:62:A0:F4:E9:EE:5F:04:14:47:DC:B3:8E:F6:A9:25:76:FC:38:90:DB:C7","apk_key_hash_origin":"android:apk-key-hash:3zJp1NzJxP5y_mFioPTp7l8EFEfcs472qSV2_DiQ28c"}' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/debug-staging-set.json"
+expect_failure debug-staging-set staging "$RELEASE_SHA" debug-staging-set.json "staging certificate set may not contain the known debug certificate"
+
+jq '.android_signing_certificates.staging = {"fingerprint":"00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00","apk_key_hash_origin":"android:apk-key-hash:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/zero-staging-set.json"
+expect_failure zero-staging-set staging "$RELEASE_SHA" zero-staging-set.json "staging certificate set may not contain placeholder certificates"
+
+jq '.android_signing_certificates.staging = {"fingerprint":"FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF","apk_key_hash_origin":"android:apk-key-hash:__________________________________________8"}' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/repeated-staging-set.json"
+expect_failure repeated-staging-set staging "$RELEASE_SHA" repeated-staging-set.json "staging certificate set may not contain placeholder certificates"
+
+jq '.android_signing_certificates.staging = {"fingerprint":"00:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F:10:11:12:13:14:15:16:17:18:19:1A:1B:1C:1D:1E:1F","apk_key_hash_origin":"android:apk-key-hash:AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"}' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/sequential-staging-set.json"
+expect_failure sequential-staging-set staging "$RELEASE_SHA" sequential-staging-set.json "staging certificate set may not contain placeholder certificates"
 
 jq '.env_vars.ANDROID_CERT_FINGERPRINTS = "00:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F:10:11:12:13:14:15:16:17:18:19:1A:1B:1C:1D:1E:1F"' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/reserved-aggregate.json"
 expect_failure reserved-aggregate staging "$RELEASE_SHA" reserved-aggregate.json "cloud_run_env must not set reserved Android aggregate keys"
@@ -655,9 +912,6 @@ expect_failure sequential-production-set production "$RELEASE_SHA" sequential-pr
 jq '.android_signing_certificates.upload = .android_signing_certificates.staging' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/unexpected-staging-role.json"
 expect_failure unexpected-staging-role staging "$RELEASE_SHA" unexpected-staging-role.json "staging requires exactly the staging signing certificate"
 
-expect_failure current-staging staging "$RELEASE_SHA" current-staging-source.json "staging requires exactly the staging signing certificate"
-expect_failure current-production production "$RELEASE_SHA" current-production-source.json "production requires separately identified Android upload certificate fingerprints and origins"
-
 while IFS= read -r data_dir; do
     [[ ! -e "$data_dir" ]] || fail "expected renderer temporary directory to be removed: $data_dir"
 done < <(sort -u "$LOG_DIR/data-dirs.log")
@@ -666,14 +920,6 @@ while IFS= read -r state_path; do
     [[ ! -e "$state_path" ]] || fail "expected renderer private state to be removed: $state_path"
 done < <(sort -u "$LOG_DIR/state-paths.log")
 pass
-assert_equals "$CHECKOUT_STATE_CHECKSUM" "$(shasum -a 256 "$CHECKOUT_STATE" | awk '{print $1}')"
-assert_equals "$STAGING_TFVARS_CHECKSUM" "$(shasum -a 256 infra/terraform/staging.tfvars | awk '{print $1}')"
-assert_equals "$PRODUCTION_TFVARS_CHECKSUM" "$(shasum -a 256 infra/terraform/production.tfvars | awk '{print $1}')"
-assert_equals "$LOCKFILE_CHECKSUM" "$(shasum -a 256 infra/terraform/.terraform.lock.hcl | awk '{print $1}')"
-assert_file_contains 'checkout-plugin-canary' "$CHECKOUT_PLUGIN_CANARY"
-assert_file_contains 'checkout-workspace-canary' "$CHECKOUT_WORKSPACE_CANARY"
-assert_file_contains 'checkout-poison' "$CHECKOUT_TFVARS_CANARY"
-assert_file_contains 'allow_unauthenticated = false' "$CHECKOUT_AUTO_TFVARS_CANARY"
 assert_file_not_contains 'backend-config' "$LOG_DIR/terraform.log"
 assert_file_not_contains 'wrong.tfvars' "$LOG_DIR/terraform.log"
 assert_file_contains 'jsonencode(' "$LOG_DIR/console-expression.log"
@@ -687,5 +933,17 @@ unique_data_dir_count="$(sort -u "$LOG_DIR/data-dirs.log" | wc -l | tr -d ' ')"
 assert_equals "$console_count" "$unique_data_dir_count"
 all_error_output="$(find "$TMP_DIR" -maxdepth 1 -name '*.err' -type f -exec cat {} +)"
 assert_not_contains "$CREDENTIAL_SENTINEL" "$all_error_output"
+
+snapshot_synthetic_sources "$SOURCE_REPO" "$SOURCE_REPO_HASHES_AFTER"
+cmp -s "$SOURCE_REPO_HASHES_BEFORE" "$SOURCE_REPO_HASHES_AFTER" || fail "renderer changed the valid synthetic source repository"
+pass
+snapshot_synthetic_sources "$CURRENT_INPUTS_REPO" "$CURRENT_REPO_HASHES_AFTER"
+cmp -s "$CURRENT_REPO_HASHES_BEFORE" "$CURRENT_REPO_HASHES_AFTER" || fail "renderer changed the current-input synthetic repository"
+pass
+
+snapshot_operator_sources "$OPERATOR_SOURCE_HASHES_AFTER"
+cmp -s "$OPERATOR_SOURCE_HASHES_BEFORE" "$OPERATOR_SOURCE_HASHES_AFTER" || fail "renderer tests changed operator Terraform sources"
+pass
+assert_equals "$STATUS_BEFORE" "$(git -C "$OPERATOR_ROOT" status --short)"
 
 print_pass_summary "Cloud Run contract renderer"
