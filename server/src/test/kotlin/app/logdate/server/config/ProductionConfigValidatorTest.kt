@@ -344,6 +344,27 @@ class ProductionConfigValidatorTest {
                     expectedMessage = "LOGDATE_DEPLOYMENT_KIND must be first_party",
                 ),
                 ValidationCase(
+                    name = "first-party expectation rejects hyphenated descriptor alias",
+                    overrides = mapOf("LOGDATE_EXPECT_FIRST_PARTY" to "true", "LOGDATE_DEPLOYMENT_KIND" to "first-party"),
+                    expectedMessage = "LOGDATE_DEPLOYMENT_KIND must be first_party",
+                ),
+                ValidationCase(
+                    name = "first-party expectation rejects concatenated descriptor alias",
+                    overrides = mapOf("LOGDATE_EXPECT_FIRST_PARTY" to "true", "LOGDATE_DEPLOYMENT_KIND" to "firstparty"),
+                    expectedMessage = "LOGDATE_DEPLOYMENT_KIND must be first_party",
+                ),
+                ValidationCase(
+                    name = "first-party deployment requires GCS instead of a filesystem path",
+                    removed = setOf("GCS_BUCKET_NAME"),
+                    overrides =
+                        mapOf(
+                            "LOGDATE_EXPECT_FIRST_PARTY" to "true",
+                            "LOGDATE_DEPLOYMENT_KIND" to "first_party",
+                            "LOGDATE_BLOB_STORAGE_DIR" to "/tmp/blobs",
+                        ),
+                    expectedMessage = "GCS_BUCKET_NAME is required when LOGDATE_EXPECT_FIRST_PARTY=true",
+                ),
+                ValidationCase(
                     name = "public origin is absent",
                     removed = setOf("LOGDATE_PUBLIC_ORIGIN"),
                     expectedMessage = "LOGDATE_PUBLIC_ORIGIN must be an https:// URL",

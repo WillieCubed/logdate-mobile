@@ -204,8 +204,11 @@ object ProductionConfigValidator {
         failures: MutableList<String>,
     ) {
         val deploymentKind = readEnv("LOGDATE_DEPLOYMENT_KIND")?.trim()?.lowercase()
-        if (deploymentKind !in setOf("first_party", "first-party", "firstparty")) {
+        if (deploymentKind != "first_party") {
             failures += "LOGDATE_DEPLOYMENT_KIND must be first_party when LOGDATE_EXPECT_FIRST_PARTY=true."
+        }
+        if (readEnv("GCS_BUCKET_NAME")?.trim().isNullOrEmpty()) {
+            failures += "GCS_BUCKET_NAME is required when LOGDATE_EXPECT_FIRST_PARTY=true."
         }
         if (readEnv("BILLING_PROVIDER")?.trim()?.lowercase().let { it.isNullOrEmpty() || it == "disabled" }) {
             failures += "BILLING_PROVIDER must not be disabled when LOGDATE_EXPECT_FIRST_PARTY=true."
