@@ -38,8 +38,11 @@ object DatabaseConfig {
         username: String? = System.getenv("DATABASE_USER") ?: System.getenv("DB_USER"),
         password: String? = System.getenv("DATABASE_PASSWORD") ?: System.getenv("DB_PASSWORD"),
         databaseUrl: String? = System.getenv("DATABASE_URL"),
+        instanceConnectionName: String? = System.getenv("INSTANCE_CONNECTION_NAME"),
+        profile: RuntimeProfile = RuntimeProfile.fromEnvironment(),
     ): DataSource {
         val urlFromEnv = databaseUrl?.trim().takeIf { !it.isNullOrEmpty() }
+        val cloudSqlInstance = instanceConnectionName?.trim().takeIf { !it.isNullOrEmpty() }
         val dataSourceConfig =
             if (urlFromEnv != null) {
                 val parsedUrl = parseDatabaseUrl(urlFromEnv)
@@ -47,11 +50,17 @@ object DatabaseConfig {
                 val resolvedUsername = resolveCredential("DATABASE_USER", username, parsedUrl?.username)
                 val resolvedPassword = resolveCredential("DATABASE_PASSWORD", password, parsedUrl?.password)
                 buildConfig(jdbcUrl, resolvedUsername, resolvedPassword)
-            } else {
+            } else if (cloudSqlInstance != null) {
+                val resolvedUsername = resolveCredential("DATABASE_USER", username, null)
+                val resolvedPassword = resolveCredential("DATABASE_PASSWORD", password, null)
+                buildCloudSqlConfig(database, resolvedUsername, resolvedPassword, cloudSqlInstance)
+            } else if (!profile.isProduction) {
                 val jdbcUrl = "jdbc:postgresql://$host:$port/$database"
                 val resolvedUsername = resolveCredential("DATABASE_USER", username, null)
                 val resolvedPassword = resolveCredential("DATABASE_PASSWORD", password, null)
                 buildConfig(jdbcUrl, resolvedUsername, resolvedPassword)
+            } else {
+                error("DATABASE_URL or INSTANCE_CONNECTION_NAME is required in production.")
             }
 
         return HikariDataSource(dataSourceConfig)
@@ -129,7 +138,22 @@ object DatabaseConfig {
             username = "logdate",
             password = "logdate",
             databaseUrl = null,
+            instanceConnectionName = null,
+            profile = RuntimeProfile.TEST,
         )
+
+    private fun buildCloudSqlConfig(
+        database: String,
+        username: String,
+        password: String,
+        instanceConnectionName: String,
+    ): HikariConfig =
+        buildConfig("jdbc:postgresql:///$database", username, password).apply {
+            addDataSourceProperty("socketFactory", "com.google.cloud.sql.postgres.SocketFactory")
+            addDataSourceProperty("cloudSqlInstance", instanceConnectionName)
+            addDataSourceProperty("ipTypes", "PUBLIC,PRIVATE")
+            addDataSourceProperty("cloudSqlRefreshStrategy", "lazy")
+        }
 
     private fun buildConfig(
         jdbcUrl: String,

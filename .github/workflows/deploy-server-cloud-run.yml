@@ -155,6 +155,7 @@ jobs:
       - name: Run database migrations
         run: |
           ./scripts/run-migrations.sh \
+            --legacy-config \
             --project-id "${PROJECT_ID}" \
             --region "${REGION}" \
             --validate-passkey-fk

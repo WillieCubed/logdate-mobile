@@ -17,8 +17,8 @@ locals {
   }
 
   cloud_sql_env = var.create_cloud_sql_instance ? {
-    CLOUD_SQL_INSTANCE_CONNECTION_NAME = google_sql_database_instance.postgres[0].connection_name
-    DB_NAME                            = google_sql_database.database[0].name
+    INSTANCE_CONNECTION_NAME = google_sql_database_instance.postgres[0].connection_name
+    DB_NAME                  = google_sql_database.database[0].name
   } : {}
 
   bucket_env = var.gcs_bucket_name != "" ? {
@@ -247,6 +247,17 @@ resource "google_secret_manager_secret_iam_member" "runtime_access" {
   secret_id = try(google_secret_manager_secret.env[each.key].secret_id, each.key)
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.runtime.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "github_migration_access" {
+  for_each = local.github_oidc_enabled && var.create_cloud_sql_instance ? toset([
+    "logdate-db-user",
+    "logdate-db-password",
+  ]) : toset([])
+
+  secret_id = try(google_secret_manager_secret.env[each.key].secret_id, each.key)
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.github_deploy[0].email}"
 }
 
 resource "google_cloud_run_v2_service" "server" {

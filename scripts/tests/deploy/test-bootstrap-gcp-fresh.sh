@@ -20,6 +20,7 @@ LOG_DIR="$TMP_DIR/logs"
 OUTPUT_FILE="$TMP_DIR/bootstrap.out"
 INTERACTIVE_LOG_DIR="$TMP_DIR/logs-interactive"
 INTERACTIVE_OUTPUT_FILE="$TMP_DIR/bootstrap-interactive.out"
+DATABASE_PASSWORD_SENTINEL="DATABASE_PASSWORD_SENTINEL_DO_NOT_LEAK"
 
 cleanup() {
     rm -rf "$TMP_DIR"
@@ -206,7 +207,19 @@ case "$1 $2" in
         fi
         if [[ "$3" == "add" ]]; then
             secret_name="$4"
-            cat >"$LOG_DIR/secret-$secret_name"
+            data_file="$(flag_value "--data-file=" "$@")"
+            [[ -n "$data_file" && -f "$data_file" ]] || exit 1
+            data_mode="$(stat -f '%Lp' "$data_file" 2>/dev/null || stat -c '%a' "$data_file")"
+            [[ "$data_mode" == "600" ]] || exit 1
+            cp "$data_file" "$LOG_DIR/secret-$secret_name"
+            printf '1' >"$LOG_DIR/secret-version-$secret_name"
+            echo "Created version [1] of the secret [$secret_name]."
+            exit 0
+        fi
+        if [[ "$3" == "describe" ]]; then
+            secret_name="$(flag_value "--secret=" "$@")"
+            [[ -f "$LOG_DIR/secret-version-$secret_name" ]] || exit 1
+            printf 'projects/123456/secrets/%s/versions/%s\n' "$secret_name" "$(cat "$LOG_DIR/secret-version-$secret_name")"
             exit 0
         fi
         ;;
@@ -337,13 +350,14 @@ WEBAUTHN_STRICT_VERIFICATION=true
 SERVER_ENCRYPTION_ENABLED=true
 SYNC_MEDIA_SIGNED_URLS=true
 SYNC_MEDIA_SIGNED_URL_TTL_HOURS=1
-CLOUD_SQL_INSTANCE_CONNECTION_NAME=logdate-bootstrap-test:us-central1:logdate-db
+INSTANCE_CONNECTION_NAME=logdate-bootstrap-test:us-central1:logdate-db
+DB_NAME=logdate
 ENVEOF
                 ;;
             'join("\n", [for k, v in var.cloud_run_secret_env : "${k}=${v.secret_id}:${try(v.version, "latest")}"])')
                 cat <<'SECRETEOF'
-DATABASE_USER=logdate-db-user:latest
-DATABASE_PASSWORD=logdate-db-password:latest
+DATABASE_USER=logdate-db-user:1
+DATABASE_PASSWORD=logdate-db-password:1
 JWT_SECRET=logdate-jwt-secret:latest
 SERVER_ENCRYPTION_KEY=logdate-server-encryption-key:latest
 SERVER_ENCRYPTION_KEY_ID=logdate-server-encryption-key-id:latest
@@ -401,12 +415,87 @@ esac
 EOF
 chmod +x "$FAKE_BIN/gh"
 
+cat >"$FAKE_BIN/openssl" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "$*" == "rand -hex 24" ]]; then
+    printf '%s\n' "${DATABASE_PASSWORD_SENTINEL:-DATABASE_PASSWORD_SENTINEL_DO_NOT_LEAK}"
+else
+    printf 'safe-non-database-secret\n'
+fi
+EOF
+chmod +x "$FAKE_BIN/openssl"
+
+cat >"$FAKE_BIN/curl" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+LOG_DIR="${TEST_LOG_DIR:?}"
+printf '%s\n' "$*" >>"$LOG_DIR/curl.log"
+if [[ "$*" == *"/health"* ]]; then
+    exit 0
+fi
+
+flag_value() {
+    local flag="$1"
+    shift
+    local next="false" arg
+    for arg in "$@"; do
+        if [[ "$next" == "true" ]]; then
+            printf '%s' "$arg"
+            return
+        fi
+        if [[ "$arg" == "$flag" ]]; then
+            next="true"
+        fi
+    done
+}
+
+url="$(flag_value --url "$@")"
+method="$(flag_value --request "$@")"
+header_arg="$(flag_value --header "$@")"
+body_arg="$(flag_value --data-binary "$@")"
+output_file="$(flag_value --output "$@")"
+header_file="${header_arg#@}"
+body_file="${body_arg#@}"
+
+if [[ "$url" == https://sqladmin.googleapis.com/sql/v1beta4/projects/*/instances/*/users* ]]; then
+    [[ -f "$header_file" && -f "$body_file" ]] || exit 1
+    header_mode="$(stat -f '%Lp' "$header_file" 2>/dev/null || stat -c '%a' "$header_file")"
+    body_mode="$(stat -f '%Lp' "$body_file" 2>/dev/null || stat -c '%a' "$body_file")"
+    [[ "$header_mode" == "600" && "$body_mode" == "600" ]] || exit 1
+    printf '%s\n%s\n%s\n' "$header_file" "$body_file" "$(dirname "$header_file")/cloud-sql-access-token" >>"$LOG_DIR/sensitive-paths"
+    grep -q '"name": "logdate"' "$body_file"
+    grep -q "${DATABASE_PASSWORD_SENTINEL:-DATABASE_PASSWORD_SENTINEL_DO_NOT_LEAK}" "$body_file"
+    printf '{}\n' >"$output_file"
+    if [[ "$method" == "PUT" && ! -f "$LOG_DIR/cloud-sql-user" ]]; then
+        printf '404'
+        exit 0
+    fi
+    if [[ "$method" == "POST" ]]; then
+        touch "$LOG_DIR/cloud-sql-user"
+        printf '201'
+        exit 0
+    fi
+    if [[ "$method" == "PUT" ]]; then
+        printf '200'
+        exit 0
+    fi
+fi
+
+echo "Unexpected curl invocation: $*" >&2
+exit 1
+EOF
+chmod +x "$FAKE_BIN/curl"
+
 set +e
 PATH="$FAKE_BIN:$PATH" ./scripts/bootstrap-gcp-fresh.sh --help >"$OUTPUT_FILE" 2>&1
 status=$?
 set -e
 
 output="$(cat "$OUTPUT_FILE")"
+if [[ "$status" != "0" ]]; then
+    echo "$output"
+fi
 assert_equals "0" "$status"
 assert_contains 'Usage:' "$output"
 assert_contains '--billing-account ID' "$output"
@@ -441,6 +530,7 @@ reset_fake_state "$LOG_DIR"
 set +e
 PATH="$FAKE_BIN:$PATH" \
 TEST_LOG_DIR="$LOG_DIR" \
+DATABASE_PASSWORD_SENTINEL="$DATABASE_PASSWORD_SENTINEL" \
 GITHUB_REPO="acme/logdate" \
 INSTANCE_NAME="$INSTANCE_PROJECT" \
 PROJECT_ID="$INSTANCE_PROJECT" \
@@ -448,11 +538,14 @@ BILLING_ACCOUNT="ABC123" \
 REGION="us-central1" \
 IMAGE_TAG="bootstrap-test" \
 USER="tester" \
-./scripts/bootstrap-gcp-fresh.sh --yes >"$OUTPUT_FILE" 2>&1
+bash -x ./scripts/bootstrap-gcp-fresh.sh --yes >"$OUTPUT_FILE" 2>&1
 status=$?
 set -e
 
 output="$(cat "$OUTPUT_FILE")"
+if [[ "$status" != "0" ]]; then
+    echo "$output"
+fi
 assert_equals "0" "$status"
 assert_contains "Bootstrap complete." "$output"
 assert_contains "Service URL:  https://logdate-server-us-central1-test.a.run.app" "$output"
@@ -460,16 +553,38 @@ assert_contains '"create_cloud_sql_instance": true' "$(cat "$INSTANCE_DIR/bootst
 assert_contains '"serviceUrl": "https://logdate-server-us-central1-test.a.run.app"' "$(cat "$INSTANCE_DIR/instance-manifest.json")"
 assert_contains '"runtimeServiceAccount": "logdate-runtime@logdate-bootstrap-test.iam.gserviceaccount.com"' "$(cat "$INSTANCE_DIR/instance-manifest.json")"
 assert_contains '"webauthn_origin": "https://logdate-server-us-central1-test.a.run.app"' "$(cat "$INSTANCE_DIR/bootstrap.tfvars.json")"
-assert_contains '"cloud_sql_user_name": "logdate"' "$(cat "$INSTANCE_DIR/bootstrap.tfvars.json")"
+assert_contains '"INSTANCE_CONNECTION_NAME": "logdate-bootstrap-test:us-central1:logdate-db"' "$(cat "$INSTANCE_DIR/bootstrap.tfvars.json")"
+assert_not_contains 'CLOUD_SQL_INSTANCE_CONNECTION_NAME' "$(cat "$INSTANCE_DIR/bootstrap.tfvars.json")"
+assert_not_contains 'cloud_sql_user_name' "$(cat "$INSTANCE_DIR/bootstrap.tfvars.json")"
+assert_contains '"version": "1"' "$(cat "$INSTANCE_DIR/bootstrap.tfvars.json")"
+assert_contains '"environment": "bootstrap"' "$(cat "$INSTANCE_DIR/deployment-contract.json")"
+assert_contains '"INSTANCE_CONNECTION_NAME": "logdate-bootstrap-test:us-central1:logdate-db"' "$(cat "$INSTANCE_DIR/deployment-contract.json")"
+assert_contains '"DATABASE_PASSWORD": { "secret_id": "logdate-db-password", "version": "1" }' "$(cat "$INSTANCE_DIR/deployment-contract.json")"
 assert_contains 'serviceusage.googleapis.com' "$(cat "$LOG_DIR/gcloud.log")"
 assert_contains 'secrets versions add logdate-jwt-secret' "$(cat "$LOG_DIR/gcloud.log")"
-assert_contains 'sql users create logdate' "$(cat "$LOG_DIR/gcloud.log")"
+assert_contains '/sql/v1beta4/projects/logdate-bootstrap-test/instances/logdate-db/users' "$(cat "$LOG_DIR/curl.log")"
+assert_contains '--request POST' "$(cat "$LOG_DIR/curl.log")"
+assert_not_contains 'sql users create' "$(cat "$LOG_DIR/gcloud.log")"
+assert_not_contains 'sql users set-password' "$(cat "$LOG_DIR/gcloud.log")"
 assert_contains 'secret GCP_WORKLOAD_IDENTITY_PROVIDER=projects/123456/locations/global/workloadIdentityPools/logdate-github-pool/providers/github-provider' "$(cat "$LOG_DIR/gh-values.log")"
 assert_contains 'variable LOGDATE_DEPLOY_SOURCE=repo_vars' "$(cat "$LOG_DIR/gh-values.log")"
 assert_contains 'variable LOGDATE_PROJECT_ID=logdate-bootstrap-test' "$(cat "$LOG_DIR/gh-values.log")"
 assert_contains 'variable LOGDATE_RUNTIME_SERVICE_ACCOUNT=logdate-runtime@logdate-bootstrap-test.iam.gserviceaccount.com' "$(cat "$LOG_DIR/gh-values.log")"
 assert_contains 'buildx build' "$(cat "$LOG_DIR/docker.log")"
 assert_contains 'run deploy logdate-server' "$(cat "$LOG_DIR/gcloud.log")"
+
+security_evidence="$(cat "$OUTPUT_FILE" "$LOG_DIR"/*.log "$INSTANCE_DIR"/*.json "$INSTANCE_DIR"/*.hcl)"
+assert_not_contains "$DATABASE_PASSWORD_SENTINEL" "$security_evidence"
+assert_not_contains 'resource "google_sql_user"' "$(cat infra/terraform/main.tf)"
+assert_contains 'roles/cloudsql.client' "$(cat infra/terraform/main.tf)"
+assert_contains 'google_secret_manager_secret_iam_member" "github_migration_access' "$(cat infra/terraform/main.tf)"
+while IFS= read -r sensitive_path; do
+    [[ ! -e "$sensitive_path" ]] || {
+        echo "FAIL: expected sensitive temporary file to be removed: $sensitive_path"
+        exit 1
+    }
+    pass_count=$((pass_count + 1))
+done <"$LOG_DIR/sensitive-paths"
 
 secret_adds_before="$(grep -c 'secrets versions add' "$LOG_DIR/gcloud.log")"
 
@@ -495,7 +610,7 @@ assert_contains "gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER --repo acme/logdat
 assert_contains "gh variable set LOGDATE_DEPLOY_SOURCE --repo acme/logdate --body 'repo_vars'" "$output"
 secret_adds_after="$(grep -c 'secrets versions add' "$LOG_DIR/gcloud.log")"
 assert_equals "$secret_adds_before" "$secret_adds_after"
-assert_contains 'sql users set-password logdate' "$(cat "$LOG_DIR/gcloud.log")"
+assert_contains '--request PUT' "$(cat "$LOG_DIR/curl.log")"
 
 reset_fake_state "$INTERACTIVE_LOG_DIR"
 set +e

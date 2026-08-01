@@ -161,12 +161,6 @@ variable "cloud_sql_database_name" {
   default     = "logdate"
 }
 
-variable "cloud_sql_user_name" {
-  type        = string
-  description = "Cloud SQL application username."
-  default     = "logdate"
-}
-
 variable "cloud_sql_database_version" {
   type        = string
   description = "Cloud SQL database engine version."

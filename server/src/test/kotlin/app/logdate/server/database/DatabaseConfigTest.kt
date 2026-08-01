@@ -163,6 +163,85 @@ class DatabaseConfigTest {
     }
 
     @Test
+    fun `Cloud SQL connection name configures the authenticated socket factory`() {
+        val source =
+            createDataSourceWithRuntimeProfile(
+                database = "logdate",
+                username = "cloud-user",
+                password = "cloud-password",
+                databaseUrl = null,
+                instanceConnectionName = "logdate-prod:us-central1:logdate-db",
+                profile = RuntimeProfile.PRODUCTION,
+            )
+
+        assertEquals("jdbc:postgresql:///logdate", source.jdbcUrl)
+        assertEquals("cloud-user", source.username)
+        assertEquals("cloud-password", source.password)
+        assertEquals("com.google.cloud.sql.postgres.SocketFactory", source.dataSourceProperties["socketFactory"])
+        assertEquals("logdate-prod:us-central1:logdate-db", source.dataSourceProperties["cloudSqlInstance"])
+        assertEquals("PUBLIC,PRIVATE", source.dataSourceProperties["ipTypes"])
+        assertEquals("lazy", source.dataSourceProperties["cloudSqlRefreshStrategy"])
+        assertEquals(5, source.maximumPoolSize)
+        assertEquals(0, source.minimumIdle)
+        source.close()
+    }
+
+    @Test
+    fun `DATABASE_URL takes precedence over Cloud SQL connector configuration`() {
+        val source =
+            createDataSourceWithRuntimeProfile(
+                database = "ignored",
+                username = null,
+                password = null,
+                databaseUrl = "postgres://neon-user:neon-password@db.example.test:5432/neon?sslmode=require",
+                instanceConnectionName = "logdate-prod:us-central1:logdate-db",
+                profile = RuntimeProfile.PRODUCTION,
+            )
+
+        assertEquals("jdbc:postgresql://db.example.test:5432/neon?sslmode=require", source.jdbcUrl)
+        assertEquals("neon-user", source.username)
+        assertEquals("neon-password", source.password)
+        assertNull(source.dataSourceProperties["socketFactory"])
+        assertNull(source.dataSourceProperties["cloudSqlInstance"])
+        source.close()
+    }
+
+    @Test
+    fun `host and port fallback is rejected in production`() {
+        val failure =
+            assertFailsWith<java.lang.reflect.InvocationTargetException> {
+                createDataSourceWithRuntimeProfile(
+                    database = "logdate",
+                    username = "local-user",
+                    password = "local-password",
+                    databaseUrl = null,
+                    instanceConnectionName = null,
+                    profile = RuntimeProfile.PRODUCTION,
+                )
+            }
+
+        assertTrue(failure.cause is IllegalStateException)
+        assertTrue(failure.cause!!.message!!.contains("DATABASE_URL or INSTANCE_CONNECTION_NAME"))
+    }
+
+    @Test
+    fun `host and port fallback remains available in development`() {
+        val source =
+            createDataSourceWithRuntimeProfile(
+                database = "logdate_dev",
+                username = "local-user",
+                password = "local-password",
+                databaseUrl = null,
+                instanceConnectionName = null,
+                profile = RuntimeProfile.DEVELOPMENT,
+            )
+
+        assertEquals("jdbc:postgresql://localhost:6543/logdate_dev", source.jdbcUrl)
+        assertNull(source.dataSourceProperties["socketFactory"])
+        source.close()
+    }
+
+    @Test
     fun `shouldRunMigrations defaults to true in development`() {
         assertTrue(DatabaseConfig.shouldRunMigrations(null, RuntimeProfile.DEVELOPMENT))
         assertTrue(DatabaseConfig.shouldRunMigrations("", RuntimeProfile.DEVELOPMENT))
@@ -292,6 +371,39 @@ class DatabaseConfigTest {
         methodName: String,
         arg: String,
     ): String = invokePrivate(methodName, arg) as String
+
+    private fun createDataSourceWithRuntimeProfile(
+        database: String,
+        username: String?,
+        password: String?,
+        databaseUrl: String?,
+        instanceConnectionName: String?,
+        profile: RuntimeProfile,
+    ): HikariDataSource {
+        val method =
+            DatabaseConfig::class.java.getDeclaredMethod(
+                "createDataSource",
+                String::class.java,
+                Int::class.javaPrimitiveType,
+                String::class.java,
+                String::class.java,
+                String::class.java,
+                String::class.java,
+                String::class.java,
+                RuntimeProfile::class.java,
+            )
+        return method.invoke(
+            DatabaseConfig,
+            "localhost",
+            6543,
+            database,
+            username,
+            password,
+            databaseUrl,
+            instanceConnectionName,
+            profile,
+        ) as HikariDataSource
+    }
 
     private fun readField(
         target: Any,

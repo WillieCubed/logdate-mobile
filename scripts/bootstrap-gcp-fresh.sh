@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -30,6 +31,9 @@ CURRENT_GCLOUD_PROJECT=""
 PROJECT_EXISTS="unknown"
 PROJECT_HAS_BILLING="unknown"
 PROJECT_BILLING_ACCOUNT=""
+SENSITIVE_WORKDIR=""
+DATABASE_USER_VERSION=""
+DATABASE_PASSWORD_VERSION=""
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -59,6 +63,13 @@ log_warn() {
 log_error() {
     printf '%b[ERROR]%b %s\n' "$RED" "$NC" "$1"
 }
+
+cleanup_sensitive_files() {
+    if [[ -n "$SENSITIVE_WORKDIR" ]]; then
+        rm -rf "$SENSITIVE_WORKDIR"
+    fi
+}
+trap cleanup_sensitive_files EXIT
 
 print_usage() {
     cat <<EOF
@@ -307,7 +318,7 @@ load_billing_accounts() {
     BILLING_ACCOUNT_IDS=()
     BILLING_ACCOUNT_NAMES=()
 
-    local accounts_output line full_id display_name account_id
+    local accounts_output full_id display_name account_id
     accounts_output="$(gcloud billing accounts list --filter='open=true' --format='value(name,displayName)' 2>/dev/null || true)"
     while IFS=$'\t' read -r full_id display_name; do
         [[ -z "$full_id" ]] && continue
@@ -550,76 +561,125 @@ generate_health_token() {
     openssl rand -hex 32 | tr -d '\n'
 }
 
-secret_latest_value() {
-    local secret_id="$1"
-    gcloud secrets versions access latest --secret "$secret_id" --project="$PROJECT_ID" 2>/dev/null || true
-}
-
-add_secret_version() {
-    local secret_id="$1" value="$2"
-    printf '%s' "$value" | gcloud secrets versions add "$secret_id" --project="$PROJECT_ID" --data-file=- >/dev/null
-}
-
-ensure_secret_value() {
-    local secret_id="$1" generator="$2"
-    local existing
-    existing="$(secret_latest_value "$secret_id")"
-    if [[ -n "$existing" ]]; then
-        printf '%s' "$existing"
+ensure_secret_file() {
+    local secret_id="$1" generator="$2" output_file="$3"
+    if gcloud secrets versions access latest \
+        --secret="$secret_id" \
+        --project="$PROJECT_ID" >"$output_file" 2>/dev/null && [[ -s "$output_file" ]]; then
+        chmod 600 "$output_file"
         return
     fi
 
-    local generated
-    generated="$("$generator")"
-    add_secret_version "$secret_id" "$generated"
-    printf '%s' "$generated"
+    "$generator" >"$output_file"
+    chmod 600 "$output_file"
+    gcloud secrets versions add "$secret_id" \
+        --project="$PROJECT_ID" \
+        --data-file="$output_file" >/dev/null
 }
 
-ensure_literal_secret_value() {
-    local secret_id="$1" literal_value="$2"
-    local existing
-    existing="$(secret_latest_value "$secret_id")"
-    if [[ -n "$existing" ]]; then
-        printf '%s' "$existing"
+ensure_literal_secret_file() {
+    local secret_id="$1" literal_value="$2" output_file="$3"
+    if gcloud secrets versions access latest \
+        --secret="$secret_id" \
+        --project="$PROJECT_ID" >"$output_file" 2>/dev/null && [[ -s "$output_file" ]]; then
+        chmod 600 "$output_file"
         return
     fi
 
-    add_secret_version "$secret_id" "$literal_value"
-    printf '%s' "$literal_value"
+    printf '%s' "$literal_value" >"$output_file"
+    chmod 600 "$output_file"
+    gcloud secrets versions add "$secret_id" \
+        --project="$PROJECT_ID" \
+        --data-file="$output_file" >/dev/null
+}
+
+secret_numeric_version() {
+    local secret_id="$1" version_name
+    version_name="$(
+        gcloud secrets versions describe latest \
+            --secret="$secret_id" \
+            --project="$PROJECT_ID" \
+            --format='value(name)'
+    )"
+    version_name="${version_name##*/}"
+    if [[ ! "$version_name" =~ ^[1-9][0-9]*$ ]]; then
+        log_error "Secret $secret_id did not resolve to an exact numeric version."
+        exit 1
+    fi
+    printf '%s' "$version_name"
 }
 
 ensure_cloud_sql_user() {
-    local existing_users
-    existing_users="$(
-        gcloud sql users list \
-            --project="$PROJECT_ID" \
-            --instance="$CLOUD_SQL_INSTANCE_NAME" \
-            --format='value(name)' 2>/dev/null || true
+    local password_file="$1"
+    local token_file="$SENSITIVE_WORKDIR/cloud-sql-access-token"
+    local header_file="$SENSITIVE_WORKDIR/cloud-sql-header"
+    local body_file="$SENSITIVE_WORKDIR/cloud-sql-user.json"
+    local response_file="$SENSITIVE_WORKDIR/cloud-sql-response.json"
+    local users_url="https://sqladmin.googleapis.com/sql/v1beta4/projects/${PROJECT_ID}/instances/${CLOUD_SQL_INSTANCE_NAME}/users"
+    local update_url="${users_url}?name=${CLOUD_SQL_USER_NAME}&host=%25"
+    local http_status
+
+    gcloud auth print-access-token >"$token_file"
+    {
+        printf 'Authorization: Bearer '
+        cat "$token_file"
+        printf '\nContent-Type: application/json\n'
+    } >"$header_file"
+    python3 - "$CLOUD_SQL_USER_NAME" "$password_file" "$body_file" <<'PY'
+import json
+import os
+import pathlib
+import sys
+
+username, password_path, output_path = sys.argv[1:]
+password = pathlib.Path(password_path).read_text()
+pathlib.Path(output_path).write_text(json.dumps({"name": username, "password": password}))
+os.chmod(output_path, 0o600)
+PY
+    chmod 600 "$token_file" "$header_file" "$body_file" "$response_file" 2>/dev/null || true
+
+    http_status="$(
+        curl --silent --show-error \
+            --request PUT \
+            --header "@$header_file" \
+            --data-binary "@$body_file" \
+            --output "$response_file" \
+            --write-out '%{http_code}' \
+            --url "$update_url"
     )"
-
-    if printf '%s\n' "$existing_users" | grep -Fxq "$CLOUD_SQL_USER_NAME"; then
-        gcloud sql users set-password "$CLOUD_SQL_USER_NAME" \
-            --project="$PROJECT_ID" \
-            --instance="$CLOUD_SQL_INSTANCE_NAME" \
-            --password="$1" >/dev/null
-        return
+    if [[ "$http_status" == "404" ]]; then
+        http_status="$(
+            curl --silent --show-error \
+                --request POST \
+                --header "@$header_file" \
+                --data-binary "@$body_file" \
+                --output "$response_file" \
+                --write-out '%{http_code}' \
+                --url "$users_url"
+        )"
     fi
-
-    gcloud sql users create "$CLOUD_SQL_USER_NAME" \
-        --project="$PROJECT_ID" \
-        --instance="$CLOUD_SQL_INSTANCE_NAME" \
-        --password="$1" >/dev/null
+    if [[ "$http_status" != "200" && "$http_status" != "201" ]]; then
+        log_error "Cloud SQL Admin API failed to provision the database user (HTTP $http_status)."
+        exit 1
+    fi
 }
 
 bootstrap_runtime_secrets() {
-    ensure_literal_secret_value "logdate-db-user" "$CLOUD_SQL_USER_NAME" >/dev/null
-    local db_pw
-    db_pw="$(ensure_secret_value "logdate-db-password" generate_password_secret)"
-    ensure_secret_value "logdate-jwt-secret" generate_base64_secret >/dev/null
-    ensure_secret_value "logdate-server-encryption-key" generate_base64_secret >/dev/null
-    ensure_literal_secret_value "logdate-server-encryption-key-id" "${SERVICE_NAME}-v1" >/dev/null
-    ensure_secret_value "logdate-health-internal-token" generate_health_token >/dev/null
-    ensure_cloud_sql_user "$db_pw"
+    SENSITIVE_WORKDIR="$(mktemp -d)"
+    chmod 700 "$SENSITIVE_WORKDIR"
+
+    local db_user_file="$SENSITIVE_WORKDIR/database-user"
+    local db_password_file="$SENSITIVE_WORKDIR/database-password"
+    ensure_literal_secret_file "logdate-db-user" "$CLOUD_SQL_USER_NAME" "$db_user_file"
+    ensure_secret_file "logdate-db-password" generate_password_secret "$db_password_file"
+    ensure_secret_file "logdate-jwt-secret" generate_base64_secret "$SENSITIVE_WORKDIR/jwt-secret"
+    ensure_secret_file "logdate-server-encryption-key" generate_base64_secret "$SENSITIVE_WORKDIR/encryption-key"
+    ensure_literal_secret_file "logdate-server-encryption-key-id" "${SERVICE_NAME}-v1" "$SENSITIVE_WORKDIR/encryption-key-id"
+    ensure_secret_file "logdate-health-internal-token" generate_health_token "$SENSITIVE_WORKDIR/health-token"
+
+    DATABASE_USER_VERSION="$(secret_numeric_version "logdate-db-user")"
+    DATABASE_PASSWORD_VERSION="$(secret_numeric_version "logdate-db-password")"
+    ensure_cloud_sql_user "$db_password_file"
 }
 
 write_backend_config() {
@@ -634,12 +694,23 @@ write_tfvars() {
     local tfvars_path="$1"
     local service_url="${2:-}"
     local service_host="${3:-}"
+    local database_user_version="${4:-}"
+    local database_password_version="${5:-}"
     local connection_name="${PROJECT_ID}:${REGION}:${CLOUD_SQL_INSTANCE_NAME}"
     local enable_github_oidc_json='false'
     local github_repo_line=""
     if [[ -n "$GITHUB_REPO" ]]; then
         enable_github_oidc_json='true'
         github_repo_line="  \"github_repo\": \"${GITHUB_REPO}\","
+    fi
+
+    local database_user_version_json=""
+    local database_password_version_json=""
+    if [[ -n "$database_user_version" ]]; then
+        database_user_version_json=", \"version\": \"${database_user_version}\""
+    fi
+    if [[ -n "$database_password_version" ]]; then
+        database_password_version_json=", \"version\": \"${database_password_version}\""
     fi
 
     local webauthn_rp_id_json='""'
@@ -672,7 +743,6 @@ ${github_repo_line}  "artifact_registry_repo": "${ARTIFACT_REGISTRY_REPO}",
   "create_cloud_sql_instance": true,
   "cloud_sql_instance_name": "${CLOUD_SQL_INSTANCE_NAME}",
   "cloud_sql_database_name": "${CLOUD_SQL_DATABASE_NAME}",
-  "cloud_sql_user_name": "${CLOUD_SQL_USER_NAME}",
   "create_secrets": true,
   "secret_ids": ["logdate-google-oidc-client-ids", "logdate-sentry-dsn"],
   "webauthn_rp_id": ${webauthn_rp_id_json},
@@ -686,11 +756,12 @@ ${github_repo_line}  "artifact_registry_repo": "${ARTIFACT_REGISTRY_REPO}",
     "SYNC_MEDIA_SIGNED_URLS": "true",
     "SYNC_MEDIA_SIGNED_URL_TTL_HOURS": "1",
     ${public_origin_env}
-    "CLOUD_SQL_INSTANCE_CONNECTION_NAME": "${connection_name}"
+    "INSTANCE_CONNECTION_NAME": "${connection_name}",
+    "DB_NAME": "${CLOUD_SQL_DATABASE_NAME}"
   },
   "cloud_run_secret_env": {
-    "DATABASE_USER": { "secret_id": "logdate-db-user" },
-    "DATABASE_PASSWORD": { "secret_id": "logdate-db-password" },
+    "DATABASE_USER": { "secret_id": "logdate-db-user"${database_user_version_json} },
+    "DATABASE_PASSWORD": { "secret_id": "logdate-db-password"${database_password_version_json} },
     "JWT_SECRET": { "secret_id": "logdate-jwt-secret" },
     "SERVER_ENCRYPTION_KEY": { "secret_id": "logdate-server-encryption-key" },
     "SERVER_ENCRYPTION_KEY_ID": { "secret_id": "logdate-server-encryption-key-id" },
@@ -698,6 +769,26 @@ ${github_repo_line}  "artifact_registry_repo": "${ARTIFACT_REGISTRY_REPO}",
   }
 }
 EOF
+}
+
+write_deployment_contract() {
+    local contract_path="$1"
+    local connection_name="${PROJECT_ID}:${REGION}:${CLOUD_SQL_INSTANCE_NAME}"
+    cat >"$contract_path" <<EOF
+{
+  "environment": "bootstrap",
+  "project_id": "${PROJECT_ID}",
+  "cloud_run_env": {
+    "INSTANCE_CONNECTION_NAME": "${connection_name}",
+    "DB_NAME": "${CLOUD_SQL_DATABASE_NAME}"
+  },
+  "cloud_run_secret_env": {
+    "DATABASE_USER": { "secret_id": "logdate-db-user", "version": "${DATABASE_USER_VERSION}" },
+    "DATABASE_PASSWORD": { "secret_id": "logdate-db-password", "version": "${DATABASE_PASSWORD_VERSION}" }
+  }
+}
+EOF
+    chmod 600 "$contract_path"
 }
 
 write_manifest() {
@@ -714,6 +805,7 @@ write_manifest() {
   "stateBucket": "${STATE_BUCKET}",
   "tfvarsPath": ".logdate/deploy/${PROJECT_ID}/bootstrap.tfvars.json",
   "backendPath": ".logdate/deploy/${PROJECT_ID}/backend.hcl",
+  "contractPath": ".logdate/deploy/${PROJECT_ID}/deployment-contract.json",
   "workloadIdentityProvider": "${workload_identity_provider}",
   "githubServiceAccount": "${github_service_account}",
   "runtimeServiceAccount": "${runtime_service_account}",
@@ -819,6 +911,8 @@ require_cmd gcloud
 require_cmd terraform
 require_cmd docker
 require_cmd openssl
+require_cmd curl
+require_cmd python3
 
 if ! gcloud auth print-access-token >/dev/null 2>&1; then
     log_error "gcloud auth is required. Run 'gcloud auth login' first."
@@ -879,6 +973,7 @@ mkdir -p "$INSTANCE_DIR"
 BACKEND_PATH="${INSTANCE_DIR}/backend.hcl"
 TFVARS_PATH="${INSTANCE_DIR}/bootstrap.tfvars.json"
 MANIFEST_PATH="${INSTANCE_DIR}/instance-manifest.json"
+CONTRACT_PATH="${INSTANCE_DIR}/deployment-contract.json"
 
 write_backend_config "$BACKEND_PATH"
 write_tfvars "$TFVARS_PATH"
@@ -889,6 +984,8 @@ terraform -chdir="$TF_DIR" apply -auto-approve -var-file="$TFVARS_PATH"
 
 log_step "Uploading runtime secrets"
 bootstrap_runtime_secrets
+write_tfvars "$TFVARS_PATH" "" "" "$DATABASE_USER_VERSION" "$DATABASE_PASSWORD_VERSION"
+write_deployment_contract "$CONTRACT_PATH"
 
 log_step "Deploying Cloud Run service"
 CONFIG_PATH="$TFVARS_PATH" \
@@ -909,7 +1006,7 @@ SERVICE_URL="$(
 )"
 SERVICE_HOST="${SERVICE_URL#https://}"
 
-write_tfvars "$TFVARS_PATH" "$SERVICE_URL" "$SERVICE_HOST"
+write_tfvars "$TFVARS_PATH" "$SERVICE_URL" "$SERVICE_HOST" "$DATABASE_USER_VERSION" "$DATABASE_PASSWORD_VERSION"
 
 gcloud run services update "$SERVICE_NAME" \
     --platform managed \

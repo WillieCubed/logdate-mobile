@@ -2,7 +2,7 @@
 
 **Authoritative reference for all environment variables used by the LogDate server.**
 
-> Last updated: 2026-03-09
+> Last updated: 2026-08-01
 
 ---
 
@@ -131,7 +131,7 @@ The server supports two sets of database environment variables for flexibility:
 - **Type**: String
 - **Default**: None
 - **Example**: `DATABASE_USER=logdate_user`
-- **Required**: Yes (if `DATABASE_URL` is set)
+- **Required**: Yes for both `DATABASE_URL` and `INSTANCE_CONNECTION_NAME` connections, unless the URL embeds it.
 
 ### `DATABASE_PASSWORD`
 - **Description**: PostgreSQL password.
@@ -142,18 +142,19 @@ The server supports two sets of database environment variables for flexibility:
 - **Security**: Store in a secret manager; never commit.
 
 ### `CLOUD_SQL_INSTANCE_CONNECTION_NAME` (removed)
-- **Status**: No longer supported. The dedicated Cloud SQL socket-factory integration was removed in favor of a single `DATABASE_URL` path. LogDate now runs on serverless Postgres (Neon) and connects over standard TLS.
-- **Migration**: Set `DATABASE_URL` to a standard `jdbc:postgresql://HOST/DB?sslmode=require` connection string (Neon, Supabase, Cloud SQL via its public IP / Auth Proxy, or any Postgres). Credentials may be embedded in the URL or supplied via `DATABASE_USER` / `DATABASE_PASSWORD`.
+- **Status**: No longer supported under this legacy name.
+- **Migration**: Use `INSTANCE_CONNECTION_NAME` for the authenticated Cloud SQL Java connector, or set `DATABASE_URL` for Neon, Supabase, self-hosted PostgreSQL, or a separately managed proxy. Credentials come from `DATABASE_USER` and `DATABASE_PASSWORD` unless they are embedded in `DATABASE_URL`.
 
 ### `INSTANCE_CONNECTION_NAME`
 - **Description**: Cloud SQL instance connection name used with `DB_NAME` as the managed connector contract.
 - **Type**: String
 - **Example**: `INSTANCE_CONNECTION_NAME=logdate-prod:us-central1:logdate`
 - **Required**: Only when `DATABASE_URL` is absent in production.
+- **Authentication**: Uses Application Default Credentials from the Cloud Run runtime service account. Service-account key files are not supported.
 
 ### Alternative Database Variables
 
-These can be used instead of `DATABASE_URL`:
+These development/test-only variables provide the local PostgreSQL fallback when neither `DATABASE_URL` nor `INSTANCE_CONNECTION_NAME` is set. Production rejects this fallback.
 
 ### `DB_HOST`
 - **Description**: PostgreSQL host address

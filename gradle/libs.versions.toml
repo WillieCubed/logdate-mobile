@@ -86,6 +86,7 @@ exposed = "1.2.0"
 postgresql = "42.7.10"
 hikariCP = "7.0.2"
 flyway = "12.4.0"
+google-cloud-sql-postgres-socket-factory = "1.29.0"
 
 # Testing Dependencies
 testcontainers = "2.0.4"
@@ -292,6 +293,7 @@ jackson-dataformat-yaml = { module = "com.fasterxml.jackson.dataformat:jackson-d
 swagger-core = { module = "io.swagger.core.v3:swagger-core", version = "2.2.34" }
 flyway-core = { group = "org.flywaydb", name = "flyway-core", version.ref = "flyway" }
 flyway-database-postgresql = { group = "org.flywaydb", name = "flyway-database-postgresql", version.ref = "flyway" }
+google-cloud-sql-postgres-socket-factory = { group = "com.google.cloud.sql", name = "postgres-socket-factory", version.ref = "google-cloud-sql-postgres-socket-factory" }
 
 # Testing Libraries
 testcontainers-testcontainers = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }

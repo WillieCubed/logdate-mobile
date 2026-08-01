@@ -1,42 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
-# Run Flyway migrations against a LogDate Cloud SQL instance via the Cloud
-# SQL Auth Proxy. Designed to be invoked from the Deploy Server workflow
-# *before* the Cloud Run revision rollout, so the new code never sees an
-# old schema. Also runnable manually (with gcloud auth + a recent
-# cloud-sql-proxy in PATH or via auto-download) for ad-hoc rescue.
-#
-# Inputs (env or flags, in order of precedence):
-#   --project-id        GCP project ID (required)
-#   --region            GCP region (required)
-#   --instance-name     Cloud SQL instance name (default: logdate-db)
-#   --database-name     Database name (default: logdate)
-#   --url-secret        Secret Manager ID for JDBC URL (default: logdate-db-url)
-#   --user-secret       Secret Manager ID for DB user (default: logdate-db-user)
-#   --password-secret   Secret Manager ID for DB password (default: logdate-db-password)
-#   --validate-passkey-fk   Run V18→V19 orphan-passkey constraint validation post-migrate.
-#                           Idempotent (re-validating an already-valid constraint is a no-op).
-#                           Recommended on first deploy after V19; harmless thereafter.
-#
-# Exit:
-#   0 — migrations applied (or already at target)
-#   non-zero — migration failed; deploy workflow should abort
+# Run Flyway migrations through a pinned Cloud SQL Auth Proxy. The deployment
+# contract is the only source of database identity and exact secret versions;
+# official callers cannot independently select a project, instance, database,
+# or credential secret.
 
-DEFAULT_CLOUD_SQL_PROXY_VERSION="v2.21.3"
-DEFAULT_FLYWAY_VERSION="12.4.0"
-DEFAULT_POSTGRES_IMAGE="postgres:16-alpine"
+readonly CLOUD_SQL_PROXY_VERSION="v2.21.3"
+readonly FLYWAY_IMAGE="flyway/flyway:12.4.0"
+readonly POSTGRES_IMAGE="postgres:16-alpine"
 
-PROJECT_ID="${PROJECT_ID:-}"
-REGION="${REGION:-}"
-INSTANCE_NAME="${INSTANCE_NAME:-logdate-db}"
-DATABASE_NAME="${DATABASE_NAME:-logdate}"
-URL_SECRET_ID="${URL_SECRET_ID:-logdate-db-url}"
-USER_SECRET_ID="${USER_SECRET_ID:-logdate-db-user}"
-PASSWORD_SECRET_ID="${PASSWORD_SECRET_ID:-logdate-db-password}"
-CLOUD_SQL_PROXY_VERSION="${CLOUD_SQL_PROXY_VERSION:-$DEFAULT_CLOUD_SQL_PROXY_VERSION}"
-FLYWAY_VERSION="${FLYWAY_VERSION:-$DEFAULT_FLYWAY_VERSION}"
-POSTGRES_IMAGE="${POSTGRES_IMAGE:-$DEFAULT_POSTGRES_IMAGE}"
+CONTRACT_FILE=""
+REQUESTED_ENVIRONMENT=""
+LEGACY_CONFIG="false"
+LEGACY_PROJECT_ID=""
+LEGACY_REGION=""
+LEGACY_INSTANCE_NAME="logdate-db"
+LEGACY_DATABASE_NAME="logdate"
+INDEPENDENT_SELECTOR_USED="false"
 PROXY_PORT="${PROXY_PORT:-15432}"
 VALIDATE_PASSKEY_FK="false"
 WORKDIR=""
@@ -46,40 +28,36 @@ log() {
     printf '%s\n' "$*"
 }
 
-usage() {
-    cat <<'EOF'
-Run Flyway migrations against a LogDate Cloud SQL instance via the Cloud SQL Auth Proxy.
-
-Inputs:
-  --project-id PROJECT_ID       GCP project ID (required)
-  --region REGION              GCP region (required)
-  --instance-name NAME          Cloud SQL instance name (default: logdate-db)
-  --database-name NAME          Database name (default: logdate)
-  --url-secret SECRET_ID        Secret Manager ID for JDBC URL (default: logdate-db-url)
-  --user-secret SECRET_ID       Secret Manager ID for DB user (default: logdate-db-user)
-  --password-secret SECRET_ID   Secret Manager ID for DB password (default: logdate-db-password)
-  --validate-passkey-fk         Validate passkeys.account_id_fkey after migrations
-  --help, -h                    Show this help
-
-Environment overrides:
-  CLOUD_SQL_PROXY_VERSION       Cloud SQL Auth Proxy version (default: v2.21.3)
-  FLYWAY_VERSION                Flyway Docker image version (default: 12.4.0)
-  POSTGRES_IMAGE                Postgres image for FK validation (default: postgres:16-alpine)
-  PROXY_PORT                    Local Cloud SQL Auth Proxy port (default: 15432)
-EOF
-}
-
 die() {
     printf 'ERROR: %s\n' "$*" >&2
     exit 1
 }
 
-require_arg_value() {
-    local flag="$1"
-    local value="${2:-}"
-    if [[ -z "$value" || "$value" == --* ]]; then
-        die "$flag requires a value."
-    fi
+usage() {
+    cat <<'EOF'
+Run Flyway migrations against the Cloud SQL database in a rendered deployment contract.
+
+Inputs:
+  --contract-file PATH          Rendered deployment contract (required)
+  --environment NAME           Expected contract environment (required)
+  --legacy-config              Temporary explicit compatibility mode for the
+                               current workflow's non-secret target selectors
+  --project-id PROJECT_ID      Legacy mode only
+  --region REGION              Legacy mode only
+  --instance-name NAME         Legacy mode only (default: logdate-db)
+  --database-name NAME         Legacy mode only (default: logdate)
+  --validate-passkey-fk        Validate passkeys.account_id_fkey after migrations
+  --help, -h                    Show this help
+
+Pinned tools:
+  Cloud SQL Auth Proxy v2.21.3
+  flyway/flyway:12.4.0
+  postgres:16-alpine
+
+The contract supplies project_id, INSTANCE_CONNECTION_NAME, DB_NAME, and exact
+numeric DATABASE_USER/DATABASE_PASSWORD Secret Manager versions. Independent
+database, instance, and secret overrides are rejected.
+EOF
 }
 
 cleanup() {
@@ -92,12 +70,62 @@ cleanup() {
     fi
 }
 
-download_with_retries() {
-    local url="$1"
-    local output="$2"
+require_arg_value() {
+    local flag="$1" value="${2:-}"
+    if [[ -z "$value" || "$value" == --* ]]; then
+        die "$flag requires a value."
+    fi
+}
 
-    log "Downloading Cloud SQL Auth Proxy ${CLOUD_SQL_PROXY_VERSION} from ${url}..."
-    if ! curl \
+reject_independent_environment_overrides() {
+    local name
+    for name in \
+        PROJECT_ID REGION INSTANCE_NAME DATABASE_NAME \
+        URL_SECRET_ID USER_SECRET_ID PASSWORD_SECRET_ID \
+        DATABASE_URL INSTANCE_CONNECTION_NAME DB_NAME \
+        DATABASE_USER DATABASE_PASSWORD; do
+        if [[ -n "${!name:-}" ]]; then
+            die "independent database overrides are not supported with --contract-file (unset $name)."
+        fi
+    done
+}
+
+validate_legacy_environment() {
+    if [[ -n "${PROJECT_ID:-}" && "$PROJECT_ID" != "$LEGACY_PROJECT_ID" ]]; then
+        die "legacy PROJECT_ID environment does not match --project-id."
+    fi
+    if [[ -n "${REGION:-}" && "$REGION" != "$LEGACY_REGION" ]]; then
+        die "legacy REGION environment does not match --region."
+    fi
+
+    local name
+    for name in \
+        INSTANCE_NAME DATABASE_NAME URL_SECRET_ID USER_SECRET_ID PASSWORD_SECRET_ID \
+        DATABASE_URL INSTANCE_CONNECTION_NAME DB_NAME DATABASE_USER DATABASE_PASSWORD; do
+        if [[ -n "${!name:-}" ]]; then
+            die "independent database overrides are not supported in --legacy-config mode (unset $name)."
+        fi
+    done
+}
+
+download_proxy() {
+    local output="$1"
+    local proxy_os="linux" proxy_arch="amd64"
+
+    case "$(uname -s)" in
+        Darwin) proxy_os="darwin" ;;
+        Linux) proxy_os="linux" ;;
+        *) die "Unsupported OS for Cloud SQL Auth Proxy: $(uname -s)" ;;
+    esac
+    case "$(uname -m)" in
+        arm64|aarch64) proxy_arch="arm64" ;;
+        x86_64) proxy_arch="amd64" ;;
+        *) die "Unsupported architecture for Cloud SQL Auth Proxy: $(uname -m)" ;;
+    esac
+
+    local url="https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/${CLOUD_SQL_PROXY_VERSION}/cloud-sql-proxy.${proxy_os}.${proxy_arch}"
+    log "Downloading Cloud SQL Auth Proxy ${CLOUD_SQL_PROXY_VERSION}..."
+    curl \
         --fail \
         --location \
         --show-error \
@@ -108,62 +136,102 @@ download_with_retries() {
         --connect-timeout 10 \
         --max-time 120 \
         "$url" \
-        -o "$output"; then
-        die "Failed to download Cloud SQL Auth Proxy ${CLOUD_SQL_PROXY_VERSION}. Verify CLOUD_SQL_PROXY_VERSION and URL: ${url}"
-    fi
+        --output "$output"
+    chmod 700 "$output"
 }
 
-secret_value_or_empty() {
-    local secret_id="$1"
-    local value
+write_flyway_env_file() {
+    local user_file="$1" password_file="$2" output_file="$3" jdbc_url="$4"
+    python3 - "$user_file" "$password_file" "$output_file" "$jdbc_url" <<'PY'
+import os
+import pathlib
+import sys
 
-    if value="$(gcloud secrets versions access latest --secret "$secret_id" --project "$PROJECT_ID" 2>/dev/null)"; then
-        printf '%s' "$value"
-    fi
+user_path, password_path, output_path, jdbc_url = sys.argv[1:]
+user = pathlib.Path(user_path).read_text()
+password = pathlib.Path(password_path).read_text()
+if not user or not password or any(character in user + password for character in "\r\n"):
+    raise SystemExit("database secrets must be non-empty single-line values")
+pathlib.Path(output_path).write_text(
+    f"FLYWAY_URL={jdbc_url}\n"
+    f"FLYWAY_USER={user}\n"
+    f"FLYWAY_PASSWORD={password}\n"
+    "FLYWAY_CONNECT_RETRIES=10\n"
+)
+os.chmod(output_path, 0o600)
+PY
 }
 
-psql_url_from_jdbc_url() {
-    local jdbc_url="$1"
-    printf '%s\n' "${jdbc_url#jdbc:}" |
-        sed -E \
-            -e 's/([?&])channelBinding=[^&]*&/\1/' \
-            -e 's/([?&])channelBinding=[^&]*$//' \
-            -e 's/\?&/?/' \
-            -e 's/[?&]$//'
-}
+write_psql_env_file() {
+    local user_file="$1" password_file="$2" output_file="$3" database_name="$4"
+    python3 - "$user_file" "$password_file" "$output_file" "$database_name" "$PROXY_PORT" <<'PY'
+import os
+import pathlib
+import sys
 
-proxy_download_url() {
-    local proxy_os="linux"
-    local proxy_arch="amd64"
-
-    case "$(uname -s)" in
-        Darwin) proxy_os="darwin" ;;
-        Linux) proxy_os="linux" ;;
-        *) die "Unsupported OS for proxy auto-download: $(uname -s)" ;;
-    esac
-
-    case "$(uname -m)" in
-        arm64|aarch64) proxy_arch="arm64" ;;
-        x86_64) proxy_arch="amd64" ;;
-        *) die "Unsupported architecture for proxy auto-download: $(uname -m)" ;;
-    esac
-
-    printf 'https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/%s/cloud-sql-proxy.%s.%s\n' \
-        "$CLOUD_SQL_PROXY_VERSION" \
-        "$proxy_os" \
-        "$proxy_arch"
+user_path, password_path, output_path, database_name, port = sys.argv[1:]
+user = pathlib.Path(user_path).read_text()
+password = pathlib.Path(password_path).read_text()
+if not user or not password or any(character in user + password for character in "\r\n"):
+    raise SystemExit("database secrets must be non-empty single-line values")
+pathlib.Path(output_path).write_text(
+    "PGHOST=127.0.0.1\n"
+    f"PGPORT={port}\n"
+    f"PGDATABASE={database_name}\n"
+    f"PGUSER={user}\n"
+    f"PGPASSWORD={password}\n"
+)
+os.chmod(output_path, 0o600)
+PY
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --project-id) require_arg_value "$1" "${2:-}"; PROJECT_ID="$2"; shift 2 ;;
-        --region) require_arg_value "$1" "${2:-}"; REGION="$2"; shift 2 ;;
-        --instance-name) require_arg_value "$1" "${2:-}"; INSTANCE_NAME="$2"; shift 2 ;;
-        --database-name) require_arg_value "$1" "${2:-}"; DATABASE_NAME="$2"; shift 2 ;;
-        --url-secret) require_arg_value "$1" "${2:-}"; URL_SECRET_ID="$2"; shift 2 ;;
-        --user-secret) require_arg_value "$1" "${2:-}"; USER_SECRET_ID="$2"; shift 2 ;;
-        --password-secret) require_arg_value "$1" "${2:-}"; PASSWORD_SECRET_ID="$2"; shift 2 ;;
-        --validate-passkey-fk) VALIDATE_PASSKEY_FK="true"; shift ;;
+        --contract-file)
+            require_arg_value "$1" "${2:-}"
+            CONTRACT_FILE="$2"
+            shift 2
+            ;;
+        --legacy-config)
+            LEGACY_CONFIG="true"
+            shift
+            ;;
+        --environment)
+            require_arg_value "$1" "${2:-}"
+            REQUESTED_ENVIRONMENT="$2"
+            shift 2
+            ;;
+        --validate-passkey-fk)
+            VALIDATE_PASSKEY_FK="true"
+            shift
+            ;;
+        --project-id)
+            require_arg_value "$1" "${2:-}"
+            LEGACY_PROJECT_ID="$2"
+            INDEPENDENT_SELECTOR_USED="true"
+            shift 2
+            ;;
+        --region)
+            require_arg_value "$1" "${2:-}"
+            LEGACY_REGION="$2"
+            INDEPENDENT_SELECTOR_USED="true"
+            shift 2
+            ;;
+        --instance-name)
+            require_arg_value "$1" "${2:-}"
+            LEGACY_INSTANCE_NAME="$2"
+            INDEPENDENT_SELECTOR_USED="true"
+            shift 2
+            ;;
+        --database-name)
+            require_arg_value "$1" "${2:-}"
+            LEGACY_DATABASE_NAME="$2"
+            INDEPENDENT_SELECTOR_USED="true"
+            shift 2
+            ;;
+        --url-secret|--user-secret|--password-secret)
+            die "independent secret selectors are not supported ($1)."
+            ;;
         --help|-h)
             usage
             exit 0
@@ -174,136 +242,180 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ -z "$PROJECT_ID" || -z "$REGION" ]]; then
-    die "--project-id and --region are required."
+if [[ "$LEGACY_CONFIG" == "true" ]]; then
+    [[ -z "$CONTRACT_FILE" ]] || die "--legacy-config cannot be combined with --contract-file."
+    [[ -z "$REQUESTED_ENVIRONMENT" ]] || die "--legacy-config cannot be combined with --environment."
+    [[ -n "$LEGACY_PROJECT_ID" && -n "$LEGACY_REGION" ]] || die "--legacy-config requires --project-id and --region."
+    validate_legacy_environment
+else
+    [[ -n "$CONTRACT_FILE" ]] || die "--contract-file is required."
+    [[ -n "$REQUESTED_ENVIRONMENT" ]] || die "--environment is required."
+    [[ -f "$CONTRACT_FILE" ]] || die "contract file not found: $CONTRACT_FILE"
+    if [[ "$INDEPENDENT_SELECTOR_USED" == "true" ]]; then
+        die "independent database overrides are not supported with --contract-file."
+    fi
+    reject_independent_environment_overrides
 fi
 
 if ! [[ "$PROXY_PORT" =~ ^[0-9]+$ ]] || (( PROXY_PORT < 1 || PROXY_PORT > 65535 )); then
     die "PROXY_PORT must be an integer from 1 to 65535."
 fi
 
-for cmd in curl docker gcloud; do
-    if ! command -v "$cmd" >/dev/null 2>&1; then
-        die "Missing required command: $cmd"
-    fi
+for cmd in curl docker gcloud python3; do
+    command -v "$cmd" >/dev/null 2>&1 || die "Missing required command: $cmd"
 done
 
 if ! gcloud auth print-access-token >/dev/null 2>&1; then
-    die "gcloud auth required (run 'gcloud auth login' or rely on workflow auth)."
+    die "gcloud auth required (use workflow identity or Application Default Credentials)."
 fi
-
-INSTANCE_CONNECTION_NAME="${PROJECT_ID}:${REGION}:${INSTANCE_NAME}"
-log "Migration target: ${INSTANCE_CONNECTION_NAME} → ${DATABASE_NAME}"
 
 WORKDIR="$(mktemp -d)"
-trap 'cleanup' EXIT
+chmod 700 "$WORKDIR"
+trap cleanup EXIT
 
-# Fetch DB user/password from Secret Manager. Production validator forbids
-# embedded credentials in DATABASE_URL when using socket connections, so we
-# read user + password from their dedicated secrets.
-DB_URL="$(secret_value_or_empty "$URL_SECRET_ID")"
-DB_USER="$(gcloud secrets versions access latest --secret "$USER_SECRET_ID" --project "$PROJECT_ID")"
-DB_PASSWORD=$(gcloud secrets versions access latest --secret "$PASSWORD_SECRET_ID" --project "$PROJECT_ID")
-
-if [[ -z "$DB_USER" || -z "$DB_PASSWORD" ]]; then
-    die "Empty DB user or password from Secret Manager; verify secrets exist and the deploy identity has secretmanager.secretAccessor."
-fi
-
-if [[ -n "$DB_URL" ]]; then
-    log "Using JDBC URL from Secret Manager secret ${URL_SECRET_ID}."
+if [[ "$LEGACY_CONFIG" == "true" ]]; then
+    PROJECT_ID="$LEGACY_PROJECT_ID"
+    INSTANCE_CONNECTION_NAME="${LEGACY_PROJECT_ID}:${LEGACY_REGION}:${LEGACY_INSTANCE_NAME}"
+    DATABASE_NAME="$LEGACY_DATABASE_NAME"
+    USER_SECRET_ID="logdate-db-user"
+    USER_SECRET_VERSION="latest"
+    PASSWORD_SECRET_ID="logdate-db-password"
+    PASSWORD_SECRET_VERSION="latest"
+    log "TEMPORARY COMPATIBILITY MODE: --legacy-config; Task 6 must remove this path."
 else
-    log "Secret ${URL_SECRET_ID} is empty or unavailable; falling back to Cloud SQL Auth Proxy."
+    PARSED_CONTRACT="$WORKDIR/parsed-contract"
+    python3 - "$CONTRACT_FILE" >"$PARSED_CONTRACT" <<'PY'
+import json
+import pathlib
+import re
+import sys
 
-    # Download cloud-sql-proxy v2 if not present. Pinned version so reproducible
-    # in CI; the proxy is small (~20 MB) and tolerates GitHub-hosted runner refreshes.
-    PROXY_BIN="${WORKDIR}/cloud-sql-proxy"
-    if ! command -v cloud-sql-proxy >/dev/null 2>&1; then
-        URL="$(proxy_download_url)"
-        download_with_retries "$URL" "$PROXY_BIN"
-        chmod +x "$PROXY_BIN"
-    else
-        PROXY_BIN="cloud-sql-proxy"
-        log "Using Cloud SQL Auth Proxy from PATH: $(command -v cloud-sql-proxy)"
+contract = json.loads(pathlib.Path(sys.argv[1]).read_text())
+
+def require_string(value, label):
+    if not isinstance(value, str) or not value or any(character in value for character in "\r\n\t"):
+        raise SystemExit(f"{label} must be a non-empty single-line string")
+    return value
+
+environment = require_string(contract.get("environment"), "contract environment")
+project_id = require_string(contract.get("project_id"), "contract project_id")
+plain_env = contract.get("cloud_run_env") or {}
+secret_env = contract.get("cloud_run_secret_env") or {}
+connection_name = require_string(plain_env.get("INSTANCE_CONNECTION_NAME"), "INSTANCE_CONNECTION_NAME")
+database_name = require_string(plain_env.get("DB_NAME"), "DB_NAME")
+
+parts = connection_name.split(":")
+if len(parts) != 3 or parts[0] != project_id or not all(parts):
+    raise SystemExit("INSTANCE_CONNECTION_NAME must be project:region:instance and match project_id")
+
+def secret_mapping(name):
+    mapping = secret_env.get(name) or {}
+    secret_id = require_string(mapping.get("secret_id"), f"{name} secret ID")
+    version = mapping.get("version")
+    if not isinstance(version, str) or not re.fullmatch(r"[1-9][0-9]*", version):
+        raise SystemExit(f"{name} secret version must be an exact numeric version")
+    return secret_id, version
+
+user_secret_id, user_secret_version = secret_mapping("DATABASE_USER")
+password_secret_id, password_secret_version = secret_mapping("DATABASE_PASSWORD")
+for value in (
+    environment,
+    project_id,
+    connection_name,
+    database_name,
+    user_secret_id,
+    user_secret_version,
+    password_secret_id,
+    password_secret_version,
+):
+    print(value)
+PY
+    chmod 600 "$PARSED_CONTRACT"
+
+    CONTRACT_ENVIRONMENT="$(sed -n '1p' "$PARSED_CONTRACT")"
+    PROJECT_ID="$(sed -n '2p' "$PARSED_CONTRACT")"
+    INSTANCE_CONNECTION_NAME="$(sed -n '3p' "$PARSED_CONTRACT")"
+    DATABASE_NAME="$(sed -n '4p' "$PARSED_CONTRACT")"
+    USER_SECRET_ID="$(sed -n '5p' "$PARSED_CONTRACT")"
+    USER_SECRET_VERSION="$(sed -n '6p' "$PARSED_CONTRACT")"
+    PASSWORD_SECRET_ID="$(sed -n '7p' "$PARSED_CONTRACT")"
+    PASSWORD_SECRET_VERSION="$(sed -n '8p' "$PARSED_CONTRACT")"
+
+    if [[ "$CONTRACT_ENVIRONMENT" != "$REQUESTED_ENVIRONMENT" ]]; then
+        die "contract environment '$CONTRACT_ENVIRONMENT' does not match requested environment '$REQUESTED_ENVIRONMENT'."
     fi
-
-    # Pick a free local port. cloud-sql-proxy v2 binds to 127.0.0.1 by default
-    # and rotates port automatically only if requested; fix one explicitly so the
-    # Flyway invocation below uses it deterministically.
-    log "Starting Cloud SQL Auth Proxy on 127.0.0.1:${PROXY_PORT}..."
-    "$PROXY_BIN" \
-        --address 127.0.0.1 \
-        --port "$PROXY_PORT" \
-        "$INSTANCE_CONNECTION_NAME" \
-        >"${WORKDIR}/proxy.log" 2>&1 &
-    PROXY_PID=$!
-
-    # Wait for proxy to accept connections (typically <2s).
-    for _ in $(seq 1 30); do
-        if (echo > /dev/tcp/127.0.0.1/"${PROXY_PORT}") 2>/dev/null; then
-            break
-        fi
-        if ! kill -0 "$PROXY_PID" 2>/dev/null; then
-            echo "Cloud SQL Auth Proxy exited before accepting connections. Tail of proxy log:" >&2
-            tail -n 40 "${WORKDIR}/proxy.log" >&2 || true
-            exit 1
-        fi
-        sleep 1
-    done
-    if ! (echo > /dev/tcp/127.0.0.1/"${PROXY_PORT}") 2>/dev/null; then
-        echo "Cloud SQL Auth Proxy failed to start. Tail of proxy log:" >&2
-        tail -n 40 "${WORKDIR}/proxy.log" >&2 || true
-        exit 1
-    fi
-    log "Proxy ready."
-
-    DB_URL="jdbc:postgresql://127.0.0.1:${PROXY_PORT}/${DATABASE_NAME}"
 fi
 
-# Resolve the migrations directory. The script lives at scripts/, so the
-# repo root is one level up; migrations are under server/src/main/resources/db/migration.
+log "Migration target: ${INSTANCE_CONNECTION_NAME} → ${DATABASE_NAME}"
+
+DB_USER_FILE="$WORKDIR/database-user"
+DB_PASSWORD_FILE="$WORKDIR/database-password"
+gcloud secrets versions access "$USER_SECRET_VERSION" \
+    --secret="$USER_SECRET_ID" \
+    --project="$PROJECT_ID" >"$DB_USER_FILE"
+gcloud secrets versions access "$PASSWORD_SECRET_VERSION" \
+    --secret="$PASSWORD_SECRET_ID" \
+    --project="$PROJECT_ID" >"$DB_PASSWORD_FILE"
+chmod 600 "$DB_USER_FILE" "$DB_PASSWORD_FILE"
+[[ -s "$DB_USER_FILE" && -s "$DB_PASSWORD_FILE" ]] || die "database credential secrets must not be empty."
+
+PROXY_BIN="$WORKDIR/cloud-sql-proxy"
+download_proxy "$PROXY_BIN"
+log "Starting Cloud SQL Auth Proxy on 127.0.0.1:${PROXY_PORT}..."
+"$PROXY_BIN" \
+    --address 127.0.0.1 \
+    --port "$PROXY_PORT" \
+    "$INSTANCE_CONNECTION_NAME" >"$WORKDIR/proxy.log" 2>&1 &
+PROXY_PID=$!
+
+for _ in $(seq 1 30); do
+    if (echo >"/dev/tcp/127.0.0.1/${PROXY_PORT}") 2>/dev/null; then
+        break
+    fi
+    if ! kill -0 "$PROXY_PID" 2>/dev/null; then
+        tail -n 40 "$WORKDIR/proxy.log" >&2 || true
+        die "Cloud SQL Auth Proxy exited before accepting connections."
+    fi
+    sleep 1
+done
+if ! (echo >"/dev/tcp/127.0.0.1/${PROXY_PORT}") 2>/dev/null; then
+    tail -n 40 "$WORKDIR/proxy.log" >&2 || true
+    die "Cloud SQL Auth Proxy failed to become ready."
+fi
+log "Proxy ready."
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-MIGRATIONS_DIR="${REPO_ROOT}/server/src/main/resources/db/migration"
+MIGRATIONS_DIR="$REPO_ROOT/server/src/main/resources/db/migration"
+[[ -d "$MIGRATIONS_DIR" ]] || die "Migrations directory not found: $MIGRATIONS_DIR"
 
-if [[ ! -d "$MIGRATIONS_DIR" ]]; then
-    die "Migrations directory not found: $MIGRATIONS_DIR"
-fi
-
-# Run Flyway via Docker. --network host so the container can reach 127.0.0.1
-# where the proxy is listening.
-FLYWAY_IMAGE="flyway/flyway:${FLYWAY_VERSION}"
+FLYWAY_ENV_FILE="$WORKDIR/flyway.env"
+JDBC_URL="jdbc:postgresql://127.0.0.1:${PROXY_PORT}/${DATABASE_NAME}"
+write_flyway_env_file "$DB_USER_FILE" "$DB_PASSWORD_FILE" "$FLYWAY_ENV_FILE" "$JDBC_URL"
 
 log "Running Flyway migrate (image: ${FLYWAY_IMAGE})..."
 docker run --rm \
     --network host \
-    -v "${MIGRATIONS_DIR}:/flyway/sql:ro" \
-    -e "FLYWAY_URL=${DB_URL}" \
-    -e "FLYWAY_USER=${DB_USER}" \
-    -e "FLYWAY_PASSWORD=${DB_PASSWORD}" \
-    -e "FLYWAY_CONNECT_RETRIES=10" \
+    --env-file "$FLYWAY_ENV_FILE" \
+    --volume "${MIGRATIONS_DIR}:/flyway/sql:ro" \
     "$FLYWAY_IMAGE" \
     -baselineOnMigrate=false \
     -outOfOrder=false \
     info migrate info
-
 log "Flyway migrate complete."
 
-# V18 dropped the passkeys → accounts FK to repair an orphan-window bug.
-# V19 restores it as NOT VALID for instant rollout — existing rows aren't
-# scanned. To finalize the constraint, run VALIDATE CONSTRAINT once after
-# V19 is applied. Idempotent: validating an already-valid constraint is a no-op.
 if [[ "$VALIDATE_PASSKEY_FK" == "true" ]]; then
+    PSQL_ENV_FILE="$WORKDIR/psql.env"
+    write_psql_env_file "$DB_USER_FILE" "$DB_PASSWORD_FILE" "$PSQL_ENV_FILE" "$DATABASE_NAME"
     log "Validating passkeys.account_id_fkey..."
-    PSQL_URL="$(psql_url_from_jdbc_url "$DB_URL")"
     docker run --rm \
         --network host \
-        -e "PGPASSWORD=${DB_PASSWORD}" \
-        -e "PSQL_URL=${PSQL_URL}" \
+        --env-file "$PSQL_ENV_FILE" \
         "$POSTGRES_IMAGE" \
         psql \
-        "${PSQL_URL}" \
-        --username "${DB_USER}" \
-        --no-psqlrc --no-align --tuples-only \
+        --no-psqlrc \
+        --no-align \
+        --tuples-only \
         --command "ALTER TABLE passkeys VALIDATE CONSTRAINT passkeys_account_id_fkey;"
     log "Passkey FK validated."
 fi
