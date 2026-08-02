@@ -368,11 +368,16 @@ def signup(
     display_name: str,
 ) -> dict:
     print(f"\n=== SIGNUP {username} ===")
+    requested_owner_id = str(uuid.uuid4())
     r = request_json(
         session,
         "POST",
         f"{base_url}/api/v1/auth/signup/passkey/begin",
-        payload={"username": username, "displayName": display_name},
+        payload={
+            "username": username,
+            "displayName": display_name,
+            "requestedOwnerId": requested_owner_id,
+        },
     )
     print(f"begin -> {r.status_code}")
     if r.status_code != 200:
