@@ -362,7 +362,8 @@ if [[ "${CI:-false}" == "true" ]]; then
     [[ "$ENVIRONMENT" == "staging" ]] || die "CI contract template is only available for staging."
     git -C "$REPO_ROOT" show "$RELEASE_SHA:infra/terraform/staging-contract-template.json" 2>/dev/null |
         jq --arg release_sha "$RELEASE_SHA" \
-            '(.release_sha, .env_vars.RELEASE_VERSION, .image) |= gsub("__RELEASE_SHA__"; $release_sha)' \
+            -c '(.release_sha, .env_vars.RELEASE_VERSION, .image) |= gsub("__RELEASE_SHA__"; $release_sha)' |
+        jq -R . \
             >"$RAW_CONSOLE_OUTPUT" || die "CI staging contract template could not be rendered."
 else
     if ! printf '%s\n' "$TERRAFORM_EXPRESSION" | tr '\n' ' ' |
