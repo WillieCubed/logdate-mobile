@@ -196,7 +196,6 @@ class DatabaseSyncMetadataService(
 
         val legacyCursor = dao.getLegacyCursor(serverOrigin, entityType.name) ?: return
         dao.upsertCursor(legacyCursor.copy(ownerId = ownerId))
-        dao.deleteLegacyCursor(legacyCursor.serverOrigin, entityType.name)
     }
 
     private suspend fun promoteLegacyPendingIfNeeded(
@@ -216,6 +215,5 @@ class DatabaseSyncMetadataService(
         legacyPending.forEach { pending ->
             dao.insertPending(pending.copy(ownerId = ownerId))
         }
-        dao.deleteLegacyPendingByType(serverOrigin, entityType.name)
     }
 }

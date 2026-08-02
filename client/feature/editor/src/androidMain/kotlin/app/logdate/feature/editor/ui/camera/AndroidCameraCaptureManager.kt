@@ -1,11 +1,9 @@
 package app.logdate.feature.editor.ui.camera
 
 import android.Manifest
-import android.content.ContentValues
 import android.content.Context
 import android.hardware.camera2.CameraCharacteristics
 import android.os.Build
-import android.provider.MediaStore
 import android.view.Surface
 import androidx.annotation.RequiresPermission
 import androidx.camera.camera2.interop.Camera2CameraInfo
@@ -21,7 +19,7 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.lifecycle.awaitInstance
 import androidx.camera.video.FallbackStrategy
-import androidx.camera.video.MediaStoreOutputOptions
+import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
 import androidx.camera.video.Recorder
@@ -32,19 +30,23 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
+import app.logdate.client.media.MediaManager
 import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.media.device.MediaDeviceUiState
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -57,6 +59,7 @@ import kotlin.coroutines.resume
  */
 class AndroidCameraCaptureManager(
     private val context: Context,
+    private val mediaManager: MediaManager,
 ) : CameraCaptureManager {
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences(CAMERA_ROUTE_PREFS_NAME, Context.MODE_PRIVATE)
@@ -237,45 +240,42 @@ class AndroidCameraCaptureManager(
 
             val timeStamp = timestampFormat.format(Date())
             val fileName = "LOGDATE_$timeStamp.jpg"
-
-            val contentValues =
-                ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                    put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/LogDate")
-                    }
-                }
-
-            val outputOptions =
-                ImageCapture.OutputFileOptions
-                    .Builder(
-                        context.contentResolver,
-                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                        contentValues,
-                    ).build()
+            val captureFile = File(context.cacheDir, "$fileName.${kotlin.uuid.Uuid.random()}.tmp")
+            val outputOptions = ImageCapture.OutputFileOptions.Builder(captureFile).build()
 
             return@withContext suspendCancellableCoroutine { continuation ->
+                continuation.invokeOnCancellation { captureFile.delete() }
                 capture.takePicture(
                     outputOptions,
                     mainExecutor,
                     object : ImageCapture.OnImageSavedCallback {
                         override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                            val uri = output.savedUri?.toString()
-
-                            _state.update {
-                                it.copy(
-                                    lastCapturedUri = uri,
-                                    error = null,
-                                )
+                            CoroutineScope(Dispatchers.IO).launch {
+                                val uri =
+                                    runCatching {
+                                        mediaManager.saveMediaFromFile(captureFile.absolutePath, fileName, "image/jpeg")
+                                    }.getOrElse { error ->
+                                        Napier.e("Photo persistence failed", error)
+                                        null
+                                    }
+                                captureFile.delete()
+                                withContext(Dispatchers.Main.immediate) {
+                                    _state.update {
+                                        it.copy(
+                                            lastCapturedUri = uri,
+                                            error = if (uri == null) CameraCaptureError.CaptureFailed else null,
+                                        )
+                                    }
+                                    if (continuation.isActive) continuation.resume(uri)
+                                }
                             }
-                            continuation.resume(uri)
                         }
 
                         override fun onError(exception: ImageCaptureException) {
                             Napier.e("Photo capture failed", exception)
+                            captureFile.delete()
                             _state.update { it.copy(error = CameraCaptureError.CaptureFailed) }
-                            continuation.resume(null)
+                            if (continuation.isActive) continuation.resume(null)
                         }
                     },
                 )
@@ -298,21 +298,8 @@ class AndroidCameraCaptureManager(
 
         val timeStamp = timestampFormat.format(Date())
         val fileName = "LOGDATE_$timeStamp.mp4"
-
-        val contentValues =
-            ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
-                put(MediaStore.MediaColumns.RELATIVE_PATH, "Movies/LogDate")
-            }
-
-        val outputOptions =
-            MediaStoreOutputOptions
-                .Builder(
-                    context.contentResolver,
-                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                ).setContentValues(contentValues)
-                .build()
+        val captureFile = File(context.cacheDir, "$fileName.${kotlin.uuid.Uuid.random()}.tmp")
+        val outputOptions = FileOutputOptions.Builder(captureFile).build()
 
         val deferred = CompletableDeferred<String?>()
         recordingDeferred = deferred
@@ -341,23 +328,33 @@ class AndroidCameraCaptureManager(
                             }
 
                             is VideoRecordEvent.Finalize -> {
-                                val uri =
-                                    if (!event.hasError()) {
-                                        event.outputResults.outputUri.toString()
-                                    } else {
-                                        Napier.e("Video recording failed with error: ${event.error}")
-                                        null
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    val uri =
+                                        if (!event.hasError()) {
+                                            runCatching {
+                                                mediaManager.saveMediaFromFile(captureFile.absolutePath, fileName, "video/mp4")
+                                            }.getOrElse { error ->
+                                                Napier.e("Video persistence failed", error)
+                                                null
+                                            }
+                                        } else {
+                                            Napier.e("Video recording failed with error: ${event.error}")
+                                            null
+                                        }
+                                    captureFile.delete()
+                                    withContext(Dispatchers.Main.immediate) {
+                                        _state.update {
+                                            it.copy(
+                                                isRecording = false,
+                                                lastCapturedUri = uri,
+                                                error = if (uri == null) CameraCaptureError.RecordingFailed else null,
+                                            )
+                                        }
+                                        currentRecording = null
+                                        recordingDeferred?.complete(uri)
+                                        recordingDeferred = null
                                     }
-                                _state.update {
-                                    it.copy(
-                                        isRecording = false,
-                                        lastCapturedUri = uri,
-                                        error = if (event.hasError()) CameraCaptureError.RecordingFailed else null,
-                                    )
                                 }
-                                currentRecording = null
-                                recordingDeferred?.complete(uri)
-                                recordingDeferred = null
                             }
                         }
                     }

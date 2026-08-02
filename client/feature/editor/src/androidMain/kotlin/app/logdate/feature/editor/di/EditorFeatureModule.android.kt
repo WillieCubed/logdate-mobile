@@ -1,5 +1,6 @@
 package app.logdate.feature.editor.di
 
+import app.logdate.client.media.MediaManager
 import app.logdate.feature.editor.audio.extraction.AmplitudeExtractor
 import app.logdate.feature.editor.audio.extraction.AndroidAmplitudeExtractor
 import app.logdate.feature.editor.ui.camera.AndroidCameraCaptureManager
@@ -17,7 +18,7 @@ actual val platformEditorModule: Module =
         // Provide Android implementation of CameraCaptureManager.
         // Factory-scoped so each CameraViewModel gets a fresh instance with clean lifecycle state.
         factory<CameraCaptureManager> {
-            AndroidCameraCaptureManager(androidContext())
+            AndroidCameraCaptureManager(androidContext(), get<MediaManager>())
         }
 
         // Audio waveform processing dependencies
