@@ -1,0 +1,63 @@
+{
+  "android_signing": {
+    "certificates": {
+      "staging": {
+        "apk_key_hash_origin": "android:apk-key-hash:22Z8pZmAkSPi8YuGmEKgIxtS1YuUopV2B7mhDR3sJog",
+        "fingerprint": "DB:66:7C:A5:99:80:91:23:E2:F1:8B:86:98:42:A0:23:1B:52:D5:8B:94:A2:95:76:07:B9:A1:0D:1D:EC:26:88"
+      }
+    },
+    "expected_build_signer_fingerprint": "DB:66:7C:A5:99:80:91:23:E2:F1:8B:86:98:42:A0:23:1B:52:D5:8B:94:A2:95:76:07:B9:A1:0D:1D:EC:26:88",
+    "expected_build_signer_origin": "android:apk-key-hash:22Z8pZmAkSPi8YuGmEKgIxtS1YuUopV2B7mhDR3sJog",
+    "expected_build_signer_role": "staging"
+  },
+  "canonical_origin": "https://cloud-staging.logdate.app",
+  "env_vars": {
+    "ANDROID_CERT_FINGERPRINTS": "DB:66:7C:A5:99:80:91:23:E2:F1:8B:86:98:42:A0:23:1B:52:D5:8B:94:A2:95:76:07:B9:A1:0D:1D:EC:26:88",
+    "ATPROTO_HANDLE_DOMAIN": "cloud-staging.logdate.app",
+    "ATPROTO_PDS_SERVICE_URL": "https://cloud-staging.logdate.app",
+    "AUTO_MIGRATE": "false",
+    "BILLING_PROVIDER": "play",
+    "GCS_BUCKET_NAME": "logdate-media-staging",
+    "GCS_PROJECT_ID": "logdate-dev",
+    "HOST": "0.0.0.0",
+    "LOGDATE_DEPLOYMENT_KIND": "first_party",
+    "LOGDATE_ENV": "production",
+    "LOGDATE_EXPECT_FIRST_PARTY": "true",
+    "LOGDATE_PUBLIC_ORIGIN": "https://cloud-staging.logdate.app",
+    "LOGDATE_SERVER_DISPLAY_NAME": "LogDate Cloud (Staging)",
+    "RELEASE_VERSION": "logdate-server@__RELEASE_SHA__",
+    "SERVER_ENCRYPTION_ENABLED": "true",
+    "SYNC_MEDIA_SIGNED_URLS": "true",
+    "SYNC_MEDIA_SIGNED_URL_TTL_HOURS": "1",
+    "WEBAUTHN_ALLOWED_ORIGINS": "https://cloud-staging.logdate.app,android:apk-key-hash:22Z8pZmAkSPi8YuGmEKgIxtS1YuUopV2B7mhDR3sJog",
+    "WEBAUTHN_ORIGIN": "https://cloud-staging.logdate.app",
+    "WEBAUTHN_RP_ID": "cloud-staging.logdate.app"
+  },
+  "environment": "staging",
+  "image": "us-central1-docker.pkg.dev/logdate-dev/logdate/logdate-server:__RELEASE_SHA__",
+  "project_id": "logdate-dev",
+  "region": "us-central1",
+  "release_sha": "__RELEASE_SHA__",
+  "runtime": {
+    "allow_unauthenticated": true,
+    "ingress": "INGRESS_TRAFFIC_ALL",
+    "liveness_probe": {"failure_threshold": 3, "initial_delay_seconds": 15, "path": "/health", "period_seconds": 30, "port": 8080, "timeout_seconds": 5},
+    "port": 8080,
+    "request_concurrency": 16,
+    "resources": {"cpu": "1", "cpu_idle": true, "memory": "512Mi", "startup_cpu_boost": true},
+    "scaling": {"max_instances": 10, "min_instances": 0},
+    "startup_probe": {"failure_threshold": 12, "path": "/health", "period_seconds": 5, "port": 8080, "timeout_seconds": 5},
+    "timeout_seconds": 60
+  },
+  "runtime_service_account": "logdate-runtime@logdate-dev.iam.gserviceaccount.com",
+  "secret_env": {
+    "DATABASE_PASSWORD": {"secret_id": "logdate-db-password", "version": "1"},
+    "DATABASE_URL": {"secret_id": "logdate-db-url", "version": "1"},
+    "DATABASE_USER": {"secret_id": "logdate-db-user", "version": "1"},
+    "HEALTH_INTERNAL_TOKEN": {"secret_id": "logdate-health-internal-token", "version": "1"},
+    "JWT_SECRET": {"secret_id": "logdate-jwt-secret", "version": "1"},
+    "SERVER_ENCRYPTION_KEY": {"secret_id": "logdate-server-encryption-key", "version": "1"},
+    "SERVER_ENCRYPTION_KEY_ID": {"secret_id": "logdate-server-encryption-key-id", "version": "1"}
+  },
+  "service_name": "logdate-server-staging"
+}
