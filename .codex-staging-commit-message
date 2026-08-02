@@ -1,0 +1,4 @@
+fix(server): export health token for public durability smoke
+
+Pass the health token into the post-promotion smoke process so the staging
+workflow can verify public durability and clean up its test account.

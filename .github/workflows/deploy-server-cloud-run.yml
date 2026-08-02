@@ -368,6 +368,7 @@ jobs:
               --project="$(jq -r '.project_id' "$CONTRACT_FILE")"
           )"
           test -n "$HEALTH_INTERNAL_TOKEN"
+          export HEALTH_INTERNAL_TOKEN
           ./scripts/smoke-test-revision.sh \
             --service-url "$(jq -r '.canonical_origin' "$CONTRACT_FILE")" \
             --contract-file "$CONTRACT_FILE" \
