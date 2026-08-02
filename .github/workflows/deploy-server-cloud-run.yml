@@ -230,6 +230,7 @@ jobs:
           .venv/bin/pip install --quiet -r scripts/passkey-verify/requirements.txt
 
       - name: Deploy candidate revision without traffic
+        id: deploy_candidate
         run: |
           IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REGISTRY_REPO}/logdate-server:${DEPLOY_SHA}"
           CONTRACT_IMAGE="$(jq -r '.image' "$CONTRACT_FILE")"
@@ -284,6 +285,7 @@ jobs:
             exit 1
           fi
           echo "REVISION_URL=$REVISION_URL" >> "$GITHUB_ENV"
+          echo "revision_url=$REVISION_URL" >> "$GITHUB_OUTPUT"
 
       - name: Collect candidate startup diagnostics
         if: ${{ failure() }}
@@ -306,17 +308,16 @@ jobs:
           fi
 
       - name: Prepare strict candidate smoke proof
+        uses: google-github-actions/auth@v3
+        id: smoke_auth
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          token_format: id_token
+          id_token_audience: ${{ steps.deploy_candidate.outputs.revision_url }}
+
+      - name: Prepare strict candidate smoke proof
         run: |
-          DEPLOYER_ACCOUNT="$(gcloud auth list --filter=status:ACTIVE --format='value(account)')"
-          if [[ "$DEPLOYER_ACCOUNT" != *@*.iam.gserviceaccount.com ]]; then
-            echo "Active gcloud identity is not a service account: $DEPLOYER_ACCOUNT"
-            exit 1
-          fi
-          gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SERVICE_ACCOUNT" \
-            --project "$PROJECT_ID" \
-            --member "serviceAccount:${DEPLOYER_ACCOUNT}" \
-            --role roles/iam.serviceAccountTokenCreator \
-            --quiet
           umask 077
           SMOKE_DIRECTORY="$(mktemp -d "${RUNNER_TEMP}/logdate-cloud-smoke.XXXXXX")"
           chmod 700 "$SMOKE_DIRECTORY"
@@ -325,9 +326,7 @@ jobs:
           : >"$INVOKER_TOKEN_FILE"
           : >"$SMOKE_STATE_FILE"
           chmod 600 "$INVOKER_TOKEN_FILE" "$SMOKE_STATE_FILE"
-          gcloud auth print-identity-token \
-            --impersonate-service-account "$RUNTIME_SERVICE_ACCOUNT" \
-            --audiences "$REVISION_URL" >"$INVOKER_TOKEN_FILE"
+          printf '%s' '${{ steps.smoke_auth.outputs.id_token }}' >"$INVOKER_TOKEN_FILE"
           test -s "$INVOKER_TOKEN_FILE"
           HEALTH_INTERNAL_TOKEN="$(
             gcloud secrets versions access \
