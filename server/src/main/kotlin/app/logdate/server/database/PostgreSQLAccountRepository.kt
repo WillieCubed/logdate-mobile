@@ -22,23 +22,24 @@ import kotlin.uuid.Uuid
 class PostgreSQLAccountRepository : AccountRepository {
     override suspend fun create(account: Account): Boolean =
         transaction {
-            AccountsTable.insertIgnore {
-                it[id] = account.id.toJavaUUID()
-                it[username] = account.username
-                it[displayName] = account.displayName
-                it[did] = account.did
-                it[handle] = account.handle
-                it[signingKeyPublic] = account.signingKeyPublic
-                it[plcRecoveryDidKey] = account.plcRecoveryDidKey
-                it[email] = account.email
-                it[emailVerified] = account.emailVerified
-                it[emailVerifiedAt] = account.emailVerifiedAt
-                it[bio] = account.bio
-                it[createdAt] = account.createdAt
-                it[lastSignInAt] = account.lastSignInAt
-                it[isActive] = account.isActive
-                it[preferences] = account.preferences ?: "{}"
-            }.insertedCount > 0
+            AccountsTable
+                .insertIgnore {
+                    it[id] = account.id.toJavaUUID()
+                    it[username] = account.username
+                    it[displayName] = account.displayName
+                    it[did] = account.did
+                    it[handle] = account.handle
+                    it[signingKeyPublic] = account.signingKeyPublic
+                    it[plcRecoveryDidKey] = account.plcRecoveryDidKey
+                    it[email] = account.email
+                    it[emailVerified] = account.emailVerified
+                    it[emailVerifiedAt] = account.emailVerifiedAt
+                    it[bio] = account.bio
+                    it[createdAt] = account.createdAt
+                    it[lastSignInAt] = account.lastSignInAt
+                    it[isActive] = account.isActive
+                    it[preferences] = account.preferences ?: "{}"
+                }.insertedCount > 0
         }
 
     override suspend fun save(account: Account): Account =
