@@ -20,6 +20,9 @@ import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
+import app.logdate.client.media.AndroidMediaManager
+import app.logdate.client.media.MediaPayload
+import app.logdate.client.media.audio.AndroidAudioDurationResolver
 import app.logdate.client.media.audio.AndroidAudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.media.audio.AudioPlaybackService
@@ -30,6 +33,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -227,6 +231,73 @@ class AudioPlaybackBackgroundE2ETest {
             }
             waitUntil("media notification remains active in multi-window") {
                 activePlaybackNotification() != null
+            }
+        }
+    }
+
+    @Test
+    fun downloadedAudioRoundTripsThroughPrivateStorageAndPlays() {
+        ActivityScenario.launch(VideoPlaybackHostActivity::class.java).use {
+            val sourceFile = silentWavFile(durationSeconds = 5)
+            val sourceBytes = sourceFile.readBytes()
+            val mediaManager = AndroidMediaManager(context.contentResolver, context, Dispatchers.Unconfined)
+            val savedUri =
+                runBlocking {
+                    mediaManager.saveMedia(
+                        MediaPayload(
+                            fileName = "restored-cloud-audio.wav",
+                            mimeType = "audio/wav",
+                            sizeBytes = sourceBytes.size.toLong(),
+                            data = sourceBytes,
+                        ),
+                    )
+                }
+            val savedFile = File(checkNotNull(Uri.parse(savedUri).path))
+
+            try {
+                assertEquals(
+                    File(context.filesDir, "audio_notes").canonicalPath,
+                    savedFile.parentFile?.canonicalPath,
+                )
+                val restoredPayload = runBlocking { mediaManager.readMedia(savedUri) }
+                assertEquals(sourceBytes.size.toLong(), restoredPayload.sizeBytes)
+                assertTrue(
+                    "Restored audio bytes must match the downloaded payload",
+                    sourceBytes.contentEquals(restoredPayload.data),
+                )
+
+                val restoredDurationMs =
+                    runBlocking {
+                        AndroidAudioDurationResolver(context, Dispatchers.Unconfined).resolveDurationMs(savedUri)
+                    }
+                assertTrue(
+                    "Restored audio duration should remain five seconds, got $restoredDurationMs",
+                    restoredDurationMs in 4_900L..5_100L,
+                )
+
+                runOnMainSync {
+                    playbackManager.startPlayback(
+                        uri = savedUri,
+                        metadata = AudioPlaybackMetadata(title = "Restored Cloud audio"),
+                        onProgressUpdated = {},
+                        onPlaybackCompleted = {},
+                    )
+                }
+                waitUntil("restored audio starts playback") {
+                    val status = playbackManager.playbackStatus.value
+                    status.isPlaying || status.isSuppressedForUnsuitableOutput
+                }
+                assertTrue(
+                    "Managed device must have suitable audio output for restored-audio validation",
+                    !playbackManager.playbackStatus.value.isSuppressedForUnsuitableOutput,
+                )
+                waitUntil("restored audio advances") {
+                    playbackManager.playbackStatus.value.progress > 0f
+                }
+            } finally {
+                runOnMainSync { playbackManager.stopPlayback() }
+                sourceFile.delete()
+                savedFile.delete()
             }
         }
     }

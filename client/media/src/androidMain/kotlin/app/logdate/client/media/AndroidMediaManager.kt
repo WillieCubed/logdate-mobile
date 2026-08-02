@@ -25,12 +25,14 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.InputStream
 import java.net.URLConnection
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 class AndroidMediaManager(
     private val contentResolver: ContentResolver,
@@ -58,13 +60,13 @@ class AndroidMediaManager(
 
             when (resolveMediaKind(parsedUri, fileName)) {
                 MediaKind.IMAGE ->
-                    if (parsedUri.scheme == ContentResolver.SCHEME_FILE) {
+                    if (parsedUri.isFileBacked()) {
                         getImageMediaFromFileUri(parsedUri)
                     } else {
                         getImageMedia(parsedUri)
                     }
                 MediaKind.VIDEO ->
-                    if (parsedUri.scheme == ContentResolver.SCHEME_FILE) {
+                    if (parsedUri.isFileBacked()) {
                         getVideoMediaFromFileUri(parsedUri)
                     } else {
                         getVideoMedia(parsedUri)
@@ -236,13 +238,17 @@ class AndroidMediaManager(
     override suspend fun addToDefaultCollection(uri: String) {
         val parsedUri = Uri.parse(uri)
         val fileName = resolveFileName(parsedUri)
-        val mimeType = resolveSupportedMimeType(parsedUri, fileName)
+        val mimeType =
+            requirePublishableMimeType(
+                resolveSupportedMimeType(parsedUri, fileName),
+                uri,
+            )
 
         if (parsedUri.authority == MediaStore.AUTHORITY) {
             return
         }
 
-        if (parsedUri.scheme == ContentResolver.SCHEME_FILE) {
+        if (parsedUri.isFileBacked()) {
             val sourceFile = requireFileFromUri(parsedUri)
             if (sourceFile.exists() && legacyMediaAlreadyPublished(sourceFile, mimeType)) {
                 Napier.d("Media already exists in MediaStore: $uri")
@@ -502,21 +508,29 @@ class AndroidMediaManager(
     override suspend fun saveMedia(payload: MediaPayload): String =
         withContext(ioDispatcher) {
             val mimeType =
-                requirePublishableMimeType(
+                requireSupportedMediaMimeType(
                     payload.mimeType.ifBlank {
                         resolveMimeTypeFromFileName(payload.fileName)
                     },
                     payload.fileName,
                 )
             try {
-                publishBytesToMediaStore(
-                    bytes = payload.data,
-                    fileName = payload.fileName,
-                    mimeType = mimeType,
-                    timestamp = Clock.System.now(),
-                )
+                if (mimeType.startsWith("audio/")) {
+                    persistAudioStream(
+                        inputStream = payload.data.inputStream(),
+                        fileName = payload.fileName,
+                        mimeType = mimeType,
+                    )
+                } else {
+                    publishBytesToMediaStore(
+                        bytes = payload.data,
+                        fileName = payload.fileName,
+                        mimeType = mimeType,
+                        timestamp = Clock.System.now(),
+                    )
+                }
             } catch (error: Exception) {
-                Napier.e("Failed to publish media payload to MediaStore", error)
+                Napier.e("Failed to persist media payload", error)
                 throw error
             }
         }
@@ -528,16 +542,25 @@ class AndroidMediaManager(
     ): String =
         withContext(ioDispatcher) {
             val sourceFile = File(sourceFilePath)
-            val publishableMimeType = requirePublishableMimeType(mimeType, fileName)
+            val supportedMimeType = requireSupportedMediaMimeType(mimeType, fileName)
             try {
-                publishFileToMediaStore(
-                    sourceFile = sourceFile,
-                    fileName = fileName,
-                    mimeType = publishableMimeType,
-                    timestamp = fileTimestamp(sourceFile),
-                )
+                if (supportedMimeType.startsWith("audio/")) {
+                    check(sourceFile.isFile) { "Media file does not exist: ${sourceFile.absolutePath}" }
+                    persistAudioStream(
+                        inputStream = FileInputStream(sourceFile),
+                        fileName = fileName,
+                        mimeType = supportedMimeType,
+                    )
+                } else {
+                    publishFileToMediaStore(
+                        sourceFile = sourceFile,
+                        fileName = fileName,
+                        mimeType = supportedMimeType,
+                        timestamp = fileTimestamp(sourceFile),
+                    )
+                }
             } catch (error: Exception) {
-                Napier.e("Failed to publish media file to MediaStore", error)
+                Napier.e("Failed to persist media file", error)
                 throw error
             }
         }
@@ -588,8 +611,13 @@ class AndroidMediaManager(
 
     private fun isPublishableMimeType(mimeType: String): Boolean = mimeType.startsWith("image/") || mimeType.startsWith("video/")
 
+    private fun isSupportedMediaMimeType(mimeType: String): Boolean = isPublishableMimeType(mimeType) || mimeType.startsWith("audio/")
+
     private fun resolveMimeTypeFromFileName(fileName: String): String? {
-        val extension = MimeTypeMap.getFileExtensionFromUrl(fileName)
+        val extension = MimeTypeMap.getFileExtensionFromUrl(fileName).lowercase()
+        if (extension == "m4a") {
+            return "audio/mp4"
+        }
         val guessedFromExtension = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
         return guessedFromExtension ?: URLConnection.guessContentTypeFromName(fileName)
     }
@@ -729,10 +757,134 @@ class AndroidMediaManager(
         }
 
     private fun openSourceInputStream(uri: Uri): InputStream =
-        when (uri.scheme) {
-            ContentResolver.SCHEME_FILE -> FileInputStream(requireFileFromUri(uri))
-            else -> contentResolver.openInputStream(uri) ?: throw IllegalArgumentException("Invalid URI: $uri")
+        if (uri.isFileBacked()) {
+            FileInputStream(requireFileFromUri(uri))
+        } else {
+            contentResolver.openInputStream(uri) ?: throw IllegalArgumentException("Invalid URI: $uri")
         }
+
+    private fun persistAudioStream(
+        inputStream: InputStream,
+        fileName: String,
+        mimeType: String,
+    ): String =
+        inputStream.use { input ->
+            val directory =
+                File(filesDir, "audio_notes").apply {
+                    check(isDirectory || mkdirs()) { "Unable to create private audio directory: $absolutePath" }
+                }
+            removeStaleAudioTemporaryFiles(directory)
+
+            val destinationPrefix = "${Uuid.random()}-"
+            val destinationName =
+                destinationPrefix +
+                    normalizeAudioFileName(
+                        fileName = fileName,
+                        mimeType = mimeType,
+                        maxBytes = MAX_AUDIO_DESTINATION_NAME_BYTES - destinationPrefix.toByteArray(Charsets.UTF_8).size,
+                    )
+            val destination = File(directory, destinationName)
+            val temporary = File(directory, ".${destination.name}.tmp")
+
+            try {
+                FileOutputStream(temporary).use { output ->
+                    input.copyTo(output)
+                    output.fd.sync()
+                }
+                check(temporary.renameTo(destination)) {
+                    "Unable to finalize private audio file: ${destination.absolutePath}"
+                }
+                Uri.fromFile(destination).toString()
+            } catch (error: Exception) {
+                temporary.delete()
+                throw error
+            }
+        }
+
+    private fun normalizeAudioFileName(
+        fileName: String,
+        mimeType: String,
+        maxBytes: Int,
+    ): String {
+        val sanitizedName = sanitizeFileName(fileName).ifBlank { "audio" }
+        val stem =
+            sanitizedName
+                .substringBeforeLast('.', missingDelimiterValue = sanitizedName)
+                .ifBlank { "audio" }
+        val suffix = ".${requireAudioFileExtension(mimeType)}"
+        val stemByteBudget = maxBytes - suffix.toByteArray(Charsets.UTF_8).size
+        check(stemByteBudget > 0) { "Audio file extension exceeds the private storage filename budget" }
+        return stem.truncateUtf8(stemByteBudget).ifBlank { "audio" } + suffix
+    }
+
+    private fun requireAudioFileExtension(mimeType: String): String =
+        when (mimeType) {
+            "audio/aac" -> "aac"
+            "audio/amr" -> "amr"
+            "audio/flac" -> "flac"
+            "audio/midi" -> "mid"
+            "audio/mp4" -> "m4a"
+            "audio/mpeg" -> "mp3"
+            "audio/ogg" -> "ogg"
+            "audio/opus" -> "opus"
+            "audio/wav" -> "wav"
+            "audio/webm" -> "webm"
+            "audio/3gpp" -> "3gp"
+            "audio/3gpp2" -> "3g2"
+            else -> throw IllegalArgumentException("Unsupported audio type for private storage: $mimeType")
+        }
+
+    private fun String.truncateUtf8(maxBytes: Int): String {
+        if (toByteArray(Charsets.UTF_8).size <= maxBytes) {
+            return this
+        }
+
+        val result = StringBuilder()
+        var index = 0
+        var byteCount = 0
+        while (index < length) {
+            val codePoint = Character.codePointAt(this, index)
+            val codePointText = String(Character.toChars(codePoint))
+            val codePointBytes = codePointText.toByteArray(Charsets.UTF_8).size
+            if (byteCount + codePointBytes > maxBytes) {
+                break
+            }
+            result.append(codePointText)
+            byteCount += codePointBytes
+            index += Character.charCount(codePoint)
+        }
+        return result.toString()
+    }
+
+    private fun removeStaleAudioTemporaryFiles(directory: File) {
+        val staleBefore = Clock.System.now().toEpochMilliseconds() - AUDIO_TEMP_MAX_AGE_MILLIS
+        directory
+            .listFiles()
+            ?.asSequence()
+            ?.filter { file -> file.isFile && file.lastModified() in 1..staleBefore && file.isManagedAudioTemporaryFile() }
+            ?.forEach { staleFile ->
+                runCatching { staleFile.delete() }
+                    .onSuccess { deleted ->
+                        if (!deleted) {
+                            Napier.w("Unable to remove stale private audio temporary file: ${staleFile.absolutePath}")
+                        }
+                    }.onFailure { error ->
+                        Napier.w("Unable to remove stale private audio temporary file: ${staleFile.absolutePath}", error)
+                    }
+            }
+    }
+
+    private fun File.isManagedAudioTemporaryFile(): Boolean {
+        if (!name.startsWith('.') || !name.endsWith(".tmp") || name.length <= AUDIO_TEMP_UUID_END_INDEX) {
+            return false
+        }
+        if (name.getOrNull(AUDIO_TEMP_UUID_END_INDEX) != '-') {
+            return false
+        }
+        return runCatching {
+            Uuid.parse(name.substring(AUDIO_TEMP_UUID_START_INDEX, AUDIO_TEMP_UUID_END_INDEX))
+        }.isSuccess
+    }
 
     private fun mediaStoreTargetForMimeType(mimeType: String): MediaStoreTarget? =
         when {
@@ -751,11 +903,21 @@ class AndroidMediaManager(
             .replace("..", "_")
             .replace("/", "_")
             .replace("\\", "_")
+            .replace('\u0000', '_')
 
     private fun requireFileFromUri(uri: Uri): File {
-        val path = uri.path ?: throw IllegalArgumentException("File URI is missing a path: $uri")
+        val path =
+            if (uri.scheme.isNullOrBlank()) {
+                uri.toString().takeIf { it.startsWith('/') }
+            } else {
+                uri.path
+            } ?: throw IllegalArgumentException("File URI is missing a path: $uri")
         return File(path)
     }
+
+    private fun Uri.isFileBacked(): Boolean =
+        scheme == ContentResolver.SCHEME_FILE ||
+            (scheme.isNullOrBlank() && toString().startsWith('/'))
 
     private fun getImageMediaFromFileUri(uri: Uri): MediaObject.Image {
         val file = requireFileFromUri(uri)
@@ -779,11 +941,11 @@ class AndroidMediaManager(
     }
 
     private fun resolveSourceTimestamp(uri: Uri): Instant =
-        when (uri.scheme) {
-            ContentResolver.SCHEME_FILE -> fileTimestamp(requireFileFromUri(uri))
-            else ->
-                querySourceTimestamp(uri)
-                    ?: throw IllegalStateException("Unable to resolve timestamp for media URI: $uri")
+        if (uri.isFileBacked()) {
+            fileTimestamp(requireFileFromUri(uri))
+        } else {
+            querySourceTimestamp(uri)
+                ?: throw IllegalStateException("Unable to resolve timestamp for media URI: $uri")
         }
 
     private fun querySourceTimestamp(uri: Uri): Instant? {
@@ -874,7 +1036,7 @@ class AndroidMediaManager(
     }
 
     private fun resolveFileName(uri: Uri): String {
-        if (uri.scheme == ContentResolver.SCHEME_FILE) {
+        if (uri.isFileBacked()) {
             return requireFileFromUri(uri).name
         }
 
@@ -902,13 +1064,40 @@ class AndroidMediaManager(
         uri: Uri,
         fileName: String,
     ): String {
-        val contentType = contentResolver.getType(uri)
-        if (!contentType.isNullOrBlank()) {
-            return requirePublishableMimeType(contentType, uri.toString())
+        if (uri.isPrivateAudioFile()) {
+            resolvePrivateAudioMimeType(fileName)?.let { return it }
         }
 
-        return requirePublishableMimeType(resolveMimeTypeFromFileName(fileName), uri.toString())
+        val contentType = if (uri.isFileBacked()) null else contentResolver.getType(uri)
+        if (!contentType.isNullOrBlank()) {
+            return requireSupportedMediaMimeType(contentType, uri.toString())
+        }
+
+        return requireSupportedMediaMimeType(resolveMimeTypeFromFileName(fileName), uri.toString())
     }
+
+    private fun Uri.isPrivateAudioFile(): Boolean =
+        isFileBacked() &&
+            runCatching {
+                requireFileFromUri(this).parentFile?.canonicalFile == File(filesDir, "audio_notes").canonicalFile
+            }.getOrDefault(false)
+
+    private fun resolvePrivateAudioMimeType(fileName: String): String? =
+        when (fileName.substringAfterLast('.', missingDelimiterValue = "").lowercase()) {
+            "aac" -> "audio/aac"
+            "amr" -> "audio/amr"
+            "flac" -> "audio/flac"
+            "mid" -> "audio/midi"
+            "m4a" -> "audio/mp4"
+            "mp3" -> "audio/mpeg"
+            "ogg" -> "audio/ogg"
+            "opus" -> "audio/opus"
+            "wav" -> "audio/wav"
+            "webm" -> "audio/webm"
+            "3gp" -> "audio/3gpp"
+            "3g2" -> "audio/3gpp2"
+            else -> null
+        }
 
     private fun readBytes(uri: Uri): ByteArray =
         openSourceInputStream(uri).use { stream ->
@@ -918,23 +1107,63 @@ class AndroidMediaManager(
     private fun resolveMediaKind(
         uri: Uri,
         fileName: String,
-    ): MediaKind =
-        when {
-            resolveSupportedMimeType(uri, fileName).startsWith("image/") -> MediaKind.IMAGE
-            else -> MediaKind.VIDEO
+    ): MediaKind {
+        val mimeType = resolveSupportedMimeType(uri, fileName)
+        return when {
+            mimeType.startsWith("image/") -> MediaKind.IMAGE
+            mimeType.startsWith("video/") -> MediaKind.VIDEO
+            else -> throw IllegalArgumentException("Media metadata is unavailable for audio type: $mimeType")
         }
+    }
 
     private fun requirePublishableMimeType(
         mimeType: String?,
         source: String,
     ): String {
         val resolvedMimeType =
-            mimeType?.takeIf { it.isNotBlank() }
+            normalizeMimeType(mimeType)
                 ?: throw IllegalArgumentException("Unable to resolve media type for $source")
         if (!isPublishableMimeType(resolvedMimeType)) {
             throw IllegalArgumentException("Unsupported media type for $source: $resolvedMimeType")
         }
         return resolvedMimeType
+    }
+
+    private fun requireSupportedMediaMimeType(
+        mimeType: String?,
+        source: String,
+    ): String {
+        val resolvedMimeType =
+            normalizeMimeType(mimeType)
+                ?: throw IllegalArgumentException("Unable to resolve media type for $source")
+        if (!isSupportedMediaMimeType(resolvedMimeType)) {
+            throw IllegalArgumentException("Unsupported media type for $source: $resolvedMimeType")
+        }
+        return resolvedMimeType
+    }
+
+    private fun normalizeMimeType(mimeType: String?): String? =
+        mimeType
+            ?.substringBefore(';')
+            ?.trim()
+            ?.lowercase()
+            ?.takeIf { it.isNotBlank() }
+            ?.let { normalized ->
+                when (normalized) {
+                    "audio/mp3" -> "audio/mpeg"
+                    "audio/wave", "audio/x-wav", "audio/vnd.wave" -> "audio/wav"
+                    "audio/x-flac" -> "audio/flac"
+                    "audio/x-m4a" -> "audio/mp4"
+                    "audio/x-midi" -> "audio/midi"
+                    else -> normalized
+                }
+            }
+
+    private companion object {
+        const val MAX_AUDIO_DESTINATION_NAME_BYTES = 250
+        const val AUDIO_TEMP_MAX_AGE_MILLIS = 24L * 60L * 60L * 1_000L
+        const val AUDIO_TEMP_UUID_START_INDEX = 1
+        const val AUDIO_TEMP_UUID_END_INDEX = 37
     }
 
     /**

@@ -4,12 +4,13 @@ import android.Manifest
 import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Color
 import android.database.Cursor
 import android.database.MatrixCursor
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.provider.MediaStore
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -31,8 +32,8 @@ import java.io.File
 import java.io.FileOutputStream
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -191,6 +192,57 @@ class AndroidMediaManagerTest {
     }
 
     @Test
+    fun readMedia_readsRawAndFileUriAudioRecordings() = runTest {
+        val audioBytes = byteArrayOf(0, 0, 0, 24, 102, 116, 121, 112, 77, 52, 65, 32)
+        val audioFile = File(context.cacheDir, "recording-${Uuid.random()}.m4a")
+        audioFile.writeBytes(audioBytes)
+
+        try {
+            listOf(audioFile.absolutePath, Uri.fromFile(audioFile).toString()).forEach { mediaRef ->
+                val payload = mediaManager.readMedia(mediaRef)
+
+                assertEquals(audioFile.name, payload.fileName)
+                assertEquals("audio/mp4", payload.mimeType)
+                assertEquals(audioBytes.size.toLong(), payload.sizeBytes)
+                assertTrue(audioBytes.contentEquals(payload.data))
+            }
+        } finally {
+            audioFile.delete()
+        }
+    }
+
+    @Test
+    fun readMedia_readsContentUriAudioRecording() = runTest {
+        val environment = createMockEnvironment()
+        val audioUri = Uri.parse("content://example.media/audio/42")
+        val audioBytes = byteArrayOf(1, 3, 3, 7)
+
+        try {
+            every { environment.contentResolver.getType(audioUri) } returns "audio/mp4"
+            every {
+                environment.contentResolver.query(
+                    audioUri,
+                    arrayOf(MediaStore.MediaColumns.DISPLAY_NAME),
+                    null,
+                    null,
+                    null,
+                )
+            } returns singleRowCursor(MediaStore.MediaColumns.DISPLAY_NAME to "voice-note.m4a")
+            every { environment.contentResolver.openInputStream(audioUri) } returns ByteArrayInputStream(audioBytes)
+
+            val payload = environment.mediaManager.readMedia(audioUri.toString())
+
+            assertEquals("voice-note.m4a", payload.fileName)
+            assertEquals("audio/mp4", payload.mimeType)
+            assertEquals(audioBytes.size.toLong(), payload.sizeBytes)
+            assertTrue(audioBytes.contentEquals(payload.data))
+        } finally {
+            environment.filesDir.deleteRecursively()
+            clearAllMocks()
+        }
+    }
+
+    @Test
     fun saveMediaFromFile_publishesImageIntoMediaStore() = runTest {
         val sourceFile = createImageFile(context.cacheDir, "source")
         var savedUri: String? = null
@@ -261,6 +313,169 @@ class AndroidMediaManagerTest {
                 context.contentResolver.delete(Uri.parse(uri), null, null)
             }
             sourceFile.delete()
+        }
+    }
+
+    @Test
+    fun saveMedia_persistsDownloadedAudioInPrivateStorage() = runTest {
+        val environment = createMockEnvironment()
+        val audioBytes = byteArrayOf(9, 8, 7, 6, 5)
+
+        try {
+            val savedUri =
+                environment.mediaManager.saveMedia(
+                    MediaPayload(
+                        fileName = "../restored-voice.m4a",
+                        mimeType = "audio/mp4",
+                        sizeBytes = audioBytes.size.toLong(),
+                        data = audioBytes,
+                    ),
+                )
+
+            val savedFile = File(requireNotNull(Uri.parse(savedUri).path))
+            assertTrue(savedUri.startsWith("file://"))
+            assertEquals(environment.filesDir.resolve("audio_notes").canonicalPath, savedFile.parentFile?.canonicalPath)
+            assertTrue(savedFile.name.endsWith("-__restored-voice.m4a"))
+            assertTrue(audioBytes.contentEquals(savedFile.readBytes()))
+            verify(exactly = 0) { environment.contentResolver.insert(any(), any()) }
+        } finally {
+            environment.filesDir.deleteRecursively()
+            clearAllMocks()
+        }
+    }
+
+    @Test
+    fun saveMediaFromFile_persistsDownloadedAudioInPrivateStorage() = runTest {
+        val environment = createMockEnvironment()
+        val audioBytes = byteArrayOf(4, 3, 2, 1)
+        val sourceFile = File(environment.filesDir, "source-${Uuid.random()}.m4a").apply { writeBytes(audioBytes) }
+
+        try {
+            val savedUri =
+                environment.mediaManager.saveMediaFromFile(
+                    sourceFilePath = sourceFile.absolutePath,
+                    fileName = "restored.m4a",
+                    mimeType = "audio/mp4",
+                )
+
+            val savedFile = File(requireNotNull(Uri.parse(savedUri).path))
+            assertEquals(environment.filesDir.resolve("audio_notes").canonicalPath, savedFile.parentFile?.canonicalPath)
+            assertTrue(audioBytes.contentEquals(savedFile.readBytes()))
+            assertTrue(sourceFile.exists(), "Adopting an audio file must not destroy the caller's source")
+            verify(exactly = 0) { environment.contentResolver.insert(any(), any()) }
+        } finally {
+            environment.filesDir.deleteRecursively()
+            clearAllMocks()
+        }
+    }
+
+    @Test
+    fun saveMedia_normalizesAudioMimeAndMismatchedFileExtension() = runTest {
+        val environment = createMockEnvironment()
+        val audioBytes = byteArrayOf(7, 7, 7)
+
+        try {
+            val savedUri =
+                environment.mediaManager.saveMedia(
+                    MediaPayload(
+                        fileName = "VOICE.MP4",
+                        mimeType = " Audio/MP4; codecs=mp4a.40.2 ",
+                        sizeBytes = audioBytes.size.toLong(),
+                        data = audioBytes,
+                    ),
+                )
+
+            val savedFile = File(requireNotNull(Uri.parse(savedUri).path))
+            val restoredPayload = environment.mediaManager.readMedia(savedUri)
+            assertTrue(savedFile.name.endsWith(".m4a"))
+            assertEquals("audio/mp4", restoredPayload.mimeType)
+            assertTrue(audioBytes.contentEquals(restoredPayload.data))
+        } finally {
+            environment.filesDir.deleteRecursively()
+            clearAllMocks()
+        }
+    }
+
+    @Test
+    fun saveMedia_addsAudioExtensionWhenFileNameHasNone() = runTest {
+        val environment = createMockEnvironment()
+        val audioBytes = byteArrayOf(6, 5, 4)
+
+        try {
+            val savedUri =
+                environment.mediaManager.saveMedia(
+                    MediaPayload(
+                        fileName = "voice-note",
+                        mimeType = "audio/mp4",
+                        sizeBytes = audioBytes.size.toLong(),
+                        data = audioBytes,
+                    ),
+                )
+
+            val restoredPayload = environment.mediaManager.readMedia(savedUri)
+            assertEquals("audio/mp4", restoredPayload.mimeType)
+            assertTrue(audioBytes.contentEquals(restoredPayload.data))
+        } finally {
+            environment.filesDir.deleteRecursively()
+            clearAllMocks()
+        }
+    }
+
+    @Test
+    fun saveMedia_boundsAsciiAndMultibyteAudioFileNames() = runTest {
+        val environment = createMockEnvironment()
+        val audioBytes = byteArrayOf(1, 2, 1, 2)
+        val oversizedNames =
+            listOf(
+                "a".repeat(300) + ".m4a",
+                "🎵".repeat(100) + ".m4a",
+            )
+
+        try {
+            oversizedNames.forEach { oversizedName ->
+                val savedUri =
+                    environment.mediaManager.saveMedia(
+                        MediaPayload(
+                            fileName = oversizedName,
+                            mimeType = "audio/mp4",
+                            sizeBytes = audioBytes.size.toLong(),
+                            data = audioBytes,
+                        ),
+                    )
+
+                val savedFile = File(requireNotNull(Uri.parse(savedUri).path))
+                assertTrue(savedFile.name.toByteArray(Charsets.UTF_8).size <= 250)
+                assertEquals("audio/mp4", environment.mediaManager.readMedia(savedUri).mimeType)
+            }
+        } finally {
+            environment.filesDir.deleteRecursively()
+            clearAllMocks()
+        }
+    }
+
+    @Test
+    fun saveMedia_removesStaleAudioTempsButPreservesFreshWriters() = runTest {
+        val environment = createMockEnvironment()
+        val audioDirectory = environment.filesDir.resolve("audio_notes").apply { mkdirs() }
+        val staleTemp = audioDirectory.resolve(".${Uuid.random()}-stale.m4a.tmp").apply { writeBytes(ByteArray(8)) }
+        val freshTemp = audioDirectory.resolve(".${Uuid.random()}-fresh.m4a.tmp").apply { writeBytes(ByteArray(8)) }
+        assertTrue(staleTemp.setLastModified(System.currentTimeMillis() - 25 * 60 * 60 * 1_000L))
+
+        try {
+            environment.mediaManager.saveMedia(
+                MediaPayload(
+                    fileName = "restored.m4a",
+                    mimeType = "audio/mp4",
+                    sizeBytes = 1,
+                    data = byteArrayOf(1),
+                ),
+            )
+
+            assertFalse(staleTemp.exists())
+            assertTrue(freshTemp.exists())
+        } finally {
+            environment.filesDir.deleteRecursively()
+            clearAllMocks()
         }
     }
 
@@ -803,20 +1018,18 @@ class AndroidMediaManagerTest {
             every {
                 environment.contentResolver.query(
                     imageCollection,
-                    any(),
+                    any<Array<String>>(),
+                    any<Bundle>(),
                     null,
-                    null,
-                    any(),
                 )
             } throws SecurityException("no permission")
 
             every {
                 environment.contentResolver.query(
                     videoCollection,
-                    any(),
+                    any<Array<String>>(),
+                    any<Bundle>(),
                     null,
-                    null,
-                    any(),
                 )
             } throws IllegalStateException("broken provider")
 
@@ -901,10 +1114,9 @@ class AndroidMediaManagerTest {
             every {
                 environment.contentResolver.query(
                     imageCollection,
-                    any(),
+                    any<Array<String>>(),
+                    any<Bundle>(),
                     null,
-                    null,
-                    any(),
                 )
             } returns singleRowCursor(
                 MediaStore.Images.Media._ID to 2L,
@@ -917,10 +1129,9 @@ class AndroidMediaManagerTest {
             every {
                 environment.contentResolver.query(
                     videoCollection,
-                    any(),
+                    any<Array<String>>(),
+                    any<Bundle>(),
                     null,
-                    null,
-                    any(),
                 )
             } returns emptyCursor(
                 MediaStore.Video.Media._ID,
@@ -958,10 +1169,9 @@ class AndroidMediaManagerTest {
             every {
                 environment.contentResolver.query(
                     imageCollection,
-                    any(),
+                    any<Array<String>>(),
+                    any<Bundle>(),
                     null,
-                    null,
-                    any(),
                 )
             } returns emptyCursor(
                 MediaStore.Images.Media._ID,
@@ -974,10 +1184,9 @@ class AndroidMediaManagerTest {
             every {
                 environment.contentResolver.query(
                     videoCollection,
-                    any(),
+                    any<Array<String>>(),
+                    any<Bundle>(),
                     null,
-                    null,
-                    any(),
                 )
             } returns singleRowCursor(
                 MediaStore.Video.Media._ID to 1_000_025_185L,
