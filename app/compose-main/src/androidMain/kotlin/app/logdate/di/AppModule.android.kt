@@ -61,6 +61,7 @@ import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import app.logdate.feature.core.export.CloudBackupScheduler
 import app.logdate.feature.core.export.CloudBackupWorker
+import app.logdate.feature.core.restore.CloudRestoreScheduler
 import coil3.SingletonImageLoader
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -125,6 +126,7 @@ actual val appModule: Module =
         workerOf(::CalendarImportWorker)
 
         single { CloudBackupScheduler(androidContext()) }
+        single { CloudRestoreScheduler(androidContext()) }
         workerOf(::CloudBackupWorker)
 
         single {

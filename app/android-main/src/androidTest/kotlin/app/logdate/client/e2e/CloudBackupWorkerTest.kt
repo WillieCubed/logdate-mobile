@@ -14,6 +14,7 @@ import app.logdate.client.sync.cloud.BackupMetadata
 import app.logdate.client.sync.cloud.BackupUploadResult
 import app.logdate.client.sync.cloud.CloudBackupDataSource
 import app.logdate.feature.core.export.CloudBackupWorker
+import app.logdate.feature.core.restore.CloudRestoreWorker
 import io.mockk.every
 import io.mockk.mockk
 import kotlin.test.Test
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.flowOf
 import org.junit.runner.RunWith
 import kotlin.uuid.Uuid
 import java.util.UUID
+import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class CloudBackupWorkerTest {
@@ -99,6 +101,41 @@ class CloudBackupWorkerTest {
         assertTrue(cloud.uploadCalls == 0)
     }
 
+    @Test
+    fun cloudRestoreDownloadsNewestBackupAndEnqueuesNormalRestore() = runTest {
+        val newest =
+            BackupMetadata(
+                id = "newest",
+                deviceId = "device",
+                manifest = "manifest",
+                createdAt = 20L,
+                sizeBytes = 3L,
+                downloadUrl = "https://unused",
+            )
+        val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L))).apply {
+            backups = listOf(
+                newest.copy(createdAt = 10L),
+                newest,
+            )
+            downloaded = BackupFile("device", "manifest", byteArrayOf(1, 2, 3))
+        }
+        var enqueued: File? = null
+        val params = mockk<WorkerParameters>(relaxed = true)
+        every { params.id } returns UUID.randomUUID()
+        val worker =
+            CloudRestoreWorker(
+                context,
+                params,
+                cloud,
+                FakeSessionStorage(UserSession("access", "refresh", "account")),
+            ) { archive -> enqueued = archive }
+
+        assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Success)
+        assertTrue(cloud.downloadedBackupId == "newest")
+        assertTrue(enqueued?.readBytes()?.contentEquals(byteArrayOf(1, 2, 3)) == true)
+        enqueued?.let(File::delete)
+    }
+
     private class FakeSessionStorage(private var session: UserSession?) : SessionStorage {
         override fun getSession() = session
         override fun getSessionFlow() = MutableStateFlow(session)
@@ -117,16 +154,22 @@ class CloudBackupWorkerTest {
         private val uploadResult: Result<BackupUploadResult>,
     ) : CloudBackupDataSource {
         var uploadCalls: Int = 0
+        var backups: List<BackupMetadata> = emptyList()
+        var downloaded: BackupFile? = null
+        var downloadedBackupId: String? = null
 
         override suspend fun uploadBackup(accessToken: String, backup: BackupFile): Result<BackupUploadResult> {
             uploadCalls++
             return uploadResult
         }
 
-        override suspend fun listBackups(accessToken: String): Result<List<BackupMetadata>> = Result.success(emptyList())
+        override suspend fun listBackups(accessToken: String): Result<List<BackupMetadata>> = Result.success(backups)
 
-        override suspend fun downloadBackup(accessToken: String, backupId: String): Result<BackupFile> =
-            Result.failure(UnsupportedOperationException())
+        override suspend fun downloadBackup(accessToken: String, backupId: String): Result<BackupFile> {
+            downloadedBackupId = backupId
+            return downloaded?.let(Result.Companion::success)
+                ?: Result.failure(UnsupportedOperationException())
+        }
 
         override suspend fun deleteBackup(accessToken: String, backupId: String): Result<Unit> = Result.success(Unit)
     }

@@ -28,6 +28,7 @@ class AppViewModel(
     networkMonitor: NetworkAvailabilityMonitor,
     private val sessionStorage: SessionStorage,
     private val tryRestoreSignInUseCase: TryRestoreSignInUseCase,
+    private val onCloudRestoreSignIn: () -> Unit = {},
 ) : ViewModel() {
     private val biometricState = biometricGatekeeper.authState
     private val appLockState = MutableStateFlow(AppLockState.Unlocked)
@@ -112,8 +113,10 @@ class AppViewModel(
 
         Napier.i("Cloud restore detected with no valid session — attempting restore sign-in")
         when (val result = tryRestoreSignInUseCase()) {
-            is TryRestoreSignInUseCase.Result.Success ->
+            is TryRestoreSignInUseCase.Result.Success -> {
                 Napier.i("Restore sign-in succeeded for ${result.account.username}")
+                onCloudRestoreSignIn()
+            }
             is TryRestoreSignInUseCase.Result.NoCredential ->
                 Napier.d("No restore credential on cloud-restored device — using manual sign-in")
             is TryRestoreSignInUseCase.Result.Error ->
