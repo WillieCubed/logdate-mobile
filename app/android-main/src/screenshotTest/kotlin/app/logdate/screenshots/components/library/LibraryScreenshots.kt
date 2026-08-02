@@ -69,6 +69,19 @@ fun LibraryGrid_Content_Tablet() {
 @PreviewTest
 @Preview(showBackground = true, device = PHONE)
 @Composable
+fun LibraryGrid_Audio() {
+    ScreenshotTheme {
+        LibraryScreenContent(
+            state = LibraryScreenshotData.audioGridContent,
+            columnCount = 3,
+            onItemClick = {},
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
 fun MediaDetail_Compact() {
     ScreenshotTheme {
         MediaDetailContent(
@@ -128,6 +141,19 @@ fun MediaDetail_VideoPresenting_Expanded() {
             state = LibraryScreenshotData.videoDetail,
             presenterState = LibraryScreenshotData.presenterActive,
             isExpanded = true,
+            onBack = {},
+        )
+    }
+}
+
+@PreviewTest
+@Preview(showBackground = true, device = PHONE)
+@Composable
+fun MediaDetail_Audio() {
+    ScreenshotTheme {
+        MediaDetailContent(
+            state = LibraryScreenshotData.audioDetail,
+            isExpanded = false,
             onBack = {},
         )
     }

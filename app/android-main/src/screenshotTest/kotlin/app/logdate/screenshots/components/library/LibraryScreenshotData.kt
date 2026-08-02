@@ -35,6 +35,29 @@ object LibraryScreenshotData {
             totalCount = sampleItems.size,
         )
 
+    val audioGridContent =
+        LibraryUiState.Content(
+            groups =
+                listOf(
+                    LibraryGridGroup(
+                        label = "March 2026",
+                        items =
+                            listOf(
+                                LibraryMediaItem(
+                                    uid = Uuid.parse("00000000-0000-0000-0000-000000000110"),
+                                    uri = "file:///recording.m4a",
+                                    thumbnailUri = null,
+                                    isVideo = false,
+                                    isAudio = true,
+                                    durationMs = 12_500,
+                                    timestamp = march2026,
+                                ),
+                            ),
+                    ),
+                ),
+            totalCount = 1,
+        )
+
     val imageDetail =
         MediaDetailUiState.ImageContent(
             mediaId = Uuid.parse("00000000-0000-0000-0000-000000000101"),
@@ -64,6 +87,23 @@ object LibraryScreenshotData {
         MediaDetailUiState.VideoContent(
             mediaId = Uuid.parse("00000000-0000-0000-0000-000000000103"),
             mediaRef = "content://media/external/video/media/3",
+            createdAt = march2026,
+            location = null,
+            locationDisplayName = "San Francisco, CA",
+            journals =
+                listOf(
+                    JournalReference(
+                        id = Uuid.parse("00000000-0000-0000-0000-000000000102"),
+                        title = "Trip to California",
+                    ),
+                ),
+        )
+
+    val audioDetail =
+        MediaDetailUiState.AudioContent(
+            mediaId = Uuid.parse("00000000-0000-0000-0000-000000000110"),
+            mediaRef = "file:///recording.m4a",
+            durationMs = 12_500,
             createdAt = march2026,
             location = null,
             locationDisplayName = "San Francisco, CA",
