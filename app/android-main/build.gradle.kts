@@ -17,6 +17,8 @@ val baselineProfileRequested =
     }
 val androidTestClassOverride = providers.gradleProperty("logdate.androidTestClass").orNull
 val androidTestPackageOverride = providers.gradleProperty("logdate.androidTestPackage").orNull
+// Runtime-only credentials for the staging sync probe. Never put tokens in source or Gradle files.
+val syncProbeArguments = providers.gradleProperty("logdate.syncProbeArguments").orNull
 val androidTestCoverageEnabled =
     providers
         .gradleProperty("logdate.androidTestCoverage")
@@ -128,6 +130,9 @@ extensions.configure<ApplicationExtension> {
         }
         if (androidTestPackageOverride != null) {
             testInstrumentationRunnerArguments["package"] = androidTestPackageOverride
+        }
+        if (syncProbeArguments != null) {
+            testInstrumentationRunnerArguments["logdate.syncProbeArguments"] = syncProbeArguments
         }
     }
 
@@ -317,6 +322,7 @@ dependencies {
     androidTestImplementation(projects.client.sync)
     androidTestImplementation(projects.client.device)
     androidTestImplementation(projects.client.feature.rewind)
+    androidTestImplementation(projects.shared.config)
     androidTestImplementation(projects.shared.model)
     androidTestImplementation(libs.nav3.runtime)
     androidTestImplementation(libs.kotlin.test.junit)
