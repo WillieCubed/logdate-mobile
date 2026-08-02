@@ -6,6 +6,7 @@ import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.GoogleIdTokenClaims
 import app.logdate.server.auth.GoogleIdTokenVerifier
 import app.logdate.server.auth.IdentityProvider
+import app.logdate.server.auth.InMemoryAccountRepository
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.SessionType
 import app.logdate.server.auth.TemporarySession
@@ -180,6 +181,49 @@ class AuthSignupFlowContractsTest {
                 }
             assertEquals(HttpStatusCode.BadRequest, verifyFailed.status)
             assertTrue(verifyFailed.bodyAsText().contains("PASSKEY_VERIFICATION_FAILED"))
+        }
+
+    @Test
+    fun `passkey signup completion rejects a claimed canonical owner ID without mutating it`() =
+        testApplication {
+            val sessionToken = "s-owner-collision"
+            val ownerId = Uuid.random()
+            val existing =
+                Account(
+                    id = ownerId,
+                    username = "existing-owner",
+                    displayName = "Existing Owner",
+                    createdAt = Clock.System.now(),
+                )
+            val accountRepository = InMemoryAccountRepository()
+            runBlocking { accountRepository.save(existing) }
+
+            val sessionManager = mockk<SessionManager>(relaxed = true)
+            coEvery { sessionManager.validateSession(eq(sessionToken), eq(SessionType.ACCOUNT_CREATION)) } returns
+                accountCreationSession(sessionToken, ownerId)
+            val passkeyService = mockk<WebAuthnPasskeyService>(relaxed = true)
+            every { passkeyService.verifyRegistrationOnly(any(), any(), any()) } returns
+                VerificationOutcome.Success(verifiedRegistration("cred-owner-collision"))
+
+            val env =
+                configureAuthV1TestApp(
+                    accountRepository = accountRepository,
+                    sessionManager = sessionManager,
+                    webAuthnPasskeyService = passkeyService,
+                )
+
+            val response =
+                client.post("/api/v1/auth/signup/passkey/complete") {
+                    contentType(ContentType.Application.Json)
+                    setBody(signupPasskeyCompleteBody(sessionToken = sessionToken, credentialId = "cred-owner-collision"))
+                }
+
+            assertEquals(HttpStatusCode.Conflict, response.status)
+            assertTrue(response.bodyAsText().contains("CANONICAL_OWNER_ID_TAKEN"))
+            runBlocking {
+                assertEquals(existing, accountRepository.findById(ownerId))
+                assertTrue(env.identityRepository.findByAccountId(ownerId).isEmpty())
+            }
         }
 
     @Test

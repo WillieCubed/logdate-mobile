@@ -111,6 +111,22 @@ class PostgreSqlRepositoriesTest {
     }
 
     @Test
+    fun `account repository create only leaves a colliding account unchanged`() {
+        withAccountTables {
+            val repository = PostgreSQLAccountRepository()
+            val ownerId = Uuid.random()
+            val existing = sampleAccount(ownerId, username = "existing-owner")
+            val attemptedReplacement = sampleAccount(ownerId, username = "attacker-owner")
+
+            repository.save(existing)
+
+            assertFalse(repository.createOnly(attemptedReplacement))
+            assertEquals(existing, repository.findById(ownerId))
+            assertNull(repository.findByUsername("attacker-owner"))
+        }
+    }
+
+    @Test
     fun `account identity repository supports upsert and query operations`() {
         withAccountIdentityTables {
             val repository = PostgreSQLAccountIdentityRepository()

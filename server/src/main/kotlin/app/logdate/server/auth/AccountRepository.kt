@@ -12,6 +12,15 @@ interface AccountRepository {
 
     suspend fun save(account: Account): Account
 
+    /**
+     * Persists a new account only when its ID has not already been claimed.
+     *
+     * Unlike [save], this operation must never update an existing account. Signup paths that
+     * accept a client-selected canonical owner ID use it to prevent an ID collision from
+     * overwriting another account.
+     */
+    suspend fun createOnly(account: Account): Boolean
+
     suspend fun findById(id: Uuid): Account?
 
     suspend fun findByUsername(username: String): Account?
@@ -85,6 +94,20 @@ class InMemoryAccountRepository : AccountRepository {
         account.handle?.let { handleIndex[it] = account.id }
         return account
     }
+
+    override suspend fun createOnly(account: Account): Boolean =
+        synchronized(accounts) {
+            if (accounts.containsKey(account.id)) {
+                false
+            } else {
+                accounts[account.id] = account
+                usernameIndex[account.username] = account.id
+                account.email?.let { emailIndex[it] = account.id }
+                account.did?.let { didIndex[it] = account.id }
+                account.handle?.let { handleIndex[it] = account.id }
+                true
+            }
+        }
 
     override suspend fun findById(id: Uuid): Account? = accounts[id]
 

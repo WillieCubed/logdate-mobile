@@ -83,6 +83,27 @@ class InMemoryAuthComponentsTest {
         }
 
     @Test
+    fun `in-memory account create only leaves a colliding account unchanged`() =
+        runBlocking {
+            val repository = InMemoryAccountRepository()
+            val ownerId = Uuid.random()
+            val existing =
+                Account(
+                    id = ownerId,
+                    username = "existing-owner",
+                    displayName = "Existing Owner",
+                    createdAt = Clock.System.now(),
+                )
+            val attemptedReplacement = existing.copy(username = "attacker-owner", displayName = "Attacker Owner")
+
+            repository.save(existing)
+
+            assertFalse(repository.createOnly(attemptedReplacement))
+            assertEquals(existing, repository.findById(ownerId))
+            assertNull(repository.findByUsername("attacker-owner"))
+        }
+
+    @Test
     fun `in-memory account identity repository supports save lookup and updates`() =
         runBlocking {
             val repository = InMemoryAccountIdentityRepository()
