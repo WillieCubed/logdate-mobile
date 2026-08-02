@@ -490,6 +490,8 @@ def signin(
             and descriptor.get("id") == credential_id
             for descriptor in allow
         ):
+            print(f"  signin options allowCredentials={allow!r}", file=sys.stderr)
+            print(f"  signin begin response={body!r}", file=sys.stderr)
             raise VerifierError("signin options did not allow the generated credential")
     except (KeyError, TypeError, AttributeError):
         raise VerifierError("signin/begin returned malformed authentication options") from None
