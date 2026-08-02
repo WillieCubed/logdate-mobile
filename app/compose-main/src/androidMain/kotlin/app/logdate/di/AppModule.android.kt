@@ -59,6 +59,8 @@ import app.logdate.dynamic.DynamicFeatureLoader
 import app.logdate.dynamic.PlayDynamicFeatureLoader
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
 import app.logdate.feature.core.settings.updates.AppUpdateController
+import app.logdate.feature.core.export.CloudBackupScheduler
+import app.logdate.feature.core.export.CloudBackupWorker
 import coil3.SingletonImageLoader
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -121,6 +123,9 @@ actual val appModule: Module =
         single { CalendarImportScheduler(androidContext()) }
         single<CalendarImportLauncher> { AndroidCalendarImportLauncher(get()) }
         workerOf(::CalendarImportWorker)
+
+        single { CloudBackupScheduler(androidContext()) }
+        workerOf(::CloudBackupWorker)
 
         single {
             val fetchMostRecentDraft: FetchMostRecentDraftUseCase = get()
