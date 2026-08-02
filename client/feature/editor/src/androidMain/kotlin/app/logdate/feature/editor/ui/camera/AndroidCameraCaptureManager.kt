@@ -39,8 +39,6 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,8 +61,10 @@ import kotlin.coroutines.resume
 class AndroidCameraCaptureManager(
     private val context: Context,
     private val mediaManager: MediaManager,
+    private val captureScope: CoroutineScope,
 ) : CameraCaptureManager {
     private val appContext = context.applicationContext
+    private val stagingStore = CameraCaptureStagingStore(File(appContext.filesDir, "camera/captures"))
     private val preferences = appContext.getSharedPreferences(CAMERA_ROUTE_PREFS_NAME, Context.MODE_PRIVATE)
     private val _state = MutableStateFlow(CameraCaptureState())
     override val state: StateFlow<CameraCaptureState> = _state.asStateFlow()
@@ -88,7 +88,6 @@ class AndroidCameraCaptureManager(
     private var previewStreamObserver: Observer<PreviewView.StreamState>? = null
 
     private val mainExecutor: Executor = ContextCompat.getMainExecutor(context)
-    private val captureScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val pendingCaptureFiles = Collections.synchronizedSet(mutableSetOf<File>())
     private val timestampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
 
@@ -169,6 +168,7 @@ class AndroidCameraCaptureManager(
     override suspend fun startPreview(facing: CameraFacing) =
         withContext(Dispatchers.Main) {
             try {
+                recoverStagedCaptures()
                 val provider = ProcessCameraProvider.awaitInstance(context)
                 cameraProvider = provider
                 val owner = lifecycleOwner ?: error("LifecycleOwner is not set")
@@ -218,7 +218,6 @@ class AndroidCameraCaptureManager(
         withContext(Dispatchers.Main) {
             try {
                 currentRecording?.stop()
-                currentRecording = null
                 camera = null
                 _previewStreaming.value = false
                 cameraProvider?.unbindAll()
@@ -245,14 +244,13 @@ class AndroidCameraCaptureManager(
 
             val timeStamp = timestampFormat.format(Date())
             val fileName = "LOGDATE_$timeStamp.jpg"
-            val captureFile = File(context.cacheDir, "$fileName.${kotlin.uuid.Uuid.random()}.tmp")
+            val captureFile = stagingStore.create(fileName)
             pendingCaptureFiles += captureFile
             val outputOptions = ImageCapture.OutputFileOptions.Builder(captureFile).build()
 
             return@withContext suspendCancellableCoroutine { continuation ->
                 continuation.invokeOnCancellation {
                     pendingCaptureFiles.remove(captureFile)
-                    captureFile.delete()
                 }
                 capture.takePicture(
                     outputOptions,
@@ -312,7 +310,7 @@ class AndroidCameraCaptureManager(
 
         val timeStamp = timestampFormat.format(Date())
         val fileName = "LOGDATE_$timeStamp.mp4"
-        val captureFile = File(context.cacheDir, "$fileName.${kotlin.uuid.Uuid.random()}.tmp")
+        val captureFile = stagingStore.create(fileName)
         pendingCaptureFiles += captureFile
         val outputOptions = FileOutputOptions.Builder(captureFile).build()
 
@@ -555,16 +553,9 @@ class AndroidCameraCaptureManager(
 
     override fun release() {
         currentRecording?.stop()
-        captureScope.cancel()
-        pendingCaptureFiles.toList().forEach { file ->
-            if (!file.delete() && file.exists()) {
-                Napier.w("Unable to remove pending camera capture: ${file.absolutePath}")
-            }
-        }
-        pendingCaptureFiles.clear()
+        // Persistence belongs to the application scope, not this camera screen. Activity
+        // recreation and navigation teardown must never cancel or delete an in-flight capture.
         currentRecording = null
-        recordingDeferred?.complete(null)
-        recordingDeferred = null
         previewStreamObserver?.let { observer ->
             previewView?.previewStreamState?.removeObserver(observer)
         }
@@ -579,6 +570,24 @@ class AndroidCameraCaptureManager(
         videoCapture = null
         lifecycleOwner = null
         _state.update { CameraCaptureState() }
+    }
+
+    private fun recoverStagedCaptures() {
+        captureScope.launch(Dispatchers.IO) {
+            stagingStore.recoverableFiles().forEach { pending ->
+                runCatching {
+                    mediaManager.saveMediaFromFile(
+                        sourceFilePath = pending.file.absolutePath,
+                        fileName = pending.fileName,
+                        mimeType = pending.mimeType,
+                    )
+                }.onSuccess {
+                    pending.file.delete()
+                }.onFailure { error ->
+                    Napier.w("Deferred camera capture remains staged for retry: ${pending.file.name}", error)
+                }
+            }
+        }
     }
 
     private fun cameraSelectorForDeviceId(deviceId: String?): CameraSelector {
