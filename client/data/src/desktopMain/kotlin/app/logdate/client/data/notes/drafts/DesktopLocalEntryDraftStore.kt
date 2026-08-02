@@ -2,6 +2,8 @@ package app.logdate.client.data.notes.drafts
 
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.PendingMediaRecord
+import io.github.aakira.napier.Napier
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -15,7 +17,9 @@ import kotlin.uuid.Uuid
 /**
  * Desktop implementation of LocalEntryDraftStore using file system storage.
  */
-class DesktopLocalEntryDraftStore : LocalEntryDraftStore {
+class DesktopLocalEntryDraftStore(
+    private val appDataDirectory: File = File(System.getProperty("user.home"), ".logdate"),
+) : LocalEntryDraftStore {
     private val json =
         Json {
             ignoreUnknownKeys = true
@@ -23,7 +27,7 @@ class DesktopLocalEntryDraftStore : LocalEntryDraftStore {
         }
 
     // Directory structure for storing drafts
-    private val appDataDir = System.getProperty("user.home") + File.separator + ".logdate"
+    private val appDataDir = appDataDirectory.path
     private val draftsDir = appDataDir + File.separator + "drafts"
     private val indexFile = draftsDir + File.separator + "index.json"
 
@@ -44,6 +48,8 @@ class DesktopLocalEntryDraftStore : LocalEntryDraftStore {
         val notes: List<JournalNote>,
         val createdAt: Long,
         val updatedAt: Long,
+        val pendingMedia: List<PendingMediaRecord> = emptyList(),
+        val selectedJournalIds: List<String> = emptyList(),
     )
 
     private fun EntryDraft.toSerializable(): SerializableEntryDraft =
@@ -52,6 +58,8 @@ class DesktopLocalEntryDraftStore : LocalEntryDraftStore {
             notes = notes,
             createdAt = createdAt.toEpochMilliseconds(),
             updatedAt = updatedAt.toEpochMilliseconds(),
+            pendingMedia = pendingMedia,
+            selectedJournalIds = selectedJournalIds.map { it.toString() },
         )
 
     private fun SerializableEntryDraft.toDomain(): EntryDraft =
@@ -60,6 +68,9 @@ class DesktopLocalEntryDraftStore : LocalEntryDraftStore {
             notes = notes,
             createdAt = Instant.fromEpochMilliseconds(createdAt),
             updatedAt = Instant.fromEpochMilliseconds(updatedAt),
+            pendingMedia = pendingMedia,
+            selectedJournalIds =
+                selectedJournalIds.map(Uuid::parse),
         )
 
     private fun getDraftFile(id: Uuid): File = File(draftsDir + File.separator + id.toString() + ".json")
@@ -78,7 +89,8 @@ class DesktopLocalEntryDraftStore : LocalEntryDraftStore {
                 json.decodeFromString<List<String>>(content)
             }
         } catch (e: Exception) {
-            emptyList()
+            Napier.e("Failed to read the local draft index", e)
+            throw EntryDraftStorageException("The local draft index is unreadable", e)
         }
     }
 
@@ -112,25 +124,23 @@ class DesktopLocalEntryDraftStore : LocalEntryDraftStore {
             val serializedDraft = json.decodeFromString<SerializableEntryDraft>(content)
             serializedDraft.toDomain()
         } catch (e: Exception) {
-            null
+            Napier.e("Failed to read local draft $id", e)
+            throw EntryDraftStorageException("Local draft $id is unreadable", e)
         }
     }
 
     override suspend fun getAllDrafts(): List<EntryDraft> {
         val draftIds = getDraftIndex()
-        return draftIds.mapNotNull { id ->
-            try {
-                val draftFile = File(draftsDir + File.separator + id + ".json")
-                if (draftFile.exists()) {
-                    val content = draftFile.readText()
-                    val serializedDraft = json.decodeFromString<SerializableEntryDraft>(content)
-                    serializedDraft.toDomain()
-                } else {
-                    null
+        return draftIds.map { encodedId ->
+            val id =
+                try {
+                    Uuid.parse(encodedId)
+                } catch (e: IllegalArgumentException) {
+                    Napier.e("Invalid draft identity in the local index", e)
+                    throw EntryDraftStorageException("The local draft index contains an invalid identity", e)
                 }
-            } catch (e: Exception) {
-                null
-            }
+            getDraft(id)
+                ?: throw EntryDraftStorageException("Indexed local draft $id is missing")
         }
     }
 

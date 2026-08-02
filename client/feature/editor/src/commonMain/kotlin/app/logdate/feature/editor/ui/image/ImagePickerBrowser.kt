@@ -2,6 +2,7 @@
 
 package app.logdate.feature.editor.ui.image
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,13 +30,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.client.media.MediaObject
+import app.logdate.feature.editor.ui.media.ManagedMediaSelectionState
 import app.logdate.ui.platform.PlatformIcons
 import coil3.compose.AsyncImage
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.adding_selected_photo
 import logdate.client.feature.editor.generated.resources.allow_access
 import logdate.client.feature.editor.generated.resources.browse_all_photos
 import logdate.client.feature.editor.generated.resources.editor_image_permission_prompt
@@ -46,6 +50,7 @@ import logdate.client.feature.editor.generated.resources.open_app_settings
 import logdate.client.feature.editor.generated.resources.partial_photo_access_message
 import logdate.client.feature.editor.generated.resources.pick_from_your_library_or_browse_all_your_photos
 import logdate.client.feature.editor.generated.resources.recent_photos
+import logdate.client.feature.editor.generated.resources.we_couldnt_add_selected_photo
 import logdate.client.feature.editor.generated.resources.we_couldnt_load_your_recent_photos
 import logdate.client.ui.generated.resources.common_try_again
 import org.jetbrains.compose.resources.stringResource
@@ -101,15 +106,20 @@ sealed interface ImagePickerPreviewState {
 @Composable
 fun ImagePickerPreviewContent(
     state: ImagePickerPreviewState,
+    importState: ManagedMediaSelectionState = ManagedMediaSelectionState.Idle,
+    previewImagePainter: Painter? = null,
     modifier: Modifier = Modifier,
 ) {
     ImagePickerBrowser(
         state = state.toLibraryState(),
+        importState = importState,
         onImageSelected = {},
         onBrowseLibrary = {},
         onRequestLibraryAccess = {},
         onOpenSettings = {},
         onRetryLoading = {},
+        onRetryImport = {},
+        previewImagePainter = previewImagePainter,
         modifier = modifier,
     )
 }
@@ -126,6 +136,7 @@ internal fun recentImagePreviews(
 @Composable
 internal fun ImagePickerBrowser(
     state: ImagePickerLibraryState,
+    importState: ManagedMediaSelectionState = ManagedMediaSelectionState.Idle,
     onImageSelected: (String) -> Unit,
     onBrowseLibrary: () -> Unit,
     modifier: Modifier = Modifier,
@@ -133,6 +144,8 @@ internal fun ImagePickerBrowser(
     onManageSelection: (() -> Unit)? = null,
     onOpenSettings: (() -> Unit)? = null,
     onRetryLoading: (() -> Unit)? = null,
+    onRetryImport: (() -> Unit)? = null,
+    previewImagePainter: Painter? = null,
 ) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 112.dp),
@@ -144,7 +157,49 @@ internal fun ImagePickerBrowser(
         item(span = { GridItemSpan(maxLineSpan) }) {
             ImagePickerHeader(
                 onBrowseLibrary = onBrowseLibrary,
+                enabled = importState != ManagedMediaSelectionState.Importing,
             )
+        }
+
+        when (importState) {
+            ManagedMediaSelectionState.Idle -> Unit
+            ManagedMediaSelectionState.Importing -> {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    ImagePickerMessageCard(
+                        icon = {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(28.dp),
+                                strokeWidth = 2.5.dp,
+                            )
+                        },
+                        message = stringResource(Res.string.adding_selected_photo),
+                    )
+                }
+            }
+
+            ManagedMediaSelectionState.Failed -> {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    ImagePickerMessageCard(
+                        icon = {
+                            Icon(
+                                painter = PlatformIcons.addPhoto(),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(28.dp),
+                            )
+                        },
+                        message = stringResource(Res.string.we_couldnt_add_selected_photo),
+                        action =
+                            onRetryImport?.let { retry ->
+                                {
+                                    OutlinedButton(onClick = retry) {
+                                        Text(stringResource(UiRes.string.common_try_again))
+                                    }
+                                }
+                            },
+                    )
+                }
+            }
         }
 
         when (state) {
@@ -170,6 +225,8 @@ internal fun ImagePickerBrowser(
                     RecentImageTile(
                         image = image,
                         onClick = { onImageSelected(image.uri) },
+                        enabled = importState != ManagedMediaSelectionState.Importing,
+                        previewImagePainter = previewImagePainter,
                     )
                 }
             }
@@ -185,6 +242,8 @@ internal fun ImagePickerBrowser(
                     RecentImageTile(
                         image = image,
                         onClick = { onImageSelected(image.uri) },
+                        enabled = importState != ManagedMediaSelectionState.Importing,
+                        previewImagePainter = previewImagePainter,
                     )
                 }
             }
@@ -323,6 +382,7 @@ private fun PartialAccessBanner(
 @Composable
 private fun ImagePickerHeader(
     onBrowseLibrary: () -> Unit,
+    enabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -343,7 +403,10 @@ private fun ImagePickerHeader(
             )
         }
 
-        OutlinedButton(onClick = onBrowseLibrary) {
+        OutlinedButton(
+            onClick = onBrowseLibrary,
+            enabled = enabled,
+        ) {
             Icon(
                 painter = PlatformIcons.addPhoto(),
                 contentDescription = null,
@@ -358,6 +421,8 @@ private fun ImagePickerHeader(
 private fun RecentImageTile(
     image: MediaObject.Image,
     onClick: () -> Unit,
+    enabled: Boolean,
+    previewImagePainter: Painter?,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -367,14 +432,26 @@ private fun RecentImageTile(
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(18.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .clickable(onClick = onClick),
+                .clickable(
+                    enabled = enabled,
+                    onClick = onClick,
+                ),
     ) {
-        AsyncImage(
-            model = image.uri,
-            contentDescription = image.name,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-        )
+        if (previewImagePainter != null) {
+            Image(
+                painter = previewImagePainter,
+                contentDescription = image.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            AsyncImage(
+                model = image.uri,
+                contentDescription = image.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 

@@ -4,5 +4,6 @@
     <string name="cd_search">Search</string>
     <string name="cd_library_photo">Photo from %1$s</string>
     <string name="cd_library_video">Video from %1$s</string>
+    <string name="cd_library_audio">Audio recording from %1$s</string>
     <string name="cd_library_photo_full">Photo</string>
 </resources>

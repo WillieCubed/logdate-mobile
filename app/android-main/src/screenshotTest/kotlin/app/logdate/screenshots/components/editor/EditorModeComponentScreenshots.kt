@@ -3,7 +3,9 @@ package app.logdate.screenshots.components.editor
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
+import app.logdate.client.R
 import app.logdate.feature.editor.audio.model.AudioPalette
 import app.logdate.feature.editor.ui.MainEditorContent
 import app.logdate.feature.editor.ui.audio.ActiveRecordingDisplay
@@ -25,6 +27,7 @@ import app.logdate.feature.editor.ui.image.ImageBlockEditor
 import app.logdate.feature.editor.ui.image.ImagePickerPreviewContent
 import app.logdate.feature.editor.ui.image.ImagePickerPreviewState
 import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
+import app.logdate.feature.editor.ui.media.ManagedMediaSelectionState
 import app.logdate.feature.editor.ui.state.BlocksUiState
 import app.logdate.feature.editor.ui.text.TextBlockContent
 import app.logdate.feature.editor.ui.video.VideoBlockEditor
@@ -40,10 +43,28 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-private const val SAMPLE_IMAGE_URI = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher"
+private const val SAMPLE_IMAGE_URI =
+    "file:///android_asset/sample_note_photo.jpg"
 private const val SAMPLE_VIDEO_URI = SAMPLE_IMAGE_URI
 private const val BOOK_FOLDABLE = "spec:width=1440dp,height=900dp"
 private const val TABLETOP_FOLDABLE = "spec:width=1440dp,height=900dp"
+
+@Preview(name = "Compact Light", showBackground = true, device = PHONE)
+@Preview(
+    name = "Compact Dark",
+    showBackground = true,
+    device = PHONE,
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES,
+)
+@Preview(name = "Large Text Light", showBackground = true, device = PHONE, fontScale = 2f)
+@Preview(
+    name = "Large Text Dark",
+    showBackground = true,
+    device = PHONE,
+    fontScale = 2f,
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES,
+)
+private annotation class MediaImportStatePreviewMatrix
 
 private val mockPalette = AudioPalette(
     waveformGradientStart = 0xFFE8A044,
@@ -119,6 +140,35 @@ fun EditorMode_ImagePickerLoaded() {
     EditorModeFrame {
         ImagePickerPreviewContent(
             state = ImagePickerPreviewState.Loaded(sampleImageUri = SAMPLE_IMAGE_URI, itemCount = 12),
+            previewImagePainter = painterResource(R.drawable.sample_note_photo),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@MediaImportStatePreviewMatrix
+@Composable
+fun EditorMode_ImagePickerImporting() {
+    EditorModeFrame {
+        ImagePickerPreviewContent(
+            state = ImagePickerPreviewState.Loaded(sampleImageUri = SAMPLE_IMAGE_URI, itemCount = 12),
+            importState = ManagedMediaSelectionState.Importing,
+            previewImagePainter = painterResource(R.drawable.sample_note_photo),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@MediaImportStatePreviewMatrix
+@Composable
+fun EditorMode_ImagePickerImportFailed() {
+    EditorModeFrame {
+        ImagePickerPreviewContent(
+            state = ImagePickerPreviewState.Loaded(sampleImageUri = SAMPLE_IMAGE_URI, itemCount = 12),
+            importState = ManagedMediaSelectionState.Failed,
+            previewImagePainter = painterResource(R.drawable.sample_note_photo),
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -145,10 +195,11 @@ fun EditorMode_ImageFocused() {
             block =
                 ImageBlockUiState(
                     uri = SAMPLE_IMAGE_URI,
-                    caption = "Late-night desk setup",
+                    caption = "Wrapped up for a rainy walk",
                 ),
             onBlockUpdated = {},
             onDeleteRequested = {},
+            previewImagePainter = painterResource(R.drawable.sample_note_photo),
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -420,6 +471,30 @@ fun EditorMode_CameraReviewVideo_TabletopPosture() {
 fun EditorMode_VideoPicker() {
     EditorModeFrame {
         VideoPickerPreviewContent(
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@MediaImportStatePreviewMatrix
+@Composable
+fun EditorMode_VideoPickerImporting() {
+    EditorModeFrame {
+        VideoPickerPreviewContent(
+            importState = ManagedMediaSelectionState.Importing,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
+@MediaImportStatePreviewMatrix
+@Composable
+fun EditorMode_VideoPickerImportFailed() {
+    EditorModeFrame {
+        VideoPickerPreviewContent(
+            importState = ManagedMediaSelectionState.Failed,
             modifier = Modifier.fillMaxSize(),
         )
     }

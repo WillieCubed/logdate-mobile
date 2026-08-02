@@ -37,4 +37,7 @@ data class LibraryMediaItem(
     val thumbnailUri: String?,
     val isVideo: Boolean,
     val timestamp: Instant,
+    /** True for voice/audio entries, which do not have an image thumbnail. */
+    val isAudio: Boolean = false,
+    val durationMs: Long = 0L,
 )

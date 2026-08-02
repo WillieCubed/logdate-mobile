@@ -86,6 +86,7 @@ class PasskeyApiClientTest {
                                     "rpId": "logdate.app",
                                     "rpName": "LogDate",
                                     "user": {"id": "u", "name": "newuser", "displayName": "New User"},
+                                    "pubKeyCredParams": [],
                                     "timeout": 300000
                                   }
                                 }

@@ -223,4 +223,40 @@ class LibraryViewModelTest {
             assertEquals(true, state.groups[0].items[0].isVideo)
             collectJob.cancel()
         }
+
+    @Test
+    fun audioNotesAppearAsPlayableAudioItems() =
+        runTest(testDispatcher) {
+            val noteId = Uuid.random()
+            val notes =
+                listOf(
+                    JournalNote.Audio(
+                        uid = noteId,
+                        creationTimestamp = Instant.fromEpochMilliseconds(1710000000000),
+                        lastUpdated = Instant.fromEpochMilliseconds(1710000000000),
+                        mediaRef = "file:///recording.m4a",
+                        durationMs = 12_500,
+                    ),
+                )
+            val viewModel =
+                LibraryViewModel(
+                    FakeJournalNotesRepository(notes),
+                    FakeIndexedMediaRepository(emptyList()),
+                )
+
+            val collectJob = launch { viewModel.uiState.collect {} }
+            advanceUntilIdle()
+
+            val state = assertIs<LibraryUiState.Content>(viewModel.uiState.value)
+            val item =
+                state.groups
+                    .single()
+                    .items
+                    .single()
+            assertEquals(noteId, item.uid)
+            assertEquals(true, item.isAudio)
+            assertEquals(false, item.isVideo)
+            assertEquals(12_500, item.durationMs)
+            collectJob.cancel()
+        }
 }

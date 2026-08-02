@@ -3,6 +3,8 @@ package app.logdate.client.domain.notes.drafts
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.PendingMediaRecord
+import app.logdate.client.repository.journals.PendingMediaType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -50,6 +52,8 @@ class UpdateEntryDraftUseCaseTest {
             val updateCall = mockRepository.updateCalls.first()
             assertEquals(draftId, updateCall.first)
             assertEquals(updatedNotes, updateCall.second)
+            assertEquals(emptyList(), mockRepository.pendingMediaCalls)
+            assertEquals(emptyList(), mockRepository.selectedJournalCalls)
         }
 
     @Test
@@ -69,6 +73,14 @@ class UpdateEntryDraftUseCaseTest {
             val updateCall = mockRepository.updateCalls.first()
             assertEquals(draftId, updateCall.first)
             assertEquals(entryDraft.notes, updateCall.second)
+            assertEquals(
+                listOf(draftId to entryDraft.pendingMedia),
+                mockRepository.pendingMediaCalls,
+            )
+            assertEquals(
+                listOf(draftId to entryDraft.selectedJournalIds),
+                mockRepository.selectedJournalCalls,
+            )
         }
 
     @Test
@@ -157,10 +169,21 @@ class UpdateEntryDraftUseCaseTest {
             notes = listOf(createTestNote("Test draft content")),
             createdAt = Clock.System.now(),
             updatedAt = Clock.System.now(),
+            pendingMedia =
+                listOf(
+                    PendingMediaRecord(
+                        blockId = Uuid.random(),
+                        mediaType = PendingMediaType.AUDIO,
+                        createdAt = Clock.System.now(),
+                    ),
+                ),
+            selectedJournalIds = listOf(Uuid.random()),
         )
 
     private class MockEntryDraftRepository : EntryDraftRepository {
         val updateCalls = mutableListOf<Pair<Uuid, List<JournalNote>>>()
+        val pendingMediaCalls = mutableListOf<Pair<Uuid, List<PendingMediaRecord>>>()
+        val selectedJournalCalls = mutableListOf<Pair<Uuid, List<Uuid>>>()
         var returnDraftId = Uuid.random()
 
         override suspend fun updateDraft(
@@ -179,8 +202,17 @@ class UpdateEntryDraftUseCaseTest {
 
         override suspend fun setPendingMedia(
             uid: Uuid,
-            pendingMedia: List<app.logdate.client.repository.journals.PendingMediaRecord>,
-        ) = Unit
+            pendingMedia: List<PendingMediaRecord>,
+        ) {
+            pendingMediaCalls += uid to pendingMedia
+        }
+
+        override suspend fun setSelectedJournalIds(
+            uid: Uuid,
+            selectedJournalIds: List<Uuid>,
+        ) {
+            selectedJournalCalls += uid to selectedJournalIds
+        }
 
         override suspend fun deleteDraft(uid: Uuid) = Unit
 

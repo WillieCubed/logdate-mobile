@@ -92,6 +92,7 @@ class MediaDetailViewModel(
                 val displays = remoteDisplayManager.observeExternalDisplays().first()
                 val displayId = displays.firstOrNull()?.id ?: return@launch
                 val item = viewerState.value.mediaItems.getOrNull(viewerState.value.currentIndex) ?: return@launch
+                if (item.isAudio) return@launch
                 val mimeType = if (item.isVideo) "video/*" else "image/*"
                 remoteDisplayManager.present(displayId, item.uri, mimeType)
             } catch (e: Exception) {
@@ -176,6 +177,16 @@ class MediaDetailViewModel(
                         MediaDetailUiState.VideoContent(
                             mediaId = media.id,
                             mediaRef = media.uri,
+                            createdAt = media.timestamp,
+                            location = primaryNote?.location,
+                            locationDisplayName = locationDisplayName,
+                            journals = journals,
+                        )
+                    media.isAudio ->
+                        MediaDetailUiState.AudioContent(
+                            mediaId = media.id,
+                            mediaRef = media.uri,
+                            durationMs = media.durationMs,
                             createdAt = media.timestamp,
                             location = primaryNote?.location,
                             locationDisplayName = locationDisplayName,
@@ -282,6 +293,7 @@ class MediaDetailViewModel(
                     uid = media.id,
                     uri = media.uri,
                     isVideo = media.isVideo,
+                    isAudio = media.isAudio,
                 )
             }
         val currentIndex =
@@ -307,6 +319,7 @@ class MediaDetailViewModel(
         }
 
         if (updatePresentation) {
+            if (item.isAudio) return
             val mimeType = if (item.isVideo) "video/*" else "image/*"
             remoteDisplayManager.updatePresentation(item.uri, mimeType)
         }

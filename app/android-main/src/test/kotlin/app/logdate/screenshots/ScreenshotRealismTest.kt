@@ -8,6 +8,8 @@ import kotlin.io.path.extension
 import kotlin.io.path.name
 import kotlin.io.path.readText
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -91,6 +93,43 @@ class ScreenshotRealismTest {
                 separator = "\n",
                 prefix = "Screenshot components must stay ecologically valid:\n",
             ),
+        )
+    }
+
+    @Test
+    fun editorMediaFixtureIsPackagedAndCheckoutIndependent() {
+        val editorScreenshotSource =
+            screenshotsDir.resolve("components/editor/EditorModeComponentScreenshots.kt")
+        val source = editorScreenshotSource.readText()
+        val packagedFixture =
+            repoRoot.resolve("app/android-main/src/debug/res/drawable-nodpi/sample_note_photo.jpg")
+
+        assertFalse(
+            source.contains("file:///Users/") || Regex("""file:/+[A-Za-z]:/Users/""").containsMatchIn(source),
+            "Editor screenshot media must not contain an absolute developer checkout path",
+        )
+        assertTrue(packagedFixture.exists(), "Missing packaged editor screenshot fixture: $packagedFixture")
+        assertTrue(
+            "painterResource(R.drawable.sample_note_photo)" in source,
+            "Editor screenshot media must render the packaged drawable deterministically",
+        )
+    }
+
+    @Test
+    fun editorMediaImportFailureCopyDoesNotAssumeTheOriginalIsInThePhotoLibrary() {
+        val editorStrings =
+            repoRoot
+                .resolve("client/feature/editor/src/commonMain/composeResources/values/strings.xml")
+                .readText()
+
+        assertFalse(
+            "device&apos;s photo library" in editorStrings,
+            "Import failure copy cannot assume a cloud-backed source lives in the device photo library",
+        )
+        assertEquals(
+            2,
+            Regex("LogDate did not change the original\\.").findAll(editorStrings).count(),
+            "Photo and video failure copy must state that LogDate did not change the original",
         )
     }
 

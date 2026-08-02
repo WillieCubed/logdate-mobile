@@ -1,5 +1,13 @@
 # Cloud Environment Recovery Implementation Plan
 
+> **Database-provider amendment (2026-08-01):** The product owner selected
+> Neon as the authoritative first-party database. Task 3 and every Cloud SQL
+> provisioning, connector, proxy, or IAM requirement in this plan are
+> superseded by
+> [`2026-08-01-neon-first-party-database.md`](./2026-08-01-neon-first-party-database.md).
+> Cloud Run and durable object storage remain in scope; first-party staging and
+> production must not provision or migrate Cloud SQL.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` to execute this plan task-by-task with specification review and code-quality review after every task.
 
 **Goal:** Make first-party staging and production deployments reproducible, fail closed when durability or identity configuration is missing, prove a debug Android build targets staging and a release build targets production, and quarantine the legacy custom-server path that can currently surface multiple origin-scoped accounts.

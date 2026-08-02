@@ -25,6 +25,7 @@ internal fun ConfirmEntryExitDialog(
     onConfirm: () -> Unit,
     onSaveAsDraft: (() -> Unit)? = null,
     dialogType: ConfirmDialogType = ConfirmDialogType.EXIT_EDITOR,
+    actionsEnabled: Boolean = true,
 ) {
     val (title, description) =
         when (dialogType) {
@@ -43,10 +44,13 @@ internal fun ConfirmEntryExitDialog(
     AlertDialog(
         title = { Text(title) },
         text = { Text(description) },
-        onDismissRequest = onCancel,
+        onDismissRequest = {
+            if (actionsEnabled) onCancel()
+        },
         dismissButton = {
             TextButton(
                 onClick = onCancel,
+                enabled = actionsEnabled,
                 modifier = Modifier.testTag("exit_dialog_cancel"),
             ) {
                 Text(stringResource(UiRes.string.common_cancel))
@@ -56,12 +60,14 @@ internal fun ConfirmEntryExitDialog(
             if (onSaveAsDraft != null && dialogType == ConfirmDialogType.EXIT_EDITOR) {
                 TextButton(
                     onClick = onConfirm,
+                    enabled = actionsEnabled,
                     modifier = Modifier.testTag("exit_dialog_discard"),
                 ) {
                     Text(stringResource(Res.string.editor_action_discard))
                 }
                 TextButton(
                     onClick = onSaveAsDraft,
+                    enabled = actionsEnabled,
                     modifier = Modifier.testTag("exit_dialog_save_draft"),
                 ) {
                     Text(stringResource(Res.string.save_draft))
@@ -69,6 +75,7 @@ internal fun ConfirmEntryExitDialog(
             } else {
                 TextButton(
                     onClick = onConfirm,
+                    enabled = actionsEnabled,
                     modifier = Modifier.testTag("exit_dialog_discard"),
                 ) {
                     Text(

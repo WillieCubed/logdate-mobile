@@ -72,7 +72,7 @@ fun NoteEditorScreen(
                 Napier.e("Failed to load existing entry: $entryId", e)
             }
         } else if (journalIds.isNotEmpty()) {
-            viewModel.setSelectedJournals(journalIds)
+            viewModel.initializeSelectedJournals(journalIds)
         }
     }
 

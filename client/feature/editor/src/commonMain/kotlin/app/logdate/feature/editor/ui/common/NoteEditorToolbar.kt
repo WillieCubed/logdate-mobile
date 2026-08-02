@@ -69,6 +69,7 @@ fun NoteEditorToolbar(
     draftCount: Int = 0,
     autoSaveStatus: AutoSaveStatus? = null,
     actionsVisible: Boolean = true,
+    actionsEnabled: Boolean = true,
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -80,6 +81,7 @@ fun NoteEditorToolbar(
         // Left-aligned back button — always visible
         FilledTonalIconButton(
             onClick = { onBack() },
+            enabled = actionsEnabled,
         ) {
             Icon(
                 painter = PlatformIcons.back(),
@@ -110,6 +112,7 @@ fun NoteEditorToolbar(
                 if (draftCount > 0) {
                     FilledTonalIconButton(
                         onClick = { onShowDrafts() },
+                        enabled = actionsEnabled,
                         modifier =
                             Modifier
                                 .testTag(LOGDATE_EDITOR_DRAFTS_BUTTON_TAG)
@@ -132,6 +135,7 @@ fun NoteEditorToolbar(
 
                 FilledTonalIconButton(
                     onClick = { onSave() },
+                    enabled = actionsEnabled,
                     modifier =
                         Modifier
                             .testTag(LOGDATE_EDITOR_SAVE_BUTTON_TAG)
@@ -145,7 +149,10 @@ fun NoteEditorToolbar(
                     )
                 }
 
-                FilledTonalIconButton(onClick = { showMenu = true }) {
+                FilledTonalIconButton(
+                    onClick = { showMenu = true },
+                    enabled = actionsEnabled,
+                ) {
                     Icon(
                         painter = PlatformIcons.more(),
                         contentDescription = stringResource(Res.string.more_options),
@@ -157,6 +164,7 @@ fun NoteEditorToolbar(
                     ) {
                         DropdownMenuItem(
                             text = { Text(stringResource(Res.string.manage_drafts)) },
+                            enabled = actionsEnabled,
                             onClick = {
                                 showMenu = false
                                 onShowDrafts()

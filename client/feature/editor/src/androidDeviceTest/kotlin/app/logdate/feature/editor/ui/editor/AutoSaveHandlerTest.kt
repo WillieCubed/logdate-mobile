@@ -23,7 +23,7 @@ class AutoSaveHandlerTest {
             val autoSaveState =
                 rememberAutoSaveHandler(
                     content = "Test content",
-                    onSave = { _: String -> Unit },
+                    onSave = { _: String -> true },
                     hasContentChanged = { _, _ -> false },
                 )
 
@@ -62,6 +62,7 @@ class AutoSaveHandlerTest {
                     onAutoSave = { state ->
                         saveCount++
                         lastSavedState = state
+                        true
                     },
                 )
 
@@ -117,13 +118,19 @@ class AutoSaveHandlerTest {
             // Test unmodified state
             rememberEditorAutoSave(
                 editorState = unmodifiedState.value,
-                onAutoSave = { saveCount++ },
+                onAutoSave = {
+                    saveCount++
+                    true
+                },
             )
 
             // Test modified state (should trigger save)
             rememberEditorAutoSave(
                 editorState = modifiedState.value,
-                onAutoSave = { saveCount++ },
+                onAutoSave = {
+                    saveCount++
+                    true
+                },
             )
         }
 
@@ -153,7 +160,10 @@ class AutoSaveHandlerTest {
             // But disable auto-save
             rememberEditorAutoSave(
                 editorState = state.value,
-                onAutoSave = { saveCount++ },
+                onAutoSave = {
+                    saveCount++
+                    true
+                },
                 enabled = false,
             )
         }
@@ -182,7 +192,10 @@ class AutoSaveHandlerTest {
 
             rememberEditorAutoSave(
                 editorState = editorState.value,
-                onAutoSave = { saveCount++ },
+                onAutoSave = {
+                    saveCount++
+                    true
+                },
                 debounceMs = 100,
                 backupIntervalMs = 10_000,
             )

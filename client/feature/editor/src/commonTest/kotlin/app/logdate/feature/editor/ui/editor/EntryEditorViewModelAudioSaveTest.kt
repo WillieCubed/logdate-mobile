@@ -16,7 +16,6 @@ import app.logdate.client.domain.notes.drafts.DeleteEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.notes.drafts.GetAllDraftsUseCase
-import app.logdate.client.domain.notes.drafts.SetEntryDraftPendingMediaUseCase
 import app.logdate.client.domain.notes.drafts.UpdateEntryDraftUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
 import app.logdate.client.repository.journals.JournalNote
@@ -32,6 +31,7 @@ import app.logdate.feature.editor.ui.editor.fakes.FakeJournalRepository
 import app.logdate.feature.editor.ui.editor.fakes.FakeLocationHistoryRepository
 import app.logdate.feature.editor.ui.editor.fakes.FakeLocationTrackingSettingsRepository
 import app.logdate.feature.editor.ui.editor.fakes.FakeMediaManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -126,7 +126,6 @@ class EntryEditorViewModelAudioSaveTest {
                 deleteEntryDraft = deleteEntryDraft,
                 deleteAllDraftsUseCase = DeleteAllDraftsUseCase(entryDraftRepository),
                 cleanupExpiredDraftsUseCase = CleanupExpiredDraftsUseCase(entryDraftRepository),
-                setPendingMedia = SetEntryDraftPendingMediaUseCase(entryDraftRepository),
             )
         val contentLoader =
             ContentLoader(
@@ -244,6 +243,48 @@ class EntryEditorViewModelAudioSaveTest {
         }
 
     @Test
+    fun saveEntry_whenFinalizerThrows_clearsSavingAndSurfacesRecoverableError() =
+        testScope.runTest {
+            val viewModel =
+                buildViewModel(
+                    finalizer = ThrowingAudioBlockFinalizer(IllegalStateException("finalizer exploded")),
+                )
+            viewModel.editorState.first()
+            viewModel.seedAudioBlock(AudioCaptureState.Recording())
+            advanceUntilIdle()
+
+            viewModel.saveEntry(viewModel.editorState.value)
+            advanceUntilIdle()
+
+            val state = viewModel.editorState.value
+            assertFalse(state.isSaving)
+            assertFalse(state.isEditingLocked)
+            assertFalse(state.shouldExit)
+            assertTrue(state.errorMessage?.contains("finalizer exploded") == true)
+        }
+
+    @Test
+    fun saveEntry_whenFinalizerCancels_clearsSavingWithoutUiError() =
+        testScope.runTest {
+            val viewModel =
+                buildViewModel(
+                    finalizer = ThrowingAudioBlockFinalizer(CancellationException("finalizer cancelled")),
+                )
+            viewModel.editorState.first()
+            viewModel.seedAudioBlock(AudioCaptureState.Recording())
+            advanceUntilIdle()
+
+            viewModel.saveEntry(viewModel.editorState.value)
+            advanceUntilIdle()
+
+            val state = viewModel.editorState.value
+            assertFalse(state.isSaving)
+            assertFalse(state.isEditingLocked)
+            assertFalse(state.shouldExit)
+            assertNull(state.errorMessage)
+        }
+
+    @Test
     fun saveEntry_whenFinalizationStalls_surfacesTimeoutAndDoesNotExit() =
         testScope.runTest {
             val stallingFinalizer = StallingAudioBlockFinalizer()
@@ -353,5 +394,14 @@ class EntryEditorViewModelAudioSaveTest {
             gate.await()
             return currentState
         }
+    }
+
+    private class ThrowingAudioBlockFinalizer(
+        private val failure: Throwable,
+    ) : AudioBlockFinalizer {
+        override suspend fun finalize(
+            blockId: Uuid,
+            currentState: AudioCaptureState,
+        ): AudioCaptureState = throw failure
     }
 }

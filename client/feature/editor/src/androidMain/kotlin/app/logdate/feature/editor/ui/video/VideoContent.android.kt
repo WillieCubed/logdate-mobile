@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -36,12 +37,14 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -49,6 +52,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,6 +64,7 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -71,10 +76,16 @@ import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import app.logdate.client.media.AndroidManagedMediaDiscarder
+import app.logdate.client.media.AndroidManagedMediaImportSource
+import app.logdate.client.media.ManagedMediaImporter
+import app.logdate.client.media.MediaManager
 import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.systemControlledSelection
 import app.logdate.client.media.video.ExoPlayerPool
+import app.logdate.feature.editor.ui.media.ManagedMediaSelectionController
+import app.logdate.feature.editor.ui.media.ManagedMediaSelectionState
 import app.logdate.ui.media.MediaDeviceSelector
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
@@ -87,13 +98,18 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.add_a_video_to_your_entry
+import logdate.client.feature.editor.generated.resources.adding_selected_video
+import logdate.client.feature.editor.generated.resources.choose_another_video
 import logdate.client.feature.editor.generated.resources.choose_from_gallery
 import logdate.client.feature.editor.generated.resources.enter_picture_in_picture
 import logdate.client.feature.editor.generated.resources.pause_video
 import logdate.client.feature.editor.generated.resources.play_video
 import logdate.client.feature.editor.generated.resources.video_thumbnail
+import logdate.client.feature.editor.generated.resources.we_couldnt_add_selected_video
+import logdate.client.ui.generated.resources.common_try_again
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+import logdate.client.ui.generated.resources.Res as UiRes
 
 object VideoPlayerTags {
     const val ROOT = "VideoPlayer"
@@ -483,6 +499,42 @@ actual fun VideoPickerContent(
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val mediaManager: MediaManager = koinInject()
+    val currentOnVideoSelected by rememberUpdatedState(onVideoSelected)
+    val managedMediaDiscarder = remember(context) { AndroidManagedMediaDiscarder(context.applicationContext) }
+    val managedMediaImporter =
+        remember(context, mediaManager, managedMediaDiscarder) {
+            ManagedMediaImporter(
+                mediaManager = mediaManager,
+                source = AndroidManagedMediaImportSource(context.applicationContext),
+                discardManagedMedia = managedMediaDiscarder::discard,
+            )
+        }
+    val selectionController =
+        remember(managedMediaImporter, managedMediaDiscarder) {
+            ManagedMediaSelectionController(
+                importMedia = managedMediaImporter::import,
+                discardManagedMedia = managedMediaDiscarder::discard,
+            )
+        }
+    val importState by selectionController.state.collectAsState()
+
+    fun importSelection(sourceUri: String) {
+        coroutineScope.launch {
+            selectionController.selectPreparedAndTransfer(
+                sourceUri = sourceUri,
+                prepareManagedMedia = { managedUri ->
+                    ManagedVideoSelection(
+                        uri = managedUri,
+                        durationMs = getVideoDuration(context, Uri.parse(managedUri)),
+                    )
+                },
+                transferOwnership = { selection ->
+                    currentOnVideoSelected(selection.uri, selection.durationMs)
+                },
+            )
+        }
+    }
 
     val videoPickerLauncher =
         rememberLauncherForActivityResult(
@@ -491,47 +543,90 @@ actual fun VideoPickerContent(
             // and only surfaces videos, not arbitrary documents.
             contract = ActivityResultContracts.PickVisualMedia(),
         ) { uri: Uri? ->
-            uri?.let {
-                Napier.d("Video selected: $uri")
-                // Duration extraction goes through MediaMetadataRetriever, which
-                // can block for hundreds of milliseconds on cloud-backed URIs.
-                // Read it off the main thread so the picker dismiss animation
-                // stays smooth.
-                coroutineScope.launch {
-                    val duration = getVideoDuration(context, uri)
-                    onVideoSelected(uri.toString(), duration)
-                }
+            if (uri == null) {
+                Napier.d("Android video picker dismissed without a selection")
+                coroutineScope.launch { selectionController.cancel() }
+            } else {
+                Napier.d("Android video selected from manual picker")
+                importSelection(uri.toString())
             }
         }
 
-    VideoPickerCard(
+    VideoPickerSurface(
+        importState = importState,
         onChooseFromGallery = {
             videoPickerLauncher.launch(
                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly),
             )
         },
+        onRetryImport = {
+            coroutineScope.launch {
+                selectionController.retryPreparedAndTransfer(
+                    prepareManagedMedia = { managedUri ->
+                        ManagedVideoSelection(
+                            uri = managedUri,
+                            durationMs = getVideoDuration(context, Uri.parse(managedUri)),
+                        )
+                    },
+                    transferOwnership = { selection ->
+                        currentOnVideoSelected(selection.uri, selection.durationMs)
+                    },
+                )
+            }
+        },
+        modifier = modifier,
+    )
+}
+
+internal data class ManagedVideoSelection(
+    val uri: String,
+    val durationMs: Long,
+)
+
+@Composable
+fun VideoPickerPreviewContent(
+    importState: ManagedMediaSelectionState = ManagedMediaSelectionState.Idle,
+    modifier: Modifier = Modifier,
+) {
+    VideoPickerSurface(
+        importState = importState,
+        onChooseFromGallery = {},
+        onRetryImport = {},
         modifier = modifier,
     )
 }
 
 @Composable
-fun VideoPickerPreviewContent(modifier: Modifier = Modifier) {
-    VideoPickerCard(
-        onChooseFromGallery = {},
-        modifier = modifier,
-    )
+private fun VideoPickerSurface(
+    importState: ManagedMediaSelectionState,
+    onChooseFromGallery: () -> Unit,
+    onRetryImport: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        VideoPickerCard(
+            importState = importState,
+            onChooseFromGallery = onChooseFromGallery,
+            onRetryImport = onRetryImport,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }
 
 @Composable
 private fun VideoPickerCard(
+    importState: ManagedMediaSelectionState,
     onChooseFromGallery: () -> Unit,
+    onRetryImport: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
         modifier =
             modifier
-                .fillMaxWidth()
-                .height(200.dp),
+                .fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors =
             CardDefaults.cardColors(
@@ -541,7 +636,8 @@ private fun VideoPickerCard(
         Column(
             modifier =
                 Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .heightIn(min = 200.dp)
                     .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
@@ -561,12 +657,43 @@ private fun VideoPickerCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedButton(
-                onClick = onChooseFromGallery,
-            ) {
-                Text(stringResource(Res.string.choose_from_gallery))
+            when (importState) {
+                ManagedMediaSelectionState.Idle -> {
+                    OutlinedButton(onClick = onChooseFromGallery) {
+                        Text(stringResource(Res.string.choose_from_gallery))
+                    }
+                }
+
+                ManagedMediaSelectionState.Importing -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(28.dp),
+                        strokeWidth = 2.5.dp,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(Res.string.adding_selected_video),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                ManagedMediaSelectionState.Failed -> {
+                    Text(
+                        text = stringResource(Res.string.we_couldnt_add_selected_video),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(onClick = onRetryImport) {
+                        Text(stringResource(UiRes.string.common_try_again))
+                    }
+                    TextButton(onClick = onChooseFromGallery) {
+                        Text(stringResource(Res.string.choose_another_video))
+                    }
+                }
             }
         }
     }
@@ -686,12 +813,12 @@ private suspend fun getVideoDuration(
         val retriever = android.media.MediaMetadataRetriever()
         try {
             retriever.setDataSource(context, uri)
-            retriever
-                .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
-                ?.toLongOrNull() ?: 0L
-        } catch (e: Exception) {
-            Napier.e("Failed to get video duration", e)
-            0L
+            val rawDuration =
+                retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+            val duration = rawDuration?.toLongOrNull()
+            checkNotNull(duration?.takeIf { it >= 0L }) {
+                "Selected video has unreadable duration metadata"
+            }
         } finally {
             try {
                 retriever.release()

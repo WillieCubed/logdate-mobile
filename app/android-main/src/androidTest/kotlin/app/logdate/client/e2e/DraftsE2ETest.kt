@@ -2,10 +2,11 @@ package app.logdate.client.e2e
 
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -17,10 +18,13 @@ import app.logdate.client.EditorActivity
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.PendingMediaRecord
 import app.logdate.di.appModule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.RuleChain
@@ -44,7 +48,7 @@ import kotlin.uuid.Uuid
  * These tests verify the full user flows:
  * - Writing content, saving, and verifying drafts are cleaned up
  * - Using "Save Draft" from the exit confirmation dialog
- * - Discarding changes and verifying no draft is persisted
+ * - Saving immediately on exit before the debounce window elapses
  * - Loading a pre-existing draft and publishing it
  *
  * Run with:
@@ -86,9 +90,7 @@ class DraftsE2ETest {
         }
 
         // Verify a draft was auto-saved
-        assert(fakeDraftRepository.currentDrafts.size == 1) {
-            "Expected 1 draft, found ${fakeDraftRepository.currentDrafts.size}"
-        }
+        assertEquals("Exactly one durable draft should exist before publish", 1, fakeDraftRepository.currentDrafts.size)
 
         // Save the entry
         composeRule.onNodeWithTag("editor_save_button").performClick()
@@ -99,19 +101,15 @@ class DraftsE2ETest {
         }
 
         // Verify draft was deleted
-        assert(fakeDraftRepository.currentDrafts.isEmpty()) {
-            "Draft should be deleted after publishing, but ${fakeDraftRepository.currentDrafts.size} remain"
-        }
+        assertTrue("Draft must be deleted after publishing", fakeDraftRepository.currentDrafts.isEmpty())
     }
 
     /**
-     * Test: Write content → auto-save → back → draft persists.
-     *
-     * The current editor flow persists drafts via auto-save before exit rather than
-     * requiring an explicit "Save Draft" confirmation.
+     * Test: Write content → auto-save → back → tap Save Draft → navigate → exact draft persists.
      */
     @Test
     fun writeContentAndSaveAsDraft_draftPersistsAfterExit() {
+        val activity = composeRule.activity
         startTextEntry()
 
         // Type content
@@ -123,40 +121,112 @@ class DraftsE2ETest {
             fakeDraftRepository.currentDrafts.isNotEmpty()
         }
 
-        // Use the toolbar back action so the editor's current exit flow runs.
+        // Exercise the real confirmation action and wait for host navigation.
         composeRule.onNodeWithContentDescription("Back").performClick()
-
-        // Verify draft was saved
-        assert(fakeDraftRepository.currentDrafts.isNotEmpty()) {
-            "Draft should persist after 'Save Draft' was tapped"
+        composeRule.onNodeWithTag("exit_dialog_save_draft").assertIsDisplayed().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            activity.isFinishing
         }
+        assertTrue("Save Draft must navigate out of the editor", activity.isFinishing)
+
+        val savedDraft = fakeDraftRepository.currentDrafts.single()
+        assertEquals(
+            "Draft content to save",
+            savedDraft.notes.filterIsInstance<JournalNote.Text>().single().content,
+        )
     }
 
-    /**
-     * Test: Write content → back immediately → no draft persisted.
-     *
-     * The current editor exits immediately when unsaved text has not yet been auto-saved,
-     * so this verifies that the quick-exit path does not create an orphan draft.
-     */
+    /** Test: Write content → back before debounce → Save Draft → local draft persists. */
     @Test
-    fun writeContentAndDiscard_noNewDraftsAfterDiscard() {
+    fun writeContentAndSaveAsDraftBeforeDebounce_draftPersistsAfterExit() {
+        val activity = composeRule.activity
         val draftsBeforeTest = fakeDraftRepository.currentDrafts.size
 
         startTextEntry()
 
-        // Type content quickly (before auto-save debounce fires)
-        composeRule.onNodeWithTag("editor_text_input").performTextInput("Temporary content")
-        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.onNodeWithTag("editor_text_input").performTextInput("Temporary content")
+            composeRule.mainClock.advanceTimeByFrame()
+            assertEquals(
+                "Normal debounce must not create a draft before the explicit exit action",
+                draftsBeforeTest,
+                fakeDraftRepository.currentDrafts.size,
+            )
 
-        // Use the toolbar back action so the editor's current exit flow runs.
-        composeRule.onNodeWithContentDescription("Back").performClick()
-
-        // Give the auto-save debounce window time to expire after exit.
-        Thread.sleep(3_000)
-
-        assert(fakeDraftRepository.currentDrafts.size == draftsBeforeTest) {
-            "Expected no new drafts after quick exit, but found ${fakeDraftRepository.currentDrafts.size - draftsBeforeTest} new draft(s)"
+            composeRule.onNodeWithContentDescription("Back").performClick()
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.onNodeWithText("Save Draft").assertIsDisplayed().performClick()
+        } finally {
+            composeRule.mainClock.autoAdvance = true
         }
+
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            fakeDraftRepository.currentDrafts.size == draftsBeforeTest + 1
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            activity.isFinishing
+        }
+        assertTrue("Immediate Save Draft must navigate out of the editor", activity.isFinishing)
+
+        val savedDraft = fakeDraftRepository.currentDrafts.last()
+        assertEquals(
+            "Immediate Save Draft must persist the entered text before navigation",
+            "Temporary content",
+            savedDraft.notes.filterIsInstance<JournalNote.Text>().single().content,
+        )
+    }
+
+    /** Test: activity recreation keeps the active editor and its durable draft visible. */
+    @Test
+    fun writeContentAndRecreateActivity_editorRestoresExactDraft() {
+        val content = "Text that must survive rotation"
+        startTextEntry()
+
+        composeRule.onNodeWithTag("editor_text_input").performTextInput(content)
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            fakeDraftRepository.currentDrafts.singleOrNull()
+                ?.notes
+                ?.filterIsInstance<JournalNote.Text>()
+                ?.singleOrNull()
+                ?.content == content
+        }
+
+        composeRule.activityRule.scenario.recreate()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.onAllNodesWithTag("editor_text_input")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onNodeWithTag("editor_text_input").assertTextEquals(content)
+    }
+
+    /** Test: Write content → auto-save → back → Discard → navigate only after durable deletion. */
+    @Test
+    fun writeContentAndDiscard_draftIsDeletedBeforeExit() {
+        val activity = composeRule.activity
+        startTextEntry()
+        composeRule.onNodeWithTag("editor_text_input").performTextInput("Discard this exact draft")
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            fakeDraftRepository.currentDrafts.singleOrNull()
+                ?.notes
+                ?.filterIsInstance<JournalNote.Text>()
+                ?.singleOrNull()
+                ?.content == "Discard this exact draft"
+        }
+
+        composeRule.onNodeWithContentDescription("Back").performClick()
+        composeRule.onNodeWithTag("exit_dialog_discard").assertIsDisplayed().performClick()
+
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            fakeDraftRepository.currentDrafts.isEmpty()
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            activity.isFinishing
+        }
+        assertTrue("Discard must delete the durable draft before navigation", fakeDraftRepository.currentDrafts.isEmpty())
+        assertTrue("Discard must navigate out of the editor", activity.isFinishing)
     }
 
     /**
@@ -172,7 +242,13 @@ class DraftsE2ETest {
 
         openDraftsDialog()
 
-        // Verify draft appears in the list with correct preview text
+        // The sheet fetches drafts asynchronously after it opens. Wait for the durable
+        // preview rather than asserting during the loading frame on slower devices.
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText(draftContent, substring = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
         composeRule.onNodeWithText(draftContent, substring = true).assertIsDisplayed()
 
         // Select the draft
@@ -181,7 +257,7 @@ class DraftsE2ETest {
 
         // Verify text content was loaded into the editor
         composeRule.onNodeWithTag("editor_text_input")
-            .assertTextContains(draftContent)
+            .assertTextEquals(draftContent)
 
         // Save the entry
         composeRule.onNodeWithTag("editor_save_button").performClick()
@@ -192,9 +268,7 @@ class DraftsE2ETest {
         }
 
         // Verify draft was deleted after publishing
-        assert(fakeDraftRepository.currentDrafts.isEmpty()) {
-            "Draft should be deleted after publishing"
-        }
+        assertTrue("Draft should be deleted after publishing", fakeDraftRepository.currentDrafts.isEmpty())
     }
 
     /**
@@ -203,7 +277,7 @@ class DraftsE2ETest {
     @Test
     fun openDraftsDialog_emptyStateShown() {
         // Ensure no drafts exist
-        assert(fakeDraftRepository.currentDrafts.isEmpty())
+        assertTrue("The empty-state test must start without drafts", fakeDraftRepository.currentDrafts.isEmpty())
 
         openDraftsDialog()
 
@@ -224,7 +298,7 @@ class DraftsE2ETest {
 
     private fun startTextEntry() {
         composeRule.onNodeWithContentDescription("Start text entry").performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) {
+        composeRule.waitUntil(timeoutMillis = 10_000) {
             composeRule.onAllNodesWithTag("editor_text_input")
                 .fetchSemanticsNodes()
                 .isNotEmpty()
@@ -273,25 +347,67 @@ private class FakeDraftRepository : EntryDraftRepository {
         }
     }
 
-    override suspend fun createDraft(notes: List<JournalNote>): Uuid {
+    override suspend fun createDraft(notes: List<JournalNote>): Uuid =
+        createDraft(
+            uid = Uuid.random(),
+            notes = notes,
+            pendingMedia = emptyList(),
+            selectedJournalIds = emptyList(),
+        )
+
+    override suspend fun createDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+        pendingMedia: List<PendingMediaRecord>,
+        selectedJournalIds: List<Uuid>,
+    ): Uuid {
         val now = Clock.System.now()
         val draft = EntryDraft(
-            id = Uuid.random(),
+            id = uid,
             notes = notes,
             createdAt = now,
             updatedAt = now,
+            pendingMedia = pendingMedia,
+            selectedJournalIds = selectedJournalIds,
         )
-        drafts.value = drafts.value + draft
+        drafts.value = drafts.value.filterNot { it.id == uid } + draft
         return draft.id
     }
 
     override suspend fun updateDraft(uid: Uuid, notes: List<JournalNote>): Uuid {
+        val existing = drafts.value.firstOrNull { it.id == uid }
+        return updateDraft(
+            uid = uid,
+            notes = notes,
+            pendingMedia = existing?.pendingMedia.orEmpty(),
+            selectedJournalIds = existing?.selectedJournalIds.orEmpty(),
+        )
+    }
+
+    override suspend fun updateDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+        pendingMedia: List<PendingMediaRecord>,
+        selectedJournalIds: List<Uuid>,
+    ): Uuid {
         val now = Clock.System.now()
         val existing = drafts.value.firstOrNull { it.id == uid }
         val updated = if (existing != null) {
-            existing.copy(notes = notes, updatedAt = now)
+            existing.copy(
+                notes = notes,
+                pendingMedia = pendingMedia,
+                selectedJournalIds = selectedJournalIds,
+                updatedAt = now,
+            )
         } else {
-            EntryDraft(id = uid, notes = notes, createdAt = now, updatedAt = now)
+            EntryDraft(
+                id = uid,
+                notes = notes,
+                createdAt = now,
+                updatedAt = now,
+                pendingMedia = pendingMedia,
+                selectedJournalIds = selectedJournalIds,
+            )
         }
         drafts.value = drafts.value.filterNot { it.id == uid } + updated
         return uid
@@ -299,8 +415,19 @@ private class FakeDraftRepository : EntryDraftRepository {
 
     override suspend fun setPendingMedia(
         uid: Uuid,
-        pendingMedia: List<app.logdate.client.repository.journals.PendingMediaRecord>,
-    ) = Unit
+        pendingMedia: List<PendingMediaRecord>,
+    ) {
+        val existing = drafts.value.firstOrNull { it.id == uid } ?: return
+        drafts.value = drafts.value.filterNot { it.id == uid } + existing.copy(pendingMedia = pendingMedia)
+    }
+
+    override suspend fun setSelectedJournalIds(
+        uid: Uuid,
+        selectedJournalIds: List<Uuid>,
+    ) {
+        val existing = drafts.value.firstOrNull { it.id == uid } ?: return
+        drafts.value = drafts.value.filterNot { it.id == uid } + existing.copy(selectedJournalIds = selectedJournalIds)
+    }
 
     override suspend fun deleteDraft(uid: Uuid) {
         drafts.value = drafts.value.filterNot { it.id == uid }

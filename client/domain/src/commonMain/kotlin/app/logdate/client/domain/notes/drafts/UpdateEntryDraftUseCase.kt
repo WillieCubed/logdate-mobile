@@ -3,6 +3,7 @@ package app.logdate.client.domain.notes.drafts
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.PendingMediaRecord
 import kotlin.uuid.Uuid
 
 /**
@@ -24,11 +25,33 @@ class UpdateEntryDraftUseCase(
         draftId: Uuid,
         content: List<JournalNote>,
         overwrite: Boolean = true,
-    ): Uuid = entryDraftRepository.updateDraft(draftId, content)
+    ): Uuid = entryDraftRepository.updateDraft(uid = draftId, notes = content)
+
+    /** Replaces every durable field in the draft with one complete snapshot. */
+    suspend operator fun invoke(
+        draftId: Uuid,
+        content: List<JournalNote>,
+        pendingMedia: List<PendingMediaRecord>,
+        selectedJournalIds: List<Uuid>,
+        overwrite: Boolean = true,
+    ): Uuid =
+        entryDraftRepository.updateDraft(
+            uid = draftId,
+            notes = content,
+            pendingMedia = pendingMedia,
+            selectedJournalIds = selectedJournalIds,
+        )
 
     suspend operator fun invoke(
         draftId: Uuid,
         content: EntryDraft,
         overwrite: Boolean = true,
-    ): Uuid = invoke(draftId, content.notes, overwrite)
+    ): Uuid =
+        invoke(
+            draftId = draftId,
+            content = content.notes,
+            overwrite = overwrite,
+            pendingMedia = content.pendingMedia,
+            selectedJournalIds = content.selectedJournalIds,
+        )
 }

@@ -32,6 +32,16 @@ sealed interface MediaDetailUiState {
         val locationDisplayName: String? = null,
         val journals: List<JournalReference> = emptyList(),
     ) : MediaDetailUiState
+
+    data class AudioContent(
+        val mediaId: Uuid,
+        val mediaRef: String,
+        val durationMs: Long,
+        val createdAt: Instant,
+        val location: NoteLocation?,
+        val locationDisplayName: String? = null,
+        val journals: List<JournalReference> = emptyList(),
+    ) : MediaDetailUiState
 }
 
 /**
@@ -72,6 +82,7 @@ data class MediaViewerItem(
     val uid: Uuid,
     val uri: String,
     val isVideo: Boolean,
+    val isAudio: Boolean = false,
 )
 
 /**

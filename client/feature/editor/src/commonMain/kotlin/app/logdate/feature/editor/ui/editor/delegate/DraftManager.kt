@@ -5,7 +5,6 @@ import app.logdate.client.domain.notes.drafts.CreateEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.DeleteAllDraftsUseCase
 import app.logdate.client.domain.notes.drafts.DeleteEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchEntryDraftUseCase
-import app.logdate.client.domain.notes.drafts.SetEntryDraftPendingMediaUseCase
 import app.logdate.client.domain.notes.drafts.UpdateEntryDraftUseCase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.PendingMediaRecord
@@ -18,6 +17,7 @@ import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.mapper.toDomainBlock
 import app.logdate.feature.editor.ui.mapper.toJournalNote
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -29,6 +29,7 @@ import kotlin.uuid.Uuid
 data class LoadedDraft(
     val blocks: List<EntryBlockUiState>,
     val draftId: Uuid,
+    val selectedJournalIds: List<Uuid> = emptyList(),
 )
 
 /**
@@ -41,8 +42,9 @@ class DraftManager(
     private val deleteEntryDraft: DeleteEntryDraftUseCase,
     private val deleteAllDraftsUseCase: DeleteAllDraftsUseCase,
     private val cleanupExpiredDraftsUseCase: CleanupExpiredDraftsUseCase,
-    private val setPendingMedia: SetEntryDraftPendingMediaUseCase,
 ) {
+    private var pendingDraftId: Uuid? = null
+
     /**
      * Auto-saves the current entry state as a draft.
      *
@@ -67,7 +69,12 @@ class DraftManager(
             }
         }
 
-        if (notes.isEmpty() && pendingMedia.isEmpty()) {
+        if (
+            notes.isEmpty() &&
+            pendingMedia.isEmpty() &&
+            !state.hasJournalSelectionChanges &&
+            state.draftState == DraftState.None
+        ) {
             Napier.d("Skip autosave: no editable content")
             return null
         }
@@ -75,16 +82,25 @@ class DraftManager(
         val draftId =
             when (val draft = state.draftState) {
                 is DraftState.Active -> {
-                    updateEntryDraft(draft.id, notes)
-                    setPendingMedia(draft.id, pendingMedia)
+                    updateEntryDraft(
+                        draftId = draft.id,
+                        content = notes,
+                        pendingMedia = pendingMedia,
+                        selectedJournalIds = state.selectedJournalIds,
+                    )
+                    pendingDraftId = null
                     draft.id
                 }
                 DraftState.None -> {
-                    val newId = createEntryDraft(notes)
-                    if (pendingMedia.isNotEmpty()) {
-                        setPendingMedia(newId, pendingMedia)
+                    val candidateId = pendingDraftId ?: Uuid.random().also { pendingDraftId = it }
+                    createEntryDraft(
+                        draftId = candidateId,
+                        notes = notes,
+                        pendingMedia = pendingMedia,
+                        selectedJournalIds = state.selectedJournalIds,
+                    ).also {
+                        pendingDraftId = null
                     }
-                    newId
                 }
             }
 
@@ -110,8 +126,11 @@ class DraftManager(
                 LoadedDraft(
                     blocks = noteBlocks + pendingBlocks,
                     draftId = draft.id,
+                    selectedJournalIds = draft.selectedJournalIds,
                 )
             }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -122,10 +141,26 @@ class DraftManager(
     suspend fun deleteDraft(draftId: Uuid): Result<Unit> =
         try {
             deleteEntryDraft(draftId)
+            acknowledgeDraftDeletion(draftId)
             Result.success(Unit)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
         } catch (e: Exception) {
             Result.failure(e)
         }
+
+    /** Returns the durable draft that must be removed after a successful publish or discard. */
+    fun draftIdForCleanup(activeDraftId: Uuid?): Uuid? = activeDraftId ?: pendingDraftId
+
+    /** Returns every durable identity owned by this editor, ordered to retain an active draft on failure. */
+    fun draftIdsForCleanup(activeDraftId: Uuid?): List<Uuid> = listOfNotNull(pendingDraftId, activeDraftId).distinct()
+
+    /** Clears a retained create candidate only after its durable row was deleted. */
+    fun acknowledgeDraftDeletion(draftId: Uuid?) {
+        if (pendingDraftId == draftId) {
+            pendingDraftId = null
+        }
+    }
 
     /**
      * Deletes all drafts atomically.
@@ -133,7 +168,10 @@ class DraftManager(
     suspend fun deleteAllDrafts(): Result<Unit> =
         try {
             deleteAllDraftsUseCase()
+            pendingDraftId = null
             Result.success(Unit)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
         } catch (e: Exception) {
             Result.failure(e)
         }

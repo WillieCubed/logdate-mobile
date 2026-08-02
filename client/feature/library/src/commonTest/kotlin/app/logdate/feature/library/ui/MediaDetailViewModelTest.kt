@@ -184,6 +184,40 @@ class MediaDetailViewModelTest {
         }
 
     @Test
+    fun noteOnlyAudioProducesAudioContentWithDuration() =
+        runTest(testDispatcher) {
+            val noteId = Uuid.random()
+            val notes =
+                listOf(
+                    JournalNote.Audio(
+                        uid = noteId,
+                        creationTimestamp = Instant.fromEpochMilliseconds(1710000000000),
+                        lastUpdated = Instant.fromEpochMilliseconds(1710000000000),
+                        mediaRef = "file:///recording.m4a",
+                        durationMs = 8_750,
+                    ),
+                )
+            val viewModel =
+                MediaDetailViewModel(
+                    noteId,
+                    FakeJournalNotesRepository(notes),
+                    contentRepository,
+                    indexedMediaRepository,
+                    resolveLocationUseCase,
+                    remoteDisplayManager,
+                )
+
+            val collectJob = launch { viewModel.uiState.collect {} }
+            advanceUntilIdle()
+
+            val state = assertIs<MediaDetailUiState.AudioContent>(viewModel.uiState.value)
+            assertEquals(noteId, state.mediaId)
+            assertEquals("file:///recording.m4a", state.mediaRef)
+            assertEquals(8_750, state.durationMs)
+            collectJob.cancel()
+        }
+
+    @Test
     fun indexedImageUsesIndexedExifMetadata() =
         runTest(testDispatcher) {
             val mediaId = Uuid.random()

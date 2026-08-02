@@ -11,7 +11,7 @@ import app.logdate.feature.editor.ui.editor.delegate.PendingAudioRecoverer
 import app.logdate.feature.editor.ui.mapper.toDomainBlock
 import app.logdate.feature.editor.ui.mapper.toJournalNote
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -49,8 +51,7 @@ class EntryEditorViewModel(
             ),
         )
 
-    // Track the auto-save job so it can be cancelled before a manual save
-    private var autoSaveJob: Job? = null
+    private val draftPersistenceMutex = Mutex()
 
     init {
         viewModelScope.launch {
@@ -67,8 +68,8 @@ class EntryEditorViewModel(
         viewModelScope.launch {
             val defaults = contentLoader.loadDefaultJournals()
             if (defaults.isNotEmpty()) {
-                mutableEditorState.update { state ->
-                    if (state.selectedJournalIds.isEmpty()) {
+                mutateEditorContent { state ->
+                    if (state.selectedJournalIds.isEmpty() && !state.hasJournalSelectionChanges) {
                         state.copy(selectedJournalIds = defaults)
                     } else {
                         state
@@ -93,7 +94,12 @@ class EntryEditorViewModel(
             val readOnlyMap = blocks.associate { it.id to (it.id in todayBlockIds) }
 
             val selectedJournalIds =
-                if (currentState.selectedJournalIds.isEmpty() && data.journals.isNotEmpty()) {
+                if (
+                    currentState.selectedJournalIds.isEmpty() &&
+                    !currentState.hasJournalSelectionChanges &&
+                    currentState.draftState == DraftState.None &&
+                    data.journals.isNotEmpty()
+                ) {
                     listOf(data.journals.first().id)
                 } else {
                     currentState.selectedJournalIds
@@ -117,11 +123,56 @@ class EntryEditorViewModel(
             ),
         )
 
+    /** Atomically rejects durable editor mutations once an exclusive save or exit begins. */
+    private fun mutateEditorContent(transform: (EditorState) -> EditorState): Boolean {
+        while (true) {
+            val currentState = mutableEditorState.value
+            if (currentState.isEditingLocked || currentState.shouldExit) return false
+            val updatedState = transform(currentState)
+            if (updatedState == currentState) return false
+            if (
+                mutableEditorState.compareAndSet(
+                    currentState,
+                    updatedState.copy(contentRevision = currentState.contentRevision + 1),
+                )
+            ) {
+                return true
+            }
+        }
+    }
+
     /**
      * Sets the journals that this entry is associated with.
      */
     fun setSelectedJournals(journalIds: List<Uuid>) {
-        mutableEditorState.update { it.copy(selectedJournalIds = journalIds) }
+        val internalState = mutableEditorState.value
+        val effectiveSelection = authoritativeSelectedJournalIds(internalState, editorState.value)
+        mutateEditorContent { currentState ->
+            if (effectiveSelection == journalIds) {
+                if (currentState.selectedJournalIds == journalIds) {
+                    currentState
+                } else {
+                    currentState.copy(selectedJournalIds = journalIds)
+                }
+            } else {
+                currentState.copy(
+                    selectedJournalIds = journalIds,
+                    hasJournalSelectionChanges = true,
+                    isModified = true,
+                )
+            }
+        }
+    }
+
+    /** Applies navigation-provided journal context without treating it as a user edit. */
+    fun initializeSelectedJournals(journalIds: List<Uuid>) {
+        mutateEditorContent { currentState ->
+            if (currentState.selectedJournalIds == journalIds) {
+                currentState
+            } else {
+                currentState.copy(selectedJournalIds = journalIds)
+            }
+        }
     }
 
     /**
@@ -172,7 +223,7 @@ class EntryEditorViewModel(
                     )
             }
 
-        mutableEditorState.update { currentState ->
+        mutateEditorContent { currentState ->
             currentState.copy(
                 blocks = currentState.blocks + newBlock,
                 expandedBlockId = if (type != BlockType.TEXT) newBlock.id else currentState.expandedBlockId,
@@ -186,7 +237,7 @@ class EntryEditorViewModel(
      * Updates an existing block in the editor.
      */
     fun updateBlock(updatedBlock: EntryBlockUiState) {
-        mutableEditorState.update { currentState ->
+        mutateEditorContent { currentState ->
             if (currentState.isReadOnly(updatedBlock.id)) {
                 currentState
             } else {
@@ -213,7 +264,7 @@ class EntryEditorViewModel(
     fun appendTextBlock(text: String) {
         if (text.isBlank()) return
         val newBlock = TextBlockUiState(content = text)
-        mutableEditorState.update { state ->
+        mutateEditorContent { state ->
             state.copy(
                 blocks = state.blocks + newBlock,
                 isModified = true,
@@ -226,7 +277,7 @@ class EntryEditorViewModel(
      * Also clears the expanded block ID if the deleted block was currently expanded.
      */
     fun removeBlock(blockId: Uuid) {
-        mutableEditorState.update { currentState ->
+        mutateEditorContent { currentState ->
             val shouldClearExpanded = currentState.expandedBlockId == blockId
             val filteredBlocks = currentState.blocks.filterNot { it.id == blockId }
 
@@ -245,28 +296,201 @@ class EntryEditorViewModel(
         val currentState = mutableEditorState.value
         if (state.isSaving || state.shouldExit || currentState.isSaving || currentState.shouldExit) return
 
-        autoSaveJob =
-            viewModelScope.launch {
-                try {
-                    draftManager.autoSave(state)?.let { draftId ->
-                        mutableEditorState.update {
-                            it.copy(draftState = DraftState.Active(draftId))
-                        }
-                    }
-                } catch (e: Exception) {
-                    Napier.e("Failed to auto-save draft: ${e.message}", e)
-                    throw e
+        viewModelScope.launch {
+            try {
+                persistDraft(state)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (e: Exception) {
+                Napier.e("Failed to auto-save draft: ${e.message}", e)
+                mutableEditorState.update {
+                    it.copy(errorMessage = "Failed to save draft: ${e.message}")
                 }
             }
+        }
     }
 
     /**
-     * Cancels any in-flight auto-save to prevent race conditions with manual save.
+     * Suspends until the local draft repository finishes persisting [state].
      */
-    private fun cancelPendingAutoSave() {
-        autoSaveJob?.cancel()
-        autoSaveJob = null
+    suspend fun persistDraft(state: EditorState): Uuid? =
+        persistDraft(
+            state = state,
+            allowWhileExplicitlySaving = false,
+        )
+
+    /**
+     * Persists an explicit exit draft and reports whether it is safe for the UI to navigate.
+     */
+    suspend fun saveAsDraft(state: EditorState): Boolean {
+        if (tryBeginExclusiveOperation(state, lockEditing = false) == null) return false
+
+        return try {
+            val draftId =
+                persistDraft(
+                    state = state,
+                    allowWhileExplicitlySaving = true,
+                ) ?: error("Draft has no content to save")
+            mutableEditorState.update {
+                it.copy(
+                    draftState = DraftState.Active(draftId),
+                    errorMessage = null,
+                )
+            }
+            true
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (e: Exception) {
+            Napier.e("Failed to save exit draft: ${e.message}", e)
+            mutableEditorState.update {
+                it.copy(
+                    errorMessage = "Failed to save draft: ${e.message}",
+                )
+            }
+            false
+        } finally {
+            mutableEditorState.update {
+                it.copy(
+                    isSaving = false,
+                    isEditingLocked = false,
+                )
+            }
+        }
     }
+
+    /** Deletes every durable draft owned by this editor before allowing navigation. */
+    suspend fun discardAndExit(): Boolean {
+        if (tryBeginExclusiveOperation(mutableEditorState.value, lockEditing = true) == null) {
+            return false
+        }
+
+        return try {
+            draftPersistenceMutex.withLock {
+                val activeDraftId = (mutableEditorState.value.draftState as? DraftState.Active)?.id
+                draftManager.draftIdsForCleanup(activeDraftId).forEach { draftId ->
+                    draftManager.deleteDraft(draftId).getOrThrow()
+                }
+                mutableEditorState.update {
+                    it.copy(
+                        draftState = DraftState.None,
+                        hasJournalSelectionChanges = false,
+                        isModified = false,
+                        errorMessage = null,
+                        shouldExit = true,
+                        exitReason = EditorExitReason.DISCARDED,
+                    )
+                }
+            }
+            true
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            Napier.e("Failed to discard draft: ${error.message}", error)
+            mutableEditorState.update {
+                it.copy(errorMessage = "Failed to discard draft: ${error.message}")
+            }
+            false
+        } finally {
+            mutableEditorState.update { currentState ->
+                currentState.copy(
+                    isSaving = false,
+                    isEditingLocked = currentState.shouldExit,
+                )
+            }
+        }
+    }
+
+    private suspend fun persistDraft(
+        state: EditorState,
+        allowWhileExplicitlySaving: Boolean,
+    ): Uuid? =
+        draftPersistenceMutex.withLock {
+            val currentState = mutableEditorState.value
+            if (state.shouldExit || currentState.shouldExit) return@withLock null
+            if (!allowWhileExplicitlySaving && (state.isSaving || currentState.isSaving)) {
+                return@withLock null
+            }
+            if (!allowWhileExplicitlySaving && state.isModified && !currentState.isModified) {
+                return@withLock null
+            }
+            if (!allowWhileExplicitlySaving && state.contentRevision != currentState.contentRevision) {
+                return@withLock null
+            }
+
+            if (allowWhileExplicitlySaving) {
+                return@withLock persistLatestDraftUntilStable(state)
+            }
+
+            // A queued snapshot may predate the first durable save. Always reuse the currently
+            // active draft identity so serialized saves cannot create sibling drafts.
+            val stateWithCurrentDraft = state.copy(draftState = currentState.draftState)
+            persistDraftSnapshot(stateWithCurrentDraft)
+        }
+
+    /**
+     * Explicit exit saves fail closed until the durable snapshot catches up with every editor
+     * mutation that arrived while an earlier write was suspended.
+     */
+    private suspend fun persistLatestDraftUntilStable(initialState: EditorState): Uuid? {
+        var snapshot = currentDraftPersistenceState(initialState)
+        while (true) {
+            val draftId = persistDraftSnapshot(snapshot) ?: return null
+            val latest =
+                currentDraftPersistenceState(snapshot).copy(
+                    draftState = DraftState.Active(draftId),
+                )
+            if (getEditorDraftFingerprint(latest) == getEditorDraftFingerprint(snapshot)) {
+                return draftId
+            }
+            snapshot = latest
+        }
+    }
+
+    private suspend fun persistDraftSnapshot(state: EditorState): Uuid? =
+        draftManager.autoSave(state)?.also { draftId ->
+            mutableEditorState.update {
+                it.copy(
+                    draftState = DraftState.Active(draftId),
+                    hasJournalSelectionChanges =
+                        if (it.selectedJournalIds == state.selectedJournalIds) {
+                            false
+                        } else {
+                            it.hasJournalSelectionChanges
+                        },
+                )
+            }
+        }
+
+    private fun currentDraftPersistenceState(template: EditorState): EditorState {
+        val current = mutableEditorState.value
+        val combined = editorState.value
+        val selectedJournalIds = authoritativeSelectedJournalIds(current, combined)
+        return template.copy(
+            blocks = current.blocks,
+            readOnlyBlocks = combined.readOnlyBlocks,
+            selectedJournalIds = selectedJournalIds,
+            hasJournalSelectionChanges = current.hasJournalSelectionChanges,
+            draftState = current.draftState,
+            shouldExit = current.shouldExit,
+            isModified = current.isModified,
+            isSaving = current.isSaving,
+            contentRevision = current.contentRevision,
+        )
+    }
+
+    private fun authoritativeSelectedJournalIds(
+        current: EditorState,
+        combined: EditorState,
+    ): List<Uuid> =
+        if (
+            current.hasJournalSelectionChanges ||
+            current.draftState is DraftState.Active ||
+            current.selectedJournalIds.isNotEmpty()
+        ) {
+            current.selectedJournalIds
+        } else {
+            combined.selectedJournalIds
+        }
 
     /**
      * Saves the current entry.
@@ -276,16 +500,51 @@ class EntryEditorViewModel(
      * save instead of being silently dropped by the mapper.
      */
     fun saveEntry(state: EditorState) {
-        cancelPendingAutoSave()
-        mutableEditorState.update { it.copy(isSaving = true) }
+        val admittedContentRevision = tryBeginEntrySave(state) ?: return
 
         viewModelScope.launch {
-            val resolvedAudio = finalizePendingAudio() ?: return@launch
+            try {
+                saveEntryAfterAdmission(admittedContentRevision)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Napier.e("Failed to save entry: ${error.message}", error)
+                mutableEditorState.update {
+                    it.copy(errorMessage = "Failed to save: ${error.message}")
+                }
+            } finally {
+                mutableEditorState.update { currentState ->
+                    if (currentState.shouldExit) {
+                        currentState.copy(isSaving = false)
+                    } else {
+                        currentState.copy(
+                            isSaving = false,
+                            isEditingLocked = false,
+                        )
+                    }
+                }
+            }
+        }
+    }
 
-            val latestState = editorState.value
+    private suspend fun saveEntryAfterAdmission(admittedContentRevision: Long) {
+        val resolvedAudio = finalizePendingAudio() ?: return
+
+        // Wait for any local draft write already in progress. Reading the latest state and
+        // deleting its active draft under the same lock prevents a completed autosave from
+        // recreating a draft after publish.
+        draftPersistenceMutex.withLock {
+            val latestEditableState = mutableEditorState.value
+            if (latestEditableState.shouldExit) return@withLock
+            val publishSnapshot = currentDraftPersistenceState(latestEditableState)
+            if (publishSnapshot.contentRevision != admittedContentRevision) {
+                failPublishInvariant()
+                return@withLock
+            }
+            val publishFingerprint = getEditorDraftFingerprint(publishSnapshot)
             val notes =
-                latestState.blocks.mapNotNull { block ->
-                    if (latestState.isReadOnly(block.id)) return@mapNotNull null
+                publishSnapshot.blocks.mapNotNull { block ->
+                    if (publishSnapshot.isReadOnly(block.id)) return@mapNotNull null
                     val effective =
                         if (block is AudioBlockUiState && block.id in resolvedAudio) {
                             block.copy(captureState = resolvedAudio.getValue(block.id))
@@ -296,30 +555,107 @@ class EntryEditorViewModel(
                 }
 
             if (notes.isEmpty()) {
-                applyResolvedAudio(resolvedAudio)
-                mutableEditorState.update { it.copy(shouldExit = true, isSaving = false) }
-                return@launch
-            }
-
-            try {
-                val activeDraftId = (latestState.draftState as? DraftState.Active)?.id
-                saveEntryUseCase(notes, latestState.selectedJournalIds, activeDraftId)
+                val activeDraftId = (publishSnapshot.draftState as? DraftState.Active)?.id
+                val cleanupDraftId = draftManager.draftIdForCleanup(activeDraftId)
+                val deletionFailure = cleanupDraftId?.let { draftManager.deleteDraft(it).exceptionOrNull() }
+                if (deletionFailure != null) {
+                    if (deletionFailure is CancellationException) throw deletionFailure
+                    Napier.e("Failed to delete cleared draft: ${deletionFailure.message}", deletionFailure)
+                    applyResolvedAudio(resolvedAudio)
+                    mutableEditorState.update {
+                        it.copy(errorMessage = "Failed to clear draft: ${deletionFailure.message}")
+                    }
+                    return@withLock
+                }
+                if (publishSnapshotChanged(admittedContentRevision, publishFingerprint, publishSnapshot)) {
+                    applyResolvedAudio(resolvedAudio)
+                    failPublishInvariant()
+                    return@withLock
+                }
                 applyResolvedAudio(resolvedAudio)
                 mutableEditorState.update {
                     it.copy(
                         draftState = DraftState.None,
+                        hasJournalSelectionChanges = false,
                         isModified = false,
-                        errorMessage = null,
                         shouldExit = true,
-                        isSaving = false,
+                        exitReason = EditorExitReason.ENTRY_SAVED,
                     )
                 }
-            } catch (e: Exception) {
-                Napier.e("Failed to save entry: ${e.message}", e)
+                return@withLock
+            }
+
+            val activeDraftId = (publishSnapshot.draftState as? DraftState.Active)?.id
+            val cleanupDraftId = draftManager.draftIdForCleanup(activeDraftId)
+            try {
+                saveEntryUseCase(notes, publishSnapshot.selectedJournalIds, cleanupDraftId)
+                draftManager.acknowledgeDraftDeletion(cleanupDraftId)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
                 applyResolvedAudio(resolvedAudio)
-                mutableEditorState.update {
-                    it.copy(errorMessage = "Failed to save: ${e.message}", isSaving = false)
-                }
+                throw error
+            }
+            if (publishSnapshotChanged(admittedContentRevision, publishFingerprint, publishSnapshot)) {
+                applyResolvedAudio(resolvedAudio)
+                failPublishInvariant()
+                return@withLock
+            }
+            applyResolvedAudio(resolvedAudio)
+            mutableEditorState.update {
+                it.copy(
+                    draftState = DraftState.None,
+                    hasJournalSelectionChanges = false,
+                    isModified = false,
+                    errorMessage = null,
+                    shouldExit = true,
+                    exitReason = EditorExitReason.ENTRY_SAVED,
+                )
+            }
+        }
+    }
+
+    private fun publishSnapshotChanged(
+        admittedContentRevision: Long,
+        admittedFingerprint: String,
+        template: EditorState,
+    ): Boolean {
+        val currentSnapshot = currentDraftPersistenceState(template)
+        return currentSnapshot.contentRevision != admittedContentRevision ||
+            getEditorDraftFingerprint(currentSnapshot) != admittedFingerprint
+    }
+
+    private fun failPublishInvariant() {
+        mutableEditorState.update {
+            it.copy(
+                errorMessage = "The editor changed while saving. Review your entry before closing.",
+                isSaving = false,
+                isEditingLocked = false,
+            )
+        }
+    }
+
+    private fun tryBeginEntrySave(requestedState: EditorState): Long? = tryBeginExclusiveOperation(requestedState, lockEditing = true)
+
+    private fun tryBeginExclusiveOperation(
+        requestedState: EditorState,
+        lockEditing: Boolean,
+    ): Long? {
+        if (requestedState.shouldExit) return null
+        while (true) {
+            val currentState = mutableEditorState.value
+            if (currentState.shouldExit || currentState.isSaving || currentState.isEditingLocked) return null
+            if (
+                mutableEditorState.compareAndSet(
+                    currentState,
+                    currentState.copy(
+                        isSaving = true,
+                        isEditingLocked = lockEditing,
+                        errorMessage = null,
+                    ),
+                )
+            ) {
+                return currentState.contentRevision
             }
         }
     }
@@ -367,6 +703,7 @@ class EntryEditorViewModel(
                         it.copy(
                             errorMessage = "Recording is still finalizing. Try again in a moment.",
                             isSaving = false,
+                            isEditingLocked = false,
                         )
                     }
                     return null
@@ -374,7 +711,11 @@ class EntryEditorViewModel(
                 is AudioCaptureState.Failed -> {
                     Napier.w("Audio finalization failed for block $blockId: ${state.reason}")
                     mutableEditorState.update {
-                        it.copy(errorMessage = state.reason, isSaving = false)
+                        it.copy(
+                            errorMessage = state.reason,
+                            isSaving = false,
+                            isEditingLocked = false,
+                        )
                     }
                     return null
                 }
@@ -422,14 +763,17 @@ class EntryEditorViewModel(
         if (!currentState.shouldReturnToPickerOnBack()) {
             return false
         }
-        mutableEditorState.update {
-            it.copy(
-                blocks = emptyList(),
-                expandedBlockId = null,
-                isModified = false,
-            )
+        return mutateEditorContent {
+            if (it.shouldReturnToPickerOnBack()) {
+                it.copy(
+                    blocks = emptyList(),
+                    expandedBlockId = null,
+                    isModified = it.hasJournalSelectionChanges,
+                )
+            } else {
+                it
+            }
         }
-        return true
     }
 
     /**
@@ -464,26 +808,38 @@ class EntryEditorViewModel(
      * Loads a draft into the editor.
      */
     fun loadDraft(draftId: Uuid) {
+        val requestedContentRevision = mutableEditorState.value.contentRevision
         viewModelScope.launch {
-            draftManager.loadDraft(draftId).fold(
-                onSuccess = { loaded ->
-                    val recoveredBlocks = recoverPendingAudio(loaded.blocks)
-                    mutableEditorState.update { currentState ->
-                        currentState.copy(
-                            blocks = recoveredBlocks,
-                            draftState = DraftState.Active(loaded.draftId),
-                            isModified = true,
-                            errorMessage = null,
-                        )
-                    }
-                },
-                onFailure = { e ->
-                    Napier.e("Failed to load draft: ${e.message}", e)
-                    mutableEditorState.update {
-                        it.copy(errorMessage = "Failed to load draft: ${e.message}")
-                    }
-                },
-            )
+            draftPersistenceMutex.withLock {
+                draftManager.loadDraft(draftId).fold(
+                    onSuccess = { loaded ->
+                        val recoveredBlocks = recoverPendingAudio(loaded.blocks)
+                        if (mutableEditorState.value.contentRevision != requestedContentRevision) {
+                            return@withLock
+                        }
+                        mutateEditorContent { currentState ->
+                            if (currentState.contentRevision != requestedContentRevision) {
+                                currentState
+                            } else {
+                                currentState.copy(
+                                    blocks = recoveredBlocks,
+                                    selectedJournalIds = loaded.selectedJournalIds,
+                                    hasJournalSelectionChanges = false,
+                                    draftState = DraftState.Active(loaded.draftId),
+                                    isModified = true,
+                                    errorMessage = null,
+                                )
+                            }
+                        }
+                    },
+                    onFailure = { e ->
+                        Napier.e("Failed to load draft: ${e.message}", e)
+                        mutableEditorState.update {
+                            it.copy(errorMessage = "Failed to load draft: ${e.message}")
+                        }
+                    },
+                )
+            }
         }
     }
 
@@ -511,25 +867,45 @@ class EntryEditorViewModel(
      * Deletes a draft.
      */
     fun deleteDraft(draftId: Uuid) {
+        val requestedContentRevision = mutableEditorState.value.contentRevision
         viewModelScope.launch {
-            draftManager.deleteDraft(draftId).fold(
-                onSuccess = {
-                    mutableEditorState.update {
-                        val newDraftState =
-                            when (val current = it.draftState) {
-                                is DraftState.Active -> if (current.id == draftId) DraftState.None else current
-                                DraftState.None -> DraftState.None
-                            }
-                        it.copy(draftState = newDraftState)
-                    }
-                },
-                onFailure = { e ->
-                    Napier.e("Failed to delete draft: ${e.message}", e)
-                    mutableEditorState.update {
-                        it.copy(errorMessage = "Failed to delete draft: ${e.message}")
-                    }
-                },
-            )
+            draftPersistenceMutex.withLock {
+                draftManager.deleteDraft(draftId).fold(
+                    onSuccess = {
+                        mutableEditorState.update {
+                            val deletedActiveDraft =
+                                (it.draftState as? DraftState.Active)?.id == draftId
+                            val contentUnchanged = it.contentRevision == requestedContentRevision
+                            val newDraftState =
+                                when (val current = it.draftState) {
+                                    is DraftState.Active -> if (current.id == draftId) DraftState.None else current
+                                    DraftState.None -> DraftState.None
+                                }
+                            it.copy(
+                                draftState = newDraftState,
+                                hasJournalSelectionChanges =
+                                    if (deletedActiveDraft && contentUnchanged) {
+                                        false
+                                    } else {
+                                        it.hasJournalSelectionChanges
+                                    },
+                                isModified =
+                                    if (deletedActiveDraft && contentUnchanged) {
+                                        false
+                                    } else {
+                                        it.isModified
+                                    },
+                            )
+                        }
+                    },
+                    onFailure = { e ->
+                        Napier.e("Failed to delete draft: ${e.message}", e)
+                        mutableEditorState.update {
+                            it.copy(errorMessage = "Failed to delete draft: ${e.message}")
+                        }
+                    },
+                )
+            }
         }
     }
 
@@ -537,18 +913,43 @@ class EntryEditorViewModel(
      * Deletes all drafts atomically.
      */
     fun deleteAllDrafts() {
+        val requestedContentRevision = mutableEditorState.value.contentRevision
         viewModelScope.launch {
-            draftManager.deleteAllDrafts().fold(
-                onSuccess = {
-                    mutableEditorState.update { it.copy(draftState = DraftState.None) }
-                },
-                onFailure = { e ->
-                    Napier.e("Failed to delete all drafts: ${e.message}", e)
-                    mutableEditorState.update {
-                        it.copy(errorMessage = "Failed to delete drafts: ${e.message}")
-                    }
-                },
-            )
+            draftPersistenceMutex.withLock {
+                draftManager.deleteAllDrafts().fold(
+                    onSuccess = {
+                        mutableEditorState.update {
+                            it.copy(
+                                draftState = DraftState.None,
+                                hasJournalSelectionChanges =
+                                    if (
+                                        it.draftState is DraftState.Active &&
+                                        it.contentRevision == requestedContentRevision
+                                    ) {
+                                        false
+                                    } else {
+                                        it.hasJournalSelectionChanges
+                                    },
+                                isModified =
+                                    if (
+                                        it.draftState is DraftState.Active &&
+                                        it.contentRevision == requestedContentRevision
+                                    ) {
+                                        false
+                                    } else {
+                                        it.isModified
+                                    },
+                            )
+                        }
+                    },
+                    onFailure = { e ->
+                        Napier.e("Failed to delete all drafts: ${e.message}", e)
+                        mutableEditorState.update {
+                            it.copy(errorMessage = "Failed to delete drafts: ${e.message}")
+                        }
+                    },
+                )
+            }
         }
     }
 
@@ -654,13 +1055,12 @@ class EntryEditorViewModel(
                     mutableEditorState.update { currentState ->
                         currentState.copy(
                             blocks = listOf(block),
+                            selectedJournalIds = journalId?.let(::listOf) ?: currentState.selectedJournalIds,
+                            hasJournalSelectionChanges = false,
                             isLoading = false,
                             isModified = false,
                             errorMessage = null,
                         )
-                    }
-                    if (journalId != null) {
-                        setSelectedJournals(listOf(journalId))
                     }
                 },
                 onFailure = { e ->

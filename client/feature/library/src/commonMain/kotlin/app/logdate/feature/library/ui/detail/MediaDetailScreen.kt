@@ -43,6 +43,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -81,6 +83,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
+import app.logdate.client.media.audio.AudioPlaybackManager
+import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
@@ -89,6 +93,7 @@ import app.logdate.feature.editor.ui.video.VideoPlayerContent
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.media.MediaDeviceSelector
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
@@ -122,6 +127,31 @@ fun MediaDetailScreen(
     val viewerState by viewModel.viewerState.collectAsStateWithLifecycle()
     val presenterState by viewModel.presenterState.collectAsStateWithLifecycle()
     val outputSelection by audioRouteRepository.outputDevices.collectAsStateWithLifecycle()
+    val audioPlaybackManager: AudioPlaybackManager = koinInject()
+    var audioProgress by remember { mutableFloatStateOf(0f) }
+    var playingAudioUri by remember { mutableStateOf<String?>(null) }
+
+    fun toggleAudio(
+        uri: String,
+        durationMs: Long,
+        noteId: Uuid,
+    ) {
+        if (playingAudioUri == uri) {
+            audioPlaybackManager.pausePlayback()
+            playingAudioUri = null
+        } else {
+            audioPlaybackManager.startPlayback(
+                uri = uri,
+                metadata = AudioPlaybackMetadata(title = "LogDate recording", noteId = noteId),
+                onProgressUpdated = { audioProgress = it },
+                onPlaybackCompleted = {
+                    audioProgress = 0f
+                    playingAudioUri = null
+                },
+            )
+            playingAudioUri = uri
+        }
+    }
 
     val isExpanded =
         currentWindowAdaptiveInfo()
@@ -145,6 +175,12 @@ fun MediaDetailScreen(
         onStartPresenting = viewModel::startPresenting,
         onStopPresenting = viewModel::stopPresenting,
         onPresentItem = viewModel::presentItem,
+        audioProgress = audioProgress,
+        isAudioPlaying = { it == playingAudioUri },
+        onToggleAudio = ::toggleAudio,
+        onSeekAudio = { uri, position, duration ->
+            if (playingAudioUri == uri && duration > 0L) audioPlaybackManager.seekTo(position)
+        },
         modifier = modifier,
     )
 }
@@ -171,6 +207,10 @@ fun MediaDetailContent(
     onStartPresenting: () -> Unit = {},
     onStopPresenting: () -> Unit = {},
     onPresentItem: (Int) -> Unit = {},
+    audioProgress: Float = 0f,
+    isAudioPlaying: (String) -> Boolean = { false },
+    onToggleAudio: (String, Long, Uuid) -> Unit = { _, _, _ -> },
+    onSeekAudio: (String, Float, Long) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     when (state) {
@@ -245,6 +285,83 @@ fun MediaDetailContent(
                 onStopPresenting = onStopPresenting,
                 onPresentItem = onPresentItem,
                 modifier = modifier,
+            )
+        }
+
+        is MediaDetailUiState.AudioContent -> {
+            AudioMediaDetailContent(
+                state = state,
+                progress = audioProgress,
+                isPlaying = isAudioPlaying(state.mediaRef),
+                onToggle = { onToggleAudio(state.mediaRef, state.durationMs, state.mediaId) },
+                onSeek = { onSeekAudio(state.mediaRef, it, state.durationMs) },
+                onBack = onBack,
+                modifier = modifier,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AudioMediaDetailContent(
+    state: MediaDetailUiState.AudioContent,
+    progress: Float,
+    isPlaying: Boolean,
+    onToggle: () -> Unit,
+    onSeek: (Float) -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier.align(Alignment.Start).padding(Spacing.md),
+        ) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+        }
+        Icon(
+            painter = PlatformIcons.audioFile(),
+            contentDescription = "Audio recording",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(80.dp),
+        )
+        Spacer(Modifier.height(Spacing.lg))
+        Text("Audio recording", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            text =
+                state.createdAt
+                    .toString()
+                    .replace('T', ' ')
+                    .substringBefore('.'),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.lg))
+        androidx.compose.material3.Slider(
+            value = progress.coerceIn(0f, 1f),
+            onValueChange = onSeek,
+            modifier = Modifier.fillMaxWidth(0.82f),
+            enabled = state.durationMs > 0,
+        )
+        LinearProgressIndicator(
+            progress = { progress.coerceIn(0f, 1f) },
+            modifier = Modifier.fillMaxWidth(0.82f),
+        )
+        Spacer(Modifier.height(Spacing.md))
+        FilledTonalIconButton(onClick = onToggle, modifier = Modifier.size(64.dp)) {
+            Icon(
+                painter =
+                    if (isPlaying) {
+                        PlatformIcons.pause()
+                    } else {
+                        PlatformIcons.play()
+                    },
+                contentDescription = if (isPlaying) "Pause audio" else "Play audio",
+                modifier = Modifier.size(32.dp),
             )
         }
     }

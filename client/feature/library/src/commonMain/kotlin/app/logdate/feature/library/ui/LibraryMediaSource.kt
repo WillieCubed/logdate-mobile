@@ -17,6 +17,8 @@ internal data class LibraryMediaSource(
     val uri: String,
     val timestamp: Instant,
     val isVideo: Boolean,
+    val isAudio: Boolean,
+    val durationMs: Long,
     val indexedMedia: IndexedMedia?,
     val matchingNotes: List<JournalNote>,
 )
@@ -50,6 +52,8 @@ internal fun buildLibraryMediaSources(
                     uri = primary.uri,
                     timestamp = primary.timestamp,
                     isVideo = primary is IndexedMedia.Video,
+                    isAudio = false,
+                    durationMs = (primary as? IndexedMedia.Video)?.duration?.inWholeMilliseconds ?: 0L,
                     indexedMedia = primary,
                     matchingNotes = noteMediaByUri[primary.uri]?.map { it.note }.orEmpty(),
                 )
@@ -66,6 +70,8 @@ internal fun buildLibraryMediaSources(
                     uri = primary.uri,
                     timestamp = primary.note.creationTimestamp,
                     isVideo = primary.isVideo,
+                    isAudio = primary.isAudio,
+                    durationMs = primary.durationMs,
                     indexedMedia = null,
                     matchingNotes = noteMedia.map { it.note },
                 )
@@ -78,11 +84,21 @@ private data class LibraryNoteMedia(
     val note: JournalNote,
     val uri: String,
     val isVideo: Boolean,
+    val isAudio: Boolean = false,
+    val durationMs: Long = 0L,
 )
 
 private fun JournalNote.asLibraryNoteMedia(): LibraryNoteMedia? =
     when (this) {
         is JournalNote.Image -> LibraryNoteMedia(note = this, uri = mediaRef, isVideo = false)
         is JournalNote.Video -> LibraryNoteMedia(note = this, uri = mediaRef, isVideo = true)
+        is JournalNote.Audio ->
+            LibraryNoteMedia(
+                note = this,
+                uri = mediaRef,
+                isVideo = false,
+                isAudio = true,
+                durationMs = durationMs,
+            )
         else -> null
     }

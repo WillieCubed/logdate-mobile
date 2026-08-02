@@ -3,6 +3,12 @@ package app.logdate.client.data.notes.drafts
 import app.logdate.client.repository.journals.EntryDraft
 import kotlin.uuid.Uuid
 
+/** Signals unreadable local draft data without deleting or replacing the original snapshot. */
+class EntryDraftStorageException(
+    message: String,
+    cause: Throwable? = null,
+) : Exception(message, cause)
+
 /**
  * Platform-agnostic interface for storing entry drafts locally on the device.
  * Each platform must provide its own implementation of this interface.

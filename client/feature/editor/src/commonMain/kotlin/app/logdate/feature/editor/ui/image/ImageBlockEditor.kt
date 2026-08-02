@@ -1,5 +1,6 @@
 package app.logdate.feature.editor.ui.image
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -8,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.common.DeleteMediaButton
@@ -37,6 +39,7 @@ fun ImageBlockEditor(
     block: ImageBlockUiState,
     onBlockUpdated: (ImageBlockUiState) -> Unit,
     onDeleteRequested: () -> Unit,
+    previewImagePainter: Painter? = null,
     modifier: Modifier = Modifier,
 ) {
     val hasExistingImage = block.uri != null
@@ -49,16 +52,25 @@ fun ImageBlockEditor(
                     .padding(8.dp)
                     .clip(RoundedCornerShape(16.dp)),
         ) {
-            AsyncImage(
-                model =
-                    ImageRequest
-                        .Builder(LocalPlatformContext.current)
-                        .data(block.uri)
-                        .build(),
-                contentDescription = block.caption.ifBlank { "Image" },
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
+            if (previewImagePainter != null) {
+                Image(
+                    painter = previewImagePainter,
+                    contentDescription = block.caption.ifBlank { "Image" },
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                AsyncImage(
+                    model =
+                        ImageRequest
+                            .Builder(LocalPlatformContext.current)
+                            .data(block.uri)
+                            .build(),
+                    contentDescription = block.caption.ifBlank { "Image" },
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
 
             DeleteMediaButton(
                 onClick = onDeleteRequested,

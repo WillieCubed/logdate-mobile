@@ -73,6 +73,8 @@ class LibraryViewModel(
             uri = uri,
             thumbnailUri = null,
             isVideo = isVideo,
+            isAudio = isAudio,
+            durationMs = durationMs,
             timestamp = timestamp,
         )
 }

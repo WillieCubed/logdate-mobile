@@ -12,10 +12,15 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.webkit.MimeTypeMap
+import app.logdate.client.media.storage.AndroidCanonicalMediaStore
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
@@ -38,6 +43,7 @@ class AndroidMediaManager(
     private val contentResolver: ContentResolver,
     private val context: Context,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val canonicalMediaStore: AndroidCanonicalMediaStore = AndroidCanonicalMediaStore(context.filesDir),
 ) : MediaManager {
     private val filesDir = context.filesDir
     private val legacyBackfillMutex = Mutex()
@@ -505,65 +511,56 @@ class AndroidMediaManager(
             )
         }
 
-    override suspend fun saveMedia(payload: MediaPayload): String =
-        withContext(ioDispatcher) {
-            val mimeType =
-                requireSupportedMediaMimeType(
-                    payload.mimeType.ifBlank {
-                        resolveMimeTypeFromFileName(payload.fileName)
-                    },
-                    payload.fileName,
-                )
-            try {
-                if (mimeType.startsWith("audio/")) {
-                    persistAudioStream(
-                        inputStream = payload.data.inputStream(),
-                        fileName = payload.fileName,
-                        mimeType = mimeType,
-                    )
-                } else {
-                    publishBytesToMediaStore(
-                        bytes = payload.data,
-                        fileName = payload.fileName,
-                        mimeType = mimeType,
-                        timestamp = Clock.System.now(),
-                    )
-                }
-            } catch (error: Exception) {
-                Napier.e("Failed to persist media payload", error)
-                throw error
+    override suspend fun saveMedia(payload: MediaPayload): String {
+        val mimeType =
+            requireSupportedMediaMimeType(
+                payload.mimeType.ifBlank {
+                    resolveMimeTypeFromFileName(payload.fileName)
+                },
+                payload.fileName,
+            )
+        return try {
+            require(payload.sizeBytes == payload.data.size.toLong()) {
+                "Expected ${payload.sizeBytes} media bytes but received ${payload.data.size}"
             }
+            withContext(ioDispatcher) {
+                canonicalMediaStore.store(
+                    input = payload.data.inputStream(),
+                    mimeType = mimeType,
+                    expectedSizeBytes = payload.sizeBytes,
+                )
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            Napier.e("Failed to persist media payload", error)
+            throw error
         }
+    }
 
     override suspend fun saveMediaFromFile(
         sourceFilePath: String,
         fileName: String,
         mimeType: String,
-    ): String =
-        withContext(ioDispatcher) {
-            val sourceFile = File(sourceFilePath)
-            val supportedMimeType = requireSupportedMediaMimeType(mimeType, fileName)
-            try {
-                if (supportedMimeType.startsWith("audio/")) {
-                    check(sourceFile.isFile) { "Media file does not exist: ${sourceFile.absolutePath}" }
-                    persistAudioStream(
-                        inputStream = FileInputStream(sourceFile),
-                        fileName = fileName,
-                        mimeType = supportedMimeType,
-                    )
-                } else {
-                    publishFileToMediaStore(
-                        sourceFile = sourceFile,
-                        fileName = fileName,
-                        mimeType = supportedMimeType,
-                        timestamp = fileTimestamp(sourceFile),
-                    )
-                }
-            } catch (error: Exception) {
-                Napier.e("Failed to persist media file", error)
-                throw error
+    ): String {
+        val sourceFile = File(sourceFilePath)
+        val supportedMimeType = requireSupportedMediaMimeType(mimeType, fileName)
+        return try {
+            withContext(ioDispatcher) {
+                check(sourceFile.isFile) { "Media file does not exist: ${sourceFile.absolutePath}" }
+                canonicalMediaStore.store(
+                    input = FileInputStream(sourceFile),
+                    mimeType = supportedMimeType,
+                    expectedSizeBytes = sourceFile.length(),
+                )
             }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            Napier.e("Failed to persist media file", error)
+            throw error
         }
+    }
 
     private suspend fun ensureLegacyManagedMediaBackfilled() =
         legacyBackfillMutex.withLock {
@@ -611,7 +608,42 @@ class AndroidMediaManager(
 
     private fun isPublishableMimeType(mimeType: String): Boolean = mimeType.startsWith("image/") || mimeType.startsWith("video/")
 
-    private fun isSupportedMediaMimeType(mimeType: String): Boolean = isPublishableMimeType(mimeType) || mimeType.startsWith("audio/")
+    private fun isSupportedMediaMimeType(mimeType: String): Boolean =
+        mimeType in
+            setOf(
+                "image/jpeg",
+                "image/heic",
+                "image/heic-sequence",
+                "image/heif",
+                "image/heif-sequence",
+                "image/avif",
+                "image/bmp",
+                "image/png",
+                "image/webp",
+                "image/gif",
+                "video/mp4",
+                "video/mpeg",
+                "video/ogg",
+                "video/webm",
+                "video/quicktime",
+                "video/3gpp",
+                "video/3gpp2",
+                "video/x-matroska",
+                "video/x-msvideo",
+                "video/x-ms-wmv",
+                "audio/mp4",
+                "audio/mpeg",
+                "audio/ogg",
+                "audio/aac",
+                "audio/amr",
+                "audio/flac",
+                "audio/midi",
+                "audio/opus",
+                "audio/3gpp",
+                "audio/3gpp2",
+                "audio/webm",
+                "audio/wav",
+            )
 
     private fun resolveMimeTypeFromFileName(fileName: String): String? {
         val extension = MimeTypeMap.getFileExtensionFromUrl(fileName).lowercase()
@@ -635,50 +667,12 @@ class AndroidMediaManager(
         mimeType: String,
         timestamp: Instant,
     ): String =
-        withContext(ioDispatcher) {
-            val target =
-                mediaStoreTargetForMimeType(mimeType)
-                    ?: throw IllegalArgumentException("Unsupported media type: $mimeType")
-            val sanitizedName = sanitizeFileName(fileName)
-            val values =
-                ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME, sanitizedName)
-                    put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, target.relativePath)
-                    put(MediaStore.MediaColumns.DATE_TAKEN, timestamp.toEpochMilliseconds())
-                    put(MediaStore.MediaColumns.IS_PENDING, 1)
-                }
-
-            val insertedUri =
-                contentResolver.insert(target.collectionUri, values)
-                    ?: throw IllegalStateException("Failed to create MediaStore row for $sourceUri")
-
-            try {
-                contentResolver.openOutputStream(insertedUri, "w")?.use { output ->
-                    openSourceInputStream(sourceUri).use { input ->
-                        input.copyTo(output)
-                    }
-                } ?: throw IllegalStateException("Failed to open output stream for $insertedUri")
-
-                val cleared =
-                    contentResolver.update(
-                        insertedUri,
-                        ContentValues().apply {
-                            put(MediaStore.MediaColumns.IS_PENDING, 0)
-                        },
-                        null,
-                        null,
-                    )
-                if (cleared <= 0) {
-                    throw IllegalStateException("Failed to finalize MediaStore row for $insertedUri")
-                }
-
-                insertedUri.toString()
-            } catch (e: Exception) {
-                contentResolver.delete(insertedUri, null, null)
-                throw e
-            }
-        }
+        publishStreamToMediaStore(
+            openInputStream = { openSourceInputStream(sourceUri) },
+            fileName = fileName,
+            mimeType = mimeType,
+            timestamp = timestamp,
+        )
 
     private suspend fun publishBytesToMediaStore(
         bytes: ByteArray,
@@ -687,7 +681,7 @@ class AndroidMediaManager(
         timestamp: Instant,
     ): String =
         publishStreamToMediaStore(
-            inputStream = java.io.ByteArrayInputStream(bytes),
+            openInputStream = { java.io.ByteArrayInputStream(bytes) },
             fileName = fileName,
             mimeType = mimeType,
             timestamp = timestamp,
@@ -700,61 +694,104 @@ class AndroidMediaManager(
         timestamp: Instant,
     ): String =
         publishStreamToMediaStore(
-            inputStream = FileInputStream(sourceFile),
+            openInputStream = { FileInputStream(sourceFile) },
             fileName = fileName,
             mimeType = mimeType,
             timestamp = timestamp,
         )
 
     private suspend fun publishStreamToMediaStore(
-        inputStream: InputStream,
+        openInputStream: () -> InputStream,
         fileName: String,
         mimeType: String,
         timestamp: Instant,
-    ): String =
-        withContext(ioDispatcher) {
-            inputStream.use { input ->
-                val target =
-                    mediaStoreTargetForMimeType(mimeType)
-                        ?: throw IllegalArgumentException("Unsupported media type: $mimeType")
-                val sanitizedName = sanitizeFileName(fileName)
-                val values =
-                    ContentValues().apply {
-                        put(MediaStore.MediaColumns.DISPLAY_NAME, sanitizedName)
-                        put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-                        put(MediaStore.MediaColumns.RELATIVE_PATH, target.relativePath)
-                        put(MediaStore.MediaColumns.DATE_TAKEN, timestamp.toEpochMilliseconds())
-                        put(MediaStore.MediaColumns.IS_PENDING, 1)
-                    }
-                val insertedUri =
-                    contentResolver.insert(target.collectionUri, values)
-                        ?: throw IllegalStateException("Failed to create MediaStore row for $fileName")
+    ): String {
+        var insertedUri: Uri? = null
+        var ownershipHandedOff = false
+        var primaryFailure: Throwable? = null
 
-                try {
-                    contentResolver.openOutputStream(insertedUri, "w")?.use { output ->
-                        input.copyTo(output)
-                    } ?: throw IllegalStateException("Failed to open output stream for $insertedUri")
+        try {
+            val publishedUri =
+                withContext(ioDispatcher) {
+                    val target =
+                        mediaStoreTargetForMimeType(mimeType)
+                            ?: throw IllegalArgumentException("Unsupported media type: $mimeType")
+                    val sanitizedName = sanitizeFileName(fileName)
+                    val values =
+                        ContentValues().apply {
+                            put(MediaStore.MediaColumns.DISPLAY_NAME, sanitizedName)
+                            put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                            put(MediaStore.MediaColumns.RELATIVE_PATH, target.relativePath)
+                            put(MediaStore.MediaColumns.DATE_TAKEN, timestamp.toEpochMilliseconds())
+                            put(MediaStore.MediaColumns.IS_PENDING, 1)
+                        }
+                    insertedUri =
+                        contentResolver.insert(target.collectionUri, values)
+                            ?: throw IllegalStateException("Failed to create MediaStore row for $fileName")
+                    val destinationUri = checkNotNull(insertedUri)
+
+                    openInputStream().use { input ->
+                        contentResolver.openOutputStream(destinationUri, "w")?.use { output ->
+                            copyToMediaStoreCancellable(input, output)
+                        } ?: throw IllegalStateException("Failed to open output stream for $destinationUri")
+                    }
+                    currentCoroutineContext().ensureActive()
 
                     val cleared =
                         contentResolver.update(
-                            insertedUri,
+                            destinationUri,
                             ContentValues().apply {
                                 put(MediaStore.MediaColumns.IS_PENDING, 0)
                             },
                             null,
                             null,
                         )
-                    if (cleared <= 0) {
-                        throw IllegalStateException("Failed to finalize MediaStore row for $insertedUri")
-                    }
+                    check(cleared > 0) { "Failed to finalize MediaStore row for $destinationUri" }
+                    currentCoroutineContext().ensureActive()
 
-                    insertedUri.toString()
-                } catch (e: Exception) {
-                    contentResolver.delete(insertedUri, null, null)
-                    throw e
+                    destinationUri.toString()
+                }
+
+            ownershipHandedOff = true
+            return publishedUri
+        } catch (error: Throwable) {
+            primaryFailure = error
+            throw error
+        } finally {
+            if (!ownershipHandedOff) {
+                insertedUri?.let { orphanedUri ->
+                    try {
+                        withContext(NonCancellable) {
+                            withContext(ioDispatcher) {
+                                check(contentResolver.delete(orphanedUri, null, null) > 0) {
+                                    "Failed to delete abandoned MediaStore row for $orphanedUri"
+                                }
+                            }
+                        }
+                    } catch (cleanupFailure: Throwable) {
+                        primaryFailure?.addSuppressed(cleanupFailure)
+                        if (primaryFailure == null) throw cleanupFailure
+                        Napier.e("Failed to delete abandoned MediaStore row", cleanupFailure)
+                    }
                 }
             }
         }
+    }
+
+    private suspend fun copyToMediaStoreCancellable(
+        input: InputStream,
+        output: java.io.OutputStream,
+    ) {
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            val byteCount = input.read(buffer)
+            if (byteCount < 0) break
+            output.write(buffer, 0, byteCount)
+        }
+        output.flush()
+        currentCoroutineContext().ensureActive()
+    }
 
     private fun openSourceInputStream(uri: Uri): InputStream =
         if (uri.isFileBacked()) {

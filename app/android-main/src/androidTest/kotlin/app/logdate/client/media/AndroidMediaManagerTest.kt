@@ -20,6 +20,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -243,7 +244,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMediaFromFile_publishesImageIntoMediaStore() = runTest {
+    fun saveMediaFromFile_persistsImageInPrivateCanonicalStore() = runTest {
         val sourceFile = createImageFile(context.cacheDir, "source")
         var savedUri: String? = null
 
@@ -255,18 +256,37 @@ class AndroidMediaManagerTest {
                     mimeType = "image/png",
                 )
 
-            assertTrue(savedUri.startsWith("content://media"))
-
-            val media = mediaManager.getMedia(savedUri)
-            assertEquals(sourceFile.name, media.name)
-            assertTrue(media.size > 0)
+            assertTrue(savedUri.startsWith("file:"))
+            assertTrue(File(Uri.parse(savedUri).path.orEmpty()).startsWith(context.filesDir.resolve("media/objects/sha256")))
+            assertTrue(File(Uri.parse(savedUri).path.orEmpty()).readBytes().contentEquals(sourceFile.readBytes()))
         } finally {
-            savedUri?.let { uri ->
-                context.contentResolver.delete(android.net.Uri.parse(uri), null, null)
-            }
+            savedUri?.let { uri -> File(Uri.parse(uri).path.orEmpty()).delete() }
             sourceFile.delete()
         }
     }
+
+    @Test
+    fun saveMediaFromFile_neverPublishesPrivateMediaToMediaStore() =
+        runTest {
+            val environment = createMockEnvironment()
+            val sourceFile = createImageFile(environment.filesDir, "private-copy")
+
+            try {
+                val uri =
+                    environment.mediaManager.saveMediaFromFile(
+                        sourceFilePath = sourceFile.absolutePath,
+                        fileName = sourceFile.name,
+                        mimeType = "image/png",
+                    )
+
+                assertTrue(uri.startsWith("file:"))
+                verify(exactly = 0) { environment.contentResolver.insert(any(), any()) }
+                verify(exactly = 0) { environment.contentResolver.openOutputStream(any(), any()) }
+            } finally {
+                environment.filesDir.deleteRecursively()
+                clearAllMocks()
+            }
+        }
 
     @Test
     fun saveMediaFromFile_rejectsUnsupportedMimeType() = runTest {
@@ -287,7 +307,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMedia_publishesImageIntoMediaStore() = runTest {
+    fun saveMedia_persistsImageInPrivateCanonicalStore() = runTest {
         val sourceFile = createImageFile(context.cacheDir, "payload")
         val payloadBytes = sourceFile.readBytes()
         var savedUri: String? = null
@@ -303,21 +323,17 @@ class AndroidMediaManagerTest {
                     ),
                 )
 
-            assertTrue(savedUri.startsWith("content://media"))
-
-            val media = mediaManager.getMedia(savedUri)
-            assertTrue(media is MediaObject.Image)
-            assertEquals("__payload.png", media.name)
+            assertTrue(savedUri.startsWith("file:"))
+            assertTrue(File(Uri.parse(savedUri).path.orEmpty()).startsWith(context.filesDir.resolve("media/objects/sha256")))
+            assertTrue(File(Uri.parse(savedUri).path.orEmpty()).readBytes().contentEquals(payloadBytes))
         } finally {
-            savedUri?.let { uri ->
-                context.contentResolver.delete(Uri.parse(uri), null, null)
-            }
+            savedUri?.let { uri -> File(Uri.parse(uri).path.orEmpty()).delete() }
             sourceFile.delete()
         }
     }
 
     @Test
-    fun saveMedia_persistsDownloadedAudioInPrivateStorage() = runTest {
+    fun saveMedia_persistsDownloadedAudioInPrivateCanonicalStorage() = runTest {
         val environment = createMockEnvironment()
         val audioBytes = byteArrayOf(9, 8, 7, 6, 5)
 
@@ -333,9 +349,9 @@ class AndroidMediaManagerTest {
                 )
 
             val savedFile = File(requireNotNull(Uri.parse(savedUri).path))
-            assertTrue(savedUri.startsWith("file://"))
-            assertEquals(environment.filesDir.resolve("audio_notes").canonicalPath, savedFile.parentFile?.canonicalPath)
-            assertTrue(savedFile.name.endsWith("-__restored-voice.m4a"))
+            assertTrue(savedUri.startsWith("file:"))
+            assertTrue(savedFile.startsWith(environment.filesDir.resolve("media/objects/sha256")))
+            assertTrue(savedFile.name.endsWith(".m4a"))
             assertTrue(audioBytes.contentEquals(savedFile.readBytes()))
             verify(exactly = 0) { environment.contentResolver.insert(any(), any()) }
         } finally {
@@ -345,7 +361,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMediaFromFile_persistsDownloadedAudioInPrivateStorage() = runTest {
+    fun saveMediaFromFile_persistsDownloadedAudioInPrivateCanonicalStorage() = runTest {
         val environment = createMockEnvironment()
         val audioBytes = byteArrayOf(4, 3, 2, 1)
         val sourceFile = File(environment.filesDir, "source-${Uuid.random()}.m4a").apply { writeBytes(audioBytes) }
@@ -359,7 +375,7 @@ class AndroidMediaManagerTest {
                 )
 
             val savedFile = File(requireNotNull(Uri.parse(savedUri).path))
-            assertEquals(environment.filesDir.resolve("audio_notes").canonicalPath, savedFile.parentFile?.canonicalPath)
+            assertTrue(savedFile.startsWith(environment.filesDir.resolve("media/objects/sha256")))
             assertTrue(audioBytes.contentEquals(savedFile.readBytes()))
             assertTrue(sourceFile.exists(), "Adopting an audio file must not destroy the caller's source")
             verify(exactly = 0) { environment.contentResolver.insert(any(), any()) }
@@ -422,7 +438,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMedia_boundsAsciiAndMultibyteAudioFileNames() = runTest {
+    fun saveMedia_canonicalizesAudioWithoutLeakingFileNames() = runTest {
         val environment = createMockEnvironment()
         val audioBytes = byteArrayOf(1, 2, 1, 2)
         val oversizedNames =
@@ -444,7 +460,7 @@ class AndroidMediaManagerTest {
                     )
 
                 val savedFile = File(requireNotNull(Uri.parse(savedUri).path))
-                assertTrue(savedFile.name.toByteArray(Charsets.UTF_8).size <= 250)
+                assertTrue(savedFile.name.matches(Regex("[0-9a-f]{64}\\.m4a")))
                 assertEquals("audio/mp4", environment.mediaManager.readMedia(savedUri).mimeType)
             }
         } finally {
@@ -454,11 +470,11 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMedia_removesStaleAudioTempsButPreservesFreshWriters() = runTest {
+    fun saveMedia_removesStaleCanonicalStagingFilesButPreservesFreshWriters() = runTest {
         val environment = createMockEnvironment()
-        val audioDirectory = environment.filesDir.resolve("audio_notes").apply { mkdirs() }
-        val staleTemp = audioDirectory.resolve(".${Uuid.random()}-stale.m4a.tmp").apply { writeBytes(ByteArray(8)) }
-        val freshTemp = audioDirectory.resolve(".${Uuid.random()}-fresh.m4a.tmp").apply { writeBytes(ByteArray(8)) }
+        val stagingDirectory = environment.filesDir.resolve("media/staging").apply { mkdirs() }
+        val staleTemp = stagingDirectory.resolve("${Uuid.random()}.tmp").apply { writeBytes(ByteArray(8)) }
+        val freshTemp = stagingDirectory.resolve("${Uuid.random()}.tmp").apply { writeBytes(ByteArray(8)) }
         assertTrue(staleTemp.setLastModified(System.currentTimeMillis() - 25 * 60 * 60 * 1_000L))
 
         try {
@@ -480,7 +496,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMedia_throwsWhenPublishingFails() = runTest {
+    fun saveMedia_doesNotRequireMediaStorePublishing() = runTest {
         val environment = createMockEnvironment()
         val payloadBytes = byteArrayOf(1, 2, 3, 4)
         val payload =
@@ -492,12 +508,10 @@ class AndroidMediaManagerTest {
             )
 
         try {
-            every { environment.contentResolver.insert(any(), any()) } returns null
+            val uri = environment.mediaManager.saveMedia(payload)
 
-            assertFailsWith<IllegalStateException> {
-                environment.mediaManager.saveMedia(payload)
-            }
-            assertTrue(environment.filesDir.resolve("user_media").listFiles().isNullOrEmpty())
+            assertTrue(uri.startsWith("file:"))
+            verify(exactly = 0) { environment.contentResolver.insert(any(), any()) }
         } finally {
             environment.filesDir.deleteRecursively()
             clearAllMocks()
@@ -527,21 +541,20 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMediaFromFile_throwsWhenPublishingFails() = runTest {
+    fun saveMediaFromFile_doesNotRequireMediaStorePublishing() = runTest {
         val environment = createMockEnvironment()
         val sourceFile = createImageFile(environment.filesDir, "publish-fallback")
 
         try {
-            every { environment.contentResolver.insert(any(), any()) } returns null
-
-            assertFailsWith<IllegalStateException> {
+            val uri =
                 environment.mediaManager.saveMediaFromFile(
                     sourceFilePath = sourceFile.absolutePath,
                     fileName = sourceFile.name,
                     mimeType = "image/png",
                 )
-            }
-            assertTrue(environment.filesDir.resolve("user_media").listFiles().isNullOrEmpty())
+
+            assertTrue(uri.startsWith("file:"))
+            verify(exactly = 0) { environment.contentResolver.insert(any(), any()) }
         } finally {
             environment.filesDir.deleteRecursively()
             clearAllMocks()
@@ -549,7 +562,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMediaFromFile_publishesVideoIntoMediaStore() = runTest {
+    fun saveMediaFromFile_persistsVideoInPrivateCanonicalStore() = runTest {
         val sourceFile = File(context.cacheDir, "video-${Uuid.random()}.mp4")
         sourceFile.writeBytes(byteArrayOf(0, 1, 2, 3, 4))
         sourceFile.setLastModified(1_234_567_890_000L)
@@ -563,13 +576,11 @@ class AndroidMediaManagerTest {
                     mimeType = "video/mp4",
                 )
 
-            assertTrue(savedUri.startsWith("content://media"))
-
-            assertTrue(mediaManager.exists(savedUri))
+            assertTrue(savedUri.startsWith("file:"))
+            assertTrue(File(Uri.parse(savedUri).path.orEmpty()).startsWith(context.filesDir.resolve("media/objects/sha256")))
+            assertTrue(File(Uri.parse(savedUri).path.orEmpty()).readBytes().contentEquals(sourceFile.readBytes()))
         } finally {
-            savedUri?.let { uri ->
-                context.contentResolver.delete(Uri.parse(uri), null, null)
-            }
+            savedUri?.let { uri -> File(Uri.parse(uri).path.orEmpty()).delete() }
             sourceFile.delete()
         }
     }
@@ -720,7 +731,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun addToDefaultCollection_publishesNewFileUriAndSkipsDuplicate() = runTest {
+    fun addToDefaultCollection_exportsNewFileUriFromPrivateStorage() = runTest {
         val freshFile = createImageFile(context.cacheDir, "fresh")
         val duplicateFile = createImageFile(context.cacheDir, "duplicate")
         duplicateFile.setLastModified(2_222_222_222_000L)
@@ -742,7 +753,7 @@ class AndroidMediaManagerTest {
             mediaManager.addToDefaultCollection(Uri.fromFile(duplicateFile).toString())
             val afterDuplicate = mediaManager.getRecentMedia().first().count { it.name == duplicateFile.name }
 
-            assertEquals(beforeDuplicate, afterDuplicate)
+            assertEquals(beforeDuplicate + 1, afterDuplicate)
             assertEquals(1, afterDuplicate)
 
             freshPublishedUri = mediaManager.getRecentMedia().first().firstOrNull { it.name == freshFile.name }?.uri
@@ -751,7 +762,7 @@ class AndroidMediaManagerTest {
                 context.contentResolver.delete(Uri.parse(uri), null, null)
             }
             duplicatePublishedUri?.let { uri ->
-                context.contentResolver.delete(Uri.parse(uri), null, null)
+                File(requireNotNull(Uri.parse(uri).path)).delete()
             }
             freshFile.delete()
             duplicateFile.delete()
@@ -1348,7 +1359,9 @@ class AndroidMediaManagerTest {
         val filesDir: File,
     )
 
-    private fun createMockEnvironment(): MockEnvironment {
+    private fun createMockEnvironment(
+        ioDispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
+    ): MockEnvironment {
         val filesDir = File(context.cacheDir, "media-${Uuid.random()}").apply { mkdirs() }
         val contentResolver = mockk<ContentResolver>()
         val mockContext = mockk<Context>()
@@ -1357,7 +1370,7 @@ class AndroidMediaManagerTest {
 
         return MockEnvironment(
             contentResolver = contentResolver,
-            mediaManager = AndroidMediaManager(contentResolver, mockContext, Dispatchers.Unconfined),
+            mediaManager = AndroidMediaManager(contentResolver, mockContext, ioDispatcher),
             filesDir = filesDir,
         )
     }

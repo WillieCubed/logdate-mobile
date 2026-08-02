@@ -6,6 +6,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.uuid.Uuid
 
 /**
  * Tests for the EditorState class, focusing on state management and modifications.
@@ -132,6 +133,32 @@ class EditorStateTest {
         // Should have a block but no content
         assertFalse(stateWithEmptyBlock.isEmpty())
         assertFalse(stateWithEmptyBlock.hasContent())
+    }
+
+    @Test
+    fun modifiedEmptyActiveDraftCannotExitBeforeClearingPersistence() {
+        val state =
+            EditorState(
+                blocks = emptyList(),
+                draftState = DraftState.Active(Uuid.random()),
+                isModified = true,
+            )
+
+        assertTrue(state.isDirty)
+        assertFalse(state.canExitWithoutSaving)
+    }
+
+    @Test
+    fun modifiedJournalSelectionIsDirtyWithoutBlocks() {
+        val state =
+            EditorState(
+                selectedJournalIds = listOf(Uuid.random()),
+                hasJournalSelectionChanges = true,
+                isModified = true,
+            )
+
+        assertTrue(state.isDirty)
+        assertFalse(state.canExitWithoutSaving)
     }
 
     @Test

@@ -22,6 +22,7 @@ import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +36,8 @@ import kotlin.uuid.Uuid
 
 class FakeJournalNotesRepository : JournalNotesRepository {
     private val notesFlow = MutableStateFlow<List<JournalNote>>(emptyList())
+    var createFailure: Throwable? = null
+    var createGate: CompletableDeferred<Unit>? = null
 
     override val allNotesObserved: Flow<List<JournalNote>> = notesFlow
 
@@ -57,6 +60,8 @@ class FakeJournalNotesRepository : JournalNotesRepository {
     override suspend fun getNoteById(noteId: Uuid): JournalNote? = notesFlow.value.firstOrNull { it.uid == noteId }
 
     override suspend fun create(note: JournalNote): Uuid {
+        createGate?.await()
+        createFailure?.let { throw it }
         notesFlow.value = notesFlow.value + note
         return note.uid
     }
@@ -87,6 +92,8 @@ class FakeJournalNotesRepository : JournalNotesRepository {
 }
 
 class FakeJournalContentRepository : JournalContentRepository {
+    val addedJournalIds = mutableListOf<Uuid>()
+
     override fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>> = flowOf(emptyList())
 
     override fun observeJournalsForContent(contentId: Uuid): Flow<List<Journal>> = flowOf(emptyList())
@@ -95,7 +102,7 @@ class FakeJournalContentRepository : JournalContentRepository {
         contentId: Uuid,
         journalId: Uuid,
     ) {
-        // No-op for tests
+        addedJournalIds += journalId
     }
 
     override suspend fun removeContentFromJournal(
@@ -109,7 +116,7 @@ class FakeJournalContentRepository : JournalContentRepository {
         contentId: Uuid,
         journalIds: List<Uuid>,
     ) {
-        // No-op for tests
+        addedJournalIds += journalIds
     }
 
     override suspend fun removeContentFromAllJournals(contentId: Uuid) {
@@ -164,36 +171,75 @@ class FakeJournalRepository : JournalRepository {
 
 class FakeEntryDraftRepository : EntryDraftRepository {
     private val drafts = MutableStateFlow<List<EntryDraft>>(emptyList())
-    private val deletionFailures = mutableSetOf<Uuid>()
+    private val deletionFailures = mutableMapOf<Uuid, Throwable>()
+
+    var getDraftFailure: Throwable? = null
+    var deleteAllDraftsFailure: Throwable? = null
+    var getDraftGate: CompletableDeferred<Unit>? = null
+    var createDraftGate: CompletableDeferred<Unit>? = null
+    var deleteDraftGate: CompletableDeferred<Unit>? = null
+    var deleteAllDraftsGate: CompletableDeferred<Unit>? = null
+    var createDraftFailure: Throwable? = null
+    var createDraftFailureAfterCommit: Throwable? = null
+    var createDraftCallCount: Int = 0
+        private set
+    var updateDraftCallCount: Int = 0
+        private set
 
     /**
      * Configures [deleteDraft] to throw for the given [draftId].
      */
-    fun setDeletionFailure(draftId: Uuid) {
-        deletionFailures.add(draftId)
+    fun setDeletionFailure(
+        draftId: Uuid,
+        failure: Throwable = IllegalStateException("Simulated deletion failure for draft $draftId"),
+    ) {
+        deletionFailures[draftId] = failure
     }
 
     override fun getDrafts(): Flow<List<EntryDraft>> = drafts
 
-    override fun getDraft(uid: Uuid): Flow<Result<EntryDraft>> {
-        val draft = drafts.value.firstOrNull { it.id == uid }
-        return if (draft != null) {
-            flowOf(Result.success(draft))
-        } else {
-            flowOf(Result.failure(NoSuchElementException("Draft not found")))
+    override fun getDraft(uid: Uuid): Flow<Result<EntryDraft>> =
+        flow {
+            getDraftGate?.await()
+            getDraftFailure?.let { throw it }
+            val draft = drafts.value.firstOrNull { it.id == uid }
+            if (draft != null) {
+                emit(Result.success(draft))
+            } else {
+                emit(Result.failure(NoSuchElementException("Draft not found")))
+            }
         }
-    }
 
-    override suspend fun createDraft(notes: List<JournalNote>): Uuid {
+    override suspend fun createDraft(notes: List<JournalNote>): Uuid =
+        createDraft(
+            uid = Uuid.random(),
+            notes = notes,
+        )
+
+    override suspend fun createDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+        pendingMedia: List<PendingMediaRecord>,
+        selectedJournalIds: List<Uuid>,
+    ): Uuid {
+        createDraftCallCount++
+        createDraftGate?.await()
+        createDraftFailure?.let { throw it }
         val now = Clock.System.now()
         val draft =
             EntryDraft(
-                id = Uuid.random(),
+                id = uid,
                 notes = notes,
                 createdAt = now,
                 updatedAt = now,
+                pendingMedia = pendingMedia,
+                selectedJournalIds = selectedJournalIds,
             )
-        drafts.value = drafts.value + draft
+        drafts.value = drafts.value.filterNot { it.id == uid } + draft
+        createDraftFailureAfterCommit?.let { failure ->
+            createDraftFailureAfterCommit = null
+            throw failure
+        }
         return draft.id
     }
 
@@ -201,13 +247,41 @@ class FakeEntryDraftRepository : EntryDraftRepository {
         uid: Uuid,
         notes: List<JournalNote>,
     ): Uuid {
+        val existing = drafts.value.firstOrNull { it.id == uid }
+        return updateDraft(
+            uid = uid,
+            notes = notes,
+            pendingMedia = existing?.pendingMedia.orEmpty(),
+            selectedJournalIds = existing?.selectedJournalIds.orEmpty(),
+        )
+    }
+
+    override suspend fun updateDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+        pendingMedia: List<PendingMediaRecord>,
+        selectedJournalIds: List<Uuid>,
+    ): Uuid {
+        updateDraftCallCount++
         val now = Clock.System.now()
         val existing = drafts.value.firstOrNull { it.id == uid }
         val updated =
             if (existing != null) {
-                existing.copy(notes = notes, updatedAt = now)
+                existing.copy(
+                    notes = notes,
+                    pendingMedia = pendingMedia,
+                    selectedJournalIds = selectedJournalIds,
+                    updatedAt = now,
+                )
             } else {
-                EntryDraft(id = uid, notes = notes, createdAt = now, updatedAt = now)
+                EntryDraft(
+                    id = uid,
+                    notes = notes,
+                    createdAt = now,
+                    updatedAt = now,
+                    pendingMedia = pendingMedia,
+                    selectedJournalIds = selectedJournalIds,
+                )
             }
         drafts.value = drafts.value.filterNot { it.id == uid } + updated
         return uid
@@ -226,14 +300,28 @@ class FakeEntryDraftRepository : EntryDraftRepository {
         drafts.value = drafts.value.filterNot { it.id == uid } + updated
     }
 
+    override suspend fun setSelectedJournalIds(
+        uid: Uuid,
+        selectedJournalIds: List<Uuid>,
+    ) {
+        val existing = drafts.value.firstOrNull { it.id == uid } ?: return
+        val updated =
+            existing.copy(
+                selectedJournalIds = selectedJournalIds,
+                updatedAt = Clock.System.now(),
+            )
+        drafts.value = drafts.value.filterNot { it.id == uid } + updated
+    }
+
     override suspend fun deleteDraft(uid: Uuid) {
-        if (uid in deletionFailures) {
-            throw IllegalStateException("Simulated deletion failure for draft $uid")
-        }
+        deleteDraftGate?.await()
+        deletionFailures[uid]?.let { throw it }
         drafts.value = drafts.value.filterNot { it.id == uid }
     }
 
     override suspend fun deleteAllDrafts() {
+        deleteAllDraftsGate?.await()
+        deleteAllDraftsFailure?.let { throw it }
         drafts.value = emptyList()
     }
 

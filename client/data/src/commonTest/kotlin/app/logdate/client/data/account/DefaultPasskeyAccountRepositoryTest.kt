@@ -43,7 +43,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -124,7 +123,7 @@ class DefaultPasskeyAccountRepositoryTest {
                     saveSession(testSession)
                 }
 
-            val repository = createRepository(sessionStorage = sessionStorage, repositoryScope = backgroundScope)
+            val repository = createRepository(sessionStorage = sessionStorage, repositoryScope = this)
 
             advanceUntilIdle()
 
@@ -152,10 +151,10 @@ class DefaultPasskeyAccountRepositoryTest {
                 createRepository(
                     sessionStorage = sessionStorage,
                     canonicalOwnerProvider = FakeCanonicalOwnerProvider(Uuid.random().toString()),
-                    repositoryScope = backgroundScope,
+                    repositoryScope = this,
                 )
 
-            runCurrent()
+            advanceUntilIdle()
 
             assertFalse(repository.isAuthenticated.value)
             assertNull(sessionStorage.getSession())

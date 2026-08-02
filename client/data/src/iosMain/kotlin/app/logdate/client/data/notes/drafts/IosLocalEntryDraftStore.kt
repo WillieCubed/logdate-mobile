@@ -2,7 +2,10 @@ package app.logdate.client.data.notes.drafts
 
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NoteType
+import app.logdate.client.repository.journals.PendingMediaRecord
+import io.github.aakira.napier.Napier
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -29,6 +32,8 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
         val notes: List<SerializableJournalNote>,
         val createdAt: Long,
         val updatedAt: Long,
+        val pendingMedia: List<PendingMediaRecord> = emptyList(),
+        val selectedJournalIds: List<String> = emptyList(),
     )
 
     @Serializable
@@ -37,7 +42,11 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
         val type: String,
         val content: String,
         val createdAt: Long,
+        val lastUpdated: Long? = null,
+        val syncVersion: Long = 0,
+        val location: NoteLocation? = null,
         val durationMs: Long = 0,
+        val caption: String = "",
     )
 
     private fun EntryDraft.toSerializable(): SerializableEntryDraft =
@@ -46,6 +55,8 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
             notes = notes.map { it.toSerializable() },
             createdAt = createdAt.toEpochMilliseconds(),
             updatedAt = updatedAt.toEpochMilliseconds(),
+            pendingMedia = pendingMedia,
+            selectedJournalIds = selectedJournalIds.map { it.toString() },
         )
 
     private fun JournalNote.toSerializable(): SerializableJournalNote {
@@ -62,7 +73,18 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
             type = this.type.toString(),
             content = noteContent,
             createdAt = this.creationTimestamp.toEpochMilliseconds(),
+            lastUpdated = this.lastUpdated.toEpochMilliseconds(),
+            syncVersion = this.syncVersion,
+            location = this.location,
             durationMs = (this as? JournalNote.Audio)?.durationMs ?: 0,
+            caption =
+                when (this) {
+                    is JournalNote.Image -> caption
+                    is JournalNote.Video -> caption
+                    is JournalNote.Text,
+                    is JournalNote.Audio,
+                    -> ""
+                },
         )
     }
 
@@ -72,74 +94,73 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
             notes = notes.map { it.toDomain() },
             createdAt = Instant.fromEpochMilliseconds(createdAt),
             updatedAt = Instant.fromEpochMilliseconds(updatedAt),
+            pendingMedia = pendingMedia,
+            selectedJournalIds =
+                selectedJournalIds.map(Uuid::parse),
         )
 
     private fun SerializableJournalNote.toDomain(): JournalNote {
-        val noteType =
-            try {
-                NoteType.valueOf(type)
-            } catch (e: IllegalArgumentException) {
-                // Default to TEXT if type is not recognized
-                NoteType.TEXT
-            }
-
-        val noteId =
-            try {
-                Uuid.parse(id)
-            } catch (e: Exception) {
-                Uuid.random()
-            }
+        val noteType = NoteType.valueOf(type)
+        val noteId = Uuid.parse(id)
 
         val timestamp = Instant.fromEpochMilliseconds(createdAt)
+        val updatedTimestamp = Instant.fromEpochMilliseconds(lastUpdated ?: createdAt)
 
         return when (noteType) {
             NoteType.TEXT ->
                 JournalNote.Text(
                     uid = noteId,
                     creationTimestamp = timestamp,
-                    lastUpdated = timestamp,
+                    lastUpdated = updatedTimestamp,
                     content = content,
+                    syncVersion = syncVersion,
+                    location = location,
                 )
             NoteType.AUDIO ->
                 JournalNote.Audio(
                     uid = noteId,
                     creationTimestamp = timestamp,
-                    lastUpdated = timestamp,
+                    lastUpdated = updatedTimestamp,
                     mediaRef = content,
                     durationMs = durationMs,
+                    syncVersion = syncVersion,
+                    location = location,
                 )
             NoteType.IMAGE ->
                 JournalNote.Image(
                     uid = noteId,
                     creationTimestamp = timestamp,
-                    lastUpdated = timestamp,
+                    lastUpdated = updatedTimestamp,
                     mediaRef = content,
+                    caption = caption,
+                    syncVersion = syncVersion,
+                    location = location,
                 )
             NoteType.VIDEO ->
                 JournalNote.Video(
                     uid = noteId,
                     creationTimestamp = timestamp,
-                    lastUpdated = timestamp,
+                    lastUpdated = updatedTimestamp,
                     mediaRef = content,
+                    caption = caption,
+                    syncVersion = syncVersion,
+                    location = location,
                 )
-            else ->
-                JournalNote.Text(
-                    uid = noteId,
-                    creationTimestamp = timestamp,
-                    lastUpdated = timestamp,
-                    content = content,
-                )
+            NoteType.LOCATION ->
+                throw IllegalArgumentException("A draft cannot contain a LOCATION journal note")
         }
     }
 
     override suspend fun saveDraft(draft: EntryDraft) {
         val key = draftsKeyPrefix + draft.id.toString()
         val serializedDraft = json.encodeToString(draft.toSerializable())
+        // Validate every byte that this operation depends on before changing any stored value.
+        if (userDefaults.stringForKey(key) != null) {
+            getDraft(draft.id)
+        }
+        val currentIndex = getDraftIndex()
 
         userDefaults.setValue(serializedDraft, key)
-
-        // Update index
-        val currentIndex = getDraftIndex()
         if (!currentIndex.contains(draft.id.toString())) {
             val updatedIndex = currentIndex + draft.id.toString()
             userDefaults.setValue(json.encodeToString(updatedIndex), draftsIndexKey)
@@ -149,9 +170,12 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
     private fun getDraftIndex(): List<String> {
         val indexJson = userDefaults.stringForKey(draftsIndexKey) ?: return emptyList()
         return try {
-            json.decodeFromString<List<String>>(indexJson)
+            json.decodeFromString<List<String>>(indexJson).also { ids ->
+                ids.forEach(Uuid::parse)
+            }
         } catch (e: Exception) {
-            emptyList()
+            Napier.e("Failed to read the local draft index", e)
+            throw EntryDraftStorageException("The local draft index is unreadable", e)
         }
     }
 
@@ -163,34 +187,35 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
             val serializedDraft = json.decodeFromString<SerializableEntryDraft>(serialized)
             serializedDraft.toDomain()
         } catch (e: Exception) {
-            null
+            Napier.e("Failed to read local draft $id", e)
+            throw EntryDraftStorageException("Local draft $id is unreadable", e)
         }
     }
 
     override suspend fun getAllDrafts(): List<EntryDraft> {
         val draftIds = getDraftIndex()
-        return draftIds.mapNotNull { id ->
-            val key = draftsKeyPrefix + id
-            val serialized = userDefaults.stringForKey(key) ?: return@mapNotNull null
-
-            try {
-                val serializedDraft = json.decodeFromString<SerializableEntryDraft>(serialized)
-                serializedDraft.toDomain()
-            } catch (e: Exception) {
-                null
-            }
+        return draftIds.map { encodedId ->
+            val id =
+                try {
+                    Uuid.parse(encodedId)
+                } catch (e: IllegalArgumentException) {
+                    Napier.e("Invalid draft identity in the local index", e)
+                    throw EntryDraftStorageException("The local draft index contains an invalid identity", e)
+                }
+            getDraft(id)
+                ?: throw EntryDraftStorageException("Indexed local draft $id is missing")
         }
     }
 
     override suspend fun deleteDraft(id: Uuid): Boolean {
         val key = draftsKeyPrefix + id.toString()
         val exists = userDefaults.stringForKey(key) != null
+        // A corrupt index must not turn a failed delete into data loss.
+        val currentIndex = getDraftIndex()
 
         if (exists) {
             userDefaults.removeObjectForKey(key)
 
-            // Update index
-            val currentIndex = getDraftIndex()
             val updatedIndex = currentIndex.filter { it != id.toString() }
             userDefaults.setValue(json.encodeToString(updatedIndex), draftsIndexKey)
         }

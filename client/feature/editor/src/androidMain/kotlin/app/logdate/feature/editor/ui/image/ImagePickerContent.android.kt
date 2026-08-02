@@ -12,10 +12,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -25,9 +28,14 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import app.logdate.client.media.AndroidManagedMediaDiscarder
+import app.logdate.client.media.AndroidManagedMediaImportSource
+import app.logdate.client.media.ManagedMediaImporter
 import app.logdate.client.media.MediaManager
 import app.logdate.client.permissions.PermissionManager
+import app.logdate.feature.editor.ui.media.ManagedMediaSelectionController
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 @Suppress("ktlint:standard:function-naming")
@@ -41,19 +49,51 @@ actual fun ImagePickerContent(
     val mediaManager: MediaManager = koinInject()
     val permissionManager: PermissionManager = koinInject()
     val imagePermissions = remember { imageLibraryPermissions() }
+    val coroutineScope = rememberCoroutineScope()
+    val currentOnImageSelected by rememberUpdatedState(onImageSelected)
+    val managedMediaDiscarder = remember(context) { AndroidManagedMediaDiscarder(context.applicationContext) }
+    val managedMediaImporter =
+        remember(context, mediaManager, managedMediaDiscarder) {
+            ManagedMediaImporter(
+                mediaManager = mediaManager,
+                source = AndroidManagedMediaImportSource(context.applicationContext),
+                discardManagedMedia = managedMediaDiscarder::discard,
+            )
+        }
+    val selectionController =
+        remember(managedMediaImporter, managedMediaDiscarder) {
+            ManagedMediaSelectionController(
+                importMedia = managedMediaImporter::import,
+                discardManagedMedia = managedMediaDiscarder::discard,
+            )
+        }
+    val importState by selectionController.state.collectAsState()
 
     var hasRequestedPermission by rememberSaveable { mutableStateOf(false) }
     var reloadTrigger by remember { mutableIntStateOf(0) }
     var libraryState by remember { mutableStateOf<ImagePickerLibraryState>(ImagePickerLibraryState.Loading) }
 
+    fun importSelection(sourceUri: String) {
+        coroutineScope.launch {
+            selectionController.selectPreparedAndTransfer(
+                sourceUri = sourceUri,
+                prepareManagedMedia = { it },
+                transferOwnership = currentOnImageSelected,
+            )
+        }
+    }
+
     val photoPickerLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.PickVisualMedia(),
         ) { uri ->
-            uri?.let {
-                Napier.d("Android image selected from manual picker: $it")
-                onImageSelected(it.toString())
-            } ?: Napier.d("Android image picker dismissed without a selection")
+            if (uri == null) {
+                Napier.d("Android image picker dismissed without a selection")
+                coroutineScope.launch { selectionController.cancel() }
+            } else {
+                Napier.d("Android image selected from manual picker")
+                importSelection(uri.toString())
+            }
         }
 
     val permissionLauncher =
@@ -144,7 +184,8 @@ actual fun ImagePickerContent(
 
     ImagePickerBrowser(
         state = libraryState,
-        onImageSelected = onImageSelected,
+        importState = importState,
+        onImageSelected = ::importSelection,
         onBrowseLibrary = {
             photoPickerLauncher.launch(
                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
@@ -163,6 +204,14 @@ actual fun ImagePickerContent(
         },
         onOpenSettings = { permissionManager.openPermissionSettings() },
         onRetryLoading = { reloadTrigger++ },
+        onRetryImport = {
+            coroutineScope.launch {
+                selectionController.retryPreparedAndTransfer(
+                    prepareManagedMedia = { it },
+                    transferOwnership = currentOnImageSelected,
+                )
+            }
+        },
         modifier = modifier,
     )
 }

@@ -124,8 +124,11 @@ refactor(media): add atomic canonical object storage
 - Modify: `client/media/src/androidMain/kotlin/app/logdate/client/media/di/MediaModule.android.kt`
 - Modify: `client/media/src/commonMain/kotlin/app/logdate/client/media/ManagedMediaImporter.kt`
 - Modify: `client/media/src/commonTest/kotlin/app/logdate/client/media/ManagedMediaImporterTest.kt`
+- Modify: `client/feature/editor/src/androidMain/kotlin/app/logdate/feature/editor/ui/camera/AndroidCameraCaptureManager.kt`
+- Modify: `client/feature/editor/src/androidMain/kotlin/app/logdate/feature/editor/di/EditorFeatureModule.android.kt`
 - Modify: `app/android-main/src/androidTest/kotlin/app/logdate/client/media/AndroidMediaManagerTest.kt`
 - Modify: `app/android-main/src/androidTest/kotlin/app/logdate/client/media/AndroidManagedMediaImporterTest.kt`
+- Create: `app/android-main/src/androidTest/kotlin/app/logdate/client/media/AndroidCameraCanonicalMediaTest.kt`
 - Modify: `app/android-main/src/main/res/xml/backup_rules.xml`
 - Modify: `app/android-main/src/main/res/xml/data_extraction_rules.xml`
 - Modify: `docs/reference/android-media-storage.md`
@@ -141,6 +144,8 @@ Update/add tests that require:
 - MIME parameters and misleading source extensions produce the trusted MIME-derived extension;
 - `saveMedia` rejects a `sizeBytes` mismatch;
 - `saveMediaFromFile` leaves the caller-owned source intact;
+- completed CameraX photo and video captures hand the editor only canonical app-private URIs and
+  create no external MediaStore row;
 - `addToDefaultCollection` can publish a canonical image/video as a derivative, and deleting that derivative leaves the canonical object readable;
 - `getRecentMedia` and `queryMediaByDate` remain MediaStore picker queries and no longer auto-publish `user_media` files;
 - legacy file/content/raw-path references remain readable.
@@ -173,6 +178,10 @@ Expected: current MediaStore-as-final behavior fails the canonical URI and no-in
 - Add `ensureManagedMedia(uri: String): String` to `MediaManager` with a compatibility default so existing platform fakes keep compiling.
 - Android overrides it to return an already verified canonical URI unchanged or stream any supported legacy/content/file source into `AndroidCanonicalMediaStore`.
 - Route Android `saveMedia` and `saveMediaFromFile` through the object store for all supported media.
+- Capture CameraX photo/video output into an app-private temporary file, stream it through
+  `MediaManager.saveMediaFromFile`, remove only that private temporary file, and expose the
+  canonical URI to editor state only after persistence succeeds. Camera capture must not use
+  `MediaStore` output options.
 - Retain `addToDefaultCollection` as the only MediaStore publication path.
 - Remove `ensureLegacyManagedMediaBackfilled` calls from picker queries and delete only the now-dead auto-publication code.
 - Keep legacy readers and existence checks; do not delete old source bytes in this task.

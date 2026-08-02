@@ -45,6 +45,7 @@ import coil3.compose.AsyncImage
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.library.generated.resources.Res
+import logdate.client.feature.library.generated.resources.cd_library_audio
 import logdate.client.feature.library.generated.resources.cd_library_photo
 import logdate.client.feature.library.generated.resources.cd_library_video
 import org.jetbrains.compose.resources.stringResource
@@ -125,20 +126,50 @@ fun MediaThumbnailItem(
                 }
             val description =
                 stringResource(
-                    if (item.isVideo) Res.string.cd_library_video else Res.string.cd_library_photo,
+                    when {
+                        item.isAudio -> Res.string.cd_library_audio
+                        item.isVideo -> Res.string.cd_library_video
+                        else -> Res.string.cd_library_photo
+                    },
                     capturedAt,
                 )
-            AsyncImage(
-                model = item.thumbnailUri ?: item.uri,
-                contentDescription = description,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
+            if (item.isAudio) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = PlatformIcons.audioFile(),
+                        contentDescription = description,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(36.dp),
+                    )
+                }
+            } else {
+                AsyncImage(
+                    model = item.thumbnailUri ?: item.uri,
+                    contentDescription = description,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             if (item.isVideo) {
                 Icon(
                     painter = PlatformIcons.playCircle(),
                     contentDescription = "Video",
                     tint = Color.White,
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(4.dp)
+                            .size(20.dp),
+                )
+            }
+            if (item.isAudio) {
+                Icon(
+                    painter = PlatformIcons.audioFile(),
+                    contentDescription = "Audio",
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier =
                         Modifier
                             .align(Alignment.BottomEnd)

@@ -6,6 +6,8 @@
     <string name="editor_discard_dialog_title">Discard changes?</string>
     <string name="add_a_caption">Add a caption...</string>
     <string name="add_a_video_to_your_entry">Add a video to your entry</string>
+    <string name="adding_selected_photo">Adding photo…</string>
+    <string name="adding_selected_video">Adding video…</string>
     <string name="add_an_image_to_your_entry">Add an image to your entry</string>
     <string name="editor_action_add_audio">Add Audio</string>
     <string name="audio_recording">Audio Recording</string>
@@ -26,6 +28,7 @@
     <string name="capture_photo_or_video">Capture photo or video</string>
     <string name="changes_saved">Changes saved</string>
     <string name="choose_a_photo">Choose a photo</string>
+    <string name="choose_another_video">Choose another video</string>
     <string name="choose_from_gallery">Choose from gallery</string>
     <string name="close">Close</string>
     <string name="close_camera">Close camera</string>
@@ -117,6 +120,8 @@
     <string name="video_playback_not_available_on_ios_yet">Video playback not available on iOS yet</string>
     <string name="video_thumbnail">Video thumbnail</string>
     <string name="we_couldnt_load_your_recent_photos">We couldn&apos;t load your recent photos.</string>
+    <string name="we_couldnt_add_selected_photo">We couldn&apos;t add that photo. LogDate did not change the original.</string>
+    <string name="we_couldnt_add_selected_video">We couldn&apos;t add that video. LogDate did not change the original.</string>
     <string name="we_couldnt_convert_this_recording_to_text">We couldn&apos;t convert this recording to text</string>
     <string name="whats_on_your_mind">What&apos;s on your mind?</string>
     <string name="would_you_like_to_save_your_changes_as_a_draft">Would you like to save your changes as a draft?</string>
