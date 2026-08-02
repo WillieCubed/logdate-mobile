@@ -26,6 +26,9 @@ jobs:
     env:
       DEPLOY_SHA: ${{ inputs.deploy-sha }}
       ENVIRONMENT: ${{ inputs.environment }}
+      # Fail provider registry calls promptly so a transient Terraform registry
+      # outage produces actionable logs instead of consuming the whole deploy window.
+      TF_REGISTRY_CLIENT_TIMEOUT: 60
       REPO_PROJECT_ID: ${{ vars.LOGDATE_PROJECT_ID }}
       REPO_REGION: ${{ vars.LOGDATE_REGION }}
       REPO_SERVICE_NAME: ${{ vars.LOGDATE_SERVICE_NAME }}

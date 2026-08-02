@@ -110,8 +110,10 @@ git -C "$REPO_ROOT" show "$RELEASE_SHA:$SELECTED_TFVARS" >"$PRIVATE_CONFIG_DIR/$
 git -C "$REPO_ROOT" show "$RELEASE_SHA:infra/terraform/.terraform.lock.hcl" >"$PRIVATE_CONFIG_DIR/.terraform.lock.hcl" 2>/dev/null ||
     die "release commit does not contain the Terraform dependency lockfile."
 
-terraform -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false >"$TERRAFORM_INIT_LOG" 2>&1 ||
+if ! terraform -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false >"$TERRAFORM_INIT_LOG" 2>&1; then
+    cat "$TERRAFORM_INIT_LOG" >&2
     die "Terraform backend-free initialization failed."
+fi
 
 read -r -d '' TERRAFORM_EXPRESSION <<'EOF' || true
 jsonencode({
@@ -182,6 +184,7 @@ if ! printf '%s\n' "$TERRAFORM_EXPRESSION" | tr '\n' ' ' |
     terraform -chdir="$PRIVATE_CONFIG_DIR" console \
         -state="$CONSOLE_STATE" \
         -var-file="${ENVIRONMENT}.tfvars" >"$RAW_CONSOLE_OUTPUT" 2>"$TERRAFORM_CONSOLE_LOG"; then
+    cat "$TERRAFORM_CONSOLE_LOG" >&2
     die "Terraform console failed."
 fi
 
