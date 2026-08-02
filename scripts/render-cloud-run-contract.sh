@@ -77,6 +77,7 @@ PRIVATE_WORK_DIR="$(mktemp -d)"
 chmod 700 "$PRIVATE_WORK_DIR"
 ISOLATED_TF_DATA_DIR="$PRIVATE_WORK_DIR/terraform-data"
 PRIVATE_CONFIG_DIR="$PRIVATE_WORK_DIR/config"
+PRIVATE_PLUGIN_DIR="$PRIVATE_WORK_DIR/terraform-plugins"
 CONSOLE_STATE="$PRIVATE_WORK_DIR/terraform-console.tfstate"
 RAW_CONSOLE_OUTPUT="$PRIVATE_WORK_DIR/terraform-console.out"
 SOURCE_JSON="$PRIVATE_WORK_DIR/source.json"
@@ -86,7 +87,7 @@ TERRAFORM_INIT_LOG="$PRIVATE_WORK_DIR/terraform-init.log"
 TERRAFORM_CONSOLE_LOG="$PRIVATE_WORK_DIR/terraform-console.log"
 JQ_SORT_LOG="$PRIVATE_WORK_DIR/jq-sort.log"
 COMMITTED_RENDERER="$PRIVATE_WORK_DIR/committed-renderer.sh"
-mkdir -p "$ISOLATED_TF_DATA_DIR" "$PRIVATE_CONFIG_DIR"
+mkdir -p "$ISOLATED_TF_DATA_DIR" "$PRIVATE_CONFIG_DIR" "$PRIVATE_PLUGIN_DIR"
 chmod 700 "$ISOLATED_TF_DATA_DIR" "$PRIVATE_CONFIG_DIR"
 
 export TF_DATA_DIR="$ISOLATED_TF_DATA_DIR"
@@ -143,7 +144,10 @@ git -C "$REPO_ROOT" show "$RELEASE_SHA:$SELECTED_TFVARS" >"$PRIVATE_CONFIG_DIR/$
 git -C "$REPO_ROOT" show "$RELEASE_SHA:infra/terraform/.terraform.lock.hcl" >"$PRIVATE_CONFIG_DIR/.terraform.lock.hcl" 2>/dev/null ||
     die "release commit does not contain the Terraform dependency lockfile."
 
-if ! terraform -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false >"$TERRAFORM_INIT_LOG" 2>&1; then
+# Contract rendering only evaluates variables and pure locals. An empty plugin
+# directory makes this initialization deterministic and prevents an unauthenticated
+# CI render from blocking on the provider registry.
+if ! terraform -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false -plugin-dir="$PRIVATE_PLUGIN_DIR" >"$TERRAFORM_INIT_LOG" 2>&1; then
     redact_log "$TERRAFORM_INIT_LOG"
     die "Terraform backend-free initialization failed."
 fi
