@@ -92,10 +92,10 @@ class AndroidCanonicalMediaStoreTest {
             val extensions =
                 listOf(
                     "image/heif" to "heif",
-                    "image/heic-sequence" to "heic",
-                    "image/heif-sequence" to "heif",
+                    "image/heic-sequence" to "heics",
+                    "image/heif-sequence" to "heifs",
                     "video/3gpp2" to "3g2",
-                    "video/mpeg" to "mpeg",
+                    "video/mpeg" to "mpg",
                     "video/ogg" to "ogv",
                     "audio/amr" to "amr",
                     "audio/midi" to "mid",
