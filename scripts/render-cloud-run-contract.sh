@@ -16,6 +16,12 @@ die() {
     exit 1
 }
 
+redact_log() {
+    # Terraform/provider diagnostics can echo variable values. Keep actionable
+    # error context while preventing secret-shaped tokens from reaching CI logs.
+    sed -E 's/[A-Z0-9_]{16,}/[redacted]/g' "$1" >&2
+}
+
 cleanup() {
     if [[ -n "$PRIVATE_WORK_DIR" ]]; then
         rm -rf "$PRIVATE_WORK_DIR"
@@ -138,7 +144,7 @@ git -C "$REPO_ROOT" show "$RELEASE_SHA:infra/terraform/.terraform.lock.hcl" >"$P
     die "release commit does not contain the Terraform dependency lockfile."
 
 if ! terraform -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false >"$TERRAFORM_INIT_LOG" 2>&1; then
-    cat "$TERRAFORM_INIT_LOG" >&2
+    redact_log "$TERRAFORM_INIT_LOG"
     die "Terraform backend-free initialization failed."
 fi
 
@@ -211,7 +217,7 @@ if ! printf '%s\n' "$TERRAFORM_EXPRESSION" | tr '\n' ' ' |
     terraform -chdir="$PRIVATE_CONFIG_DIR" console \
         -state="$CONSOLE_STATE" \
         -var-file="${ENVIRONMENT}.tfvars" >"$RAW_CONSOLE_OUTPUT" 2>"$TERRAFORM_CONSOLE_LOG"; then
-    cat "$TERRAFORM_CONSOLE_LOG" >&2
+    redact_log "$TERRAFORM_CONSOLE_LOG"
     die "Terraform console failed."
 fi
 

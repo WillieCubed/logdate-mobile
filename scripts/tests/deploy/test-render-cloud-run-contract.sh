@@ -828,14 +828,11 @@ assert_equals "$(git -C "$OPERATOR_ROOT" show HEAD:infra/terraform/production.tf
 
 CURRENT_STAGING_OUT="$TMP_DIR/current-staging.out"
 CURRENT_STAGING_ERR="$TMP_DIR/current-staging.err"
-set +e
-run_real_renderer "$CURRENT_INPUTS_REPO" staging "$CURRENT_RELEASE_SHA" "$CURRENT_STAGING_OUT" "$CURRENT_STAGING_ERR"
-current_staging_status=$?
-set -e
-[[ "$current_staging_status" != "0" ]] || fail "current committed staging inputs unexpectedly rendered"
+run_real_renderer "$CURRENT_INPUTS_REPO" staging "$CURRENT_RELEASE_SHA" "$CURRENT_STAGING_OUT" "$CURRENT_STAGING_ERR" ||
+    fail "current committed staging inputs did not render"
 pass
-assert_zero_bytes "$CURRENT_STAGING_OUT"
-assert_contains 'ERROR:' "$(cat "$CURRENT_STAGING_ERR")"
+assert_zero_bytes "$CURRENT_STAGING_ERR"
+assert_equals "first_party" "$(jq -r '.env_vars.LOGDATE_DEPLOYMENT_KIND' "$CURRENT_STAGING_OUT")"
 
 CURRENT_PRODUCTION_OUT="$TMP_DIR/current-production.out"
 CURRENT_PRODUCTION_ERR="$TMP_DIR/current-production.err"
