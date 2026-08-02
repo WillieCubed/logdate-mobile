@@ -41,6 +41,7 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkAll
 import org.jetbrains.exposed.v1.jdbc.Database
+import org.jetbrains.exposed.v1.jdbc.transactions.TransactionManager
 import org.koin.core.context.stopKoin
 import org.koin.core.logger.EmptyLogger
 import org.koin.dsl.koinApplication
@@ -142,6 +143,7 @@ class ServerModuleTest {
         )
 
         assertTrue(initializeDatabase())
+        assertTrue(TransactionManager.defaultDatabase === database)
     }
 
     @Test

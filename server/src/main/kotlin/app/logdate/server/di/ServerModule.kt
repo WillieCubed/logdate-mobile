@@ -98,6 +98,7 @@ import app.logdate.server.sync.SyncRepository
 import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
+import org.jetbrains.exposed.v1.jdbc.transactions.TransactionManager
 import org.koin.dsl.bind
 import org.koin.dsl.module
 import studio.hypertext.atproto.pds.DescribeServerResponse
@@ -136,7 +137,10 @@ fun initializeDatabase(): Boolean =
     try {
         val dataSource = DatabaseConfig.createDataSource()
         val runFlyway = DatabaseConfig.shouldRunMigrations()
-        DatabaseConfig.initializeDatabase(dataSource, autoMigrate = runFlyway)
+        val database = DatabaseConfig.initializeDatabase(dataSource, autoMigrate = runFlyway)
+        // Register the application database before Koin creates entitlement services. Exposed's
+        // default handle is not guaranteed when Database.connect is performed during bootstrap.
+        TransactionManager.defaultDatabase = database
         Napier.i("Database repositories initialized successfully")
         true
     } catch (e: Exception) {
