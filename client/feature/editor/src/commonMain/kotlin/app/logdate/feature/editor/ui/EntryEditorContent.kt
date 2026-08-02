@@ -34,6 +34,7 @@ import app.logdate.feature.editor.ui.common.PlatformBackHandler
 import app.logdate.feature.editor.ui.content.EditorBottomContent
 import app.logdate.feature.editor.ui.dialog.DraftsBottomSheet
 import app.logdate.feature.editor.ui.dialog.alert.ConfirmEntryExitDialog
+import app.logdate.feature.editor.ui.editor.EditorExitReason
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.rememberEditorAutoSave
 import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
@@ -99,9 +100,11 @@ fun EntryEditorContent(
 
     var showExitConfirmation by remember { mutableStateOf(false) }
     var showDraftsDialog by remember { mutableStateOf(false) }
+    var isExitDraftSaving by remember { mutableStateOf(false) }
 
     val handleEditorBack: () -> Unit = {
         when {
+            editorState.isSaving || editorState.shouldExit -> Unit
             editorState.expandedBlockId != null -> {
                 viewModel.dismissExpandedBlockOrClearSingleEmpty()
                 Unit
@@ -133,7 +136,7 @@ fun EntryEditorContent(
     val autoSaveState =
         rememberEditorAutoSave(
             editorState = editorState,
-            onAutoSave = { state -> viewModel.autoSaveEntry(state) },
+            onAutoSave = { state -> viewModel.persistDraft(state) != null },
             enabled = !editorState.isSaving && !editorState.shouldExit,
         )
 
@@ -143,24 +146,51 @@ fun EntryEditorContent(
         }
     }
 
-    LaunchedEffect(editorState.shouldExit) {
+    LaunchedEffect(editorState.shouldExit, editorState.exitReason) {
         if (editorState.shouldExit) {
-            onEntrySaved()
+            when (editorState.exitReason) {
+                EditorExitReason.DISCARDED -> onNavigateBack()
+                EditorExitReason.ENTRY_SAVED,
+                null,
+                -> onEntrySaved()
+            }
         }
     }
 
     if (showExitConfirmation) {
         ConfirmEntryExitDialog(
-            onCancel = { showExitConfirmation = false },
+            onCancel = {
+                if (!isExitDraftSaving) showExitConfirmation = false
+            },
             onConfirm = {
-                showExitConfirmation = false
-                onNavigateBack()
+                if (!isExitDraftSaving) {
+                    isExitDraftSaving = true
+                    scope.launch {
+                        val discarded = viewModel.discardAndExit()
+                        isExitDraftSaving = false
+                        if (discarded) {
+                            showExitConfirmation = false
+                        }
+                    }
+                }
             },
             onSaveAsDraft = {
-                showExitConfirmation = false
-                viewModel.autoSaveEntry(editorState)
-                onNavigateBack()
+                if (!isExitDraftSaving) {
+                    isExitDraftSaving = true
+                    scope.launch {
+                        // Read the latest state at click time. The dialog can remain composed
+                        // while the text field is dispatching its final edit, so the captured
+                        // composition value may otherwise persist stale content.
+                        val saved = viewModel.saveAsDraft(viewModel.editorState.value)
+                        isExitDraftSaving = false
+                        if (saved) {
+                            showExitConfirmation = false
+                            onNavigateBack()
+                        }
+                    }
+                }
             },
+            actionsEnabled = !isExitDraftSaving && !editorState.isSaving,
         )
     }
 
@@ -206,6 +236,7 @@ fun EntryEditorContent(
                 draftCount = editorState.availableDrafts.size,
                 autoSaveStatus = autoSaveState.status,
                 actionsVisible = !isImmersiveBlockActive,
+                actionsEnabled = !editorState.isSaving && !editorState.shouldExit,
             )
         },
         editorContent = {
@@ -232,7 +263,11 @@ fun EntryEditorContent(
                 selectedJournalIds = uiState.selectedJournalIds,
                 onJournalSelectionChanged = uiState.onJournalSelectionChanged,
                 journalSelectorExpanded = journalSelectorExpanded,
-                onJournalSelectorExpandedChange = { journalSelectorExpanded = it },
+                onJournalSelectorExpandedChange = { expanded ->
+                    if (!editorState.isSaving && !editorState.shouldExit) {
+                        journalSelectorExpanded = expanded
+                    }
+                },
             )
         },
     )
