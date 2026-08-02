@@ -876,6 +876,7 @@ resume_cleanup() {
         account_deletion_started="$(jq -r '.cleanup.accountDeletionStarted' "$STATE_FILE")"
         if [[ "$account_deletion_started" != "true" ]]; then
             update_cleanup_phase accountDeletionStarted true || return 1
+            account_deletion_started="true"
         fi
         body="$WORK_DIR/account-delete.json"
         status="$(http_request DELETE "$SERVICE_URL/api/v1/auth/me" "$body" "$AUTH_HEADER_FILE")"
