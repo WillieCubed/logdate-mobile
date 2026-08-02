@@ -254,6 +254,26 @@ jobs:
           fi
           echo "REVISION_URL=$REVISION_URL" >> "$GITHUB_ENV"
 
+      - name: Collect candidate startup diagnostics
+        if: ${{ failure() }}
+        run: |
+          REVISION_NAME="$(gcloud run revisions list \
+            --service "$(jq -r '.service_name' "$CONTRACT_FILE")" \
+            --region "$(jq -r '.region' "$CONTRACT_FILE")" \
+            --project "$(jq -r '.project_id' "$CONTRACT_FILE")" \
+            --sort-by='~metadata.creationTimestamp' --limit=1 --format='value(metadata.name)')"
+          echo "Latest candidate revision: ${REVISION_NAME:-unknown}"
+          if [[ -n "$REVISION_NAME" ]]; then
+            gcloud run revisions describe "$REVISION_NAME" \
+              --region "$(jq -r '.region' "$CONTRACT_FILE")" \
+              --project "$(jq -r '.project_id' "$CONTRACT_FILE")" \
+              --format='yaml(status.conditions,status.containerStatuses,metadata.name,metadata.creationTimestamp)' || true
+            gcloud logging read \
+              "resource.type=cloud_run_revision AND resource.labels.revision_name=${REVISION_NAME}" \
+              --project "$(jq -r '.project_id' "$CONTRACT_FILE")" \
+              --limit=50 --order=asc --format='value(textPayload,jsonPayload.message)' || true
+          fi
+
       - name: Prepare strict candidate smoke proof
         run: |
           umask 077
