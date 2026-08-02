@@ -25,6 +25,15 @@ printf '%s\n' "$*" >>"$GCLOUD_COMMAND_LOG"
 project="${GCLOUD_FAKE_PROJECT:-logdate-dev}"
 principal="${GCLOUD_FAKE_PRINCIPAL:-github-deploy@${project}.iam.gserviceaccount.com}"
 
+if [[ "${GCLOUD_FAIL_PROJECT:-}" == "true" && "$*" == "projects describe "* ]]; then
+    printf 'permission-string-and-credential-value-must-not-print\n' >&2
+    exit 41
+fi
+if [[ "${GCLOUD_FAIL_VERSION:-}" == "true" && "$*" == "secrets versions list "* ]]; then
+    printf 'permission-string-and-credential-value-must-not-print\n' >&2
+    exit 42
+fi
+
 case "$*" in
     "auth list --filter=status:ACTIVE --format=value(account) --quiet")
         printf '%s\n' "$principal"
@@ -74,7 +83,8 @@ assert_file_exists "$WORKFLOW"
 staging_output="$(run_inventory staging)"
 assert_contains 'environment=staging' "$staging_output"
 assert_contains 'project_id=logdate-dev' "$staging_output"
-assert_contains 'authenticated_principal=github-deploy@logdate-dev.iam.gserviceaccount.com' "$staging_output"
+assert_not_contains 'authenticated_principal=' "$staging_output"
+assert_not_contains '@logdate-dev.iam.gserviceaccount.com' "$staging_output"
 assert_contains 'secret_id=logdate-db-url' "$staging_output"
 assert_contains 'secret_id=logdate-db-user' "$staging_output"
 assert_contains 'secret_id=logdate-db-password' "$staging_output"
@@ -101,10 +111,11 @@ pass
 production_output="$(GCLOUD_FAKE_PROJECT=logdate GCLOUD_COMMAND_LOG="$COMMAND_LOG" PATH="$FAKE_BIN:$PATH" "$SCRIPT" --environment production)"
 assert_contains 'environment=production' "$production_output"
 assert_contains 'project_id=logdate' "$production_output"
-assert_contains 'authenticated_principal=github-deploy@logdate.iam.gserviceaccount.com' "$production_output"
+assert_not_contains 'authenticated_principal=' "$production_output"
+assert_not_contains '@logdate.iam.gserviceaccount.com' "$production_output"
 
 assert_fails() {
-    local description="$1"
+    local failure_code="$1"
     shift
     set +e
     local output
@@ -112,15 +123,18 @@ assert_fails() {
     local status=$?
     set -e
     assert_exit_code 1 "$status"
-    assert_contains "$description" "$output"
+    assert_contains "INVENTORY_FAILURE_CODE=$failure_code" "$output"
     assert_not_contains 'credential-value-must-not-print' "$output"
+    assert_not_contains 'permission-string-and-credential-value-must-not-print' "$output"
 }
 
-assert_fails 'authenticated principal does not match' env GCLOUD_FAKE_PRINCIPAL='unexpected@example.invalid' "$SCRIPT" --environment staging
-assert_fails 'target project does not match' env GCLOUD_DESCRIBED_PROJECT=logdate "$SCRIPT" --environment staging
-assert_fails 'invalid enabled version resource name' env GCLOUD_VERSION_PROJECT=logdate "$SCRIPT" --environment staging
-assert_fails 'no enabled numeric version' env GCLOUD_EMPTY_SECRET=logdate-health-internal-token "$SCRIPT" --environment staging
-assert_fails 'environment must be staging or production' "$SCRIPT" --environment unexpected
+assert_fails identity_mismatch env GCLOUD_FAKE_PRINCIPAL='unexpected@example.invalid' "$SCRIPT" --environment staging
+assert_fails target_project_unavailable env GCLOUD_FAIL_PROJECT=true "$SCRIPT" --environment staging
+assert_fails invalid_metadata env GCLOUD_DESCRIBED_PROJECT=logdate "$SCRIPT" --environment staging
+assert_fails invalid_metadata env GCLOUD_VERSION_PROJECT=logdate "$SCRIPT" --environment staging
+assert_fails metadata_access_denied_or_missing env GCLOUD_FAIL_VERSION=true "$SCRIPT" --environment staging
+assert_fails invalid_metadata env GCLOUD_EMPTY_SECRET=logdate-health-internal-token "$SCRIPT" --environment staging
+assert_fails invalid_metadata "$SCRIPT" --environment unexpected
 
 command_log="$(<"$COMMAND_LOG")"
 assert_not_contains 'secrets list' "$command_log"
@@ -140,8 +154,14 @@ assert_file_contains "environment: "'${{ inputs.environment }}' "$WORKFLOW"
 assert_file_contains 'id-token: write' "$WORKFLOW"
 assert_file_contains 'google-github-actions/auth@v3' "$WORKFLOW"
 assert_file_contains 'inventory-secret-manager-versions.sh' "$WORKFLOW"
-assert_file_contains '::error::Secret Manager metadata inventory failed.' "$WORKFLOW"
+# Literal shell expansion under test.
+# shellcheck disable=SC2016
+assert_file_contains '::error::Secret Manager metadata inventory failed: $failure_code' "$WORKFLOW"
 assert_file_contains 'GITHUB_STEP_SUMMARY' "$WORKFLOW"
+assert_file_contains 'identity_mismatch' "$WORKFLOW"
+assert_file_contains 'target_project_unavailable' "$WORKFLOW"
+assert_file_contains 'metadata_access_denied_or_missing' "$WORKFLOW"
+assert_file_contains 'invalid_metadata' "$WORKFLOW"
 assert_file_not_contains 'gcloud run' "$WORKFLOW"
 assert_file_not_contains 'run-migrations.sh' "$WORKFLOW"
 assert_file_not_contains 'secrets versions access' "$WORKFLOW"
@@ -149,6 +169,8 @@ assert_file_contains 'seven required server secrets' docs/runbook/secret-manager
 assert_file_contains 'does not prove environment isolation' docs/runbook/secret-manager-version-inventory.md
 assert_file_contains 'Viewer at the project level' docs/runbook/secret-manager-version-inventory.md
 assert_file_contains 'never lists project secrets' docs/runbook/secret-manager-version-inventory.md
+assert_file_contains 'never prints an account or email address' docs/runbook/secret-manager-version-inventory.md
+assert_file_contains 'identity_mismatch' docs/runbook/secret-manager-version-inventory.md
 # Literal Markdown code spans under test.
 # shellcheck disable=SC2016
 assert_file_contains '| GitHub Environment | `staging` | `production` |' docs/runbook/staging-production-configuration.md

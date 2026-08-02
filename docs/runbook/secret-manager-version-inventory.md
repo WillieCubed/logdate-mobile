@@ -9,11 +9,10 @@ It inventories only the seven required server secrets:
 `logdate-db-url`, `logdate-db-user`, `logdate-db-password`,
 `logdate-jwt-secret`, `logdate-server-encryption-key`,
 `logdate-server-encryption-key-id`, and `logdate-health-internal-token`.
-It prints only the environment/project label, the authenticated deploy
-principal, these secret IDs, and their enabled numeric version IDs. It never
-prints a secret value, URL, password, or the contents of a Secret Manager
-version. It fails closed when any required secret has no enabled numeric
-version.
+It prints only the environment/project label, these secret IDs, and their
+enabled numeric version IDs. It never prints an account or email address,
+secret value, URL, password, or the contents of a Secret Manager version. It
+fails closed when any required secret has no enabled numeric version.
 
 The GitHub deploy identity receives Secret Manager Viewer at the project level
 solely so this read-only check can distinguish a missing required container
@@ -23,6 +22,11 @@ the three database secrets needed by migrations.
 
 The workflow is inventory-only: it cannot run migrations, modify Cloud Run, or
 alter traffic. It fails if the environment is not exactly `staging` or
-`production`, if the active gcloud principal/project does not match the
-selected environment, or if Google Cloud cannot list the requested metadata.
-This check verifies the active principal and explicit target-project access; it does not prove environment isolation beyond that configured identity/project pairing.
+`production`, if the active principal or explicit target-project access does
+not match the selected environment, or if Google Cloud cannot list the
+requested metadata. The workflow reports only one of
+`identity_mismatch`, `target_project_unavailable`,
+`metadata_access_denied_or_missing`, or `invalid_metadata`; it suppresses raw
+gcloud stderr. This check verifies the active principal and explicit
+target-project access; it does not prove environment isolation beyond that
+configured identity/project pairing.
