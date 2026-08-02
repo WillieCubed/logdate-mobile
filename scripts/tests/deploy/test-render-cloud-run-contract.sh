@@ -454,7 +454,7 @@ config_dir="${1#-chdir=}"
 [[ "$(head -n 1 "$config_dir/${EXPECTED_ENVIRONMENT}.tfvars")" == "# committed-valid-${EXPECTED_ENVIRONMENT}" ]] || { printf 'selected tfvars did not come from release commit\n' >"$LOG_DIR/preflight-failure.log"; exit 93; }
 ! grep -Rq 'DIRTY_WORKTREE_POISON' "$config_dir" || { printf 'dirty worktree configuration was copied\n' >"$LOG_DIR/preflight-failure.log"; exit 93; }
 config_files="$(find "$config_dir" -maxdepth 1 -type f -print | sed 's#.*/##' | sort | tr '\n' ' ')"
-[[ "$config_files" == ".terraform.lock.hcl main.tf outputs.tf ${EXPECTED_ENVIRONMENT}.tfvars variables.tf versions.tf " ]] || { printf 'unexpected isolated inputs: %s\n' "$config_files" >"$LOG_DIR/preflight-failure.log"; exit 93; }
+[[ "$config_files" == ".terraform.lock.hcl contract-locals.tf ${EXPECTED_ENVIRONMENT}.tfvars variables.tf " ]] || { printf 'unexpected isolated inputs: %s\n' "$config_files" >"$LOG_DIR/preflight-failure.log"; exit 93; }
 mode="$(stat -f '%Lp' "$TF_DATA_DIR" 2>/dev/null || stat -c '%a' "$TF_DATA_DIR")"
 [[ "$mode" == "700" ]] || exit 94
 printf '%s\n' "$TF_DATA_DIR" >>"$LOG_DIR/data-dirs.log"
