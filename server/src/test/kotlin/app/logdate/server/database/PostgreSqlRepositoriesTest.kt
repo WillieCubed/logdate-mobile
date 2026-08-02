@@ -8,6 +8,7 @@ import app.logdate.server.auth.IdentityProvider
 import app.logdate.server.auth.SessionType
 import app.logdate.server.auth.TemporarySession
 import app.logdate.server.database.support.withH2Database
+import app.logdate.server.entitlements.AccountEntitlementsTable
 import app.logdate.server.identity.StoredSigningKey
 import app.logdate.shared.model.PasskeyInfo
 import kotlinx.coroutines.runBlocking
@@ -392,7 +393,20 @@ class PostgreSqlRepositoriesTest {
     }
 
     private fun withAccountTables(block: suspend () -> Unit) {
-        withH2Database(AccountsTable) {
+        withH2Database(
+            AccountsTable,
+            PendingEmailVerificationsTable,
+            AtprotoPasswordCredentialsTable,
+            AtprotoSessionsTable,
+            SigningKeysTable,
+            HostedPlcOperationsTable,
+            AccountIdentitiesTable,
+            AccountLinkEventsTable,
+            PasskeysTable,
+            RestoreCredentialsTable,
+            ResourceRoutesTable,
+            AccountEntitlementsTable,
+        ) {
             runBlocking { block() }
         }
     }
