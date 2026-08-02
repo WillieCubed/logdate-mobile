@@ -1,5 +1,0 @@
-feat(sync): restore LogDate Cloud backups on fresh installs
-
-Download the newest authenticated backup and hand it to the existing restore
-pipeline after restore sign-in, preserving offline-first local data and the
-single canonical owner identity.
