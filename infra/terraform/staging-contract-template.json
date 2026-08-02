@@ -11,6 +11,12 @@
     "expected_build_signer_role": "staging"
   },
   "canonical_origin": "https://cloud-staging.logdate.app",
+  "cloud_run_image": "us-central1-docker.pkg.dev/logdate-dev/logdate/logdate-server:latest",
+  "runtime_service_account_name": "logdate-runtime",
+  "artifact_registry_repo": "logdate",
+  "artifact_registry_image_name": "logdate-server",
+  "domains": ["cloud-staging.logdate.app"],
+  "domain": "",
   "env_vars": {
     "ANDROID_CERT_FINGERPRINTS": "DB:66:7C:A5:99:80:91:23:E2:F1:8B:86:98:42:A0:23:1B:52:D5:8B:94:A2:95:76:07:B9:A1:0D:1D:EC:26:88",
     "ATPROTO_HANDLE_DOMAIN": "cloud-staging.logdate.app",
