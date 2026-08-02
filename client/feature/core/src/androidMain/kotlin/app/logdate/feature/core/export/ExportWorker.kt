@@ -60,6 +60,7 @@ class ExportWorker(
 
     private val exportUserDataUseCase: ExportUserDataUseCase by inject()
     private val exportLauncher: ExportLauncher by inject()
+    private val archiveWriter = AndroidExportArchiveWriter(context)
     private val notificationHelper = ExportNotificationHelper(context, Uuid.parse(id.toString()))
 
     private val destinationUri: Uri? = inputData.getString(DESTINATION_URI_KEY)?.toUri()
@@ -237,9 +238,7 @@ class ExportWorker(
         uri: Uri,
     ): SavedExport {
         context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-            ZipOutputStream(outputStream).use { zipOut ->
-                writeExportToZip(zipOut, exportData)
-            }
+            archiveWriter.write(exportData, outputStream)
         } ?: throw IllegalStateException("Could not open output stream for URI: $uri")
 
         return SavedExport(
@@ -253,11 +252,7 @@ class ExportWorker(
         val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         val file = File(downloadsDir, fileName)
 
-        FileOutputStream(file).use { fileOut ->
-            ZipOutputStream(fileOut).use { zipOut ->
-                writeExportToZip(zipOut, exportData)
-            }
-        }
+        FileOutputStream(file).use { fileOut -> archiveWriter.write(exportData, fileOut) }
 
         return SavedExport(
             path = file.absolutePath,
