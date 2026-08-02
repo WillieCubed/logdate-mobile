@@ -11,7 +11,7 @@ resolved.
 | --- | --- | --- |
 | Deploy workflow | `.github/workflows/deploy-server-staging.yml` | `.github/workflows/deploy-server-production.yml` |
 | Trigger | Successful `CI` workflow on `main` | `server-v*` tag push only |
-| GitHub Environment | `server-staging` | `server-production` |
+| GitHub Environment | `staging` | `production` |
 | Terraform file | `infra/terraform/staging.tfvars` | `infra/terraform/production.tfvars` |
 | GCP project | `logdate-dev` | `logdate` |
 | Cloud Run service | `logdate-server-staging` | `logdate-server` |
@@ -39,6 +39,16 @@ configuration:
 The committed tfvars files must contain only non-sensitive configuration:
 project IDs, service names, domains, Secret Manager secret IDs, and runtime
 flags. Secret values belong only in Secret Manager or GitHub Actions secrets.
+
+Every Cloud Run secret mount, including `DATABASE_URL`, `DATABASE_USER`, and
+`DATABASE_PASSWORD`, must name an enabled, exact numeric Secret Manager version.
+`latest` is prohibited in first-party staging and production contracts. Before
+rotating a database secret, add and enable the new version, update all three
+database bindings together in the committed environment contract, deploy a
+no-traffic candidate, run migrations and smoke checks against that same
+contract, then promote. Do not use a Cloud SQL instance name or database name
+as a first-party deployment input: both the migration helper and candidate
+revision consume the rendered Neon contract.
 
 ## Server Safety Rules
 

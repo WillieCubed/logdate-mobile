@@ -260,7 +260,8 @@ resource "google_secret_manager_secret_iam_member" "runtime_access" {
 }
 
 resource "google_secret_manager_secret_iam_member" "github_migration_access" {
-  for_each = local.github_oidc_enabled && var.create_cloud_sql_instance ? toset([
+  for_each = local.github_oidc_enabled ? toset([
+    "logdate-db-url",
     "logdate-db-user",
     "logdate-db-password",
   ]) : toset([])
@@ -268,6 +269,18 @@ resource "google_secret_manager_secret_iam_member" "github_migration_access" {
   secret_id = try(google_secret_manager_secret.env[each.key].secret_id, each.key)
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.github_deploy[0].email}"
+}
+
+# The manual version-inventory workflow needs to discover whether required
+# containers exist before it can list their versions. Viewer grants metadata
+# only; it cannot read a secret value. Keep all emitted IDs allowlisted in the
+# inventory helper rather than enumerating project secrets.
+resource "google_project_iam_member" "github_secret_metadata_view" {
+  for_each = local.github_oidc_enabled ? toset(["roles/secretmanager.viewer"]) : toset([])
+
+  project = var.project_id
+  role    = "roles/secretmanager.viewer"
+  member  = "serviceAccount:${google_service_account.github_deploy[0].email}"
 }
 
 resource "google_cloud_run_v2_service" "server" {
