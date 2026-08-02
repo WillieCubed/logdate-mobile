@@ -1660,15 +1660,15 @@ private suspend fun resolveGoogleAccount(
 
     val account =
         Account(
-                id = requestedOwnerId ?: Uuid.random(),
-                username = username,
-                displayName = displayName,
-                email = normalizedEmail,
-                emailVerified = true,
-                createdAt = now,
-                lastSignInAt = now,
-                isActive = true,
-            )
+            id = requestedOwnerId ?: Uuid.random(),
+            username = username,
+            displayName = displayName,
+            email = normalizedEmail,
+            emailVerified = true,
+            createdAt = now,
+            lastSignInAt = now,
+            isActive = true,
+        )
     if (!accountRepository.create(account)) return null
 
     val identity =

@@ -4,8 +4,8 @@ import app.logdate.server.ServerDescriptorConfig
 import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.shared.model.DeploymentKind
 import app.logdate.shared.model.ServerCapability
-import app.logdate.shared.model.ServerProtocolFeature
 import app.logdate.shared.model.ServerInfoResponse
+import app.logdate.shared.model.ServerProtocolFeature
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode

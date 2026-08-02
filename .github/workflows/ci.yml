@@ -173,7 +173,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Build server
-        run: ./gradlew :server:build -x test
+        run: ./gradlew :server:build -x test -x jacocoTestCoverageVerification
 
       - name: Upload server artifact
         uses: actions/upload-artifact@v7
