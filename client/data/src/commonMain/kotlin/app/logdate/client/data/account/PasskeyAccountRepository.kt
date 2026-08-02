@@ -381,7 +381,7 @@ class DefaultPasskeyAccountRepository(
     }
 
     private suspend fun belongsToCanonicalOwner(account: LogDateAccount): Boolean =
-        account.id.toString() == canonicalOwnerProvider.getCanonicalOwnerId()
+        canonicalOwnerProvider.adoptRemoteOwnerIfUninitialized(account.id.toString())
 
     private suspend fun sessionBelongsToCanonicalOwner(session: UserSession): Boolean =
         runCatching { session.accountId == canonicalOwnerProvider.getCanonicalOwnerId() }.getOrDefault(false)
@@ -653,6 +653,9 @@ class DefaultPasskeyAccountRepository(
             }
 
             val completeData = completeResult.getOrThrow()
+            if (!belongsToCanonicalOwner(completeData.account)) {
+                return Result.failure(CanonicalOwnerMismatchException())
+            }
             sessionStorage.saveSession(
                 UserSession(
                     accessToken = completeData.tokens.accessToken,

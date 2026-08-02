@@ -397,6 +397,38 @@ class DefaultPasskeyAccountRepositoryTest {
             assertFalse(repository.isAuthenticated.value)
         }
 
+    @Test
+    fun authenticateWithPasskey_binds_an_unused_installation_to_the_authenticated_owner() =
+        runTest {
+            val sessionStorage = FakeSessionStorage()
+            val repository =
+                createRepository(
+                    sessionStorage = sessionStorage,
+                    canonicalOwnerProvider = FreshInstallationCanonicalOwnerProvider(),
+                )
+
+            val result = repository.authenticateWithPasskey("testuser")
+
+            assertTrue(result.isSuccess)
+            assertEquals(testAccount.id.toString(), sessionStorage.getSession()?.accountId)
+        }
+
+    @Test
+    fun signInWithRestoreKey_does_not_replace_the_installation_owner() =
+        runTest {
+            val sessionStorage = FakeSessionStorage()
+            val repository =
+                createRepository(
+                    sessionStorage = sessionStorage,
+                    canonicalOwnerProvider = FakeCanonicalOwnerProvider(Uuid.random().toString()),
+                )
+
+            val result = repository.signInWithRestoreKey()
+
+            assertTrue(result.isFailure)
+            assertNull(sessionStorage.getSession())
+        }
+
     /**
      * Tests that authentication fails when the API cannot begin authentication.
      */
@@ -908,6 +940,18 @@ class DefaultPasskeyAccountRepositoryTest {
         private val ownerId: String,
     ) : CanonicalOwnerProvider {
         override suspend fun getCanonicalOwnerId(): String = ownerId
+    }
+
+    private class FreshInstallationCanonicalOwnerProvider : CanonicalOwnerProvider {
+        private var ownerId: String? = null
+
+        override suspend fun getCanonicalOwnerId(): String = ownerId ?: "a8a3400a-9f3c-4fca-9a7a-7c8cbe5ca24e"
+
+        override suspend fun adoptRemoteOwnerIfUninitialized(remoteOwnerId: String): Boolean {
+            if (ownerId != null) return ownerId == remoteOwnerId
+            ownerId = remoteOwnerId
+            return true
+        }
     }
 
     class FakeSessionStorage : SessionStorage {

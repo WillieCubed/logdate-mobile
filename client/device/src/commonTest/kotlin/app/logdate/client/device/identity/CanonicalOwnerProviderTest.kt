@@ -68,6 +68,31 @@ class CanonicalOwnerProviderTest {
             assertEquals(null, storage.getString("identity.canonical_owner_id"))
         }
 
+    @Test
+    fun `fresh installation adopts the remote owner without replacing an existing local identity`() =
+        runTest {
+            val remoteOwner = "b930bf49-d1e9-4a65-b84b-8e74af45012b"
+            val freshStorage = InMemoryKeyValueStorage()
+
+            val adopted = DefaultCanonicalOwnerProvider(freshStorage).adoptRemoteOwnerIfUninitialized(remoteOwner)
+
+            assertEquals(true, adopted)
+            assertEquals(remoteOwner, DefaultCanonicalOwnerProvider(freshStorage).getCanonicalOwnerId())
+
+            val existingOwner = "a8a3400a-9f3c-4fca-9a7a-7c8cbe5ca24e"
+            val populatedStorage =
+                InMemoryKeyValueStorage().apply {
+                    putString("identity.canonical_owner_id", existingOwner)
+                }
+
+            val replaced =
+                DefaultCanonicalOwnerProvider(populatedStorage)
+                    .adoptRemoteOwnerIfUninitialized(remoteOwner)
+
+            assertEquals(false, replaced)
+            assertEquals(existingOwner, DefaultCanonicalOwnerProvider(populatedStorage).getCanonicalOwnerId())
+        }
+
     private class InMemoryKeyValueStorage(
         private val dropWrites: Boolean = false,
     ) : KeyValueStorage {
