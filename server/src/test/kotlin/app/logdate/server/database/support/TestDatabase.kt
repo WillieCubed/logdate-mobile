@@ -3,6 +3,7 @@ package app.logdate.server.database.support
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.SchemaUtils
+import org.jetbrains.exposed.v1.jdbc.transactions.TransactionManager
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 
 fun withH2Database(
@@ -10,12 +11,15 @@ fun withH2Database(
     block: () -> Unit,
 ) {
     val dbName = "server_test_${System.nanoTime()}"
-    Database.connect(
+    val database =
+        Database.connect(
         url = "jdbc:h2:mem:$dbName;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false",
         driver = "org.h2.Driver",
         user = "sa",
         password = "",
-    )
+        )
+    val previousDatabase = TransactionManager.defaultDatabase
+    TransactionManager.defaultDatabase = database
 
     transaction {
         SchemaUtils.create(*tables)
@@ -27,5 +31,6 @@ fun withH2Database(
         transaction {
             SchemaUtils.drop(*tables)
         }
+        TransactionManager.defaultDatabase = previousDatabase
     }
 }

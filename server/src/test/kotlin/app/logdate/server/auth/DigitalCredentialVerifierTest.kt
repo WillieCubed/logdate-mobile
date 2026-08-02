@@ -363,13 +363,17 @@ class DigitalCredentialVerifierTest {
     }
 
     private fun flipLastCharOfFirstSegment(credentialJson: String): String {
-        // The credential is JSON containing a JWS-shaped string; flip the very last
-        // character of the issuer JWT's signature segment to corrupt it.
+        // The credential is JSON containing a JWS-shaped string; flip a character
+        // in the middle of the issuer JWT signature so base64url padding cannot
+        // make the mutation a no-op.
         val sdJwt = credentialJson.substringAfter("[\"").substringBefore("\"]")
         val firstSegment = sdJwt.substringBefore("~")
-        val flippedFirstSegment =
-            firstSegment.dropLast(1) +
-                (if (firstSegment.last() == 'A') 'B' else 'A')
+        val jwtParts = firstSegment.split('.')
+        check(jwtParts.size == 3) { "expected a three-segment issuer JWT" }
+        val signature = jwtParts[2]
+        val index = signature.length / 2
+        val flippedSignature = signature.replaceRange(index, index + 1, if (signature[index] == 'A') "B" else "A")
+        val flippedFirstSegment = listOf(jwtParts[0], jwtParts[1], flippedSignature).joinToString(".")
         val tamperedSdJwt = flippedFirstSegment + sdJwt.removePrefix(firstSegment)
         return credentialJson.replace(sdJwt, tamperedSdJwt)
     }
