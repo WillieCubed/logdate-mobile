@@ -882,7 +882,7 @@ resume_cleanup() {
         status="$(http_request DELETE "$SERVICE_URL/api/v1/auth/me" "$body" "$AUTH_HEADER_FILE")"
         if [[ "$status" != "204" && "$status" != "404" ]] &&
             ! [[ "$account_deletion_started" == "true" && "$status" == "401" ]]; then
-            fail "account deletion did not return 204 or 404"
+            fail "account deletion did not return 204 or 404 (status=$status response=$(tr '\\n' ' ' <\"$body\" | cut -c1-400))"
             return 1
         fi
         body="$WORK_DIR/account-after-delete.json"
