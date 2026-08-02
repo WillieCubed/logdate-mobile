@@ -31,6 +31,7 @@ class CloudRestoreWorker(
                 .setInputData(
                     workDataOf(
                         RestoreWorker.SOURCE_URI_KEY to Uri.fromFile(archive).toString(),
+                        RestoreWorker.DELETE_SOURCE_AFTER_RESTORE_KEY to true,
                         RestoreWorker.INCLUDE_DRAFTS_KEY to true,
                         RestoreWorker.INCLUDE_MEDIA_KEY to true,
                     ),

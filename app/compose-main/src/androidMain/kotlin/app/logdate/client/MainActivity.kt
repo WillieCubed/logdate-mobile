@@ -79,6 +79,7 @@ import app.logdate.feature.core.GlobalAppUiLoadingState
 import app.logdate.feature.core.GlobalAppUiState
 import app.logdate.feature.core.di.ActivityProvider
 import app.logdate.feature.core.export.AndroidExportLauncher
+import app.logdate.feature.core.export.CloudBackupScheduler
 import app.logdate.feature.core.isAppUnlocked
 import app.logdate.feature.core.notifications.NAV_SOURCE_DATA_TRANSFER
 import app.logdate.feature.core.restore.AndroidRestoreLauncher
@@ -123,6 +124,7 @@ class MainActivity : FragmentActivity() {
     private val profileRepository: ProfileRepository by inject()
     private val userStateRepository: UserStateRepository by inject()
     private val sessionStorage: SessionStorage by inject()
+    private val cloudBackupScheduler: CloudBackupScheduler by inject()
     private val memoriesSettingsRepository: MemoriesSettingsRepository by inject()
     private val locationTrackingSettingsRepository: LocationTrackingSettingsRepository by inject()
     private val dayBoundarySettingsRepository: DayBoundarySettingsRepository by inject()
@@ -173,6 +175,9 @@ class MainActivity : FragmentActivity() {
         markLaunchStage(LaunchStage.ActivityCreated)
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        // Enqueue only network-constrained work. CloudBackupWorker checks SessionStorage and
+        // exits without touching the network when the user is signed out or offline.
+        cloudBackupScheduler.schedulePeriodicBackup()
         if (savedInstanceState == null) {
             applyOnboardingTestFixtureFromLaunchIntent()
         }

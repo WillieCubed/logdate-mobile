@@ -296,7 +296,12 @@ class AccountSettingsViewModel(
         viewModelScope.launch {
             try {
                 Napier.i("Signing out user")
-                passkeyAccountRepository.signOut()
+                val result = passkeyAccountRepository.signOut()
+                if (result.isFailure) {
+                    val message = result.exceptionOrNull()?.message ?: "Failed to sign out"
+                    onError(message)
+                    return@launch
+                }
                 preferencesDataSource.setBackgroundSyncEnabled(false)
                 Napier.i("Session cleared; local backup queue is retained until sign-in resumes")
             } catch (e: Exception) {
