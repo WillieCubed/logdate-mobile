@@ -225,6 +225,42 @@ variable "request_concurrency" {
   type = number
   default = 80
 }
+variable "create_gcs_bucket" {
+  type = bool
+  default = false
+}
+variable "create_secrets" {
+  type = bool
+  default = false
+}
+variable "enable_domain_mapping" {
+  type = bool
+  default = false
+}
+variable "enable_github_oidc" {
+  type = bool
+  default = false
+}
+variable "gcs_bucket_name" {
+  type = string
+  default = ""
+}
+variable "github_repo" {
+  type = string
+  default = ""
+}
+variable "secret_ids" {
+  type = list(string)
+  default = []
+}
+variable "webauthn_origin" {
+  type = string
+  default = ""
+}
+variable "webauthn_rp_id" {
+  type = string
+  default = ""
+}
 EOF
 else
     git -C "$REPO_ROOT" show "$RELEASE_SHA:infra/terraform/.terraform.lock.hcl" >"$PRIVATE_CONFIG_DIR/.terraform.lock.hcl" 2>/dev/null ||
