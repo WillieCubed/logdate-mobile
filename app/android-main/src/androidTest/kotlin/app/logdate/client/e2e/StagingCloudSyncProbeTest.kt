@@ -3,6 +3,7 @@ package app.logdate.client.e2e
 import androidx.test.platform.app.InstrumentationRegistry
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
+import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
@@ -38,18 +39,24 @@ class StagingCloudSyncProbeTest {
         val refreshToken = values["refreshToken"]
         val accountId = values["accountId"]
         val serverOrigin = values["serverOrigin"]
+        val recoveryPhrase = values["recoveryPhrase"]
         assumeTrue("mode must be create or read", mode == "create" || mode == "read")
         require(!marker.isNullOrBlank()) { "marker is required" }
         require(!accessToken.isNullOrBlank()) { "accessToken is required" }
         require(!refreshToken.isNullOrBlank()) { "refreshToken is required" }
         require(!accountId.isNullOrBlank()) { "accountId is required" }
         require(!serverOrigin.isNullOrBlank()) { "serverOrigin is required" }
+        require(!recoveryPhrase.isNullOrBlank()) { "recoveryPhrase is required" }
 
         val koin = GlobalContext.get()
         // The debug artifact is built with -Plogdate.backendUrl pointing at this origin.
         // Keeping the origin in the runtime arguments makes accidental prod-token/prod-build
         // mixing visible in the probe output without adding a production-only config hook.
         require(serverOrigin.startsWith("https://")) { "serverOrigin must use HTTPS" }
+        val identityKeyManager = koin.get<IdentityKeyManager>()
+        if (!identityKeyManager.hasIdentityKey()) {
+            identityKeyManager.recoverIdentity(recoveryPhrase.split(' '))
+        }
         koin.get<SessionStorage>().saveSession(UserSession(accessToken, refreshToken, accountId))
         val sync = koin.get<DefaultSyncManager>()
         val notes = koin.get<JournalNotesRepository>()
