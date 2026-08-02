@@ -1955,6 +1955,19 @@ fun A117_AppUpdatePromptBookPosture() {
 
 @Composable
 private fun FoldableMediaDetailScene(
+    foldableLayoutInfo: FoldableLayoutInfo,
+    state: MediaDetailUiState,
+) {
+    provideFoldableLayoutInfo(foldableLayoutInfo) {
+        ScreenshotTheme {
+            MediaDetailContent(
+                state = state,
+                isExpanded = true,
+                onBack = {},
+            )
+        }
+    }
+}
 
 @Composable
 private fun FoldableEntryEditorScene(foldableLayoutInfo: FoldableLayoutInfo) {
@@ -2008,6 +2021,19 @@ private fun TabletopPostureNoteViewerScene(noteContent: @Composable () -> Unit) 
 
 @Composable
 private fun FoldableNoteViewerScene(
+    foldableLayoutInfo: FoldableLayoutInfo,
+    noteContent: @Composable () -> Unit,
+) {
+    provideFoldableLayoutInfo(foldableLayoutInfo) {
+        ScreenshotTheme {
+            NoteViewerScaffoldContent(
+                shared = auditNoteShared,
+                onGoBack = {},
+                noteContent = noteContent,
+            )
+        }
+    }
+}
 
 @Composable
 private fun AuditNoteImage() {
