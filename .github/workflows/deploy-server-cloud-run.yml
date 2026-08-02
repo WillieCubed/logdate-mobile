@@ -208,6 +208,7 @@ jobs:
             echo "Deployment contract image mismatch: expected $IMAGE_URI, got $CONTRACT_IMAGE"
             exit 1
           fi
+          echo "Deploying immutable image: $IMAGE_URI"
           ENV_VARS_FILE="$(mktemp "${RUNNER_TEMP}/logdate-cloud-run-env.XXXXXX.yaml")"
           chmod 600 "$ENV_VARS_FILE"
           jq -c '.env_vars' "$CONTRACT_FILE" >"$ENV_VARS_FILE"
