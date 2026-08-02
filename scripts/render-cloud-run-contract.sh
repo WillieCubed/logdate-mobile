@@ -147,9 +147,20 @@ git -C "$REPO_ROOT" show "$RELEASE_SHA:infra/terraform/.terraform.lock.hcl" >"$P
 # Contract rendering only evaluates variables and pure locals. An empty plugin
 # directory makes this initialization deterministic and prevents an unauthenticated
 # CI render from blocking on the provider registry.
-if ! terraform -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false -plugin-dir="$PRIVATE_PLUGIN_DIR" >"$TERRAFORM_INIT_LOG" 2>&1; then
+set +e
+if command -v timeout >/dev/null 2>&1; then
+    timeout 15 terraform -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false -plugin-dir="$PRIVATE_PLUGIN_DIR" >"$TERRAFORM_INIT_LOG" 2>&1
+else
+    terraform -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false -plugin-dir="$PRIVATE_PLUGIN_DIR" >"$TERRAFORM_INIT_LOG" 2>&1
+fi
+TERRAFORM_INIT_STATUS=$?
+set -e
+if [[ "$TERRAFORM_INIT_STATUS" -ne 0 && "$TERRAFORM_INIT_STATUS" -ne 124 ]]; then
     redact_log "$TERRAFORM_INIT_LOG"
     die "Terraform backend-free initialization failed."
+fi
+if [[ "$TERRAFORM_INIT_STATUS" -eq 124 ]]; then
+    printf 'WARNING: Terraform initialization exceeded 15 seconds; continuing with provider-free console evaluation.\n' >&2
 fi
 
 read -r -d '' TERRAFORM_EXPRESSION <<'EOF' || true
