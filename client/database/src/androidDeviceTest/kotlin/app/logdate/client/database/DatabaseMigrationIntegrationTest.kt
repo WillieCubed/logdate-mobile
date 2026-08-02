@@ -12,6 +12,7 @@ import app.logdate.client.database.migrations.MIGRATION_25_26
 import app.logdate.client.database.migrations.MIGRATION_26_27
 import app.logdate.client.database.migrations.MIGRATION_39_40
 import app.logdate.client.database.migrations.MIGRATION_40_41
+import app.logdate.client.database.migrations.MIGRATION_45_46
 import app.logdate.client.database.migrations.MIGRATION_5_6
 import app.logdate.client.database.migrations.MIGRATION_6_7
 import app.logdate.client.database.migrations.MIGRATION_7_8
@@ -649,5 +650,48 @@ class DatabaseMigrationIntegrationTest {
 
         assertFalse(cursor.moveToFirst())
         cursor.close()
+    }
+
+    @Test
+    fun testMigrationFrom45To46PreservesSyncMetadataAsUnowned() {
+        val databaseName = "$testDatabaseName-45-46"
+        helper.createDatabase(databaseName, 45).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO pending_uploads (serverOrigin, entityType, entityId, operation, createdAt, retryCount)
+                VALUES ('https://cloud-staging.logdate.app', 'JOURNAL', 'journal-1', 'CREATE', 1710000000000, 2)
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                INSERT INTO sync_cursors (serverOrigin, entityType, lastSyncTimestamp)
+                VALUES ('https://cloud-staging.logdate.app', 'JOURNAL', 1710000000100)
+                """.trimIndent(),
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(databaseName, 46, true, MIGRATION_45_46)
+        val pending = db.query("SELECT ownerId, retryCount FROM pending_uploads WHERE entityId = 'journal-1'")
+        assertTrue(pending.moveToFirst())
+        assertEquals("", pending.getString(pending.getColumnIndexOrThrow("ownerId")))
+        assertEquals(2, pending.getInt(pending.getColumnIndexOrThrow("retryCount")))
+        pending.close()
+
+        val cursor = db.query("SELECT ownerId, lastSyncTimestamp FROM sync_cursors WHERE entityType = 'JOURNAL'")
+        assertTrue(cursor.moveToFirst())
+        assertEquals("", cursor.getString(cursor.getColumnIndexOrThrow("ownerId")))
+        assertEquals(1710000000100, cursor.getLong(cursor.getColumnIndexOrThrow("lastSyncTimestamp")))
+        cursor.close()
+
+        db.execSQL(
+            """
+            INSERT INTO pending_uploads (ownerId, serverOrigin, entityType, entityId, operation, createdAt, retryCount)
+            VALUES ('other-owner', 'https://cloud-staging.logdate.app', 'JOURNAL', 'journal-1', 'UPDATE', 1710000000200, 0)
+            """.trimIndent(),
+        )
+        val ownerCount = db.query("SELECT COUNT(*) FROM pending_uploads WHERE entityId = 'journal-1'")
+        assertTrue(ownerCount.moveToFirst())
+        assertEquals(2, ownerCount.getInt(0), "Different owners must not overwrite each other's outbox rows")
+        ownerCount.close()
     }
 }

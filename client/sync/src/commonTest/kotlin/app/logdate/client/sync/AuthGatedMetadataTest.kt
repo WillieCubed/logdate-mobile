@@ -12,21 +12,12 @@ import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
 /**
- * Unit-level coverage for the auth-gated metadata service. The journey test in
- * `journey/AccountlessToCloudJourneyTest.kt` exercises the full path; these tests pin the
- * tighter invariants:
- *
- * - `enqueuePending` is a no-op while signed-out.
- * - `getPendingCount()` reports zero while signed-out, regardless of any rows that may exist.
- * - First sign-in unblocks enqueue without losing the gate semantics.
- * - `clearPending()` empties the queue at any auth state.
- *
- * The fakes mirror production `DatabaseSyncMetadataService` behavior — the fake takes a real
- * `SessionStorage` and gates against it, same shape as the prod impl.
+ * Unit-level coverage for the offline-first metadata service. The queue always belongs to the
+ * local person; authentication only controls when it may be uploaded.
  */
-class AuthGatedMetadataTest {
+class OfflineFirstMetadataTest {
     @Test
-    fun enqueue_is_no_op_while_signed_out() =
+    fun enqueue_is_retained_while_signed_out() =
         runTest {
             val session = fakeSessionStorage(authenticated = false)
             val metadata = fakeSyncMetadataService(session)
@@ -38,14 +29,14 @@ class AuthGatedMetadataTest {
             )
 
             assertTrue(
-                metadata.getPendingUploads(EntityType.JOURNAL).isEmpty(),
-                "Accountless writes must not enqueue",
+                metadata.getPendingUploads(EntityType.JOURNAL).isNotEmpty(),
+                "Offline writes must remain queued until Cloud backup is available",
             )
-            assertEquals(0, metadata.getPendingCount())
+            assertEquals(1, metadata.getPendingCount())
         }
 
     @Test
-    fun getPendingCount_returns_zero_when_signed_out_even_after_signing_back_out() =
+    fun pending_count_survives_sign_out() =
         runTest {
             val session = fakeSessionStorage(authenticated = true)
             val metadata = fakeSyncMetadataService(session)
@@ -58,13 +49,13 @@ class AuthGatedMetadataTest {
             )
             assertEquals(1, metadata.getPendingCount())
 
-            // Signing out flips the count to zero — the UI must never see queue state without auth.
+            // Signing out pauses transport but must not make durable work disappear.
             session.clearSession()
-            assertEquals(0, metadata.getPendingCount())
+            assertEquals(1, metadata.getPendingCount())
         }
 
     @Test
-    fun first_sign_in_unblocks_enqueue() =
+    fun queued_offline_work_is_available_after_sign_in() =
         runTest {
             val session = fakeSessionStorage(authenticated = false)
             val metadata = fakeSyncMetadataService(session)
@@ -74,7 +65,7 @@ class AuthGatedMetadataTest {
                 entityType = EntityType.JOURNAL,
                 operation = PendingOperation.CREATE,
             )
-            assertTrue(metadata.getPendingUploads(EntityType.JOURNAL).isEmpty())
+            assertEquals(1, metadata.getPendingUploads(EntityType.JOURNAL).size)
 
             session.saveSession(
                 UserSession(accessToken = "a", refreshToken = "r", accountId = "acct-1"),
@@ -86,8 +77,9 @@ class AuthGatedMetadataTest {
                 operation = PendingOperation.CREATE,
             )
             val pending = metadata.getPendingUploads(EntityType.JOURNAL)
-            assertEquals(1, pending.size)
-            assertEquals("after-signin", pending.single().entityId)
+            assertEquals(2, pending.size)
+            assertTrue(pending.any { it.entityId == "before-signin" })
+            assertTrue(pending.any { it.entityId == "after-signin" })
         }
 
     @Test

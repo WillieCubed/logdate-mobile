@@ -67,6 +67,10 @@ interface PasskeyApiClientContract {
 
     suspend fun refreshToken(refreshToken: String): Result<String>
 
+    /** Best-effort server-side refresh-token revocation for an explicit sign-out. */
+    suspend fun logout(refreshToken: String): Result<Unit> =
+        Result.failure(PasskeyApiException("NOT_SUPPORTED", "Remote logout is not supported by this client"))
+
     suspend fun deletePasskey(
         accessToken: String,
         credentialId: String,
@@ -125,6 +129,7 @@ interface PasskeyApiClientContract {
         username: String? = null,
         displayName: String? = null,
         nonce: String? = null,
+        requestedOwnerId: String? = null,
     ): Result<CompleteAccountCreationData> =
         Result.failure(PasskeyApiException("NOT_SUPPORTED", "Google sign-up is not supported by this client"))
 
@@ -186,6 +191,7 @@ class PasskeyApiClient(
                             username = request.username,
                             displayName = request.displayName,
                             bio = request.bio,
+                            requestedOwnerId = request.requestedOwnerId,
                         ),
                     )
                 }
@@ -375,6 +381,26 @@ class PasskeyApiClient(
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to refresh token", e))
         }
 
+    override suspend fun logout(refreshToken: String): Result<Unit> =
+        try {
+            val baseUrl = getBaseUrl()
+            val response =
+                httpClient.post("$baseUrl$AUTH_PATH/logout") {
+                    contentType(ContentType.Application.Json)
+                    setBody(LogoutRequestDto(refreshToken))
+                }
+
+            if (response.status.value in 200..299) {
+                Result.success(Unit)
+            } else {
+                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+            }
+        } catch (e: Exception) {
+            Napier.w("Failed to revoke refresh token during logout", e)
+            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to revoke refresh token", e))
+        }
+
     override suspend fun deletePasskey(
         accessToken: String,
         credentialId: String,
@@ -421,6 +447,7 @@ class PasskeyApiClient(
         username: String?,
         displayName: String?,
         nonce: String?,
+        requestedOwnerId: String?,
     ): Result<CompleteAccountCreationData> =
         try {
             val baseUrl = getBaseUrl()
@@ -433,6 +460,7 @@ class PasskeyApiClient(
                             username = username,
                             displayName = displayName,
                             nonce = nonce,
+                            requestedOwnerId = requestedOwnerId,
                         ),
                     )
                 }
@@ -625,6 +653,7 @@ private data class GoogleAuthRequestDto(
     val username: String? = null,
     val displayName: String? = null,
     val nonce: String? = null,
+    val requestedOwnerId: String? = null,
 )
 
 @Serializable
@@ -632,6 +661,7 @@ private data class SignupPasskeyBeginRequestDto(
     val username: String,
     val displayName: String,
     val bio: String? = null,
+    val requestedOwnerId: String? = null,
 )
 
 @Serializable
@@ -698,6 +728,11 @@ private data class RefreshTokenResponseV1Dto(
 @Serializable
 private data class RefreshTokenDataV1Dto(
     val accessToken: String,
+)
+
+@Serializable
+private data class LogoutRequestDto(
+    val refreshToken: String,
 )
 
 @Serializable

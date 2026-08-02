@@ -56,6 +56,5 @@ val accountDomainModule: Module =
         factory { VerifyEmailUseCase(sessionStorage = get(), manager = get()) }
         factory { EmailVerificationAvailability(manager = get(), getCurrentEntitlement = get()) }
 
-        // User ID - depends on account
-        factory { GetUserIdUseCase(get(), get()) }
+        factory { GetUserIdUseCase(get()) }
     }

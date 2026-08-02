@@ -124,26 +124,6 @@ class DefaultSyncManager(
         syncScope.launch {
             sessionStorage.getSessionFlow().collect { publishStatus() }
         }
-        // One-shot migration: users running pre-gating builds may have accumulated pending
-        // uploads while signed-out. Now that the metadata service refuses such writes and the
-        // UI hides queue state without an account, those orphan rows would persist invisibly.
-        // Clear them on first launch with this build.
-        syncScope.launch { clearOrphanQueueIfUnauthenticated() }
-    }
-
-    private suspend fun clearOrphanQueueIfUnauthenticated() {
-        // While unauthenticated, no row in pending_uploads should exist post-gating. If any do,
-        // they came from a pre-gating build and would otherwise sit invisibly. clearPending is
-        // an unconditional DB delete, so this is safe even on a clean install.
-        val hasSession =
-            runCatching { sessionStorage.hasValidSession() }
-                .getOrElse { error ->
-                    Napier.w("Skipping orphan queue cleanup after session check failure", error)
-                    return
-                }
-        if (hasSession) return
-        runCatching { syncMetadataService.clearPending() }
-            .onFailure { Napier.w("Failed to clear orphan pending queue", it) }
     }
 
     /**

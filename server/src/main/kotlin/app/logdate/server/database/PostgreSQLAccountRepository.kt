@@ -9,6 +9,7 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.greater
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.insertIgnore
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
@@ -19,6 +20,27 @@ import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
 class PostgreSQLAccountRepository : AccountRepository {
+    override suspend fun create(account: Account): Boolean =
+        transaction {
+            AccountsTable.insertIgnore {
+                it[id] = account.id.toJavaUUID()
+                it[username] = account.username
+                it[displayName] = account.displayName
+                it[did] = account.did
+                it[handle] = account.handle
+                it[signingKeyPublic] = account.signingKeyPublic
+                it[plcRecoveryDidKey] = account.plcRecoveryDidKey
+                it[email] = account.email
+                it[emailVerified] = account.emailVerified
+                it[emailVerifiedAt] = account.emailVerifiedAt
+                it[bio] = account.bio
+                it[createdAt] = account.createdAt
+                it[lastSignInAt] = account.lastSignInAt
+                it[isActive] = account.isActive
+                it[preferences] = account.preferences ?: "{}"
+            }.insertedCount > 0
+        }
+
     override suspend fun save(account: Account): Account =
         transaction {
             val existingAccount =

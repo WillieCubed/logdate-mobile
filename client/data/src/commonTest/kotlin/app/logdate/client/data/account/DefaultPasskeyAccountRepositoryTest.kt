@@ -5,6 +5,7 @@ import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.PlatformAccountInfo
 import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.device.TokenPair
+import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.client.permissions.PasskeyManager
 import app.logdate.client.permissions.RestoreCredentialManager
@@ -28,11 +29,15 @@ import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyUser
 import app.logdate.shared.model.PublicKeyCredentialParameter
 import app.logdate.shared.model.UsernameAvailabilityData
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -42,6 +47,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 /**
  * Comprehensive tests for [DefaultPasskeyAccountRepository] covering the full lifecycle of
@@ -82,6 +88,8 @@ class DefaultPasskeyAccountRepositoryTest {
         sessionStorage: FakeSessionStorage = FakeSessionStorage(),
         platformAccountManager: FakePlatformAccountManager = FakePlatformAccountManager(),
         configRepository: FakeConfigRepository = FakeConfigRepository(),
+        canonicalOwnerProvider: CanonicalOwnerProvider = FakeCanonicalOwnerProvider(testAccount.id.toString()),
+        repositoryScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     ): DefaultPasskeyAccountRepository =
         DefaultPasskeyAccountRepository(
             apiClient = apiClient,
@@ -90,6 +98,8 @@ class DefaultPasskeyAccountRepositoryTest {
             sessionStorage = sessionStorage,
             platformAccountManager = platformAccountManager,
             configRepository = configRepository,
+            canonicalOwnerProvider = canonicalOwnerProvider,
+            repositoryScope = repositoryScope,
             json = Json { ignoreUnknownKeys = true },
         )
 
@@ -120,6 +130,24 @@ class DefaultPasskeyAccountRepositoryTest {
 
             assertFalse(repository.isAuthenticated.value)
             assertNull(repository.currentAccount.value)
+        }
+
+    @Test
+    fun initialization_quarantines_a_session_for_a_different_local_owner() =
+        runTest {
+            val sessionStorage = FakeSessionStorage().apply { saveSession(testSession) }
+
+            val repository =
+                createRepository(
+                    sessionStorage = sessionStorage,
+                    canonicalOwnerProvider = FakeCanonicalOwnerProvider(Uuid.random().toString()),
+                    repositoryScope = this,
+                )
+
+            advanceUntilIdle()
+
+            assertFalse(repository.isAuthenticated.value)
+            assertNull(sessionStorage.getSession())
         }
 
     /**
@@ -224,6 +252,23 @@ class DefaultPasskeyAccountRepositoryTest {
             assertEquals(testTokens.accessToken, storedSession.accessToken)
             assertEquals(testTokens.refreshToken, storedSession.refreshToken)
             assertEquals(testAccount.id.toString(), storedSession.accountId)
+        }
+
+    @Test
+    fun createAccountWithPasskey_does_not_persist_a_different_cloud_owner() =
+        runTest {
+            val sessionStorage = FakeSessionStorage()
+            val repository =
+                createRepository(
+                    sessionStorage = sessionStorage,
+                    canonicalOwnerProvider = FakeCanonicalOwnerProvider(Uuid.random().toString()),
+                )
+
+            val result = repository.createAccountWithPasskey(AccountCreationRequest("newuser", "New User"))
+
+            assertTrue(result.isFailure)
+            assertNull(sessionStorage.getSession())
+            assertFalse(repository.isAuthenticated.value)
         }
 
     /**
@@ -335,6 +380,23 @@ class DefaultPasskeyAccountRepositoryTest {
             assertEquals(testAccount.id.toString(), storedSession.accountId)
         }
 
+    @Test
+    fun authenticateWithPasskey_does_not_replace_the_installation_owner() =
+        runTest {
+            val sessionStorage = FakeSessionStorage()
+            val repository =
+                createRepository(
+                    sessionStorage = sessionStorage,
+                    canonicalOwnerProvider = FakeCanonicalOwnerProvider(Uuid.random().toString()),
+                )
+
+            val result = repository.authenticateWithPasskey("testuser")
+
+            assertTrue(result.isFailure)
+            assertNull(sessionStorage.getSession())
+            assertFalse(repository.isAuthenticated.value)
+        }
+
     /**
      * Tests that authentication fails when the API cannot begin authentication.
      */
@@ -399,6 +461,22 @@ class DefaultPasskeyAccountRepositoryTest {
             assertTrue(result.isSuccess)
             assertFalse(repository.isAuthenticated.value)
             assertNull(repository.currentAccount.value)
+            assertNull(sessionStorage.getSession())
+        }
+
+    @Test
+    fun signOut_revokes_the_remote_refresh_token_before_clearing_local_credentials() =
+        runTest {
+            val sessionStorage = FakeSessionStorage().apply { saveSession(testSession) }
+            val apiClient = FakePasskeyApiClient()
+            val repository = createRepository(apiClient = apiClient, sessionStorage = sessionStorage)
+
+            repository.createAccountWithPasskey(AccountCreationRequest("user", "User", "Bio"))
+
+            val result = repository.signOut()
+
+            assertTrue(result.isSuccess)
+            assertEquals(testTokens.refreshToken, apiClient.loggedOutRefreshToken)
             assertNull(sessionStorage.getSession())
         }
 
@@ -675,6 +753,8 @@ class DefaultPasskeyAccountRepositoryTest {
         var refreshTokenResponse: Result<String> = Result.success("new_access_token")
         var deletePasskeyResponse: Result<Unit> = Result.success(Unit)
         var deleteAccountResponse: Result<Unit> = Result.success(Unit)
+        var logoutResponse: Result<Unit> = Result.success(Unit)
+        var loggedOutRefreshToken: String? = null
         var getAccountInfoResponse: Result<LogDateAccount> = Result.success(testAccount)
         var getAccountInfoResponses: List<Result<LogDateAccount>>? = null
         var deletePasskeyResponses: List<Result<Unit>>? = null
@@ -716,6 +796,11 @@ class DefaultPasskeyAccountRepositoryTest {
             }
 
         override suspend fun refreshToken(refreshToken: String): Result<String> = refreshTokenResponse
+
+        override suspend fun logout(refreshToken: String): Result<Unit> {
+            loggedOutRefreshToken = refreshToken
+            return logoutResponse
+        }
 
         override suspend fun deletePasskey(
             accessToken: String,
@@ -819,6 +904,12 @@ class DefaultPasskeyAccountRepositoryTest {
     /**
      * Fake implementation of SessionStorage for testing.
      */
+    private class FakeCanonicalOwnerProvider(
+        private val ownerId: String,
+    ) : CanonicalOwnerProvider {
+        override suspend fun getCanonicalOwnerId(): String = ownerId
+    }
+
     class FakeSessionStorage : SessionStorage {
         private var session: UserSession? = null
         private val sessionFlow = MutableStateFlow<UserSession?>(null)

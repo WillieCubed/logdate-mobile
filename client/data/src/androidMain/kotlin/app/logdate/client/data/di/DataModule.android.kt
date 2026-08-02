@@ -1,5 +1,6 @@
 package app.logdate.client.data.di
 
+import android.content.Context
 import app.logdate.client.data.account.DefaultAccountIdentityRepository
 import app.logdate.client.data.account.DefaultAccountRepository
 import app.logdate.client.data.account.DefaultPasskeyAccountRepository
@@ -152,7 +153,7 @@ actual val dataModule: Module =
         }
 
         single<EntryDraftRepository> { OfflineFirstEntryDraftRepository(get(), get()) }
-        factory<LocalEntryDraftStore> { AndroidLocalEntryDraftStore(get()) }
+        factory<LocalEntryDraftStore> { AndroidLocalEntryDraftStore(get<Context>()) }
 
         // Rewind
         single<RewindRepository> { OfflineFirstRewindRepository(get()) }
@@ -224,6 +225,7 @@ actual val dataModule: Module =
                 get(),
                 get(),
                 get(),
+                get(),
                 googleSignInManager = get(),
                 serverClientId = DefaultLogDateConfigRepository.GOOGLE_SERVER_CLIENT_ID,
             )
@@ -273,5 +275,5 @@ actual val dataModule: Module =
         single<StreakSettingsRepository> { DefaultStreakSettingsRepository(get()) }
 
         // Integrity
-        single { DataIntegrityService(get(), get(), get(), get()) }
+        single { DataIntegrityService(get(), get(), get(), get(), get()) }
     }

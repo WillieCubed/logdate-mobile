@@ -3,6 +3,7 @@ package app.logdate.client.data.maintenance
 import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.dao.maintenance.IntegrityDao
 import app.logdate.client.database.dao.sync.SyncMetadataDao
+import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.shared.config.LogDateConfigRepository
@@ -17,12 +18,15 @@ class DataIntegrityService(
     private val syncMetadataDao: SyncMetadataDao,
     private val journalContentDao: JournalContentDao,
     private val configRepository: LogDateConfigRepository,
+    private val canonicalOwnerProvider: CanonicalOwnerProvider,
 ) {
     suspend fun audit(): IntegrityReport {
+        val ownerId = canonicalOwnerProvider.getCanonicalOwnerId()
+        val serverOrigin = currentOrigin()
         val orphanedJournalLinks = integrityDao.countOrphanedJournalLinks()
         val orphanedContentLinks = integrityDao.countOrphanedContentLinks()
-        val pendingMissingJournals = integrityDao.countPendingMissingJournals()
-        val pendingMissingNotes = integrityDao.countPendingMissingNotes()
+        val pendingMissingJournals = integrityDao.countPendingMissingJournals(ownerId, serverOrigin)
+        val pendingMissingNotes = integrityDao.countPendingMissingNotes(ownerId, serverOrigin)
         val associationAudit = auditPendingAssociations()
 
         return IntegrityReport(
@@ -37,10 +41,12 @@ class DataIntegrityService(
     }
 
     suspend fun repair(): IntegrityRepairResult {
+        val ownerId = canonicalOwnerProvider.getCanonicalOwnerId()
+        val serverOrigin = currentOrigin()
         val orphanedJournalLinksRemoved = integrityDao.deleteOrphanedJournalLinks()
         val orphanedContentLinksRemoved = integrityDao.deleteOrphanedContentLinks()
-        val pendingMissingJournalsRemoved = integrityDao.deletePendingMissingJournals()
-        val pendingMissingNotesRemoved = integrityDao.deletePendingMissingNotes()
+        val pendingMissingJournalsRemoved = integrityDao.deletePendingMissingJournals(ownerId, serverOrigin)
+        val pendingMissingNotesRemoved = integrityDao.deletePendingMissingNotes(ownerId, serverOrigin)
         val pendingAssociationsRemoved = repairPendingAssociations()
 
         return IntegrityRepairResult(
@@ -54,7 +60,12 @@ class DataIntegrityService(
     }
 
     private suspend fun auditPendingAssociations(): PendingAssociationAudit {
-        val pending = syncMetadataDao.getPendingByType(currentOrigin(), EntityType.ASSOCIATION.name)
+        val pending =
+            syncMetadataDao.getPendingByType(
+                canonicalOwnerProvider.getCanonicalOwnerId(),
+                currentOrigin(),
+                EntityType.ASSOCIATION.name,
+            )
         var missingLinks = 0
         var malformed = 0
 
@@ -74,20 +85,21 @@ class DataIntegrityService(
     }
 
     private suspend fun repairPendingAssociations(): Int {
-        val pending = syncMetadataDao.getPendingByType(currentOrigin(), EntityType.ASSOCIATION.name)
+        val ownerId = canonicalOwnerProvider.getCanonicalOwnerId()
+        val pending = syncMetadataDao.getPendingByType(ownerId, currentOrigin(), EntityType.ASSOCIATION.name)
         var removed = 0
 
         for (entry in pending) {
             val key = AssociationPendingKey.fromPendingId(entry.entityId)
             if (key == null) {
-                syncMetadataDao.deletePending(currentOrigin(), EntityType.ASSOCIATION.name, entry.entityId)
+                syncMetadataDao.deletePending(ownerId, currentOrigin(), EntityType.ASSOCIATION.name, entry.entityId)
                 removed++
                 continue
             }
 
             val exists = journalContentDao.isContentInJournal(key.journalId, key.contentId)
             if (!exists) {
-                syncMetadataDao.deletePending(currentOrigin(), EntityType.ASSOCIATION.name, entry.entityId)
+                syncMetadataDao.deletePending(ownerId, currentOrigin(), EntityType.ASSOCIATION.name, entry.entityId)
                 removed++
             }
         }

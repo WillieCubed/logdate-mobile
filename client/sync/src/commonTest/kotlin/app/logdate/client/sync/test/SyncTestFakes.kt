@@ -109,11 +109,7 @@ fun fakeSessionStorage(authenticated: Boolean = true): FakeSessionStorage =
 
 fun fakeSyncMetadataService(): FakeSyncMetadataService = FakeSyncMetadataService()
 
-/**
- * Variant that mirrors production gating: enqueue is a no-op while [sessionStorage] reports no
- * session. Counts also surface zero in that state. Use this when a test exercises the
- * "accountless writes don't enqueue" invariant.
- */
+/** Variant using an explicit session for tests which need to pause and resume sync transport. */
 fun fakeSyncMetadataService(sessionStorage: SessionStorage): FakeSyncMetadataService = FakeSyncMetadataService(sessionStorage)
 
 /**
@@ -625,8 +621,6 @@ class FakeSyncMetadataService(
     private val pendingCountFlow = MutableStateFlow(0)
     var clearPendingCalls: Int = 0
 
-    private fun isAuthenticated(): Boolean = sessionStorage.getSession() != null
-
     override suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload> =
         pendingUploads[entityType]
             ?.map { (entityId, operation) ->
@@ -660,7 +654,6 @@ class FakeSyncMetadataService(
         entityType: EntityType,
         operation: PendingOperation,
     ) {
-        if (!isAuthenticated()) return
         val existing = pendingUploads[entityType]?.get(entityId)
         val resolved = PendingOperation.coalesce(existing, operation)
         if (resolved == null) {
@@ -684,7 +677,7 @@ class FakeSyncMetadataService(
         updatePendingCount()
     }
 
-    override suspend fun getPendingCount(): Int = if (isAuthenticated()) pendingUploads.values.sumOf { it.size } else 0
+    override suspend fun getPendingCount(): Int = pendingUploads.values.sumOf { it.size }
 
     override fun observePendingCount(): Flow<Int> = pendingCountFlow
 

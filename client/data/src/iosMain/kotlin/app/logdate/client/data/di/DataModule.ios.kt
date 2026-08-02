@@ -217,6 +217,7 @@ actual val dataModule: Module =
                 sessionStorage = get(),
                 platformAccountManager = get(),
                 configRepository = get(),
+                canonicalOwnerProvider = get(),
             )
         }
 
@@ -252,5 +253,5 @@ actual val dataModule: Module =
         single<StreakSettingsRepository> { DefaultStreakSettingsRepository(get()) }
 
         // Integrity
-        single { DataIntegrityService(get(), get(), get(), get()) }
+        single { DataIntegrityService(get(), get(), get(), get(), get()) }
     }

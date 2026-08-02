@@ -1,6 +1,8 @@
 package app.logdate.client.device.identity.di
 
 import app.logdate.client.datastore.KeyValueStorage
+import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.device.identity.DefaultCanonicalOwnerProvider
 import app.logdate.client.device.identity.DefaultDeviceIdProvider
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.device.identity.DeviceRepository
@@ -14,6 +16,10 @@ import org.koin.dsl.module
  */
 actual val deviceIdentityModule: Module =
     module {
+        single<CanonicalOwnerProvider> {
+            DefaultCanonicalOwnerProvider(get<KeyValueStorage>(named("deviceKeyValueStorage")))
+        }
+
         single<DeviceIdProvider>(named("modernDeviceIdProvider")) {
             DefaultDeviceIdProvider(get<KeyValueStorage>(named("deviceKeyValueStorage")))
         }

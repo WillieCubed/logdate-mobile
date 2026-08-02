@@ -35,8 +35,8 @@ val conflictResolverModule: Module =
             JournalNoteConflictResolver()
         }
 
-        // Sync metadata service backed by Room database. SessionStorage gates the queue:
-        // accountless writes do not enqueue, so the UI never has a queue to surface.
+        // Sync metadata service backed by Room. A missing Cloud session pauses transport but
+        // never deletes local outbox work.
         single<SyncMetadataService> {
             DatabaseSyncMetadataService(get<SyncMetadataDao>(), get(), get())
         }

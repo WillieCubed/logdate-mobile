@@ -5,6 +5,7 @@ package app.logdate.client.data.account
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.PlatformAccountManager
+import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.client.permissions.GoogleSignInManager
 import app.logdate.client.permissions.NoOpGoogleSignInManager
@@ -45,8 +46,10 @@ class DefaultPasskeyAccountRepository(
     private val sessionStorage: SessionStorage,
     private val platformAccountManager: PlatformAccountManager,
     private val configRepository: LogDateConfigRepository,
+    private val canonicalOwnerProvider: CanonicalOwnerProvider,
     private val googleSignInManager: GoogleSignInManager = NoOpGoogleSignInManager(),
     private val serverClientId: String = "",
+    private val repositoryScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val json: Json =
         Json {
             ignoreUnknownKeys = true
@@ -58,19 +61,20 @@ class DefaultPasskeyAccountRepository(
 
     private val _isAuthenticated = MutableStateFlow(false)
     override val isAuthenticated: StateFlow<Boolean> = _isAuthenticated.asStateFlow()
-    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     init {
-        val existingSession = sessionStorage.getSession()
-        if (existingSession != null) {
-            _isAuthenticated.value = true
-        }
-
         repositoryScope.launch {
             sessionStorage.getSessionFlow().collect { session ->
-                _isAuthenticated.value = session != null
-                if (session == null) {
+                if (session != null && !sessionBelongsToCanonicalOwner(session)) {
+                    Napier.w("Discarding credentials for a different LogDate identity")
+                    sessionStorage.clearSession()
+                    _isAuthenticated.value = false
                     _currentAccount.value = null
+                } else {
+                    _isAuthenticated.value = session != null
+                    if (session == null) {
+                        _currentAccount.value = null
+                    }
                 }
             }
         }
@@ -78,7 +82,8 @@ class DefaultPasskeyAccountRepository(
         repositoryScope.launch {
             configRepository.backendUrl.drop(1).collect {
                 _currentAccount.value = null
-                _isAuthenticated.value = sessionStorage.getSession() != null
+                val session = sessionStorage.getSession()
+                _isAuthenticated.value = session != null && sessionBelongsToCanonicalOwner(session)
             }
         }
     }
@@ -95,11 +100,13 @@ class DefaultPasskeyAccountRepository(
     override suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> {
         return try {
             // Step 1: Begin account creation
+            val canonicalOwnerId = canonicalOwnerProvider.getCanonicalOwnerId()
             val beginRequest =
                 BeginAccountCreationRequest(
                     username = request.username,
                     displayName = request.displayName,
                     bio = request.bio,
+                    requestedOwnerId = canonicalOwnerId,
                 )
 
             val beginResult = apiClient.beginAccountCreation(beginRequest)
@@ -131,6 +138,9 @@ class DefaultPasskeyAccountRepository(
             }
 
             val completeData = completeResult.getOrThrow()
+            if (completeData.account.id.toString() != canonicalOwnerId) {
+                return Result.failure(CanonicalOwnerMismatchException())
+            }
 
             // Step 4: Store session and account data
             sessionStorage.saveSession(
@@ -175,6 +185,11 @@ class DefaultPasskeyAccountRepository(
         }
     }
 
+    private class CanonicalOwnerMismatchException :
+        IllegalStateException(
+            "LogDate Cloud returned an account that does not match this installation's identity",
+        )
+
     override suspend fun authenticateWithPasskey(username: String?): Result<LogDateAccount> {
         return try {
             // Step 1: Begin authentication
@@ -218,6 +233,9 @@ class DefaultPasskeyAccountRepository(
             }
 
             val completeData = completeResult.getOrThrow()
+            if (!belongsToCanonicalOwner(completeData.account)) {
+                return Result.failure(CanonicalOwnerMismatchException())
+            }
 
             // Step 5: Store session and account data
             sessionStorage.saveSession(
@@ -258,6 +276,7 @@ class DefaultPasskeyAccountRepository(
         displayName: String?,
     ): Result<LogDateAccount> {
         return try {
+            val canonicalOwnerId = canonicalOwnerProvider.getCanonicalOwnerId()
             val tokenResult = googleSignInManager.getGoogleIdToken(serverClientId)
             if (tokenResult.isFailure) {
                 return Result.failure(tokenResult.exceptionOrNull()!!)
@@ -268,12 +287,16 @@ class DefaultPasskeyAccountRepository(
                     idToken = tokenResult.getOrThrow(),
                     username = username,
                     displayName = displayName,
+                    requestedOwnerId = canonicalOwnerId,
                 )
             if (createResult.isFailure) {
                 return Result.failure(createResult.exceptionOrNull()!!)
             }
 
             val data = createResult.getOrThrow()
+            if (data.account.id.toString() != canonicalOwnerId) {
+                return Result.failure(CanonicalOwnerMismatchException())
+            }
             persistAuthenticatedSession(data.account, data.tokens, isNewAccount = true)
 
             createRestoreKey().onFailure { error ->
@@ -301,6 +324,9 @@ class DefaultPasskeyAccountRepository(
             }
 
             val data = authResult.getOrThrow()
+            if (!belongsToCanonicalOwner(data.account)) {
+                return Result.failure(CanonicalOwnerMismatchException())
+            }
             persistAuthenticatedSession(data.account, data.tokens, isNewAccount = false)
 
             Napier.i("Authentication with Google successful for user: ${data.account.username}")
@@ -354,9 +380,22 @@ class DefaultPasskeyAccountRepository(
         _isAuthenticated.value = true
     }
 
+    private suspend fun belongsToCanonicalOwner(account: LogDateAccount): Boolean =
+        account.id.toString() == canonicalOwnerProvider.getCanonicalOwnerId()
+
+    private suspend fun sessionBelongsToCanonicalOwner(session: UserSession): Boolean =
+        runCatching { session.accountId == canonicalOwnerProvider.getCanonicalOwnerId() }.getOrDefault(false)
+
     override suspend fun signOut(): Result<Unit> =
         try {
             val currentAccountValue = _currentAccount.value
+            val session = sessionStorage.getSession()
+
+            session?.let {
+                apiClient.logout(it.refreshToken).onFailure { error ->
+                    Napier.w("Remote logout failed; local credentials will still be cleared", error)
+                }
+            }
 
             sessionStorage.clearSession()
 

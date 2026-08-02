@@ -1,6 +1,8 @@
 package app.logdate.client.device.identity.di
 
 import app.logdate.client.datastore.KeyValueStorage
+import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.device.identity.DefaultCanonicalOwnerProvider
 import app.logdate.client.device.identity.DefaultDeviceManager
 import app.logdate.client.device.identity.DesktopDeviceIdProvider
 import app.logdate.client.device.identity.DeviceIdProvider
@@ -18,6 +20,10 @@ import java.util.Properties
  */
 actual val deviceIdentityModule: Module =
     module {
+        single<CanonicalOwnerProvider> {
+            DefaultCanonicalOwnerProvider(get<KeyValueStorage>(named("deviceKeyValueStorage")))
+        }
+
         // Device ID provider
         single<DeviceIdProvider> {
             DesktopDeviceIdProvider(

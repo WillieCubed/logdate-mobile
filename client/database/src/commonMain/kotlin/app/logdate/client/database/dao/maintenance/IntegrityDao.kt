@@ -55,17 +55,24 @@ interface IntegrityDao {
         SELECT COUNT(*)
         FROM pending_uploads AS pending
         LEFT JOIN journals AS journals ON pending.entityId = journals.id
-        WHERE pending.entityType = 'JOURNAL'
+        WHERE pending.ownerId = :ownerId
+          AND pending.serverOrigin = :serverOrigin
+          AND pending.entityType = 'JOURNAL'
           AND journals.id IS NULL
         """,
     )
-    suspend fun countPendingMissingJournals(): Int
+    suspend fun countPendingMissingJournals(
+        ownerId: String,
+        serverOrigin: String,
+    ): Int
 
     @Query(
         """
         SELECT COUNT(*)
         FROM pending_uploads AS pending
-        WHERE pending.entityType = 'NOTE'
+        WHERE pending.ownerId = :ownerId
+          AND pending.serverOrigin = :serverOrigin
+          AND pending.entityType = 'NOTE'
           AND pending.entityId NOT IN (
             SELECT uid FROM text_notes
             UNION SELECT uid FROM image_notes
@@ -74,21 +81,31 @@ interface IntegrityDao {
           )
         """,
     )
-    suspend fun countPendingMissingNotes(): Int
+    suspend fun countPendingMissingNotes(
+        ownerId: String,
+        serverOrigin: String,
+    ): Int
 
     @Query(
         """
         DELETE FROM pending_uploads
-        WHERE entityType = 'JOURNAL'
+        WHERE ownerId = :ownerId
+          AND serverOrigin = :serverOrigin
+          AND entityType = 'JOURNAL'
           AND entityId NOT IN (SELECT id FROM journals)
         """,
     )
-    suspend fun deletePendingMissingJournals(): Int
+    suspend fun deletePendingMissingJournals(
+        ownerId: String,
+        serverOrigin: String,
+    ): Int
 
     @Query(
         """
         DELETE FROM pending_uploads
-        WHERE entityType = 'NOTE'
+        WHERE ownerId = :ownerId
+          AND serverOrigin = :serverOrigin
+          AND entityType = 'NOTE'
           AND entityId NOT IN (
             SELECT uid FROM text_notes
             UNION SELECT uid FROM image_notes
@@ -97,5 +114,8 @@ interface IntegrityDao {
           )
         """,
     )
-    suspend fun deletePendingMissingNotes(): Int
+    suspend fun deletePendingMissingNotes(
+        ownerId: String,
+        serverOrigin: String,
+    ): Int
 }

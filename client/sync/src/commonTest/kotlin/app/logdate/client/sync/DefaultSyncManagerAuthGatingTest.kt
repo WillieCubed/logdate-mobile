@@ -40,7 +40,7 @@ class DefaultSyncManagerAuthGatingTest {
 
             val status = manager.getSyncStatus()
             assertFalse(status.isEnabled, "Without a session, isEnabled must be false")
-            assertEquals(0, status.pendingUploads, "Pending count must be zero without a session")
+            assertEquals(0, status.pendingUploads, "An empty offline queue has no pending work")
         }
 
     @Test
@@ -81,7 +81,7 @@ class DefaultSyncManagerAuthGatingTest {
         }
 
     @Test
-    fun startup_cleanup_keeps_pending_queue_when_auth_is_loaded_but_cache_is_still_empty() =
+    fun startup_never_clears_pending_queue_when_auth_is_loaded_but_cache_is_still_empty() =
         runTest {
             val session =
                 object : SessionStorage {
@@ -105,7 +105,7 @@ class DefaultSyncManagerAuthGatingTest {
 
             testScheduler.advanceUntilIdle()
 
-            assertEquals(0, metadata.clearPendingCalls, "Cleanup must not run when durable auth exists")
+            assertEquals(0, metadata.clearPendingCalls, "Startup must never destroy offline work")
             // Sanity: the manager stays usable once the session cache catches up.
             assertFalse(manager.getSyncStatus().isEnabled, "Cached session is still empty in this test")
         }

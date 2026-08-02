@@ -4,6 +4,7 @@ import app.logdate.server.ServerDescriptorConfig
 import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.shared.model.DeploymentKind
 import app.logdate.shared.model.ServerCapability
+import app.logdate.shared.model.ServerProtocolFeature
 import app.logdate.shared.model.ServerInfoResponse
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
@@ -66,6 +67,7 @@ class ServerInfoRoutesTest {
             assertEquals("https://journal.example.com", payload.data.serverOrigin)
             assertEquals("https://journal.example.com/api/v1", payload.data.apiBaseUrl)
             assertTrue(payload.data.capabilities.contains(ServerCapability.AUTH_PASSKEY))
+            assertTrue(payload.data.protocolFeatures.contains(ServerProtocolFeature.CANONICAL_OWNER_BINDING_V1))
             assertTrue(payload.data.capabilities.contains(ServerCapability.ATPROTO_IDENTITY))
             assertTrue(payload.data.capabilities.contains(ServerCapability.ATPROTO_OAUTH))
             assertTrue(payload.data.capabilities.contains(ServerCapability.SYNC_CONTENT))

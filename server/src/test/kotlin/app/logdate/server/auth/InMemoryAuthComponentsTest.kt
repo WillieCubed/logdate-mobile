@@ -22,6 +22,25 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class)
 class InMemoryAuthComponentsTest {
     @Test
+    fun `create account refuses to replace an existing canonical owner`() =
+        runBlocking {
+            val repository = InMemoryAccountRepository()
+            val ownerId = Uuid.random()
+            val first =
+                Account(
+                    id = ownerId,
+                    username = "first_owner",
+                    displayName = "First Owner",
+                    createdAt = Clock.System.now(),
+                )
+            val replacement = first.copy(username = "replacement_owner", displayName = "Replacement Owner")
+
+            assertTrue(repository.create(first))
+            assertFalse(repository.create(replacement))
+            assertEquals("first_owner", repository.findById(ownerId)?.username)
+        }
+
+    @Test
     fun `in-memory account repository supports lifecycle and indexes`() =
         runBlocking {
             val repository = InMemoryAccountRepository()

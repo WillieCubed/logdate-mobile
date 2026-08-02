@@ -5,6 +5,7 @@ import app.logdate.shared.model.DeploymentKind
 import app.logdate.shared.model.ServerCapability
 import app.logdate.shared.model.ServerDescriptor
 import app.logdate.shared.model.ServerPasskeyConfig
+import app.logdate.shared.model.ServerProtocolFeature
 
 data class ServerDescriptorConfig(
     val deploymentKind: DeploymentKind = DeploymentKind.SELF_HOSTED,
@@ -41,6 +42,7 @@ data class ServerDescriptorConfig(
             handleDomain = identityConfig.normalizedHandleDomain,
             passkey = ServerPasskeyConfig(rpId = webAuthnRpId, rpName = webAuthnRpName),
             capabilities = capabilities,
+            protocolFeatures = listOf(ServerProtocolFeature.CANONICAL_OWNER_BINDING_V1),
             privacyPolicyUrl = privacyPolicyUrl,
             termsOfServiceUrl = termsOfServiceUrl,
         )

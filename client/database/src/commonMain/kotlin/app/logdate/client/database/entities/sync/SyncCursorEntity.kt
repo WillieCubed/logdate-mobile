@@ -1,5 +1,6 @@
 package app.logdate.client.database.entities.sync
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 
 /**
@@ -8,9 +9,11 @@ import androidx.room.Entity
  */
 @Entity(
     tableName = "sync_cursors",
-    primaryKeys = ["serverOrigin", "entityType"],
+    primaryKeys = ["ownerId", "serverOrigin", "entityType"],
 )
 data class SyncCursorEntity(
+    @ColumnInfo(defaultValue = "''")
+    val ownerId: String,
     val serverOrigin: String,
     val entityType: String,
     val lastSyncTimestamp: Long,

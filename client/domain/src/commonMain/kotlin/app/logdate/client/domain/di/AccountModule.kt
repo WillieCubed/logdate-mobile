@@ -22,5 +22,5 @@ val accountModule: Module =
         factory { DeletePasskeyUseCase(get()) }
 
         // User identity
-        factory { GetUserIdUseCase(get(), get()) }
+        factory { GetUserIdUseCase(get()) }
     }

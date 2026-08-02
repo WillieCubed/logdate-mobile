@@ -35,6 +35,8 @@ data class BeginAccountCreationRequest(
     val username: String,
     val displayName: String,
     val bio: String? = null,
+    /** The durable local owner that a new Cloud account must bind to. */
+    val requestedOwnerId: String? = null,
 )
 
 @Serializable

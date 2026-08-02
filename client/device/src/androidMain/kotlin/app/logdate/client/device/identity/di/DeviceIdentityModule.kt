@@ -4,6 +4,8 @@ import android.os.Build
 import android.provider.Settings
 import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.device.AppInfoProvider
+import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.device.identity.DefaultCanonicalOwnerProvider
 import app.logdate.client.device.identity.DefaultDeviceIdProvider
 import app.logdate.client.device.identity.DefaultDeviceManager
 import app.logdate.client.device.identity.DeviceIdProvider
@@ -20,6 +22,10 @@ import org.koin.dsl.module
  */
 actual val deviceIdentityModule: Module =
     module {
+        single<CanonicalOwnerProvider> {
+            DefaultCanonicalOwnerProvider(get<KeyValueStorage>(named("deviceKeyValueStorage")))
+        }
+
         single<DeviceIdProvider> {
             DefaultDeviceIdProvider(get<KeyValueStorage>(named("deviceKeyValueStorage")))
         }

@@ -35,12 +35,44 @@ interface EntryDraftRepository {
     suspend fun createDraft(notes: List<JournalNote>): Uuid
 
     /**
+     * Creates a complete draft snapshot using the caller-provided stable [uid].
+     *
+     * The default implementation preserves compatibility with repositories that only
+     * implement note-only drafts. Production repositories should override this method
+     * so notes, pending media, and journal selection are committed atomically.
+     */
+    suspend fun createDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+        pendingMedia: List<PendingMediaRecord> = emptyList(),
+        selectedJournalIds: List<Uuid> = emptyList(),
+    ): Uuid {
+        val createdId = createDraft(notes)
+        setPendingMedia(createdId, pendingMedia)
+        setSelectedJournalIds(createdId, selectedJournalIds)
+        return createdId
+    }
+
+    /**
      * Updates a draft with the given notes and returns its ID.
      */
     suspend fun updateDraft(
         uid: Uuid,
         notes: List<JournalNote>,
     ): Uuid
+
+    /** Updates every durable field in a draft snapshot. */
+    suspend fun updateDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+        pendingMedia: List<PendingMediaRecord>,
+        selectedJournalIds: List<Uuid> = emptyList(),
+    ): Uuid {
+        val updatedId = updateDraft(uid, notes)
+        setPendingMedia(updatedId, pendingMedia)
+        setSelectedJournalIds(updatedId, selectedJournalIds)
+        return updatedId
+    }
 
     /**
      * Replaces the [EntryDraft.pendingMedia] list of the draft with [uid].
@@ -55,6 +87,16 @@ interface EntryDraftRepository {
         uid: Uuid,
         pendingMedia: List<PendingMediaRecord>,
     )
+
+    /**
+     * Replaces the journals selected for a draft.
+     *
+     * This compatibility default lets note-only test repositories continue to compile.
+     */
+    suspend fun setSelectedJournalIds(
+        uid: Uuid,
+        selectedJournalIds: List<Uuid>,
+    ) = Unit
 
     /**
      * Deletes any drafts with the given UID.
@@ -92,6 +134,10 @@ data class EntryDraft(
     val createdAt: Instant,
     val updatedAt: Instant,
     val pendingMedia: List<PendingMediaRecord> = emptyList(),
+    val selectedJournalIds: List<
+        @Serializable(with = UuidSerializer::class)
+        Uuid,
+    > = emptyList(),
 )
 
 /** Type of pending media. Currently only audio is wired; camera/video will follow. */

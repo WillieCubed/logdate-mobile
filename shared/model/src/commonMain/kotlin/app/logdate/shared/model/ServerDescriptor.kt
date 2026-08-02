@@ -20,6 +20,11 @@ enum class ServerCapability {
     CLOUD_TRANSCRIPTION,
 }
 
+/** Additive protocol flags that old clients can safely ignore. */
+object ServerProtocolFeature {
+    const val CANONICAL_OWNER_BINDING_V1 = "canonicalOwnerBindingV1"
+}
+
 @Serializable
 data class ServerPasskeyConfig(
     val rpId: String,
@@ -36,10 +41,13 @@ data class ServerDescriptor(
     val handleDomain: String? = null,
     val passkey: ServerPasskeyConfig? = null,
     val capabilities: List<ServerCapability> = emptyList(),
+    val protocolFeatures: List<String> = emptyList(),
     val privacyPolicyUrl: String? = null,
     val termsOfServiceUrl: String? = null,
 ) {
     fun hasCapability(capability: ServerCapability): Boolean = capabilities.contains(capability)
+
+    fun hasProtocolFeature(feature: String): Boolean = protocolFeatures.contains(feature)
 }
 
 @Serializable

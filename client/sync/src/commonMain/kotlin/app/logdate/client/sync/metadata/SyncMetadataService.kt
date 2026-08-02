@@ -74,12 +74,8 @@ interface SyncMetadataService {
     )
 
     /**
-     * Drops every queued pending upload across all entity types.
-     *
-     * Called from sign-out and from the one-shot startup migration that clears orphan items
-     * accumulated under the previous "enqueue regardless of auth" behavior. Cursors are left
-     * intact: a future sign-in still wants to know how far we got with downloads, even if the
-     * upload queue is being reset.
+     * Drops the current local owner's queued uploads for the current backend.
+     * This is not a sign-out operation: sign-out always preserves offline work.
      */
     suspend fun clearPending()
 }

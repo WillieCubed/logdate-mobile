@@ -82,6 +82,7 @@ class BasicCloudApiClientTest {
                                       "rpId": "logdate.app",
                                       "rpName": "LogDate",
                                       "user": {"id":"u","name":"newuser","displayName":"New User"},
+                                      "pubKeyCredParams": [{"type":"public-key","alg":-7}],
                                       "timeout": 300000
                                     }
                                   }

@@ -1,5 +1,6 @@
 package app.logdate.client.database.entities.sync
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 
 /**
@@ -8,9 +9,11 @@ import androidx.room.Entity
  */
 @Entity(
     tableName = "pending_uploads",
-    primaryKeys = ["serverOrigin", "entityType", "entityId"],
+    primaryKeys = ["ownerId", "serverOrigin", "entityType", "entityId"],
 )
 data class PendingUploadEntity(
+    @ColumnInfo(defaultValue = "''")
+    val ownerId: String,
     val serverOrigin: String,
     val entityType: String,
     val entityId: String,

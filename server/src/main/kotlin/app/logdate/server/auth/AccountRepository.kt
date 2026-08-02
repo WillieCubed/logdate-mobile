@@ -7,6 +7,9 @@ import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
 interface AccountRepository {
+    /** Atomically creates an account without ever replacing an existing owner. */
+    suspend fun create(account: Account): Boolean
+
     suspend fun save(account: Account): Account
 
     suspend fun findById(id: Uuid): Account?
@@ -45,6 +48,20 @@ class InMemoryAccountRepository : AccountRepository {
     private val emailIndex = mutableMapOf<String, Uuid>() // email -> account ID
     private val didIndex = mutableMapOf<String, Uuid>() // did -> account ID
     private val handleIndex = mutableMapOf<String, Uuid>() // handle -> account ID
+
+    override suspend fun create(account: Account): Boolean =
+        synchronized(accounts) {
+            if (accounts.containsKey(account.id) || usernameIndex.containsKey(account.username)) {
+                false
+            } else {
+                accounts[account.id] = account
+                usernameIndex[account.username] = account.id
+                account.email?.let { emailIndex[it] = account.id }
+                account.did?.let { didIndex[it] = account.id }
+                account.handle?.let { handleIndex[it] = account.id }
+                true
+            }
+        }
 
     override suspend fun save(account: Account): Account {
         val existingAccount = accounts[account.id]

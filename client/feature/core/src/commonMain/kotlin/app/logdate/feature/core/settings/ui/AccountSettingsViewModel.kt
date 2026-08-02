@@ -298,11 +298,7 @@ class AccountSettingsViewModel(
                 Napier.i("Signing out user")
                 passkeyAccountRepository.signOut()
                 preferencesDataSource.setBackgroundSyncEnabled(false)
-                // Drop the pending-uploads queue tied to this account. Without a session there's
-                // nowhere for those items to go, and re-signing into the same or a different
-                // account triggers a fresh BackfillLocalDataUseCase pass over local data.
-                syncMetadataService.clearPending()
-                Napier.i("Session cleared successfully")
+                Napier.i("Session cleared; local backup queue is retained until sign-in resumes")
             } catch (e: Exception) {
                 Napier.e("Failed to sign out", e)
                 onError(e.message ?: "Failed to sign out")
