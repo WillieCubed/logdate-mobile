@@ -101,10 +101,18 @@ variable "cloud_run_env" {
 variable "cloud_run_secret_env" {
   type = map(object({
     secret_id = string
-    version   = optional(string, "latest")
+    version   = string
   }))
-  description = "Secret-backed environment variables for Cloud Run."
+  description = "Secret-backed environment variables for Cloud Run, pinned to immutable enabled numeric Secret Manager versions."
   default     = {}
+
+  validation {
+    condition = alltrue([
+      for binding in values(var.cloud_run_secret_env) :
+      can(regex("^[1-9][0-9]*$", binding.version))
+    ])
+    error_message = "Cloud Run secret versions must be exact positive numeric Secret Manager versions; latest is not allowed."
+  }
 }
 
 variable "android_signing_certificates" {

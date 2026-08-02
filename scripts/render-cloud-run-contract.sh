@@ -131,10 +131,6 @@ jsonencode({
   },
   env_vars = merge(
     local.base_env,
-    var.create_cloud_sql_instance ? {
-      INSTANCE_CONNECTION_NAME = "${var.project_id}:${var.region}:${var.cloud_sql_instance_name}",
-      DB_NAME                  = var.cloud_sql_database_name,
-    } : {},
     local.bucket_env,
     local.webauthn_env,
     local.webauthn_origin_env,
@@ -367,7 +363,7 @@ try:
         "SYNC_MEDIA_SIGNED_URL_TTL_HOURS",
         "AUTO_MIGRATE",
     }
-    allowed_env_keys = required_env_keys | {"INSTANCE_CONNECTION_NAME", "DB_NAME"}
+    allowed_env_keys = required_env_keys
     unexpected_env = set(env_vars) - allowed_env_keys
     if unexpected_env:
         fail("environment contract contains unexpected keys")
@@ -412,6 +408,7 @@ try:
     if not isinstance(secret_env, dict):
         fail("secret_env must be an object")
     required_secret_keys = {
+        "DATABASE_URL",
         "DATABASE_USER",
         "DATABASE_PASSWORD",
         "JWT_SECRET",
@@ -420,7 +417,6 @@ try:
         "HEALTH_INTERNAL_TOKEN",
     }
     optional_secret_keys = {
-        "DATABASE_URL",
         "SENTRY_DSN",
         "GOOGLE_OIDC_CLIENT_IDS",
         "REDIS_URL",
@@ -443,20 +439,7 @@ try:
             fail(f"{name} secret version must be an exact positive integer")
         normalized_secrets[name] = {"secret_id": secret_id, "version": version}
 
-    connector_selected = "INSTANCE_CONNECTION_NAME" in env_vars or "DB_NAME" in env_vars
-    url_selected = "DATABASE_URL" in normalized_secrets
-    if connector_selected == url_selected:
-        fail("database contract must select exactly one of connector or URL mode")
-    if connector_selected:
-        connection_name = required_string(env_vars.get("INSTANCE_CONNECTION_NAME"), "INSTANCE_CONNECTION_NAME")
-        database_name = env_vars.get("DB_NAME")
-        if not isinstance(database_name, str) or not database_name.strip():
-            fail("DB_NAME is required with INSTANCE_CONNECTION_NAME")
-        parts = connection_name.split(":")
-        if len(parts) != 3 or parts[0] != project_id or parts[1] != region or not parts[2]:
-            fail("INSTANCE_CONNECTION_NAME must be project:region:instance and match the contract")
-    else:
-        required_string(normalized_secrets["DATABASE_URL"]["secret_id"], "DATABASE_URL secret ID")
+    required_string(normalized_secrets["DATABASE_URL"]["secret_id"], "DATABASE_URL secret ID")
 
     runtime_keys = {
         "allow_unauthenticated",

@@ -19,12 +19,17 @@ cloud_run_env = {
 }
 
 cloud_run_secret_env = {
-  DATABASE_URL = { secret_id = "logdate-db-url" }
-  DATABASE_USER = { secret_id = "logdate-db-user" }
-  DATABASE_PASSWORD = { secret_id = "logdate-db-password" }
-  JWT_SECRET = { secret_id = "logdate-jwt-secret" }
-  GOOGLE_OIDC_CLIENT_IDS = { secret_id = "logdate-google-oidc-client-ids" }
-  REDIS_URL = { secret_id = "logdate-redis-url" }
+  # Replace each example version with an enabled numeric version in the
+  # production project. Never use Secret Manager's mutable `latest` alias.
+  DATABASE_URL             = { secret_id = "logdate-db-url", version = "1" }
+  DATABASE_USER            = { secret_id = "logdate-db-user", version = "1" }
+  DATABASE_PASSWORD        = { secret_id = "logdate-db-password", version = "1" }
+  JWT_SECRET               = { secret_id = "logdate-jwt-secret", version = "1" }
+  GOOGLE_OIDC_CLIENT_IDS   = { secret_id = "logdate-google-oidc-client-ids", version = "1" }
+  REDIS_URL                = { secret_id = "logdate-redis-url", version = "1" }
+  SERVER_ENCRYPTION_KEY    = { secret_id = "logdate-server-encryption-key", version = "1" }
+  SERVER_ENCRYPTION_KEY_ID = { secret_id = "logdate-server-encryption-key-id", version = "1" }
+  HEALTH_INTERNAL_TOKEN    = { secret_id = "logdate-health-internal-token", version = "1" }
 }
 
 create_secrets = true

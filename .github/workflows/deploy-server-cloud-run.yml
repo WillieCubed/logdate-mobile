@@ -112,6 +112,23 @@ jobs:
             echo "SERVICE_NAME, PROJECT_ID, and REGION must be set in infra/terraform/${ENVIRONMENT}.tfvars or repository variables."
             exit 1
           fi
+
+      - name: Render immutable deployment contract
+        run: |
+          CONTRACT_FILE="$(mktemp "${RUNNER_TEMP}/logdate-cloud-run-contract.XXXXXX.json")"
+          chmod 600 "$CONTRACT_FILE"
+          ./scripts/render-cloud-run-contract.sh \
+            --environment "$ENVIRONMENT" \
+            --release-sha "$DEPLOY_SHA" >"$CONTRACT_FILE"
+
+          if [[ "$(jq -r '.project_id' "$CONTRACT_FILE")" != "$PROJECT_ID" ||
+                "$(jq -r '.region' "$CONTRACT_FILE")" != "$REGION" ||
+                "$(jq -r '.service_name' "$CONTRACT_FILE")" != "$SERVICE_NAME" ]]; then
+            echo "Rendered deployment contract does not match the selected project, region, and service."
+            exit 1
+          fi
+
+          echo "CONTRACT_FILE=$CONTRACT_FILE" >> "$GITHUB_ENV"
           if [[ "${PROJECT_ID}" == *"Terraform exited with code"* || "${REGION}" == *"Terraform exited with code"* ]]; then
             echo "SERVICE_NAME, PROJECT_ID, and REGION must be set in infra/terraform/${ENVIRONMENT}.tfvars or repository variables."
             exit 1
@@ -155,9 +172,8 @@ jobs:
       - name: Run database migrations
         run: |
           ./scripts/run-migrations.sh \
-            --legacy-config \
-            --project-id "${PROJECT_ID}" \
-            --region "${REGION}" \
+            --contract-file "$CONTRACT_FILE" \
+            --environment "$ENVIRONMENT" \
             --validate-passkey-fk
 
       - name: Configure candidate tag
@@ -177,26 +193,33 @@ jobs:
 
       - name: Deploy candidate revision without traffic
         run: |
+          ENV_VARS_FILE="$(mktemp "${RUNNER_TEMP}/logdate-cloud-run-env.XXXXXX.yaml")"
+          chmod 600 "$ENV_VARS_FILE"
+          jq -c '.env_vars' "$CONTRACT_FILE" >"$ENV_VARS_FILE"
+          SECRET_ENV_BINDINGS="$(jq -r '.secret_env | to_entries | map("\(.key)=\(.value.secret_id):\(.value.version)") | join(",")' "$CONTRACT_FILE")"
+
           service_account_args=()
-          if [[ -n "${RUNTIME_SERVICE_ACCOUNT}" ]]; then
-            service_account_args=(--service-account "${RUNTIME_SERVICE_ACCOUNT}")
+          CONTRACT_RUNTIME_SERVICE_ACCOUNT="$(jq -r '.runtime_service_account' "$CONTRACT_FILE")"
+          if [[ -n "$CONTRACT_RUNTIME_SERVICE_ACCOUNT" ]]; then
+            service_account_args=(--service-account "$CONTRACT_RUNTIME_SERVICE_ACCOUNT")
           fi
 
-          gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:${{ env.DEPLOY_SHA }} \
+          gcloud run deploy "$(jq -r '.service_name' "$CONTRACT_FILE")" \
+            --image "$(jq -r '.image' "$CONTRACT_FILE")" \
             --platform managed \
-            --region ${{ env.REGION }} \
-            --project ${{ env.PROJECT_ID }} \
+            --region "$(jq -r '.region' "$CONTRACT_FILE")" \
+            --project "$(jq -r '.project_id' "$CONTRACT_FILE")" \
             --no-traffic \
             --tag "$CANDIDATE_TAG" \
-            --set-env-vars "RELEASE_VERSION=logdate-server@${{ env.DEPLOY_SHA }}" \
+            --env-vars-file "$ENV_VARS_FILE" \
+            --set-secrets "$SECRET_ENV_BINDINGS" \
             "${service_account_args[@]}"
 
           REVISION_URL=""
           for _ in $(seq 1 30); do
             REVISION_URL=$(
-              gcloud run services describe ${{ env.SERVICE_NAME }} \
-                --platform managed --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} \
+              gcloud run services describe "$(jq -r '.service_name' "$CONTRACT_FILE")" \
+                --platform managed --region "$(jq -r '.region' "$CONTRACT_FILE")" --project "$(jq -r '.project_id' "$CONTRACT_FILE")" \
                 --format=json |
                 jq -r --arg tag "$CANDIDATE_TAG" '.status.traffic[]? | select(.tag == $tag) | .url // empty'
             )
@@ -207,28 +230,71 @@ jobs:
           done
           if [[ -z "$REVISION_URL" ]]; then
             echo "Timed out waiting for candidate revision URL for tag ${CANDIDATE_TAG}."
-            gcloud run services describe ${{ env.SERVICE_NAME }} \
-              --platform managed --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} \
+            gcloud run services describe "$(jq -r '.service_name' "$CONTRACT_FILE")" \
+              --platform managed --region "$(jq -r '.region' "$CONTRACT_FILE")" --project "$(jq -r '.project_id' "$CONTRACT_FILE")" \
               --format="yaml(status.traffic)"
             exit 1
           fi
           echo "REVISION_URL=$REVISION_URL" >> "$GITHUB_ENV"
 
-      - name: Smoke test candidate revision
+      - name: Prepare strict candidate smoke proof
         run: |
-          origin_arg=()
-          if [[ -n "${DOMAIN}" ]]; then
-            origin_arg=("https://${DOMAIN}")
-          fi
-          ./scripts/smoke-test-revision.sh "$REVISION_URL" "${origin_arg[@]}"
+          umask 077
+          SMOKE_DIRECTORY="$(mktemp -d "${RUNNER_TEMP}/logdate-cloud-smoke.XXXXXX")"
+          chmod 700 "$SMOKE_DIRECTORY"
+          INVOKER_TOKEN_FILE="$SMOKE_DIRECTORY/invoker-token"
+          SMOKE_STATE_FILE="$SMOKE_DIRECTORY/state.json"
+          : >"$INVOKER_TOKEN_FILE"
+          : >"$SMOKE_STATE_FILE"
+          chmod 600 "$INVOKER_TOKEN_FILE" "$SMOKE_STATE_FILE"
+          gcloud auth print-identity-token --audiences "$REVISION_URL" >"$INVOKER_TOKEN_FILE"
+          test -s "$INVOKER_TOKEN_FILE"
+          HEALTH_INTERNAL_TOKEN="$(
+            gcloud secrets versions access \
+              "$(jq -r '.secret_env.HEALTH_INTERNAL_TOKEN.version' "$CONTRACT_FILE")" \
+              --secret="$(jq -r '.secret_env.HEALTH_INTERNAL_TOKEN.secret_id' "$CONTRACT_FILE")" \
+              --project="$(jq -r '.project_id' "$CONTRACT_FILE")"
+          )"
+          test -n "$HEALTH_INTERNAL_TOKEN"
+
+          {
+            echo "SMOKE_DIRECTORY=$SMOKE_DIRECTORY"
+            echo "INVOKER_TOKEN_FILE=$INVOKER_TOKEN_FILE"
+            echo "SMOKE_STATE_FILE=$SMOKE_STATE_FILE"
+          } >> "$GITHUB_ENV"
+
+          ./scripts/smoke-test-revision.sh \
+            --service-url "$REVISION_URL" \
+            --contract-file "$CONTRACT_FILE" \
+            --expected-release "$(jq -r '.env_vars.RELEASE_VERSION' "$CONTRACT_FILE")" \
+            --invoker-token-file "$INVOKER_TOKEN_FILE" \
+            --phase prepare \
+            --state-file "$SMOKE_STATE_FILE"
 
       - name: Promote candidate to 100 percent traffic
         run: |
-          gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
+          gcloud run services update-traffic "$(jq -r '.service_name' "$CONTRACT_FILE")" \
             --platform managed \
-            --region ${{ env.REGION }} \
-            --project ${{ env.PROJECT_ID }} \
+            --region "$(jq -r '.region' "$CONTRACT_FILE")" \
+            --project "$(jq -r '.project_id' "$CONTRACT_FILE")" \
             --to-tags "$CANDIDATE_TAG=100"
+
+      - name: Verify public durability and clean smoke data
+        run: |
+          HEALTH_INTERNAL_TOKEN="$(
+            gcloud secrets versions access \
+              "$(jq -r '.secret_env.HEALTH_INTERNAL_TOKEN.version' "$CONTRACT_FILE")" \
+              --secret="$(jq -r '.secret_env.HEALTH_INTERNAL_TOKEN.secret_id' "$CONTRACT_FILE")" \
+              --project="$(jq -r '.project_id' "$CONTRACT_FILE")"
+          )"
+          test -n "$HEALTH_INTERNAL_TOKEN"
+          ./scripts/smoke-test-revision.sh \
+            --service-url "$(jq -r '.canonical_origin' "$CONTRACT_FILE")" \
+            --contract-file "$CONTRACT_FILE" \
+            --expected-release "$(jq -r '.env_vars.RELEASE_VERSION' "$CONTRACT_FILE")" \
+            --invoker-token-file "$INVOKER_TOKEN_FILE" \
+            --phase verify-and-cleanup \
+            --state-file "$SMOKE_STATE_FILE"
 
       - name: Verify deployed service
         run: |

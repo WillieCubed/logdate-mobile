@@ -1,6 +1,6 @@
-project_id      = "logdate-dev"
-region          = "us-central1"
-service_name    = "logdate-server-staging"
+project_id   = "logdate-dev"
+region       = "us-central1"
+service_name = "logdate-server-staging"
 # Placeholder image only used for the initial terraform apply. Real images get
 # pushed by the Deploy Server Staging workflow (in repo_vars mode for this env).
 cloud_run_image = "us-central1-docker.pkg.dev/logdate-dev/logdate/logdate-server:latest"
@@ -42,16 +42,17 @@ cloud_run_env = {
 # Secret IDs are scoped to this project's Secret Manager namespace (separate
 # from the prod project's identically-named secrets, no collision).
 cloud_run_secret_env = {
-  DATABASE_URL      = { secret_id = "logdate-db-url" }
-  DATABASE_USER     = { secret_id = "logdate-db-user" }
-  DATABASE_PASSWORD = { secret_id = "logdate-db-password" }
-  JWT_SECRET        = { secret_id = "logdate-jwt-secret" }
+  DATABASE_URL             = { secret_id = "logdate-db-url", version = "1" }
+  DATABASE_USER            = { secret_id = "logdate-db-user", version = "1" }
+  DATABASE_PASSWORD        = { secret_id = "logdate-db-password", version = "1" }
+  JWT_SECRET               = { secret_id = "logdate-jwt-secret", version = "1" }
+  SERVER_ENCRYPTION_KEY    = { secret_id = "logdate-server-encryption-key", version = "1" }
+  SERVER_ENCRYPTION_KEY_ID = { secret_id = "logdate-server-encryption-key-id", version = "1" }
+  HEALTH_INTERNAL_TOKEN    = { secret_id = "logdate-health-internal-token", version = "1" }
   # Mount these only AFTER the matching secret has at least one version.
   # Cloud Run fails the revision if it tries to mount an empty container.
-  # Provisioning steps: docs/observability/sentry.md and
-  # docs/observability/health-endpoint.md.
-  #   SENTRY_DSN              = { secret_id = "logdate-sentry-dsn" }
-  #   HEALTH_INTERNAL_TOKEN   = { secret_id = "logdate-health-internal-token" }
+  # Provisioning steps: docs/observability/sentry.md.
+  #   SENTRY_DSN              = { secret_id = "logdate-sentry-dsn", version = "1" }
   # Opt-in only — populate the secret container then add an entry here:
   #   GOOGLE_OIDC_CLIENT_IDS = { secret_id = "logdate-google-oidc-client-ids" }
   #   REDIS_URL              = { secret_id = "logdate-redis-url" }

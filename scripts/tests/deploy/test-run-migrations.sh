@@ -41,11 +41,9 @@ cat >"$CONTRACT_FILE" <<'EOF'
   "canonical_origin": "https://cloud-staging.logdate.app",
   "runtime_service_account": "logdate-runtime@logdate-contract-test.iam.gserviceaccount.com",
   "image": "us-central1-docker.pkg.dev/logdate-contract-test/logdate/logdate-server:0123456789abcdef0123456789abcdef01234567",
-  "env_vars": {
-    "INSTANCE_CONNECTION_NAME": "logdate-contract-test:us-central1:logdate-db",
-    "DB_NAME": "logdate"
-  },
+  "env_vars": {},
   "secret_env": {
+    "DATABASE_URL": { "secret_id": "logdate-db-url", "version": "17" },
     "DATABASE_USER": { "secret_id": "logdate-db-user", "version": "7" },
     "DATABASE_PASSWORD": { "secret_id": "logdate-db-password", "version": "11" }
   },
@@ -78,6 +76,9 @@ case "${1:-} ${2:-} ${3:-}" in
             esac
         done
         case "$secret_id:$version" in
+            logdate-db-url:17)
+                printf '%s' "jdbc:postgresql://contract-neon.example.test/logdate?sslmode=verify-full&channelBinding=require"
+                ;;
             logdate-db-url:latest)
                 if [[ -n "${MISSING_LEGACY_DATABASE_URL:-}" ]]; then
                     exit 1
@@ -399,8 +400,13 @@ run_invalid_direct_url_case() {
 set +e
 PATH="$FAKE_BIN:$PATH" \
 TEST_LOG_DIR="$LOG_DIR" \
-EXPECTED_PROXY_URL="$DEFAULT_PROXY_URL" \
 DATABASE_PASSWORD_SENTINEL="$DATABASE_PASSWORD_SENTINEL" \
+TEST_EXPECT_DIRECT_URL=1 \
+EXPECTED_FLYWAY_URL="jdbc:postgresql://contract-neon.example.test/logdate?sslmode=verify-full&channelBinding=require" \
+EXPECTED_PGHOST="contract-neon.example.test" \
+EXPECTED_PGPORT="5432" \
+EXPECTED_PGSSLMODE="verify-full" \
+EXPECTED_PGCHANNELBINDING="require" \
 bash -x "$SCRIPT" \
     --contract-file "$CONTRACT_FILE" \
     --environment staging \
@@ -413,12 +419,10 @@ if [[ "$status" != "0" ]]; then
     echo "$output"
 fi
 assert_exit_code 0 "$status"
-assert_contains 'Migration target: logdate-contract-test:us-central1:logdate-db' "$output"
-assert_contains 'Proxy ready.' "$output"
+assert_contains 'Migration target: pinned runtime DATABASE_URL secret.' "$output"
 assert_contains 'Flyway migrate complete.' "$output"
 assert_contains 'Passkey FK validated.' "$output"
-assert_contains "$DEFAULT_PROXY_URL" "$(cat "$LOG_DIR/curl.log")"
-assert_contains '[logdate-contract-test:us-central1:logdate-db]' "$(cat "$LOG_DIR/proxy.log")"
+assert_contains '[access][17][--secret=logdate-db-url][--project=logdate-contract-test]' "$(cat "$LOG_DIR/gcloud.log")"
 assert_contains '[flyway/flyway:12.4.0]' "$(cat "$LOG_DIR/docker.log")"
 assert_contains '[postgres:16-alpine]' "$(cat "$LOG_DIR/docker.log")"
 assert_contains '[access][7][--secret=logdate-db-user][--project=logdate-contract-test]' "$(cat "$LOG_DIR/gcloud.log")"
@@ -430,7 +434,7 @@ pass
 [[ -f "$LOG_DIR/psql-called" ]] || fail "expected PostgreSQL validation container to run"
 pass
 
-security_evidence="$(cat "$OUTPUT_FILE" "$LOG_DIR/gcloud.log" "$LOG_DIR/curl.log" "$LOG_DIR/proxy.log" "$LOG_DIR/docker.log")"
+security_evidence="$(cat "$OUTPUT_FILE" "$LOG_DIR/gcloud.log" "$LOG_DIR/docker.log")"
 assert_not_contains "$DATABASE_PASSWORD_SENTINEL" "$security_evidence"
 assert_not_contains 'migration-user' "$security_evidence"
 
@@ -438,11 +442,7 @@ while IFS= read -r env_path; do
     [[ ! -e "$env_path" ]] || fail "expected trap to remove $env_path"
     pass
 done <"$LOG_DIR/env-paths.log"
-proxy_pid="$(cat "$LOG_DIR/proxy-pid")"
-if kill -0 "$proxy_pid" 2>/dev/null; then
-    fail "expected trap to stop Cloud SQL Auth Proxy process $proxy_pid"
-fi
-pass
+assert_direct_neon_path_did_not_start_proxy "$LOG_DIR"
 
 while IFS='|' read -r name url expected_flyway_url expected_host expected_port expected_sslmode expected_channel_binding; do
     [[ -n "$name" ]] || continue
@@ -526,9 +526,9 @@ pass
 pass
 
 workflow_contents="$(cat .github/workflows/deploy-server-cloud-run.yml)"
-assert_contains '--legacy-config' "$workflow_contents"
-assert_contains "--project-id \"\${PROJECT_ID}\"" "$workflow_contents"
-assert_contains "--region \"\${REGION}\"" "$workflow_contents"
+assert_contains '--contract-file "$CONTRACT_FILE"' "$workflow_contents"
+assert_contains '--environment "$ENVIRONMENT"' "$workflow_contents"
+assert_not_contains '--legacy-config' "$workflow_contents"
 assert_not_contains '--user-secret' "$workflow_contents"
 assert_not_contains '--password-secret' "$workflow_contents"
 
@@ -568,7 +568,7 @@ alternate_shape_output="$(TEST_LOG_DIR="$LOG_DIR" PATH="$FAKE_BIN:$PATH" "$SCRIP
 alternate_shape_status=$?
 set -e
 assert_exit_code 1 "$alternate_shape_status"
-assert_contains 'INSTANCE_CONNECTION_NAME must be a non-empty single-line string' "$alternate_shape_output"
+assert_contains 'DATABASE_URL secret ID must be a non-empty single-line string' "$alternate_shape_output"
 
 help_output="$("$SCRIPT" --help)"
 assert_contains '--contract-file PATH' "$help_output"

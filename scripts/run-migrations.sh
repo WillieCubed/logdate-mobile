@@ -3,9 +3,8 @@ set -euo pipefail
 umask 077
 
 # Run Flyway migrations for a rendered deployment contract. Strict contract
-# mode uses the pinned Cloud SQL target. The temporary legacy mode must use the
-# same DATABASE_URL secret as the currently serving runtime until Task 6 removes
-# that compatibility path atomically.
+# mode uses the same pinned Neon secrets as the Cloud Run candidate. The
+# temporary legacy mode is retained only until Cloud SQL support is removed.
 
 readonly CLOUD_SQL_PROXY_VERSION="v2.21.3"
 readonly FLYWAY_IMAGE="flyway/flyway:12.4.0"
@@ -54,9 +53,9 @@ Pinned tools:
   flyway/flyway:12.4.0
   postgres:16-alpine
 
-The contract supplies project_id, INSTANCE_CONNECTION_NAME, DB_NAME, and exact
-numeric DATABASE_USER/DATABASE_PASSWORD Secret Manager versions. Independent
-database, instance, and secret overrides are rejected.
+The contract supplies project_id and exact numeric DATABASE_URL,
+DATABASE_USER, and DATABASE_PASSWORD Secret Manager versions. Independent
+database and secret overrides are rejected.
 EOF
 }
 
@@ -357,12 +356,8 @@ environment = require_string(contract.get("environment"), "contract environment"
 project_id = require_string(contract.get("project_id"), "contract project_id")
 plain_env = contract.get("env_vars") or {}
 secret_env = contract.get("secret_env") or {}
-connection_name = require_string(plain_env.get("INSTANCE_CONNECTION_NAME"), "INSTANCE_CONNECTION_NAME")
-database_name = require_string(plain_env.get("DB_NAME"), "DB_NAME")
-
-parts = connection_name.split(":")
-if len(parts) != 3 or parts[0] != project_id or not all(parts):
-    raise SystemExit("INSTANCE_CONNECTION_NAME must be project:region:instance and match project_id")
+if not isinstance(plain_env, dict) or "INSTANCE_CONNECTION_NAME" in plain_env or "DB_NAME" in plain_env:
+    raise SystemExit("contract must not contain Cloud SQL database fields")
 
 def secret_mapping(name):
     mapping = secret_env.get(name) or {}
@@ -372,13 +367,14 @@ def secret_mapping(name):
         raise SystemExit(f"{name} secret version must be an exact numeric version")
     return secret_id, version
 
+url_secret_id, url_secret_version = secret_mapping("DATABASE_URL")
 user_secret_id, user_secret_version = secret_mapping("DATABASE_USER")
 password_secret_id, password_secret_version = secret_mapping("DATABASE_PASSWORD")
 for value in (
     environment,
     project_id,
-    connection_name,
-    database_name,
+    url_secret_id,
+    url_secret_version,
     user_secret_id,
     user_secret_version,
     password_secret_id,
@@ -390,8 +386,8 @@ PY
 
     CONTRACT_ENVIRONMENT="$(sed -n '1p' "$PARSED_CONTRACT")"
     PROJECT_ID="$(sed -n '2p' "$PARSED_CONTRACT")"
-    INSTANCE_CONNECTION_NAME="$(sed -n '3p' "$PARSED_CONTRACT")"
-    DATABASE_NAME="$(sed -n '4p' "$PARSED_CONTRACT")"
+    URL_SECRET_ID="$(sed -n '3p' "$PARSED_CONTRACT")"
+    URL_SECRET_VERSION="$(sed -n '4p' "$PARSED_CONTRACT")"
     USER_SECRET_ID="$(sed -n '5p' "$PARSED_CONTRACT")"
     USER_SECRET_VERSION="$(sed -n '6p' "$PARSED_CONTRACT")"
     PASSWORD_SECRET_ID="$(sed -n '7p' "$PARSED_CONTRACT")"
@@ -424,33 +420,14 @@ if [[ "$LEGACY_CONFIG" == "true" ]]; then
     [[ -s "$JDBC_URL_FILE" ]] || die "legacy runtime database URL secret must not be empty."
     log "Using the legacy runtime DATABASE_URL target."
 else
-    log "Migration target: ${INSTANCE_CONNECTION_NAME} → ${DATABASE_NAME}"
-    PROXY_BIN="$WORKDIR/cloud-sql-proxy"
-    download_proxy "$PROXY_BIN"
-    log "Starting Cloud SQL Auth Proxy on 127.0.0.1:${PROXY_PORT}..."
-    "$PROXY_BIN" \
-        --address 127.0.0.1 \
-        --port "$PROXY_PORT" \
-        "$INSTANCE_CONNECTION_NAME" >"$WORKDIR/proxy.log" 2>&1 &
-    PROXY_PID=$!
-
-    for _ in $(seq 1 30); do
-        if (echo >"/dev/tcp/127.0.0.1/${PROXY_PORT}") 2>/dev/null; then
-            break
-        fi
-        if ! kill -0 "$PROXY_PID" 2>/dev/null; then
-            tail -n 40 "$WORKDIR/proxy.log" >&2 || true
-            die "Cloud SQL Auth Proxy exited before accepting connections."
-        fi
-        sleep 1
-    done
-    if ! (echo >"/dev/tcp/127.0.0.1/${PROXY_PORT}") 2>/dev/null; then
-        tail -n 40 "$WORKDIR/proxy.log" >&2 || true
-        die "Cloud SQL Auth Proxy failed to become ready."
+    if ! gcloud secrets versions access "$URL_SECRET_VERSION" \
+        --secret="$URL_SECRET_ID" \
+        --project="$PROJECT_ID" >"$JDBC_URL_FILE"; then
+        die "pinned runtime database URL secret is unavailable; refusing to migrate a different target."
     fi
-    log "Proxy ready."
-    printf 'jdbc:postgresql://127.0.0.1:%s/%s' "$PROXY_PORT" "$DATABASE_NAME" >"$JDBC_URL_FILE"
     chmod 600 "$JDBC_URL_FILE"
+    [[ -s "$JDBC_URL_FILE" ]] || die "pinned runtime database URL secret must not be empty."
+    log "Migration target: pinned runtime DATABASE_URL secret."
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -495,5 +472,5 @@ fi
 if [[ "$LEGACY_CONFIG" == "true" ]]; then
     log "Migrations complete for the legacy runtime database target."
 else
-    log "Migrations complete for ${INSTANCE_CONNECTION_NAME}/${DATABASE_NAME}."
+    log "Migrations complete for the pinned runtime database target."
 fi
