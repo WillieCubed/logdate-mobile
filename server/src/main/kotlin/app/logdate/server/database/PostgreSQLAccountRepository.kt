@@ -2,6 +2,7 @@ package app.logdate.server.database
 
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
+import app.logdate.server.entitlements.AccountEntitlementsTable
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
@@ -224,7 +225,23 @@ class PostgreSQLAccountRepository : AccountRepository {
 
     override suspend fun deleteAccount(accountId: Uuid): Boolean =
         transaction {
-            val deletedRows = AccountsTable.deleteWhere { id eq accountId.toJavaUUID() }
+            val id = accountId.toJavaUUID()
+            // Keep deletion deterministic even when an older deployment has not
+            // yet repaired one of the account-owned foreign keys. These rows are
+            // all user-owned authentication/identity state; billing events use
+            // ON DELETE SET NULL and remain as history.
+            PendingEmailVerificationsTable.deleteWhere { PendingEmailVerificationsTable.accountId eq id }
+            AtprotoPasswordCredentialsTable.deleteWhere { AtprotoPasswordCredentialsTable.accountId eq id }
+            AtprotoSessionsTable.deleteWhere { AtprotoSessionsTable.accountId eq id }
+            SigningKeysTable.deleteWhere { SigningKeysTable.accountId eq id }
+            HostedPlcOperationsTable.deleteWhere { HostedPlcOperationsTable.accountId eq id }
+            AccountIdentitiesTable.deleteWhere { AccountIdentitiesTable.accountId eq id }
+            AccountLinkEventsTable.deleteWhere { AccountLinkEventsTable.accountId eq id }
+            PasskeysTable.deleteWhere { PasskeysTable.accountId eq id }
+            RestoreCredentialsTable.deleteWhere { RestoreCredentialsTable.accountId eq id }
+            ResourceRoutesTable.deleteWhere { ResourceRoutesTable.accountId eq id }
+            AccountEntitlementsTable.deleteWhere { AccountEntitlementsTable.accountId eq id }
+            val deletedRows = AccountsTable.deleteWhere { AccountsTable.id eq id }
             deletedRows > 0
         }
 
