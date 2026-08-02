@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Real-behavior regression tests for the contract-driven Cloud SQL migration helper.
+# Real-behavior regression tests for the deployment migration helper.
 
 set -euo pipefail
 
@@ -11,10 +11,12 @@ SCRIPT="scripts/run-migrations.sh"
 DEFAULT_PROXY_VERSION="v2.21.3"
 DEFAULT_PROXY_URL="https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/${DEFAULT_PROXY_VERSION}/cloud-sql-proxy.linux.amd64"
 DATABASE_PASSWORD_SENTINEL="MIGRATION_DATABASE_PASSWORD_SENTINEL_DO_NOT_LEAK"
+LEGACY_DATABASE_URL="jdbc:postgresql://legacy-neon.example.test/logdate?sslmode=require"
 TMP_DIR="$(mktemp -d)"
 FAKE_BIN="$TMP_DIR/bin"
 LOG_DIR="$TMP_DIR/logs"
-LEGACY_LOG_DIR="$TMP_DIR/logs-legacy"
+MISSING_LEGACY_LOG_DIR="$TMP_DIR/logs-legacy-missing-url"
+MALFORMED_LEGACY_LOG_DIR="$TMP_DIR/logs-legacy-malformed-url"
 CONTRACT_FILE="$TMP_DIR/staging-contract.json"
 OUTPUT_FILE="$TMP_DIR/migrations.out"
 
@@ -23,7 +25,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "$FAKE_BIN" "$LOG_DIR" "$LEGACY_LOG_DIR"
+mkdir -p \
+    "$FAKE_BIN" \
+    "$LOG_DIR" \
+    "$MISSING_LEGACY_LOG_DIR" \
+    "$MALFORMED_LEGACY_LOG_DIR"
 
 cat >"$CONTRACT_FILE" <<'EOF'
 {
@@ -72,6 +78,15 @@ case "${1:-} ${2:-} ${3:-}" in
             esac
         done
         case "$secret_id:$version" in
+            logdate-db-url:latest)
+                if [[ -n "${MISSING_LEGACY_DATABASE_URL:-}" ]]; then
+                    exit 1
+                elif [[ -n "${MALFORMED_LEGACY_DATABASE_URL:-}" ]]; then
+                    printf 'jdbc:postgresql://legacy-neon.example.test/logdate\nFLYWAY_USER=attacker'
+                else
+                    printf '%s' "${LEGACY_DATABASE_URL:?}"
+                fi
+                ;;
             logdate-db-user:7) printf 'migration-user' ;;
             logdate-db-password:11) printf '%s' "${DATABASE_PASSWORD_SENTINEL:?}" ;;
             logdate-db-user:latest) printf 'migration-user' ;;
@@ -194,26 +209,63 @@ mode="$(stat -f '%Lp' "$env_file" 2>/dev/null || stat -c '%a' "$env_file")"
 [[ "$mode" == "600" ]] || { echo "env file mode was $mode" >&2; exit 1; }
 printf '%s\n' "$env_file" >>"$LOG_DIR/env-paths.log"
 
+require_env_line() {
+    local expected="$1"
+    grep -Fxq "$expected" "$env_file" || {
+        printf 'missing expected environment key: %s\n' "${expected%%=*}" >&2
+        exit 1
+    }
+}
+
+require_env_key_absent() {
+    local key="$1"
+    ! grep -Fq "${key}=" "$env_file" || {
+        printf 'unexpected environment key: %s\n' "$key" >&2
+        exit 1
+    }
+}
+
 case "$image" in
     flyway/flyway:12.4.0)
-        grep -Fxq 'FLYWAY_URL=jdbc:postgresql://127.0.0.1:15432/logdate' "$env_file"
-        grep -Fxq 'FLYWAY_USER=migration-user' "$env_file"
-        grep -Fxq "FLYWAY_PASSWORD=${DATABASE_PASSWORD_SENTINEL:?}" "$env_file"
-        grep -Fxq 'FLYWAY_CONNECT_RETRIES=10' "$env_file"
-        python3 - <<'PY'
+        if [[ -n "${TEST_EXPECT_DIRECT_URL:-}" ]]; then
+            require_env_line "FLYWAY_URL=${EXPECTED_FLYWAY_URL:?}"
+        else
+            require_env_line 'FLYWAY_URL=jdbc:postgresql://127.0.0.1:15432/logdate'
+        fi
+        require_env_line 'FLYWAY_USER=migration-user'
+        require_env_line "FLYWAY_PASSWORD=${DATABASE_PASSWORD_SENTINEL:?}"
+        require_env_line 'FLYWAY_CONNECT_RETRIES=10'
+        if [[ -z "${TEST_EXPECT_DIRECT_URL:-}" ]]; then
+            python3 - <<'PY'
 import socket
 
 with socket.create_connection(("127.0.0.1", 15432), timeout=1):
     pass
 PY
+        fi
         touch "$LOG_DIR/flyway-called"
         ;;
     postgres:16-alpine)
-        grep -Fxq 'PGHOST=127.0.0.1' "$env_file"
-        grep -Fxq 'PGPORT=15432' "$env_file"
-        grep -Fxq 'PGDATABASE=logdate' "$env_file"
-        grep -Fxq 'PGUSER=migration-user' "$env_file"
-        grep -Fxq "PGPASSWORD=${DATABASE_PASSWORD_SENTINEL:?}" "$env_file"
+        if [[ -n "${TEST_EXPECT_DIRECT_URL:-}" ]]; then
+            require_env_line "PGHOST=${EXPECTED_PGHOST:?}"
+            require_env_line "PGPORT=${EXPECTED_PGPORT:?}"
+            if [[ -n "${EXPECTED_PGSSLMODE:-}" ]]; then
+                require_env_line "PGSSLMODE=${EXPECTED_PGSSLMODE}"
+            else
+                require_env_key_absent 'PGSSLMODE'
+            fi
+            if [[ -n "${EXPECTED_PGCHANNELBINDING:-}" ]]; then
+                require_env_line "PGCHANNELBINDING=${EXPECTED_PGCHANNELBINDING}"
+            else
+                require_env_key_absent 'PGCHANNELBINDING'
+            fi
+        else
+            require_env_line 'PGHOST=127.0.0.1'
+            require_env_line 'PGPORT=15432'
+        fi
+        require_env_line 'PGDATABASE=logdate'
+        require_env_line 'PGUSER=migration-user'
+        require_env_line "PGPASSWORD=${DATABASE_PASSWORD_SENTINEL:?}"
         touch "$LOG_DIR/psql-called"
         ;;
     *)
@@ -233,6 +285,116 @@ case "${1:-}" in
 esac
 EOF
 chmod +x "$FAKE_BIN/uname"
+
+assert_direct_neon_path_did_not_start_proxy() {
+    local log_dir="$1"
+
+    for path in \
+        "$log_dir/curl.log" \
+        "$log_dir/proxy.log" \
+        "$log_dir/proxy-pid"; do
+        [[ ! -e "$path" ]] || fail "direct Neon migration must not create $path"
+        pass
+    done
+}
+
+assert_rejected_before_database_clients() {
+    local log_dir="$1"
+
+    for path in \
+        "$log_dir/docker.log" \
+        "$log_dir/flyway-called" \
+        "$log_dir/psql-called"; do
+        [[ ! -e "$path" ]] || fail "invalid database URL must not create $path"
+        pass
+    done
+    assert_direct_neon_path_did_not_start_proxy "$log_dir"
+}
+
+run_direct_url_success_case() {
+    local name="$1" url="$2" expected_flyway_url="$3" expected_host="$4"
+    local expected_port="$5" expected_sslmode="$6" expected_channel_binding="$7"
+    local log_dir="$TMP_DIR/logs-legacy-$name"
+    local output_file="$TMP_DIR/migrations-legacy-$name.out"
+    local output status security_evidence env_path
+
+    mkdir -p "$log_dir"
+    set +e
+    PATH="$FAKE_BIN:$PATH" \
+    TEST_LOG_DIR="$log_dir" \
+    EXPECTED_PROXY_URL="$DEFAULT_PROXY_URL" \
+    DATABASE_PASSWORD_SENTINEL="$DATABASE_PASSWORD_SENTINEL" \
+    LEGACY_DATABASE_URL="$url" \
+    TEST_EXPECT_DIRECT_URL=1 \
+    EXPECTED_FLYWAY_URL="$expected_flyway_url" \
+    EXPECTED_PGHOST="$expected_host" \
+    EXPECTED_PGPORT="$expected_port" \
+    EXPECTED_PGSSLMODE="$expected_sslmode" \
+    EXPECTED_PGCHANNELBINDING="$expected_channel_binding" \
+    bash -x "$SCRIPT" \
+        --legacy-config \
+        --project-id logdate-contract-test \
+        --region us-central1 \
+        --instance-name logdate-db \
+        --database-name logdate \
+        --validate-passkey-fk >"$output_file" 2>&1
+    status=$?
+    set -e
+
+    output="$(cat "$output_file")"
+    if [[ "$status" != "0" ]]; then
+        echo "$output"
+    fi
+    assert_exit_code 0 "$status"
+    assert_contains 'TEMPORARY COMPATIBILITY MODE: --legacy-config' "$output"
+    assert_contains 'Using the legacy runtime DATABASE_URL target.' "$output"
+    assert_contains '[access][latest][--secret=logdate-db-url][--project=logdate-contract-test]' "$(cat "$log_dir/gcloud.log")"
+    [[ -f "$log_dir/flyway-called" ]] || fail "expected Flyway container to run for $name"
+    pass
+    [[ -f "$log_dir/psql-called" ]] || fail "expected PostgreSQL validation container to run for $name"
+    pass
+    assert_direct_neon_path_did_not_start_proxy "$log_dir"
+
+    security_evidence="$(cat "$output_file" "$log_dir/gcloud.log" "$log_dir/docker.log")"
+    assert_not_contains "$DATABASE_PASSWORD_SENTINEL" "$security_evidence"
+    assert_not_contains 'migration-user' "$security_evidence"
+    assert_not_contains "$url" "$security_evidence"
+    while IFS= read -r env_path; do
+        [[ ! -e "$env_path" ]] || fail "expected trap to remove $env_path"
+        pass
+    done <"$log_dir/env-paths.log"
+}
+
+run_invalid_direct_url_case() {
+    local name="$1" url="$2"
+    local log_dir="$TMP_DIR/logs-legacy-invalid-$name"
+    local output_file="$TMP_DIR/migrations-legacy-invalid-$name.out"
+    local output status security_evidence
+
+    mkdir -p "$log_dir"
+    set +e
+    PATH="$FAKE_BIN:$PATH" \
+    TEST_LOG_DIR="$log_dir" \
+    EXPECTED_PROXY_URL="$DEFAULT_PROXY_URL" \
+    DATABASE_PASSWORD_SENTINEL="$DATABASE_PASSWORD_SENTINEL" \
+    LEGACY_DATABASE_URL="$url" \
+    bash "$SCRIPT" \
+        --legacy-config \
+        --project-id logdate-contract-test \
+        --region us-central1 \
+        --instance-name logdate-db \
+        --database-name logdate \
+        --validate-passkey-fk >"$output_file" 2>&1
+    status=$?
+    set -e
+
+    output="$(cat "$output_file")"
+    assert_exit_code 1 "$status"
+    assert_rejected_before_database_clients "$log_dir"
+    security_evidence="$(cat "$output_file" "$log_dir/gcloud.log")"
+    assert_not_contains "$DATABASE_PASSWORD_SENTINEL" "$security_evidence"
+    assert_not_contains "$url" "$security_evidence"
+}
 
 set +e
 PATH="$FAKE_BIN:$PATH" \
@@ -282,40 +444,85 @@ if kill -0 "$proxy_pid" 2>/dev/null; then
 fi
 pass
 
-LEGACY_OUTPUT_FILE="$TMP_DIR/migrations-legacy.out"
+while IFS='|' read -r name url expected_flyway_url expected_host expected_port expected_sslmode expected_channel_binding; do
+    [[ -n "$name" ]] || continue
+    run_direct_url_success_case \
+        "$name" \
+        "$url" \
+        "$expected_flyway_url" \
+        "$expected_host" \
+        "$expected_port" \
+        "$expected_sslmode" \
+        "$expected_channel_binding"
+done <<'EOF'
+jdbc-ipv6|jdbc:postgresql://[2001:db8::7]:6543/logdate?sslmode=verify-full&channelBinding=require|jdbc:postgresql://[2001:db8::7]:6543/logdate?sslmode=verify-full&channelBinding=require|2001:db8::7|6543|verify-full|require
+postgres-normalization|postgres://legacy-neon.example.test/logdate?sslmode=require|jdbc:postgresql://legacy-neon.example.test/logdate?sslmode=require|legacy-neon.example.test|5432|require|
+postgresql-normalization|postgresql://legacy-neon.example.test/logdate?channelBinding=prefer|jdbc:postgresql://legacy-neon.example.test/logdate?channelBinding=prefer|legacy-neon.example.test|5432||prefer
+EOF
+
+invalid_direct_url_cases=(
+    'userinfo-credentials|jdbc:postgresql://migration-user:embedded-password@legacy-neon.example.test/logdate?sslmode=require'
+    'query-user|jdbc:postgresql://legacy-neon.example.test/logdate?user=attacker'
+    'query-username|jdbc:postgresql://legacy-neon.example.test/logdate?username=attacker'
+    'query-password|jdbc:postgresql://legacy-neon.example.test/logdate?password=attacker'
+    'missing-host|jdbc:postgresql:///logdate?sslmode=require'
+    'multi-host|jdbc:postgresql://first.example.test,second.example.test/logdate?sslmode=require'
+    'malformed-port|jdbc:postgresql://legacy-neon.example.test:not-a-port/logdate?sslmode=require'
+    'zero-port|jdbc:postgresql://legacy-neon.example.test:0/logdate?sslmode=require'
+    'unsafe-database-path|jdbc:postgresql://legacy-neon.example.test/logdate/other?sslmode=require'
+    'fragment|jdbc:postgresql://legacy-neon.example.test/logdate?sslmode=require#fragment'
+    $'tab|jdbc:postgresql://legacy-neon.example.test/logdate\t?sslmode=require'
+    $'newline|jdbc:postgresql://legacy-neon.example.test/logdate\n?sslmode=require'
+    'duplicate-parameter|jdbc:postgresql://legacy-neon.example.test/logdate?sslmode=require&sslmode=verify-full'
+    'unsupported-parameter|jdbc:postgresql://legacy-neon.example.test/logdate?applicationName=unsafe'
+    'invalid-sslmode|jdbc:postgresql://legacy-neon.example.test/logdate?sslmode=unsafe'
+    'invalid-channel-binding|jdbc:postgresql://legacy-neon.example.test/logdate?channelBinding=unsafe'
+)
+
+for case_definition in "${invalid_direct_url_cases[@]}"; do
+    name="${case_definition%%|*}"
+    url="${case_definition#*|}"
+    run_invalid_direct_url_case "$name" "$url"
+done
+
 set +e
-PATH="$FAKE_BIN:$PATH" \
-TEST_LOG_DIR="$LEGACY_LOG_DIR" \
-EXPECTED_PROXY_URL="$DEFAULT_PROXY_URL" \
-DATABASE_PASSWORD_SENTINEL="$DATABASE_PASSWORD_SENTINEL" \
-bash -x "$SCRIPT" \
-    --legacy-config \
-    --project-id logdate-contract-test \
-    --region us-central1 \
-    --instance-name logdate-db \
-    --database-name logdate >"$LEGACY_OUTPUT_FILE" 2>&1
-legacy_status=$?
+missing_legacy_url_output="$(
+    TEST_LOG_DIR="$MISSING_LEGACY_LOG_DIR" \
+    MISSING_LEGACY_DATABASE_URL=1 \
+    DATABASE_PASSWORD_SENTINEL="$DATABASE_PASSWORD_SENTINEL" \
+    LEGACY_DATABASE_URL="$LEGACY_DATABASE_URL" \
+    PATH="$FAKE_BIN:$PATH" \
+    "$SCRIPT" \
+        --legacy-config \
+        --project-id logdate-contract-test \
+        --region us-central1 2>&1
+)"
+missing_legacy_url_status=$?
+malformed_legacy_url_output="$(
+    TEST_LOG_DIR="$MALFORMED_LEGACY_LOG_DIR" \
+    MALFORMED_LEGACY_DATABASE_URL=1 \
+    DATABASE_PASSWORD_SENTINEL="$DATABASE_PASSWORD_SENTINEL" \
+    LEGACY_DATABASE_URL="$LEGACY_DATABASE_URL" \
+    PATH="$FAKE_BIN:$PATH" \
+    "$SCRIPT" \
+        --legacy-config \
+        --project-id logdate-contract-test \
+        --region us-central1 2>&1
+)"
+malformed_legacy_url_status=$?
 set -e
 
-legacy_output="$(cat "$LEGACY_OUTPUT_FILE")"
-if [[ "$legacy_status" != "0" ]]; then
-    echo "$legacy_output"
-fi
-assert_exit_code 0 "$legacy_status"
-assert_contains 'TEMPORARY COMPATIBILITY MODE: --legacy-config' "$legacy_output"
-assert_contains '[access][latest][--secret=logdate-db-user][--project=logdate-contract-test]' "$(cat "$LEGACY_LOG_DIR/gcloud.log")"
-assert_contains '[access][latest][--secret=logdate-db-password][--project=logdate-contract-test]' "$(cat "$LEGACY_LOG_DIR/gcloud.log")"
-legacy_security_evidence="$(cat "$LEGACY_OUTPUT_FILE" "$LEGACY_LOG_DIR"/gcloud.log "$LEGACY_LOG_DIR"/curl.log "$LEGACY_LOG_DIR"/proxy.log "$LEGACY_LOG_DIR"/docker.log)"
-assert_not_contains "$DATABASE_PASSWORD_SENTINEL" "$legacy_security_evidence"
-assert_not_contains 'migration-user' "$legacy_security_evidence"
-while IFS= read -r env_path; do
-    [[ ! -e "$env_path" ]] || fail "expected legacy trap to remove $env_path"
-    pass
-done <"$LEGACY_LOG_DIR/env-paths.log"
-legacy_proxy_pid="$(cat "$LEGACY_LOG_DIR/proxy-pid")"
-if kill -0 "$legacy_proxy_pid" 2>/dev/null; then
-    fail "expected legacy trap to stop Cloud SQL Auth Proxy process $legacy_proxy_pid"
-fi
+assert_exit_code 1 "$missing_legacy_url_status"
+assert_contains 'legacy runtime database URL secret is unavailable' "$missing_legacy_url_output"
+[[ ! -e "$MISSING_LEGACY_LOG_DIR/docker.log" ]] || fail "missing legacy URL must fail before Docker"
+pass
+[[ ! -e "$MISSING_LEGACY_LOG_DIR/curl.log" ]] || fail "missing legacy URL must not fall back to Cloud SQL"
+pass
+assert_exit_code 1 "$malformed_legacy_url_status"
+assert_contains 'database URL must be a single-line PostgreSQL JDBC URL' "$malformed_legacy_url_output"
+[[ ! -e "$MALFORMED_LEGACY_LOG_DIR/docker.log" ]] || fail "malformed legacy URL must fail before Docker"
+pass
+[[ ! -e "$MALFORMED_LEGACY_LOG_DIR/curl.log" ]] || fail "malformed legacy URL must not start Cloud SQL"
 pass
 
 workflow_contents="$(cat .github/workflows/deploy-server-cloud-run.yml)"
