@@ -161,6 +161,10 @@ cat >"$FIXTURE_DIR/staging-source.json" <<'EOF'
     "staging": {
       "fingerprint": "E1:6A:82:07:74:DE:F6:29:24:EB:E1:48:67:47:8C:72:9C:69:A0:CB:9D:01:8A:8C:E4:49:44:DA:00:15:E9:5A",
       "apk_key_hash_origin": "android:apk-key-hash:4WqCB3Te9ikk6-FIZ0eMcpxpoMudAYqM5ElE2gAV6Vo"
+    },
+    "play_app_signing": {
+      "fingerprint": "F1:3E:F5:D0:EC:93:ED:B0:8C:6C:F2:1D:8A:12:84:99:42:C2:92:D8:ED:EC:26:C0:E4:46:0C:3C:71:BC:6E:5F",
+      "apk_key_hash_origin": "android:apk-key-hash:8T710OyT7bCMbPIdihKEmULCktjt7CbA5EYMPHG8bl8"
     }
   },
   "env_vars": {
@@ -321,6 +325,10 @@ android_signing_certificates = {
   staging = {
     fingerprint         = "E1:6A:82:07:74:DE:F6:29:24:EB:E1:48:67:47:8C:72:9C:69:A0:CB:9D:01:8A:8C:E4:49:44:DA:00:15:E9:5A"
     apk_key_hash_origin = "android:apk-key-hash:4WqCB3Te9ikk6-FIZ0eMcpxpoMudAYqM5ElE2gAV6Vo"
+  }
+  play_app_signing = {
+    fingerprint         = "F1:3E:F5:D0:EC:93:ED:B0:8C:6C:F2:1D:8A:12:84:99:42:C2:92:D8:ED:EC:26:C0:E4:46:0C:3C:71:BC:6E:5F"
+    apk_key_hash_origin = "android:apk-key-hash:8T710OyT7bCMbPIdihKEmULCktjt7CbA5EYMPHG8bl8"
   }
 }
 cloud_run_env = {
@@ -595,9 +603,24 @@ run_real_renderer() {
 
 cat >"$FIXTURE_DIR/staging-contract.json" <<EOF
 {
+  "android_signing": {
+    "certificates": {
+      "play_app_signing": {
+        "apk_key_hash_origin": "android:apk-key-hash:8T710OyT7bCMbPIdihKEmULCktjt7CbA5EYMPHG8bl8",
+        "fingerprint": "F1:3E:F5:D0:EC:93:ED:B0:8C:6C:F2:1D:8A:12:84:99:42:C2:92:D8:ED:EC:26:C0:E4:46:0C:3C:71:BC:6E:5F"
+      },
+      "staging": {
+        "apk_key_hash_origin": "android:apk-key-hash:4WqCB3Te9ikk6-FIZ0eMcpxpoMudAYqM5ElE2gAV6Vo",
+        "fingerprint": "E1:6A:82:07:74:DE:F6:29:24:EB:E1:48:67:47:8C:72:9C:69:A0:CB:9D:01:8A:8C:E4:49:44:DA:00:15:E9:5A"
+      }
+    },
+    "expected_build_signer_fingerprint": "E1:6A:82:07:74:DE:F6:29:24:EB:E1:48:67:47:8C:72:9C:69:A0:CB:9D:01:8A:8C:E4:49:44:DA:00:15:E9:5A",
+    "expected_build_signer_origin": "android:apk-key-hash:4WqCB3Te9ikk6-FIZ0eMcpxpoMudAYqM5ElE2gAV6Vo",
+    "expected_build_signer_role": "staging"
+  },
   "canonical_origin": "https://cloud-staging.logdate.app",
   "env_vars": {
-    "ANDROID_CERT_FINGERPRINTS": "E1:6A:82:07:74:DE:F6:29:24:EB:E1:48:67:47:8C:72:9C:69:A0:CB:9D:01:8A:8C:E4:49:44:DA:00:15:E9:5A",
+    "ANDROID_CERT_FINGERPRINTS": "E1:6A:82:07:74:DE:F6:29:24:EB:E1:48:67:47:8C:72:9C:69:A0:CB:9D:01:8A:8C:E4:49:44:DA:00:15:E9:5A,F1:3E:F5:D0:EC:93:ED:B0:8C:6C:F2:1D:8A:12:84:99:42:C2:92:D8:ED:EC:26:C0:E4:46:0C:3C:71:BC:6E:5F",
     "ATPROTO_HANDLE_DOMAIN": "cloud-staging.logdate.app",
     "ATPROTO_PDS_SERVICE_URL": "https://cloud-staging.logdate.app",
     "AUTO_MIGRATE": "false",
@@ -616,7 +639,7 @@ cat >"$FIXTURE_DIR/staging-contract.json" <<EOF
     "SERVER_ENCRYPTION_ENABLED": "true",
     "SYNC_MEDIA_SIGNED_URLS": "true",
     "SYNC_MEDIA_SIGNED_URL_TTL_HOURS": "1",
-    "WEBAUTHN_ALLOWED_ORIGINS": "https://cloud-staging.logdate.app,android:apk-key-hash:4WqCB3Te9ikk6-FIZ0eMcpxpoMudAYqM5ElE2gAV6Vo",
+    "WEBAUTHN_ALLOWED_ORIGINS": "https://cloud-staging.logdate.app,android:apk-key-hash:4WqCB3Te9ikk6-FIZ0eMcpxpoMudAYqM5ElE2gAV6Vo,android:apk-key-hash:8T710OyT7bCMbPIdihKEmULCktjt7CbA5EYMPHG8bl8",
     "WEBAUTHN_ORIGIN": "https://cloud-staging.logdate.app",
     "WEBAUTHN_RP_ID": "cloud-staging.logdate.app"
   },
@@ -686,6 +709,21 @@ run_renderer production "$RELEASE_SHA" production-source.json "$PRODUCTION_OUT" 
 assert_zero_bytes "$PRODUCTION_ERR"
 cat >"$FIXTURE_DIR/production-contract.json" <<EOF
 {
+  "android_signing": {
+    "certificates": {
+      "play_app_signing": {
+        "apk_key_hash_origin": "android:apk-key-hash:8T710OyT7bCMbPIdihKEmULCktjt7CbA5EYMPHG8bl8",
+        "fingerprint": "F1:3E:F5:D0:EC:93:ED:B0:8C:6C:F2:1D:8A:12:84:99:42:C2:92:D8:ED:EC:26:C0:E4:46:0C:3C:71:BC:6E:5F"
+      },
+      "upload": {
+        "apk_key_hash_origin": "android:apk-key-hash:EZhwuHjzq19VwN9lx4eJwCRZyp_zIqCJQK5Dop0d1as",
+        "fingerprint": "11:98:70:B8:78:F3:AB:5F:55:C0:DF:65:C7:87:89:C0:24:59:CA:9F:F3:22:A0:89:40:AE:43:A2:9D:1D:D5:AB"
+      }
+    },
+    "expected_build_signer_fingerprint": "11:98:70:B8:78:F3:AB:5F:55:C0:DF:65:C7:87:89:C0:24:59:CA:9F:F3:22:A0:89:40:AE:43:A2:9D:1D:D5:AB",
+    "expected_build_signer_origin": "android:apk-key-hash:EZhwuHjzq19VwN9lx4eJwCRZyp_zIqCJQK5Dop0d1as",
+    "expected_build_signer_role": "upload"
+  },
   "canonical_origin": "https://cloud.logdate.app",
   "env_vars": {
     "ANDROID_CERT_FINGERPRINTS": "11:98:70:B8:78:F3:AB:5F:55:C0:DF:65:C7:87:89:C0:24:59:CA:9F:F3:22:A0:89:40:AE:43:A2:9D:1D:D5:AB,F1:3E:F5:D0:EC:93:ED:B0:8C:6C:F2:1D:8A:12:84:99:42:C2:92:D8:ED:EC:26:C0:E4:46:0C:3C:71:BC:6E:5F",
@@ -747,7 +785,14 @@ assert_equals "us-central1-docker.pkg.dev/logdate/logdate/logdate-server:$RELEAS
 assert_equals "17" "$(jq -r '.secret_env.DATABASE_URL.version' "$PRODUCTION_OUT")"
 assert_equals "2" "$(jq -r '.env_vars.ANDROID_CERT_FINGERPRINTS | split(",") | length' "$PRODUCTION_OUT")"
 assert_equals "10" "$(jq -r '.runtime.scaling.max_instances' "$PRODUCTION_OUT")"
-assert_equals "false" "$(jq -r 'has("android_signing_certificates")' "$PRODUCTION_OUT")"
+assert_equals "staging" "$(jq -r '.android_signing.expected_build_signer_role' "$STAGING_OUT")"
+assert_equals "upload" "$(jq -r '.android_signing.expected_build_signer_role' "$PRODUCTION_OUT")"
+assert_equals "play_app_signing,staging" "$(jq -r '.android_signing.certificates | keys | join(",")' "$STAGING_OUT")"
+assert_equals "play_app_signing,upload" "$(jq -r '.android_signing.certificates | keys | join(",")' "$PRODUCTION_OUT")"
+assert_equals "true" "$(jq -r '.android_signing as $signing | $signing.certificates[$signing.expected_build_signer_role].fingerprint == $signing.expected_build_signer_fingerprint and $signing.certificates[$signing.expected_build_signer_role].apk_key_hash_origin == $signing.expected_build_signer_origin' "$STAGING_OUT")"
+assert_equals "true" "$(jq -r '.android_signing as $signing | $signing.certificates[$signing.expected_build_signer_role].fingerprint == $signing.expected_build_signer_fingerprint and $signing.certificates[$signing.expected_build_signer_role].apk_key_hash_origin == $signing.expected_build_signer_origin' "$PRODUCTION_OUT")"
+assert_equals "false" "$(jq -r '.android_signing.expected_build_signer_fingerprint == .android_signing.certificates.play_app_signing.fingerprint' "$STAGING_OUT")"
+assert_equals "false" "$(jq -r '.android_signing.expected_build_signer_fingerprint == .android_signing.certificates.play_app_signing.fingerprint' "$PRODUCTION_OUT")"
 assert_equals "1" "$(jq -s 'length' "$PRODUCTION_OUT")"
 assert_equals "object" "$(jq -r 'type' "$PRODUCTION_OUT")"
 assert_equals "false" "$(jq -r '.env_vars | has("INSTANCE_CONNECTION_NAME") or has("DB_NAME")' "$PRODUCTION_OUT")"
@@ -794,7 +839,7 @@ set -e
 [[ "$current_staging_status" != "0" ]] || fail "current committed staging inputs unexpectedly rendered"
 pass
 assert_zero_bytes "$CURRENT_STAGING_OUT"
-assert_exact_line "ERROR: staging requires exactly the staging signing certificate" "$CURRENT_STAGING_ERR"
+assert_exact_line "ERROR: staging requires exactly staging and play_app_signing signing certificates" "$CURRENT_STAGING_ERR"
 
 CURRENT_PRODUCTION_OUT="$TMP_DIR/current-production.out"
 CURRENT_PRODUCTION_ERR="$TMP_DIR/current-production.err"
@@ -824,6 +869,46 @@ expect_failure() {
     pass
 }
 
+jq '(.android_signing_certificates[].fingerprint) |= ascii_downcase' \
+    "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/lowercase-staging-signing.json"
+LOWERCASE_STAGING_OUT="$TMP_DIR/lowercase-staging-signing.out"
+LOWERCASE_STAGING_ERR="$TMP_DIR/lowercase-staging-signing.err"
+run_renderer staging "$RELEASE_SHA" lowercase-staging-signing.json "$LOWERCASE_STAGING_OUT" "$LOWERCASE_STAGING_ERR"
+assert_zero_bytes "$LOWERCASE_STAGING_ERR"
+assert_equals "E1:6A:82:07:74:DE:F6:29:24:EB:E1:48:67:47:8C:72:9C:69:A0:CB:9D:01:8A:8C:E4:49:44:DA:00:15:E9:5A" \
+    "$(jq -r '.android_signing.certificates.staging.fingerprint' "$LOWERCASE_STAGING_OUT")"
+assert_equals "F1:3E:F5:D0:EC:93:ED:B0:8C:6C:F2:1D:8A:12:84:99:42:C2:92:D8:ED:EC:26:C0:E4:46:0C:3C:71:BC:6E:5F" \
+    "$(jq -r '.android_signing.certificates.play_app_signing.fingerprint' "$LOWERCASE_STAGING_OUT")"
+assert_equals \
+    "$(jq -r '[.android_signing.certificates.staging.fingerprint, .android_signing.certificates.play_app_signing.fingerprint] | join(",")' "$LOWERCASE_STAGING_OUT")" \
+    "$(jq -r '.env_vars.ANDROID_CERT_FINGERPRINTS' "$LOWERCASE_STAGING_OUT")"
+assert_equals \
+    "$(jq -r '[.canonical_origin, .android_signing.certificates.staging.apk_key_hash_origin, .android_signing.certificates.play_app_signing.apk_key_hash_origin] | join(",")' "$LOWERCASE_STAGING_OUT")" \
+    "$(jq -r '.env_vars.WEBAUTHN_ALLOWED_ORIGINS' "$LOWERCASE_STAGING_OUT")"
+assert_equals \
+    "$(jq -r '.android_signing.certificates[.android_signing.expected_build_signer_role].fingerprint' "$LOWERCASE_STAGING_OUT")" \
+    "$(jq -r '.android_signing.expected_build_signer_fingerprint' "$LOWERCASE_STAGING_OUT")"
+
+jq '(.android_signing_certificates[].fingerprint) |= ascii_downcase' \
+    "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/lowercase-production-signing.json"
+LOWERCASE_PRODUCTION_OUT="$TMP_DIR/lowercase-production-signing.out"
+LOWERCASE_PRODUCTION_ERR="$TMP_DIR/lowercase-production-signing.err"
+run_renderer production "$RELEASE_SHA" lowercase-production-signing.json "$LOWERCASE_PRODUCTION_OUT" "$LOWERCASE_PRODUCTION_ERR"
+assert_zero_bytes "$LOWERCASE_PRODUCTION_ERR"
+assert_equals "11:98:70:B8:78:F3:AB:5F:55:C0:DF:65:C7:87:89:C0:24:59:CA:9F:F3:22:A0:89:40:AE:43:A2:9D:1D:D5:AB" \
+    "$(jq -r '.android_signing.certificates.upload.fingerprint' "$LOWERCASE_PRODUCTION_OUT")"
+assert_equals "F1:3E:F5:D0:EC:93:ED:B0:8C:6C:F2:1D:8A:12:84:99:42:C2:92:D8:ED:EC:26:C0:E4:46:0C:3C:71:BC:6E:5F" \
+    "$(jq -r '.android_signing.certificates.play_app_signing.fingerprint' "$LOWERCASE_PRODUCTION_OUT")"
+assert_equals \
+    "$(jq -r '[.android_signing.certificates.upload.fingerprint, .android_signing.certificates.play_app_signing.fingerprint] | join(",")' "$LOWERCASE_PRODUCTION_OUT")" \
+    "$(jq -r '.env_vars.ANDROID_CERT_FINGERPRINTS' "$LOWERCASE_PRODUCTION_OUT")"
+assert_equals \
+    "$(jq -r '[.canonical_origin, .android_signing.certificates.upload.apk_key_hash_origin, .android_signing.certificates.play_app_signing.apk_key_hash_origin] | join(",")' "$LOWERCASE_PRODUCTION_OUT")" \
+    "$(jq -r '.env_vars.WEBAUTHN_ALLOWED_ORIGINS' "$LOWERCASE_PRODUCTION_OUT")"
+assert_equals \
+    "$(jq -r '.android_signing.certificates[.android_signing.expected_build_signer_role].fingerprint' "$LOWERCASE_PRODUCTION_OUT")" \
+    "$(jq -r '.android_signing.expected_build_signer_fingerprint' "$LOWERCASE_PRODUCTION_OUT")"
+
 expect_failure invalid-environment preview "$RELEASE_SHA" staging-source.json "environment must be staging or production"
 expect_failure invalid-sha staging ABCDEF staging-source.json "release SHA must be 40 lowercase hexadecimal characters"
 expect_failure nonexistent-release staging 0000000000000000000000000000000000000001 staging-source.json "release SHA must resolve to a commit"
@@ -850,6 +935,12 @@ expect_failure http-origin staging "$RELEASE_SHA" http-origin.json "LOGDATE_PUBL
 jq '.android_signing_certificates.staging.apk_key_hash_origin = "android:apk-key-hash:ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8"' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/certificate-mismatch.json"
 expect_failure certificate-mismatch staging "$RELEASE_SHA" certificate-mismatch.json "Android certificate fingerprints and apk-key-hash origins must match exactly"
 
+jq '.android_signing_certificates.play_app_signing.apk_key_hash_origin = .android_signing_certificates.staging.apk_key_hash_origin' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/staging-play-certificate-mismatch.json"
+expect_failure staging-play-certificate-mismatch staging "$RELEASE_SHA" staging-play-certificate-mismatch.json "Android certificate fingerprints and apk-key-hash origins must match exactly"
+
+jq '.android_signing_certificates.play_app_signing.apk_key_hash_origin = .android_signing_certificates.upload.apk_key_hash_origin' "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/production-play-certificate-mismatch.json"
+expect_failure production-play-certificate-mismatch production "$RELEASE_SHA" production-play-certificate-mismatch.json "Android certificate fingerprints and apk-key-hash origins must match exactly"
+
 jq '.artifact_registry_image_name = "logdate-server-staging"' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/wrong-image-name.json"
 expect_failure wrong-image-name staging "$RELEASE_SHA" wrong-image-name.json "artifact_registry_image_name must be logdate-server"
 
@@ -868,8 +959,20 @@ expect_failure conflicting-legacy-domain staging "$RELEASE_SHA" conflicting-lega
 jq '.android_signing_certificates.staging = {"fingerprint":"DF:32:69:D4:DC:C9:C4:FE:72:FE:61:62:A0:F4:E9:EE:5F:04:14:47:DC:B3:8E:F6:A9:25:76:FC:38:90:DB:C7","apk_key_hash_origin":"android:apk-key-hash:3zJp1NzJxP5y_mFioPTp7l8EFEfcs472qSV2_DiQ28c"}' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/debug-staging-set.json"
 expect_failure debug-staging-set staging "$RELEASE_SHA" debug-staging-set.json "staging certificate set may not contain the known debug certificate"
 
+jq '.android_signing_certificates.play_app_signing = {"fingerprint":"DF:32:69:D4:DC:C9:C4:FE:72:FE:61:62:A0:F4:E9:EE:5F:04:14:47:DC:B3:8E:F6:A9:25:76:FC:38:90:DB:C7","apk_key_hash_origin":"android:apk-key-hash:3zJp1NzJxP5y_mFioPTp7l8EFEfcs472qSV2_DiQ28c"}' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/debug-staging-play-set.json"
+expect_failure debug-staging-play-set staging "$RELEASE_SHA" debug-staging-play-set.json "staging certificate set may not contain the known debug certificate"
+
+jq '.android_signing_certificates.play_app_signing = {"fingerprint":"DF:32:69:D4:DC:C9:C4:FE:72:FE:61:62:A0:F4:E9:EE:5F:04:14:47:DC:B3:8E:F6:A9:25:76:FC:38:90:DB:C7","apk_key_hash_origin":"android:apk-key-hash:3zJp1NzJxP5y_mFioPTp7l8EFEfcs472qSV2_DiQ28c"}' "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/debug-production-play-set.json"
+expect_failure debug-production-play-set production "$RELEASE_SHA" debug-production-play-set.json "production certificate sets may not contain the known debug certificate"
+
 jq '.android_signing_certificates.staging = {"fingerprint":"00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00","apk_key_hash_origin":"android:apk-key-hash:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/zero-staging-set.json"
 expect_failure zero-staging-set staging "$RELEASE_SHA" zero-staging-set.json "staging certificate set may not contain placeholder certificates"
+
+jq '.android_signing_certificates.play_app_signing = {"fingerprint":"00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00","apk_key_hash_origin":"android:apk-key-hash:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/zero-staging-play-set.json"
+expect_failure zero-staging-play-set staging "$RELEASE_SHA" zero-staging-play-set.json "staging certificate set may not contain placeholder certificates"
+
+jq '.android_signing_certificates.play_app_signing = {"fingerprint":"00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00","apk_key_hash_origin":"android:apk-key-hash:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}' "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/zero-production-play-set.json"
+expect_failure zero-production-play-set production "$RELEASE_SHA" zero-production-play-set.json "production certificate sets may not contain placeholder certificates"
 
 jq '.android_signing_certificates.staging = {"fingerprint":"FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF","apk_key_hash_origin":"android:apk-key-hash:__________________________________________8"}' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/repeated-staging-set.json"
 expect_failure repeated-staging-set staging "$RELEASE_SHA" repeated-staging-set.json "staging certificate set may not contain placeholder certificates"
@@ -979,6 +1082,12 @@ expect_failure missing-upload-set production "$RELEASE_SHA" missing-upload-set.j
 jq '.android_signing_certificates.play_app_signing = .android_signing_certificates.upload' "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/duplicate-production-set.json"
 expect_failure duplicate-production-set production "$RELEASE_SHA" duplicate-production-set.json "production upload and Play app-signing certificates must be distinct"
 
+jq 'del(.android_signing_certificates.play_app_signing)' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/missing-play-staging-set.json"
+expect_failure missing-play-staging-set staging "$RELEASE_SHA" missing-play-staging-set.json "staging requires exactly staging and play_app_signing signing certificates"
+
+jq '.android_signing_certificates.play_app_signing = .android_signing_certificates.staging' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/duplicate-staging-set.json"
+expect_failure duplicate-staging-set staging "$RELEASE_SHA" duplicate-staging-set.json "staging and Play app-signing certificates must be distinct"
+
 jq '.android_signing_certificates.upload = {"fingerprint":"DF:32:69:D4:DC:C9:C4:FE:72:FE:61:62:A0:F4:E9:EE:5F:04:14:47:DC:B3:8E:F6:A9:25:76:FC:38:90:DB:C7","apk_key_hash_origin":"android:apk-key-hash:3zJp1NzJxP5y_mFioPTp7l8EFEfcs472qSV2_DiQ28c"}' "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/debug-production-set.json"
 expect_failure debug-production-set production "$RELEASE_SHA" debug-production-set.json "production certificate sets may not contain the known debug certificate"
 
@@ -1001,7 +1110,7 @@ jq '.android_signing_certificates.upload = {"fingerprint":"F0:F1:F2:F3:F4:F5:F6:
 expect_failure wrapping-sequential-production-set production "$RELEASE_SHA" wrapping-sequential-production-set.json "production certificate sets may not contain placeholder certificates"
 
 jq '.android_signing_certificates.upload = .android_signing_certificates.staging' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/unexpected-staging-role.json"
-expect_failure unexpected-staging-role staging "$RELEASE_SHA" unexpected-staging-role.json "staging requires exactly the staging signing certificate"
+expect_failure unexpected-staging-role staging "$RELEASE_SHA" unexpected-staging-role.json "staging requires exactly staging and play_app_signing signing certificates"
 
 while IFS= read -r data_dir; do
     [[ ! -e "$data_dir" ]] || fail "expected renderer temporary directory to be removed: $data_dir"

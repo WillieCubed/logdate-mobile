@@ -297,17 +297,19 @@ try:
     signing = source["android_signing_certificates"]
     if not isinstance(signing, dict):
         fail("android_signing_certificates must be an object")
-    if environment == "staging" and set(signing) != {"staging"}:
-        fail("staging requires exactly the staging signing certificate")
+    if environment == "staging" and set(signing) != {"staging", "play_app_signing"}:
+        fail("staging requires exactly staging and play_app_signing signing certificates")
     if environment == "production" and set(signing) != {"upload", "play_app_signing"}:
         if "upload" not in signing:
             fail("production requires separately identified Android upload certificate fingerprints and origins")
         fail("production requires exactly upload and play_app_signing signing certificates")
 
     known_debug_fingerprint = "DF:32:69:D4:DC:C9:C4:FE:72:FE:61:62:A0:F4:E9:EE:5F:04:14:47:DC:B3:8E:F6:A9:25:76:FC:38:90:DB:C7"
-    role_order = ["staging"] if environment == "staging" else ["upload", "play_app_signing"]
+    expected_build_signer_role = "staging" if environment == "staging" else "upload"
+    role_order = [expected_build_signer_role, "play_app_signing"]
     fingerprints: list[str] = []
     android_origins: list[str] = []
+    normalized_certificates: dict[str, dict[str, str]] = {}
     for role in role_order:
         certificate = exact_keys(signing[role], {"fingerprint", "apk_key_hash_origin"}, f"{role} signing certificate")
         fingerprint = required_string(certificate["fingerprint"], f"{role} certificate fingerprint").upper()
@@ -331,8 +333,14 @@ try:
             fail("staging certificate set may not contain placeholder certificates")
         fingerprints.append(fingerprint)
         android_origins.append(origin)
+        normalized_certificates[role] = {
+            "fingerprint": fingerprint,
+            "apk_key_hash_origin": origin,
+        }
     if len(fingerprints) != len(set(fingerprints)) or len(android_origins) != len(set(android_origins)):
-        fail("production upload and Play app-signing certificates must be distinct")
+        if environment == "production":
+            fail("production upload and Play app-signing certificates must be distinct")
+        fail("staging and Play app-signing certificates must be distinct")
 
     env_vars = source["env_vars"]
     if not isinstance(env_vars, dict):
@@ -514,6 +522,7 @@ try:
     rendered_env["WEBAUTHN_ALLOWED_ORIGINS"] = ",".join([canonical_origin, *android_origins])
     rendered_env["ANDROID_CERT_FINGERPRINTS"] = ",".join(fingerprints)
     rendered_env["RELEASE_VERSION"] = f"logdate-server@{release_sha}"
+    expected_build_signer = normalized_certificates[expected_build_signer_role]
     contract = {
         "environment": environment,
         "release_sha": release_sha,
@@ -523,6 +532,12 @@ try:
         "canonical_origin": canonical_origin,
         "runtime_service_account": f"{runtime_service_account_name}@{project_id}.iam.gserviceaccount.com",
         "image": f"{region}-docker.pkg.dev/{project_id}/{artifact_registry_repo}/{artifact_registry_image_name}:{release_sha}",
+        "android_signing": {
+            "expected_build_signer_role": expected_build_signer_role,
+            "expected_build_signer_fingerprint": expected_build_signer["fingerprint"],
+            "expected_build_signer_origin": expected_build_signer["apk_key_hash_origin"],
+            "certificates": normalized_certificates,
+        },
         "env_vars": rendered_env,
         "secret_env": normalized_secrets,
         "runtime": runtime,
