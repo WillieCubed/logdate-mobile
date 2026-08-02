@@ -65,6 +65,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.route
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import java.util.concurrent.ConcurrentHashMap
@@ -160,6 +161,7 @@ data class SigninPasskeyBeginResponse(
 
 @Serializable
 data class PasskeyAllowCredentialDto(
+    @EncodeDefault
     val type: String = "public-key",
     val id: String,
     val transports: List<String> = emptyList(),
