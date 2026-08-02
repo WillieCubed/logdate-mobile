@@ -173,6 +173,12 @@ jobs:
             type=gha,mode=max,scope=${{ env.SERVICE_NAME }}-image
 
       - name: Run database migrations
+        env:
+          # Contract mode must source the project and database target only from
+          # the immutable contract; do not leak the workflow's selector vars
+          # in as independent overrides.
+          PROJECT_ID: ""
+          REGION: ""
         run: |
           ./scripts/run-migrations.sh \
             --contract-file "$CONTRACT_FILE" \
