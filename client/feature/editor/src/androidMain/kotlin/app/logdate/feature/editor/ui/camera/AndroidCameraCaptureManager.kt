@@ -39,16 +39,15 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.text.SimpleDateFormat
-import java.util.Collections
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executor
@@ -61,10 +60,8 @@ import kotlin.coroutines.resume
 class AndroidCameraCaptureManager(
     private val context: Context,
     private val mediaManager: MediaManager,
-    private val captureScope: CoroutineScope,
 ) : CameraCaptureManager {
     private val appContext = context.applicationContext
-    private val stagingStore = CameraCaptureStagingStore(File(appContext.filesDir, "camera/captures"))
     private val preferences = appContext.getSharedPreferences(CAMERA_ROUTE_PREFS_NAME, Context.MODE_PRIVATE)
     private val _state = MutableStateFlow(CameraCaptureState())
     override val state: StateFlow<CameraCaptureState> = _state.asStateFlow()
@@ -84,11 +81,19 @@ class AndroidCameraCaptureManager(
     private var lifecycleOwner: LifecycleOwner? = null
     private var camera: Camera? = null
     private var recordingDeferred: CompletableDeferred<String?>? = null
+    private var recordingFile: java.io.File? = null
     private var previewView: PreviewView? = null
     private var previewStreamObserver: Observer<PreviewView.StreamState>? = null
 
     private val mainExecutor: Executor = ContextCompat.getMainExecutor(context)
-    private val pendingCaptureFiles = Collections.synchronizedSet(mutableSetOf<File>())
+    private val captureScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    /**
+     * Capture output must survive activity teardown and Android's cache eviction. The
+     * finalizer may still be running after the camera ViewModel is cleared, so these files
+     * intentionally live in app-private durable storage rather than [Context.getCacheDir].
+     */
+    private val captureStagingDirectory =
+        java.io.File(appContext.filesDir, "camera-captures").apply { mkdirs() }
     private val timestampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
 
     /**
@@ -168,7 +173,6 @@ class AndroidCameraCaptureManager(
     override suspend fun startPreview(facing: CameraFacing) =
         withContext(Dispatchers.Main) {
             try {
-                recoverStagedCaptures()
                 val provider = ProcessCameraProvider.awaitInstance(context)
                 cameraProvider = provider
                 val owner = lifecycleOwner ?: error("LifecycleOwner is not set")
@@ -218,6 +222,7 @@ class AndroidCameraCaptureManager(
         withContext(Dispatchers.Main) {
             try {
                 currentRecording?.stop()
+                currentRecording = null
                 camera = null
                 _previewStreaming.value = false
                 cameraProvider?.unbindAll()
@@ -244,53 +249,58 @@ class AndroidCameraCaptureManager(
 
             val timeStamp = timestampFormat.format(Date())
             val fileName = "LOGDATE_$timeStamp.jpg"
-            val captureFile = stagingStore.create(fileName)
-            pendingCaptureFiles += captureFile
-            val outputOptions = ImageCapture.OutputFileOptions.Builder(captureFile).build()
-
-            return@withContext suspendCancellableCoroutine { continuation ->
+            val sourceFile = java.io.File.createTempFile("logdate-camera-", ".jpg", captureStagingDirectory)
+            val outputOptions = ImageCapture.OutputFileOptions.Builder(sourceFile).build()
+            val capturedPath =
+                suspendCancellableCoroutine<String?> { continuation ->
                 continuation.invokeOnCancellation {
-                    pendingCaptureFiles.remove(captureFile)
+                    // Keep the durable staged file for the capture finalizer/recovery path.
+                    // Deleting it here loses a valid capture when the activity is destroyed
+                    // while CameraX is delivering the callback.
                 }
                 capture.takePicture(
                     outputOptions,
                     mainExecutor,
                     object : ImageCapture.OnImageSavedCallback {
                         override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                            captureScope.launch {
-                                val uri =
-                                    try {
-                                        runCatching {
-                                            mediaManager.saveMediaFromFile(captureFile.absolutePath, fileName, "image/jpeg")
-                                        }.getOrElse { error ->
-                                            Napier.e("Photo persistence failed", error)
-                                            null
-                                        }
-                                    } finally {
-                                        pendingCaptureFiles.remove(captureFile)
-                                        captureFile.delete()
-                                    }
-                                withContext(Dispatchers.Main.immediate) {
-                                    _state.update {
-                                        it.copy(
-                                            lastCapturedUri = uri,
-                                            error = if (uri == null) CameraCaptureError.CaptureFailed else null,
-                                        )
-                                    }
-                                    if (continuation.isActive) continuation.resume(uri)
-                                }
+                            if (continuation.isActive) {
+                                continuation.resume(sourceFile.absolutePath)
+                            } else {
+                                // The callback can arrive after the activity/VM was torn down.
+                                // Keep the durable staged file for recovery instead of losing
+                                // a successfully captured photo.
+                                Napier.d("Photo capture completed after camera teardown; retaining staged output")
                             }
                         }
 
                         override fun onError(exception: ImageCaptureException) {
                             Napier.e("Photo capture failed", exception)
-                            pendingCaptureFiles.remove(captureFile)
-                            captureFile.delete()
                             _state.update { it.copy(error = CameraCaptureError.CaptureFailed) }
-                            if (continuation.isActive) continuation.resume(null)
+                            sourceFile.delete()
+                            continuation.resume(null)
                         }
                     },
                 )
+            }
+            capturedPath ?: return@withContext null
+            try {
+                val uri =
+                    withContext(Dispatchers.IO) {
+                        mediaManager.saveMediaFromFile(capturedPath, fileName, "image/jpeg")
+                    }
+                _state.update {
+                    it.copy(
+                        lastCapturedUri = uri,
+                        error = null,
+                    )
+                }
+                uri
+            } catch (exception: Exception) {
+                Napier.e("Failed to persist photo capture", exception)
+                _state.update { it.copy(error = CameraCaptureError.CaptureFailed) }
+                null
+            } finally {
+                java.io.File(capturedPath).delete()
             }
         }
 
@@ -310,12 +320,13 @@ class AndroidCameraCaptureManager(
 
         val timeStamp = timestampFormat.format(Date())
         val fileName = "LOGDATE_$timeStamp.mp4"
-        val captureFile = stagingStore.create(fileName)
-        pendingCaptureFiles += captureFile
-        val outputOptions = FileOutputOptions.Builder(captureFile).build()
+
+        val outputFile = java.io.File.createTempFile("logdate-camera-", ".mp4", captureStagingDirectory)
+        val outputOptions = FileOutputOptions.Builder(outputFile).build()
 
         val deferred = CompletableDeferred<String?>()
         recordingDeferred = deferred
+        recordingFile = outputFile
 
         try {
             currentRecording =
@@ -341,33 +352,35 @@ class AndroidCameraCaptureManager(
                             }
 
                             is VideoRecordEvent.Finalize -> {
-                                captureScope.launch {
+                                val file = recordingFile
+                                currentRecording = null
+                                recordingFile = null
+                                captureScope.launch(Dispatchers.IO) {
                                     val uri =
-                                        try {
-                                            if (!event.hasError()) {
-                                                runCatching {
-                                                    mediaManager.saveMediaFromFile(captureFile.absolutePath, fileName, "video/mp4")
-                                                }.getOrElse { error ->
-                                                    Napier.e("Video persistence failed", error)
-                                                    null
-                                                }
-                                            } else {
-                                                Napier.e("Video recording failed with error: ${event.error}")
-                                                null
-                                            }
-                                        } finally {
-                                            pendingCaptureFiles.remove(captureFile)
-                                            captureFile.delete()
+                                        if (!event.hasError() && file != null) {
+                                            runCatching {
+                                                mediaManager.saveMediaFromFile(
+                                                    sourceFilePath = file.absolutePath,
+                                                    fileName = fileName,
+                                                    mimeType = "video/mp4",
+                                                )
+                                            }.onFailure { error ->
+                                                Napier.e("Failed to persist video capture", error)
+                                            }.getOrNull()
+                                        } else {
+                                            Napier.e("Video recording failed with error: ${event.error}")
+                                            null
                                         }
+                                    file?.delete()
                                     withContext(Dispatchers.Main.immediate) {
                                         _state.update {
                                             it.copy(
                                                 isRecording = false,
                                                 lastCapturedUri = uri,
-                                                error = if (uri == null) CameraCaptureError.RecordingFailed else null,
+                                                error =
+                                                    if (uri == null) CameraCaptureError.RecordingFailed else null,
                                             )
                                         }
-                                        currentRecording = null
                                         recordingDeferred?.complete(uri)
                                         recordingDeferred = null
                                     }
@@ -378,11 +391,15 @@ class AndroidCameraCaptureManager(
         } catch (e: SecurityException) {
             Napier.e("Audio permission required for video recording", e)
             _state.update { it.copy(error = CameraCaptureError.PermissionDenied) }
+            outputFile.delete()
+            recordingFile = null
             deferred.complete(null)
             recordingDeferred = null
         } catch (e: Exception) {
             Napier.e("Failed to start video recording", e)
             _state.update { it.copy(error = CameraCaptureError.RecordingFailed) }
+            outputFile.delete()
+            recordingFile = null
             deferred.complete(null)
             recordingDeferred = null
         }
@@ -553,9 +570,11 @@ class AndroidCameraCaptureManager(
 
     override fun release() {
         currentRecording?.stop()
-        // Persistence belongs to the application scope, not this camera screen. Activity
-        // recreation and navigation teardown must never cancel or delete an in-flight capture.
         currentRecording = null
+        // Camera resources are activity-scoped; capture finalization is not. Do not delete
+        // staged output, complete the deferred with failure, or cancel captureScope here:
+        // release() is called from ViewModel.onCleared during navigation/configuration and
+        // the CameraX Finalize callback may still be handing the file to MediaManager.
         previewStreamObserver?.let { observer ->
             previewView?.previewStreamState?.removeObserver(observer)
         }
@@ -570,24 +589,6 @@ class AndroidCameraCaptureManager(
         videoCapture = null
         lifecycleOwner = null
         _state.update { CameraCaptureState() }
-    }
-
-    private fun recoverStagedCaptures() {
-        captureScope.launch(Dispatchers.IO) {
-            stagingStore.recoverableFiles().forEach { pending ->
-                runCatching {
-                    mediaManager.saveMediaFromFile(
-                        sourceFilePath = pending.file.absolutePath,
-                        fileName = pending.fileName,
-                        mimeType = pending.mimeType,
-                    )
-                }.onSuccess {
-                    pending.file.delete()
-                }.onFailure { error ->
-                    Napier.w("Deferred camera capture remains staged for retry: ${pending.file.name}", error)
-                }
-            }
-        }
     }
 
     private fun cameraSelectorForDeviceId(deviceId: String?): CameraSelector {

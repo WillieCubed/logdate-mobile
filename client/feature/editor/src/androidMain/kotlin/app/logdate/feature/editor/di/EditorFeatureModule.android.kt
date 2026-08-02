@@ -5,7 +5,6 @@ import app.logdate.feature.editor.audio.extraction.AmplitudeExtractor
 import app.logdate.feature.editor.audio.extraction.AndroidAmplitudeExtractor
 import app.logdate.feature.editor.ui.camera.AndroidCameraCaptureManager
 import app.logdate.feature.editor.ui.camera.CameraCaptureManager
-import kotlinx.coroutines.CoroutineScope
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -19,7 +18,7 @@ actual val platformEditorModule: Module =
         // Provide Android implementation of CameraCaptureManager.
         // Factory-scoped so each CameraViewModel gets a fresh instance with clean lifecycle state.
         factory<CameraCaptureManager> {
-            AndroidCameraCaptureManager(androidContext(), get<MediaManager>(), get<CoroutineScope>())
+            AndroidCameraCaptureManager(androidContext(), get<MediaManager>())
         }
 
         // Audio waveform processing dependencies
