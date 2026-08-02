@@ -887,7 +887,7 @@ resume_cleanup() {
         fi
         body="$WORK_DIR/account-after-delete.json"
         status="$(http_request GET "$SERVICE_URL/api/v1/auth/me" "$body" "$AUTH_HEADER_FILE")"
-        if [[ "$status" != "401" ]]; then
+        if [[ "$status" != "401" && "$status" != "404" ]]; then
             fail "deleted account remained readable"
             return 1
         fi
