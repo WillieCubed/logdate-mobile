@@ -70,7 +70,10 @@ jobs:
         run: |
           python -m venv .venv
           .venv/bin/pip install --quiet -r scripts/passkey-verify/requirements.txt
-          .venv/bin/python scripts/passkey-verify/sim.py --base https://cloud-staging.logdate.app
+          .venv/bin/python scripts/passkey-verify/sim.py \
+            --base https://cloud-staging.logdate.app \
+            --origin https://cloud-staging.logdate.app \
+            --expected-rp-id cloud-staging.logdate.app
 
   deploy:
     name: Deploy production revision

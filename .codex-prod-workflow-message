@@ -1,0 +1,3 @@
+fix(cloud): pass staging WebAuthn contract to production gate
+
+Provide the staging origin and RP ID required by the passkey verifier so production deployment can reach its guarded Cloud Run rollout.
