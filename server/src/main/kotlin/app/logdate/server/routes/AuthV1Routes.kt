@@ -118,6 +118,7 @@ data class SignupPasskeyBeginRequest(
     val username: String,
     val displayName: String,
     val bio: String? = null,
+    val requestedOwnerId: String? = null,
 )
 
 @Serializable
@@ -179,6 +180,7 @@ data class GoogleAuthRequest(
     val username: String? = null,
     val displayName: String? = null,
     val nonce: String? = null,
+    val requestedOwnerId: String? = null,
 )
 
 @Serializable
@@ -360,17 +362,28 @@ fun Route.authV1Routes(
                             )
                         }
 
-                        val temporaryUserId = Uuid.random()
+                        val requestedOwnerId =
+                            call.parseRequiredCanonicalOwnerId(request.requestedOwnerId, metrics)
+                                ?: return@post
+                        if (accountRepository.findById(requestedOwnerId) != null) {
+                            return@post call.respondApiError(
+                                HttpStatusCode.Conflict,
+                                "CANONICAL_OWNER_ID_TAKEN",
+                                "This device identity is already associated with an account",
+                                metrics,
+                            )
+                        }
+
                         val registrationOptions =
                             webAuthnService.generateRegistrationOptions(
-                                userId = temporaryUserId,
+                                userId = requestedOwnerId,
                                 username = request.username,
                                 displayName = request.displayName,
                             )
 
                         val session =
                             sessionManager.createAccountCreationSession(
-                                temporaryUserId = temporaryUserId,
+                                temporaryUserId = requestedOwnerId,
                                 username = request.username,
                                 displayName = request.displayName,
                                 challenge = registrationOptions.challenge,
@@ -629,6 +642,10 @@ fun Route.authV1Routes(
                         )
                     }
 
+                    val requestedOwnerId =
+                        call.parseRequiredCanonicalOwnerId(request.requestedOwnerId, metrics)
+                            ?: return@post
+
                     val resolution =
                         resolveGoogleAccount(
                             claims = claims,
@@ -637,6 +654,7 @@ fun Route.authV1Routes(
                             allowCreate = true,
                             requestedUsername = request.username,
                             requestedDisplayName = request.displayName,
+                            requestedOwnerId = requestedOwnerId,
                             call = call,
                         )
                     if (resolution == null) {
@@ -860,6 +878,7 @@ fun Route.authV1Routes(
                             allowCreate = false,
                             requestedUsername = request.username,
                             requestedDisplayName = request.displayName,
+                            requestedOwnerId = null,
                             call = call,
                         )
                             ?: return@post call.respondApiError(
@@ -1550,6 +1569,7 @@ private suspend fun resolveGoogleAccount(
     allowCreate: Boolean,
     requestedUsername: String?,
     requestedDisplayName: String?,
+    requestedOwnerId: Uuid?,
     call: ApplicationCall,
 ): GoogleResolution? {
     val normalizedEmail = claims.email.lowercase()
@@ -1558,6 +1578,7 @@ private suspend fun resolveGoogleAccount(
     val googleIdentity = identityRepository.findByProviderSubject(IdentityProvider.GOOGLE, claims.subject)
     if (googleIdentity != null) {
         val account = accountRepository.findById(googleIdentity.accountId) ?: return null
+        if (requestedOwnerId != null && account.id != requestedOwnerId) return null
         identityRepository.touchLastSignIn(googleIdentity.id)
         return GoogleResolution(account, googleIdentity)
     }
@@ -1570,6 +1591,7 @@ private suspend fun resolveGoogleAccount(
 
     if (emailMatches.size == 1) {
         val matchedAccount = emailMatches.first()
+        if (requestedOwnerId != null && matchedAccount.id != requestedOwnerId) return null
         val identity =
             identityRepository.save(
                 AccountIdentity(
@@ -1625,6 +1647,8 @@ private suspend fun resolveGoogleAccount(
         return null
     }
 
+    val ownerId = requestedOwnerId ?: return null
+
     val username =
         resolveUniqueUsername(
             requestedUsername = requestedUsername,
@@ -1634,32 +1658,37 @@ private suspend fun resolveGoogleAccount(
     val displayName = requestedDisplayName?.takeIf { it.isNotBlank() } ?: claims.name?.takeIf { it.isNotBlank() } ?: username
 
     val account =
-        accountRepository.save(
-            Account(
-                id = Uuid.random(),
-                username = username,
-                displayName = displayName,
-                email = normalizedEmail,
-                emailVerified = true,
-                createdAt = now,
-                lastSignInAt = now,
-                isActive = true,
-            ),
+        Account(
+            id = ownerId,
+            username = username,
+            displayName = displayName,
+            email = normalizedEmail,
+            emailVerified = true,
+            createdAt = now,
+            lastSignInAt = now,
+            isActive = true,
         )
+    if (!accountRepository.createOnly(account)) return null
 
     val identity =
-        identityRepository.save(
-            AccountIdentity(
-                id = Uuid.random(),
-                accountId = account.id,
-                provider = IdentityProvider.GOOGLE,
-                providerSubject = claims.subject,
-                email = normalizedEmail,
-                emailVerified = true,
-                createdAt = now,
-                lastSignInAt = now,
-            ),
-        )
+        try {
+            identityRepository.save(
+                AccountIdentity(
+                    id = Uuid.random(),
+                    accountId = account.id,
+                    provider = IdentityProvider.GOOGLE,
+                    providerSubject = claims.subject,
+                    email = normalizedEmail,
+                    emailVerified = true,
+                    createdAt = now,
+                    lastSignInAt = now,
+                ),
+            )
+        } catch (error: Exception) {
+            runCatching { accountRepository.deleteAccount(account.id) }
+                .onFailure { Napier.w("Failed to roll back Google account ${account.id}", it) }
+            throw error
+        }
 
     identityRepository.saveLinkEvent(
         AccountLinkEvent(
@@ -1910,6 +1939,33 @@ private suspend fun ApplicationCall.respondApiError(
 ) {
     metrics?.recordError(code)
     respond(status, ApiErrorResponse(ApiError(code, message)))
+}
+
+@OptIn(ExperimentalUuidApi::class)
+private suspend fun ApplicationCall.parseRequiredCanonicalOwnerId(
+    requestedOwnerId: String?,
+    metrics: AuthMetricsRegistry,
+): Uuid? {
+    val rawOwnerId = requestedOwnerId?.trim().orEmpty()
+    if (rawOwnerId.isEmpty()) {
+        respondApiError(
+            HttpStatusCode.BadRequest,
+            "CANONICAL_OWNER_ID_REQUIRED",
+            "A canonical device identity is required to create a Cloud account",
+            metrics,
+        )
+        return null
+    }
+
+    return runCatching { Uuid.parse(rawOwnerId) }.getOrElse {
+        respondApiError(
+            HttpStatusCode.BadRequest,
+            "CANONICAL_OWNER_ID_INVALID",
+            "The canonical device identity must be a UUID",
+            metrics,
+        )
+        return null
+    }
 }
 
 private suspend fun ApplicationCall.respondForRequestException(

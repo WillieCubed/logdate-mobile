@@ -37,7 +37,9 @@ class AuthRestoreCredentialJourneyE2ETest {
         val beginSignup =
             client.post("/api/v1/auth/signup/passkey/begin") {
                 contentType(ContentType.Application.Json)
-                setBody("""{"username":"$username","displayName":"$username"}""")
+                setBody(
+                    """{"username":"$username","displayName":"$username","requestedOwnerId":"00000000-0000-0000-0000-000000000001"}""",
+                )
             }
         val sessionToken =
             json

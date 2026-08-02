@@ -1,7 +1,15 @@
 package app.logdate.server.routes.support
 
-fun googleAuthBody(idToken: String): String = """{"idToken":"$idToken"}"""
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
+fun googleAuthBody(
+    idToken: String,
+    requestedOwnerId: String = Uuid.random().toString(),
+): String = """{"idToken":"$idToken","requestedOwnerId":"$requestedOwnerId"}"""
+
+@OptIn(ExperimentalUuidApi::class)
 fun signupPasskeyBeginBody(
     username: String,
     displayName: String,
@@ -9,7 +17,8 @@ fun signupPasskeyBeginBody(
     """
     {
       "username": "$username",
-      "displayName": "$displayName"
+      "displayName": "$displayName",
+      "requestedOwnerId": "${Uuid.random()}"
     }
     """.trimIndent()
 

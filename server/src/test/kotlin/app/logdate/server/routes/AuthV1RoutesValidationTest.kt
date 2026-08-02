@@ -258,7 +258,7 @@ class AuthV1RoutesValidationTest {
             val response =
                 client.post("/api/v1/auth/signup/google") {
                     contentType(ContentType.Application.Json)
-                    setBody(googleAuthBody("token-link"))
+                    setBody(googleAuthBody(idToken = "token-link", requestedOwnerId = existing.id.toString()))
                 }
 
             assertEquals(HttpStatusCode.OK, response.status)

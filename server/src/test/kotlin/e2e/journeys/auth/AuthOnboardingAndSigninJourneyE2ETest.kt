@@ -47,7 +47,8 @@ class AuthOnboardingAndSigninJourneyE2ETest {
                         """
                         {
                           "username": "authv1_user",
-                          "displayName": "Auth V1 User"
+                          "displayName": "Auth V1 User",
+                          "requestedOwnerId": "00000000-0000-0000-0000-000000000001"
                         }
                         """.trimIndent(),
                     )

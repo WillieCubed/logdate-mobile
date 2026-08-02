@@ -119,7 +119,7 @@ class AuthSignupFlowContractsTest {
             val response =
                 client.post("/api/v1/auth/signup/google") {
                     contentType(ContentType.Application.Json)
-                    setBody("""{"idToken":"suffix-token","username":"takenbase"}""")
+                    setBody("""{"idToken":"suffix-token","username":"takenbase","requestedOwnerId":"${Uuid.random()}"}""")
                 }
 
             assertEquals(HttpStatusCode.OK, response.status)
@@ -130,6 +130,7 @@ class AuthSignupFlowContractsTest {
     fun `google signup returns conflict when no unique username can be generated`() =
         testApplication {
             val accountRepository = mockk<AccountRepository>(relaxed = true)
+            coEvery { accountRepository.findById(any()) } returns null
             coEvery { accountRepository.findByVerifiedEmail(any()) } returns emptyList()
             coEvery { accountRepository.usernameExists(any()) } returns true
 
@@ -149,7 +150,7 @@ class AuthSignupFlowContractsTest {
             val response =
                 client.post("/api/v1/auth/signup/google") {
                     contentType(ContentType.Application.Json)
-                    setBody("""{"idToken":"exhaust-token","username":"takenbase"}""")
+                    setBody("""{"idToken":"exhaust-token","username":"takenbase","requestedOwnerId":"${Uuid.random()}"}""")
                 }
 
             assertEquals(HttpStatusCode.Conflict, response.status)

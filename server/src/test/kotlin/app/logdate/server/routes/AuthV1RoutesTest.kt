@@ -79,6 +79,7 @@ class AuthV1RoutesTest {
     @Test
     fun `google signup creates account and returns tokens`() =
         testApplication {
+            val requestedOwnerId = Uuid.random().toString()
             configureAuthV1TestApp(
                 googleClaimsByToken =
                     googleClaimsByToken(
@@ -94,7 +95,7 @@ class AuthV1RoutesTest {
             val response =
                 client.post("/api/v1/auth/signup/google") {
                     contentType(ContentType.Application.Json)
-                    setBody(googleAuthBody("google-token-new"))
+                    setBody("""{"idToken":"google-token-new","requestedOwnerId":"$requestedOwnerId"}""")
                 }
 
             assertEquals(HttpStatusCode.OK, response.status)
@@ -102,6 +103,7 @@ class AuthV1RoutesTest {
             assertEquals("true", payload["success"]?.jsonPrimitive?.content)
             val account = payload["data"]?.jsonObject?.get("account")?.jsonObject
             assertNotNull(account)
+            assertEquals(requestedOwnerId, account["id"]?.jsonPrimitive?.content)
             assertEquals("new.user@example.com", account["email"]?.jsonPrimitive?.content)
             assertTrue(account["did"]?.jsonPrimitive?.content?.startsWith("did:plc:") == true)
             assertEquals("new-user.logdate.app", account["handle"]?.jsonPrimitive?.content)
@@ -110,6 +112,21 @@ class AuthV1RoutesTest {
             assertNotNull(tokens)
             assertTrue(tokens["accessToken"]?.jsonPrimitive?.content?.isNotBlank() == true)
             assertTrue(tokens["refreshToken"]?.jsonPrimitive?.content?.isNotBlank() == true)
+        }
+
+    @Test
+    fun `passkey signup requires a canonical owner ID`() =
+        testApplication {
+            configureAuthV1TestApp()
+
+            val response =
+                client.post("/api/v1/auth/signup/passkey/begin") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"username":"owner_required","displayName":"Owner Required"}""")
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("CANONICAL_OWNER_ID_REQUIRED"))
         }
 
     @Test
