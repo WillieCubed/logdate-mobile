@@ -146,6 +146,86 @@ if [[ "${CI:-false}" == "true" ]]; then
     # lockfile would make terraform console demand uncached provider packages.
     git -C "$REPO_ROOT" cat-file -e "$RELEASE_SHA:infra/terraform/.terraform.lock.hcl" 2>/dev/null ||
         die "release commit does not contain the Terraform dependency lockfile."
+    # Terraform console otherwise spends time loading the full provider-era
+    # variable schema. Contract rendering needs only these provider-free values.
+    cat >"$PRIVATE_CONFIG_DIR/variables.tf" <<'EOF'
+variable "project_id" { type = string }
+variable "region" { type = string }
+variable "service_name" { type = string }
+variable "cloud_run_image" { type = string }
+variable "runtime_service_account_name" {
+  type = string
+  default = "logdate-runtime"
+}
+variable "artifact_registry_repo" {
+  type = string
+  default = "logdate"
+}
+variable "artifact_registry_image_name" {
+  type = string
+  default = "logdate-server"
+}
+variable "domains" {
+  type = list(string)
+  default = []
+}
+variable "domain" {
+  type = string
+  default = ""
+}
+variable "android_signing_certificates" {
+  type = any
+  default = {}
+}
+variable "cloud_run_env" {
+  type = map(string)
+  default = {}
+}
+variable "cloud_run_secret_env" {
+  type = any
+  default = {}
+}
+variable "allow_unauthenticated" {
+  type = bool
+  default = true
+}
+variable "ingress" {
+  type = string
+  default = "INGRESS_TRAFFIC_ALL"
+}
+variable "min_instances" {
+  type = number
+  default = 0
+}
+variable "max_instances" {
+  type = number
+  default = 10
+}
+variable "cpu" {
+  type = string
+  default = "1"
+}
+variable "memory" {
+  type = string
+  default = "512Mi"
+}
+variable "cpu_idle" {
+  type = bool
+  default = true
+}
+variable "startup_cpu_boost" {
+  type = bool
+  default = true
+}
+variable "timeout_seconds" {
+  type = number
+  default = 60
+}
+variable "request_concurrency" {
+  type = number
+  default = 80
+}
+EOF
 else
     git -C "$REPO_ROOT" show "$RELEASE_SHA:infra/terraform/.terraform.lock.hcl" >"$PRIVATE_CONFIG_DIR/.terraform.lock.hcl" 2>/dev/null ||
         die "release commit does not contain the Terraform dependency lockfile."
