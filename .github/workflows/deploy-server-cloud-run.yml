@@ -221,7 +221,7 @@ jobs:
           fi
 
           gcloud run deploy "$(jq -r '.service_name' "$CONTRACT_FILE")" \
-            --image "$IMAGE_URI" \
+            --image="${IMAGE_URI}" \
             --platform managed \
             --region "$(jq -r '.region' "$CONTRACT_FILE")" \
             --project "$(jq -r '.project_id' "$CONTRACT_FILE")" \
