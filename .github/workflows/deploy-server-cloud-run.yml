@@ -230,6 +230,8 @@ jobs:
             --tag "$CANDIDATE_TAG" \
             --env-vars-file "$ENV_VARS_FILE" \
             --set-secrets "$SECRET_ENV_BINDINGS" \
+            --startup-probe "timeoutSeconds=5,periodSeconds=5,failureThreshold=12,httpGet.path=/health,httpGet.port=8080" \
+            --liveness-probe "initialDelaySeconds=15,timeoutSeconds=5,periodSeconds=30,failureThreshold=3,httpGet.path=/health,httpGet.port=8080" \
             "${service_account_args[@]}"
 
           REVISION_URL=""
