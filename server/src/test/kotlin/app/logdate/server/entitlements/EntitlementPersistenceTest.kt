@@ -19,7 +19,7 @@ class EntitlementPersistenceTest {
     fun `stored service falls back to active free plan when account has no subscription row`() =
         runTest {
             withDatabase(PlansTable, AccountEntitlementsTable) { database ->
-                insertPlan(id = "free", tier = "free", storageBytes = 50_000L, backupCount = 2)
+                insertPlan(database, id = "free", tier = "free", storageBytes = 50_000L, backupCount = 2)
 
                 val entitlement = StoredEntitlementService(database).resolve(UUID.randomUUID())
 
@@ -36,8 +36,8 @@ class EntitlementPersistenceTest {
         runTest {
             withDatabase(PlansTable, AccountEntitlementsTable) { database ->
                 val accountId = UUID.randomUUID()
-                insertPlan(id = "pro", tier = "PRO", storageBytes = null, backupCount = null)
-                insertAccountEntitlement(accountId = accountId, planId = "pro", status = "past_due")
+                insertPlan(database, id = "pro", tier = "PRO", storageBytes = null, backupCount = null)
+                insertAccountEntitlement(database, accountId = accountId, planId = "pro", status = "past_due")
 
                 val entitlement = StoredEntitlementService(database).resolve(accountId)
 
@@ -55,10 +55,10 @@ class EntitlementPersistenceTest {
             withDatabase(PlansTable, AccountEntitlementsTable) { database ->
                 val standardAccountId = UUID.randomUUID()
                 val unlimitedAccountId = UUID.randomUUID()
-                insertPlan(id = "standard", tier = "standard", storageBytes = 100L, backupCount = 3)
-                insertPlan(id = "unlimited", tier = "unlimited", storageBytes = null, backupCount = null)
-                insertAccountEntitlement(accountId = standardAccountId, planId = "standard", status = "grace")
-                insertAccountEntitlement(accountId = unlimitedAccountId, planId = "unlimited", status = "cancelled")
+                insertPlan(database, id = "standard", tier = "standard", storageBytes = 100L, backupCount = 3)
+                insertPlan(database, id = "unlimited", tier = "unlimited", storageBytes = null, backupCount = null)
+                insertAccountEntitlement(database, accountId = standardAccountId, planId = "standard", status = "grace")
+                insertAccountEntitlement(database, accountId = unlimitedAccountId, planId = "unlimited", status = "cancelled")
 
                 val standard = StoredEntitlementService(database).resolve(standardAccountId)
                 val unlimited = StoredEntitlementService(database).resolve(unlimitedAccountId)
@@ -76,13 +76,14 @@ class EntitlementPersistenceTest {
             withDatabase(PlansTable, AccountEntitlementsTable) { database ->
                 val accountId = UUID.randomUUID()
                 insertPlan(
+                    database,
                     id = "standard",
                     tier = "standard",
                     storageBytes = 100L,
                     backupCount = 3,
                     features = mapOf("email_verification" to true, "future_flag" to false),
                 )
-                insertAccountEntitlement(accountId = accountId, planId = "standard", status = "active")
+                insertAccountEntitlement(database, accountId = accountId, planId = "standard", status = "active")
 
                 val entitlement = StoredEntitlementService(database).resolve(accountId)
 
@@ -110,7 +111,7 @@ class EntitlementPersistenceTest {
                         it[features] = "not-json"
                     }
                 }
-                insertAccountEntitlement(accountId = accountId, planId = "broken", status = "active")
+                insertAccountEntitlement(database, accountId = accountId, planId = "broken", status = "active")
 
                 val entitlement = StoredEntitlementService(database).resolve(accountId)
 
@@ -123,8 +124,8 @@ class EntitlementPersistenceTest {
         runTest {
             withDatabase(PlansTable, AccountEntitlementsTable) { database ->
                 val accountId = UUID.randomUUID()
-                insertPlan(id = "custom", tier = "custom", storageBytes = 10L, backupCount = 1)
-                insertAccountEntitlement(accountId = accountId, planId = "custom", status = "unexpected")
+                insertPlan(database, id = "custom", tier = "custom", storageBytes = 10L, backupCount = 1)
+                insertAccountEntitlement(database, accountId = accountId, planId = "custom", status = "unexpected")
 
                 val entitlement = StoredEntitlementService(database).resolve(accountId)
 
@@ -139,9 +140,9 @@ class EntitlementPersistenceTest {
             withDatabase(PlansTable, AccountEntitlementsTable) { database ->
                 val inactiveAccountId = UUID.randomUUID()
                 val missingAccountId = UUID.randomUUID()
-                insertPlan(id = "standard", tier = "standard", storageBytes = 100L, backupCount = 1, active = false)
-                insertAccountEntitlement(accountId = inactiveAccountId, planId = "standard", status = "active")
-                insertAccountEntitlement(accountId = missingAccountId, planId = "missing", status = "canceled")
+                insertPlan(database, id = "standard", tier = "standard", storageBytes = 100L, backupCount = 1, active = false)
+                insertAccountEntitlement(database, accountId = inactiveAccountId, planId = "standard", status = "active")
+                insertAccountEntitlement(database, accountId = missingAccountId, planId = "missing", status = "canceled")
 
                 val inactivePlanEntitlement = StoredEntitlementService(database).resolve(inactiveAccountId)
                 val missingPlanEntitlement = StoredEntitlementService(database).resolve(missingAccountId)
@@ -160,12 +161,12 @@ class EntitlementPersistenceTest {
             withDatabase(LogDateMediaRecordsTable, LogDateBackupsTable) { database ->
                 val accountId = UUID.randomUUID()
                 val otherAccountId = UUID.randomUUID()
-                insertMedia(accountId = accountId, mediaId = "media-1", bytes = 30L)
-                insertMedia(accountId = accountId, mediaId = "media-2", bytes = 40L, deleted = true)
-                insertMedia(accountId = otherAccountId, mediaId = "media-3", bytes = 70L)
-                insertBackup(accountId = accountId, bytes = 50L)
-                insertBackup(accountId = accountId, bytes = 20L)
-                insertBackup(accountId = otherAccountId, bytes = 90L)
+                insertMedia(database, accountId = accountId, mediaId = "media-1", bytes = 30L)
+                insertMedia(database, accountId = accountId, mediaId = "media-2", bytes = 40L, deleted = true)
+                insertMedia(database, accountId = otherAccountId, mediaId = "media-3", bytes = 70L)
+                insertBackup(database, accountId = accountId, bytes = 50L)
+                insertBackup(database, accountId = accountId, bytes = 20L)
+                insertBackup(database, accountId = otherAccountId, bytes = 90L)
 
                 val calculator = DatabaseUsageCalculator(database)
 
@@ -211,6 +212,7 @@ class EntitlementPersistenceTest {
     }
 
     private fun insertPlan(
+        database: Database,
         id: String,
         tier: String,
         storageBytes: Long?,
@@ -218,7 +220,7 @@ class EntitlementPersistenceTest {
         active: Boolean = true,
         features: Map<String, Boolean> = emptyMap(),
     ) {
-        transaction {
+        transaction(database) {
             PlansTable.insert {
                 it[PlansTable.id] = id
                 it[name] = "$id plan"
@@ -238,11 +240,12 @@ class EntitlementPersistenceTest {
     }
 
     private fun insertAccountEntitlement(
+        database: Database,
         accountId: UUID,
         planId: String,
         status: String,
     ) {
-        transaction {
+        transaction(database) {
             AccountEntitlementsTable.insert {
                 it[AccountEntitlementsTable.accountId] = accountId
                 it[AccountEntitlementsTable.planId] = planId
@@ -256,12 +259,13 @@ class EntitlementPersistenceTest {
     }
 
     private fun insertMedia(
+        database: Database,
         accountId: UUID,
         mediaId: String,
         bytes: Long,
         deleted: Boolean = false,
     ) {
-        transaction {
+        transaction(database) {
             LogDateMediaRecordsTable.insert {
                 it[userId] = accountId
                 it[LogDateMediaRecordsTable.mediaId] = mediaId
@@ -284,10 +288,11 @@ class EntitlementPersistenceTest {
     }
 
     private fun insertBackup(
+        database: Database,
         accountId: UUID,
         bytes: Long,
     ) {
-        transaction {
+        transaction(database) {
             LogDateBackupsTable.insert {
                 it[id] = UUID.randomUUID()
                 it[userId] = accountId
