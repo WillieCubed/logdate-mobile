@@ -202,6 +202,12 @@ jobs:
 
       - name: Deploy candidate revision without traffic
         run: |
+          IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REGISTRY_REPO}/logdate-server:${DEPLOY_SHA}"
+          CONTRACT_IMAGE="$(jq -r '.image' "$CONTRACT_FILE")"
+          if [[ "$CONTRACT_IMAGE" != "$IMAGE_URI" ]]; then
+            echo "Deployment contract image mismatch: expected $IMAGE_URI, got $CONTRACT_IMAGE"
+            exit 1
+          fi
           ENV_VARS_FILE="$(mktemp "${RUNNER_TEMP}/logdate-cloud-run-env.XXXXXX.yaml")"
           chmod 600 "$ENV_VARS_FILE"
           jq -c '.env_vars' "$CONTRACT_FILE" >"$ENV_VARS_FILE"
@@ -214,7 +220,7 @@ jobs:
           fi
 
           gcloud run deploy "$(jq -r '.service_name' "$CONTRACT_FILE")" \
-            --image "$(jq -r '.image' "$CONTRACT_FILE")" \
+            --image "$IMAGE_URI" \
             --platform managed \
             --region "$(jq -r '.region' "$CONTRACT_FILE")" \
             --project "$(jq -r '.project_id' "$CONTRACT_FILE")" \
