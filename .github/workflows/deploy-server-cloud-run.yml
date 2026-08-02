@@ -332,9 +332,10 @@ jobs:
             gcloud secrets versions access \
               "$(jq -r '.secret_env.HEALTH_INTERNAL_TOKEN.version' "$CONTRACT_FILE")" \
               --secret="$(jq -r '.secret_env.HEALTH_INTERNAL_TOKEN.secret_id' "$CONTRACT_FILE")" \
-              --project="$(jq -r '.project_id' "$CONTRACT_FILE")"
+            --project="$(jq -r '.project_id' "$CONTRACT_FILE")"
           )"
           test -n "$HEALTH_INTERNAL_TOKEN"
+          export HEALTH_INTERNAL_TOKEN
 
           {
             echo "SMOKE_DIRECTORY=$SMOKE_DIRECTORY"
