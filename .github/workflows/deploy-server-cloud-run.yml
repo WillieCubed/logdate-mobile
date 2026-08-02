@@ -307,6 +307,16 @@ jobs:
 
       - name: Prepare strict candidate smoke proof
         run: |
+          DEPLOYER_ACCOUNT="$(gcloud auth list --filter=status:ACTIVE --format='value(account)')"
+          if [[ "$DEPLOYER_ACCOUNT" != *@*.iam.gserviceaccount.com ]]; then
+            echo "Active gcloud identity is not a service account: $DEPLOYER_ACCOUNT"
+            exit 1
+          fi
+          gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SERVICE_ACCOUNT" \
+            --project "$PROJECT_ID" \
+            --member "serviceAccount:${DEPLOYER_ACCOUNT}" \
+            --role roles/iam.serviceAccountTokenCreator \
+            --quiet
           umask 077
           SMOKE_DIRECTORY="$(mktemp -d "${RUNNER_TEMP}/logdate-cloud-smoke.XXXXXX")"
           chmod 700 "$SMOKE_DIRECTORY"
