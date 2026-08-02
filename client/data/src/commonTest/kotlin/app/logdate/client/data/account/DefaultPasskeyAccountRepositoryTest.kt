@@ -10,6 +10,7 @@ import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.client.permissions.PasskeyManager
 import app.logdate.client.permissions.RestoreCredentialManager
 import app.logdate.client.repository.account.AccountCreationRequest
+import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.AccountTokens
 import app.logdate.shared.model.BeginAccountCreationData
@@ -20,6 +21,7 @@ import app.logdate.shared.model.CompleteAccountCreationData
 import app.logdate.shared.model.CompleteAccountCreationRequest
 import app.logdate.shared.model.CompleteAuthenticationData
 import app.logdate.shared.model.CompleteAuthenticationRequest
+import app.logdate.shared.model.DeploymentKind
 import app.logdate.shared.model.EntitlementResponse
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyAllowCredential
@@ -28,9 +30,12 @@ import app.logdate.shared.model.PasskeyCapabilities
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyUser
 import app.logdate.shared.model.PublicKeyCredentialParameter
+import app.logdate.shared.model.ServerCapability
+import app.logdate.shared.model.ServerDescriptor
 import app.logdate.shared.model.UsernameAvailabilityData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +43,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -57,6 +63,7 @@ import kotlin.uuid.Uuid
  * automatic token refreshing, and integration with platform-level account managers and
  * passkey providers.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class DefaultPasskeyAccountRepositoryTest {
     private val testAccount =
         LogDateAccount(
@@ -89,6 +96,7 @@ class DefaultPasskeyAccountRepositoryTest {
         platformAccountManager: FakePlatformAccountManager = FakePlatformAccountManager(),
         configRepository: FakeConfigRepository = FakeConfigRepository(),
         canonicalOwnerProvider: CanonicalOwnerProvider = FakeCanonicalOwnerProvider(testAccount.id.toString()),
+        hasLocalData: suspend () -> Boolean = { false },
         repositoryScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     ): DefaultPasskeyAccountRepository =
         DefaultPasskeyAccountRepository(
@@ -99,6 +107,7 @@ class DefaultPasskeyAccountRepositoryTest {
             platformAccountManager = platformAccountManager,
             configRepository = configRepository,
             canonicalOwnerProvider = canonicalOwnerProvider,
+            hasLocalData = hasLocalData,
             repositoryScope = repositoryScope,
             json = Json { ignoreUnknownKeys = true },
         )
@@ -115,7 +124,9 @@ class DefaultPasskeyAccountRepositoryTest {
                     saveSession(testSession)
                 }
 
-            val repository = createRepository(sessionStorage = sessionStorage)
+            val repository = createRepository(sessionStorage = sessionStorage, repositoryScope = backgroundScope)
+
+            advanceUntilIdle()
 
             assertTrue(repository.isAuthenticated.value)
         }
@@ -141,10 +152,10 @@ class DefaultPasskeyAccountRepositoryTest {
                 createRepository(
                     sessionStorage = sessionStorage,
                     canonicalOwnerProvider = FakeCanonicalOwnerProvider(Uuid.random().toString()),
-                    repositoryScope = this,
+                    repositoryScope = backgroundScope,
                 )
 
-            advanceUntilIdle()
+            runCurrent()
 
             assertFalse(repository.isAuthenticated.value)
             assertNull(sessionStorage.getSession())
@@ -414,6 +425,47 @@ class DefaultPasskeyAccountRepositoryTest {
         }
 
     @Test
+    fun `authenticateWithPasskey refuses to adopt a remote owner when local data exists`() =
+        runTest {
+            val sessionStorage = FakeSessionStorage()
+            val repository =
+                createRepository(
+                    sessionStorage = sessionStorage,
+                    canonicalOwnerProvider = FreshInstallationCanonicalOwnerProvider(),
+                    hasLocalData = { true },
+                )
+
+            val result = repository.authenticateWithPasskey("testuser")
+
+            assertTrue(result.isFailure)
+            assertNull(sessionStorage.getSession())
+        }
+
+    @Test
+    fun `authenticateWithPasskey refuses an alternate server without canonical owner binding`() =
+        runTest {
+            val configRepository = FakeConfigRepository().apply {
+                updateBackendUrl("https://alternate.logdate.test")
+                updateServerDescriptor(
+                    ServerDescriptor(
+                        serverOrigin = "https://alternate.logdate.test",
+                        apiBaseUrl = "https://alternate.logdate.test/api/v1",
+                        deploymentKind = DeploymentKind.SELF_HOSTED,
+                        displayName = "Alternate LogDate",
+                        capabilities = listOf(ServerCapability.AUTH_PASSKEY),
+                    ),
+                )
+            }
+            val apiClient = FakePasskeyApiClient()
+            val repository = createRepository(apiClient = apiClient, configRepository = configRepository)
+
+            val result = repository.authenticateWithPasskey("testuser")
+
+            assertTrue(result.isFailure)
+            assertEquals(0, apiClient.beginAuthenticationCalls)
+        }
+
+    @Test
     fun signInWithRestoreKey_does_not_replace_the_installation_owner() =
         runTest {
             val sessionStorage = FakeSessionStorage()
@@ -494,6 +546,7 @@ class DefaultPasskeyAccountRepositoryTest {
             assertFalse(repository.isAuthenticated.value)
             assertNull(repository.currentAccount.value)
             assertNull(sessionStorage.getSession())
+            assertEquals(1, platformAccountManager.removeAccountCalls)
         }
 
     @Test
@@ -793,6 +846,7 @@ class DefaultPasskeyAccountRepositoryTest {
 
         private var getAccountInfoCallCount = 0
         private var deletePasskeyCallCount = 0
+        var beginAuthenticationCalls = 0
 
         override suspend fun checkUsernameAvailability(username: String): Result<UsernameAvailabilityData> = usernameAvailabilityResponse
 
@@ -802,8 +856,10 @@ class DefaultPasskeyAccountRepositoryTest {
         override suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationData> =
             completeAccountCreationResponse
 
-        override suspend fun beginAuthentication(request: BeginAuthenticationRequest): Result<BeginAuthenticationData> =
-            beginAuthenticationResponse
+        override suspend fun beginAuthentication(request: BeginAuthenticationRequest): Result<BeginAuthenticationData> {
+            beginAuthenticationCalls++
+            return beginAuthenticationResponse
+        }
 
         override suspend fun completeAuthentication(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData> =
             completeAuthenticationResponse
@@ -981,6 +1037,7 @@ class DefaultPasskeyAccountRepositoryTest {
     class FakePlatformAccountManager : PlatformAccountManager {
         var addAccountResponse: Result<Unit> = Result.success(Unit)
         var updateTokensResponse: Result<Unit> = Result.success(Unit)
+        var removeAccountCalls = 0
 
         override suspend fun addAccount(
             account: LogDateAccount,
@@ -1004,7 +1061,10 @@ class DefaultPasskeyAccountRepositoryTest {
         override suspend fun removeAccount(
             username: String,
             backendUrl: String,
-        ): Result<Unit> = Result.success(Unit)
+        ): Result<Unit> {
+            removeAccountCalls++
+            return Result.success(Unit)
+        }
 
         override suspend fun getStoredAccounts(): Result<List<PlatformAccountInfo>> = Result.success(emptyList())
 
@@ -1026,9 +1086,9 @@ class DefaultPasskeyAccountRepositoryTest {
      * Fake implementation of LogDateConfigRepository for testing.
      */
     class FakeConfigRepository : LogDateConfigRepository {
-        private val _backendUrl = MutableStateFlow("https://api.logdate.app")
+        private val _backendUrl = MutableStateFlow(DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL)
         private val _apiVersion = MutableStateFlow("v1")
-        private val _apiBaseUrl = MutableStateFlow("https://api.logdate.app/api/v1")
+        private val _apiBaseUrl = MutableStateFlow("${DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL}/api/v1")
         private val _localServerAddress = MutableStateFlow("localhost:8765")
         private val _serverDescriptor = MutableStateFlow<app.logdate.shared.model.ServerDescriptor?>(null)
 
@@ -1057,9 +1117,9 @@ class DefaultPasskeyAccountRepositoryTest {
         }
 
         override suspend fun resetToDefaults() {
-            _backendUrl.value = "https://api.logdate.app"
+            _backendUrl.value = DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL
             _apiVersion.value = "v1"
-            _apiBaseUrl.value = "https://api.logdate.app/api/v1"
+            _apiBaseUrl.value = "${DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL}/api/v1"
             _localServerAddress.value = "localhost:8765"
             _serverDescriptor.value = null
         }

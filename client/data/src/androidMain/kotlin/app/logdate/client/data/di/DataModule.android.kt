@@ -87,6 +87,7 @@ import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.repository.user.devices.UserDeviceRepository
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.configModule
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
@@ -226,6 +227,14 @@ actual val dataModule: Module =
                 get(),
                 get(),
                 get(),
+                hasLocalData = {
+                    val journals = get<JournalRepository>()
+                    val notes = get<JournalNotesRepository>()
+                    journals.allJournalsObserved.first().isNotEmpty() ||
+                        notes.allNotesObserved.first().isNotEmpty() ||
+                        journals.getAllDrafts().isNotEmpty() ||
+                        notes.getAllJournalNoteLinks().isNotEmpty()
+                },
                 googleSignInManager = get(),
                 serverClientId = DefaultLogDateConfigRepository.GOOGLE_SERVER_CLIENT_ID,
             )

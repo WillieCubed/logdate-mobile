@@ -11,6 +11,7 @@ import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.model.DeploymentKind
 import app.logdate.shared.model.ServerCapability
 import app.logdate.shared.model.ServerDescriptor
+import app.logdate.shared.model.ServerProtocolFeature
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -118,6 +119,24 @@ class AdvancedSettingsViewModelTest {
             assertEquals("http://10.0.2.2:8765", configRepository.serverDescriptor.value?.serverOrigin)
         }
 
+    @Test
+    fun `custom server without canonical owner binding is not persisted`() =
+        runTest {
+            val configRepository = DefaultLogDateConfigRepository()
+            val coordinator =
+                ServerConfigurationCoordinator(
+                    serverHealthChecker = FakeServerHealthChecker(),
+                    serverDiscoveryClient = FakeServerDiscoveryClient(protocolFeatures = emptyList()),
+                    configRepository = configRepository,
+                )
+
+            val result = coordinator.validateAndSaveCustomServer("https://example.test")
+
+            assertTrue(result.isFailure)
+            assertEquals(DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL, configRepository.backendUrl.value)
+            assertEquals(null, configRepository.serverDescriptor.value)
+        }
+
     private class FakeServerHealthChecker : ServerHealthChecker {
         override suspend fun checkServerHealth(baseUrl: String): Result<ServerHealthInfo> =
             Result.success(
@@ -128,7 +147,9 @@ class AdvancedSettingsViewModelTest {
             )
     }
 
-    private class FakeServerDiscoveryClient : ServerDiscoveryClient {
+    private class FakeServerDiscoveryClient(
+        private val protocolFeatures: List<String> = listOf(ServerProtocolFeature.CANONICAL_OWNER_BINDING_V1),
+    ) : ServerDiscoveryClient {
         override suspend fun discoverServer(serverOrigin: String): Result<ServerDescriptor> =
             Result.success(
                 ServerDescriptor(
@@ -143,6 +164,7 @@ class AdvancedSettingsViewModelTest {
                             ServerCapability.SYNC_CONTENT,
                             ServerCapability.SYNC_MEDIA,
                         ),
+                    protocolFeatures = protocolFeatures,
                 ),
             )
     }

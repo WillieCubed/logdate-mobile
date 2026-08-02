@@ -5,6 +5,7 @@ import app.logdate.client.networking.ServerHealthChecker
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.ServerDescriptor
+import app.logdate.shared.model.ServerProtocolFeature
 
 class ServerConfigurationCoordinator(
     private val serverHealthChecker: ServerHealthChecker,
@@ -44,6 +45,9 @@ class ServerConfigurationCoordinator(
         val normalizedOrigin = normalizeOrigin(serverOrigin)
         val healthInfo = serverHealthChecker.checkServerHealth(normalizedOrigin).getOrElse { error -> return Result.failure(error) }
         val descriptor = serverDiscoveryClient.discoverServer(normalizedOrigin).getOrElse { error -> return Result.failure(error) }
+        if (!descriptor.hasProtocolFeature(ServerProtocolFeature.CANONICAL_OWNER_BINDING_V1)) {
+            return Result.failure(IllegalArgumentException("Server does not support LogDate's single-identity protocol"))
+        }
         saveServerConfiguration(normalizedOrigin, descriptor)
         return Result.success(
             SaveResult(

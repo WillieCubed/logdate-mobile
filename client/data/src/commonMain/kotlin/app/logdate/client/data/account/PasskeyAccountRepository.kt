@@ -25,6 +25,7 @@ import app.logdate.shared.model.PasskeyAssertionResponse
 import app.logdate.shared.model.PasskeyAuthenticationOptions
 import app.logdate.shared.model.PasskeyCredentialResponse
 import app.logdate.shared.model.ServerCapability
+import app.logdate.shared.model.ServerProtocolFeature
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -47,6 +48,7 @@ class DefaultPasskeyAccountRepository(
     private val platformAccountManager: PlatformAccountManager,
     private val configRepository: LogDateConfigRepository,
     private val canonicalOwnerProvider: CanonicalOwnerProvider,
+    private val hasLocalData: suspend () -> Boolean,
     private val googleSignInManager: GoogleSignInManager = NoOpGoogleSignInManager(),
     private val serverClientId: String = "",
     private val repositoryScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
@@ -99,6 +101,7 @@ class DefaultPasskeyAccountRepository(
 
     override suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> {
         return try {
+            requireCanonicalOwnerBinding()
             // Step 1: Begin account creation
             val canonicalOwnerId = canonicalOwnerProvider.getCanonicalOwnerId()
             val beginRequest =
@@ -192,6 +195,7 @@ class DefaultPasskeyAccountRepository(
 
     override suspend fun authenticateWithPasskey(username: String?): Result<LogDateAccount> {
         return try {
+            requireCanonicalOwnerBinding()
             // Step 1: Begin authentication
             val beginRequest = BeginAuthenticationRequest(username = username)
             val beginResult = apiClient.beginAuthentication(beginRequest)
@@ -276,6 +280,7 @@ class DefaultPasskeyAccountRepository(
         displayName: String?,
     ): Result<LogDateAccount> {
         return try {
+            requireCanonicalOwnerBinding()
             val canonicalOwnerId = canonicalOwnerProvider.getCanonicalOwnerId()
             val tokenResult = googleSignInManager.getGoogleIdToken(serverClientId)
             if (tokenResult.isFailure) {
@@ -313,6 +318,7 @@ class DefaultPasskeyAccountRepository(
 
     override suspend fun signInWithGoogle(): Result<LogDateAccount> {
         return try {
+            requireCanonicalOwnerBinding()
             val tokenResult = googleSignInManager.getGoogleIdToken(serverClientId)
             if (tokenResult.isFailure) {
                 return Result.failure(tokenResult.exceptionOrNull()!!)
@@ -380,8 +386,12 @@ class DefaultPasskeyAccountRepository(
         _isAuthenticated.value = true
     }
 
-    private suspend fun belongsToCanonicalOwner(account: LogDateAccount): Boolean =
-        canonicalOwnerProvider.adoptRemoteOwnerIfUninitialized(account.id.toString())
+    private suspend fun belongsToCanonicalOwner(account: LogDateAccount): Boolean {
+        if (runCatching { hasLocalData() }.getOrDefault(true)) {
+            return account.id.toString() == canonicalOwnerProvider.getCanonicalOwnerId()
+        }
+        return canonicalOwnerProvider.adoptRemoteOwnerIfUninitialized(account.id.toString())
+    }
 
     private suspend fun sessionBelongsToCanonicalOwner(session: UserSession): Boolean =
         runCatching { session.accountId == canonicalOwnerProvider.getCanonicalOwnerId() }.getOrDefault(false)
@@ -399,18 +409,18 @@ class DefaultPasskeyAccountRepository(
 
             sessionStorage.clearSession()
 
-            // Clear tokens from platform account manager but keep account info
+            // A LogDate installation has one canonical identity. Remove the platform account
+            // rather than leaving an origin-scoped blank account that can later be mistaken for
+            // another selectable identity.
             if (currentAccountValue != null) {
                 val platformResult =
-                    platformAccountManager.updateTokens(
+                    platformAccountManager.removeAccount(
                         username = currentAccountValue.username,
                         backendUrl = configRepository.getCurrentBackendUrl(),
-                        accessToken = "",
-                        refreshToken = "",
                     )
 
                 if (platformResult.isFailure) {
-                    Napier.w("Failed to clear tokens in platform account manager", platformResult.exceptionOrNull())
+                    Napier.w("Failed to remove platform account on sign-out", platformResult.exceptionOrNull())
                 }
             }
 
@@ -615,6 +625,9 @@ class DefaultPasskeyAccountRepository(
     }
 
     override suspend fun signInWithRestoreKey(): Result<LogDateAccount> {
+        if (!currentServerSupportsCanonicalOwnerBinding()) {
+            return Result.failure(UnsupportedCanonicalOwnerBindingException())
+        }
         val serverDescriptor = configRepository.getCurrentServerDescriptor()
         if (serverDescriptor != null && !serverDescriptor.hasCapability(ServerCapability.AUTH_PASSKEY)) {
             return Result.failure(Exception("Server does not support passkey authentication"))
@@ -688,6 +701,26 @@ class DefaultPasskeyAccountRepository(
             Result.failure(e)
         }
     }
+
+    private fun requireCanonicalOwnerBinding() {
+        if (!currentServerSupportsCanonicalOwnerBinding()) {
+            throw UnsupportedCanonicalOwnerBindingException()
+        }
+    }
+
+    private fun currentServerSupportsCanonicalOwnerBinding(): Boolean {
+        if (configRepository.getCurrentBackendUrl() == app.logdate.shared.config.DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL) {
+            return true
+        }
+        return configRepository
+            .getCurrentServerDescriptor()
+            ?.hasProtocolFeature(ServerProtocolFeature.CANONICAL_OWNER_BINDING_V1) == true
+    }
+
+    private class UnsupportedCanonicalOwnerBindingException :
+        IllegalStateException(
+            "This LogDate server does not support the required single-identity protocol",
+        )
 
     override suspend fun deleteRestoreKey(): Result<Unit> =
         restoreCredentialManager

@@ -79,6 +79,7 @@ import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.repository.user.devices.UserDeviceRepository
 import app.logdate.shared.config.configModule
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -218,6 +219,14 @@ actual val dataModule: Module =
                 platformAccountManager = get(),
                 configRepository = get(),
                 canonicalOwnerProvider = get(),
+                hasLocalData = {
+                    val journals = get<JournalRepository>()
+                    val notes = get<JournalNotesRepository>()
+                    journals.allJournalsObserved.first().isNotEmpty() ||
+                        notes.allNotesObserved.first().isNotEmpty() ||
+                        journals.getAllDrafts().isNotEmpty() ||
+                        notes.getAllJournalNoteLinks().isNotEmpty()
+                },
             )
         }
 

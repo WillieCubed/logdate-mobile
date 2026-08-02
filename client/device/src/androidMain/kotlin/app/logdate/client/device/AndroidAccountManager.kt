@@ -40,8 +40,13 @@ class AndroidAccountManager(
     ): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
-                val systemAccount = Account(account.username, ACCOUNT_TYPE)
                 val backendAwareAccount = Account(accountKey(account.username, backendUrl), ACCOUNT_TYPE)
+
+                // The OS AccountManager is an implementation detail, not an account chooser.
+                // Remove stale LogDate entries before recording the sole canonical identity.
+                accountManager.getAccountsByType(ACCOUNT_TYPE).forEach { existing ->
+                    accountManager.removeAccountExplicitly(existing)
+                }
 
                 // Prepare user data
                 val userData =
