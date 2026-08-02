@@ -864,6 +864,21 @@ expect_failure() {
     pass
 }
 
+jq 'del(.android_signing_certificates.play_app_signing)' \
+    "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/staging-only-signing.json"
+STAGING_ONLY_OUT="$TMP_DIR/staging-only.out"
+STAGING_ONLY_ERR="$TMP_DIR/staging-only.err"
+set +e
+run_renderer staging "$RELEASE_SHA" staging-only-signing.json "$STAGING_ONLY_OUT" "$STAGING_ONLY_ERR"
+staging_only_status=$?
+set -e
+assert_exit_code 0 "$staging_only_status"
+assert_zero_bytes "$STAGING_ONLY_ERR"
+assert_equals "staging" "$(jq -r '.android_signing.certificates | keys | join(",")' "$STAGING_ONLY_OUT")"
+assert_equals \
+    "$(jq -r '[.canonical_origin, .android_signing.certificates.staging.apk_key_hash_origin] | join(",")' "$STAGING_ONLY_OUT")" \
+    "$(jq -r '.env_vars.WEBAUTHN_ALLOWED_ORIGINS' "$STAGING_ONLY_OUT")"
+
 jq '(.android_signing_certificates[].fingerprint) |= ascii_downcase' \
     "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/lowercase-staging-signing.json"
 LOWERCASE_STAGING_OUT="$TMP_DIR/lowercase-staging-signing.out"
@@ -1074,9 +1089,6 @@ expect_failure missing-upload-set production "$RELEASE_SHA" missing-upload-set.j
 jq '.android_signing_certificates.play_app_signing = .android_signing_certificates.upload' "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/duplicate-production-set.json"
 expect_failure duplicate-production-set production "$RELEASE_SHA" duplicate-production-set.json "production upload and Play app-signing certificates must be distinct"
 
-jq 'del(.android_signing_certificates.play_app_signing)' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/missing-play-staging-set.json"
-expect_failure missing-play-staging-set staging "$RELEASE_SHA" missing-play-staging-set.json "staging requires exactly staging and play_app_signing signing certificates"
-
 jq '.android_signing_certificates.play_app_signing = .android_signing_certificates.staging' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/duplicate-staging-set.json"
 expect_failure duplicate-staging-set staging "$RELEASE_SHA" duplicate-staging-set.json "staging and Play app-signing certificates must be distinct"
 
@@ -1102,7 +1114,7 @@ jq '.android_signing_certificates.upload = {"fingerprint":"F0:F1:F2:F3:F4:F5:F6:
 expect_failure wrapping-sequential-production-set production "$RELEASE_SHA" wrapping-sequential-production-set.json "production certificate sets may not contain placeholder certificates"
 
 jq '.android_signing_certificates.upload = .android_signing_certificates.staging' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/unexpected-staging-role.json"
-expect_failure unexpected-staging-role staging "$RELEASE_SHA" unexpected-staging-role.json "staging requires exactly staging and play_app_signing signing certificates"
+expect_failure unexpected-staging-role staging "$RELEASE_SHA" unexpected-staging-role.json "staging requires a staging signer and may include the Play app-signing certificate"
 
 while IFS= read -r data_dir; do
     [[ ! -e "$data_dir" ]] || fail "expected renderer temporary directory to be removed: $data_dir"

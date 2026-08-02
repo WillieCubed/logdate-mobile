@@ -67,8 +67,16 @@ val resolvedPlayTrack: String =
  * local assembles don't fail on developer machines. CI *must* set all four to produce a
  * Play-publishable APK/AAB.
  */
+val releaseEnvironmentVariables =
+    mapOf(
+        "storeFile" to "LOGDATE_RELEASE_STORE_FILE",
+        "storePassword" to "LOGDATE_RELEASE_STORE_PASSWORD",
+        "keyAlias" to "LOGDATE_RELEASE_KEY_ALIAS",
+        "keyPassword" to "LOGDATE_RELEASE_KEY_PASSWORD",
+    )
+
 fun resolveRelease(prop: String): String? =
-    System.getenv("LOGDATE_RELEASE_${prop.uppercase()}")
+    System.getenv(requireNotNull(releaseEnvironmentVariables[prop]))
         ?: providers.gradleProperty("logdate.release.$prop").orNull
 
 val releaseStoreFile: String? = resolveRelease("storeFile")
