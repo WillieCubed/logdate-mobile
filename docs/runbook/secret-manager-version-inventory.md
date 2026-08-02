@@ -25,4 +25,4 @@ The workflow is inventory-only: it cannot run migrations, modify Cloud Run, or
 alter traffic. It fails if the environment is not exactly `staging` or
 `production`, if the active gcloud principal/project does not match the
 selected environment, or if Google Cloud cannot list the requested metadata.
-This check verifies the active identity and target project; it does not prove environment isolation beyond that configured identity/project pairing.
+This check verifies the active principal and explicit target-project access; it does not prove environment isolation beyond that configured identity/project pairing.

@@ -40,16 +40,16 @@ WORK_DIR="$(mktemp -d)"
 chmod 700 "$WORK_DIR"
 
 ACTIVE_PRINCIPAL_FILE="$WORK_DIR/active-principal"
-ACTIVE_PROJECT_FILE="$WORK_DIR/active-project"
+TARGET_PROJECT_FILE="$WORK_DIR/target-project"
 gcloud auth list --filter='status:ACTIVE' --format='value(account)' --quiet >"$ACTIVE_PRINCIPAL_FILE"
-gcloud config get-value project --quiet >"$ACTIVE_PROJECT_FILE"
+gcloud projects describe "$PROJECT_ID" --format='value(projectId)' --quiet >"$TARGET_PROJECT_FILE"
 
 ACTIVE_PRINCIPAL="$(LC_ALL=C sort -u "$ACTIVE_PRINCIPAL_FILE")"
-ACTIVE_PROJECT="$(LC_ALL=C sort -u "$ACTIVE_PROJECT_FILE")"
+TARGET_PROJECT="$(LC_ALL=C sort -u "$TARGET_PROJECT_FILE")"
 EXPECTED_PRINCIPAL="github-deploy@${PROJECT_ID}.iam.gserviceaccount.com"
 
 [[ "$ACTIVE_PRINCIPAL" == "$EXPECTED_PRINCIPAL" ]] || die 'authenticated principal does not match the expected GitHub deploy identity.'
-[[ "$ACTIVE_PROJECT" == "$PROJECT_ID" ]] || die 'active project does not match the selected environment.'
+[[ "$TARGET_PROJECT" == "$PROJECT_ID" ]] || die 'target project does not match the selected environment.'
 
 printf 'environment=%s\nproject_id=%s\nauthenticated_principal=%s\n' \
     "$ENVIRONMENT" "$PROJECT_ID" "$ACTIVE_PRINCIPAL"

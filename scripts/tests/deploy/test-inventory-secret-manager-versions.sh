@@ -29,8 +29,8 @@ case "$*" in
     "auth list --filter=status:ACTIVE --format=value(account) --quiet")
         printf '%s\n' "$principal"
         ;;
-    "config get-value project --quiet")
-        printf '%s\n' "$project"
+    "projects describe $project --format=value(projectId) --quiet")
+        printf '%s\n' "${GCLOUD_DESCRIBED_PROJECT:-$project}"
         ;;
     "secrets versions list logdate-db-url --project $project"*)
         printf 'projects/%s/secrets/logdate-db-url/versions/10\nprojects/%s/secrets/logdate-db-url/versions/2\nprojects/%s/secrets/logdate-db-url/versions/1\n' \
@@ -117,7 +117,7 @@ assert_fails() {
 }
 
 assert_fails 'authenticated principal does not match' env GCLOUD_FAKE_PRINCIPAL='unexpected@example.invalid' "$SCRIPT" --environment staging
-assert_fails 'active project does not match' env GCLOUD_FAKE_PROJECT=logdate GCLOUD_FAKE_PRINCIPAL=github-deploy@logdate-dev.iam.gserviceaccount.com "$SCRIPT" --environment staging
+assert_fails 'target project does not match' env GCLOUD_DESCRIBED_PROJECT=logdate "$SCRIPT" --environment staging
 assert_fails 'invalid enabled version resource name' env GCLOUD_VERSION_PROJECT=logdate "$SCRIPT" --environment staging
 assert_fails 'no enabled numeric version' env GCLOUD_EMPTY_SECRET=logdate-health-internal-token "$SCRIPT" --environment staging
 assert_fails 'environment must be staging or production' "$SCRIPT" --environment unexpected
@@ -131,6 +131,7 @@ assert_not_contains 'secrets delete' "$command_log"
 assert_not_contains 'run deploy' "$command_log"
 assert_not_contains 'run services' "$command_log"
 assert_not_contains 'sql ' "$command_log"
+assert_not_contains 'config get-value project' "$command_log"
 
 assert_file_contains 'workflow_dispatch:' "$WORKFLOW"
 # Literal GitHub Actions expression under test.
@@ -139,6 +140,8 @@ assert_file_contains "environment: "'${{ inputs.environment }}' "$WORKFLOW"
 assert_file_contains 'id-token: write' "$WORKFLOW"
 assert_file_contains 'google-github-actions/auth@v3' "$WORKFLOW"
 assert_file_contains 'inventory-secret-manager-versions.sh' "$WORKFLOW"
+assert_file_contains '::error::Secret Manager metadata inventory failed.' "$WORKFLOW"
+assert_file_contains 'GITHUB_STEP_SUMMARY' "$WORKFLOW"
 assert_file_not_contains 'gcloud run' "$WORKFLOW"
 assert_file_not_contains 'run-migrations.sh' "$WORKFLOW"
 assert_file_not_contains 'secrets versions access' "$WORKFLOW"
