@@ -209,6 +209,7 @@ jobs:
             exit 1
           fi
           echo "Deploying immutable image: $IMAGE_URI"
+          gcloud artifacts docker images describe "$IMAGE_URI" --format='value(image_summary.digest)'
           ENV_VARS_FILE="$(mktemp "${RUNNER_TEMP}/logdate-cloud-run-env.XXXXXX.yaml")"
           chmod 600 "$ENV_VARS_FILE"
           jq -c '.env_vars' "$CONTRACT_FILE" >"$ENV_VARS_FILE"
