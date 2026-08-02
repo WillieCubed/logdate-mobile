@@ -315,7 +315,9 @@ jobs:
           : >"$INVOKER_TOKEN_FILE"
           : >"$SMOKE_STATE_FILE"
           chmod 600 "$INVOKER_TOKEN_FILE" "$SMOKE_STATE_FILE"
-          gcloud auth print-identity-token --audiences "$REVISION_URL" >"$INVOKER_TOKEN_FILE"
+          gcloud auth print-identity-token \
+            --impersonate-service-account "$RUNTIME_SERVICE_ACCOUNT" \
+            --audiences "$REVISION_URL" >"$INVOKER_TOKEN_FILE"
           test -s "$INVOKER_TOKEN_FILE"
           HEALTH_INTERNAL_TOKEN="$(
             gcloud secrets versions access \
