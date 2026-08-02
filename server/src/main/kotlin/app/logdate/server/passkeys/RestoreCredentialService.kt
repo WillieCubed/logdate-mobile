@@ -7,6 +7,7 @@ import app.logdate.shared.model.PasskeyChallenge
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyRegistrationResponse
 import app.logdate.shared.model.PasskeyUser
+import app.logdate.shared.model.PublicKeyCredentialParameter
 import com.webauthn4j.WebAuthnManager
 import com.webauthn4j.converter.AttestedCredentialDataConverter
 import com.webauthn4j.converter.exception.DataConversionException
@@ -101,6 +102,13 @@ class RestoreCredentialService(
                     id = Base64.getEncoder().encodeToString(userId.toString().toByteArray()),
                     name = username,
                     displayName = displayName,
+                ),
+            pubKeyCredParams =
+                listOf(
+                    PublicKeyCredentialParameter(
+                        type = "public-key",
+                        alg = -7,
+                    ),
                 ),
             excludeCredentials = excludeCredentials,
             timeout = 300_000L,

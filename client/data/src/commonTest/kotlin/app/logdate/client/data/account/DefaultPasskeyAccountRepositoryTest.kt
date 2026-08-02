@@ -26,6 +26,7 @@ import app.logdate.shared.model.PasskeyAuthenticationOptions
 import app.logdate.shared.model.PasskeyCapabilities
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyUser
+import app.logdate.shared.model.PublicKeyCredentialParameter
 import app.logdate.shared.model.UsernameAvailabilityData
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -628,6 +629,13 @@ class DefaultPasskeyAccountRepositoryTest {
                                     id = "user123",
                                     name = "testuser",
                                     displayName = "Test User",
+                                ),
+                            pubKeyCredParams =
+                                listOf(
+                                    PublicKeyCredentialParameter(
+                                        type = "public-key",
+                                        alg = -7,
+                                    ),
                                 ),
                             timeout = 300000,
                         ),

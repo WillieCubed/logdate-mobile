@@ -18,11 +18,18 @@ data class PasskeyInfo(
 )
 
 @Serializable
+data class PublicKeyCredentialParameter(
+    val type: String,
+    val alg: Int,
+)
+
+@Serializable
 data class PasskeyRegistrationOptions(
     val challenge: String,
     val rpId: String,
     val rpName: String,
     val user: PasskeyUser,
+    val pubKeyCredParams: List<PublicKeyCredentialParameter>,
     val excludeCredentials: List<String> = emptyList(),
     val timeout: Long = 300_000,
 )

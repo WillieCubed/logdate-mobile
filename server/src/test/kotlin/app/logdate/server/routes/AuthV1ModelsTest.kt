@@ -46,6 +46,13 @@ class AuthV1ModelsTest {
                         user =
                             app.logdate.shared.model
                                 .PasskeyUser("1", "u", "U"),
+                        pubKeyCredParams =
+                            listOf(
+                                app.logdate.shared.model.PublicKeyCredentialParameter(
+                                    type = "public-key",
+                                    alg = -7,
+                                ),
+                            ),
                     ),
             )
         val signupBeginResp = SignupPasskeyBeginResponse(success = true, data = signupBeginData)
@@ -182,6 +189,13 @@ class AuthV1ModelsTest {
                 user =
                     app.logdate.shared.model
                         .PasskeyUser("u1", "user_a", "User A"),
+                pubKeyCredParams =
+                    listOf(
+                        app.logdate.shared.model.PublicKeyCredentialParameter(
+                            type = "public-key",
+                            alg = -7,
+                        ),
+                    ),
             )
         val signupBeginData = SignupPasskeyBeginData("session", registrationOptions)
         val signupBeginResp = SignupPasskeyBeginResponse(true, signupBeginData)

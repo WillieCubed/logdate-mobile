@@ -3,8 +3,13 @@ package app.logdate.server.passkeys
 import app.logdate.shared.model.AuthenticatorAssertionResponse
 import app.logdate.shared.model.AuthenticatorAttestationResponse
 import app.logdate.shared.model.PasskeyAuthenticationResponse
+import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyRegistrationResponse
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,6 +34,25 @@ class WebAuthnVerificationTest {
     @BeforeTest
     fun setup() {
         passkeyService = SimplePasskeyService()
+    }
+
+    @Test
+    fun `simple registration options advertise ES256 so test flows match the production contract`() {
+        val options = passkeyService.generateRegistrationOptions(Uuid.random(), "es256_user", "ES256 User")
+        val parameters =
+            Json
+                .encodeToJsonElement(PasskeyRegistrationOptions.serializer(), options)
+                .jsonObject["pubKeyCredParams"]
+                ?.jsonArray
+
+        assertTrue(
+            parameters?.any { parameter ->
+                val fields = parameter.jsonObject
+                fields["type"]?.jsonPrimitive?.content == "public-key" &&
+                    fields["alg"]?.jsonPrimitive?.content == "-7"
+            } == true,
+            "Simple registration options must advertise the ES256 algorithm",
+        )
     }
 
     @Test

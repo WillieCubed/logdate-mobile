@@ -7,6 +7,7 @@ import app.logdate.shared.model.PasskeyInfo
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyRegistrationResponse
 import app.logdate.shared.model.PasskeyUser
+import app.logdate.shared.model.PublicKeyCredentialParameter
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
@@ -57,6 +58,13 @@ class SimplePasskeyService(
                     id = userId.toString(),
                     name = username,
                     displayName = displayName,
+                ),
+            pubKeyCredParams =
+                listOf(
+                    PublicKeyCredentialParameter(
+                        type = "public-key",
+                        alg = -7,
+                    ),
                 ),
             excludeCredentials = getExistingCredentialsForUser(userId),
             timeout = 300_000L,

@@ -8,6 +8,7 @@ import app.logdate.shared.model.PasskeyChallenge
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyRegistrationResponse
 import app.logdate.shared.model.PasskeyUser
+import app.logdate.shared.model.PublicKeyCredentialParameter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -96,6 +97,13 @@ class SimplePasskeyTest {
                 rpId = "logdate.app",
                 rpName = "LogDate",
                 user = user,
+                pubKeyCredParams =
+                    listOf(
+                        PublicKeyCredentialParameter(
+                            type = "public-key",
+                            alg = -7,
+                        ),
+                    ),
             )
 
         assertEquals("Y2hhbGxlbmdl", options.challenge)

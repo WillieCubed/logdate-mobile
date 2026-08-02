@@ -4,6 +4,7 @@ import app.logdate.shared.model.AuthenticatorAssertionResponse
 import app.logdate.shared.model.AuthenticatorAttestationResponse
 import app.logdate.shared.model.PasskeyAuthenticationResponse
 import app.logdate.shared.model.PasskeyChallenge
+import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyRegistrationResponse
 import com.webauthn4j.WebAuthnManager
 import com.webauthn4j.converter.AttestedCredentialDataConverter
@@ -23,6 +24,10 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -722,6 +727,29 @@ class RestoreCredentialServiceBehaviorContractTest {
     // -----------------------------------------------------------------------
     // Registration options — generate options shape
     // -----------------------------------------------------------------------
+
+    @Test
+    fun `restore registration options advertise ES256 so recovery credentials can be prepared`() {
+        val repository = mockk<RestoreCredentialRepository>()
+        coEvery { repository.getCredentialIdsForUser(any()) } returns emptyList()
+        val service = RestoreCredentialService(restoreCredentialRepository = repository)
+
+        val options = service.generateRegistrationOptions(Uuid.random(), "recovery_user", "Recovery User")
+        val parameters =
+            Json
+                .encodeToJsonElement(PasskeyRegistrationOptions.serializer(), options)
+                .jsonObject["pubKeyCredParams"]
+                ?.jsonArray
+
+        assertTrue(
+            parameters?.any { parameter ->
+                val fields = parameter.jsonObject
+                fields["type"]?.jsonPrimitive?.content == "public-key" &&
+                    fields["alg"]?.jsonPrimitive?.content == "-7"
+            } == true,
+            "Restore registration options must advertise the ES256 algorithm",
+        )
+    }
 
     @Test
     fun `generateRegistrationOptions returns expected shape`() {

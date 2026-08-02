@@ -46,6 +46,37 @@ class AuthV1RoutesTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun `signup passkey begin advertises ES256 so WebAuthn preparation can create a credential`() =
+        testApplication {
+            configureAuthV1TestApp()
+
+            val response =
+                client.post("/api/v1/auth/signup/passkey/begin") {
+                    contentType(ContentType.Application.Json)
+                    setBody(signupPasskeyBeginBody(username = "es256_user", displayName = "ES256 User"))
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val payload = json.parseToJsonElement(response.bodyAsText()).jsonObject
+            val parameters =
+                payload["data"]
+                    ?.jsonObject
+                    ?.get("registrationOptions")
+                    ?.jsonObject
+                    ?.get("pubKeyCredParams")
+                    ?.jsonArray
+
+            assertTrue(
+                parameters?.any { parameter ->
+                    val fields = parameter.jsonObject
+                    fields["type"]?.jsonPrimitive?.content == "public-key" &&
+                        fields["alg"]?.jsonPrimitive?.content == "-7"
+                } == true,
+                "Signup registration options must advertise the ES256 algorithm",
+            )
+        }
+
+    @Test
     fun `google signup creates account and returns tokens`() =
         testApplication {
             configureAuthV1TestApp(
