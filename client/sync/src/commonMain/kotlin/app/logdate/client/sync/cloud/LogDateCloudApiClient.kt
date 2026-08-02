@@ -837,6 +837,123 @@ class LogDateCloudApiClient(
             )
         }
 
+    override suspend fun uploadBackup(
+        accessToken: String,
+        backup: BackupUploadRequest,
+    ): Result<BackupUploadResponse> =
+        try {
+            val baseUrl = getBaseUrl()
+            val response =
+                httpClient.post("$baseUrl/backups") {
+                    headers.append("Authorization", "Bearer $accessToken")
+                    setBody(
+                        MultiPartFormDataContent(
+                            formData {
+                                append("deviceId", backup.deviceId)
+                                append("manifest", backup.manifest)
+                                append(
+                                    key = "data",
+                                    value = backup.data,
+                                    headers =
+                                        Headers.build {
+                                            append(HttpHeaders.ContentDisposition, "filename=\"backup.bin\"")
+                                            append(HttpHeaders.ContentType, ContentType.Application.OctetStream.toString())
+                                        },
+                                )
+                            },
+                        ),
+                    )
+                }
+
+            when (response.status) {
+                HttpStatusCode.Created -> Result.success(response.body<BackupUploadResponse>())
+                else -> handleApiError(response)
+            }
+        } catch (e: Exception) {
+            Napier.e("Failed to upload backup", e)
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to upload backup: ${e.message}", cause = e))
+        }
+
+    override suspend fun listBackups(accessToken: String): Result<BackupListResponse> =
+        try {
+            val response =
+                httpClient.get("${getBaseUrl()}/backups") {
+                    headers.append("Authorization", "Bearer $accessToken")
+                }
+            when (response.status) {
+                HttpStatusCode.OK -> Result.success(response.body<BackupListResponse>())
+                else -> handleApiError(response)
+            }
+        } catch (e: Exception) {
+            Napier.e("Failed to list backups", e)
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to list backups: ${e.message}", cause = e))
+        }
+
+    override suspend fun getBackup(
+        accessToken: String,
+        backupId: String,
+    ): Result<BackupInfoResponse> =
+        try {
+            val response =
+                httpClient.get("${getBaseUrl()}/backups/$backupId") {
+                    headers.append("Authorization", "Bearer $accessToken")
+                }
+            when (response.status) {
+                HttpStatusCode.OK -> Result.success(response.body<BackupInfoResponse>())
+                else -> handleApiError(response)
+            }
+        } catch (e: Exception) {
+            Napier.e("Failed to get backup metadata", e)
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to get backup metadata: ${e.message}", cause = e))
+        }
+
+    override suspend fun downloadBackup(
+        accessToken: String,
+        backupId: String,
+    ): Result<BackupDownloadResponse> =
+        try {
+            // Resolve the backend once so a user changing server settings cannot combine metadata
+            // from one server with bytes from another during this two-request operation.
+            val baseUrl = getBaseUrl()
+            val metadataResponse =
+                httpClient.get("$baseUrl/backups/$backupId") {
+                    headers.append("Authorization", "Bearer $accessToken")
+                }
+            if (metadataResponse.status != HttpStatusCode.OK) {
+                return handleApiError(metadataResponse)
+            }
+            val metadata = metadataResponse.body<BackupInfoResponse>()
+            val binaryResponse =
+                httpClient.get("$baseUrl/backups/$backupId/binary") {
+                    headers.append("Authorization", "Bearer $accessToken")
+                }
+            when (binaryResponse.status) {
+                HttpStatusCode.OK -> Result.success(BackupDownloadResponse(metadata, binaryResponse.body<ByteArray>()))
+                else -> handleApiError(binaryResponse)
+            }
+        } catch (e: Exception) {
+            Napier.e("Failed to download backup", e)
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to download backup: ${e.message}", cause = e))
+        }
+
+    override suspend fun deleteBackup(
+        accessToken: String,
+        backupId: String,
+    ): Result<Unit> =
+        try {
+            val response =
+                httpClient.delete("${getBaseUrl()}/backups/$backupId") {
+                    headers.append("Authorization", "Bearer $accessToken")
+                }
+            when (response.status) {
+                HttpStatusCode.NoContent -> Result.success(Unit)
+                else -> handleApiError(response)
+            }
+        } catch (e: Exception) {
+            Napier.e("Failed to delete backup", e)
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to delete backup: ${e.message}", cause = e))
+        }
+
     // No custom HttpClient needed as we use the app's shared httpClient
 }
 

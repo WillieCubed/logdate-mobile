@@ -23,6 +23,11 @@ import app.logdate.client.sync.cloud.AssociationChangesResponse
 import app.logdate.client.sync.cloud.AssociationDeleteRequest
 import app.logdate.client.sync.cloud.AssociationUploadRequest
 import app.logdate.client.sync.cloud.AssociationUploadResponse
+import app.logdate.client.sync.cloud.BackupDownloadResponse
+import app.logdate.client.sync.cloud.BackupInfoResponse
+import app.logdate.client.sync.cloud.BackupListResponse
+import app.logdate.client.sync.cloud.BackupUploadRequest
+import app.logdate.client.sync.cloud.BackupUploadResponse
 import app.logdate.client.sync.cloud.CheckUsernameAvailabilityResponse
 import app.logdate.client.sync.cloud.CloudApiClient
 import app.logdate.client.sync.cloud.CloudAssociationDataSource
@@ -286,6 +291,18 @@ open class FakeCloudApiClient : CloudApiClient {
 
     var deleteDraftResponse: Result<Unit> = Result.success(Unit)
 
+    var uploadBackupResponse: Result<BackupUploadResponse> =
+        Result.success(BackupUploadResponse("backup-id", 1L, 0L))
+    var listBackupsResponse: Result<BackupListResponse> = Result.success(BackupListResponse(emptyList()))
+    var downloadBackupResponse: Result<BackupDownloadResponse> =
+        Result.success(
+            BackupDownloadResponse(
+                BackupInfoResponse("backup-id", "device-id", "{}", 1L, 0L, ""),
+                byteArrayOf(),
+            ),
+        )
+    var deleteBackupResponse: Result<Unit> = Result.success(Unit)
+
     val methodCalls = mutableListOf<String>()
     val uploadContentCalls = mutableListOf<Pair<String, ContentUploadRequest>>()
     val updateContentCalls = mutableListOf<Triple<String, String, ContentUpdateRequest>>()
@@ -474,6 +491,35 @@ open class FakeCloudApiClient : CloudApiClient {
         methodCalls.add("downloadMedia")
         downloadMediaCalls.add(accessToken to mediaId)
         return downloadMediaResponse
+    }
+
+    override suspend fun uploadBackup(
+        accessToken: String,
+        backup: BackupUploadRequest,
+    ): Result<BackupUploadResponse> {
+        methodCalls.add("uploadBackup")
+        return uploadBackupResponse
+    }
+
+    override suspend fun listBackups(accessToken: String): Result<BackupListResponse> {
+        methodCalls.add("listBackups")
+        return listBackupsResponse
+    }
+
+    override suspend fun downloadBackup(
+        accessToken: String,
+        backupId: String,
+    ): Result<BackupDownloadResponse> {
+        methodCalls.add("downloadBackup")
+        return downloadBackupResponse
+    }
+
+    override suspend fun deleteBackup(
+        accessToken: String,
+        backupId: String,
+    ): Result<Unit> {
+        methodCalls.add("deleteBackup")
+        return deleteBackupResponse
     }
 
     fun reset() {

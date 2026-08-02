@@ -198,6 +198,35 @@ interface CloudApiClient {
         accessToken: String,
         mediaId: String,
     ): Result<MediaDownloadResponse>
+
+    // Encrypted device backup operations. The server receives the payload over TLS and
+    // encrypts it before persisting it; callers must still treat the bytes as sensitive.
+    suspend fun uploadBackup(
+        accessToken: String,
+        backup: BackupUploadRequest,
+    ): Result<BackupUploadResponse> =
+        Result.failure(UnsupportedOperationException("Backup uploads are not supported by this cloud client"))
+
+    suspend fun listBackups(accessToken: String): Result<BackupListResponse> =
+        Result.failure(UnsupportedOperationException("Backup listing is not supported by this cloud client"))
+
+    suspend fun getBackup(
+        accessToken: String,
+        backupId: String,
+    ): Result<BackupInfoResponse> =
+        Result.failure(UnsupportedOperationException("Backup metadata is not supported by this cloud client"))
+
+    suspend fun downloadBackup(
+        accessToken: String,
+        backupId: String,
+    ): Result<BackupDownloadResponse> =
+        Result.failure(UnsupportedOperationException("Backup downloads are not supported by this cloud client"))
+
+    suspend fun deleteBackup(
+        accessToken: String,
+        backupId: String,
+    ): Result<Unit> =
+        Result.failure(UnsupportedOperationException("Backup deletion is not supported by this cloud client"))
 }
 
 /**

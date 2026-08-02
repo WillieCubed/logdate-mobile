@@ -34,6 +34,25 @@ typealias MediaUploadResponse = app.logdate.shared.model.sync.MediaUploadRespons
 typealias MediaMetadataResponse = app.logdate.shared.model.sync.MediaMetadataResponse
 typealias MediaDownloadResponse = app.logdate.shared.model.sync.MediaDownloadResponse
 
+typealias BackupUploadRequest = app.logdate.shared.model.sync.BackupUploadRequest
+typealias BackupUploadResponse = app.logdate.shared.model.sync.BackupUploadResponse
+typealias BackupInfoResponse = app.logdate.shared.model.sync.BackupInfoResponse
+typealias BackupListResponse = app.logdate.shared.model.sync.BackupListResponse
+
+/** Metadata and plaintext backup bytes returned by the authenticated download flow. */
+data class BackupDownloadResponse(
+    val metadata: BackupInfoResponse,
+    val data: ByteArray,
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is BackupDownloadResponse) return false
+        return metadata == other.metadata && data.contentEquals(other.data)
+    }
+
+    override fun hashCode(): Int = 31 * metadata.hashCode() + data.contentHashCode()
+}
+
 typealias DraftUploadRequest = app.logdate.shared.model.sync.DraftUploadRequest
 typealias DraftUploadResponse = app.logdate.shared.model.sync.DraftUploadResponse
 typealias DraftChangesResponse = app.logdate.shared.model.sync.DraftChangesResponse
