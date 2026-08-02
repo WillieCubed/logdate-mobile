@@ -170,9 +170,6 @@ actual fun CameraCaptureContent(
 
     val hasPermissions = cameraPermissions.allPermissionsGranted
 
-    // Track review state locally — media is only committed on "Use"
-    var pendingReview by remember { mutableStateOf<PendingReview?>(null) }
-
     LaunchedEffect(uiState.capturedMediaUri) {
         uiState.capturedMediaUri?.let { uri ->
             val mediaType = uiState.capturedMediaType ?: CapturedMediaType.PHOTO
@@ -180,10 +177,8 @@ actual fun CameraCaptureContent(
             if (remoteControl.autoAcceptCapturedMedia) {
                 currentOnMediaCaptured(uri, mediaType, duration)
                 remoteControl.onCaptureCompleted(uri, mediaType)
-            } else {
-                pendingReview = PendingReview(uri, mediaType, duration)
+                viewModel.clearCapturedMedia()
             }
-            viewModel.clearCapturedMedia()
         }
     }
 
@@ -224,15 +219,17 @@ actual fun CameraCaptureContent(
             onRequestPermission = { cameraPermissions.launchMultiplePermissionRequest() },
             modifier = modifier,
         )
-    } else if (pendingReview != null) {
-        val review = pendingReview!!
+    } else if (uiState.capturedMediaUri != null) {
+        val reviewUri = uiState.capturedMediaUri!!
+        val reviewMediaType = uiState.capturedMediaType ?: CapturedMediaType.PHOTO
+        val reviewDuration = if (reviewMediaType == CapturedMediaType.VIDEO) uiState.recordingDurationMs else 0L
         MediaReviewContent(
-            uri = review.uri,
-            mediaType = review.mediaType,
-            onRetake = { pendingReview = null },
+            uri = reviewUri,
+            mediaType = reviewMediaType,
+            onRetake = { viewModel.clearCapturedMedia() },
             onUse = {
-                onMediaCaptured(review.uri, review.mediaType, review.durationMs)
-                pendingReview = null
+                onMediaCaptured(reviewUri, reviewMediaType, reviewDuration)
+                viewModel.clearCapturedMedia()
             },
             modifier = modifier,
         )
@@ -1152,12 +1149,3 @@ private fun Float.pxToDp(): Dp {
     val density = LocalDensity.current
     return with(density) { this@pxToDp.toDp() }
 }
-
-/**
- * Holds captured media pending user review (retake/use decision).
- */
-private data class PendingReview(
-    val uri: String,
-    val mediaType: CapturedMediaType,
-    val durationMs: Long,
-)
