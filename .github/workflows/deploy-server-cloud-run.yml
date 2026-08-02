@@ -185,6 +185,35 @@ jobs:
             --environment "$ENVIRONMENT" \
             --validate-passkey-fk
 
+      - name: Run container startup preflight
+        run: |
+          IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REGISTRY_REPO}/logdate-server:${DEPLOY_SHA}"
+          PREFLIGHT_ENV="$(mktemp "${RUNNER_TEMP}/logdate-preflight-env.XXXXXX")"
+          chmod 600 "$PREFLIGHT_ENV"
+          trap 'rm -f "$PREFLIGHT_ENV"; docker rm -f logdate-startup-preflight >/dev/null 2>&1 || true' EXIT
+          jq -r '.env_vars | to_entries[] | "\(.key)=\(.value)"' "$CONTRACT_FILE" >"$PREFLIGHT_ENV"
+          while IFS=$'\t' read -r key secret_id version; do
+            value="$(gcloud secrets versions access "$version" --secret="$secret_id" --project="$PROJECT_ID")"
+            printf '%s=%s\n' "$key" "$value" >>"$PREFLIGHT_ENV"
+          done < <(jq -r '.secret_env | to_entries[] | [.key, .value.secret_id, .value.version] | @tsv' "$CONTRACT_FILE")
+          docker pull "$IMAGE_URI"
+          docker run -d --name logdate-startup-preflight --publish 18080:8080 --env-file "$PREFLIGHT_ENV" "$IMAGE_URI" >/dev/null
+          for _ in $(seq 1 60); do
+            if curl --fail --silent --show-error --max-time 2 http://127.0.0.1:18080/health >/dev/null; then
+              echo "Container startup preflight passed."
+              exit 0
+            fi
+            if ! docker inspect -f '{{.State.Running}}' logdate-startup-preflight 2>/dev/null | grep -q true; then
+              echo "Container exited before /health became available."
+              docker logs logdate-startup-preflight || true
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "Container did not serve /health within 120 seconds."
+          docker logs logdate-startup-preflight || true
+          exit 1
+
       - name: Configure candidate tag
         run: echo "CANDIDATE_TAG=c-${DEPLOY_SHA:0:12}" >> "$GITHUB_ENV"
 
