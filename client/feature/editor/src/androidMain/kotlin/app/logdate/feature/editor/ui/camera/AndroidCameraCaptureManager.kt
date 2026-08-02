@@ -39,6 +39,8 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,6 +50,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
+import java.util.Collections
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executor
@@ -85,6 +88,8 @@ class AndroidCameraCaptureManager(
     private var previewStreamObserver: Observer<PreviewView.StreamState>? = null
 
     private val mainExecutor: Executor = ContextCompat.getMainExecutor(context)
+    private val captureScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val pendingCaptureFiles = Collections.synchronizedSet(mutableSetOf<File>())
     private val timestampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
 
     /**
@@ -241,24 +246,32 @@ class AndroidCameraCaptureManager(
             val timeStamp = timestampFormat.format(Date())
             val fileName = "LOGDATE_$timeStamp.jpg"
             val captureFile = File(context.cacheDir, "$fileName.${kotlin.uuid.Uuid.random()}.tmp")
+            pendingCaptureFiles += captureFile
             val outputOptions = ImageCapture.OutputFileOptions.Builder(captureFile).build()
 
             return@withContext suspendCancellableCoroutine { continuation ->
-                continuation.invokeOnCancellation { captureFile.delete() }
+                continuation.invokeOnCancellation {
+                    pendingCaptureFiles.remove(captureFile)
+                    captureFile.delete()
+                }
                 capture.takePicture(
                     outputOptions,
                     mainExecutor,
                     object : ImageCapture.OnImageSavedCallback {
                         override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                            CoroutineScope(Dispatchers.IO).launch {
+                            captureScope.launch {
                                 val uri =
-                                    runCatching {
-                                        mediaManager.saveMediaFromFile(captureFile.absolutePath, fileName, "image/jpeg")
-                                    }.getOrElse { error ->
-                                        Napier.e("Photo persistence failed", error)
-                                        null
+                                    try {
+                                        runCatching {
+                                            mediaManager.saveMediaFromFile(captureFile.absolutePath, fileName, "image/jpeg")
+                                        }.getOrElse { error ->
+                                            Napier.e("Photo persistence failed", error)
+                                            null
+                                        }
+                                    } finally {
+                                        pendingCaptureFiles.remove(captureFile)
+                                        captureFile.delete()
                                     }
-                                captureFile.delete()
                                 withContext(Dispatchers.Main.immediate) {
                                     _state.update {
                                         it.copy(
@@ -273,6 +286,7 @@ class AndroidCameraCaptureManager(
 
                         override fun onError(exception: ImageCaptureException) {
                             Napier.e("Photo capture failed", exception)
+                            pendingCaptureFiles.remove(captureFile)
                             captureFile.delete()
                             _state.update { it.copy(error = CameraCaptureError.CaptureFailed) }
                             if (continuation.isActive) continuation.resume(null)
@@ -299,6 +313,7 @@ class AndroidCameraCaptureManager(
         val timeStamp = timestampFormat.format(Date())
         val fileName = "LOGDATE_$timeStamp.mp4"
         val captureFile = File(context.cacheDir, "$fileName.${kotlin.uuid.Uuid.random()}.tmp")
+        pendingCaptureFiles += captureFile
         val outputOptions = FileOutputOptions.Builder(captureFile).build()
 
         val deferred = CompletableDeferred<String?>()
@@ -328,20 +343,24 @@ class AndroidCameraCaptureManager(
                             }
 
                             is VideoRecordEvent.Finalize -> {
-                                CoroutineScope(Dispatchers.IO).launch {
+                                captureScope.launch {
                                     val uri =
-                                        if (!event.hasError()) {
-                                            runCatching {
-                                                mediaManager.saveMediaFromFile(captureFile.absolutePath, fileName, "video/mp4")
-                                            }.getOrElse { error ->
-                                                Napier.e("Video persistence failed", error)
+                                        try {
+                                            if (!event.hasError()) {
+                                                runCatching {
+                                                    mediaManager.saveMediaFromFile(captureFile.absolutePath, fileName, "video/mp4")
+                                                }.getOrElse { error ->
+                                                    Napier.e("Video persistence failed", error)
+                                                    null
+                                                }
+                                            } else {
+                                                Napier.e("Video recording failed with error: ${event.error}")
                                                 null
                                             }
-                                        } else {
-                                            Napier.e("Video recording failed with error: ${event.error}")
-                                            null
+                                        } finally {
+                                            pendingCaptureFiles.remove(captureFile)
+                                            captureFile.delete()
                                         }
-                                    captureFile.delete()
                                     withContext(Dispatchers.Main.immediate) {
                                         _state.update {
                                             it.copy(
@@ -536,6 +555,13 @@ class AndroidCameraCaptureManager(
 
     override fun release() {
         currentRecording?.stop()
+        captureScope.cancel()
+        pendingCaptureFiles.toList().forEach { file ->
+            if (!file.delete() && file.exists()) {
+                Napier.w("Unable to remove pending camera capture: ${file.absolutePath}")
+            }
+        }
+        pendingCaptureFiles.clear()
         currentRecording = null
         recordingDeferred?.complete(null)
         recordingDeferred = null
