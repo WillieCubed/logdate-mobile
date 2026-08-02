@@ -12,10 +12,6 @@ permissions:
   contents: read
   id-token: write
 
-concurrency:
-  group: deploy-server-staging
-  cancel-in-progress: true
-
 jobs:
   deploy:
     name: Deploy staging revision
