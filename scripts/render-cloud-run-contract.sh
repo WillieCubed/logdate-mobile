@@ -100,9 +100,36 @@ COMMITTED_TERRAFORM_PATHS="$(
 )" || die "could not enumerate committed Terraform configuration."
 [[ -n "$COMMITTED_TERRAFORM_PATHS" ]] || die "release commit contains no Terraform configuration."
 while IFS= read -r committed_path; do
+    # Contract rendering only needs variable declarations and pure locals. Do not
+    # load provider-backed resources here: the deployment job renders before
+    # authentication and must not depend on a Terraform registry round trip.
+    case "${committed_path##*/}" in
+        main.tf | outputs.tf | versions.tf) continue ;;
+    esac
     git -C "$REPO_ROOT" show "$RELEASE_SHA:$committed_path" >"$PRIVATE_CONFIG_DIR/${committed_path##*/}" 2>/dev/null ||
         die "could not isolate committed Terraform configuration."
 done <<<"$COMMITTED_TERRAFORM_PATHS"
+
+cat >"$PRIVATE_CONFIG_DIR/contract-locals.tf" <<'EOF'
+locals {
+  base_env = {
+    HOST           = "0.0.0.0"
+    GCS_PROJECT_ID = var.project_id
+  }
+
+  bucket_env = var.gcs_bucket_name != "" ? {
+    GCS_BUCKET_NAME = var.gcs_bucket_name
+  } : {}
+
+  webauthn_env = var.webauthn_rp_id != "" ? {
+    WEBAUTHN_RP_ID = var.webauthn_rp_id
+  } : {}
+
+  webauthn_origin_env = var.webauthn_origin != "" ? {
+    WEBAUTHN_ORIGIN = var.webauthn_origin
+  } : {}
+}
+EOF
 
 SELECTED_TFVARS="infra/terraform/${ENVIRONMENT}.tfvars"
 git -C "$REPO_ROOT" show "$RELEASE_SHA:$SELECTED_TFVARS" >"$PRIVATE_CONFIG_DIR/${ENVIRONMENT}.tfvars" 2>/dev/null ||
