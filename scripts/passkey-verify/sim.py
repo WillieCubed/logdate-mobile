@@ -482,6 +482,7 @@ def signin(
         rp_id = data["rpId"]
         allow = data["allowCredentials"]
         credential_id = b64u(state["credential_id"])
+        print(f"  expected credential={credential_id}", file=sys.stderr)
         if rp_id != expected_rp_id:
             raise VerifierError("signin options RP ID does not match the deployment contract")
         if not isinstance(allow, list) or not any(
