@@ -87,6 +87,32 @@ fun EditorMode_TextFocused() {
 }
 
 @PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun EditorMode_InlineMarkdownFocused() {
+    EditorModeFrame {
+        TextBlockContent(
+            block =
+                TextBlockUiState(
+                    content =
+                        """# Olympic Peninsula
+
+                            |The tide was **much higher** than expected, but the trail stayed open.
+
+                            |- Pack the `rain shell`
+                            |- Share the [photos](https://logdate.app)
+                            |
+                            |> Come back in autumn.
+                        """.trimMargin(),
+                ),
+            onTextChanged = {},
+            onFocused = {},
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewTest
 @Preview(showBackground = true, device = PHONE)
 @Composable
 fun EditorMode_ImagePickerLoaded() {

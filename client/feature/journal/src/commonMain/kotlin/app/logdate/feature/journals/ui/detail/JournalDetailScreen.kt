@@ -93,6 +93,8 @@ import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.audio.AudioPlaybackDisplayInfo
 import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.common.AspectRatios
+import app.logdate.ui.common.MarkdownPreviewText
+import app.logdate.ui.common.MarkdownText
 import app.logdate.ui.common.applyStandardContentWidth
 import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.media.MediaDeviceSelector
@@ -797,17 +799,28 @@ private fun TextEntryCard(
         modifier = modifier,
         cardModifier = cardModifier,
     ) {
-        Text(
-            text = entry.content,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = if (expanded) Int.MAX_VALUE else 4,
-            overflow = if (expanded) TextOverflow.Visible else TextOverflow.Ellipsis,
+        Box(
             modifier =
                 Modifier
                     .weight(1f)
                     .animateContentSize()
                     .heightIn(min = 40.dp),
-        )
+        ) {
+            if (expanded) {
+                MarkdownText(
+                    content = entry.content,
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                MarkdownPreviewText(
+                    content = entry.content,
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    maxLines = 4,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
     }
 }
 

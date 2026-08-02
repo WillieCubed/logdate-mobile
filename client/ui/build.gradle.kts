@@ -81,6 +81,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.coil.compose)
+            implementation(libs.multiplatform.markdown.renderer)
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.core)
@@ -98,7 +99,6 @@ kotlin {
             implementation(libs.google.maps.compose)
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.window)
-            implementation(libs.multiplatform.markdown.renderer)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)

@@ -30,6 +30,7 @@ import app.logdate.feature.journals.ui.detail.NoteViewerErrorContent
 import app.logdate.feature.journals.ui.detail.NoteViewerLoadingContent
 import app.logdate.feature.journals.ui.detail.NoteViewerScaffoldContent
 import app.logdate.feature.journals.ui.detail.NoteViewerShared
+import app.logdate.feature.journals.ui.detail.TextNoteViewerContent
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTheme
@@ -129,9 +130,13 @@ fun S03_NoteViewerText() {
             shared = sharedNote,
             onGoBack = {},
         ) {
-            Text(
-                text = "Captured the train ride home before the details blurred. The city felt quieter than usual.",
-                style = MaterialTheme.typography.bodyLarge,
+            TextNoteViewerContent(
+                text =
+                    """# Train ride home
+
+                        |Captured the details before they blurred. The city felt **quieter than usual**.
+                    """.trimMargin(),
+                shared = sharedNote,
             )
         }
     }

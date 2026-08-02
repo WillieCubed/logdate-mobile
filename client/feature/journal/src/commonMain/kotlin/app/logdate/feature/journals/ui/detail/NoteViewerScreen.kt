@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -67,6 +68,7 @@ import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.audio.LocalAudioPlaybackState
+import app.logdate.ui.common.MarkdownText
 import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
@@ -147,7 +149,7 @@ fun NoteViewerScreen(
                 onShare = viewModel::shareCurrentNote,
                 modifier = modifier.then(sharedBoundsModifier),
             ) {
-                TextNoteViewer(
+                TextNoteViewerContent(
                     text = state.text,
                     shared = state.shared,
                 )
@@ -202,7 +204,7 @@ fun NoteViewerScreen(
  * Text note rendered as a page with generous typography and a journal spine accent.
  */
 @Composable
-private fun TextNoteViewer(
+fun TextNoteViewerContent(
     text: String,
     shared: NoteViewerShared,
     modifier: Modifier = Modifier,
@@ -233,29 +235,34 @@ private fun TextNoteViewer(
                 )
             }
 
-            Column(
+            Box(
                 modifier =
                     Modifier
-                        .fillMaxWidth()
-                        .padding(Spacing.xl),
-                verticalArrangement = Arrangement.SpaceBetween,
+                        .weight(1f),
+                contentAlignment = Alignment.TopCenter,
             ) {
-                Text(
-                    text = text,
-                    style =
-                        MaterialTheme.typography.bodyLarge.copy(
-                            lineHeight = 28.sp,
-                        ),
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                Column(
+                    modifier =
+                        Modifier
+                            .widthIn(max = 840.dp)
+                            .fillMaxWidth()
+                            .padding(Spacing.xl),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    MarkdownText(
+                        content = text,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(lineHeight = 28.sp),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
 
-                Spacer(modifier = Modifier.height(Spacing.xl))
+                    Spacer(modifier = Modifier.height(Spacing.xl))
 
-                Text(
-                    text = shared.createdAt.toReadableDateTimeShort(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                )
+                    Text(
+                        text = shared.createdAt.toReadableDateTimeShort(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    )
+                }
             }
         }
     }
@@ -555,6 +562,7 @@ private fun NoteViewerToolbar(
             Icon(
                 Icons.Default.LibraryAdd,
                 contentDescription = stringResource(Res.string.add_to_journal),
+                tint = MaterialTheme.colorScheme.onSurface,
             )
         }
 
@@ -562,6 +570,7 @@ private fun NoteViewerToolbar(
             Icon(
                 Icons.Default.Share,
                 contentDescription = stringResource(Res.string.share),
+                tint = MaterialTheme.colorScheme.onSurface,
             )
         }
 
@@ -573,6 +582,7 @@ private fun NoteViewerToolbar(
                 Icon(
                     Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                     contentDescription = stringResource(Res.string.cd_previous_entry),
+                    tint = MaterialTheme.colorScheme.onSurface,
                 )
             }
             IconButton(
@@ -582,6 +592,7 @@ private fun NoteViewerToolbar(
                 Icon(
                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = stringResource(Res.string.cd_next_entry),
+                    tint = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }

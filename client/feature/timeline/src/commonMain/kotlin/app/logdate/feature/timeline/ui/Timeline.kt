@@ -34,14 +34,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.ui.common.MarkdownText
 import app.logdate.ui.common.noteDragSource
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.TimelineLine
 import app.logdate.util.toReadableDateShort
 import app.logdate.util.weeksAgo
-import com.mikepenz.markdown.m3.Markdown
-import com.mikepenz.markdown.m3.markdownTypography
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
@@ -326,15 +325,9 @@ private fun TimelineContentItem(
             // Actual content
             when (item) {
                 is JournalNote.Text -> {
-                    Markdown(
+                    MarkdownText(
                         content = item.content,
-                        typography =
-                            markdownTypography(
-                                text =
-                                    MaterialTheme.typography.bodyMedium.copy(
-                                        lineBreak = MaterialTheme.typography.bodyMedium.lineBreak,
-                                    ),
-                            ),
+                        textStyle = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.noteDragSource(item.content),
                     )
 //                    Text(

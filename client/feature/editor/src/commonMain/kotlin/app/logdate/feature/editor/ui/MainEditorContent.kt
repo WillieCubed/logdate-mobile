@@ -218,6 +218,7 @@ fun MainEditorContent(
                                 ) {
                                     BlockContentInner(
                                         block = liveBlock,
+                                        isExpanded = true,
                                         onBlockFocused = uiState.onBlockFocused,
                                         onBlockUpdated = uiState.onUpdateBlock,
                                         onBlockDeleted = uiState.onDeleteBlock,
@@ -247,6 +248,7 @@ fun MainEditorContent(
                                         ) {
                                             BlockContentInner(
                                                 block = block,
+                                                isExpanded = false,
                                                 onBlockFocused = uiState.onBlockFocused,
                                                 onBlockUpdated = uiState.onUpdateBlock,
                                                 onBlockDeleted = uiState.onDeleteBlock,
@@ -383,6 +385,7 @@ private fun EditorBlockList(
 @Composable
 private fun BlockContentInner(
     block: EntryBlockUiState,
+    isExpanded: Boolean,
     onBlockFocused: (Uuid) -> Unit,
     onBlockUpdated: (EntryBlockUiState) -> Unit,
     onBlockDeleted: (Uuid) -> Unit,
@@ -392,7 +395,7 @@ private fun BlockContentInner(
         is TextBlockUiState ->
             TextBlockContent(
                 block = block,
-                isExpanded = true,
+                isExpanded = isExpanded,
                 onTextChanged = { newText -> onBlockUpdated(block.copy(content = newText)) },
                 onFocused = { onBlockFocused(block.id) },
                 modifier = modifier,

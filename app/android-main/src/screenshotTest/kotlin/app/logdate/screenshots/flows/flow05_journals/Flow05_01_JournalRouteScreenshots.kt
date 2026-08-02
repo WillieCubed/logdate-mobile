@@ -1,6 +1,7 @@
 package app.logdate.screenshots.flows.flow05_journals
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.feature.journals.ui.creation.JournalCreationScreenContent
 import app.logdate.feature.journals.ui.detail.EntryDisplayData
 import app.logdate.feature.journals.ui.detail.JournalDetailScreenContent
@@ -12,6 +13,7 @@ import app.logdate.feature.journals.ui.share.ShareJournalScreenContent
 import app.logdate.feature.journals.ui.share.ShareJournalUiState
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
+import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
 import com.android.tools.screenshot.PreviewTest
 import kotlin.time.Duration.Companion.hours
@@ -36,6 +38,30 @@ private val populatedJournalState =
         journalId = ScreenshotTestData.sampleJournal.id,
         title = ScreenshotTestData.sampleJournal.title,
         entries = journalEntries,
+    )
+
+private val markdownPreviewJournalState =
+    JournalDetailUiState.Success(
+        journalId = ScreenshotTestData.sampleJournal.id,
+        title = "Launch notes",
+        entries =
+            listOf(
+                EntryDisplayData.TextEntry(
+                    id = Uuid.parse("00000000-0000-0000-0000-000000000083"),
+                    content =
+                        """# Offline-first polish
+
+                            |The **local journal** stays writable even when LogDate Cloud is unavailable.
+
+                            |- Record audio, photos, and video
+                            |- Sync later without changing identity
+                            |- Keep every pending edit durable
+                            |
+                            |> This final line must be visibly ellipsized in the collapsed card.
+                        """.trimMargin(),
+                    timestamp = ScreenshotTestData.baseInstant,
+                ),
+            ),
     )
 
 @PreviewTest
@@ -238,6 +264,24 @@ fun S14_ShareJournalError() {
             onShareToInstagram = {},
             onShareQrCode = {},
             onShareJournal = {},
+        )
+    }
+}
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Preview(
+    name = "Phone 200% text",
+    showBackground = true,
+    device = PHONE,
+    fontScale = 2f,
+)
+@Composable
+fun S15_JournalDetailMarkdownPreview() {
+    ScreenshotTheme {
+        JournalDetailScreenContent(
+            uiState = markdownPreviewJournalState,
+            onGoBack = {},
         )
     }
 }
