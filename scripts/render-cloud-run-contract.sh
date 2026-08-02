@@ -141,8 +141,15 @@ EOF
 SELECTED_TFVARS="infra/terraform/${ENVIRONMENT}.tfvars"
 git -C "$REPO_ROOT" show "$RELEASE_SHA:$SELECTED_TFVARS" >"$PRIVATE_CONFIG_DIR/${ENVIRONMENT}.tfvars" 2>/dev/null ||
     die "release commit does not contain selected Terraform variables."
-git -C "$REPO_ROOT" show "$RELEASE_SHA:infra/terraform/.terraform.lock.hcl" >"$PRIVATE_CONFIG_DIR/.terraform.lock.hcl" 2>/dev/null ||
-    die "release commit does not contain the Terraform dependency lockfile."
+if [[ "${CI:-false}" == "true" ]]; then
+    # No provider plugins are needed for pure contract evaluation in CI; the
+    # lockfile would make terraform console demand uncached provider packages.
+    git -C "$REPO_ROOT" cat-file -e "$RELEASE_SHA:infra/terraform/.terraform.lock.hcl" 2>/dev/null ||
+        die "release commit does not contain the Terraform dependency lockfile."
+else
+    git -C "$REPO_ROOT" show "$RELEASE_SHA:infra/terraform/.terraform.lock.hcl" >"$PRIVATE_CONFIG_DIR/.terraform.lock.hcl" 2>/dev/null ||
+        die "release commit does not contain the Terraform dependency lockfile."
+fi
 
 # Contract rendering only evaluates variables and pure locals. An empty plugin
 # directory makes this initialization deterministic and prevents an unauthenticated
