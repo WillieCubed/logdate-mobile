@@ -145,6 +145,19 @@ fun HomeScreen(
         }
     }
     val snackbarHostState = remember { SnackbarHostState() }
+    val adaptiveInfo = currentWindowAdaptiveInfo()
+    val navLayoutType =
+        when {
+            // Foldable laid flat (tabletop): keep navigation in the bottom/flat half rather
+            // than spanning a rail across the hinge.
+            adaptiveInfo.windowPosture.isTabletop -> NavigationSuiteType.NavigationBar
+            // Wide enough (>= 600dp), including landscape phones: always use the side rail,
+            // never a bottom bar. Material's default would drop to a bottom bar here because
+            // the window height is compact.
+            adaptiveInfo.windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND) ->
+                NavigationSuiteType.NavigationRail
+            else -> NavigationSuiteType.NavigationBar
+        }
 
     // On Apple platforms the timeline's new-entry action lives in the top app bar, so the
     // floating button is hidden there. Other tabs (Journals, Library, Rewind, etc.) keep
@@ -168,6 +181,17 @@ fun HomeScreen(
                     },
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    // NavigationSuiteScaffold owns the bottom navigation while this FAB belongs
+                    // to the outer shell. Reserve the NavigationBar height on compact layouts.
+                    modifier =
+                        Modifier.padding(
+                            bottom =
+                                if (navLayoutType == NavigationSuiteType.NavigationBar) {
+                                    80.dp
+                                } else {
+                                    0.dp
+                                },
+                        ),
                 ) {
                     Icon(
                         painter = PlatformIcons.newEntry(),
@@ -202,19 +226,6 @@ fun HomeScreen(
                             .widthIn(max = 560.dp),
                 )
             }
-            val adaptiveInfo = currentWindowAdaptiveInfo()
-            val navLayoutType =
-                when {
-                    // Foldable laid flat (tabletop): keep navigation in the bottom/flat half rather
-                    // than spanning a rail across the hinge.
-                    adaptiveInfo.windowPosture.isTabletop -> NavigationSuiteType.NavigationBar
-                    // Wide enough (>= 600dp), including landscape phones: always use the side rail,
-                    // never a bottom bar. Material's default would drop to a bottom bar here because
-                    // the window height is compact.
-                    adaptiveInfo.windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND) ->
-                        NavigationSuiteType.NavigationRail
-                    else -> NavigationSuiteType.NavigationBar
-                }
             NavigationSuiteScaffold(
                 layoutType = navLayoutType,
                 containerColor = Color.Transparent,
