@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -36,17 +37,20 @@ class LogDateCloudQuotaManager(
     private var cachedQuota: CloudStorageQuota? = null
     private var cachedAccountId: String? = null
     private var lastServerSyncTime: kotlin.time.Instant? = null
+    private var hasAuthoritativeQuota = false
 
     override fun observeQuota(): Flow<CloudStorageQuota> {
-        val session = sessionStorage ?: return quotaStateFlow.filterNotNull()
+        val session = sessionStorage ?: return quotaStateFlow.filterNotNull().filter { hasAuthoritativeQuota }
         return session
             .getSessionFlow()
             .flatMapLatest {
                 flow {
                     // Re-fetch whenever the canonical Cloud identity changes. The previous
-                    // account's stream is cancelled before this request starts.
-                    emit(getCurrentQuota())
-                    emitAll(quotaStateFlow.filterNotNull())
+                    // account's stream is cancelled before this request starts. Local fallback
+                    // remains available to callers of getCurrentQuota, but is not presented as
+                    // authoritative Cloud usage.
+                    runCatching { syncWithServer() }.getOrNull()?.let { emit(it) }
+                    emitAll(quotaStateFlow.filterNotNull().filter { hasAuthoritativeQuota })
                 }
             }.distinctUntilChanged()
     }
@@ -106,6 +110,7 @@ class LogDateCloudQuotaManager(
         cachedQuota = calculatedQuota
         cachedAccountId = currentAccountId()
         lastServerSyncTime = null
+        hasAuthoritativeQuota = false
         quotaStateFlow.value = calculatedQuota
         return calculatedQuota
     }
@@ -157,6 +162,7 @@ class LogDateCloudQuotaManager(
                 cachedQuota = serverQuota
                 cachedAccountId = currentAccountId()
                 lastServerSyncTime = Clock.System.now()
+                hasAuthoritativeQuota = true
                 quotaStateFlow.value = serverQuota
                 serverQuota
             }
@@ -177,6 +183,7 @@ class LogDateCloudQuotaManager(
         cachedQuota = null
         cachedAccountId = accountId
         lastServerSyncTime = null
+        hasAuthoritativeQuota = false
         quotaStateFlow.value = null
     }
 

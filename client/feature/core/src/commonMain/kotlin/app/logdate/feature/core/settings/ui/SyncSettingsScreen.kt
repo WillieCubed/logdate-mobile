@@ -103,7 +103,7 @@ fun SyncSettingsScreen(
         conflictsState = uiState.conflictsState,
         onClearConflicts = viewModel::clearConflicts,
         onRefreshConflicts = { viewModel.refreshConflicts(force = true) },
-        quotaUsage = uiState.quotaState.toStorageQuotaUi(),
+        quotaUsage = uiState.quotaState.orDefault().toStorageQuotaUi(),
         isQuotaAvailable = uiState.isQuotaAvailable && uiState.hasAuthoritativeQuota,
         snackbarHostState = snackbarHostState,
     )

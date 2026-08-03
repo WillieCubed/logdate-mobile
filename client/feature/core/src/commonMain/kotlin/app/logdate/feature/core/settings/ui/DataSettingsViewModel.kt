@@ -31,7 +31,7 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 data class DataSettingsState(
-    val quotaState: CloudStorageQuota,
+    val quotaState: CloudStorageQuota?,
     val hasAuthoritativeQuota: Boolean,
     val isQuotaAvailable: Boolean,
     val integrityState: IntegrityState,
@@ -101,8 +101,8 @@ class DataSettingsViewModel(
             _conflictsState,
         ) { quotaState, isQuotaAvailable, integrityState, conflictsState ->
             DataSettingsState(
-                quotaState = quotaState.orDefault(),
-                hasAuthoritativeQuota = quotaState != null,
+                quotaState = quotaState,
+                hasAuthoritativeQuota = true,
                 isQuotaAvailable = isQuotaAvailable,
                 integrityState = integrityState,
                 conflictsState = conflictsState,
@@ -128,7 +128,7 @@ class DataSettingsViewModel(
             viewModelScope,
             SharingStarted.WhileSubscribed(5000),
             DataSettingsState(
-                quotaState = (null as CloudStorageQuota?).orDefault(),
+                quotaState = null,
                 hasAuthoritativeQuota = false,
                 isQuotaAvailable = true,
                 integrityState = IntegrityState(),
