@@ -2,6 +2,7 @@
 
 package app.logdate.feature.core.main
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -159,47 +160,10 @@ fun HomeScreen(
             else -> NavigationSuiteType.NavigationBar
         }
 
-    // On Apple platforms the timeline's new-entry action lives in the top app bar, so the
-    // floating button is hidden there. Other tabs (Journals, Library, Rewind, etc.) keep
-    // the FAB until their own headers grow a native create affordance. Android always shows
-    // the FAB.
-    val showFloatingActionButton =
-        !(currentPlatform.isApple && currentDestination == HomeRouteDestination.Timeline)
-
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        floatingActionButton = {
-            if (showFloatingActionButton) {
-                FloatingActionButton(
-                    onClick = {
-                        when (currentDestination) {
-                            HomeRouteDestination.Journals -> onCreateJournal()
-                            else -> onNewEntry()
-                        }
-                    },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    // NavigationSuiteScaffold owns the bottom navigation while this FAB belongs
-                    // to the outer shell. Reserve the NavigationBar height on compact layouts.
-                    modifier =
-                        Modifier.padding(
-                            bottom =
-                                if (navLayoutType == NavigationSuiteType.NavigationBar) {
-                                    80.dp
-                                } else {
-                                    0.dp
-                                },
-                        ),
-                ) {
-                    Icon(
-                        painter = PlatformIcons.newEntry(),
-                        contentDescription = stringResource(Res.string.create_new_entry),
-                    )
-                }
-            }
-        },
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         modifier = modifier,
     ) { innerPadding ->
         // Action-required sync states (auth lapsed, quota exceeded, conflicts) need to surface
@@ -264,77 +228,106 @@ fun HomeScreen(
                     }
                 },
             ) {
-                when (currentDestination) {
-                    HomeRouteDestination.Timeline -> {
-                        val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-                        Column(
-                            modifier =
-                                Modifier
-                                    .applyScreenStyles()
-                                    .safeDrawingPadding(),
-                        ) {
-                            SyncIssuesBanner(onOpenSyncIssues = onOpenSyncIssues)
-                            val transcriptionState by viewModel.transcriptionState.collectAsStateWithLifecycle()
-                            TranscriptionProvider(transcriptionState) {
-                                TimelinePane(
-                                    uiState =
-                                        TimelineUiState(
-                                            items = uiState.items,
-                                            loadingState = uiState.loadingState,
-                                            isLoadingMore = uiState.isLoadingMore,
-                                            hasMoreOlderContent = uiState.hasMoreOlderContent,
-                                            appendError = uiState.appendError,
-                                        ),
-                                    onNewEntry = onNewEntry,
-                                    onOpenDay = onOpenDay,
-                                    onVisibleAudioNoteIdsChanged = viewModel::updateVisibleAudioNoteIds,
-                                    onLoadMoreOlder = viewModel::loadMoreOlder,
-                                    onProfileClick = onOpenSettings,
-                                    onSearchClick = onOpenSearch,
-                                    onOpenDraft = onOpenDraft,
-                                    onImportBackup = onImportBackup,
-                                    timelineSuggestion = uiState.timelineSuggestion,
-                                    syncPresentation = syncPresentation,
-                                    onSyncAction = { action ->
-                                        when (action) {
-                                            app.logdate.ui.sync.SyncAction.SignIn,
-                                            app.logdate.ui.sync.SyncAction.ManageStorage,
-                                            -> onOpenSettings()
-                                            app.logdate.ui.sync.SyncAction.ReviewConflicts -> onOpenSyncIssues()
-                                            app.logdate.ui.sync.SyncAction.Retry -> Unit
-                                        }
-                                    },
+                // Keep the FAB inside NavigationSuiteScaffold's content slot. The adaptive
+                // navigation surface then measures and reserves its own bottom-bar or rail
+                // space, so the create action remains responsive without a hardcoded offset.
+                Scaffold(
+                    containerColor = Color.Transparent,
+                    contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                    floatingActionButton = {
+                        if (!(currentPlatform.isApple && currentDestination == HomeRouteDestination.Timeline)) {
+                            FloatingActionButton(
+                                onClick = {
+                                    when (currentDestination) {
+                                        HomeRouteDestination.Journals -> onCreateJournal()
+                                        else -> onNewEntry()
+                                    }
+                                },
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ) {
+                                Icon(
+                                    painter = PlatformIcons.newEntry(),
+                                    contentDescription = stringResource(Res.string.create_new_entry),
                                 )
                             }
                         }
-                    }
+                    },
+                ) { innerPadding ->
+                    Box(modifier = Modifier.padding(innerPadding)) {
+                        when (currentDestination) {
+                            HomeRouteDestination.Timeline -> {
+                                val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+                                Column(
+                                    modifier =
+                                        Modifier
+                                            .applyScreenStyles()
+                                            .safeDrawingPadding(),
+                                ) {
+                                    SyncIssuesBanner(onOpenSyncIssues = onOpenSyncIssues)
+                                    val transcriptionState by viewModel.transcriptionState.collectAsStateWithLifecycle()
+                                    TranscriptionProvider(transcriptionState) {
+                                        TimelinePane(
+                                            uiState =
+                                                TimelineUiState(
+                                                    items = uiState.items,
+                                                    loadingState = uiState.loadingState,
+                                                    isLoadingMore = uiState.isLoadingMore,
+                                                    hasMoreOlderContent = uiState.hasMoreOlderContent,
+                                                    appendError = uiState.appendError,
+                                                ),
+                                            onNewEntry = onNewEntry,
+                                            onOpenDay = onOpenDay,
+                                            onVisibleAudioNoteIdsChanged = viewModel::updateVisibleAudioNoteIds,
+                                            onLoadMoreOlder = viewModel::loadMoreOlder,
+                                            onProfileClick = onOpenSettings,
+                                            onSearchClick = onOpenSearch,
+                                            onOpenDraft = onOpenDraft,
+                                            onImportBackup = onImportBackup,
+                                            timelineSuggestion = uiState.timelineSuggestion,
+                                            syncPresentation = syncPresentation,
+                                            onSyncAction = { action ->
+                                                when (action) {
+                                                    app.logdate.ui.sync.SyncAction.SignIn,
+                                                    app.logdate.ui.sync.SyncAction.ManageStorage,
+                                                    -> onOpenSettings()
+                                                    app.logdate.ui.sync.SyncAction.ReviewConflicts -> onOpenSyncIssues()
+                                                    app.logdate.ui.sync.SyncAction.Retry -> Unit
+                                                }
+                                            },
+                                        )
+                                    }
+                                }
+                            }
 
-                    HomeRouteDestination.LocationHistory -> {
-                        locationContent(
-                            Modifier
-                                .applyScreenStyles()
-                                .safeDrawingPadding(),
-                        )
-                    }
+                            HomeRouteDestination.LocationHistory -> {
+                                locationContent(
+                                    Modifier
+                                        .applyScreenStyles()
+                                        .safeDrawingPadding(),
+                                )
+                            }
 
-                    HomeRouteDestination.Journals -> {
-                        JournalsOverviewScreen(
-                            onOpenJournal = onOpenJournal,
-                            onBrowseJournals = onBrowseJournals,
-                            onCreateJournal = onCreateJournal,
-                            modifier = Modifier.applyScreenStyles(),
-                        )
-                    }
+                            HomeRouteDestination.Journals -> {
+                                JournalsOverviewScreen(
+                                    onOpenJournal = onOpenJournal,
+                                    onBrowseJournals = onBrowseJournals,
+                                    onCreateJournal = onCreateJournal,
+                                    modifier = Modifier.applyScreenStyles(),
+                                )
+                            }
 
-                    HomeRouteDestination.Library -> {
-                        libraryContent(Modifier.applyScreenStyles())
-                    }
+                            HomeRouteDestination.Library -> {
+                                libraryContent(Modifier.applyScreenStyles())
+                            }
 
-                    HomeRouteDestination.Rewind -> {
-                        RewindOverviewScreen(
-                            onOpenRewind = onOpenRewind,
-                            modifier = Modifier.applyScreenStyles(),
-                        )
+                            HomeRouteDestination.Rewind -> {
+                                RewindOverviewScreen(
+                                    onOpenRewind = onOpenRewind,
+                                    modifier = Modifier.applyScreenStyles(),
+                                )
+                            }
+                        }
                     }
                 }
             }
