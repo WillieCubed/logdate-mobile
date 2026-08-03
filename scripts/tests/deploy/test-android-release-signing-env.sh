@@ -12,6 +12,7 @@ assert_file_contains '"keyAlias" to "LOGDATE_RELEASE_KEY_ALIAS"' "$build_file"
 assert_file_contains '"keyPassword" to "LOGDATE_RELEASE_KEY_PASSWORD"' "$build_file"
 assert_file_not_contains '"LOGDATE_RELEASE_${prop.uppercase()}"' "$build_file"
 assert_file_contains 'logdate.allowDebugReleaseSigning' "$build_file"
+assert_file_contains 'releaseTaskRequested' "$build_file"
 assert_file_contains 'Release signing is not configured.' "$build_file"
 assert_file_not_contains 'if (baselineProfileRequested || !hasReleaseSigningConfig)' "$build_file"
 

@@ -92,8 +92,13 @@ val hasReleaseSigningConfig: Boolean =
         !releaseKeyPassword.isNullOrBlank()
 val allowDebugReleaseSigning: Boolean =
     providers.gradleProperty("logdate.allowDebugReleaseSigning").orNull?.toBoolean() == true
+val releaseTaskRequested: Boolean =
+    gradle.startParameter.taskNames.any { taskName ->
+        taskName.contains("Release", ignoreCase = true) ||
+            taskName.contains("Play", ignoreCase = true)
+    }
 
-if (!hasReleaseSigningConfig && !baselineProfileRequested && !allowDebugReleaseSigning) {
+if (releaseTaskRequested && !hasReleaseSigningConfig && !baselineProfileRequested && !allowDebugReleaseSigning) {
     error(
         "Release signing is not configured. Set LOGDATE_RELEASE_STORE_FILE, " +
             "LOGDATE_RELEASE_STORE_PASSWORD, LOGDATE_RELEASE_KEY_ALIAS, and " +
@@ -172,7 +177,10 @@ extensions.configure<ApplicationExtension> {
             isMinifyEnabled = true
             isDebuggable = false
             signingConfig =
-                if (baselineProfileRequested || (allowDebugReleaseSigning && !hasReleaseSigningConfig)) {
+                if (!releaseTaskRequested ||
+                    baselineProfileRequested ||
+                    (allowDebugReleaseSigning && !hasReleaseSigningConfig)
+                ) {
                     signingConfigs.getByName("debug")
                 } else {
                     signingConfigs.getByName("release")
