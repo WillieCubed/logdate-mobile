@@ -358,8 +358,7 @@ jsonencode({
 })
 EOF
 
-if [[ "${CI:-false}" == "true" ]]; then
-    [[ "$ENVIRONMENT" == "staging" ]] || die "CI contract template is only available for staging."
+if [[ "${CI:-false}" == "true" && "$ENVIRONMENT" == "staging" ]]; then
     git -C "$REPO_ROOT" show "$RELEASE_SHA:infra/terraform/staging-contract-template.json" 2>/dev/null |
         jq -c . | jq -R . \
             >"$RAW_CONSOLE_OUTPUT" || die "CI staging contract template could not be rendered."
