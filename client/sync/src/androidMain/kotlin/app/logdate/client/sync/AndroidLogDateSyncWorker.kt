@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
+import kotlin.coroutines.cancellation.CancellationException
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.util.concurrent.TimeUnit
@@ -87,6 +88,10 @@ class AndroidLogDateSyncWorker(
                     Result.retry()
                 }
             }
+        } catch (e: CancellationException) {
+            // WorkManager cancellation is terminal. Propagating it prevents a cancelled job from
+            // being reported as a retry and accidentally resurrected by the scheduler.
+            throw e
         } catch (e: Exception) {
             Napier.e("Unexpected error in sync worker", e)
             Result.retry()

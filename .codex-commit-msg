@@ -1,4 +1,4 @@
-chore(ci): preserve unit-test reports on failure
+fix(sync): respect cancellation in background worker
 
-Upload Gradle test results when the aggregate unit-test job fails so CI exposes
-the exact failing test instead of only reporting a red workflow step.
+Propagate WorkManager cancellation instead of reporting it as a retry, so
+offline or stopped work cannot be unintentionally rescheduled.
