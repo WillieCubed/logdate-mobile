@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlin.io.encoding.Base64
 import kotlin.time.Instant
@@ -66,8 +67,13 @@ class DefaultCloudAccountRepository(
             loadStoredAccount()
         }
         coroutineScope.launch {
-            configRepository.backendUrl.collect {
-                loadStoredAccount()
+            // A LogDate installation has one active Cloud identity. Backend selection is a
+            // user-level routing choice, not an account switcher: never revive credentials that
+            // happen to be stored for another origin when the user changes servers. Local data
+            // remains available offline and the user can explicitly authenticate on the new
+            // server if that server represents the same canonical identity.
+            configRepository.backendUrl.drop(1).collect {
+                accountFlow.value = null
             }
         }
     }

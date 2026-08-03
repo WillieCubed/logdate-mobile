@@ -136,6 +136,63 @@ class DefaultCloudAccountRepositoryTest {
             assertNull(storage.getString(scopedKey("cloud_account_did", configRepository.getCurrentBackendUrl())))
             assertNull(storage.getString(scopedKey("cloud_account_handle", configRepository.getCurrentBackendUrl())))
         }
+
+    @Test
+    fun `changing backend clears active identity instead of reviving another server account`() =
+        runTest {
+            val storage = InMemoryKeyValueStorage()
+            val configRepository = DefaultLogDateConfigRepository(initialBackendUrl = "https://first.logdate.app")
+            storage.putString(
+                scopedKey("cloud_access_token", configRepository.getCurrentBackendUrl()),
+                "first-access",
+            )
+            storage.putString(
+                scopedKey("cloud_account_id", configRepository.getCurrentBackendUrl()),
+                "550e8400-e29b-41d4-a716-446655440000",
+            )
+            storage.putString(
+                scopedKey("cloud_username", configRepository.getCurrentBackendUrl()),
+                "first-user",
+            )
+            storage.putString(
+                scopedKey("cloud_display_name", configRepository.getCurrentBackendUrl()),
+                "First User",
+            )
+            storage.putString(
+                scopedKey("cloud_user_id", configRepository.getCurrentBackendUrl()),
+                "550e8400-e29b-41d4-a716-446655440000",
+            )
+            storage.putString(
+                scopedKey("cloud_created_at", configRepository.getCurrentBackendUrl()),
+                "2026-03-05T00:00:00Z",
+            )
+            storage.putString(
+                scopedKey("cloud_updated_at", configRepository.getCurrentBackendUrl()),
+                "2026-03-05T00:00:00Z",
+            )
+
+            // Recreate the repository so its initial load sees the persisted first identity.
+            val reloadedRepository =
+                DefaultCloudAccountRepository(
+                    apiClient = FakeCloudApiClient(),
+                    secureStorage = storage,
+                    configRepository = configRepository,
+                    coroutineScope = TestScope(StandardTestDispatcher(testScheduler)),
+                )
+            testScheduler.advanceUntilIdle()
+            assertEquals("first-user", reloadedRepository.getCurrentAccount()?.username)
+
+            // Even if another origin has credentials left by an older build, selecting it must
+            // not implicitly switch identities. Explicit authentication is required instead.
+            storage.putString(
+                scopedKey("cloud_access_token", "https://second.logdate.app"),
+                "second-access",
+            )
+            configRepository.updateBackendUrl("https://second.logdate.app")
+            testScheduler.advanceUntilIdle()
+
+            assertNull(reloadedRepository.getCurrentAccount())
+        }
 }
 
 private fun scopedKey(
