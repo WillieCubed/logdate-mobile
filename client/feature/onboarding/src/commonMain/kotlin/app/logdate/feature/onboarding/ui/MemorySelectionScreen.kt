@@ -836,18 +836,18 @@ private fun SharedTransitionScope.AllMemoriesStaggeredGrid(
 /**
  * Calculates the native aspect ratio of a media object, constrained to max 3:2.
  */
-private fun MediaObject.getNativeAspectRatio(): Float {
-    // For now, use placeholder values - in real implementation would get actual dimensions
-    // from media metadata or by loading the image/video
+internal fun MediaObject.getNativeAspectRatio(): Float {
+    // Until media metadata is available, use a stable placeholder derived from the URI. A
+    // random ratio makes the grid jump between recompositions and makes screenshot output
+    // nondeterministic, which is also jarring when a user returns to this screen.
+    val stableIndex = (uri.hashCode() and Int.MAX_VALUE)
     return when (this) {
         is MediaObject.Image -> {
-            // Placeholder: varies by image
-            listOf(1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f).random()
+            listOf(1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f)[stableIndex % 6]
         }
 
         is MediaObject.Video -> {
-            // Placeholder: standard video aspect ratios
-            listOf(1f, 1.2f, 1.33f, 1.5f).random()
+            listOf(1f, 1.2f, 1.33f, 1.5f)[stableIndex % 4]
         }
     }
 }
