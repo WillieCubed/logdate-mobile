@@ -1,6 +1,5 @@
-fix(release): fail closed without publishable Android signing
+fix(sync): preserve canonical identity through Cloud signup
 
-Prevent normal release builds from silently using the debug certificate when
-Play signing credentials are missing. Keep debug signing available only for
-explicit local non-publishing and baseline-profile workflows while preserving
-ordinary lint and analysis tasks.
+Send the durable owner ID through the Cloud API client and update synthetic
+server/client signup fixtures so integration journeys exercise the one-identity
+contract instead of failing before sync begins.

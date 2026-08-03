@@ -115,6 +115,7 @@ class LogDateCloudApiClient(
                             username = request.username,
                             displayName = request.displayName,
                             bio = request.bio,
+                            requestedOwnerId = request.requestedOwnerId,
                         ),
                     )
                 }
@@ -962,6 +963,7 @@ private data class SignupPasskeyBeginRequestDto(
     val username: String,
     val displayName: String,
     val bio: String? = null,
+    val requestedOwnerId: String? = null,
 )
 
 @Serializable

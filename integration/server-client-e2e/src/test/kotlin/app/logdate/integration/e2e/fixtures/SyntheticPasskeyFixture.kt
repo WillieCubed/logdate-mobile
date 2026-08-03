@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+
 package app.logdate.integration.e2e.fixtures
 
 import app.logdate.client.sync.cloud.LogDateCloudApiClient
@@ -7,6 +9,7 @@ import app.logdate.shared.model.CompleteAccountCreationResponse
 import app.logdate.shared.model.PasskeyAuthenticatorResponse
 import app.logdate.shared.model.PasskeyCredentialResponse
 import kotlin.random.Random
+import kotlin.uuid.Uuid
 
 fun syntheticPasskeyCredential(credentialId: String): PasskeyCredentialResponse =
     PasskeyCredentialResponse(
@@ -28,6 +31,7 @@ suspend fun LogDateCloudApiClient.createAccountWithSyntheticPasskey(
             BeginAccountCreationRequest(
                 username = username,
                 displayName = displayName,
+                requestedOwnerId = Uuid.random().toString(),
             ),
         ).getOrElse { throw AssertionError("beginAccountCreation failed: ${it.message}", it) }
 
