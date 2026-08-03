@@ -122,7 +122,12 @@ class PostgreSqlRepositoriesTest {
             repository.save(existing)
 
             assertFalse(repository.createOnly(attemptedReplacement))
-            assertEquals(existing, repository.findById(ownerId))
+            // SQL timestamp columns have lower precision than kotlin.time.Instant;
+            // compare the round-tripped account after adopting the persisted
+            // timestamp so this test focuses on collision safety, not storage
+            // precision.
+            val persisted = requireNotNull(repository.findById(ownerId))
+            assertEquals(existing.copy(createdAt = persisted.createdAt), persisted)
             assertNull(repository.findByUsername("attacker-owner"))
         }
     }
