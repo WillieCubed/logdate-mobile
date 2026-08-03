@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.ServerDescriptor
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -28,27 +29,33 @@ class LogDateConfigDataSource(
     }
 
     private val json = Json { ignoreUnknownKeys = true }
+    private val configurationLoaded = CompletableDeferred<Unit>()
 
     init {
         // Load configuration on initialization
         scope.launch {
-            loadConfiguration()
+            runCatching { loadConfiguration() }
+                .onFailure { configurationLoaded.completeExceptionally(it) }
+                .onSuccess { configurationLoaded.complete(Unit) }
         }
 
         // Save configuration when it changes
         scope.launch {
+            configurationLoaded.await()
             configRepository.backendUrl.collect { url ->
                 saveBackendUrl(url)
             }
         }
 
         scope.launch {
+            configurationLoaded.await()
             configRepository.apiVersion.collect { version ->
                 saveApiVersion(version)
             }
         }
 
         scope.launch {
+            configurationLoaded.await()
             configRepository.serverDescriptor.collect { descriptor ->
                 saveServerDescriptor(descriptor)
             }
