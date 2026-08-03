@@ -13,10 +13,10 @@ fun withH2Database(
     val dbName = "server_test_${System.nanoTime()}"
     val database =
         Database.connect(
-        url = "jdbc:h2:mem:$dbName;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false",
-        driver = "org.h2.Driver",
-        user = "sa",
-        password = "",
+            url = "jdbc:h2:mem:$dbName;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false",
+            driver = "org.h2.Driver",
+            user = "sa",
+            password = "",
         )
     val previousDatabase = TransactionManager.defaultDatabase
     TransactionManager.defaultDatabase = database
