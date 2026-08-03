@@ -65,9 +65,9 @@ val resolvedPlayTrack: String =
  *  - `LOGDATE_RELEASE_KEY_ALIAS`
  *  - `LOGDATE_RELEASE_KEY_PASSWORD`
  *
- * When any of these are missing, the release build falls back to the debug signing config so
- * local assembles don't fail on developer machines. CI *must* set all four to produce a
- * Play-publishable APK/AAB.
+ * A normal release build fails closed when any of these are missing. Local benchmark and
+ * baseline-profile work may explicitly opt into debug signing with
+ * `-Plogdate.allowDebugReleaseSigning=true`; that override must never be used for publishing.
  */
 val releaseEnvironmentVariables =
     mapOf(
@@ -90,6 +90,17 @@ val hasReleaseSigningConfig: Boolean =
         !releaseStorePassword.isNullOrBlank() &&
         !releaseKeyAlias.isNullOrBlank() &&
         !releaseKeyPassword.isNullOrBlank()
+val allowDebugReleaseSigning: Boolean =
+    providers.gradleProperty("logdate.allowDebugReleaseSigning").orNull?.toBoolean() == true
+
+if (!hasReleaseSigningConfig && !baselineProfileRequested && !allowDebugReleaseSigning) {
+    error(
+        "Release signing is not configured. Set LOGDATE_RELEASE_STORE_FILE, " +
+            "LOGDATE_RELEASE_STORE_PASSWORD, LOGDATE_RELEASE_KEY_ALIAS, and " +
+            "LOGDATE_RELEASE_KEY_PASSWORD, or explicitly pass " +
+            "-Plogdate.allowDebugReleaseSigning=true for a local non-publishing build.",
+    )
+}
 
 if (baselineProfileRequested) {
     apply(
@@ -161,7 +172,7 @@ extensions.configure<ApplicationExtension> {
             isMinifyEnabled = true
             isDebuggable = false
             signingConfig =
-                if (baselineProfileRequested || !hasReleaseSigningConfig) {
+                if (baselineProfileRequested || (allowDebugReleaseSigning && !hasReleaseSigningConfig)) {
                     signingConfigs.getByName("debug")
                 } else {
                     signingConfigs.getByName("release")

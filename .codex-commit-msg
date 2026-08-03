@@ -1,0 +1,5 @@
+fix(release): fail closed without publishable Android signing
+
+Prevent normal release builds from silently using the debug certificate when
+Play signing credentials are missing. Keep debug signing available only for
+explicit local non-publishing and baseline-profile workflows.
