@@ -1,4 +1,1 @@
-fix(sync): respect cancellation in background worker
-
-Propagate WorkManager cancellation instead of reporting it as a retry, so
-offline or stopped work cannot be unintentionally rescheduled.
+chore(sync): remove local commit helper
