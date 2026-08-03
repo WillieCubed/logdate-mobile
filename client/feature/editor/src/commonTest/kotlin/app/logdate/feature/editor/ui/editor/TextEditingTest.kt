@@ -18,6 +18,7 @@ import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.notes.drafts.GetAllDraftsUseCase
 import app.logdate.client.domain.notes.drafts.UpdateEntryDraftUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.feature.editor.ui.editor.delegate.ContentLoader
 import app.logdate.feature.editor.ui.editor.delegate.DraftManager
 import app.logdate.feature.editor.ui.editor.fakes.FakeActivityTimelineRepository
@@ -44,6 +45,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * Tests for the text editing functionality in the editor.
@@ -54,13 +57,14 @@ class TextEditingTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var testScope: TestScope
     private lateinit var viewModel: EntryEditorViewModel
+    private lateinit var journalNotesRepository: FakeJournalNotesRepository
 
     @BeforeTest
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         testScope = TestScope(testDispatcher)
 
-        val journalNotesRepository = FakeJournalNotesRepository()
+        journalNotesRepository = FakeJournalNotesRepository()
         val journalContentRepository = FakeJournalContentRepository()
         val journalRepository = FakeJournalRepository()
         val entryDraftRepository = FakeEntryDraftRepository()
@@ -205,6 +209,58 @@ class TextEditingTest {
             val updatedState = viewModel.editorState.value
             assertEquals(1, updatedState.blocks.size)
             assertEquals(block.id, updatedState.blocks.first().id)
+        }
+
+    @Test
+    fun initialAttachments_areNotDuplicatedWhenEditorIsRecreated() =
+        testScope.runTest {
+            val attachments = listOf("content://image/one", "content://video/two")
+
+            // NoteEditorScreen replays its initial-input effect when the Activity is recreated.
+            // Re-applying the same intent inputs must not add a second copy of each media block.
+            viewModel.setInitialAttachments(attachments)
+            advanceUntilIdle()
+            viewModel.setInitialAttachments(attachments)
+            advanceUntilIdle()
+
+            val blocks = viewModel.editorState.value.blocks
+            assertEquals(2, blocks.size)
+            assertEquals(
+                attachments.toSet(),
+                blocks.mapNotNull { (it as? MediaBlockUiState)?.uri }.toSet(),
+            )
+        }
+
+    @Test
+    fun existingEntry_editsAreNotOverwrittenWhenLoadEffectReplays() =
+        testScope.runTest {
+            val noteId = Uuid.random()
+            val timestamp = Instant.parse("2020-01-01T00:00:00Z")
+            journalNotesRepository.create(
+                JournalNote.Text(
+                    uid = noteId,
+                    content = "Original content",
+                    creationTimestamp = timestamp,
+                    lastUpdated = timestamp,
+                ),
+            )
+
+            viewModel.loadExistingEntry(noteId)
+            advanceUntilIdle()
+            val loaded = viewModel.editorState.value.blocks.single() as TextBlockUiState
+            viewModel.updateBlock(loaded.copy(content = "Unsaved edit"))
+            advanceUntilIdle()
+
+            // NoteEditorScreen's load effect runs again after Activity recreation. It must not
+            // replace the surviving ViewModel state with the original repository value.
+            viewModel.loadExistingEntry(noteId)
+            advanceUntilIdle()
+
+            assertEquals(
+                "Unsaved edit",
+                (viewModel.editorState.value.blocks.single() as TextBlockUiState)
+                    .content,
+            )
         }
 
     @Test

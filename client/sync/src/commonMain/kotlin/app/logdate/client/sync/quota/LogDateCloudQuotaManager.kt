@@ -1,5 +1,6 @@
 package app.logdate.client.sync.quota
 
+import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.repository.quota.QuotaResult
 import app.logdate.client.repository.quota.RemoteQuotaDataSource
 import app.logdate.shared.model.CloudObjectType
@@ -8,9 +9,14 @@ import app.logdate.shared.model.CloudStorageCategoryUsage
 import app.logdate.shared.model.CloudStorageQuota
 import app.logdate.shared.model.QuotaContentType
 import app.logdate.shared.model.QuotaUsage
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlin.time.Clock
 
 /**
@@ -20,17 +26,33 @@ import kotlin.time.Clock
  * Applies incremental updates to cache when local objects change, but server sync
  * will override any local modifications with authoritative server data.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class LogDateCloudQuotaManager(
     private val quotaCalculator: QuotaCalculator,
     private val remoteQuotaDataSource: RemoteQuotaDataSource,
+    private val sessionStorage: SessionStorage? = null,
 ) : CloudQuotaManager {
     private val quotaStateFlow = MutableStateFlow<CloudStorageQuota?>(null)
     private var cachedQuota: CloudStorageQuota? = null
+    private var cachedAccountId: String? = null
     private var lastServerSyncTime: kotlin.time.Instant? = null
 
-    override fun observeQuota(): Flow<CloudStorageQuota> = quotaStateFlow.filterNotNull()
+    override fun observeQuota(): Flow<CloudStorageQuota> {
+        val session = sessionStorage ?: return quotaStateFlow.filterNotNull()
+        return session
+            .getSessionFlow()
+            .flatMapLatest {
+                flow {
+                    // Re-fetch whenever the canonical Cloud identity changes. The previous
+                    // account's stream is cancelled before this request starts.
+                    emit(getCurrentQuota())
+                    emitAll(quotaStateFlow.filterNotNull())
+                }
+            }.distinctUntilChanged()
+    }
 
     override suspend fun getCurrentQuota(): CloudStorageQuota {
+        invalidateCacheIfAccountChanged()
         // Return cached data if available and not stale (within 5 minutes)
         val now = Clock.System.now()
         cachedQuota?.let { cached ->
@@ -54,6 +76,7 @@ class LogDateCloudQuotaManager(
         objectType: CloudObjectType,
         bytes: Long,
     ) {
+        invalidateCacheIfAccountChanged()
         updateCachedCategory(objectType, bytes)
         emitUpdatedQuota()
     }
@@ -62,6 +85,7 @@ class LogDateCloudQuotaManager(
         objectType: CloudObjectType,
         bytes: Long,
     ) {
+        invalidateCacheIfAccountChanged()
         updateCachedCategory(objectType, -bytes)
         emitUpdatedQuota()
     }
@@ -71,6 +95,7 @@ class LogDateCloudQuotaManager(
         oldBytes: Long,
         newBytes: Long,
     ) {
+        invalidateCacheIfAccountChanged()
         val deltaBytes = newBytes - oldBytes
         updateCachedCategory(objectType, deltaBytes)
         emitUpdatedQuota()
@@ -79,6 +104,8 @@ class LogDateCloudQuotaManager(
     override suspend fun recalculateQuota(): CloudStorageQuota {
         val calculatedQuota = quotaCalculator.calculateTotalUsage()
         cachedQuota = calculatedQuota
+        cachedAccountId = currentAccountId()
+        lastServerSyncTime = null
         quotaStateFlow.value = calculatedQuota
         return calculatedQuota
     }
@@ -128,6 +155,7 @@ class LogDateCloudQuotaManager(
             is QuotaResult.Success -> {
                 val serverQuota = mapToCloudStorageQuota(result.data)
                 cachedQuota = serverQuota
+                cachedAccountId = currentAccountId()
                 lastServerSyncTime = Clock.System.now()
                 quotaStateFlow.value = serverQuota
                 serverQuota
@@ -136,6 +164,23 @@ class LogDateCloudQuotaManager(
                 throw Exception("Failed to sync with server: ${result.message}", result.throwable)
             }
         }
+
+    /**
+     * A quota cache belongs to one Cloud identity. Session storage is optional for backwards
+     * compatibility with JVM-only callers, but Android/iOS production wiring always supplies it.
+     * Clearing on account changes prevents a signed-out user or a newly signed-in user from
+     * seeing the previous identity's usage while the first server request is in flight.
+     */
+    private fun invalidateCacheIfAccountChanged() {
+        val accountId = currentAccountId()
+        if (cachedAccountId == accountId) return
+        cachedQuota = null
+        cachedAccountId = accountId
+        lastServerSyncTime = null
+        quotaStateFlow.value = null
+    }
+
+    private fun currentAccountId(): String? = sessionStorage?.getSession()?.accountId
 
     override suspend fun getLastServerSyncTime(): kotlin.time.Instant? = lastServerSyncTime
 

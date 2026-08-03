@@ -14,7 +14,7 @@ import org.koin.dsl.module
 val quotaModule =
     module {
         single<QuotaCalculator> { LogDateQuotaCalculator(get()) }
-        single<CloudQuotaManager> { LogDateCloudQuotaManager(get(), get()) }
+        single<CloudQuotaManager> { LogDateCloudQuotaManager(get(), get(), get()) }
     }
 
 /**

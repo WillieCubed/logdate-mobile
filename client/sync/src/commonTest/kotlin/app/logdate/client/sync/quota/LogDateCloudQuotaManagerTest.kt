@@ -1,5 +1,7 @@
 package app.logdate.client.sync.quota
 
+import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.datastore.UserSession
 import app.logdate.client.repository.quota.QuotaResult
 import app.logdate.client.repository.quota.RemoteQuotaDataSource
 import app.logdate.shared.model.CloudObjectType
@@ -8,12 +10,72 @@ import app.logdate.shared.model.CloudStorageQuota
 import app.logdate.shared.model.QuotaCategoryUsage
 import app.logdate.shared.model.QuotaContentType
 import app.logdate.shared.model.QuotaUsage
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.launch
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class LogDateCloudQuotaManagerTest {
+    @Test
+    fun `active quota observer refreshes when the authenticated account changes`() =
+        runTest {
+            val sessionStorage = TestSessionStorage(UserSession("token-a", "refresh-a", "account-a"))
+            val remote =
+                ScriptedRemoteQuotaDataSource(
+                    quotas =
+                        ArrayDeque(
+                            listOf(
+                                QuotaUsage(totalBytes = 1_000, usedBytes = 100, categories = emptyList()),
+                                QuotaUsage(totalBytes = 2_000, usedBytes = 1_500, categories = emptyList()),
+                            ),
+                        ),
+                )
+            val manager = LogDateCloudQuotaManager(StaticQuotaCalculator(), remote, sessionStorage)
+            val observed = mutableListOf<Long>()
+
+            val observer =
+                launch {
+                    manager.observeQuota().collect { quota ->
+                        observed += quota.usedBytes
+                        if (observed.size == 1) {
+                            sessionStorage.saveSession(UserSession("token-b", "refresh-b", "account-b"))
+                        }
+                    }
+                }
+            while (observed.size < 2) testScheduler.advanceUntilIdle()
+            observer.cancel()
+
+            assertEquals(listOf(100L, 1_500L), observed)
+        }
+
+    @Test
+    fun `account switch never returns the previous account quota from cache`() =
+        runTest {
+            val sessionStorage = TestSessionStorage(UserSession("token-a", "refresh-a", "account-a"))
+            val remote =
+                ScriptedRemoteQuotaDataSource(
+                    quotas =
+                        ArrayDeque(
+                            listOf(
+                                QuotaUsage(totalBytes = 1_000, usedBytes = 100, categories = emptyList()),
+                                QuotaUsage(totalBytes = 2_000, usedBytes = 1_500, categories = emptyList()),
+                            ),
+                        ),
+                )
+            val manager = LogDateCloudQuotaManager(StaticQuotaCalculator(), remote, sessionStorage)
+
+            assertEquals(100, manager.getCurrentQuota().usedBytes)
+            sessionStorage.saveSession(UserSession("token-b", "refresh-b", "account-b"))
+
+            assertEquals(1_500, manager.getCurrentQuota().usedBytes)
+            assertEquals(2, remote.getQuotaUsageCalls)
+        }
+
     @Test
     fun `syncWithServer publishes authoritative server quota to observers`() =
         runTest {
@@ -92,16 +154,37 @@ class LogDateCloudQuotaManagerTest {
     }
 
     private class ScriptedRemoteQuotaDataSource(
-        private val quota: QuotaUsage,
+        private val quota: QuotaUsage? = null,
+        private val quotas: ArrayDeque<QuotaUsage> = ArrayDeque(),
     ) : RemoteQuotaDataSource {
         var getQuotaUsageCalls = 0
             private set
 
         override suspend fun getQuotaUsage(): QuotaResult<QuotaUsage> {
             getQuotaUsageCalls += 1
-            return QuotaResult.Success(quota)
+            return QuotaResult.Success(quotas.removeFirstOrNull() ?: requireNotNull(quota))
         }
 
         override suspend fun refreshQuotaUsage(): QuotaResult<QuotaUsage> = getQuotaUsage()
+    }
+
+    private class TestSessionStorage(
+        initial: UserSession?,
+    ) : SessionStorage {
+        private val state = MutableStateFlow(initial)
+
+        override fun getSession(): UserSession? = state.value
+
+        override fun getSessionFlow(): Flow<UserSession?> = state.asStateFlow()
+
+        override suspend fun hasValidSession(): Boolean = state.value != null
+
+        override fun saveSession(session: UserSession) {
+            state.value = session
+        }
+
+        override fun clearSession() {
+            state.value = null
+        }
     }
 }

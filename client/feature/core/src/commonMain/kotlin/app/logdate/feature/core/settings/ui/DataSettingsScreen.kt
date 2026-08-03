@@ -122,7 +122,7 @@ fun DataSettingsScreen(
     DataSettingsContent(
         onBack = onBack,
         quotaUsage = uiState.quotaState.toStorageQuotaUi(),
-        isQuotaAvailable = uiState.isQuotaAvailable,
+        isQuotaAvailable = uiState.isQuotaAvailable && uiState.hasAuthoritativeQuota,
         exportState = exportState,
         isExportSheetVisible = isExportSheetVisible,
         onShowExportOptions = exportViewModel::showExportOptions,

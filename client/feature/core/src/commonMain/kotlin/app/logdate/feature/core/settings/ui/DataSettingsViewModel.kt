@@ -32,6 +32,7 @@ import kotlin.time.Instant
 
 data class DataSettingsState(
     val quotaState: CloudStorageQuota,
+    val hasAuthoritativeQuota: Boolean,
     val isQuotaAvailable: Boolean,
     val integrityState: IntegrityState,
     val conflictsState: ConflictsState,
@@ -101,6 +102,7 @@ class DataSettingsViewModel(
         ) { quotaState, isQuotaAvailable, integrityState, conflictsState ->
             DataSettingsState(
                 quotaState = quotaState.orDefault(),
+                hasAuthoritativeQuota = quotaState != null,
                 isQuotaAvailable = isQuotaAvailable,
                 integrityState = integrityState,
                 conflictsState = conflictsState,
@@ -127,6 +129,7 @@ class DataSettingsViewModel(
             SharingStarted.WhileSubscribed(5000),
             DataSettingsState(
                 quotaState = (null as CloudStorageQuota?).orDefault(),
+                hasAuthoritativeQuota = false,
                 isQuotaAvailable = true,
                 integrityState = IntegrityState(),
                 conflictsState = ConflictsState(),

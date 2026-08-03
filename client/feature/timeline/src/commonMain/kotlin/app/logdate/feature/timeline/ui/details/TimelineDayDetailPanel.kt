@@ -51,6 +51,7 @@ fun TimelineDayDetailPanel(
     onOpenRewind: (() -> Unit)? = null,
     onDecorate: (() -> Unit)? = null,
     onJournalClick: (Uuid) -> Unit = {},
+    onNoteClick: (Uuid) -> Unit = {},
     scrollState: LazyListState = rememberLazyListState(),
     /**
      * Optional UUID of an entry within this day to scroll to on first composition. Used by the
@@ -127,6 +128,7 @@ fun TimelineDayDetailPanel(
             onAttachNoteToEvent = onAttachNoteToEvent,
             onOpenLocations = onOpenLocations,
             onJournalClick = onJournalClick,
+            onNoteClick = onNoteClick,
             scrollState = scrollState,
             modifier =
                 Modifier
@@ -145,6 +147,7 @@ private fun TimelineDayDetailAdaptiveContent(
     onAttachNoteToEvent: (noteId: String, eventId: String) -> Unit,
     onOpenLocations: (() -> Unit)?,
     onJournalClick: (Uuid) -> Unit,
+    onNoteClick: (Uuid) -> Unit,
     scrollState: LazyListState,
     modifier: Modifier = Modifier,
 ) {
@@ -162,6 +165,7 @@ private fun TimelineDayDetailAdaptiveContent(
                 onAttachNoteToEvent = onAttachNoteToEvent,
                 onOpenLocations = onOpenLocations,
                 onJournalClick = onJournalClick,
+                onNoteClick = onNoteClick,
                 contentPadding = listContentPadding,
                 includeNotesAndEvents = false,
             )
@@ -175,6 +179,7 @@ private fun TimelineDayDetailAdaptiveContent(
                 onAttachNoteToEvent = onAttachNoteToEvent,
                 onOpenLocations = onOpenLocations,
                 onJournalClick = onJournalClick,
+                onNoteClick = onNoteClick,
                 contentPadding = listContentPadding,
                 includeSummaryContext = false,
                 includeLocations = false,
@@ -192,6 +197,7 @@ private fun TimelineDayDetailAdaptiveContent(
                         onAttachNoteToEvent = onAttachNoteToEvent,
                         onOpenLocations = onOpenLocations,
                         onJournalClick = onJournalClick,
+                        onNoteClick = onNoteClick,
                         contentPadding = listContentPadding,
                         includeNotesAndEvents = false,
                     )
@@ -205,6 +211,7 @@ private fun TimelineDayDetailAdaptiveContent(
                         onAttachNoteToEvent = onAttachNoteToEvent,
                         onOpenLocations = onOpenLocations,
                         onJournalClick = onJournalClick,
+                        onNoteClick = onNoteClick,
                         contentPadding = listContentPadding,
                         includeSummaryContext = false,
                         includeLocations = false,
@@ -219,6 +226,7 @@ private fun TimelineDayDetailAdaptiveContent(
                         onAttachNoteToEvent = onAttachNoteToEvent,
                         onOpenLocations = onOpenLocations,
                         onJournalClick = onJournalClick,
+                        onNoteClick = onNoteClick,
                         scrollState = scrollState,
                         contentPadding = listContentPadding,
                     )
@@ -237,6 +245,7 @@ private fun TimelineDayDetailList(
     onAttachNoteToEvent: (noteId: String, eventId: String) -> Unit,
     onOpenLocations: (() -> Unit)?,
     onJournalClick: (Uuid) -> Unit,
+    onNoteClick: (Uuid) -> Unit,
     scrollState: LazyListState = rememberLazyListState(),
     contentPadding: PaddingValues,
     includeSummaryContext: Boolean = true,
@@ -274,6 +283,7 @@ private fun TimelineDayDetailList(
                 NotesListSection(
                     notes = uiState.notes,
                     onJournalClick = onJournalClick,
+                    onNoteClick = onNoteClick,
                 )
             }
         }

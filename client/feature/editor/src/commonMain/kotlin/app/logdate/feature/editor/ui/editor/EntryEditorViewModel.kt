@@ -53,6 +53,11 @@ class EntryEditorViewModel(
 
     private val draftPersistenceMutex = Mutex()
 
+    // Navigation effects are replayed when an Activity is recreated. Keep the source that has
+    // already initialized this ViewModel so a replay cannot overwrite edits that survived the
+    // configuration change. A failed load clears the request and remains retryable.
+    private var activeLoadRequest: LoadRequest? = null
+
     init {
         viewModelScope.launch {
             try {
@@ -808,6 +813,9 @@ class EntryEditorViewModel(
      * Loads a draft into the editor.
      */
     fun loadDraft(draftId: Uuid) {
+        val request = LoadRequest.Draft(draftId)
+        if (activeLoadRequest == request) return
+        activeLoadRequest = request
         val requestedContentRevision = mutableEditorState.value.contentRevision
         viewModelScope.launch {
             draftPersistenceMutex.withLock {
@@ -833,6 +841,7 @@ class EntryEditorViewModel(
                         }
                     },
                     onFailure = { e ->
+                        if (activeLoadRequest == request) activeLoadRequest = null
                         Napier.e("Failed to load draft: ${e.message}", e)
                         mutableEditorState.update {
                             it.copy(errorMessage = "Failed to load draft: ${e.message}")
@@ -988,6 +997,17 @@ class EntryEditorViewModel(
         viewModelScope.launch {
             try {
                 attachmentUris.forEach { uri ->
+                    // NoteEditorScreen replays initial intent inputs after an Activity
+                    // recreation. The ViewModel survives configuration changes, so don't append
+                    // another block for a URI that has already been initialized. User-created
+                    // media blocks are unaffected because this method is only used for launch
+                    // attachments.
+                    val alreadyInitialized =
+                        mutableEditorState.value.blocks.any { block ->
+                            (block as? MediaBlockUiState)?.uri == uri
+                        }
+                    if (alreadyInitialized) return@forEach
+
                     val blockType =
                         when {
                             uri.contains(".jpg", ignoreCase = true) ||
@@ -1047,6 +1067,9 @@ class EntryEditorViewModel(
         entryId: Uuid,
         journalId: Uuid? = null,
     ) {
+        val request = LoadRequest.Existing(entryId, journalId)
+        if (activeLoadRequest == request) return
+        activeLoadRequest = request
         viewModelScope.launch {
             mutableEditorState.update { it.copy(isLoading = true) }
 
@@ -1064,6 +1087,7 @@ class EntryEditorViewModel(
                     }
                 },
                 onFailure = { e ->
+                    if (activeLoadRequest == request) activeLoadRequest = null
                     Napier.e("Failed to load existing entry: $entryId", e)
                     mutableEditorState.update {
                         it.copy(
@@ -1082,5 +1106,11 @@ class EntryEditorViewModel(
          * generous so a slow flush on an aging device doesn't cost the user their entry.
          */
         const val AUDIO_FINALIZE_TIMEOUT_MS: Long = 5_000L
+    }
+
+    private sealed interface LoadRequest {
+        data class Draft(val id: Uuid) : LoadRequest
+
+        data class Existing(val id: Uuid, val journalId: Uuid?) : LoadRequest
     }
 }

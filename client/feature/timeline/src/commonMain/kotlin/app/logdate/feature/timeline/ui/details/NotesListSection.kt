@@ -3,6 +3,7 @@
 package app.logdate.feature.timeline.ui.details
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +41,7 @@ import kotlin.uuid.Uuid
 internal fun NotesListSection(
     notes: List<NoteUiState>,
     onJournalClick: (Uuid) -> Unit = {},
+    onNoteClick: (Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -48,7 +50,9 @@ internal fun NotesListSection(
     ) {
         Text(stringResource(Res.string.notes), style = MaterialTheme.typography.titleSmall)
         notes.forEach { note ->
-            Column {
+            Column(
+                modifier = Modifier.clickable { onNoteClick(note.noteId) },
+            ) {
                 when (note) {
                     is TextNoteUiState -> TextNoteSnippet(note)
                     is ImageNoteUiState -> ImageNoteSnippet(note)

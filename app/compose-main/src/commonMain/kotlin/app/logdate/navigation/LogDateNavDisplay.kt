@@ -97,6 +97,7 @@ import app.logdate.ui.theme.LogDateTheme
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.uuid.Uuid
 
 /**
  * Multiplatform Navigation 3 root for the LogDate app.
@@ -350,6 +351,7 @@ fun LogDateNavDisplay(
                                             onClose = { backStack.removeLastOrNull() },
                                             onOpenLocations = { backStack.add(LocationTimelineRoute) },
                                             onOpenEvent = { backStack.add(EventDetailRoute(it)) },
+                                            onOpenNote = { backStack.add(NoteDetailRoute(it)) },
                                         )
                                     }
                                 },
@@ -434,6 +436,7 @@ private fun TimelineDetailEntry(
     onClose: () -> Unit,
     onOpenLocations: () -> Unit,
     onOpenEvent: (eventId: String) -> Unit,
+    onOpenNote: (Uuid) -> Unit,
 ) {
     val viewModel: app.logdate.feature.core.main.HomeViewModel =
         org.koin.compose.viewmodel
@@ -458,6 +461,7 @@ private fun TimelineDetailEntry(
                 onOpenEvent = onOpenEvent,
                 onAttachNoteToEvent = viewModel::attachNoteToEvent,
                 onOpenLocations = onOpenLocations,
+                onNoteClick = onOpenNote,
             )
         }
     }
