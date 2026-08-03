@@ -12,7 +12,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.feature.editor.audio.extraction.AmplitudeExtractor
-import app.logdate.feature.editor.audio.storage.WaveformStorage
+import app.logdate.ui.audio.WaveformStorage
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.Flow
