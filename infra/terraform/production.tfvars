@@ -40,10 +40,10 @@ cloud_run_env = {
 }
 
 cloud_run_secret_env = {
-  DATABASE_URL      = { secret_id = "logdate-db-url" }
-  DATABASE_USER     = { secret_id = "logdate-db-user" }
-  DATABASE_PASSWORD = { secret_id = "logdate-db-password" }
-  JWT_SECRET        = { secret_id = "logdate-jwt-secret" }
+  DATABASE_URL      = { secret_id = "logdate-db-url", version = "1" }
+  DATABASE_USER     = { secret_id = "logdate-db-user", version = "1" }
+  DATABASE_PASSWORD = { secret_id = "logdate-db-password", version = "1" }
+  JWT_SECRET        = { secret_id = "logdate-jwt-secret", version = "1" }
   # Mount these only AFTER the matching secret has at least one version.
   # Cloud Run fails the revision if it tries to mount an empty container.
   # Provisioning steps: docs/observability/sentry.md and
