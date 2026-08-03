@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.io.encoding.Base64
@@ -84,6 +85,16 @@ class DataStoreSessionStorage(
             }.distinctUntilChanged()
                 .collect { sessionState.value = it }
         }
+        scope.launch {
+            var previousBackendUrl = configRepository.getCurrentBackendUrl()
+            configRepository.backendUrl.drop(1).collect { backendUrl ->
+                if (backendUrl != previousBackendUrl) {
+                    sessionState.value = null
+                    clearPersistedSession(previousBackendUrl)
+                }
+                previousBackendUrl = backendUrl
+            }
+        }
     }
 
     override fun getSession(): UserSession? = sessionState.value
@@ -135,6 +146,14 @@ class DataStoreSessionStorage(
             loaded != null
         } catch (e: Exception) {
             false
+        }
+    }
+
+    private suspend fun clearPersistedSession(backendUrl: String) {
+        dataStore.edit { preferences ->
+            preferences.remove(scopedKey(ACCESS_TOKEN_KEY.name, backendUrl))
+            preferences.remove(scopedKey(REFRESH_TOKEN_KEY.name, backendUrl))
+            preferences.remove(scopedKey(ACCOUNT_ID_KEY.name, backendUrl))
         }
     }
 
