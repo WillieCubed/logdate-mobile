@@ -214,7 +214,6 @@ fun LogDateNavDisplay(
                                     rememberSaveableStateHolderNavEntryDecorator(),
                                     rememberNavAnimatedVisibilityScopeEntryDecorator(),
                                 ),
-                            sharedTransitionScope = this,
                             entryProvider =
                                 entryProvider {
                                     taggedEntry<BaseRoute> { /* loading placeholder */ }
