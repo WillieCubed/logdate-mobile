@@ -255,9 +255,13 @@ class AudioPlaybackBackgroundE2ETest {
             val savedFile = File(checkNotNull(Uri.parse(savedUri).path))
 
             try {
-                assertEquals(
-                    File(context.filesDir, "audio_notes").canonicalPath,
-                    savedFile.parentFile?.canonicalPath,
+                assertTrue(
+                    "Downloaded audio must be stored in the canonical private media store",
+                    savedFile.startsWith(context.filesDir.resolve("media/objects/sha256")),
+                )
+                assertTrue(
+                    "Downloaded audio must retain an audio file extension",
+                    savedFile.name.endsWith(".wav"),
                 )
                 val restoredPayload = runBlocking { mediaManager.readMedia(savedUri) }
                 assertEquals(sourceBytes.size.toLong(), restoredPayload.sizeBytes)
