@@ -5,8 +5,10 @@ import app.logdate.shared.model.ServerInfoResponse
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -15,6 +17,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -23,7 +27,7 @@ import kotlin.test.assertTrue
  * server correctly mounts and responds to its primary endpoints.
  *
  * This suite covers root routes, health checks, OAuth discovery metadata,
- * API v1 mounting, and the availability of OpenAPI/Swagger documentation.
+ * API v1 mounting, and the availability of OpenAPI/Scalar documentation.
  */
 class ApplicationTest {
     private val json = Json { ignoreUnknownKeys = true }
@@ -39,7 +43,7 @@ class ApplicationTest {
                 assertEquals(HttpStatusCode.OK, status)
                 val payload = json.parseToJsonElement(bodyAsText()).jsonObject
                 assertEquals("LogDate Server API", payload["name"]?.jsonPrimitive?.content)
-                assertEquals("/swagger", payload["docs"]?.jsonPrimitive?.content)
+                assertEquals("/docs", payload["docs"]?.jsonPrimitive?.content)
             }
         }
 
@@ -57,7 +61,7 @@ class ApplicationTest {
                     assertEquals(HttpStatusCode.OK, status)
                     val body = bodyAsText()
                     assertTrue(body.contains("<title>LogDate API</title>"))
-                    assertTrue(body.contains("/swagger"))
+                    assertTrue(body.contains("/docs"))
                 }
         }
 
@@ -227,17 +231,61 @@ class ApplicationTest {
         }
 
     @Test
-    fun testSwaggerUi() =
+    fun testScalarApiReference() =
         testApplication {
             application {
                 module()
             }
 
-            client.get("/swagger/index.html").apply {
+            client.get("/docs").apply {
                 assertEquals(HttpStatusCode.OK, status)
                 val responseBody = bodyAsText()
-                assertTrue(responseBody.contains("Swagger UI"))
-                assertTrue(responseBody.contains("swagger-ui-bundle.js"))
+                assertTrue(responseBody.contains("LogDate API Reference"))
+                assertTrue(responseBody.contains("/openapi.json"))
+            }
+            client.get("/docs/scalar.js").apply {
+                assertEquals(HttpStatusCode.OK, status)
+                assertTrue(contentType()?.match(ContentType.Application.JavaScript) == true)
+                assertTrue(bodyAsText().isNotBlank())
+            }
+            client.get("/swagger").apply {
+                assertEquals(HttpStatusCode.NotFound, status)
+            }
+        }
+
+    @Test
+    fun testPublishedOpenApiOperationsAreComplete() =
+        testApplication {
+            application { module() }
+            client.get("/openapi.json").apply {
+                val document = json.parseToJsonElement(bodyAsText()).jsonObject
+                val paths = assertNotNull(document["paths"]?.jsonObject)
+                setOf("/health", "/docs", "/api/v1/auth/metrics", "/api/v1/ops/sync/metrics").forEach {
+                    assertFalse(paths.containsKey(it), "$it must not be published")
+                }
+                val ids = mutableSetOf<String>()
+                paths.forEach { (path, item) ->
+                    item.jsonObject.forEach operation@{ (method, value) ->
+                        if (method !in setOf("get", "post", "put", "patch", "delete")) return@operation
+                        val operation = value.jsonObject
+                        val label = "$method $path"
+                        assertTrue(operation["summary"]?.jsonPrimitive?.content?.isNotBlank() == true, "$label needs summary")
+                        assertTrue(operation["description"]?.jsonPrimitive?.content?.isNotBlank() == true, "$label needs description")
+                        assertTrue(operation["tags"]?.jsonArray?.isNotEmpty() == true, "$label needs tags")
+                        assertTrue(operation["responses"]?.jsonObject?.isNotEmpty() == true, "$label needs responses")
+                        val id = assertNotNull(operation["operationId"]?.jsonPrimitive?.content)
+                        assertTrue(ids.add(id), "duplicate operationId $id")
+                    }
+                }
+                val schemes = assertNotNull(document["components"]?.jsonObject?.get("securitySchemes")?.jsonObject)
+                assertTrue(setOf("bearerAuth", "dpopProof", "oauth2").all(schemes::containsKey))
+                assertTrue(
+                    document["components"]
+                        ?.jsonObject
+                        ?.get("schemas")
+                        ?.jsonObject
+                        ?.size ?: 0 >= 34,
+                )
             }
         }
 

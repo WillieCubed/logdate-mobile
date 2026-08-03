@@ -229,7 +229,7 @@ FROM eclipse-temurin:17-jre-alpine AS runtime
 ## TODOs
 
 ### Core API Features
-- [ ] Implement comprehensive API documentation (OpenAPI/Swagger)
+- [x] Publish comprehensive OpenAPI documentation with the self-hosted Scalar API reference at `/docs`
 - [ ] Add API rate limiting and throttling
 - [ ] Implement advanced authentication (OAuth, SSO)
 - [ ] Add server monitoring and metrics collection

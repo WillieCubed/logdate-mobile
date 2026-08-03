@@ -12,6 +12,7 @@ import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthUseDpopNonceException
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -24,6 +25,7 @@ import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
+import kotlinx.serialization.Serializable
 import studio.hypertext.atproto.pds.AuthorizationCodeTokenRequest
 import studio.hypertext.atproto.pds.AuthorizationDecisionRequest
 import studio.hypertext.atproto.pds.AuthorizationPrompt
@@ -180,7 +182,26 @@ fun Route.oauthRoutes(
         }
     }
 
-    post("/oauth/token", {}) {
+    post("/oauth/token", {
+        dpopOperation(
+            "exchangeOAuthToken",
+            "OAuth",
+            "Exchange an OAuth token",
+            "Exchange an authorization code or refresh token for DPoP-bound credentials.",
+        )
+        request {
+            headerParameter<String>(DPOP_HEADER) { description = "DPoP proof JWT for this request." }
+            body<OAuthTokenForm> {
+                required = true
+                mediaTypes(ContentType.Application.FormUrlEncoded)
+            }
+        }
+        response {
+            HttpStatusCode.OK to { body<OAuthTokenResponse>() }
+            HttpStatusCode.BadRequest to { body<OAuthErrorResponse>() }
+            HttpStatusCode.NotImplemented to { body<OAuthErrorResponse>() }
+        }
+    }) {
         val service =
             authorizationService ?: return@post call.respond(
                 HttpStatusCode.NotImplemented,
@@ -269,6 +290,18 @@ fun Route.oauthRoutes(
         }
     }
 }
+
+@Serializable
+internal data class OAuthTokenForm(
+    val grantType: String,
+    val code: String? = null,
+    val redirectUri: String? = null,
+    val clientId: String,
+    val codeVerifier: String? = null,
+    val refreshToken: String? = null,
+    val clientAssertionType: String? = null,
+    val clientAssertion: String? = null,
+)
 
 private suspend fun ApplicationCall.respondOAuthToken(
     tokenResponse: OAuthTokenResponse,

@@ -1139,7 +1139,18 @@ fun Route.authV1Routes(
             }
         }
 
-        get("/me") {
+        get("/me", {
+            bearerOperation(
+                "getCurrentAccount",
+                "Authentication",
+                "Get current account",
+                "Return the authenticated account and fresh credentials.",
+            )
+            response {
+                HttpStatusCode.OK to { body<AuthResponse>() }
+                HttpStatusCode.Unauthorized to { body<ApiErrorResponse>() }
+            }
+        }) {
             try {
                 val account =
                     resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)

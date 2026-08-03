@@ -6,10 +6,10 @@ import app.logdate.server.database.toKotlinUuid
 import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.logdate.ResourceKind
 import app.logdate.server.logdate.ResourceRouteRepository
+import io.github.smiley4.ktoropenapi.get
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.get
 import io.ktor.server.routing.route
 import kotlinx.serialization.Serializable
 import kotlin.uuid.ExperimentalUuidApi
@@ -29,7 +29,19 @@ fun Route.resourceRoutes(
     resourceRouteRepository: ResourceRouteRepository,
 ) {
     route("/resources") {
-        get("/{resourceId}") {
+        get("/{resourceId}", {
+            publicOperation(
+                "resolveResource",
+                "Resources",
+                "Resolve a public resource",
+                "Resolve an opaque resource ID to its canonical public URL.",
+            )
+            request { pathParameter<String>("resourceId") { description = "Opaque LogDate resource identifier." } }
+            response {
+                HttpStatusCode.OK to { body<ResourceResponse>() }
+                HttpStatusCode.NotFound to { description = "Resource not found" }
+            }
+        }) {
             val resourceId = call.parameters["resourceId"]?.trim().orEmpty()
             if (resourceId.isBlank()) {
                 call.respond(HttpStatusCode.NotFound)

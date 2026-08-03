@@ -49,7 +49,7 @@ dependencies {
     implementation(libs.ktor.server.cors)
     implementation(libs.ktor.server.forwarded.header)
     implementation(libs.ktor.server.http.redirect)
-    implementation(libs.ktor.swagger.ui)
+    implementation(libs.scalar.core)
     implementation(libs.ktor.openapi)
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.jackson.dataformat.yaml)

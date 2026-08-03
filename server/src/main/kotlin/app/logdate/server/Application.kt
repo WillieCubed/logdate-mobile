@@ -53,10 +53,10 @@ import app.logdate.server.transcription.cloudTranscriptionSessionProviderFromEnv
 import app.logdate.util.UuidSerializer
 import io.github.aakira.napier.Napier
 import io.github.smiley4.ktoropenapi.OpenApi
+import io.github.smiley4.ktoropenapi.config.AuthKeyLocation
 import io.github.smiley4.ktoropenapi.config.AuthScheme
 import io.github.smiley4.ktoropenapi.config.AuthType
 import io.github.smiley4.ktoropenapi.openApi
-import io.github.smiley4.ktorswaggerui.swaggerUI
 import io.ktor.client.HttpClient
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -122,7 +122,7 @@ private val rootDescriptorJson: JsonObject by lazy {
     buildJsonObject {
         put("name", "LogDate Server API")
         put("version", "1.0.0")
-        put("docs", "/swagger")
+        put("docs", "/docs")
         put("openapi", "/openapi.json")
         put("openapi_yaml", "/openapi.yaml")
         put("health", "/health")
@@ -201,23 +201,54 @@ fun Application.module(
                 bearerFormat = "JWT"
                 description = "JWT bearer token for authenticated endpoints."
             }
+            securityScheme("dpopProof") {
+                type = AuthType.API_KEY
+                name = "DPoP"
+                location = AuthKeyLocation.HEADER
+                description = "DPoP proof JWT bound to the request method and URL."
+            }
+            securityScheme("oauth2") {
+                type = AuthType.OAUTH2
+                description = "OAuth 2.0 authorization-code flow for AT Protocol clients."
+                flows {
+                    authorizationCode {
+                        authorizationUrl = "/oauth/authorize"
+                        tokenUrl = "/oauth/token"
+                        scopes = mapOf("atproto" to "Access the user's AT Protocol repository")
+                    }
+                }
+            }
         }
         info {
             title = "LogDate Server API"
             version = "1.0.0"
             description = "Machine-readable contract for LogDate auth and sync endpoints."
         }
-        if (!profile.isProduction) {
-            server {
-                url = "http://localhost:8080"
-                description = "Local development server"
-            }
+        server {
+            url = "/"
+            description = "Current LogDate Cloud deployment"
+        }
+        val hiddenPaths =
+            setOf(
+                "/api/v1/auth/metrics",
+                "/api/v1/auth/metrics/prometheus",
+                "/api/v1/ops/sync/metrics",
+                "/api/v1/ops/sync/metrics/prometheus",
+                "/api/v1/ops/sync/tombstones:purge",
+                "/api/v1/ops/backups:purge",
+            )
+        pathFilter = { _, segments ->
+            val path = "/" + segments.joinToString("/")
+            path !in hiddenPaths && listOf("/api/v1/", "/oauth/", "/xrpc/", "/.well-known/").any(path::startsWith)
         }
         // Capture the built spec so the /openapi.yaml route below can serialize
         // it directly. Smiley4 v5's spec("yaml") API doesn't share routes or
         // config with the parent spec, so a parallel YAML spec would ship
         // empty.
-        postBuild = { api, _ -> openApiSpec.set(api) }
+        postBuild = { api, _ ->
+            completeOpenApiContract(api)
+            openApiSpec.set(api)
+        }
     }
 
     // Stop any existing Koin instance to ensure clean state for tests
@@ -334,9 +365,7 @@ fun Application.module(
                 call.respondText(Yaml31.pretty(spec), ContentType("application", "yaml"))
             }
         }
-        route("swagger") {
-            swaggerUI("/openapi.json")
-        }
+        scalarApiReferenceRoutes()
 
         get("/") {
             val accept = call.request.headers[HttpHeaders.Accept].orEmpty()

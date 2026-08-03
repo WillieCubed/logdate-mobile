@@ -15,6 +15,7 @@ import app.logdate.shared.model.transcription.CloudTranscriptionClientSecret
 import app.logdate.shared.model.transcription.CloudTranscriptionMode
 import app.logdate.shared.model.transcription.CloudTranscriptionSessionRequest
 import app.logdate.shared.model.transcription.CloudTranscriptionSessionResponse
+import io.github.smiley4.ktoropenapi.post
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -22,7 +23,6 @@ import io.ktor.server.application.call
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import java.util.UUID
 
@@ -41,7 +41,22 @@ fun Route.transcriptionRoutes(
     rateLimiter: SlidingWindowRateLimiter = SlidingWindowRateLimiter(),
 ) {
     route("/transcription") {
-        post("/sessions") {
+        post("/sessions", {
+            bearerOperation(
+                "createTranscriptionSession",
+                "Transcription",
+                "Create a transcription session",
+                "Reserve a short-lived cloud transcription session.",
+            )
+            request { body<CloudTranscriptionSessionRequest>() }
+            response {
+                HttpStatusCode.Created to { body<CloudTranscriptionSessionResponse>() }
+                HttpStatusCode.Unauthorized to { body<MessageErrorResponse>() }
+                HttpStatusCode.PaymentRequired to { body<MessageErrorResponse>() }
+                HttpStatusCode.TooManyRequests to { body<MessageErrorResponse>() }
+                HttpStatusCode.ServiceUnavailable to { body<MessageErrorResponse>() }
+            }
+        }) {
             val accountId =
                 call.resolveBearerAccountId(tokenService)
                     ?: return@post call.respond(
