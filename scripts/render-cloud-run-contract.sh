@@ -363,11 +363,23 @@ if [[ "${CI:-false}" == "true" && "$ENVIRONMENT" == "staging" ]]; then
         jq -c . | jq -R . \
             >"$RAW_CONSOLE_OUTPUT" || die "CI staging contract template could not be rendered."
 else
-    if ! printf '%s\n' "$TERRAFORM_EXPRESSION" | tr '\n' ' ' |
-        terraform -chdir="$PRIVATE_CONFIG_DIR" console \
-            -state="$CONSOLE_STATE" \
-            -var-file="${ENVIRONMENT}.tfvars" >"$RAW_CONSOLE_OUTPUT" 2>"$TERRAFORM_CONSOLE_LOG"; then
+    set +e
+    if command -v timeout >/dev/null 2>&1; then
+        printf '%s\n' "$TERRAFORM_EXPRESSION" | tr '\n' ' ' |
+            timeout --foreground -k 5 30 terraform -chdir="$PRIVATE_CONFIG_DIR" console \
+                -state="$CONSOLE_STATE" \
+                -var-file="${ENVIRONMENT}.tfvars" >"$RAW_CONSOLE_OUTPUT" 2>"$TERRAFORM_CONSOLE_LOG"
+    else
+        printf '%s\n' "$TERRAFORM_EXPRESSION" | tr '\n' ' ' |
+            terraform -chdir="$PRIVATE_CONFIG_DIR" console \
+                -state="$CONSOLE_STATE" \
+                -var-file="${ENVIRONMENT}.tfvars" >"$RAW_CONSOLE_OUTPUT" 2>"$TERRAFORM_CONSOLE_LOG"
+    fi
+    TERRAFORM_CONSOLE_STATUS=$?
+    set -e
+    if [[ "$TERRAFORM_CONSOLE_STATUS" -ne 0 ]]; then
         redact_log "$TERRAFORM_CONSOLE_LOG"
+        [[ "$TERRAFORM_CONSOLE_STATUS" -ne 124 ]] || die "Terraform console exceeded 30 seconds."
         die "Terraform console failed."
     fi
 fi
