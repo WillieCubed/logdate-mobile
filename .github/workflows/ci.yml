@@ -69,6 +69,16 @@ jobs:
           DATABASE_PASSWORD: test
           REDIS_URL: redis://localhost:6379
 
+      - name: Upload unit-test reports
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-reports
+          if-no-files-found: warn
+          path: |
+            **/build/test-results/test
+            **/build/reports/tests
+
       - name: Generate coverage report
         run: ./gradlew koverXmlReport
         continue-on-error: true

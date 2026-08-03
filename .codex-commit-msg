@@ -1,5 +1,4 @@
-fix(sync): preserve canonical identity through Cloud signup
+chore(ci): preserve unit-test reports on failure
 
-Send the durable owner ID through the Cloud API client and update synthetic
-server/client signup fixtures so integration journeys exercise the one-identity
-contract instead of failing before sync begins.
+Upload Gradle test results when the aggregate unit-test job fails so CI exposes
+the exact failing test instead of only reporting a red workflow step.
