@@ -25,6 +25,24 @@ github_repo        = "WillieCubed/logdate-mobile"
 enable_domain_mapping = true
 domains               = ["cloud.logdate.app"]
 
+# REQUIRED before production can deploy. scripts/render-cloud-run-contract.sh accepts exactly
+# an `upload` and a `play_app_signing` certificate here, rejects the known debug certificate,
+# and requires the two to differ. Both fingerprints come from Play Console once the LogDate
+# application exists (Setup -> App integrity); the same pair must be published at
+# https://logdate.app/.well-known/assetlinks.json, which is the relying-party domain Android
+# Credential Manager reads for the production rpId.
+#
+# android_signing_certificates = {
+#   upload = {
+#     fingerprint         = "<colon-hex SHA-256 of the upload certificate>"
+#     apk_key_hash_origin = "android:apk-key-hash:<base64url of the same digest>"
+#   }
+#   play_app_signing = {
+#     fingerprint         = "<colon-hex SHA-256 of the Play app-signing certificate>"
+#     apk_key_hash_origin = "android:apk-key-hash:<base64url of the same digest>"
+#   }
+# }
+
 create_gcs_bucket = true
 gcs_bucket_name   = "logdate-media-logdate"
 
@@ -32,24 +50,38 @@ request_concurrency = 16
 cpu_idle            = true
 startup_cpu_boost   = true
 
+# Must match scripts/render-cloud-run-contract.sh exactly: the renderer requires every key
+# below and rejects any it does not know, so an extra entry fails the deploy just as a missing
+# one does. HOST, GCS_*, and WEBAUTHN_* are derived by the renderer from the fields above.
 cloud_run_env = {
-  LOGDATE_ENV     = "production"
-  AUTO_MIGRATE    = "false"
-  ALLOWED_ORIGINS = "https://cloud.logdate.app"
-  REQUIRE_HTTPS   = "true"
+  LOGDATE_ENV                     = "production"
+  LOGDATE_EXPECT_FIRST_PARTY      = "true"
+  LOGDATE_DEPLOYMENT_KIND         = "first_party"
+  LOGDATE_SERVER_DISPLAY_NAME     = "LogDate Cloud"
+  LOGDATE_PUBLIC_ORIGIN           = "https://cloud.logdate.app"
+  ATPROTO_PDS_SERVICE_URL         = "https://cloud.logdate.app"
+  ATPROTO_HANDLE_DOMAIN           = "logdate.app"
+  BILLING_PROVIDER                = "play"
+  SERVER_ENCRYPTION_ENABLED       = "true"
+  SYNC_MEDIA_SIGNED_URLS          = "true"
+  SYNC_MEDIA_SIGNED_URL_TTL_HOURS = "1"
+  AUTO_MIGRATE                    = "false"
 }
 
 cloud_run_secret_env = {
-  DATABASE_URL      = { secret_id = "logdate-db-url", version = "1" }
-  DATABASE_USER     = { secret_id = "logdate-db-user", version = "1" }
-  DATABASE_PASSWORD = { secret_id = "logdate-db-password", version = "1" }
-  JWT_SECRET        = { secret_id = "logdate-jwt-secret", version = "1" }
+  DATABASE_URL             = { secret_id = "logdate-db-url", version = "1" }
+  DATABASE_USER            = { secret_id = "logdate-db-user", version = "1" }
+  DATABASE_PASSWORD        = { secret_id = "logdate-db-password", version = "1" }
+  JWT_SECRET               = { secret_id = "logdate-jwt-secret", version = "1" }
+  # Required by the first-party contract. Create a version for each of these in the production
+  # project's Secret Manager before deploying; Cloud Run rejects an empty mounted secret.
+  SERVER_ENCRYPTION_KEY    = { secret_id = "logdate-server-encryption-key", version = "1" }
+  SERVER_ENCRYPTION_KEY_ID = { secret_id = "logdate-server-encryption-key-id", version = "1" }
+  HEALTH_INTERNAL_TOKEN    = { secret_id = "logdate-health-internal-token", version = "1" }
   # Mount these only AFTER the matching secret has at least one version.
   # Cloud Run fails the revision if it tries to mount an empty container.
-  # Provisioning steps: docs/observability/sentry.md and
-  # docs/observability/health-endpoint.md.
-  #   SENTRY_DSN              = { secret_id = "logdate-sentry-dsn" }
-  #   HEALTH_INTERNAL_TOKEN   = { secret_id = "logdate-health-internal-token" }
+  # Provisioning steps: docs/observability/sentry.md.
+  #   SENTRY_DSN             = { secret_id = "logdate-sentry-dsn", version = "1" }
   # Opt-in only — add entries below and drop a matching key into
   # infra/terraform/production.env to configure Google OIDC or Redis:
   #   GOOGLE_OIDC_CLIENT_IDS = { secret_id = "logdate-google-oidc-client-ids" }
@@ -65,7 +97,8 @@ secret_ids = [
   "logdate-google-oidc-client-ids",
   "logdate-redis-url",
   "logdate-sentry-dsn",
-  "logdate-health-internal-token",
+  "logdate-server-encryption-key",
+  "logdate-server-encryption-key-id",
 ]
 
 create_secrets = true

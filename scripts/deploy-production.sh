@@ -633,21 +633,39 @@ gcs_bucket_name   = "logdate-media-$PROJECT_ID"
 # provision a managed Cloud SQL instance (and pay the monthly baseline).
 create_cloud_sql_instance = false
 
+# Keys and values here must match scripts/render-cloud-run-contract.sh, which requires every
+# one of them and rejects anything it does not recognise. An earlier version of this template
+# emitted ALLOWED_ORIGINS/REQUIRE_HTTPS and omitted the rest, which made every generated
+# production contract fail to render.
 cloud_run_env = {
-  LOGDATE_ENV     = "production"
-  AUTO_MIGRATE    = "false"
-  ALLOWED_ORIGINS = "$allowed_origins"
-  REQUIRE_HTTPS   = "true"
+  LOGDATE_ENV                     = "production"
+  LOGDATE_EXPECT_FIRST_PARTY      = "true"
+  LOGDATE_DEPLOYMENT_KIND         = "first_party"
+  LOGDATE_SERVER_DISPLAY_NAME     = "LogDate Cloud"
+  LOGDATE_PUBLIC_ORIGIN           = "https://$PRIMARY_DOMAIN"
+  ATPROTO_PDS_SERVICE_URL         = "https://$PRIMARY_DOMAIN"
+  ATPROTO_HANDLE_DOMAIN           = "$WEBAUTHN_RP_ID"
+  BILLING_PROVIDER                = "play"
+  SERVER_ENCRYPTION_ENABLED       = "true"
+  SYNC_MEDIA_SIGNED_URLS          = "true"
+  SYNC_MEDIA_SIGNED_URL_TTL_HOURS = "1"
+  AUTO_MIGRATE                    = "false"
 }
 
+# Secret versions are pinned; `latest` is prohibited in first-party contracts.
 cloud_run_secret_env = {
-  DATABASE_URL           = { secret_id = "logdate-db-url" }
-  DATABASE_USER          = { secret_id = "logdate-db-user" }
-  DATABASE_PASSWORD      = { secret_id = "logdate-db-password" }
-  JWT_SECRET             = { secret_id = "logdate-jwt-secret" }
-  GOOGLE_OIDC_CLIENT_IDS = { secret_id = "logdate-google-oidc-client-ids" }
-  REDIS_URL              = { secret_id = "logdate-redis-url" }
+  DATABASE_URL             = { secret_id = "logdate-db-url", version = "1" }
+  DATABASE_USER            = { secret_id = "logdate-db-user", version = "1" }
+  DATABASE_PASSWORD        = { secret_id = "logdate-db-password", version = "1" }
+  JWT_SECRET               = { secret_id = "logdate-jwt-secret", version = "1" }
+  SERVER_ENCRYPTION_KEY    = { secret_id = "logdate-server-encryption-key", version = "1" }
+  SERVER_ENCRYPTION_KEY_ID = { secret_id = "logdate-server-encryption-key-id", version = "1" }
+  HEALTH_INTERNAL_TOKEN    = { secret_id = "logdate-health-internal-token", version = "1" }
 }
+
+# The renderer additionally requires an `android_signing_certificates` block with exactly an
+# `upload` and a `play_app_signing` entry. Those fingerprints only exist once the Play
+# application does, so add them by hand before the first production deploy.
 
 create_secrets = true
 EOF
