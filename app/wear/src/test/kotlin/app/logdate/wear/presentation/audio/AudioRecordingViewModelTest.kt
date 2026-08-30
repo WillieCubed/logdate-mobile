@@ -521,8 +521,18 @@ class AudioRecordingViewModelTest {
             audioLevelFlow.value = 0.2f
             advanceTimeBy(500)
 
+            // Read the duration before stopping: cancelRecording resets it to zero.
+            val durationWhileRecording = viewModel.uiState.value.durationMs
+
+            // The audio-level collector samples on a 100ms tick, which schedules an unbounded
+            // chain of delays on the virtual clock. runTest waits for the scope to go idle, so
+            // leaving the collector running hangs the test rather than failing it. Every other
+            // test here stops recording first; this one has to as well.
+            viewModel.cancelRecording()
+            advanceTimeBy(200)
+
             assertTrue(
-                viewModel.uiState.value.durationMs > 0,
+                durationWhileRecording > 0,
                 "Expected duration to increase while recording",
             )
             viewModel.cancelScope()
