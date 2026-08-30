@@ -1,5 +1,9 @@
 package app.logdate.feature.onboarding.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -7,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
@@ -134,23 +139,27 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
         val progressSnapshot by flowViewModel.progressSnapshot.collectAsState()
         val coroutineScope = rememberCoroutineScope()
 
-        OnboardingStartScreen(
-            onNext = {
-                coroutineScope.launch {
-                    flowViewModel.setActiveEntryMode(OnboardingEntryMode.FRESH)
-                    onGoToItem(routeForStep(firstOnboardingStep(OnboardingEntryMode.FRESH, progressSnapshot)))
-                }
-            },
-            onSignIn = {
-                coroutineScope.launch {
-                    // "Sign into LogDate Cloud" previously dropped the user at the first
-                    // CONTINUE_SETUP step, which is the local personal-introduction screen - there
-                    // was no reachable path to authenticate an existing account from onboarding.
-                    flowViewModel.setActiveEntryMode(OnboardingEntryMode.CONTINUE_SETUP)
-                    onGoToItem(SignIn)
-                }
-            },
-        )
+        OnboardingInsets {
+            OnboardingStartScreen(
+                onNext = {
+                    coroutineScope.launch {
+                        flowViewModel.setActiveEntryMode(OnboardingEntryMode.FRESH)
+                        onGoToItem(
+                            routeForStep(firstOnboardingStep(OnboardingEntryMode.FRESH, progressSnapshot)),
+                        )
+                    }
+                },
+                onSignIn = {
+                    coroutineScope.launch {
+                        // "Sign into LogDate Cloud" previously dropped the user at the first
+                        // CONTINUE_SETUP step, which is the local personal-introduction screen -
+                        // there was no reachable path to authenticate an existing account.
+                        flowViewModel.setActiveEntryMode(OnboardingEntryMode.CONTINUE_SETUP)
+                        onGoToItem(SignIn)
+                    }
+                },
+            )
+        }
     }
     taggedEntry<PersonalIntro> {
         val flowViewModel = koinViewModel<OnboardingViewModel>()
@@ -326,18 +335,22 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
         }
 
         if (entryMode == OnboardingEntryMode.CONTINUE_SETUP) {
-            RecoveryPhraseEntryScreen(
-                onRecoverPhrase = recoveryViewModel::recoverIdentity,
-                onRecovered = ::continueAfterRecovery,
-            )
+            OnboardingInsets {
+                RecoveryPhraseEntryScreen(
+                    onRecoverPhrase = recoveryViewModel::recoverIdentity,
+                    onRecovered = ::continueAfterRecovery,
+                )
+            }
         } else {
-            RecoveryPhraseSetupScreen(
-                words = setupState.words,
-                isLoading = setupState.isLoading,
-                errorMessage = setupState.errorMessage,
-                onRetry = recoveryViewModel::prepareRecoveryPhrase,
-                onPhraseContinue = { continueAfterRecovery() },
-            )
+            OnboardingInsets {
+                RecoveryPhraseSetupScreen(
+                    words = setupState.words,
+                    isLoading = setupState.isLoading,
+                    errorMessage = setupState.errorMessage,
+                    onRetry = recoveryViewModel::prepareRecoveryPhrase,
+                    onPhraseContinue = { continueAfterRecovery() },
+                )
+            }
         }
     }
     taggedEntry<BirthdayIntro> {
@@ -533,7 +546,7 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
         )
     }
     taggedEntry<WelcomeBack> {
-        WelcomeBackScreen(onFinish = onWelcomeBack)
+        OnboardingInsets { WelcomeBackScreen(onFinish = onWelcomeBack) }
     }
 }
 
@@ -559,3 +572,16 @@ private fun terminalStepFor(entryMode: OnboardingEntryMode): OnboardingStep =
         OnboardingEntryMode.FRESH -> OnboardingStep.COMPLETE
         OnboardingEntryMode.CONTINUE_SETUP -> OnboardingStep.WELCOME_BACK
     }
+
+/**
+ * Applies window insets to onboarding screens that lay themselves out edge to edge.
+ *
+ * Most screens here sit inside a Scaffold that handles this; these four do not, so their
+ * headings drew underneath the status bar and their actions under the navigation bar.
+ */
+@Composable
+private fun OnboardingInsets(content: @Composable () -> Unit) {
+    Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+        content()
+    }
+}
