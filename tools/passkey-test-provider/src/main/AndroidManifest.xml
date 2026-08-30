@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:label="LogDate Test Authenticator"
+        android:allowBackup="false"
+        android:theme="@android:style/Theme.Material.Light.Dialog.NoActionBar">
+
+        <!--
+          Registers this app with Credential Manager. BIND_CREDENTIAL_PROVIDER_SERVICE ensures only
+          the system can bind, and the meta-data declares which credential types are handled.
+        -->
+        <service
+            android:name=".TestPasskeyProviderService"
+            android:enabled="true"
+            android:exported="true"
+            android:label="LogDate Test Authenticator"
+            android:permission="android.permission.BIND_CREDENTIAL_PROVIDER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.credentials.CredentialProviderService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.credentials.provider"
+                android:resource="@xml/provider" />
+        </service>
+
+        <activity
+            android:name=".CeremonyActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop" />
+    </application>
+</manifest>
