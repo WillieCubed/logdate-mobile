@@ -15,6 +15,7 @@ import androidx.credentials.provider.ProviderCreateCredentialRequest
 import androidx.credentials.provider.ProviderGetCredentialRequest
 import androidx.credentials.CreatePublicKeyCredentialRequest
 import androidx.credentials.GetPublicKeyCredentialOption
+import java.io.File
 import java.security.MessageDigest
 import java.security.interfaces.ECPublicKey
 import org.json.JSONObject
@@ -169,7 +170,22 @@ class CeremonyActivity : Activity() {
         return json.toByteArray(Charsets.UTF_8)
     }
 
+    /**
+     * Optional origin override, used to exercise relying parties whose allowlist does not yet carry
+     * this build's signing certificate. Write it with:
+     *
+     * ```
+     * adb shell run-as app.logdate.tools.passkeyprovider \
+     *   sh -c 'echo -n https://example.com > files/origin_override'
+     * ```
+     */
+    private fun overrideOrigin(): String? =
+        runCatching { File(filesDir, ORIGIN_OVERRIDE_FILE).takeIf { it.exists() }?.readText()?.trim() }
+            .getOrNull()
+            ?.takeIf { it.isNotEmpty() }
+
     private fun apkKeyHashOrigin(callingPackage: String): String {
+        overrideOrigin()?.let { return it }
         val signatures =
             packageManager
                 .getPackageInfo(callingPackage, PackageManager.GET_SIGNING_CERTIFICATES)
@@ -202,6 +218,7 @@ class CeremonyActivity : Activity() {
         const val ACTION_GET = "app.logdate.tools.passkeyprovider.GET"
         const val EXTRA_CREDENTIAL_ID = "credentialId"
         const val EXTRA_CALLING_PACKAGE = "callingPackage"
+        private const val ORIGIN_OVERRIDE_FILE = "origin_override"
         private const val TAG = "TestPasskeyProvider"
     }
 }

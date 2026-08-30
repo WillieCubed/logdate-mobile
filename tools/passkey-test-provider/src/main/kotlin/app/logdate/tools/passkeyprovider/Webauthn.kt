@@ -40,8 +40,13 @@ object Cbor {
 
     fun uint(value: Long): ByteArray = header(0, value)
 
-    /** CBOR negative integers encode -1-n, which is how COSE spells alg/crv labels. */
-    fun nint(value: Long): ByteArray = header(1, -1 - value)
+    /**
+     * Encodes the negative integer `-magnitude`, the form COSE uses for its alg and crv labels.
+     *
+     * CBOR stores a negative integer n as major type 1 with argument `-1 - n`, so `-7` is written
+     * with argument 6 - hence `magnitude - 1`.
+     */
+    fun nint(magnitude: Long): ByteArray = header(1, magnitude - 1)
 
     fun bytes(value: ByteArray): ByteArray = header(2, value.size.toLong()) + value
 

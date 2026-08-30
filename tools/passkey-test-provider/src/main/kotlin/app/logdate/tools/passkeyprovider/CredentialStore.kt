@@ -1,6 +1,7 @@
 package app.logdate.tools.passkeyprovider
 
 import android.content.Context
+import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -40,6 +41,27 @@ data class StoredCredential(
 
 class CredentialStore(context: Context) {
     private val prefs = context.getSharedPreferences("test-passkeys", Context.MODE_PRIVATE)
+
+    init {
+        importSeedIfPresent(context)
+    }
+
+    /**
+     * Imports a credential produced elsewhere (for example `scripts/passkey-verify/sim.py`) so the
+     * sign-in half of a ceremony can be driven against an account that already exists.
+     *
+     * Seeding happens here rather than in the ceremony activity because the provider service
+     * answers `onBeginGetCredentialRequest` before any activity runs; seeding later meant the
+     * service reported no credentials and the ceremony never started.
+     */
+    private fun importSeedIfPresent(context: Context) {
+        val seed = File(context.filesDir, "seed_credential.json")
+        if (!seed.exists()) return
+        runCatching {
+            save(StoredCredential.fromJson(JSONObject(seed.readText())))
+            seed.delete()
+        }
+    }
 
     fun all(): List<StoredCredential> {
         val raw = prefs.getString(KEY, null) ?: return emptyList()
