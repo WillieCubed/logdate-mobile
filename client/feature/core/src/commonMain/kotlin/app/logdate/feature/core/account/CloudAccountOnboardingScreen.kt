@@ -135,7 +135,7 @@ fun CloudAccountOnboardingScreen(
     // indicator and progress bar clear of the status bar, which none of these steps did.
     Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
         when (uiState.currentStep) {
-                OnboardingStep.Welcome -> {
+            OnboardingStep.Welcome -> {
                 CloudAccountWelcomeScreen(
                     onContinue = viewModel::goToNextStep,
                     onSignIn = viewModel::goToSignIn,
@@ -147,99 +147,99 @@ fun CloudAccountOnboardingScreen(
                     isPasskeySupported = uiState.isPasskeySupported,
                     modifier = modifier,
                 )
-        }
+            }
 
-        OnboardingStep.SignIn -> {
-            val googleAuthError = uiState.googleAuthError
-            val signInError =
-                uiState.errorMessage
-                    ?: if (googleAuthError != null) googleAuthErrorMessage(googleAuthError) else null
-            CloudAccountSignInScreen(
-                onSignIn = viewModel::signInWithPasskey,
-                onAccountRecovery = { showRecoveryInfo.value = true },
-                onPrivacyPolicy = serverPresentation.privacyPolicyUrl?.let { { uriHandler.openUri(it) } },
-                onTermsOfService = serverPresentation.termsOfServiceUrl?.let { { uriHandler.openUri(it) } },
-                onBack = viewModel::goToPreviousStep,
-                isSigningIn = uiState.isSigningIn,
-                errorMessage = signInError,
-                onClearError = viewModel::clearError,
-                onSignInWithGoogle =
-                    if (uiState.isGoogleSignInAvailable) viewModel::signInWithGoogle else null,
-                serverDisplayName = serverPresentation.displayName,
-                serverHandleDomain = serverPresentation.handleDomain,
-                modifier = modifier,
-            )
-        }
+            OnboardingStep.SignIn -> {
+                val googleAuthError = uiState.googleAuthError
+                val signInError =
+                    uiState.errorMessage
+                        ?: if (googleAuthError != null) googleAuthErrorMessage(googleAuthError) else null
+                CloudAccountSignInScreen(
+                    onSignIn = viewModel::signInWithPasskey,
+                    onAccountRecovery = { showRecoveryInfo.value = true },
+                    onPrivacyPolicy = serverPresentation.privacyPolicyUrl?.let { { uriHandler.openUri(it) } },
+                    onTermsOfService = serverPresentation.termsOfServiceUrl?.let { { uriHandler.openUri(it) } },
+                    onBack = viewModel::goToPreviousStep,
+                    isSigningIn = uiState.isSigningIn,
+                    errorMessage = signInError,
+                    onClearError = viewModel::clearError,
+                    onSignInWithGoogle =
+                        if (uiState.isGoogleSignInAvailable) viewModel::signInWithGoogle else null,
+                    serverDisplayName = serverPresentation.displayName,
+                    serverHandleDomain = serverPresentation.handleDomain,
+                    modifier = modifier,
+                )
+            }
 
-        OnboardingStep.DisplayName -> {
-            DisplayNameSetupScreen(
-                displayName = uiState.displayName,
-                onDisplayNameChange = viewModel::updateDisplayName,
-                onContinue = viewModel::goToNextStep,
-                onBack = viewModel::goToPreviousStep,
-                isValid = uiState.canContinueFromDisplayName,
-                modifier = modifier,
-            )
-        }
+            OnboardingStep.DisplayName -> {
+                DisplayNameSetupScreen(
+                    displayName = uiState.displayName,
+                    onDisplayNameChange = viewModel::updateDisplayName,
+                    onContinue = viewModel::goToNextStep,
+                    onBack = viewModel::goToPreviousStep,
+                    isValid = uiState.canContinueFromDisplayName,
+                    modifier = modifier,
+                )
+            }
 
-        OnboardingStep.Username -> {
-            val stepCount = if (uiState.hasProfileDisplayName) 2 else 3
-            UsernameSetupScreen(
-                username = uiState.username,
-                onUsernameChange = viewModel::updateUsername,
-                onContinue = viewModel::goToNextStep,
-                onBack = viewModel::goToPreviousStep,
-                usernameAvailability = uiState.usernameAvailability,
-                isValid = uiState.canContinueFromUsername,
-                handleDomain = serverPresentation.handleDomain,
-                stepNumber = stepCount - 1,
-                stepCount = stepCount,
-                modifier = modifier,
-            )
-        }
+            OnboardingStep.Username -> {
+                val stepCount = if (uiState.hasProfileDisplayName) 2 else 3
+                UsernameSetupScreen(
+                    username = uiState.username,
+                    onUsernameChange = viewModel::updateUsername,
+                    onContinue = viewModel::goToNextStep,
+                    onBack = viewModel::goToPreviousStep,
+                    usernameAvailability = uiState.usernameAvailability,
+                    isValid = uiState.canContinueFromUsername,
+                    handleDomain = serverPresentation.handleDomain,
+                    stepNumber = stepCount - 1,
+                    stepCount = stepCount,
+                    modifier = modifier,
+                )
+            }
 
-        OnboardingStep.PasskeyCreation -> {
-            // The DisplayName step is skipped when onboarding already captured a name, so the
-            // stepper reports the number of steps this user actually sees.
-            val stepCount = if (uiState.hasProfileDisplayName) 2 else 3
-            PasskeyAccountCreationFinalContent(
-                displayName = uiState.displayName,
-                username = uiState.username,
-                onCreateAccount = viewModel::createAccount,
-                onBack = viewModel::goToPreviousStep,
-                isCreatingAccount = uiState.isCreatingAccount,
-                errorMessage = uiState.errorMessage,
-                onClearError = viewModel::clearError,
-                isPasskeySupported = uiState.isPasskeySupported,
-                handleDomain = serverPresentation.handleDomain,
-                serverDisplayName = serverPresentation.displayName,
-                stepNumber = stepCount,
-                stepCount = stepCount,
-                modifier = modifier,
-            )
-        }
+            OnboardingStep.PasskeyCreation -> {
+                // The DisplayName step is skipped when onboarding already captured a name, so the
+                // stepper reports the number of steps this user actually sees.
+                val stepCount = if (uiState.hasProfileDisplayName) 2 else 3
+                PasskeyAccountCreationFinalContent(
+                    displayName = uiState.displayName,
+                    username = uiState.username,
+                    onCreateAccount = viewModel::createAccount,
+                    onBack = viewModel::goToPreviousStep,
+                    isCreatingAccount = uiState.isCreatingAccount,
+                    errorMessage = uiState.errorMessage,
+                    onClearError = viewModel::clearError,
+                    isPasskeySupported = uiState.isPasskeySupported,
+                    handleDomain = serverPresentation.handleDomain,
+                    serverDisplayName = serverPresentation.displayName,
+                    stepNumber = stepCount,
+                    stepCount = stepCount,
+                    modifier = modifier,
+                )
+            }
 
-        OnboardingStep.EmailVerification -> {
-            EmailVerificationStep(
-                isVerifying = uiState.isVerifyingEmail,
-                outcome = uiState.emailVerificationOutcome,
-                onVerifyClick = viewModel::onVerifyEmailClicked,
-                onSkip = viewModel::onSkipEmailVerification,
-                onContinue = viewModel::goToNextStep,
-                modifier = modifier,
-            )
-        }
+            OnboardingStep.EmailVerification -> {
+                EmailVerificationStep(
+                    isVerifying = uiState.isVerifyingEmail,
+                    outcome = uiState.emailVerificationOutcome,
+                    onVerifyClick = viewModel::onVerifyEmailClicked,
+                    onSkip = viewModel::onSkipEmailVerification,
+                    onContinue = viewModel::goToNextStep,
+                    modifier = modifier,
+                )
+            }
 
-        OnboardingStep.Complete -> {
-            // Stay here until the first sync finishes so the user sees we're actually doing
-            // something; the completion LaunchedEffect above navigates away once isAccountCreated
-            // / isSignedIn flips, which [CloudAccountOnboardingViewModel.performInitialSync] only
-            // sets after sync settles.
-            InitialSyncProgressScreen(
-                status = uiState.initialSyncStatus,
-                modifier = modifier,
-            )
-        }
+            OnboardingStep.Complete -> {
+                // Stay here until the first sync finishes so the user sees we're actually doing
+                // something; the completion LaunchedEffect above navigates away once isAccountCreated
+                // / isSignedIn flips, which [CloudAccountOnboardingViewModel.performInitialSync] only
+                // sets after sync settles.
+                InitialSyncProgressScreen(
+                    status = uiState.initialSyncStatus,
+                    modifier = modifier,
+                )
+            }
         }
     }
 }
