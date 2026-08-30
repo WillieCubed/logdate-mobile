@@ -257,6 +257,24 @@
                     android:pathPrefix="/logdate/camera" />
             </intent-filter>
         </service>
+
+        <!--
+            Owning the account type is what allows addAccountExplicitly to succeed. LogDate signs
+            in with passkeys inside the app, so this authenticator exposes no system credential
+            flow; it exists so the account can be recorded with the platform at all.
+        -->
+        <service
+            android:name="app.logdate.client.LogDateAccountAuthenticatorService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.accounts.AccountAuthenticator" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.accounts.AccountAuthenticator"
+                android:resource="@xml/authenticator" />
+        </service>
+
     </application>
 
 </manifest>
