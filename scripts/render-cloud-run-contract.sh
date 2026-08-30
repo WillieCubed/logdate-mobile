@@ -7,6 +7,13 @@ set -euo pipefail
 # The previous fixed 30s was tuned on a warm workstation and expired on a cold CI runner,
 # which failed the first production deploy at the render step. Defaults are generous enough
 # for a cold runner and overridable for slower ones.
+# hashicorp/setup-terraform installs a wrapper script named `terraform` that captures stdio,
+# and renames the real binary to `terraform-bin`. The wrapper hangs when a command reads from a
+# pipe, which is exactly how the contract expression is fed to `terraform console` - the first
+# two production deploys died on that, at 30s and then at 120s, while the same render finished
+# instantly on a workstation with no wrapper installed. Prefer the real binary when it exists.
+readonly TERRAFORM_BIN="$(command -v terraform-bin 2>/dev/null || command -v terraform 2>/dev/null || echo terraform)"
+
 readonly TERRAFORM_INIT_TIMEOUT_SECONDS="${LOGDATE_TERRAFORM_INIT_TIMEOUT_SECONDS:-60}"
 readonly TERRAFORM_CONSOLE_TIMEOUT_SECONDS="${LOGDATE_TERRAFORM_CONSOLE_TIMEOUT_SECONDS:-120}"
 umask 077
@@ -282,9 +289,9 @@ fi
 # which is the property the CI skip was reaching for.
 set +e
 if command -v timeout >/dev/null 2>&1; then
-    timeout --foreground -k 5 "$TERRAFORM_INIT_TIMEOUT_SECONDS" terraform -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false -plugin-dir="$PRIVATE_PLUGIN_DIR" >"$TERRAFORM_INIT_LOG" 2>&1
+    timeout --foreground -k 5 "$TERRAFORM_INIT_TIMEOUT_SECONDS" "$TERRAFORM_BIN" -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false -plugin-dir="$PRIVATE_PLUGIN_DIR" >"$TERRAFORM_INIT_LOG" 2>&1
 else
-    terraform -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false -plugin-dir="$PRIVATE_PLUGIN_DIR" >"$TERRAFORM_INIT_LOG" 2>&1
+    "$TERRAFORM_BIN" -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false -plugin-dir="$PRIVATE_PLUGIN_DIR" >"$TERRAFORM_INIT_LOG" 2>&1
 fi
 TERRAFORM_INIT_STATUS=$?
 set -e
@@ -366,22 +373,35 @@ if [[ "${CI:-false}" == "true" && "$ENVIRONMENT" == "staging" ]]; then
         jq -c . | jq -R . \
             >"$RAW_CONSOLE_OUTPUT" || die "CI staging contract template could not be rendered."
 else
+    # Feed the expression from a regular file rather than a pipe. `console` reads stdin to EOF,
+    # and a pipe leaves that at the mercy of whatever wraps the binary - which is how the first
+    # production renders stalled with no output at all. A file gives a clean, immediate EOF.
+    CONSOLE_EXPRESSION_FILE="$PRIVATE_WORK_DIR/console-expression"
+    printf '%s\n' "$TERRAFORM_EXPRESSION" | tr '\n' ' ' >"$CONSOLE_EXPRESSION_FILE"
+    printf '\n' >>"$CONSOLE_EXPRESSION_FILE"
+    chmod 600 "$CONSOLE_EXPRESSION_FILE"
+
+    CONSOLE_STARTED_AT=$(date +%s)
     set +e
     if command -v timeout >/dev/null 2>&1; then
-        printf '%s\n' "$TERRAFORM_EXPRESSION" | tr '\n' ' ' |
-            timeout --foreground -k 5 "$TERRAFORM_CONSOLE_TIMEOUT_SECONDS" terraform -chdir="$PRIVATE_CONFIG_DIR" console \
-                -state="$CONSOLE_STATE" \
-                -var-file="${ENVIRONMENT}.tfvars" >"$RAW_CONSOLE_OUTPUT" 2>"$TERRAFORM_CONSOLE_LOG"
+        timeout --foreground -k 5 "$TERRAFORM_CONSOLE_TIMEOUT_SECONDS" "$TERRAFORM_BIN" -chdir="$PRIVATE_CONFIG_DIR" console \
+            -state="$CONSOLE_STATE" \
+            -var-file="${ENVIRONMENT}.tfvars" \
+            <"$CONSOLE_EXPRESSION_FILE" >"$RAW_CONSOLE_OUTPUT" 2>"$TERRAFORM_CONSOLE_LOG"
     else
-        printf '%s\n' "$TERRAFORM_EXPRESSION" | tr '\n' ' ' |
-            terraform -chdir="$PRIVATE_CONFIG_DIR" console \
-                -state="$CONSOLE_STATE" \
-                -var-file="${ENVIRONMENT}.tfvars" >"$RAW_CONSOLE_OUTPUT" 2>"$TERRAFORM_CONSOLE_LOG"
+        "$TERRAFORM_BIN" -chdir="$PRIVATE_CONFIG_DIR" console \
+            -state="$CONSOLE_STATE" \
+            -var-file="${ENVIRONMENT}.tfvars" \
+            <"$CONSOLE_EXPRESSION_FILE" >"$RAW_CONSOLE_OUTPUT" 2>"$TERRAFORM_CONSOLE_LOG"
     fi
     TERRAFORM_CONSOLE_STATUS=$?
     set -e
     if [[ "$TERRAFORM_CONSOLE_STATUS" -ne 0 ]]; then
         redact_log "$TERRAFORM_CONSOLE_LOG"
+        # A silent timeout tells you nothing, which is how two production deploys were lost.
+        # Surface what initialization did, since console inherits its state.
+        printf '%s\n' 'terraform init log follows:' >&2
+        redact_log "$TERRAFORM_INIT_LOG" 2>/dev/null || true
         [[ "$TERRAFORM_CONSOLE_STATUS" -ne 124 ]] || die "Terraform console exceeded ${TERRAFORM_CONSOLE_TIMEOUT_SECONDS} seconds."
         die "Terraform console failed."
     fi
