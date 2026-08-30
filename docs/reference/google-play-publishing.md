@@ -60,12 +60,25 @@ full secret rotation runbook.
 
 ## Helper Scripts
 
-Setup splits across two scripts:
+Setup splits across three scripts:
 
 ```bash
+./scripts/create-signing-keystore.sh --environment production   # creates the keystore
 ./scripts/sync-firebase-configs.sh android-all       # uploads both Firebase JSONs
 ./scripts/setup-play-publishing-secrets.sh           # uploads Play API creds + keystore
 ```
+
+`create-signing-keystore.sh` owns the keystore itself. It creates one per
+environment on first run and reuses it forever after — re-running is a no-op
+that reprints the same values, and it refuses to continue if the keystore
+survives but its credentials file does not, because that passphrase cannot be
+recovered. Every downstream value is derived from the certificate rather than
+transcribed: the colon-hex fingerprint for Digital Asset Links, the base64url
+`apk-key-hash` origin for WebAuthn, the `android_signing_certificates` block
+for Terraform, and the `LOGDATE_RELEASE_*` secrets below. Pass
+`--play-fingerprint` once the app exists in Play Console to fold the Play
+app-signing certificate in, and `--write-assetlinks PATH` to write the
+`assetlinks.json` served from `logdate.app` directly.
 
 `sync-firebase-configs.sh` validates each JSON before transmission (`jq`
 sanity-checks `.project_info.project_id`) and is idempotent — re-running
