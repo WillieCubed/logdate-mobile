@@ -259,16 +259,12 @@ resource "google_secret_manager_secret_iam_member" "runtime_access" {
   member    = "serviceAccount:${google_service_account.runtime.email}"
 }
 
+# The deploy job reads every secret the revision mounts, not just the database credentials: it
+# runs the container locally as a startup preflight before anything is promoted, and that
+# container refuses to boot without its full environment. Granting only the database secrets
+# meant the deploy could migrate but never prove the image it had just built would start.
 resource "google_secret_manager_secret_iam_member" "github_migration_access" {
-  for_each = local.github_oidc_enabled ? toset([
-    "logdate-db-url",
-    "logdate-db-user",
-    "logdate-db-password",
-    # The deploy job also reads the health token, to authenticate the smoke proof it runs
-    # against the candidate revision before promoting it. Leaving it out of this set meant the
-    # binding existed nowhere, and the deploy could not verify what it had just built.
-    "logdate-health-internal-token",
-  ]) : toset([])
+  for_each = local.github_oidc_enabled ? local.secret_ids : toset([])
 
   secret_id = try(google_secret_manager_secret.env[each.key].secret_id, each.key)
   role      = "roles/secretmanager.secretAccessor"
