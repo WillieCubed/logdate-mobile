@@ -154,7 +154,7 @@
     <!-- Common actions -->
     <string name="check">Check</string>
     <string name="checking">Checking...</string>
-    <string name="examples">💡 Examples:</string>
+    <string name="examples">Examples</string>
     <string name="go_to_account_settings">Go to account settings</string>
     <string name="got_it">Got it</string>
     <string name="learn_more">Learn more</string>

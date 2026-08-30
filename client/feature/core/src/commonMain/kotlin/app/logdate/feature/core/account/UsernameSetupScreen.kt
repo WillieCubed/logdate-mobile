@@ -210,10 +210,21 @@ private fun UsernameSetupContent(
                     supportingText = {
                         when (usernameAvailability) {
                             UsernameAvailability.Available ->
-                                Text(
-                                    text = stringResource(Res.string.username_is_available_2),
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                    Text(
+                                        text = stringResource(Res.string.username_is_available_2),
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
                             UsernameAvailability.Taken ->
                                 Text(
                                     text = stringResource(Res.string.username_is_already_taken),
@@ -328,15 +339,12 @@ private fun UsernameSetupContent(
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                         )
-                        Text(
-                            text =
-                                "• Use only letters, numbers, and underscores\n" +
-                                    "• Keep it memorable and easy to share\n" +
-                                    "• 3-30 characters long\n" +
-                                    "• Can't be changed later",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        listOf(
+                            "Letters, numbers, and underscores only",
+                            "Memorable and easy to share",
+                            "3-30 characters",
+                            "Cannot be changed later",
+                        ).forEach { tip -> GuidelineRow(text = tip) }
                     }
                 }
             }
@@ -423,5 +431,30 @@ private fun UsernameSetupScreenTakenPreview() {
                 isValid = false,
             )
         }
+    }
+}
+
+
+/**
+ * A single guideline. Rendering these as rows rather than a newline-joined string of "•"
+ * characters keeps them selectable, screen-reader friendly, and correctly wrapped.
+ */
+@Composable
+private fun GuidelineRow(text: String) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            imageVector = Icons.Default.Check,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 2.dp).size(14.dp),
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }

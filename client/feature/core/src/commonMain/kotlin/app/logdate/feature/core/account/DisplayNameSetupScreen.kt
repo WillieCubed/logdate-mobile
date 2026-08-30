@@ -193,7 +193,7 @@ private fun DisplayNameSetupContent(
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = "• Alex Johnson\n• Sarah M.\n• Coffee Lover\n• The Wanderer",
+                            text = "Alex Johnson, Sarah M., Coffee Lover, The Wanderer",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

@@ -5,6 +5,10 @@ package app.logdate.feature.onboarding.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -199,17 +203,11 @@ private fun RecoveryPhraseDisplayTopPane(
             }
         }
 
-        WarningCard(
-            icon = "⚠️",
-            text = stringResource(Res.string.warning_recovery_phrase_never_share),
-        )
-        WarningCard(
-            icon = "📝",
+        WarningCard(text = stringResource(Res.string.warning_recovery_phrase_never_share))
+        Text(
             text = stringResource(Res.string.warning_recovery_phrase_store_securely),
-        )
-        WarningCard(
-            icon = "🔒",
-            text = stringResource(Res.string.warning_recovery_phrase_store_safe),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -278,45 +276,19 @@ private fun RecoveryPhraseDisplayCompactContent(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Card(
-            colors =
-                CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                ),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                words.forEachIndexed { index, word ->
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            text =
-                                stringResource(
-                                    Res.string.recovery_phrase_index,
-                                    index + 1,
-                                ),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.width(24.dp),
-                        )
-                        Text(
-                            text = word,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
-            }
-        }
-        WarningCard(icon = "⚠️", text = stringResource(Res.string.warning_recovery_phrase_never_share))
-        WarningCard(icon = "📝", text = stringResource(Res.string.warning_recovery_phrase_store_securely))
-        WarningCard(icon = "🔒", text = stringResource(Res.string.warning_recovery_phrase_store_safe))
+        RecoveryPhraseGrid(words = words)
+
+        // One genuine warning. The other two notices were an informational aside about secure
+        // storage and a restatement of the body copy, both dressed as alarms - three stacked
+        // error-coloured cards taught the user to ignore all of them.
+        WarningCard(text = stringResource(Res.string.warning_recovery_phrase_never_share))
+
+        Text(
+            text = stringResource(Res.string.warning_recovery_phrase_store_securely),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
         Spacer(modifier = Modifier.weight(1f))
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -407,10 +379,7 @@ private fun RecoveryPhraseVerificationContent(
 }
 
 @Composable
-private fun WarningCard(
-    icon: String,
-    text: String,
-) {
+private fun WarningCard(text: String) {
     Card(
         colors =
             CardDefaults.cardColors(
@@ -423,8 +392,78 @@ private fun WarningCard(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(icon, style = MaterialTheme.typography.bodyLarge)
-            Text(text, style = MaterialTheme.typography.bodySmall)
+            Icon(
+                imageVector = Icons.Default.WarningAmber,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
         }
+    }
+}
+
+/**
+ * The phrase itself, as a two-column grid.
+ *
+ * A single column of twelve rows pushed the confirmation and the primary action off-screen and
+ * made the phrase harder to transcribe; pairing the words halves the height and keeps the
+ * numbering scannable.
+ */
+@Composable
+private fun RecoveryPhraseGrid(words: List<String>) {
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 16.dp, horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            words.chunked(2).forEachIndexed { rowIndex, pair ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    pair.forEachIndexed { columnIndex, word ->
+                        RecoveryPhraseWord(
+                            position = rowIndex * 2 + columnIndex + 1,
+                            word = word,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecoveryPhraseWord(
+    position: Int,
+    word: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = position.toString(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.End,
+            modifier = Modifier.width(20.dp),
+        )
+        Text(
+            text = word,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
