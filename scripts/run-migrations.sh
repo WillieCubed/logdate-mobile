@@ -2,26 +2,17 @@
 set -euo pipefail
 umask 077
 
-# Run Flyway migrations for a rendered deployment contract. Strict contract
-# mode uses the same pinned Neon secrets as the Cloud Run candidate. The
-# temporary legacy mode is retained only until Cloud SQL support is removed.
+# Run Flyway migrations for a rendered deployment contract. The contract pins
+# the same Neon secret versions the Cloud Run candidate mounts, so migrations
+# and the runtime can never address different databases.
 
-readonly CLOUD_SQL_PROXY_VERSION="v2.21.3"
 readonly FLYWAY_IMAGE="flyway/flyway:12.4.0"
 readonly POSTGRES_IMAGE="postgres:16-alpine"
 
 CONTRACT_FILE=""
 REQUESTED_ENVIRONMENT=""
-LEGACY_CONFIG="false"
-LEGACY_PROJECT_ID=""
-LEGACY_REGION=""
-LEGACY_INSTANCE_NAME="logdate-db"
-LEGACY_DATABASE_NAME="logdate"
-INDEPENDENT_SELECTOR_USED="false"
-PROXY_PORT="${PROXY_PORT:-15432}"
 VALIDATE_PASSKEY_FK="false"
 WORKDIR=""
-PROXY_PID=""
 
 log() {
     printf '%s\n' "$*"
@@ -39,17 +30,10 @@ Run Flyway migrations against the database selected by a rendered deployment con
 Inputs:
   --contract-file PATH          Rendered deployment contract (required)
   --environment NAME           Expected contract environment (required)
-  --legacy-config              Temporary explicit compatibility mode for the
-                               current workflow's non-secret target selectors
-  --project-id PROJECT_ID      Legacy mode only
-  --region REGION              Legacy mode only
-  --instance-name NAME         Legacy mode only (default: logdate-db)
-  --database-name NAME         Legacy mode only (default: logdate)
   --validate-passkey-fk        Validate passkeys.account_id_fkey after migrations
   --help, -h                    Show this help
 
 Pinned tools:
-  Cloud SQL Auth Proxy v2.21.3
   flyway/flyway:12.4.0
   postgres:16-alpine
 
@@ -60,10 +44,6 @@ EOF
 }
 
 cleanup() {
-    if [[ -n "$PROXY_PID" ]] && kill -0 "$PROXY_PID" 2>/dev/null; then
-        kill "$PROXY_PID" 2>/dev/null || true
-        wait "$PROXY_PID" 2>/dev/null || true
-    fi
     if [[ -n "$WORKDIR" ]]; then
         rm -rf "$WORKDIR"
     fi
@@ -87,56 +67,6 @@ reject_independent_environment_overrides() {
             die "independent database overrides are not supported with --contract-file (unset $name)."
         fi
     done
-}
-
-validate_legacy_environment() {
-    if [[ -n "${PROJECT_ID:-}" && "$PROJECT_ID" != "$LEGACY_PROJECT_ID" ]]; then
-        die "legacy PROJECT_ID environment does not match --project-id."
-    fi
-    if [[ -n "${REGION:-}" && "$REGION" != "$LEGACY_REGION" ]]; then
-        die "legacy REGION environment does not match --region."
-    fi
-
-    local name
-    for name in \
-        INSTANCE_NAME DATABASE_NAME URL_SECRET_ID USER_SECRET_ID PASSWORD_SECRET_ID \
-        DATABASE_URL INSTANCE_CONNECTION_NAME DB_NAME DATABASE_USER DATABASE_PASSWORD; do
-        if [[ -n "${!name:-}" ]]; then
-            die "independent database overrides are not supported in --legacy-config mode (unset $name)."
-        fi
-    done
-}
-
-download_proxy() {
-    local output="$1"
-    local proxy_os="linux" proxy_arch="amd64"
-
-    case "$(uname -s)" in
-        Darwin) proxy_os="darwin" ;;
-        Linux) proxy_os="linux" ;;
-        *) die "Unsupported OS for Cloud SQL Auth Proxy: $(uname -s)" ;;
-    esac
-    case "$(uname -m)" in
-        arm64|aarch64) proxy_arch="arm64" ;;
-        x86_64) proxy_arch="amd64" ;;
-        *) die "Unsupported architecture for Cloud SQL Auth Proxy: $(uname -m)" ;;
-    esac
-
-    local url="https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/${CLOUD_SQL_PROXY_VERSION}/cloud-sql-proxy.${proxy_os}.${proxy_arch}"
-    log "Downloading Cloud SQL Auth Proxy ${CLOUD_SQL_PROXY_VERSION}..."
-    curl \
-        --fail \
-        --location \
-        --show-error \
-        --silent \
-        --retry 5 \
-        --retry-delay 2 \
-        --retry-all-errors \
-        --connect-timeout 10 \
-        --max-time 120 \
-        "$url" \
-        --output "$output"
-    chmod 700 "$output"
 }
 
 write_database_env_files() {
@@ -245,10 +175,6 @@ while [[ $# -gt 0 ]]; do
             CONTRACT_FILE="$2"
             shift 2
             ;;
-        --legacy-config)
-            LEGACY_CONFIG="true"
-            shift
-            ;;
         --environment)
             require_arg_value "$1" "${2:-}"
             REQUESTED_ENVIRONMENT="$2"
@@ -258,29 +184,8 @@ while [[ $# -gt 0 ]]; do
             VALIDATE_PASSKEY_FK="true"
             shift
             ;;
-        --project-id)
-            require_arg_value "$1" "${2:-}"
-            LEGACY_PROJECT_ID="$2"
-            INDEPENDENT_SELECTOR_USED="true"
-            shift 2
-            ;;
-        --region)
-            require_arg_value "$1" "${2:-}"
-            LEGACY_REGION="$2"
-            INDEPENDENT_SELECTOR_USED="true"
-            shift 2
-            ;;
-        --instance-name)
-            require_arg_value "$1" "${2:-}"
-            LEGACY_INSTANCE_NAME="$2"
-            INDEPENDENT_SELECTOR_USED="true"
-            shift 2
-            ;;
-        --database-name)
-            require_arg_value "$1" "${2:-}"
-            LEGACY_DATABASE_NAME="$2"
-            INDEPENDENT_SELECTOR_USED="true"
-            shift 2
+        --legacy-config|--project-id|--region|--instance-name|--database-name)
+            die "Cloud SQL compatibility mode has been removed; pass --contract-file and --environment ($1)."
             ;;
         --url-secret|--user-secret|--password-secret)
             die "independent secret selectors are not supported ($1)."
@@ -295,26 +200,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ "$LEGACY_CONFIG" == "true" ]]; then
-    [[ -z "$CONTRACT_FILE" ]] || die "--legacy-config cannot be combined with --contract-file."
-    [[ -z "$REQUESTED_ENVIRONMENT" ]] || die "--legacy-config cannot be combined with --environment."
-    [[ -n "$LEGACY_PROJECT_ID" && -n "$LEGACY_REGION" ]] || die "--legacy-config requires --project-id and --region."
-    validate_legacy_environment
-else
-    [[ -n "$CONTRACT_FILE" ]] || die "--contract-file is required."
-    [[ -n "$REQUESTED_ENVIRONMENT" ]] || die "--environment is required."
-    [[ -f "$CONTRACT_FILE" ]] || die "contract file not found: $CONTRACT_FILE"
-    if [[ "$INDEPENDENT_SELECTOR_USED" == "true" ]]; then
-        die "independent database overrides are not supported with --contract-file."
-    fi
-    reject_independent_environment_overrides
-fi
+[[ -n "$CONTRACT_FILE" ]] || die "--contract-file is required."
+[[ -n "$REQUESTED_ENVIRONMENT" ]] || die "--environment is required."
+[[ -f "$CONTRACT_FILE" ]] || die "contract file not found: $CONTRACT_FILE"
+reject_independent_environment_overrides
 
-if ! [[ "$PROXY_PORT" =~ ^[0-9]+$ ]] || (( PROXY_PORT < 1 || PROXY_PORT > 65535 )); then
-    die "PROXY_PORT must be an integer from 1 to 65535."
-fi
-
-for cmd in curl docker gcloud python3; do
+for cmd in docker gcloud python3; do
     command -v "$cmd" >/dev/null 2>&1 || die "Missing required command: $cmd"
 done
 
@@ -326,19 +217,7 @@ WORKDIR="$(mktemp -d)"
 chmod 700 "$WORKDIR"
 trap cleanup EXIT
 
-if [[ "$LEGACY_CONFIG" == "true" ]]; then
-    PROJECT_ID="$LEGACY_PROJECT_ID"
-    INSTANCE_CONNECTION_NAME="${LEGACY_PROJECT_ID}:${LEGACY_REGION}:${LEGACY_INSTANCE_NAME}"
-    DATABASE_NAME="$LEGACY_DATABASE_NAME"
-    URL_SECRET_ID="logdate-db-url"
-    URL_SECRET_VERSION="latest"
-    USER_SECRET_ID="logdate-db-user"
-    USER_SECRET_VERSION="latest"
-    PASSWORD_SECRET_ID="logdate-db-password"
-    PASSWORD_SECRET_VERSION="latest"
-    log "TEMPORARY COMPATIBILITY MODE: --legacy-config; Task 6 must remove this path."
-else
-    PARSED_CONTRACT="$WORKDIR/parsed-contract"
+PARSED_CONTRACT="$WORKDIR/parsed-contract"
     python3 - "$CONTRACT_FILE" >"$PARSED_CONTRACT" <<'PY'
 import json
 import pathlib
@@ -382,20 +261,19 @@ for value in (
 ):
     print(value)
 PY
-    chmod 600 "$PARSED_CONTRACT"
+chmod 600 "$PARSED_CONTRACT"
 
-    CONTRACT_ENVIRONMENT="$(sed -n '1p' "$PARSED_CONTRACT")"
-    PROJECT_ID="$(sed -n '2p' "$PARSED_CONTRACT")"
-    URL_SECRET_ID="$(sed -n '3p' "$PARSED_CONTRACT")"
-    URL_SECRET_VERSION="$(sed -n '4p' "$PARSED_CONTRACT")"
-    USER_SECRET_ID="$(sed -n '5p' "$PARSED_CONTRACT")"
-    USER_SECRET_VERSION="$(sed -n '6p' "$PARSED_CONTRACT")"
-    PASSWORD_SECRET_ID="$(sed -n '7p' "$PARSED_CONTRACT")"
-    PASSWORD_SECRET_VERSION="$(sed -n '8p' "$PARSED_CONTRACT")"
+CONTRACT_ENVIRONMENT="$(sed -n '1p' "$PARSED_CONTRACT")"
+PROJECT_ID="$(sed -n '2p' "$PARSED_CONTRACT")"
+URL_SECRET_ID="$(sed -n '3p' "$PARSED_CONTRACT")"
+URL_SECRET_VERSION="$(sed -n '4p' "$PARSED_CONTRACT")"
+USER_SECRET_ID="$(sed -n '5p' "$PARSED_CONTRACT")"
+USER_SECRET_VERSION="$(sed -n '6p' "$PARSED_CONTRACT")"
+PASSWORD_SECRET_ID="$(sed -n '7p' "$PARSED_CONTRACT")"
+PASSWORD_SECRET_VERSION="$(sed -n '8p' "$PARSED_CONTRACT")"
 
-    if [[ "$CONTRACT_ENVIRONMENT" != "$REQUESTED_ENVIRONMENT" ]]; then
-        die "contract environment '$CONTRACT_ENVIRONMENT' does not match requested environment '$REQUESTED_ENVIRONMENT'."
-    fi
+if [[ "$CONTRACT_ENVIRONMENT" != "$REQUESTED_ENVIRONMENT" ]]; then
+    die "contract environment '$CONTRACT_ENVIRONMENT' does not match requested environment '$REQUESTED_ENVIRONMENT'."
 fi
 
 DB_USER_FILE="$WORKDIR/database-user"
@@ -410,25 +288,14 @@ gcloud secrets versions access "$PASSWORD_SECRET_VERSION" \
 chmod 600 "$DB_USER_FILE" "$DB_PASSWORD_FILE"
 [[ -s "$DB_USER_FILE" && -s "$DB_PASSWORD_FILE" ]] || die "database credential secrets must not be empty."
 
-if [[ "$LEGACY_CONFIG" == "true" ]]; then
-    if ! gcloud secrets versions access "$URL_SECRET_VERSION" \
-        --secret="$URL_SECRET_ID" \
-        --project="$PROJECT_ID" >"$JDBC_URL_FILE"; then
-        die "legacy runtime database URL secret is unavailable; refusing to migrate a different target."
-    fi
-    chmod 600 "$JDBC_URL_FILE"
-    [[ -s "$JDBC_URL_FILE" ]] || die "legacy runtime database URL secret must not be empty."
-    log "Using the legacy runtime DATABASE_URL target."
-else
-    if ! gcloud secrets versions access "$URL_SECRET_VERSION" \
-        --secret="$URL_SECRET_ID" \
-        --project="$PROJECT_ID" >"$JDBC_URL_FILE"; then
-        die "pinned runtime database URL secret is unavailable; refusing to migrate a different target."
-    fi
-    chmod 600 "$JDBC_URL_FILE"
-    [[ -s "$JDBC_URL_FILE" ]] || die "pinned runtime database URL secret must not be empty."
-    log "Migration target: pinned runtime DATABASE_URL secret."
+if ! gcloud secrets versions access "$URL_SECRET_VERSION" \
+    --secret="$URL_SECRET_ID" \
+    --project="$PROJECT_ID" >"$JDBC_URL_FILE"; then
+    die "pinned runtime database URL secret is unavailable; refusing to migrate a different target."
 fi
+chmod 600 "$JDBC_URL_FILE"
+[[ -s "$JDBC_URL_FILE" ]] || die "pinned runtime database URL secret must not be empty."
+log "Migration target: pinned runtime DATABASE_URL secret."
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -469,8 +336,4 @@ if [[ "$VALIDATE_PASSKEY_FK" == "true" ]]; then
     log "Passkey FK validated."
 fi
 
-if [[ "$LEGACY_CONFIG" == "true" ]]; then
-    log "Migrations complete for the legacy runtime database target."
-else
-    log "Migrations complete for the pinned runtime database target."
-fi
+log "Migrations complete for the pinned runtime database target."

@@ -8,10 +8,8 @@ source "$(git rev-parse --show-toplevel)/scripts/tests/lib/assertions.sh"
 enter_repo_root
 
 SCRIPT="scripts/run-migrations.sh"
-DEFAULT_PROXY_VERSION="v2.21.3"
-DEFAULT_PROXY_URL="https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/${DEFAULT_PROXY_VERSION}/cloud-sql-proxy.linux.amd64"
 DATABASE_PASSWORD_SENTINEL="MIGRATION_DATABASE_PASSWORD_SENTINEL_DO_NOT_LEAK"
-LEGACY_DATABASE_URL="jdbc:postgresql://legacy-neon.example.test/logdate?sslmode=require"
+TEST_DATABASE_URL="jdbc:postgresql://neon.example.test/logdate?sslmode=require"
 TMP_DIR="$(mktemp -d)"
 FAKE_BIN="$TMP_DIR/bin"
 LOG_DIR="$TMP_DIR/logs"
@@ -77,21 +75,16 @@ case "${1:-} ${2:-} ${3:-}" in
         done
         case "$secret_id:$version" in
             logdate-db-url:17)
-                printf '%s' "jdbc:postgresql://contract-neon.example.test/logdate?sslmode=verify-full&channelBinding=require"
-                ;;
-            logdate-db-url:latest)
-                if [[ -n "${MISSING_LEGACY_DATABASE_URL:-}" ]]; then
+                if [[ -n "${TEST_MISSING_DATABASE_URL:-}" ]]; then
                     exit 1
-                elif [[ -n "${MALFORMED_LEGACY_DATABASE_URL:-}" ]]; then
-                    printf 'jdbc:postgresql://legacy-neon.example.test/logdate\nFLYWAY_USER=attacker'
+                elif [[ -n "${TEST_MALFORMED_DATABASE_URL:-}" ]]; then
+                    printf 'jdbc:postgresql://neon.example.test/logdate\nFLYWAY_USER=attacker'
                 else
-                    printf '%s' "${LEGACY_DATABASE_URL:?}"
+                    printf '%s' "${TEST_DATABASE_URL:-jdbc:postgresql://contract-neon.example.test/logdate?sslmode=verify-full&channelBinding=require}"
                 fi
                 ;;
             logdate-db-user:7) printf 'migration-user' ;;
             logdate-db-password:11) printf '%s' "${DATABASE_PASSWORD_SENTINEL:?}" ;;
-            logdate-db-user:latest) printf 'migration-user' ;;
-            logdate-db-password:latest) printf '%s' "${DATABASE_PASSWORD_SENTINEL:?}" ;;
             *)
                 echo "Unexpected secret/version: $secret_id:$version" >&2
                 exit 1
@@ -106,75 +99,17 @@ esac
 EOF
 chmod +x "$FAKE_BIN/gcloud"
 
+# run-migrations.sh no longer downloads anything: Cloud SQL and its auth proxy
+# are gone, and the Neon URL comes from Secret Manager. Any curl invocation is
+# therefore a regression, so the stub records it and fails.
 cat >"$FAKE_BIN/curl" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-
-LOG_DIR="${TEST_LOG_DIR:?}"
-{
-    for arg in "$@"; do
-        printf '[%q]' "$arg"
-    done
-    printf '\n'
-} >>"$LOG_DIR/curl.log"
-
-output_path=""
-url=""
-next_is_output="false"
-for arg in "$@"; do
-    if [[ "$next_is_output" == "true" ]]; then
-        output_path="$arg"
-        next_is_output="false"
-        continue
-    fi
-    case "$arg" in
-        -o|--output) next_is_output="true" ;;
-        http://*|https://*) url="$arg" ;;
-    esac
-done
-
-if [[ "$url" != "${EXPECTED_PROXY_URL:?}" || -z "$output_path" ]]; then
-    echo "Unexpected curl invocation: $*" >&2
-    exit 1
+if [[ -n "${TEST_LOG_DIR:-}" ]]; then
+    printf 'curl %s\n' "$*" >>"$TEST_LOG_DIR/curl.log"
 fi
-
-cat >"$output_path" <<'PROXY'
-#!/usr/bin/env bash
-set -euo pipefail
-LOG_DIR="${TEST_LOG_DIR:?}"
-{
-    for arg in "$@"; do
-        printf '[%q]' "$arg"
-    done
-    printf '\n'
-} >>"$LOG_DIR/proxy.log"
-printf '%s\n' "$$" >"$LOG_DIR/proxy-pid"
-
-port=""
-next_is_port="false"
-for arg in "$@"; do
-    if [[ "$next_is_port" == "true" ]]; then
-        port="$arg"
-        next_is_port="false"
-        continue
-    fi
-    [[ "$arg" == "--port" ]] && next_is_port="true"
-done
-
-exec python3 - "$port" <<'PY'
-import socket
-import sys
-
-server = socket.socket()
-server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-server.bind(("127.0.0.1", int(sys.argv[1])))
-server.listen()
-while True:
-    connection, _ = server.accept()
-    connection.close()
-PY
-PROXY
-chmod +x "$output_path"
+echo "Unexpected curl invocation: $*" >&2
+exit 1
 EOF
 chmod +x "$FAKE_BIN/curl"
 
@@ -323,9 +258,8 @@ run_direct_url_success_case() {
     set +e
     PATH="$FAKE_BIN:$PATH" \
     TEST_LOG_DIR="$log_dir" \
-    EXPECTED_PROXY_URL="$DEFAULT_PROXY_URL" \
     DATABASE_PASSWORD_SENTINEL="$DATABASE_PASSWORD_SENTINEL" \
-    LEGACY_DATABASE_URL="$url" \
+    TEST_DATABASE_URL="$url" \
     TEST_EXPECT_DIRECT_URL=1 \
     EXPECTED_FLYWAY_URL="$expected_flyway_url" \
     EXPECTED_PGHOST="$expected_host" \
@@ -333,11 +267,8 @@ run_direct_url_success_case() {
     EXPECTED_PGSSLMODE="$expected_sslmode" \
     EXPECTED_PGCHANNELBINDING="$expected_channel_binding" \
     bash -x "$SCRIPT" \
-        --legacy-config \
-        --project-id logdate-contract-test \
-        --region us-central1 \
-        --instance-name logdate-db \
-        --database-name logdate \
+        --contract-file "$CONTRACT_FILE" \
+        --environment staging \
         --validate-passkey-fk >"$output_file" 2>&1
     status=$?
     set -e
@@ -347,9 +278,8 @@ run_direct_url_success_case() {
         echo "$output"
     fi
     assert_exit_code 0 "$status"
-    assert_contains 'TEMPORARY COMPATIBILITY MODE: --legacy-config' "$output"
-    assert_contains 'Using the legacy runtime DATABASE_URL target.' "$output"
-    assert_contains '[access][latest][--secret=logdate-db-url][--project=logdate-contract-test]' "$(cat "$log_dir/gcloud.log")"
+    assert_contains 'Migration target: pinned runtime DATABASE_URL secret.' "$output"
+    assert_contains '[access][17][--secret=logdate-db-url][--project=logdate-contract-test]' "$(cat "$log_dir/gcloud.log")"
     [[ -f "$log_dir/flyway-called" ]] || fail "expected Flyway container to run for $name"
     pass
     [[ -f "$log_dir/psql-called" ]] || fail "expected PostgreSQL validation container to run for $name"
@@ -376,15 +306,11 @@ run_invalid_direct_url_case() {
     set +e
     PATH="$FAKE_BIN:$PATH" \
     TEST_LOG_DIR="$log_dir" \
-    EXPECTED_PROXY_URL="$DEFAULT_PROXY_URL" \
     DATABASE_PASSWORD_SENTINEL="$DATABASE_PASSWORD_SENTINEL" \
-    LEGACY_DATABASE_URL="$url" \
+    TEST_DATABASE_URL="$url" \
     bash "$SCRIPT" \
-        --legacy-config \
-        --project-id logdate-contract-test \
-        --region us-central1 \
-        --instance-name logdate-db \
-        --database-name logdate \
+        --contract-file "$CONTRACT_FILE" \
+        --environment staging \
         --validate-passkey-fk >"$output_file" 2>&1
     status=$?
     set -e
@@ -488,32 +414,28 @@ done
 set +e
 missing_legacy_url_output="$(
     TEST_LOG_DIR="$MISSING_LEGACY_LOG_DIR" \
-    MISSING_LEGACY_DATABASE_URL=1 \
+    TEST_MISSING_DATABASE_URL=1 \
     DATABASE_PASSWORD_SENTINEL="$DATABASE_PASSWORD_SENTINEL" \
-    LEGACY_DATABASE_URL="$LEGACY_DATABASE_URL" \
     PATH="$FAKE_BIN:$PATH" \
     "$SCRIPT" \
-        --legacy-config \
-        --project-id logdate-contract-test \
-        --region us-central1 2>&1
+        --contract-file "$CONTRACT_FILE" \
+        --environment staging 2>&1
 )"
 missing_legacy_url_status=$?
 malformed_legacy_url_output="$(
     TEST_LOG_DIR="$MALFORMED_LEGACY_LOG_DIR" \
-    MALFORMED_LEGACY_DATABASE_URL=1 \
+    TEST_MALFORMED_DATABASE_URL=1 \
     DATABASE_PASSWORD_SENTINEL="$DATABASE_PASSWORD_SENTINEL" \
-    LEGACY_DATABASE_URL="$LEGACY_DATABASE_URL" \
     PATH="$FAKE_BIN:$PATH" \
     "$SCRIPT" \
-        --legacy-config \
-        --project-id logdate-contract-test \
-        --region us-central1 2>&1
+        --contract-file "$CONTRACT_FILE" \
+        --environment staging 2>&1
 )"
 malformed_legacy_url_status=$?
 set -e
 
 assert_exit_code 1 "$missing_legacy_url_status"
-assert_contains 'legacy runtime database URL secret is unavailable' "$missing_legacy_url_output"
+assert_contains 'pinned runtime database URL secret is unavailable' "$missing_legacy_url_output"
 [[ ! -e "$MISSING_LEGACY_LOG_DIR/docker.log" ]] || fail "missing legacy URL must fail before Docker"
 pass
 [[ ! -e "$MISSING_LEGACY_LOG_DIR/curl.log" ]] || fail "missing legacy URL must not fall back to Cloud SQL"
@@ -548,7 +470,7 @@ assert_contains '--contract-file is required' "$missing_contract_output"
 assert_exit_code 1 "$independent_override_status"
 assert_contains 'independent database overrides are not supported' "$independent_override_output"
 assert_exit_code 1 "$flag_override_status"
-assert_contains 'independent database overrides are not supported' "$flag_override_output"
+assert_contains 'Cloud SQL compatibility mode has been removed' "$flag_override_output"
 assert_exit_code 1 "$environment_mismatch_status"
 assert_contains "contract environment 'staging' does not match requested environment 'production'" "$environment_mismatch_output"
 
@@ -573,7 +495,8 @@ assert_contains 'DATABASE_URL secret ID must be a non-empty single-line string' 
 help_output="$("$SCRIPT" --help)"
 assert_contains '--contract-file PATH' "$help_output"
 assert_contains '--environment NAME' "$help_output"
-assert_contains 'v2.21.3' "$help_output"
+assert_not_contains 'v2.21.3' "$help_output"
+assert_not_contains 'Cloud SQL' "$help_output"
 assert_contains 'flyway/flyway:12.4.0' "$help_output"
 
 print_pass_summary "run-migrations"
