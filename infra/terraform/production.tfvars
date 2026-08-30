@@ -78,7 +78,10 @@ cloud_run_env = {
 }
 
 cloud_run_secret_env = {
-  DATABASE_URL             = { secret_id = "logdate-db-url", version = "1" }
+  # Version 2 carries no credentials in the query string. Version 1 embedded the Neon user and
+  # password there, which the migration runner refuses outright - credentials belong in
+  # DATABASE_USER and DATABASE_PASSWORD, which the server and the runner both read.
+  DATABASE_URL             = { secret_id = "logdate-db-url", version = "2" }
   DATABASE_USER            = { secret_id = "logdate-db-user", version = "1" }
   DATABASE_PASSWORD        = { secret_id = "logdate-db-password", version = "1" }
   JWT_SECRET               = { secret_id = "logdate-jwt-secret", version = "1" }
