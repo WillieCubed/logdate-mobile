@@ -27,7 +27,6 @@ import coil3.disk.directory
 import coil3.memory.MemoryCache
 import coil3.request.crossfade
 import coil3.video.VideoFrameDecoder
-import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
@@ -70,13 +69,13 @@ class LogdateApplication :
 
         installStrictModeIfDebuggable()
 
-        // DebugAntilog derives its log tag by walking the stack trace at a fixed depth. R8 inlines
-        // frames away, so in a minified build that index runs off the end and every Napier call
-        // throws ArrayIndexOutOfBoundsException - crashing the app from inside its own error
-        // logging. It is a logcat convenience with no place in a release build regardless.
-        if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
-            Napier.base(DebugAntilog())
-        }
+        // Napier's DebugAntilog derives its tag by walking the stack trace at a fixed depth. R8
+        // inlines frames away, so in a minified build that index runs off the end and every
+        // Napier call throws ArrayIndexOutOfBoundsException - crashing the app from inside its
+        // own error logging. LogcatAntilog does no stack introspection, so it is safe minified,
+        // and it keeps warnings and errors in release builds: without them a failing release
+        // install produces no on-device output at all.
+        Napier.base(LogcatAntilog(isDebuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0))
         Napier.base(CrashlyticsAntilog())
         initializeKoin()
         Log.i(APP_STARTUP_TAG, "Application onCreate: Koin initialized")
