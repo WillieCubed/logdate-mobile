@@ -264,6 +264,10 @@ resource "google_secret_manager_secret_iam_member" "github_migration_access" {
     "logdate-db-url",
     "logdate-db-user",
     "logdate-db-password",
+    # The deploy job also reads the health token, to authenticate the smoke proof it runs
+    # against the candidate revision before promoting it. Leaving it out of this set meant the
+    # binding existed nowhere, and the deploy could not verify what it had just built.
+    "logdate-health-internal-token",
   ]) : toset([])
 
   secret_id = try(google_secret_manager_secret.env[each.key].secret_id, each.key)
