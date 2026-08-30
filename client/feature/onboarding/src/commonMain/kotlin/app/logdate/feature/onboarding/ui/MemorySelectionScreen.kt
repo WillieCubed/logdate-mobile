@@ -29,12 +29,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -59,6 +61,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,6 +73,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.client.media.MediaObject
+import coil3.compose.AsyncImage
 import app.logdate.client.permissions.rememberMediaLibraryPermissionState
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
@@ -109,6 +113,8 @@ data class MemorySelectionUiState(
  * Features AI-curated high emotional salience content and infinite scroll.
  */
 @OptIn(ExperimentalMaterial3Api::class)
+private const val SUGGESTED_MEMORY_LIMIT = 6
+
 @Composable
 fun MemorySelectionScreen(
     uiState: MemorySelectionUiState,
@@ -151,6 +157,21 @@ fun MemorySelectionScreen(
                                 )
                             }
                         },
+                    )
+                },
+                // The list paginates as you scroll, so a Continue button at the end of it is
+                // unreachable on any real photo library. Pinning it to the Scaffold keeps the
+                // way forward on screen no matter how much media loads.
+                bottomBar = {
+                    ContinueMemoryImportButton(
+                        onContinue = onContinue,
+                        selectedCount = uiState.selectedMemoryIds.size,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surface)
+                                .navigationBarsPadding()
+                                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
                     )
                 },
             ) { contentPadding ->
@@ -307,13 +328,6 @@ private fun MemorySelectionTopPane(
                 fontWeight = FontWeight.Medium,
             )
         }
-        item {
-            Text(
-                text = stringResource(Res.string.onboarding_import_media_description),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
 
         when {
             !hasMediaPermission ->
@@ -355,11 +369,6 @@ private fun MemorySelectionTopPane(
                         text = stringResource(Res.string.moments_that_might_matter_most),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = stringResource(Res.string.onboarding_import_smart_selection_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
         }
@@ -468,35 +477,20 @@ private fun SharedTransitionScope.MemorySelectionContent(
     animatedVisibilityScope: AnimatedVisibilityScope,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(
+    // One scroller for the whole page. The grids used to be nested inside this list inside
+    // fixed-height boxes - 200dp for the suggestions, a guessed `rows * 120dp` capped at 600dp
+    // for the rest - so the inner grids competed with the outer list for the same drag and
+    // anything past the cap could not be reached, including the Continue button. A single
+    // staggered grid with full-line headers scrolls once and reaches the end.
+    LazyVerticalStaggeredGrid(
+        columns = StaggeredGridCells.Fixed(3),
         modifier = modifier.testTag(MEMORY_SELECTION_ROOT_TAG),
         contentPadding = PaddingValues(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalItemSpacing = Spacing.sm,
     ) {
-        // Header
-        item {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                Text(
-                    text = stringResource(Res.string.choose_memories_to_import),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Medium,
-                )
-
-                Text(
-                    text =
-                        stringResource(
-                            Res.string.onboarding_import_media_description,
-                        ),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
         if (uiState.isLoading) {
-            item {
+            item(span = StaggeredGridItemSpan.FullLine) {
                 Box(
                     modifier =
                         Modifier
@@ -507,11 +501,11 @@ private fun SharedTransitionScope.MemorySelectionContent(
                     CircularProgressIndicator()
                 }
             }
-            return@LazyColumn
+            return@LazyVerticalStaggeredGrid
         }
 
         if (!hasMediaPermission) {
-            item {
+            item(span = StaggeredGridItemSpan.FullLine) {
                 MemorySelectionStatusCard(
                     title = stringResource(Res.string.memory_access_needed),
                     body = stringResource(Res.string.memory_access_needed_body),
@@ -520,92 +514,93 @@ private fun SharedTransitionScope.MemorySelectionContent(
                     actionTag = MEMORY_SELECTION_PERMISSION_ACTION_TAG,
                 )
             }
-            item {
-                ContinueMemoryImportButton(onContinue = onContinue)
-            }
-            return@LazyColumn
+            return@LazyVerticalStaggeredGrid
         }
 
-        if (uiState.loadFailed) {
-            item {
-                MemorySelectionStatusCard(
-                    title = stringResource(Res.string.select_memories),
-                    body = stringResource(Res.string.memory_load_failed_body),
-                    actionLabel = stringResource(UiRes.string.common_retry),
-                    onAction = onRetryLoad,
-                    actionTag = MEMORY_SELECTION_STATUS_ACTION_TAG,
-                )
-            }
-            item {
-                ContinueMemoryImportButton(onContinue = onContinue)
-            }
-            return@LazyColumn
-        }
-
-        if (uiState.aiCuratedMemories.isEmpty() && uiState.allMemories.isEmpty()) {
-            item {
-                MemorySelectionStatusCard(
-                    title = stringResource(Res.string.select_memories),
-                    body = stringResource(Res.string.memory_no_recent_items_body),
-                    actionLabel = stringResource(UiRes.string.common_retry),
-                    onAction = onRetryLoad,
-                    actionTag = MEMORY_SELECTION_STATUS_ACTION_TAG,
-                )
-            }
-            item {
-                ContinueMemoryImportButton(onContinue = onContinue)
-            }
-            return@LazyColumn
-        }
-
-        // AI-curated section
         if (uiState.aiCuratedMemories.isNotEmpty()) {
-            item {
-                AICuratedMemoriesSection(
-                    memories = uiState.aiCuratedMemories,
-                    selectedMemoryIds = uiState.selectedMemoryIds,
-                    onToggleMemorySelection = onToggleMemorySelection,
-                    onMemoryLongPress = onMemoryLongPress,
-                    onMemoryLongPressEnd = onMemoryLongPressEnd,
-                    expandedMemory = expandedMemory,
+            item(span = StaggeredGridItemSpan.FullLine) {
+                MemorySectionHeader(
+                    text = stringResource(Res.string.moments_that_might_matter_most),
+                    showBullet = true,
+                )
+            }
+            items(uiState.aiCuratedMemories.take(SUGGESTED_MEMORY_LIMIT), key = { "suggested:${it.uri}" }) { memory ->
+                MemoryThumbnail(
+                    memory = memory,
+                    isSelected = memory.uri in uiState.selectedMemoryIds,
+                    onToggleSelection = { onToggleMemorySelection(memory.uri) },
+                    onLongPress = { onMemoryLongPress(memory) },
+                    onLongPressEnd = onMemoryLongPressEnd,
+                    isExpanded = expandedMemory == memory,
                     animatedVisibilityScope = animatedVisibilityScope,
                 )
             }
         }
 
-        // All memories section
         if (uiState.allMemories.isNotEmpty()) {
-            item {
-                Text(
-                    text = stringResource(Res.string.all_memories),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
+            item(span = StaggeredGridItemSpan.FullLine) {
+                MemorySectionHeader(text = stringResource(Res.string.all_memories))
             }
-
-            item {
-                AllMemoriesStaggeredGrid(
-                    memories = uiState.allMemories,
-                    selectedMemoryIds = uiState.selectedMemoryIds,
-                    onToggleMemorySelection = onToggleMemorySelection,
-                    onMemoryLongPress = onMemoryLongPress,
-                    onMemoryLongPressEnd = onMemoryLongPressEnd,
-                    isLoadingMore = uiState.isLoadingMore,
-                    hasMoreMemories = uiState.hasMoreMemories,
-                    onLoadMoreMemories = onLoadMoreMemories,
-                    expandedMemory = expandedMemory,
+            items(uiState.allMemories, key = { "all:${it.uri}" }) { memory ->
+                MemoryThumbnail(
+                    memory = memory,
+                    isSelected = memory.uri in uiState.selectedMemoryIds,
+                    onToggleSelection = { onToggleMemorySelection(memory.uri) },
+                    onLongPress = { onMemoryLongPress(memory) },
+                    onLongPressEnd = onMemoryLongPressEnd,
+                    isExpanded = expandedMemory == memory,
                     animatedVisibilityScope = animatedVisibilityScope,
                 )
             }
+
+            if (uiState.isLoadingMore) {
+                item(span = StaggeredGridItemSpan.FullLine) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(Spacing.lg),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+            }
+
+            if (uiState.hasMoreMemories && !uiState.isLoadingMore) {
+                item(span = StaggeredGridItemSpan.FullLine) {
+                    LaunchedEffect(Unit) { onLoadMoreMemories() }
+                }
+            }
         }
 
-        // Continue button
-        item {
-            ContinueMemoryImportButton(
-                onContinue = onContinue,
-                selectedCount = uiState.selectedMemoryIds.size,
+    }
+}
+
+/** Section label for a run of thumbnails. */
+@Composable
+private fun MemorySectionHeader(
+    text: String,
+    showBullet: Boolean = false,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        modifier = Modifier.padding(top = Spacing.md, bottom = Spacing.sm),
+    ) {
+        if (showBullet) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(8.dp)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape),
             )
         }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
@@ -656,13 +651,13 @@ private fun MemorySelectionStatusCard(
 private fun ContinueMemoryImportButton(
     onContinue: () -> Unit,
     selectedCount: Int = 0,
+    modifier: Modifier = Modifier,
 ) {
     Button(
         onClick = onContinue,
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
-                .padding(top = Spacing.lg)
                 .testTag(MEMORY_SELECTION_CONTINUE_TAG),
     ) {
         Text(
@@ -715,15 +710,6 @@ private fun SharedTransitionScope.AICuratedMemoriesSection(
                 fontWeight = FontWeight.SemiBold,
             )
         }
-
-        Text(
-            text =
-                stringResource(
-                    Res.string.onboarding_import_smart_selection_description,
-                ),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
 
         // Fixed height staggered grid for AI curated content
         Box(
@@ -935,7 +921,9 @@ private fun SharedTransitionScope.MemoryThumbnail(
                         },
                     ),
         ) {
-            // Placeholder for image/video content - in real implementation would load from filesystem
+            // This grid asks the user to choose between their own photos, so it has to show
+            // them. It previously rendered a literal "IMG" label per tile, which made the
+            // choice impossible to make.
             Box(
                 modifier =
                     Modifier
@@ -944,23 +932,19 @@ private fun SharedTransitionScope.MemoryThumbnail(
                         .clip(MaterialTheme.shapes.medium),
                 contentAlignment = Alignment.Center,
             ) {
-                when (memory) {
-                    is MediaObject.Video -> {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = stringResource(Res.string.video),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                AsyncImage(
+                    model = memory.uri,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
 
-                    is MediaObject.Image -> {
-                        // Placeholder for image - real implementation would use filesystem to load image
-                        Text(
-                            "IMG",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                if (memory is MediaObject.Video) {
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = stringResource(Res.string.video),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 
