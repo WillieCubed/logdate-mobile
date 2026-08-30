@@ -2,6 +2,13 @@
 # Render a deterministic, deployment-ready Cloud Run contract from committed Terraform inputs.
 
 set -euo pipefail
+
+# Terraform init and console are given a deadline so a hung provider cannot wedge a deploy.
+# The previous fixed 30s was tuned on a warm workstation and expired on a cold CI runner,
+# which failed the first production deploy at the render step. Defaults are generous enough
+# for a cold runner and overridable for slower ones.
+readonly TERRAFORM_INIT_TIMEOUT_SECONDS="${LOGDATE_TERRAFORM_INIT_TIMEOUT_SECONDS:-60}"
+readonly TERRAFORM_CONSOLE_TIMEOUT_SECONDS="${LOGDATE_TERRAFORM_CONSOLE_TIMEOUT_SECONDS:-120}"
 umask 077
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -267,30 +274,26 @@ else
         die "release commit does not contain the Terraform dependency lockfile."
 fi
 
-# Contract rendering only evaluates variables and pure locals. An empty plugin
-# directory makes this initialization deterministic and prevents an unauthenticated
-# CI render from blocking on the provider registry.
-if [[ "${CI:-false}" == "true" ]]; then
-    # GitHub Actions has no provider-backed Terraform work in this step. Skip
-    # initialization entirely so a registry outage cannot leave an orphaned
-    # terraform process behind while rendering pure variables and locals.
-    printf 'CI contract render: skipping provider initialization.\n' >&2
+# Initialization runs everywhere, including CI. Skipping it there looked safe because this
+# step only evaluates variables and pure locals, but an uninitialized `terraform console`
+# reaches for the provider registry on a runner with no plugin cache, which is what hung the
+# first production deploy until its deadline expired. `-plugin-dir` points at an empty
+# directory, so init cannot contact the registry either - it is offline and deterministic,
+# which is the property the CI skip was reaching for.
+set +e
+if command -v timeout >/dev/null 2>&1; then
+    timeout --foreground -k 5 "$TERRAFORM_INIT_TIMEOUT_SECONDS" terraform -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false -plugin-dir="$PRIVATE_PLUGIN_DIR" >"$TERRAFORM_INIT_LOG" 2>&1
 else
-    set +e
-    if command -v timeout >/dev/null 2>&1; then
-        timeout --foreground -k 5 15 terraform -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false -plugin-dir="$PRIVATE_PLUGIN_DIR" >"$TERRAFORM_INIT_LOG" 2>&1
-    else
-        terraform -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false -plugin-dir="$PRIVATE_PLUGIN_DIR" >"$TERRAFORM_INIT_LOG" 2>&1
-    fi
-    TERRAFORM_INIT_STATUS=$?
-    set -e
-    if [[ "$TERRAFORM_INIT_STATUS" -ne 0 && "$TERRAFORM_INIT_STATUS" -ne 124 ]]; then
-        redact_log "$TERRAFORM_INIT_LOG"
-        die "Terraform backend-free initialization failed."
-    fi
-    if [[ "$TERRAFORM_INIT_STATUS" -eq 124 ]]; then
-        printf 'WARNING: Terraform initialization exceeded 15 seconds; continuing with provider-free console evaluation.\n' >&2
-    fi
+    terraform -chdir="$PRIVATE_CONFIG_DIR" init -backend=false -input=false -plugin-dir="$PRIVATE_PLUGIN_DIR" >"$TERRAFORM_INIT_LOG" 2>&1
+fi
+TERRAFORM_INIT_STATUS=$?
+set -e
+if [[ "$TERRAFORM_INIT_STATUS" -ne 0 && "$TERRAFORM_INIT_STATUS" -ne 124 ]]; then
+    redact_log "$TERRAFORM_INIT_LOG"
+    die "Terraform backend-free initialization failed."
+fi
+if [[ "$TERRAFORM_INIT_STATUS" -eq 124 ]]; then
+    printf 'WARNING: Terraform initialization exceeded 15 seconds; continuing with provider-free console evaluation.\n' >&2
 fi
 
 read -r -d '' TERRAFORM_EXPRESSION <<'EOF' || true
@@ -366,7 +369,7 @@ else
     set +e
     if command -v timeout >/dev/null 2>&1; then
         printf '%s\n' "$TERRAFORM_EXPRESSION" | tr '\n' ' ' |
-            timeout --foreground -k 5 30 terraform -chdir="$PRIVATE_CONFIG_DIR" console \
+            timeout --foreground -k 5 "$TERRAFORM_CONSOLE_TIMEOUT_SECONDS" terraform -chdir="$PRIVATE_CONFIG_DIR" console \
                 -state="$CONSOLE_STATE" \
                 -var-file="${ENVIRONMENT}.tfvars" >"$RAW_CONSOLE_OUTPUT" 2>"$TERRAFORM_CONSOLE_LOG"
     else
@@ -379,7 +382,7 @@ else
     set -e
     if [[ "$TERRAFORM_CONSOLE_STATUS" -ne 0 ]]; then
         redact_log "$TERRAFORM_CONSOLE_LOG"
-        [[ "$TERRAFORM_CONSOLE_STATUS" -ne 124 ]] || die "Terraform console exceeded 30 seconds."
+        [[ "$TERRAFORM_CONSOLE_STATUS" -ne 124 ]] || die "Terraform console exceeded ${TERRAFORM_CONSOLE_TIMEOUT_SECONDS} seconds."
         die "Terraform console failed."
     fi
 fi
