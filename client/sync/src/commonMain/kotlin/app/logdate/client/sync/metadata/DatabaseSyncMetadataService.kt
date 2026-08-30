@@ -53,9 +53,15 @@ class DatabaseSyncMetadataService(
         val serverOrigin = currentOrigin()
         val ownerId = currentOwnerId()
         promoteLegacyCursorIfNeeded(ownerId, serverOrigin, entityType)
-        return dao.getCursor(ownerId, serverOrigin, entityType.name)?.let { cursor ->
-            Instant.fromEpochMilliseconds(cursor.lastSyncTimestamp)
-        }
+        // A cursor row can exist before anything has actually synced, carrying a zero
+        // timestamp. Mapping that straight through reports the Unix epoch as a sync time -
+        // "Last synced: December 31, 1969" in any timezone west of UTC - instead of letting
+        // the caller fall back to "never synced".
+        return dao
+            .getCursor(ownerId, serverOrigin, entityType.name)
+            ?.lastSyncTimestamp
+            ?.takeIf { it > 0L }
+            ?.let { Instant.fromEpochMilliseconds(it) }
     }
 
     override suspend fun updateLastSyncTime(
