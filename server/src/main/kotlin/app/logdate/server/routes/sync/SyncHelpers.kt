@@ -322,6 +322,7 @@ internal fun LogDateEntry.toContentChange(): ContentChange =
         serverVersion = version,
         isDeleted = false,
         caption = caption,
+        location = location,
     )
 
 internal fun LogDateJournal.toJournalChange(): JournalChange =

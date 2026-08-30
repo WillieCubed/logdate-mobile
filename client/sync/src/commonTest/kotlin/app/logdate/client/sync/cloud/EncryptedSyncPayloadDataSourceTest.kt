@@ -6,6 +6,9 @@ import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.KeyDerivation
 import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.NotePlace
+import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.client.sync.test.FakeCloudApiClient
 import app.logdate.shared.model.EditorDraft
@@ -71,6 +74,61 @@ class EncryptedSyncPayloadDataSourceTest {
             val downloaded = dataSource.getContentChanges("token", Clock.System.now()).getOrThrow()
             val downloadedNote = downloaded.changes.single() as JournalNote.Text
             assertEquals(note.content, downloadedNote.content)
+        }
+
+    @Test
+    fun `content upload encrypts location before API boundary and download decrypts it`() =
+        runTest {
+            val cipher = configuredCipher()
+            val apiClient = RecordingPayloadCloudApiClient()
+            val dataSource = DefaultCloudContentDataSource(apiClient, cipher)
+            val location =
+                NoteLocation(
+                    coordinates = NoteCoordinates(latitude = 37.8199, longitude = -122.4783),
+                    place = NotePlace(id = Uuid.random(), name = "Golden Gate", latitude = 37.8199, longitude = -122.4783),
+                )
+            val note =
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    content = "private journal text",
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                    location = location,
+                )
+
+            val upload = dataSource.uploadNote("token", note)
+
+            assertTrue(upload.isSuccess)
+            val uploaded = apiClient.uploadContentCalls.single().second
+            val payload = uploaded.location.orEmpty()
+            assertTrue(payload.startsWith("LDSE1:"), "Location must use the sync E2EE envelope")
+            assertFalse(payload.contains("37.8199"), "Cloud API must not receive plaintext coordinates")
+            assertFalse(payload.contains("Golden Gate"), "Cloud API must not receive plaintext place names")
+
+            apiClient.getContentChangesResponse =
+                Result.success(
+                    ContentChangesResponse(
+                        changes =
+                            listOf(
+                                ContentChange(
+                                    id = note.uid.toString(),
+                                    type = "TEXT",
+                                    content = uploaded.content,
+                                    mediaUri = null,
+                                    createdAt = note.creationTimestamp.toEpochMilliseconds(),
+                                    lastUpdated = note.lastUpdated.toEpochMilliseconds(),
+                                    serverVersion = 1,
+                                    location = payload,
+                                ),
+                            ),
+                        deletions = emptyList(),
+                        lastTimestamp = Clock.System.now().toEpochMilliseconds(),
+                    ),
+                )
+
+            val downloaded = dataSource.getContentChanges("token", Clock.System.now()).getOrThrow()
+            val restored = (downloaded.changes.single() as JournalNote.Text).location
+            assertEquals(location, restored, "location must survive the round trip")
         }
 
     @Test

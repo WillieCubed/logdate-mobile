@@ -62,6 +62,14 @@ data class ContentUploadRequest(
      * entry has no caption, not that the caption is unknown.
      */
     val caption: String? = null,
+    /**
+     * Encrypted note location, or null when the entry has none.
+     *
+     * Carried as an opaque ciphertext string for the same reason note text is: the server must
+     * not hold a plaintext location history. Clients encrypt with the sync payload cipher before
+     * upload and decrypt after download.
+     */
+    val location: String? = null,
 )
 
 @Serializable
@@ -87,6 +95,14 @@ data class ContentUpdateRequest(
      * entry has no caption, not that the caption is unknown.
      */
     val caption: String? = null,
+    /**
+     * Encrypted note location, or null when the entry has none.
+     *
+     * Carried as an opaque ciphertext string for the same reason note text is: the server must
+     * not hold a plaintext location history. Clients encrypt with the sync payload cipher before
+     * upload and decrypt after download.
+     */
+    val location: String? = null,
 )
 
 @Serializable
@@ -117,6 +133,8 @@ data class ContentChange(
     val isDeleted: Boolean = false,
     /** User-authored caption for an image or video; absent for entries without one. */
     val caption: String? = null,
+    /** Encrypted note location; absent for entries without one. */
+    val location: String? = null,
 )
 
 @Serializable

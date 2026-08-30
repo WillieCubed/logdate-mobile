@@ -21,6 +21,8 @@ data class LogDateEntry(
     val deviceId: DeviceId,
     /** User-authored caption for image and video entries. */
     val caption: String? = null,
+    /** Encrypted note location; the server stores and returns it without interpreting it. */
+    val location: String? = null,
 )
 
 data class LogDateJournal(

@@ -121,6 +121,9 @@ internal fun LogDateEntry.toRepoJson(): JsonObject =
         if (caption != null) {
             put("caption", caption)
         }
+        if (location != null) {
+            put("location", location)
+        }
     }
 
 internal fun LogDateEntry.toEntryRepoJson(): JsonObject =
@@ -140,6 +143,9 @@ internal fun LogDateEntry.toEntryRepoJson(): JsonObject =
         if (caption != null) {
             put("caption", caption)
         }
+        if (location != null) {
+            put("location", location)
+        }
     }
 
 internal fun JsonObject.toLogDateEntry(
@@ -157,6 +163,7 @@ internal fun JsonObject.toLogDateEntry(
         version = version,
         deviceId = deviceIdOrDefault(),
         caption = nullableStringValue("caption"),
+        location = nullableStringValue("location"),
     )
 
 internal fun LogDateJournal.toRepoJson(): JsonObject =

@@ -114,6 +114,7 @@ private fun Route.contentRoutes(
                                 version = 0L,
                                 deviceId = req.deviceId,
                                 caption = req.caption,
+                                location = req.location,
                             ),
                     )
                 val response =
@@ -225,6 +226,7 @@ private fun Route.contentRoutes(
                                 version = existing?.version ?: 0L,
                                 deviceId = req.deviceId,
                                 caption = req.caption ?: existing?.caption,
+                                location = req.location ?: existing?.location,
                             ),
                     )
                 call.respond(ContentUpdateResponse(contentId, updated.version, updated.lastUpdated))

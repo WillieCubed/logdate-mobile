@@ -1,6 +1,9 @@
 package app.logdate.client.sync.cloud
 
 import app.logdate.client.repository.journals.JournalNote
+import kotlinx.serialization.json.Json
+import io.github.aakira.napier.Napier
+import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.shared.model.sync.VersionConstraint
 import kotlin.time.Instant
@@ -150,6 +153,7 @@ class DefaultCloudContentDataSource(
                     is JournalNote.Video -> caption.takeIf { it.isNotBlank() }
                     else -> null
                 },
+            location = encryptNoteLocation(uid, location),
         )
 
     private suspend fun JournalNote.toUpdateRequest(): ContentUpdateRequest =
@@ -185,6 +189,7 @@ class DefaultCloudContentDataSource(
                     is JournalNote.Video -> caption.takeIf { it.isNotBlank() }
                     else -> null
                 },
+            location = encryptNoteLocation(uid, location),
         )
 
     private suspend fun ContentChangesResponse.toContentSyncResult(): ContentSyncResult =
@@ -207,6 +212,7 @@ class DefaultCloudContentDataSource(
                     creationTimestamp = creationTimestamp,
                     lastUpdated = lastUpdated,
                     content = decryptNoteText(uid, content ?: ""),
+                    location = decryptNoteLocation(uid, location),
                     syncVersion = serverVersion,
                 )
             "IMAGE" ->
@@ -216,6 +222,7 @@ class DefaultCloudContentDataSource(
                     lastUpdated = lastUpdated,
                     mediaRef = mediaUri ?: "",
                     caption = caption.orEmpty(),
+                    location = decryptNoteLocation(uid, location),
                     syncVersion = serverVersion,
                 )
             "VIDEO" ->
@@ -225,6 +232,7 @@ class DefaultCloudContentDataSource(
                     lastUpdated = lastUpdated,
                     mediaRef = mediaUri ?: "",
                     caption = caption.orEmpty(),
+                    location = decryptNoteLocation(uid, location),
                     syncVersion = serverVersion,
                 )
             "AUDIO" ->
@@ -234,6 +242,7 @@ class DefaultCloudContentDataSource(
                     lastUpdated = lastUpdated,
                     mediaRef = mediaUri ?: "",
                     durationMs = durationMs,
+                    location = decryptNoteLocation(uid, location),
                     syncVersion = serverVersion,
                 )
             else -> throw IllegalArgumentException("Unknown content type: $type")
@@ -250,5 +259,40 @@ class DefaultCloudContentDataSource(
         content: String,
     ): String = syncPayloadCipher?.decryptString(noteTextFieldId(noteId), content) ?: content
 
+    private val locationJson = Json { ignoreUnknownKeys = true }
+
     private fun noteTextFieldId(noteId: Uuid): String = "sync:note:$noteId:text"
+
+    /**
+     * Encrypts a note's location before upload.
+     *
+     * Location gets the same treatment as note text rather than travelling in the clear: the
+     * server would otherwise hold a precise location history for every entry.
+     */
+    private suspend fun encryptNoteLocation(
+        noteId: Uuid,
+        location: NoteLocation?,
+    ): String? {
+        if (location == null || !location.hasLocation) return null
+        val plaintext = locationJson.encodeToString(NoteLocation.serializer(), location)
+        return syncPayloadCipher?.encryptString(noteLocationFieldId(noteId), plaintext) ?: plaintext
+    }
+
+    private suspend fun decryptNoteLocation(
+        noteId: Uuid,
+        payload: String?,
+    ): NoteLocation? {
+        if (payload.isNullOrBlank()) return null
+        return runCatching {
+            val plaintext =
+                syncPayloadCipher?.decryptString(noteLocationFieldId(noteId), payload) ?: payload
+            locationJson.decodeFromString(NoteLocation.serializer(), plaintext)
+        }.getOrElse {
+            // A location that cannot be decoded must not cost the user the entry itself.
+            Napier.w("Failed to decode synced location for note $noteId", it)
+            null
+        }
+    }
+
+    private fun noteLocationFieldId(noteId: Uuid): String = "sync:note:$noteId:location"
 }
