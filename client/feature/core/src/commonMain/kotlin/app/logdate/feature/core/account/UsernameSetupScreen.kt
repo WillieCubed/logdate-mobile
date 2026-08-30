@@ -26,20 +26,18 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_step_progress
+import logdate.client.feature.core.generated.resources.account_username_requirements
 import logdate.client.feature.core.generated.resources.account_username_choose_screen_title
 import logdate.client.feature.core.generated.resources.account_username_domain_hint
 import logdate.client.feature.core.generated.resources.account_username_network_address_description
 import logdate.client.feature.core.generated.resources.at
-import logdate.client.feature.core.generated.resources.connected_to_the_fediverse
 import logdate.client.feature.core.generated.resources.error_checking_username
-import logdate.client.feature.core.generated.resources.logdate_uses_activitypub_the_same_technology_that_powers_mastodon_pixelfed_and_other_social_networks_this_means_you_can_interact_with_a_global_community_while_keeping_control_of_your_data
 import logdate.client.feature.core.generated.resources.unique_address_username
 import logdate.client.feature.core.generated.resources.username
 import logdate.client.feature.core.generated.resources.username_available
 import logdate.client.feature.core.generated.resources.username_is_already_taken
 import logdate.client.feature.core.generated.resources.username_is_available_2
 import logdate.client.feature.core.generated.resources.username_taken
-import logdate.client.feature.core.generated.resources.username_tips
 import logdate.client.feature.core.generated.resources.your_username
 import logdate.client.ui.generated.resources.common_continue
 import logdate.client.ui.generated.resources.common_go_back
@@ -267,86 +265,14 @@ private fun UsernameSetupContent(
                             .focusRequester(focusRequester),
                 )
 
-                // ActivityPub/Fediverse explanation
-                Card(
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        ),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(Spacing.md),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Public,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Text(
-                                text = stringResource(Res.string.connected_to_the_fediverse),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                            )
-                        }
-
-                        val activityPubText =
-                            stringResource(
-                                Res.string
-                                    .logdate_uses_activitypub_the_same_technology_that_powers_mastodon_pixelfed_and_other_social_networks_this_means_you_can_interact_with_a_global_community_while_keeping_control_of_your_data,
-                            )
-                        Text(
-                            text = activityPubText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer,
-                        )
-
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                            modifier = Modifier.padding(top = Spacing.xs),
-                        ) {
-                            Chip(
-                                text = "Decentralized",
-                                icon = Icons.Default.Hub,
-                            )
-                            Chip(
-                                text = "Open Source",
-                                icon = Icons.Default.Code,
-                            )
-                        }
-                    }
-                }
-
-                // Username guidelines
-                Card(
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        ),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(Spacing.md),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    ) {
-                        Text(
-                            text = stringResource(Res.string.username_tips),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        listOf(
-                            "Letters, numbers, and underscores only",
-                            "Memorable and easy to share",
-                            "3-30 characters",
-                            "Cannot be changed later",
-                        ).forEach { tip -> GuidelineRow(text = tip) }
-                    }
-                }
+                // The constraints that actually change what you can type, in one line.
+                // This screen previously stacked an ActivityPub explainer and a bulleted tips
+                // card beneath the field, which buried the single decision it exists for.
+                Text(
+                    text = stringResource(Res.string.account_username_requirements),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
 
@@ -357,39 +283,6 @@ private fun UsernameSetupContent(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(UiRes.string.common_continue))
-        }
-    }
-}
-
-@Composable
-private fun Chip(
-    text: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-            ),
-        modifier = modifier,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
         }
     }
 }
@@ -434,26 +327,3 @@ private fun UsernameSetupScreenTakenPreview() {
     }
 }
 
-/**
- * A single guideline. Rendering these as rows rather than a newline-joined string of "•"
- * characters keeps them selectable, screen-reader friendly, and correctly wrapped.
- */
-@Composable
-private fun GuidelineRow(text: String) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Icon(
-            imageVector = Icons.Default.Check,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 2.dp).size(14.dp),
-        )
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}

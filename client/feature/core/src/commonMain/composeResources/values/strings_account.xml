@@ -126,6 +126,7 @@
     <string name="username_optional">Username (Optional)</string>
     <string name="username_handle">@%1$s</string>
     <string name="username_available">Username available</string>
+    <string name="account_username_requirements">Letters, numbers, and underscores. 3-30 characters. This cannot be changed later.</string>
     <string name="username_is_already_taken">Username is already taken</string>
     <string name="username_is_available">Username is available</string>
     <string name="username_is_available_2">Username is available</string>
