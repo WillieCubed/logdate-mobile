@@ -117,7 +117,8 @@ internal fun parseInlineMarkdown(text: String): List<InlineMarkdownSpan> {
     LINK_PATTERN.findAll(text).forEach { match ->
         val label = match.groups[1] ?: return@forEach
         if (!isEscaped(text, match.range.first) && !codeRanges.intersects(match.range)) {
-            addSpan(InlineMarkdownStyle.LINK, label.range.first, label.range.last + 1)
+            val labelStart = match.range.first + LINK_LABEL_OFFSET
+            addSpan(InlineMarkdownStyle.LINK, labelStart, labelStart + label.value.length)
         }
     }
 
@@ -142,7 +143,8 @@ internal fun parseInlineMarkdown(text: String): List<InlineMarkdownSpan> {
             !codeRanges.intersects(match.range) &&
             !strongRanges.intersects(match.range)
         ) {
-            addSpan(InlineMarkdownStyle.STRONG, content.range.first, content.range.last + 1)
+            val strongStart = match.range.first + PAIRED_DELIMITER_OFFSET
+            addSpan(InlineMarkdownStyle.STRONG, strongStart, strongStart + content.value.length)
             strongRanges += TextRange(match.range.first, match.range.last + 1)
         }
     }
@@ -150,7 +152,8 @@ internal fun parseInlineMarkdown(text: String): List<InlineMarkdownSpan> {
     STRIKETHROUGH_PATTERN.findAll(text).forEach { match ->
         val content = match.groups[1] ?: return@forEach
         if (!isEscaped(text, match.range.first) && !codeRanges.intersects(match.range)) {
-            addSpan(InlineMarkdownStyle.STRIKETHROUGH, content.range.first, content.range.last + 1)
+            val strikeStart = match.range.first + PAIRED_DELIMITER_OFFSET
+            addSpan(InlineMarkdownStyle.STRIKETHROUGH, strikeStart, strikeStart + content.value.length)
         }
     }
 
@@ -367,6 +370,12 @@ private fun hasUnderscoreDelimiterBoundary(
 }
 
 private fun Char?.isMarkdownWordCharacter(): Boolean = this != null && (isLetterOrDigit() || this == '_')
+
+// `MatchGroup.range` is JVM/JS-only; the common standard library exposes ranges on
+// `MatchResult` alone, so a capture group's start is derived from the width of the delimiter
+// that opens it. Every pattern below opens its group at a fixed offset from the match.
+private const val LINK_LABEL_OFFSET = 1
+private const val PAIRED_DELIMITER_OFFSET = 2
 
 private val LINK_PATTERN = Regex("\\[([^]\\n]+)]\\(([^)\\n]+)\\)")
 private val STRONG_PATTERN = Regex("\\*\\*([^*\\n]+)\\*\\*|__([^_\\n]+)__")
