@@ -1242,13 +1242,27 @@ class DefaultSyncManager(
                                 } else {
                                     val mediaUpload = uploadMediaIfNeeded(accessToken, note)
                                     if (mediaUpload.isFailure) {
-                                        val error = mediaUpload.exceptionOrNull()
+                                        val error =
+                                            mediaUpload.exceptionOrNull()
+                                                ?: Exception("Unknown media upload error")
+                                        // This used to `continue` without recording an attempt, so a
+                                        // note whose media file no longer exists on disk retried for
+                                        // ever and held the whole queue behind it - the upload can
+                                        // never succeed, because the bytes are gone. Counting the
+                                        // attempt lets it dead-letter like any other stuck upload,
+                                        // where it stays visible for review instead of blocking sync.
+                                        val movedToDeadLetter =
+                                            handleRetryFailure(
+                                                entityType = EntityType.NOTE,
+                                                pending = pending,
+                                                error = error,
+                                            )
                                         errors.add(
                                             SyncError(
                                                 SyncErrorType.STORAGE_ERROR,
-                                                "Failed to upload media for note ${note.uid}: ${error?.message}",
+                                                "Failed to upload media for note ${note.uid}: ${error.message}",
                                                 error,
-                                                retryable = true,
+                                                retryable = !movedToDeadLetter,
                                             ),
                                         )
                                         Napier.w("Skipping note ${note.uid} sync; media upload failed", error)
