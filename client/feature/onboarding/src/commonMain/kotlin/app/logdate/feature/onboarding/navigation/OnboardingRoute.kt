@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.onboarding.navigation
 
 import androidx.compose.foundation.layout.Box
