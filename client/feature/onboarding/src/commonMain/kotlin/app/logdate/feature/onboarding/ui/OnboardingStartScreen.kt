@@ -56,7 +56,7 @@ const val ONBOARDING_START_FROM_BACKUP_TAG = "onboarding_start_from_backup"
 @Composable
 fun OnboardingStartScreen(
     onNext: () -> Unit,
-    onStartFromBackup: () -> Unit,
+    onSignIn: () -> Unit,
     modifier: Modifier = Modifier,
     useLargerTextSizes: Boolean = false,
 ) {
@@ -70,7 +70,7 @@ fun OnboardingStartScreen(
     OnboardingStartScreenContent(
         showLanding = shouldShowMain,
         onGetStarted = onNext,
-        onStartFromBackup = onStartFromBackup,
+        onSignIn = onSignIn,
         modifier = modifier,
         useLargerTextSizes = useLargerTextSizes,
     )
@@ -80,7 +80,7 @@ fun OnboardingStartScreen(
 fun OnboardingStartScreenContent(
     showLanding: Boolean,
     onGetStarted: () -> Unit,
-    onStartFromBackup: () -> Unit,
+    onSignIn: () -> Unit,
     modifier: Modifier = Modifier,
     useLargerTextSizes: Boolean = false,
     animateContent: Boolean = true,
@@ -104,7 +104,7 @@ fun OnboardingStartScreenContent(
                 if (target) {
                     OnboardingLandingContent(
                         onGetStarted = onGetStarted,
-                        onStartFromBackup = onStartFromBackup,
+                        onSignIn = onSignIn,
                         useLargerTextSizes = useLargerTextSizes,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -115,7 +115,7 @@ fun OnboardingStartScreenContent(
         } else if (showLanding) {
             OnboardingLandingContent(
                 onGetStarted = onGetStarted,
-                onStartFromBackup = onStartFromBackup,
+                onSignIn = onSignIn,
                 useLargerTextSizes = useLargerTextSizes,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -141,7 +141,7 @@ private fun OnboardingSplashPane() {
 @Composable
 private fun OnboardingLandingContent(
     onGetStarted: () -> Unit,
-    onStartFromBackup: () -> Unit,
+    onSignIn: () -> Unit,
     modifier: Modifier = Modifier,
     useLargerTextSizes: Boolean = false,
 ) {
@@ -157,7 +157,7 @@ private fun OnboardingLandingContent(
         bottomPane = {
             OnboardingLandingActionPane(
                 onGetStarted = onGetStarted,
-                onStartFromBackup = onStartFromBackup,
+                onSignIn = onSignIn,
                 modifier = Modifier.fillMaxSize(),
             )
         },
@@ -174,7 +174,7 @@ private fun OnboardingLandingContent(
                 endPane = {
                     OnboardingLandingActionPane(
                         onGetStarted = onGetStarted,
-                        onStartFromBackup = onStartFromBackup,
+                        onSignIn = onSignIn,
                         modifier = Modifier.fillMaxSize(),
                     )
                 },
@@ -194,7 +194,7 @@ private fun OnboardingLandingContent(
                             OnboardingLandingMessage(useLargerTextSizes = useLargerTextSizes)
                             OnboardingLandingActions(
                                 onGetStarted = onGetStarted,
-                                onStartFromBackup = onStartFromBackup,
+                                onSignIn = onSignIn,
                             )
                         }
                     }
@@ -223,7 +223,7 @@ private fun OnboardingLandingMessagePane(
 @Composable
 private fun OnboardingLandingActionPane(
     onGetStarted: () -> Unit,
-    onStartFromBackup: () -> Unit,
+    onSignIn: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -235,7 +235,7 @@ private fun OnboardingLandingActionPane(
     ) {
         OnboardingLandingActions(
             onGetStarted = onGetStarted,
-            onStartFromBackup = onStartFromBackup,
+            onSignIn = onSignIn,
         )
     }
 }
@@ -275,7 +275,7 @@ private fun OnboardingLandingMessage(useLargerTextSizes: Boolean) {
 @Composable
 private fun OnboardingLandingActions(
     onGetStarted: () -> Unit,
-    onStartFromBackup: () -> Unit,
+    onSignIn: () -> Unit,
 ) {
     Column(
         modifier =
@@ -298,7 +298,7 @@ private fun OnboardingLandingActions(
             Text(stringResource(UiRes.string.common_get_started))
         }
         OutlinedButton(
-            onClick = onStartFromBackup,
+            onClick = onSignIn,
             modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_START_FROM_BACKUP_TAG),
         ) {
             Text(
@@ -352,7 +352,7 @@ private fun OnboardingSplashContent() {
 @Composable
 fun OnboardingStartScreenPreview() {
     LogDateTheme {
-        OnboardingStartScreen(onNext = {}, onStartFromBackup = {})
+        OnboardingStartScreen(onNext = {}, onSignIn = {})
     }
 }
 
@@ -362,7 +362,7 @@ fun OnboardingStartScreenPreview() {
 @Composable
 fun OnboardingSplashContentPreview() {
     LogDateTheme {
-        OnboardingLandingContent(onGetStarted = {}, onStartFromBackup = {})
+        OnboardingLandingContent(onGetStarted = {}, onSignIn = {})
     }
 }
 
@@ -375,7 +375,7 @@ fun OnboardingSplashContentPreview_Medium() {
     LogDateTheme {
         OnboardingLandingContent(
             onGetStarted = {},
-            onStartFromBackup = {},
+            onSignIn = {},
             useLargerTextSizes = true,
         )
     }

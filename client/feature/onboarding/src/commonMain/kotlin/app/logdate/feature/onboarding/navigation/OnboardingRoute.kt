@@ -141,10 +141,13 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
                     onGoToItem(routeForStep(firstOnboardingStep(OnboardingEntryMode.FRESH, progressSnapshot)))
                 }
             },
-            onStartFromBackup = {
+            onSignIn = {
                 coroutineScope.launch {
+                    // "Sign into LogDate Cloud" previously dropped the user at the first
+                    // CONTINUE_SETUP step, which is the local personal-introduction screen - there
+                    // was no reachable path to authenticate an existing account from onboarding.
                     flowViewModel.setActiveEntryMode(OnboardingEntryMode.CONTINUE_SETUP)
-                    onGoToItem(routeForStep(firstOnboardingStep(OnboardingEntryMode.CONTINUE_SETUP, progressSnapshot)))
+                    onGoToItem(SignIn)
                 }
             },
         )

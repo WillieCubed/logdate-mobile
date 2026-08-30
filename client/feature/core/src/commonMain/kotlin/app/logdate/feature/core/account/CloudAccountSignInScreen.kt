@@ -293,11 +293,37 @@ private fun CloudAccountSignInActionPane(
     onSignInWithGoogle: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    CloudAccountSignInActions(
+        onSignIn = onSignIn,
+        onAccountRecovery = onAccountRecovery,
+        onPrivacyPolicy = onPrivacyPolicy,
+        onTermsOfService = onTermsOfService,
+        isSigningIn = isSigningIn,
+        errorMessage = errorMessage,
+        onSignInWithGoogle = onSignInWithGoogle,
         modifier =
             modifier
                 .verticalScroll(rememberScrollState())
                 .padding(Spacing.lg),
+    )
+}
+
+/**
+ * The sign-in actions without a scroll container, so callers that already scroll can embed them.
+ */
+@Composable
+private fun CloudAccountSignInActions(
+    onSignIn: () -> Unit,
+    onAccountRecovery: () -> Unit,
+    onPrivacyPolicy: (() -> Unit)?,
+    onTermsOfService: (() -> Unit)?,
+    isSigningIn: Boolean,
+    errorMessage: String?,
+    onSignInWithGoogle: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Button(
@@ -498,16 +524,19 @@ private fun CloudAccountSignInCompactContent(
                 }
             }
 
-            Column(
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                if (onPrivacyPolicy != null || onTermsOfService != null) {
-                    LegalLinksRow(
-                        onPrivacyPolicy = onPrivacyPolicy,
-                        onTermsOfService = onTermsOfService,
-                    )
-                }
-            }
+            // Compact previously rendered only the legal links here, leaving the phone layout with
+            // a username field and no way to submit it. Reuse the same action set as the wide
+            // layouts so every form factor can actually sign in.
+            CloudAccountSignInActions(
+                onSignIn = onSignIn,
+                onAccountRecovery = onAccountRecovery,
+                onPrivacyPolicy = onPrivacyPolicy,
+                onTermsOfService = onTermsOfService,
+                isSigningIn = isSigningIn,
+                errorMessage = errorMessage,
+                onSignInWithGoogle = onSignInWithGoogle,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

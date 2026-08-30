@@ -107,7 +107,14 @@ data class BeginAuthenticationData(
 data class PasskeyAllowCredential(
     val type: String = "public-key",
     val id: String,
-    val transports: List<String>,
+    /**
+     * Transport hints for the credential.
+     *
+     * Optional in the WebAuthn spec and omitted by the server whenever a stored passkey recorded
+     * none, so this must default rather than be required: making it mandatory failed
+     * deserialization of every `signin/passkey/begin` response and broke sign-in outright.
+     */
+    val transports: List<String> = emptyList(),
 )
 
 @Serializable
