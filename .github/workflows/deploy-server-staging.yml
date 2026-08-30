@@ -15,9 +15,13 @@ permissions:
 jobs:
   deploy:
     name: Deploy staging revision
+    # The workflow_run trigger above could never satisfy a workflow_dispatch-only guard, so
+    # staging only ever deployed by hand - and production, which requires a successful staging
+    # deploy for the same SHA, could not be released without someone remembering to dispatch it.
     if: >-
       ${{
-        github.event_name == 'workflow_dispatch'
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
       }}
     uses: ./.github/workflows/deploy-server-cloud-run.yml
     with:
