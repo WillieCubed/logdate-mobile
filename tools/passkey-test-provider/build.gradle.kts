@@ -19,7 +19,10 @@ android {
 
     defaultConfig {
         applicationId = "app.logdate.tools.passkeyprovider"
-        minSdk = libs.versions.android.minSdk.get().toInt()
+        // CredentialProviderService is API 34. This module is an emulator-only test
+        // authenticator, never shipped, so it pins its own floor rather than forcing the app's
+        // minSdk up or scattering @RequiresApi over every override.
+        minSdk = 34
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"

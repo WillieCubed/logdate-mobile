@@ -268,14 +268,14 @@ object SharedScreenshotCatalog {
                 OnboardingStartScreenContent(
                     showLanding = false,
                     onGetStarted = {},
-                    onStartFromBackup = {},
+                    onSignIn = {},
                 )
             },
             sharedScene(SharedScreenshotSceneId.OnboardingStartLanding, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
                 OnboardingStartScreenContent(
                     showLanding = true,
                     onGetStarted = {},
-                    onStartFromBackup = {},
+                    onSignIn = {},
                     animateContent = false,
                 )
             },
@@ -566,8 +566,6 @@ object SharedScreenshotCatalog {
                 PasskeyAccountCreationFinalContent(
                     displayName = "Alex Rivera",
                     username = "alex",
-                    bio = "I keep a durable private memory archive of people, places, and milestones.",
-                    onBioChange = {},
                     onCreateAccount = {},
                     onBack = {},
                     isCreatingAccount = false,
@@ -576,6 +574,8 @@ object SharedScreenshotCatalog {
                     isPasskeySupported = true,
                     handleDomain = "logdate.app",
                     serverDisplayName = "LogDate Cloud",
+                    stepNumber = 2,
+                    stepCount = 2,
                 )
             },
         )
