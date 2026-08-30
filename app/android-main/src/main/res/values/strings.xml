@@ -2,6 +2,11 @@
     <!-- App identity -->
     <string name="app_name">LogDate</string>
     <!--
+        The account type LogDate owns in the platform AccountManager. Must stay identical to
+        AndroidAccountManager.ACCOUNT_TYPE; res/xml/authenticator.xml reads it from here.
+    -->
+    <string name="logdate_account_type" translatable="false">app.logdate.account</string>
+    <!--
         Required by Health Connect to register LogDate in the "App permissions" list.
         Health Connect displays this label when the user manages which apps can access
         their health data. Without this resource the app does not appear in Health Connect
