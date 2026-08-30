@@ -25,13 +25,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.account_step_progress
 import logdate.client.feature.core.generated.resources.account_username_choose_screen_title
+import logdate.client.feature.core.generated.resources.account_username_domain_hint
 import logdate.client.feature.core.generated.resources.account_username_network_address_description
 import logdate.client.feature.core.generated.resources.at
 import logdate.client.feature.core.generated.resources.connected_to_the_fediverse
 import logdate.client.feature.core.generated.resources.error_checking_username
 import logdate.client.feature.core.generated.resources.logdate_uses_activitypub_the_same_technology_that_powers_mastodon_pixelfed_and_other_social_networks_this_means_you_can_interact_with_a_global_community_while_keeping_control_of_your_data
-import logdate.client.feature.core.generated.resources.text_2_of_3
 import logdate.client.feature.core.generated.resources.unique_address_username
 import logdate.client.feature.core.generated.resources.username
 import logdate.client.feature.core.generated.resources.username_available
@@ -52,6 +53,8 @@ fun UsernameSetupScreen(
     onContinue: () -> Unit,
     onBack: () -> Unit,
     handleDomain: String,
+    stepNumber: Int,
+    stepCount: Int,
     usernameAvailability: UsernameAvailability = UsernameAvailability.Unknown,
     isValid: Boolean = true,
     modifier: Modifier = Modifier,
@@ -62,6 +65,8 @@ fun UsernameSetupScreen(
         onContinue = onContinue,
         onBack = onBack,
         handleDomain = handleDomain,
+        stepNumber = stepNumber,
+        stepCount = stepCount,
         usernameAvailability = usernameAvailability,
         isValid = isValid,
         modifier = modifier,
@@ -76,6 +81,8 @@ private fun UsernameSetupContent(
     onContinue: () -> Unit,
     onBack: () -> Unit,
     handleDomain: String,
+    stepNumber: Int,
+    stepCount: Int,
     usernameAvailability: UsernameAvailability,
     isValid: Boolean,
     modifier: Modifier = Modifier,
@@ -111,7 +118,7 @@ private fun UsernameSetupContent(
                 }
 
                 LinearProgressIndicator(
-                    progress = { 0.66f }, // Step 2 of 3
+                    progress = { if (stepCount <= 0) 0f else stepNumber.toFloat() / stepCount },
                     modifier =
                         Modifier
                             .weight(1f)
@@ -119,7 +126,7 @@ private fun UsernameSetupContent(
                 )
 
                 Text(
-                    text = stringResource(Res.string.text_2_of_3),
+                    text = stringResource(Res.string.account_step_progress, stepNumber, stepCount),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -214,11 +221,17 @@ private fun UsernameSetupContent(
                                 )
                             else ->
                                 Text(
-                                    stringResource(
-                                        Res.string.unique_address_username,
-                                        username,
-                                        handleDomain,
-                                    ),
+                                    // A blank username would render "@@domain"; show the plain
+                                    // domain hint until there is something to preview.
+                                    if (username.isBlank()) {
+                                        stringResource(Res.string.account_username_domain_hint, handleDomain)
+                                    } else {
+                                        stringResource(
+                                            Res.string.unique_address_username,
+                                            username,
+                                            handleDomain,
+                                        )
+                                    },
                                 )
                         }
                     },
@@ -384,6 +397,8 @@ private fun UsernameSetupScreenPreview() {
                 onContinue = {},
                 onBack = {},
                 handleDomain = "logdate.app",
+                stepNumber = 1,
+                stepCount = 2,
                 usernameAvailability = UsernameAvailability.Available,
                 isValid = true,
             )
@@ -402,6 +417,8 @@ private fun UsernameSetupScreenTakenPreview() {
                 onContinue = {},
                 onBack = {},
                 handleDomain = "logdate.app",
+                stepNumber = 1,
+                stepCount = 2,
                 usernameAvailability = UsernameAvailability.Taken,
                 isValid = false,
             )

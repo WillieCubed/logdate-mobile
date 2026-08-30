@@ -1,56 +1,90 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports", "ktlint:standard:max-line-length")
-
 package app.logdate.feature.core.account
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import app.logdate.ui.adaptive.FoldableBookLayout
-import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.about_passkeys
-import logdate.client.feature.core.generated.resources.account_bio_community_placeholder
-import logdate.client.feature.core.generated.resources.account_passkey_create_review_description
+import logdate.client.feature.core.generated.resources.account_confirm_title
+import logdate.client.feature.core.generated.resources.account_create_cta
+import logdate.client.feature.core.generated.resources.account_handle_change
+import logdate.client.feature.core.generated.resources.account_passkey_headline
+import logdate.client.feature.core.generated.resources.account_passkey_learn_more
 import logdate.client.feature.core.generated.resources.account_passkey_not_supported_description
-import logdate.client.feature.core.generated.resources.almost_ready
-import logdate.client.feature.core.generated.resources.bio_optional
-import logdate.client.feature.core.generated.resources.create_account_with_passkey
+import logdate.client.feature.core.generated.resources.account_passkey_point_device_auth
+import logdate.client.feature.core.generated.resources.account_passkey_point_multi_device
+import logdate.client.feature.core.generated.resources.account_passkey_point_no_passwords
+import logdate.client.feature.core.generated.resources.account_passkey_point_phish_resistant
+import logdate.client.feature.core.generated.resources.account_passkey_subhead
+import logdate.client.feature.core.generated.resources.account_step_progress
+import logdate.client.feature.core.generated.resources.account_will_sign_in_to
 import logdate.client.feature.core.generated.resources.creating_account
-import logdate.client.feature.core.generated.resources.display_name
 import logdate.client.feature.core.generated.resources.passkeys_not_supported
-import logdate.client.feature.core.generated.resources.tell_others_about_yourself
-import logdate.client.feature.core.generated.resources.text_3_of_3
-import logdate.client.feature.core.generated.resources.unique_address_username
-import logdate.client.feature.core.generated.resources.username
 import logdate.client.ui.generated.resources.common_dismiss
 import logdate.client.ui.generated.resources.common_go_back
 import logdate.client.ui.generated.resources.common_try_again
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
 
+/**
+ * Final step of LogDate Cloud account setup: confirm who the account will belong to, then create it.
+ *
+ * This screen is deliberately a *confirmation*, not a form. Name and bio are captured during app
+ * onboarding, so re-collecting them here produced empty fields on a screen labelled "review your
+ * details". The identity is the subject of the screen; the passkey explainer is collapsed because a
+ * user who has reached the last step has already opted in.
+ */
 @Composable
 fun PasskeyAccountCreationFinalContent(
     displayName: String,
     username: String,
-    bio: String,
-    onBioChange: (String) -> Unit,
     onCreateAccount: () -> Unit,
     onBack: () -> Unit,
     isCreatingAccount: Boolean,
@@ -59,409 +93,72 @@ fun PasskeyAccountCreationFinalContent(
     isPasskeySupported: Boolean,
     handleDomain: String,
     serverDisplayName: String,
+    stepNumber: Int,
+    stepCount: Int,
     modifier: Modifier = Modifier,
 ) {
-    PasskeyAccountCreationFinalAdaptiveContent(
-        displayName = displayName,
-        username = username,
-        bio = bio,
-        onBioChange = onBioChange,
-        onCreateAccount = onCreateAccount,
-        onBack = onBack,
-        isCreatingAccount = isCreatingAccount,
-        errorMessage = errorMessage,
-        onClearError = onClearError,
-        isPasskeySupported = isPasskeySupported,
-        handleDomain = handleDomain,
-        serverDisplayName = serverDisplayName,
-        modifier = modifier,
-    )
-}
+    Column(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = Spacing.lg),
+    ) {
+        StepHeader(
+            stepNumber = stepNumber,
+            stepCount = stepCount,
+            onBack = onBack,
+            enabled = !isCreatingAccount,
+        )
 
-@Composable
-private fun PasskeyAccountCreationFinalAdaptiveContent(
-    displayName: String,
-    username: String,
-    bio: String,
-    onBioChange: (String) -> Unit,
-    onCreateAccount: () -> Unit,
-    onBack: () -> Unit,
-    isCreatingAccount: Boolean,
-    errorMessage: String?,
-    onClearError: () -> Unit,
-    isPasskeySupported: Boolean,
-    handleDomain: String,
-    serverDisplayName: String,
-    modifier: Modifier = Modifier,
-) {
-    FoldableTabletopLayout(
-        modifier = modifier.fillMaxSize(),
-        minPaneHeight = 260.dp,
-        topPane = {
-            PasskeyAccountCreationFinalTopPane(
+        // Scrollable body; the call to action stays pinned so it is reachable without scrolling
+        // on short screens and does not float mid-screen on tall ones.
+        Column(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+        ) {
+            Spacer(Modifier.height(Spacing.lg))
+
+            Text(
+                text = stringResource(Res.string.account_confirm_title),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+            )
+
+            Spacer(Modifier.height(Spacing.xl))
+
+            AccountIdentity(
                 displayName = displayName,
                 username = username,
                 handleDomain = handleDomain,
-                serverDisplayName = serverDisplayName,
-                isPasskeySupported = isPasskeySupported,
-                onBack = onBack,
-                modifier = Modifier.fillMaxSize(),
+                onChange = onBack,
+                changeEnabled = !isCreatingAccount,
             )
-        },
-        bottomPane = {
-            PasskeyAccountCreationFinalBottomPane(
-                bio = bio,
-                onBioChange = onBioChange,
-                onCreateAccount = onCreateAccount,
-                isCreatingAccount = isCreatingAccount,
-                errorMessage = errorMessage,
-                onClearError = onClearError,
-                isPasskeySupported = isPasskeySupported,
-                modifier = Modifier.fillMaxSize(),
-            )
-        },
-        standardContent = {
-            FoldableBookLayout(
-                modifier = Modifier.fillMaxSize(),
-                minPaneWidth = 320.dp,
-                startPane = {
-                    PasskeyAccountCreationFinalTopPane(
-                        displayName = displayName,
-                        username = username,
-                        handleDomain = handleDomain,
-                        serverDisplayName = serverDisplayName,
-                        isPasskeySupported = isPasskeySupported,
-                        onBack = onBack,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                },
-                endPane = {
-                    PasskeyAccountCreationFinalBottomPane(
-                        bio = bio,
-                        onBioChange = onBioChange,
-                        onCreateAccount = onCreateAccount,
-                        isCreatingAccount = isCreatingAccount,
-                        errorMessage = errorMessage,
-                        onClearError = onClearError,
-                        isPasskeySupported = isPasskeySupported,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                },
-                standardContent = {
-                    PasskeyAccountCreationFinalCompactContent(
-                        displayName = displayName,
-                        username = username,
-                        bio = bio,
-                        onBioChange = onBioChange,
-                        onCreateAccount = onCreateAccount,
-                        onBack = onBack,
-                        isCreatingAccount = isCreatingAccount,
-                        errorMessage = errorMessage,
-                        onClearError = onClearError,
-                        isPasskeySupported = isPasskeySupported,
-                        handleDomain = handleDomain,
-                        serverDisplayName = serverDisplayName,
-                    )
-                },
-            )
-        },
-    )
-}
 
-@Composable
-private fun PasskeyAccountCreationFinalTopPane(
-    displayName: String,
-    username: String,
-    handleDomain: String,
-    serverDisplayName: String,
-    isPasskeySupported: Boolean,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .padding(Spacing.lg)
-                .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xl),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(UiRes.string.common_go_back),
+            Spacer(Modifier.height(Spacing.xl))
+
+            PasskeyExplainer()
+
+            if (!isPasskeySupported) {
+                Spacer(Modifier.height(Spacing.lg))
+                NoticeCard(
+                    icon = Icons.Default.Warning,
+                    title = stringResource(Res.string.passkeys_not_supported),
+                    body = stringResource(Res.string.account_passkey_not_supported_description),
                 )
             }
 
-            LinearProgressIndicator(
-                progress = { 1.0f },
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .padding(horizontal = Spacing.md),
-            )
-
-            Text(
-                text = stringResource(Res.string.text_3_of_3),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = stringResource(Res.string.almost_ready),
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-            )
-
-            Text(
-                text =
-                    stringResource(
-                        Res.string.account_passkey_create_review_description,
-                        serverDisplayName,
-                    ),
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Spacing.md),
-            )
-        }
-
-        Card(
-            colors =
-                CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                ),
-        ) {
-            Column(
-                modifier = Modifier.padding(Spacing.md),
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                Text(
-                    text = "Your $serverDisplayName account",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                    Column {
-                        Text(
-                            text = stringResource(Res.string.display_name),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                        )
-                        Text(
-                            text = displayName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                    }
-                }
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AlternateEmail,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                    Column {
-                        Text(
-                            text = stringResource(Res.string.username),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                        )
-                        Text(
-                            text =
-                                stringResource(
-                                    Res.string.unique_address_username,
-                                    username,
-                                    handleDomain,
-                                ),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                    }
-                }
+            errorMessage?.let { error ->
+                Spacer(Modifier.height(Spacing.lg))
+                ErrorBanner(message = error, onDismiss = onClearError)
             }
-        }
 
-        if (!isPasskeySupported) {
-            Card(
-                colors =
-                    CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                    ),
-            ) {
-                Column(
-                    modifier = Modifier.padding(Spacing.md),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onErrorContainer,
-                        )
-                        Text(
-                            text = stringResource(Res.string.passkeys_not_supported),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                        )
-                    }
-                    Text(
-                        text = stringResource(Res.string.account_passkey_not_supported_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PasskeyAccountCreationFinalBottomPane(
-    bio: String,
-    onBioChange: (String) -> Unit,
-    onCreateAccount: () -> Unit,
-    isCreatingAccount: Boolean,
-    errorMessage: String?,
-    onClearError: () -> Unit,
-    isPasskeySupported: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val focusManager = LocalFocusManager.current
-
-    Column(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .padding(Spacing.lg)
-                .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-    ) {
-        OutlinedTextField(
-            value = bio,
-            onValueChange = onBioChange,
-            label = { Text(stringResource(Res.string.bio_optional)) },
-            placeholder = { Text(stringResource(Res.string.tell_others_about_yourself)) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Description,
-                    contentDescription = null,
-                )
-            },
-            supportingText = { Text(stringResource(Res.string.account_bio_community_placeholder)) },
-            keyboardOptions =
-                KeyboardOptions(
-                    imeAction = ImeAction.Done,
-                    capitalization = KeyboardCapitalization.Sentences,
-                ),
-            keyboardActions =
-                KeyboardActions(
-                    onDone = { focusManager.clearFocus() },
-                ),
-            minLines = 3,
-            maxLines = 5,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        errorMessage?.let { error ->
-            Card(
-                colors =
-                    CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                    ),
-            ) {
-                Row(
-                    modifier = Modifier.padding(Spacing.md),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Error,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onErrorContainer,
-                    )
-                    Text(
-                        text = error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.weight(1f),
-                    )
-                    IconButton(onClick = onClearError) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = stringResource(UiRes.string.common_dismiss),
-                            tint = MaterialTheme.colorScheme.onErrorContainer,
-                        )
-                    }
-                }
-            }
-        }
-
-        Card(
-            colors =
-                CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                ),
-        ) {
-            Column(
-                modifier = Modifier.padding(Spacing.md),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Key,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Text(
-                        text = stringResource(Res.string.about_passkeys),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                Text(
-                    text =
-                        "• No passwords to remember or type\n" +
-                            "• Uses your device's biometric authentication\n" +
-                            "• More secure than traditional passwords\n" +
-                            "• Works across all your devices",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Spacer(Modifier.height(Spacing.xl))
         }
 
         Button(
@@ -469,332 +166,286 @@ private fun PasskeyAccountCreationFinalBottomPane(
             enabled = !isCreatingAccount && isPasskeySupported,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            if (isCreatingAccount) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onPrimary,
+            when {
+                isCreatingAccount -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                    Spacer(Modifier.width(Spacing.sm))
+                    Text(stringResource(Res.string.creating_account))
+                }
+
+                errorMessage != null -> Text(stringResource(UiRes.string.common_try_again))
+
+                else -> Text(stringResource(Res.string.account_create_cta))
+            }
+        }
+
+        Spacer(Modifier.height(Spacing.md))
+
+        Text(
+            text = stringResource(Res.string.account_will_sign_in_to, serverDisplayName),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        Spacer(Modifier.height(Spacing.xl))
+    }
+}
+
+@Composable
+private fun StepHeader(
+    stepNumber: Int,
+    stepCount: Int,
+    onBack: () -> Unit,
+    enabled: Boolean,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onBack, enabled = enabled) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = stringResource(UiRes.string.common_go_back),
+            )
+        }
+
+        LinearProgressIndicator(
+            progress = { if (stepCount <= 0) 1f else stepNumber.toFloat() / stepCount },
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .padding(horizontal = Spacing.md),
+        )
+
+        Text(
+            text = stringResource(Res.string.account_step_progress, stepNumber, stepCount),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * The account as the user will see it elsewhere: a monogram, their name, and one canonical handle.
+ *
+ * The handle is rendered as a single `@user@domain` token rather than a sentence in a value slot,
+ * which is what produced the doubled `@@domain` when the username was still blank.
+ */
+@Composable
+private fun AccountIdentity(
+    displayName: String,
+    username: String,
+    handleDomain: String,
+    onChange: () -> Unit,
+    changeEnabled: Boolean,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(88.dp)
+                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text =
+                    displayName
+                        .trim()
+                        .firstOrNull()
+                        ?.uppercase()
+                        .orEmpty(),
+                style = MaterialTheme.typography.displaySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+
+        Spacer(Modifier.height(Spacing.md))
+
+        Text(
+            text = displayName,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+        )
+
+        Spacer(Modifier.height(Spacing.sm))
+
+        Surface(
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        ) {
+            Text(
+                text = "@$username@$handleDomain",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            )
+        }
+
+        TextButton(onClick = onChange, enabled = changeEnabled) {
+            Text(stringResource(Res.string.account_handle_change))
+        }
+    }
+}
+
+/**
+ * One line of reassurance, with the detail behind a disclosure so the last step stays scannable.
+ */
+@Composable
+private fun PasskeyExplainer() {
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(
+                imageVector = Icons.Default.Key,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = Spacing.xs).size(20.dp),
+            )
+            Spacer(Modifier.width(Spacing.md))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(Res.string.account_passkey_headline),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
                 )
-                Spacer(modifier = Modifier.width(Spacing.sm))
-                Text(stringResource(Res.string.creating_account))
-            } else if (errorMessage != null) {
-                Text(stringResource(UiRes.string.common_try_again))
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Key,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
+                Text(
+                    text = stringResource(Res.string.account_passkey_subhead),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(modifier = Modifier.width(Spacing.sm))
-                Text(stringResource(Res.string.create_account_with_passkey))
+            }
+        }
+
+        TextButton(onClick = { expanded = !expanded }) {
+            Text(
+                text =
+                    if (expanded) {
+                        stringResource(Res.string.about_passkeys)
+                    } else {
+                        stringResource(Res.string.account_passkey_learn_more)
+                    },
+            )
+            Spacer(Modifier.width(Spacing.xs))
+            Icon(
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+
+        AnimatedVisibility(visible = expanded) {
+            Column(
+                modifier = Modifier.padding(start = Spacing.xl, bottom = Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                PasskeyPoint(stringResource(Res.string.account_passkey_point_no_passwords))
+                PasskeyPoint(stringResource(Res.string.account_passkey_point_device_auth))
+                PasskeyPoint(stringResource(Res.string.account_passkey_point_phish_resistant))
+                PasskeyPoint(stringResource(Res.string.account_passkey_point_multi_device))
             }
         }
     }
 }
 
 @Composable
-private fun PasskeyAccountCreationFinalCompactContent(
-    displayName: String,
-    username: String,
-    bio: String,
-    onBioChange: (String) -> Unit,
-    onCreateAccount: () -> Unit,
-    onBack: () -> Unit,
-    isCreatingAccount: Boolean,
-    errorMessage: String?,
-    onClearError: () -> Unit,
-    isPasskeySupported: Boolean,
-    handleDomain: String,
-    serverDisplayName: String,
-) {
-    val focusManager = LocalFocusManager.current
+private fun PasskeyPoint(text: String) {
+    Row(verticalAlignment = Alignment.Top) {
+        Icon(
+            imageVector = Icons.Default.Check,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(top = Spacing.xs).size(16.dp),
+        )
+        Spacer(Modifier.width(Spacing.sm))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(Spacing.lg)
-                .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xl),
+@Composable
+private fun NoticeCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    body: String,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                )
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
+            Text(
+                text = body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ErrorBanner(
+    message: String,
+    onDismiss: () -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.padding(start = Spacing.md, top = Spacing.sm, bottom = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(UiRes.string.common_go_back),
-                )
-            }
-
-            LinearProgressIndicator(
-                progress = { 1.0f },
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .padding(horizontal = Spacing.md),
+            Icon(
+                imageVector = Icons.Default.Error,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer,
             )
-
             Text(
-                text = stringResource(Res.string.text_3_of_3),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f),
             )
-        }
-
-        Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = stringResource(Res.string.almost_ready),
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-            )
-
-            Text(
-                text =
-                    stringResource(
-                        Res.string.account_passkey_create_review_description,
-                        serverDisplayName,
-                    ),
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Spacing.md),
-            )
-        }
-
-        Card(
-            colors =
-                CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                ),
-        ) {
-            Column(
-                modifier = Modifier.padding(Spacing.md),
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                Text(
-                    text = "Your $serverDisplayName account",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                    Column {
-                        Text(
-                            text = stringResource(Res.string.display_name),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                        )
-                        Text(
-                            text = displayName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                    }
-                }
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AlternateEmail,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                    Column {
-                        Text(
-                            text = stringResource(Res.string.username),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                        )
-                        Text(
-                            text =
-                                stringResource(
-                                    Res.string.unique_address_username,
-                                    username,
-                                    handleDomain,
-                                ),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                    }
-                }
-            }
-        }
-
-        if (!isPasskeySupported) {
-            Card(
-                colors =
-                    CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                    ),
-            ) {
-                Column(
-                    modifier = Modifier.padding(Spacing.md),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onErrorContainer,
-                        )
-                        Text(
-                            text = stringResource(Res.string.passkeys_not_supported),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                        )
-                    }
-                    Text(
-                        text = stringResource(Res.string.account_passkey_not_supported_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                    )
-                }
-            }
-        }
-
-        OutlinedTextField(
-            value = bio,
-            onValueChange = onBioChange,
-            label = { Text(stringResource(Res.string.bio_optional)) },
-            placeholder = { Text(stringResource(Res.string.tell_others_about_yourself)) },
-            leadingIcon = {
+            IconButton(onClick = onDismiss) {
                 Icon(
-                    imageVector = Icons.Default.Description,
-                    contentDescription = null,
+                    imageVector = Icons.Default.Close,
+                    contentDescription = stringResource(UiRes.string.common_dismiss),
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
                 )
-            },
-            supportingText = { Text(stringResource(Res.string.account_bio_community_placeholder)) },
-            keyboardOptions =
-                KeyboardOptions(
-                    imeAction = ImeAction.Done,
-                    capitalization = KeyboardCapitalization.Sentences,
-                ),
-            keyboardActions =
-                KeyboardActions(
-                    onDone = { focusManager.clearFocus() },
-                ),
-            minLines = 3,
-            maxLines = 5,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        errorMessage?.let { error ->
-            Card(
-                colors =
-                    CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                    ),
-            ) {
-                Row(
-                    modifier = Modifier.padding(Spacing.md),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Error,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onErrorContainer,
-                    )
-                    Text(
-                        text = error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.weight(1f),
-                    )
-                    IconButton(onClick = onClearError) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = stringResource(UiRes.string.common_dismiss),
-                            tint = MaterialTheme.colorScheme.onErrorContainer,
-                        )
-                    }
-                }
-            }
-        }
-
-        Card(
-            colors =
-                CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                ),
-        ) {
-            Column(
-                modifier = Modifier.padding(Spacing.md),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Key,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Text(
-                        text = stringResource(Res.string.about_passkeys),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                Text(
-                    text =
-                        "• No passwords to remember or type\n" +
-                            "• Uses your device's biometric authentication\n" +
-                            "• More secure than traditional passwords\n" +
-                            "• Works across all your devices",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
-        Button(
-            onClick = onCreateAccount,
-            enabled = !isCreatingAccount && isPasskeySupported,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            if (isCreatingAccount) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                )
-                Spacer(modifier = Modifier.width(Spacing.sm))
-                Text(stringResource(Res.string.creating_account))
-            } else if (errorMessage != null) {
-                Text(stringResource(UiRes.string.common_try_again))
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Key,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(modifier = Modifier.width(Spacing.sm))
-                Text(stringResource(Res.string.create_account_with_passkey))
             }
         }
     }
@@ -808,8 +459,6 @@ private fun PasskeyAccountCreationFinalScreenPreview() {
             PasskeyAccountCreationFinalContent(
                 displayName = "Alex Johnson",
                 username = "alex_j",
-                bio = "Software developer passionate about productivity apps and mindful journaling.",
-                onBioChange = {},
                 onCreateAccount = {},
                 onBack = {},
                 isCreatingAccount = false,
@@ -818,6 +467,8 @@ private fun PasskeyAccountCreationFinalScreenPreview() {
                 isPasskeySupported = true,
                 handleDomain = "logdate.app",
                 serverDisplayName = "LogDate Cloud",
+                stepNumber = 2,
+                stepCount = 2,
             )
         }
     }
@@ -825,22 +476,22 @@ private fun PasskeyAccountCreationFinalScreenPreview() {
 
 @Preview
 @Composable
-private fun PasskeyAccountCreationFinalScreenLoadingPreview() {
+private fun PasskeyAccountCreationFinalScreenErrorPreview() {
     MaterialTheme {
         Surface {
             PasskeyAccountCreationFinalContent(
                 displayName = "Alex Johnson",
                 username = "alex_j",
-                bio = "",
-                onBioChange = {},
                 onCreateAccount = {},
                 onBack = {},
-                isCreatingAccount = true,
-                errorMessage = null,
+                isCreatingAccount = false,
+                errorMessage = "Too many attempts. Please wait a moment before trying again.",
                 onClearError = {},
                 isPasskeySupported = true,
-                handleDomain = "journal.example.com",
-                serverDisplayName = "Custom server",
+                handleDomain = "logdate.app",
+                serverDisplayName = "LogDate Cloud",
+                stepNumber = 3,
+                stepCount = 3,
             )
         }
     }

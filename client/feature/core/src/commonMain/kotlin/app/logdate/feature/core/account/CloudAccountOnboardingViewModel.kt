@@ -27,6 +27,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class CloudAccountOnboardingViewModel(
@@ -68,7 +69,70 @@ class CloudAccountOnboardingViewModel(
                 Napier.w("Failed to resolve email verification availability", e)
             }
         }
+        prefillFromLocalProfile()
     }
+
+    /**
+     * Seeds the flow from the local profile onboarding already captured.
+     *
+     * Onboarding asks for a name and a bio before this flow ever runs, so asking again - with empty
+     * fields - reads as a broken form rather than a review. When a name is already known the
+     * DisplayName step is skipped outright; the user can still edit it from the confirmation step.
+     */
+    private fun prefillFromLocalProfile() {
+        viewModelScope.launch {
+            val profile =
+                try {
+                    profileRepository.getCurrentProfile()
+                } catch (e: Exception) {
+                    Napier.w("Failed to load local profile for account setup prefill", e)
+                    return@launch
+                }
+            val name = profile.displayName.trim()
+            val bio = profile.bio?.trim().orEmpty()
+            _uiState.update { state ->
+                val resolvedName = state.displayName.ifBlank { name }
+                state.copy(
+                    displayName = resolvedName,
+                    bio = state.bio.ifBlank { bio },
+                    hasProfileDisplayName = resolvedName.isNotBlank(),
+                )
+            }
+            collapseDisplayNameStepIfKnown()
+        }
+    }
+
+    /**
+     * Moves off the DisplayName step once the profile is known to carry a name.
+     *
+     * [setInitialStep] and the profile load race each other - the caller sets the entry step from a
+     * composition effect while the profile resolves off the main thread - so both call this and
+     * whichever finishes last performs the collapse.
+     */
+    private fun collapseDisplayNameStepIfKnown() {
+        if (_uiState.value.currentStep != OnboardingStep.DisplayName) return
+        val resolved = resolveStep(OnboardingStep.DisplayName)
+        if (resolved == OnboardingStep.DisplayName) return
+        _uiState.update { it.copy(currentStep = resolved) }
+    }
+
+    /**
+     * Maps a requested step to the step the user should actually land on.
+     *
+     * Server-selection persistence assigns the step from its own coroutine, so resolving at every
+     * assignment point - rather than only after the profile loads - keeps the two races from
+     * reinstating a step that was already collapsed.
+     */
+    private fun resolveStep(step: OnboardingStep): OnboardingStep =
+        if (step == OnboardingStep.DisplayName && _uiState.value.hasProfileDisplayName) {
+            if (entryStep == OnboardingStep.DisplayName) {
+                // Keep "back exits the flow" pointing at the step the user actually lands on.
+                entryStep = OnboardingStep.Username
+            }
+            OnboardingStep.Username
+        } else {
+            step
+        }
 
     /**
      * Sets the initial step for the flow, skipping earlier steps.
@@ -88,16 +152,22 @@ class CloudAccountOnboardingViewModel(
      */
     fun setInitialStep(step: OnboardingStep) {
         entryStep = step
-        _uiState.value = _uiState.value.copy(currentStep = step)
+        _uiState.value = _uiState.value.copy(currentStep = resolveStep(step))
         if (step != OnboardingStep.Welcome) {
             prepareServerSelection(step)
         }
     }
 
+    /**
+     * The first step after Welcome. DisplayName is skipped when onboarding already captured a name,
+     * so the flow is Username -> Confirm rather than three screens with a pre-answered one in front.
+     */
+    private fun stepAfterWelcome(): OnboardingStep = resolveStep(OnboardingStep.DisplayName)
+
     fun goToNextStep() {
         val currentStep = _uiState.value.currentStep
         when (currentStep) {
-            OnboardingStep.Welcome -> prepareServerSelection(OnboardingStep.DisplayName)
+            OnboardingStep.Welcome -> prepareServerSelection(stepAfterWelcome())
             OnboardingStep.SignIn -> _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.Complete)
             OnboardingStep.DisplayName -> _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.Username)
             OnboardingStep.Username -> _uiState.value = _uiState.value.copy(currentStep = OnboardingStep.PasskeyCreation)
@@ -126,7 +196,8 @@ class CloudAccountOnboardingViewModel(
                 OnboardingStep.Welcome -> OnboardingStep.Welcome
                 OnboardingStep.SignIn -> OnboardingStep.Welcome
                 OnboardingStep.DisplayName -> OnboardingStep.Welcome
-                OnboardingStep.Username -> OnboardingStep.DisplayName
+                OnboardingStep.Username ->
+                    if (_uiState.value.hasProfileDisplayName) OnboardingStep.Welcome else OnboardingStep.DisplayName
                 OnboardingStep.PasskeyCreation -> OnboardingStep.Username
                 OnboardingStep.EmailVerification -> OnboardingStep.PasskeyCreation
                 OnboardingStep.Complete -> OnboardingStep.Complete
@@ -359,6 +430,9 @@ class CloudAccountOnboardingViewModel(
                 serverSelectionState = serverConfigurationCoordinator.initialSelectionState(),
             )
         checkPasskeySupport()
+        // Restarting the flow must not discard what onboarding already knows about the user;
+        // otherwise the name and bio fields come back empty and the flow re-asks for both.
+        prefillFromLocalProfile()
     }
 
     fun selectServerPreset(preset: ServerPreset) {
@@ -470,7 +544,7 @@ class CloudAccountOnboardingViewModel(
                 updateServerSelectionState(
                     validationState = ServerValidationState.Success(result.serverVersion),
                     errorMessage = null,
-                    nextStep = nextStep,
+                    nextStep = resolveStep(nextStep),
                     activeServerDescriptor = result.descriptor,
                     customServerUrl =
                         result.serverOrigin.takeIf {
@@ -648,6 +722,8 @@ data class CloudAccountOnboardingUiState(
     val displayName: String = "",
     val username: String = "",
     val bio: String = "",
+    /** True when onboarding already captured a name, which collapses the DisplayName step. */
+    val hasProfileDisplayName: Boolean = false,
     val displayNameError: String? = null,
     val usernameError: String? = null,
     val usernameAvailability: UsernameAvailability = UsernameAvailability.Unknown,

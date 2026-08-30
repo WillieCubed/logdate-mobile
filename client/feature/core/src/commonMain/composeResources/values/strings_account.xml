@@ -203,4 +203,18 @@
     <string name="email_verification_settings_row_subtitle">Add a verified email to your account</string>
     <string name="email_verification_settings_row_verified">%1$s</string>
     <string name="email_verification_settings_row_verified_subtitle">Verified</string>
+    <!-- Account confirmation step -->
+    <string name="account_step_progress">Step %1$d of %2$d</string>
+    <string name="account_username_domain_hint">Your address will end in @%1$s</string>
+    <string name="account_handle_change">Change</string>
+    <string name="account_confirm_title">Confirm your account</string>
+    <string name="account_passkey_headline">You'll sign in with a passkey</string>
+    <string name="account_passkey_subhead">Your fingerprint, face, or screen lock. Nothing to remember.</string>
+    <string name="account_passkey_learn_more">What's a passkey?</string>
+    <string name="account_passkey_point_no_passwords">No password to create or remember</string>
+    <string name="account_passkey_point_device_auth">Unlocked by your device's biometrics or screen lock</string>
+    <string name="account_passkey_point_phish_resistant">Can't be phished, guessed, or reused</string>
+    <string name="account_passkey_point_multi_device">Syncs to your other devices through your password manager</string>
+    <string name="account_create_cta">Create account</string>
+    <string name="account_will_sign_in_to">You'll be signed in to %1$s</string>
 </resources>

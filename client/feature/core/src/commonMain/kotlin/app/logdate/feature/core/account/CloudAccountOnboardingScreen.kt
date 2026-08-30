@@ -178,6 +178,7 @@ fun CloudAccountOnboardingScreen(
         }
 
         OnboardingStep.Username -> {
+            val stepCount = if (uiState.hasProfileDisplayName) 2 else 3
             UsernameSetupScreen(
                 username = uiState.username,
                 onUsernameChange = viewModel::updateUsername,
@@ -186,16 +187,19 @@ fun CloudAccountOnboardingScreen(
                 usernameAvailability = uiState.usernameAvailability,
                 isValid = uiState.canContinueFromUsername,
                 handleDomain = serverPresentation.handleDomain,
+                stepNumber = stepCount - 1,
+                stepCount = stepCount,
                 modifier = modifier,
             )
         }
 
         OnboardingStep.PasskeyCreation -> {
-            PasskeyAccountCreationFinalScreen(
+            // The DisplayName step is skipped when onboarding already captured a name, so the
+            // stepper reports the number of steps this user actually sees.
+            val stepCount = if (uiState.hasProfileDisplayName) 2 else 3
+            PasskeyAccountCreationFinalContent(
                 displayName = uiState.displayName,
                 username = uiState.username,
-                bio = uiState.bio,
-                onBioChange = viewModel::updateBio,
                 onCreateAccount = viewModel::createAccount,
                 onBack = viewModel::goToPreviousStep,
                 isCreatingAccount = uiState.isCreatingAccount,
@@ -204,6 +208,8 @@ fun CloudAccountOnboardingScreen(
                 isPasskeySupported = uiState.isPasskeySupported,
                 handleDomain = serverPresentation.handleDomain,
                 serverDisplayName = serverPresentation.displayName,
+                stepNumber = stepCount,
+                stepCount = stepCount,
                 modifier = modifier,
             )
         }
@@ -279,37 +285,3 @@ private fun app.logdate.feature.core.settings.ui.ServerSelectionState.toPresenta
 
 private fun ServerDescriptor?.displayNameOrFallback(isProduction: Boolean): String =
     this?.displayName ?: if (isProduction) "LogDate Cloud" else CUSTOM_SERVER_FALLBACK_NAME
-
-@Composable
-private fun PasskeyAccountCreationFinalScreen(
-    displayName: String,
-    username: String,
-    bio: String,
-    onBioChange: (String) -> Unit,
-    onCreateAccount: () -> Unit,
-    onBack: () -> Unit,
-    isCreatingAccount: Boolean,
-    errorMessage: String?,
-    onClearError: () -> Unit,
-    isPasskeySupported: Boolean,
-    handleDomain: String,
-    serverDisplayName: String,
-    modifier: Modifier = Modifier,
-) {
-    // Reuse the existing final creation screen but adapt it for the flow
-    PasskeyAccountCreationFinalContent(
-        displayName = displayName,
-        username = username,
-        bio = bio,
-        onBioChange = onBioChange,
-        onCreateAccount = onCreateAccount,
-        onBack = onBack,
-        isCreatingAccount = isCreatingAccount,
-        errorMessage = errorMessage,
-        onClearError = onClearError,
-        isPasskeySupported = isPasskeySupported,
-        handleDomain = handleDomain,
-        serverDisplayName = serverDisplayName,
-        modifier = modifier,
-    )
-}
