@@ -1,6 +1,7 @@
 package app.logdate.integration.e2e.harness
 
 import app.logdate.client.sync.cloud.LogDateCloudApiClient
+import app.logdate.server.di.initializeDatabase
 import app.logdate.server.module
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import io.ktor.client.HttpClient
@@ -40,9 +41,14 @@ suspend fun <T> withServerClientHarness(block: suspend ServerClientE2EHarness.()
 
     val port = ServerSocket(0).use { it.localPort }
     val host = "127.0.0.1"
+    val databaseConfigured = !System.getenv("DATABASE_URL").isNullOrBlank()
+    val databaseAvailable = databaseConfigured && initializeDatabase()
+    check(!databaseConfigured || databaseAvailable) {
+        "DATABASE_URL is set but the database could not be initialized."
+    }
     val engine =
         embeddedServer(Netty, host = host, port = port) {
-            module(isDatabaseAvailable = false)
+            module(isDatabaseAvailable = databaseAvailable)
         }
 
     engine.start(wait = false)
