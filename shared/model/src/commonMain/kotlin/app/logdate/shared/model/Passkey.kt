@@ -21,7 +21,27 @@ data class PasskeyInfo(
 data class PublicKeyCredentialParameter(
     val type: String,
     val alg: Int,
-)
+) {
+    companion object {
+        /** COSE identifier for ECDSA with SHA-256, which every platform authenticator supports. */
+        const val ALG_ES256 = -7
+
+        /** COSE identifier for RSASSA-PKCS1-v1_5 with SHA-256, the usual fallback. */
+        const val ALG_RS256 = -257
+
+        /**
+         * The algorithms to request when a server does not state its own.
+         *
+         * WebAuthn requires a non-empty `pubKeyCredParams`, so an absent list cannot mean "no
+         * algorithms" - it means the server left the choice to the client.
+         */
+        val DEFAULT: List<PublicKeyCredentialParameter> =
+            listOf(
+                PublicKeyCredentialParameter(type = "public-key", alg = ALG_ES256),
+                PublicKeyCredentialParameter(type = "public-key", alg = ALG_RS256),
+            )
+    }
+}
 
 @Serializable
 data class PasskeyRegistrationOptions(
@@ -29,7 +49,15 @@ data class PasskeyRegistrationOptions(
     val rpId: String,
     val rpName: String,
     val user: PasskeyUser,
-    val pubKeyCredParams: List<PublicKeyCredentialParameter>,
+    /**
+     * Algorithms the relying party will accept.
+     *
+     * Optional because the deployed server omits the field entirely, and a required field it
+     * never sends made every account creation fail while deserializing the begin response -
+     * surfacing to the user as a generic network error. Defaults to ES256 and RS256, which is
+     * what a server that does state its preference asks for anyway.
+     */
+    val pubKeyCredParams: List<PublicKeyCredentialParameter> = PublicKeyCredentialParameter.DEFAULT,
     val excludeCredentials: List<String> = emptyList(),
     val timeout: Long = 300_000,
 )
