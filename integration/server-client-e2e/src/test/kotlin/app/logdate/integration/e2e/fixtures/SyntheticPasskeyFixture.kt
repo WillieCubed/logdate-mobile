@@ -8,7 +8,6 @@ import app.logdate.shared.model.CompleteAccountCreationRequest
 import app.logdate.shared.model.CompleteAccountCreationResponse
 import app.logdate.shared.model.PasskeyAuthenticatorResponse
 import app.logdate.shared.model.PasskeyCredentialResponse
-import kotlin.random.Random
 import kotlin.uuid.Uuid
 
 fun syntheticPasskeyCredential(credentialId: String): PasskeyCredentialResponse =
@@ -35,12 +34,27 @@ suspend fun LogDateCloudApiClient.createAccountWithSyntheticPasskey(
             ),
         ).getOrElse { throw AssertionError("beginAccountCreation failed: ${it.message}", it) }
 
-    val credentialId = "cred-$username-${Random.nextInt(1000, 9999)}"
+    // Perform the real ceremony against the rpId and challenge the server just issued, so the
+    // relying party verifies this the same way it verifies a platform authenticator. A
+    // placeholder credential only survives the in-memory repositories.
+    val options = begin.data.registrationOptions
+    val authenticator = TestAuthenticator(rpId = options.rpId)
+    val (clientDataJson, attestationObject) = authenticator.register(options.challenge)
+
     val complete =
         completeAccountCreation(
             CompleteAccountCreationRequest(
                 sessionToken = begin.data.sessionToken,
-                credential = syntheticPasskeyCredential(credentialId),
+                credential =
+                    PasskeyCredentialResponse(
+                        id = authenticator.credentialIdB64,
+                        rawId = authenticator.credentialIdB64,
+                        response =
+                            PasskeyAuthenticatorResponse(
+                                clientDataJSON = clientDataJson,
+                                attestationObject = attestationObject,
+                            ),
+                    ),
             ),
         ).getOrElse { throw AssertionError("completeAccountCreation failed: ${it.message}", it) }
 
