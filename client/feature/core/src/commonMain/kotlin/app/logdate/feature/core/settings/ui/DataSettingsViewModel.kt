@@ -8,6 +8,7 @@ import app.logdate.client.data.maintenance.IntegrityReport
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.domain.quota.ObserveCloudQuotaUseCase
+import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.conflict.SyncConflictRecord
 import app.logdate.client.sync.conflict.SyncConflictStore
@@ -49,6 +50,26 @@ data class IntegrityState(
     val errorMessage: String? = null,
 )
 
+/**
+ * The outcome of a manual sync, for the UI to report once.
+ *
+ * Sync Now previously logged its result and nothing else, so a refused sync, a failed sync and a
+ * successful one were indistinguishable from the outside - the button appeared to do nothing.
+ */
+sealed interface SyncFeedback {
+    /** Sync was refused because there is no account yet; the user needs to sign in, not retry. */
+    data object NeedsAccount : SyncFeedback
+
+    data class Succeeded(
+        val uploadedItems: Int,
+        val downloadedItems: Int,
+    ) : SyncFeedback
+
+    data class Failed(
+        val message: String,
+    ) : SyncFeedback
+}
+
 data class ConflictsState(
     val conflicts: List<SyncConflictRecord> = emptyList(),
     val isLoading: Boolean = false,
@@ -70,6 +91,9 @@ class DataSettingsViewModel(
 
     private val _conflictsState = MutableStateFlow(ConflictsState())
     val conflictsState: StateFlow<ConflictsState> = _conflictsState.asStateFlow()
+
+    private val _syncFeedback = MutableStateFlow<SyncFeedback?>(null)
+    val syncFeedback: StateFlow<SyncFeedback?> = _syncFeedback.asStateFlow()
 
     private val quotaFlow = observeCloudQuotaUseCase()
     private val sessionFlow = sessionStorage.getSessionFlow()
@@ -235,16 +259,31 @@ class DataSettingsViewModel(
             try {
                 Napier.d("Starting manual sync...")
                 val result = syncManager.fullSync()
-                if (result.success) {
-                    Napier.i("Sync completed successfully: uploaded=${result.uploadedItems}, downloaded=${result.downloadedItems}")
-                } else {
-                    val errorMessage = result.errors.firstOrNull()?.message ?: "Unknown sync error"
-                    Napier.w("Sync failed: $errorMessage")
-                }
+                _syncFeedback.value =
+                    if (result.success) {
+                        Napier.i("Sync completed successfully: uploaded=${result.uploadedItems}, downloaded=${result.downloadedItems}")
+                        SyncFeedback.Succeeded(result.uploadedItems, result.downloadedItems)
+                    } else {
+                        val error = result.errors.firstOrNull()
+                        Napier.w("Sync failed: ${error?.message ?: "Unknown sync error"}")
+                        // Being signed out is the expected state before an account exists, not a
+                        // failure to report as one. Send the user somewhere useful instead.
+                        if (error?.type == SyncErrorType.AUTHENTICATION_ERROR) {
+                            SyncFeedback.NeedsAccount
+                        } else {
+                            SyncFeedback.Failed(error?.message ?: "Unknown sync error")
+                        }
+                    }
             } catch (e: Exception) {
                 Napier.e("Sync failed with exception", e)
+                _syncFeedback.value = SyncFeedback.Failed(e.message ?: "Unknown sync error")
             }
         }
+    }
+
+    /** Clears the last sync outcome once the UI has shown it. */
+    fun consumeSyncFeedback() {
+        _syncFeedback.value = null
     }
 
     fun setBackgroundSyncEnabled(enabled: Boolean) {

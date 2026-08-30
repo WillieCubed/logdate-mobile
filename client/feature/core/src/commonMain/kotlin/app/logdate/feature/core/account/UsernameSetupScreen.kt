@@ -26,10 +26,10 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_step_progress
-import logdate.client.feature.core.generated.resources.account_username_requirements
 import logdate.client.feature.core.generated.resources.account_username_choose_screen_title
 import logdate.client.feature.core.generated.resources.account_username_domain_hint
 import logdate.client.feature.core.generated.resources.account_username_network_address_description
+import logdate.client.feature.core.generated.resources.account_username_requirements
 import logdate.client.feature.core.generated.resources.at
 import logdate.client.feature.core.generated.resources.error_checking_username
 import logdate.client.feature.core.generated.resources.unique_address_username
@@ -326,4 +326,3 @@ private fun UsernameSetupScreenTakenPreview() {
         }
     }
 }
-
