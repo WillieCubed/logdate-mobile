@@ -191,6 +191,34 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
             existing.toCollectionMetadata().copy(version = state.lastVersion, deletedAt = deletedAt)
         }
 
+    override suspend fun purgeAllTombstones(olderThan: Long): LogDateCollectionsPurgeResult =
+        transaction {
+            val rowsToRemove =
+                LogDateCollectionRecordsTable
+                    .selectAll()
+                    .where {
+                        (LogDateCollectionRecordsTable.deleted eq true) and
+                            (LogDateCollectionRecordsTable.deletedAt less olderThan)
+                    }.toList()
+            if (rowsToRemove.isNotEmpty()) {
+                LogDateCollectionRecordsTable.deleteWhere {
+                    (LogDateCollectionRecordsTable.deleted eq true) and
+                        (LogDateCollectionRecordsTable.deletedAt less olderThan)
+                }
+            }
+
+            fun countOf(kind: LogDateCollectionKind) =
+                rowsToRemove.count {
+                    it[LogDateCollectionRecordsTable.collection] == kind.storageName
+                }
+            LogDateCollectionsPurgeResult(
+                entryPurged = countOf(LogDateCollectionKind.ENTRY),
+                journalPurged = countOf(LogDateCollectionKind.JOURNAL),
+                associationPurged = countOf(LogDateCollectionKind.ASSOCIATION),
+                cutoff = olderThan,
+            )
+        }
+
     override suspend fun purgeTombstones(
         userId: UUID,
         olderThan: Long,

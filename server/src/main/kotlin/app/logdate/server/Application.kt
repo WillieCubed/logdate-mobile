@@ -24,6 +24,7 @@ import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.logdate.CompositeLogDateMediaBlobRepository
 import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateBlobStorage
+import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
@@ -326,7 +327,8 @@ fun Application.module(
         } else {
             { name -> if (name == "SYNC_TOMBSTONE_PURGE_ENABLED") "false" else null }
         }
-    val maintenanceJob: Job? = startSyncMaintenance(syncRepository, syncMetrics, maintenanceReadEnv)
+    val maintenanceJob: Job? =
+        startSyncMaintenance(logDateCollectionsRepository, syncMetrics, maintenanceReadEnv)
     monitor.subscribe(ApplicationStopped) {
         maintenanceJob?.cancel()
         runCatching {
@@ -571,8 +573,15 @@ internal data class AllowedOrigin(
     val port: Int? = null,
 )
 
+/**
+ * Schedules the tombstone retention sweep.
+ *
+ * This drove [SyncRepository] and therefore the legacy `sync_*` tables, which no route has
+ * written since sync moved to [LogDateCollectionsRepository] - so the purge ran cleanly against
+ * data nobody produces any more while real tombstones accumulated forever.
+ */
 internal fun startSyncMaintenance(
-    syncRepository: SyncRepository,
+    collectionsRepository: LogDateCollectionsRepository,
     metrics: SyncMetricsRegistry,
     readEnv: (String) -> String?,
 ): Job? {
@@ -594,8 +603,12 @@ internal fun startSyncMaintenance(
             var success = false
             try {
                 val cutoff = System.currentTimeMillis() - retentionDays * 24 * 60 * 60 * 1000
-                syncRepository.purgeTombstonesOlderThan(cutoff)
-                Napier.i("Purged sync tombstones older than $retentionDays days")
+                val purged = collectionsRepository.purgeTombstones(cutoff)
+                Napier.i(
+                    "Purged sync tombstones older than $retentionDays days " +
+                        "(entries=${purged.entryPurged} journals=${purged.journalPurged} " +
+                        "associations=${purged.associationPurged})",
+                )
                 success = true
             } catch (e: Exception) {
                 if (e is CancellationException) throw e

@@ -383,6 +383,8 @@ internal class RepoBackedLogDateCollectionsRepository(
         )
     }
 
+    override suspend fun purgeTombstones(olderThan: Long): LogDateCollectionsPurgeResult = metadataStore.purgeAllTombstones(olderThan)
+
     override suspend fun purgeTombstones(
         userId: UUID,
         olderThan: Long,

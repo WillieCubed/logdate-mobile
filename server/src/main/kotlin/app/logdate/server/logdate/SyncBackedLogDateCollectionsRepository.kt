@@ -197,6 +197,16 @@ class SyncBackedLogDateCollectionsRepository(
     ): LogDateChangeSet<LogDateDraft, LogDateDraftDeletion> =
         LogDateChangeSet(changes = emptyList(), deletions = emptyList(), lastTimestamp = 0L)
 
+    override suspend fun purgeTombstones(olderThan: Long): LogDateCollectionsPurgeResult =
+        syncRepository.purgeTombstonesOlderThan(olderThan).let { result ->
+            LogDateCollectionsPurgeResult(
+                entryPurged = result.contentPurged,
+                journalPurged = result.journalPurged,
+                associationPurged = result.associationPurged,
+                cutoff = result.cutoff,
+            )
+        }
+
     override suspend fun purgeTombstones(
         userId: UUID,
         olderThan: Long,

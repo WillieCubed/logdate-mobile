@@ -198,4 +198,12 @@ interface LogDateCollectionsRepository {
         userId: UUID,
         olderThan: Long,
     ): LogDateCollectionsPurgeResult
+
+    /**
+     * Purges expired tombstones across every user, for the scheduled retention job.
+     *
+     * The job runs without a request context and therefore without a user, which is why it
+     * cannot reuse the per-user purge behind the maintenance endpoint.
+     */
+    suspend fun purgeTombstones(olderThan: Long): LogDateCollectionsPurgeResult
 }

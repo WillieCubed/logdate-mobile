@@ -224,6 +224,53 @@ class RepoBackedLogDateCollectionsRepositoryTest {
             assertEquals(listOf("entry-fallback"), changes.changes.map(LogDateEntry::id))
         }
 
+    @Test
+    fun `tenant-wide purge removes expired tombstones for every user`() =
+        runTest {
+            val accountRepository = InMemoryAccountRepository()
+            val repository =
+                RepoBackedLogDateCollectionsRepository(
+                    accountRepository = accountRepository,
+                    identityService = identityService(accountRepository),
+                    signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
+                    blockStore = InMemoryRepoBlockStore(),
+                    metadataStore = InMemoryLogDateCollectionsMetadataStore(),
+                )
+            val first = UUID.randomUUID()
+            val second = UUID.randomUUID()
+
+            listOf(first, second).forEach { userId ->
+                repository.upsertEntry(userId = userId, entry = entry("doomed-$userId"))
+                repository.upsertEntry(userId = userId, entry = entry("kept-$userId"))
+                repository.deleteEntry(userId = userId, id = "doomed-$userId", deletedAt = 1L)
+            }
+
+            // The scheduled retention job runs without a user, so it must reach both tenants.
+            val purged = repository.purgeTombstones(olderThan = 2L)
+
+            assertEquals(2, purged.entryPurged)
+            listOf(first, second).forEach { userId ->
+                assertTrue(
+                    repository.entryChanges(userId, since = 0, limit = 50).deletions.isEmpty(),
+                    "expected tombstones to be purged for $userId",
+                )
+                assertNotNull(repository.getEntry(userId, "kept-$userId"))
+            }
+        }
+
+    private fun entry(id: String) =
+        LogDateEntry(
+            id = id,
+            type = "TEXT",
+            content = "content",
+            mediaUri = null,
+            durationMs = 0,
+            createdAt = 1L,
+            lastUpdated = 1L,
+            version = 0L,
+            deviceId = DeviceId("device-purge"),
+        )
+
     private fun identityService(accountRepository: InMemoryAccountRepository): AtprotoIdentityService =
         AtprotoIdentityService(
             accountRepository = accountRepository,

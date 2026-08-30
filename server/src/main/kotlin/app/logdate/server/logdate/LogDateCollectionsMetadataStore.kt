@@ -66,6 +66,14 @@ internal interface LogDateCollectionsMetadataStore {
         userId: UUID,
         olderThan: Long,
     ): LogDateCollectionsPurgeResult
+
+    /**
+     * Purges expired tombstones for every user.
+     *
+     * The scheduled retention job has no user context, so it needs a tenant-wide sweep rather
+     * than the per-user purge the maintenance endpoint uses.
+     */
+    suspend fun purgeAllTombstones(olderThan: Long): LogDateCollectionsPurgeResult
 }
 
 internal class InMemoryLogDateCollectionsMetadataStore : LogDateCollectionsMetadataStore {
@@ -191,6 +199,34 @@ internal class InMemoryLogDateCollectionsMetadataStore : LogDateCollectionsMetad
             entryPurged = removed.count { it.collection == LogDateCollectionKind.ENTRY },
             journalPurged = removed.count { it.collection == LogDateCollectionKind.JOURNAL },
             associationPurged = removed.count { it.collection == LogDateCollectionKind.ASSOCIATION },
+            cutoff = olderThan,
+        )
+    }
+
+    override suspend fun purgeAllTombstones(olderThan: Long): LogDateCollectionsPurgeResult {
+        var entry = 0
+        var journal = 0
+        var association = 0
+        metadata.values.forEach { rows ->
+            val removed =
+                rows
+                    .filterValues { row -> row.deleted && (row.deletedAt ?: Long.MAX_VALUE) < olderThan }
+                    .values
+                    .toList()
+            removed.forEach { row ->
+                rows.remove(LogDateCollectionKey(collection = row.collection, recordKey = row.recordKey))
+                when (row.collection) {
+                    LogDateCollectionKind.ENTRY -> entry++
+                    LogDateCollectionKind.JOURNAL -> journal++
+                    LogDateCollectionKind.ASSOCIATION -> association++
+                    else -> Unit
+                }
+            }
+        }
+        return LogDateCollectionsPurgeResult(
+            entryPurged = entry,
+            journalPurged = journal,
+            associationPurged = association,
             cutoff = olderThan,
         )
     }

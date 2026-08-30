@@ -1,6 +1,7 @@
 package app.logdate.server
 
 import app.logdate.server.config.profileAwareBoolEnv
+import app.logdate.server.logdate.asLogDateCollectionsRepository
 import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncPurgeResult
@@ -88,7 +89,7 @@ class ApplicationLifecycleBehaviorTest {
 
             val job =
                 startSyncMaintenance(
-                    syncRepository = repository,
+                    collectionsRepository = repository.asLogDateCollectionsRepository(),
                     metrics = metrics,
                     readEnv = { name -> if (name == "SYNC_TOMBSTONE_PURGE_ENABLED") "false" else null },
                 )
@@ -114,7 +115,7 @@ class ApplicationLifecycleBehaviorTest {
 
             val job =
                 startSyncMaintenance(
-                    syncRepository = repository,
+                    collectionsRepository = repository.asLogDateCollectionsRepository(),
                     metrics = metrics,
                     readEnv = { name ->
                         when (name) {
@@ -163,7 +164,7 @@ class ApplicationLifecycleBehaviorTest {
 
             val job =
                 startSyncMaintenance(
-                    syncRepository = repository,
+                    collectionsRepository = repository.asLogDateCollectionsRepository(),
                     metrics = metrics,
                     readEnv = { name ->
                         when (name) {
@@ -204,7 +205,7 @@ class ApplicationLifecycleBehaviorTest {
 
             val job =
                 startSyncMaintenance(
-                    syncRepository = repository,
+                    collectionsRepository = repository.asLogDateCollectionsRepository(),
                     metrics = metrics,
                     readEnv = { name ->
                         when (name) {
