@@ -70,7 +70,13 @@ class LogdateApplication :
 
         installStrictModeIfDebuggable()
 
-        Napier.base(DebugAntilog())
+        // DebugAntilog derives its log tag by walking the stack trace at a fixed depth. R8 inlines
+        // frames away, so in a minified build that index runs off the end and every Napier call
+        // throws ArrayIndexOutOfBoundsException - crashing the app from inside its own error
+        // logging. It is a logcat convenience with no place in a release build regardless.
+        if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+            Napier.base(DebugAntilog())
+        }
         Napier.base(CrashlyticsAntilog())
         initializeKoin()
         Log.i(APP_STARTUP_TAG, "Application onCreate: Koin initialized")

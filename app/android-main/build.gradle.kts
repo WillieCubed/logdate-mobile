@@ -175,6 +175,13 @@ extensions.configure<ApplicationExtension> {
         }
         getByName("release") {
             isMinifyEnabled = true
+            isShrinkResources = true
+            // Without these, R8 shrinks the shipped app using only dependency consumer rules -
+            // none of AGP's baseline Android keep rules and nothing this project declares.
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             isDebuggable = false
             signingConfig =
                 if (!releaseTaskRequested ||
@@ -193,6 +200,8 @@ extensions.configure<ApplicationExtension> {
             initWith(getByName("release"))
             matchingFallbacks += listOf("release")
             isMinifyEnabled = false
+            // Inherited from release; resource shrinking requires code shrinking to be on.
+            isShrinkResources = false
             signingConfig = signingConfigs.getByName("debug")
             isProfileable = true
         }
