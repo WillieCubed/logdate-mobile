@@ -279,17 +279,21 @@ private fun AccountIdentity(
 
         Spacer(Modifier.height(Spacing.sm))
 
-        Surface(
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        ) {
-            Text(
-                text = "@$username@$handleDomain",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
-            )
+        // Only render a handle once there is a username to put in it; interpolating a blank
+        // one produces the doubled "@@domain" this screen was rebuilt to stop showing.
+        if (username.isNotBlank()) {
+            Surface(
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ) {
+                Text(
+                    text = "@$username@$handleDomain",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                )
+            }
         }
 
         TextButton(onClick = onChange, enabled = changeEnabled) {

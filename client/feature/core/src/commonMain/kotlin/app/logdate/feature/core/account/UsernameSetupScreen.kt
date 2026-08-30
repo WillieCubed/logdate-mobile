@@ -434,7 +434,6 @@ private fun UsernameSetupScreenTakenPreview() {
     }
 }
 
-
 /**
  * A single guideline. Rendering these as rows rather than a newline-joined string of "•"
  * characters keeps them selectable, screen-reader friendly, and correctly wrapped.

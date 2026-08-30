@@ -193,28 +193,33 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
 
     override suspend fun purgeAllTombstones(olderThan: Long): LogDateCollectionsPurgeResult =
         transaction {
-            val rowsToRemove =
+            // This sweep is tenant-wide, so the expired set is bounded only by how many
+            // tombstones the whole deployment has accumulated. Count with aggregates rather
+            // than loading every row into the heap just to tally three numbers.
+            fun countOf(kind: LogDateCollectionKind): Int =
                 LogDateCollectionRecordsTable
                     .selectAll()
                     .where {
-                        (LogDateCollectionRecordsTable.deleted eq true) and
+                        (LogDateCollectionRecordsTable.collection eq kind.storageName) and
+                            (LogDateCollectionRecordsTable.deleted eq true) and
                             (LogDateCollectionRecordsTable.deletedAt less olderThan)
-                    }.toList()
-            if (rowsToRemove.isNotEmpty()) {
-                LogDateCollectionRecordsTable.deleteWhere {
-                    (LogDateCollectionRecordsTable.deleted eq true) and
-                        (LogDateCollectionRecordsTable.deletedAt less olderThan)
-                }
+                    }.count()
+                    .toInt()
+
+            // Counted before the delete; afterwards the rows are gone.
+            val entryPurged = countOf(LogDateCollectionKind.ENTRY)
+            val journalPurged = countOf(LogDateCollectionKind.JOURNAL)
+            val associationPurged = countOf(LogDateCollectionKind.ASSOCIATION)
+
+            LogDateCollectionRecordsTable.deleteWhere {
+                (LogDateCollectionRecordsTable.deleted eq true) and
+                    (LogDateCollectionRecordsTable.deletedAt less olderThan)
             }
 
-            fun countOf(kind: LogDateCollectionKind) =
-                rowsToRemove.count {
-                    it[LogDateCollectionRecordsTable.collection] == kind.storageName
-                }
             LogDateCollectionsPurgeResult(
-                entryPurged = countOf(LogDateCollectionKind.ENTRY),
-                journalPurged = countOf(LogDateCollectionKind.JOURNAL),
-                associationPurged = countOf(LogDateCollectionKind.ASSOCIATION),
+                entryPurged = entryPurged,
+                journalPurged = journalPurged,
+                associationPurged = associationPurged,
                 cutoff = olderThan,
             )
         }

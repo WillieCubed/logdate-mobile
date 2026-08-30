@@ -119,13 +119,13 @@ fi
 [[ -f "$RENDERED_CONTRACT" ]] || die "rendered contract not found: $RENDERED_CONTRACT"
 [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || die "--source-sha must be 40 lowercase hexadecimal characters."
 
-python3 - "$EVIDENCE_FILE" "$RENDERED_CONTRACT" "$ENVIRONMENT" "$KNOWN_DEBUG_FINGERPRINT" <<'PY'
+python3 - "$EVIDENCE_FILE" "$RENDERED_CONTRACT" "$ENVIRONMENT" "$KNOWN_DEBUG_FINGERPRINT" "$SOURCE_SHA" <<'PY'
 import base64
 import json
 import pathlib
 import sys
 
-evidence_path, contract_path, environment, known_debug = sys.argv[1:5]
+evidence_path, contract_path, environment, known_debug, source_sha = sys.argv[1:6]
 evidence = json.loads(pathlib.Path(evidence_path).read_text())
 contract = json.loads(pathlib.Path(contract_path).read_text())
 
@@ -137,6 +137,12 @@ def check(condition, message):
         failures.append(message)
 
 
+# Without this the evidence is not commit-bound at all: a contract rendered
+# before a certificate was rotated would validate against the new commit.
+check(
+    contract.get("release_sha") == source_sha,
+    f"contract was rendered at {contract.get('release_sha')!r}, not at {source_sha!r}",
+)
 check(
     evidence.get("environment") == environment,
     f"evidence environment {evidence.get('environment')!r} does not match {environment!r}",

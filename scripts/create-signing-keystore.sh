@@ -144,6 +144,22 @@ if [[ -f "$KEYSTORE" ]]; then
     KEY_ALIAS="${LOGDATE_RELEASE_KEY_ALIAS:-$KEY_ALIAS}"
     STORE_PASSWORD="${LOGDATE_RELEASE_STORE_PASSWORD:?missing in $ENV_FILE}"
     KEY_PASSWORD="${LOGDATE_RELEASE_KEY_PASSWORD:-$STORE_PASSWORD}"
+
+    # Gradle signs with whatever LOGDATE_RELEASE_STORE_FILE names, while everything
+    # printed below is derived from $KEYSTORE. If the two disagree -- because the
+    # keystore moved, or --keystore pointed elsewhere -- the published fingerprint
+    # would describe a certificate the build never used, and passkey enrolment would
+    # fail on device. Keep the recorded path pointing at the keystore actually read.
+    if [[ "${LOGDATE_RELEASE_STORE_FILE:-}" != "$KEYSTORE" ]]; then
+        log_warn "Updating LOGDATE_RELEASE_STORE_FILE in $ENV_FILE to $KEYSTORE"
+        ENV_TMP="$(mktemp)"
+        chmod 600 "$ENV_TMP"
+        sed "s#^LOGDATE_RELEASE_STORE_FILE=.*#LOGDATE_RELEASE_STORE_FILE=$KEYSTORE#" \
+            "$ENV_FILE" >"$ENV_TMP"
+        cat "$ENV_TMP" >"$ENV_FILE"
+        rm -f "$ENV_TMP"
+        LOGDATE_RELEASE_STORE_FILE="$KEYSTORE"
+    fi
 else
     log_phase "Creating $ENVIRONMENT keystore"
     mkdir -p "$SIGNING_DIR"

@@ -23,13 +23,13 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.NavEntryDecorator
+import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
-import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.navigation3.scene.SceneStrategy
+import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.navigation3.ui.NavDisplay
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
@@ -83,8 +83,8 @@ import app.logdate.feature.rewind.navigation.rewindDetailEntry
 import app.logdate.feature.search.ui.SearchScreen
 import app.logdate.navigation.scenes.HomeSceneStrategy
 import app.logdate.navigation.scenes.supportsDualPaneHomeScene
-import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
+import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.audio.AudioPlaybackProvider
 import app.logdate.ui.foldable.FoldableSplitLayout
 import app.logdate.ui.foldable.calculateFoldableSplitLayout
@@ -188,7 +188,7 @@ fun LogDateNavDisplay(
                     onUsePasscode = onShowUnlockPrompt,
                 ) {
                     AudioPlaybackProvider {
-                            NavDisplay(
+                        NavDisplay(
                             backStack = backStack,
                             onBack = { backStack.removeLastOrNull() },
                             sceneStrategies = listOf(sceneStrategy),
