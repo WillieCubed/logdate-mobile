@@ -25,9 +25,11 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -65,11 +67,17 @@ import logdate.client.feature.core.generated.resources.sync_devices_subtitle
 import logdate.client.feature.core.generated.resources.sync_feature_access
 import logdate.client.feature.core.generated.resources.sync_feature_backup
 import logdate.client.feature.core.generated.resources.sync_feature_sync
+import logdate.client.feature.core.generated.resources.sync_feedback_failed
+import logdate.client.feature.core.generated.resources.sync_feedback_needs_account
+import logdate.client.feature.core.generated.resources.sync_feedback_sign_in_action
+import logdate.client.feature.core.generated.resources.sync_feedback_succeeded
+import logdate.client.feature.core.generated.resources.sync_feedback_up_to_date
 import logdate.client.feature.core.generated.resources.sync_now
 import logdate.client.feature.core.generated.resources.sync_status
 import logdate.client.feature.core.generated.resources.syncing
 import logdate.client.ui.generated.resources.common_loading
 import logdate.client.ui.generated.resources.common_refresh
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Instant
@@ -90,6 +98,45 @@ fun SyncSettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // This screen owns the Sync Now the user actually reaches from Settings, so it reports the
+    // outcome the same way Data & Storage does. Both share DataSettingsViewModel.
+    val syncFeedback by viewModel.syncFeedback.collectAsState()
+    val needsAccountMessage = stringResource(Res.string.sync_feedback_needs_account)
+    val signInActionLabel = stringResource(Res.string.sync_feedback_sign_in_action)
+    val upToDateMessage = stringResource(Res.string.sync_feedback_up_to_date)
+    LaunchedEffect(syncFeedback) {
+        val feedback = syncFeedback ?: return@LaunchedEffect
+        when (feedback) {
+            is SyncFeedback.NeedsAccount -> {
+                val action = snackbarHostState.showSnackbar(needsAccountMessage, signInActionLabel)
+                if (action == SnackbarResult.ActionPerformed) {
+                    onNavigateToSignIn()
+                }
+            }
+
+            is SyncFeedback.Succeeded -> {
+                val moved = feedback.uploadedItems + feedback.downloadedItems
+                snackbarHostState.showSnackbar(
+                    if (moved == 0) {
+                        upToDateMessage
+                    } else {
+                        getString(
+                            Res.string.sync_feedback_succeeded,
+                            feedback.uploadedItems,
+                            feedback.downloadedItems,
+                        )
+                    },
+                )
+            }
+
+            is SyncFeedback.Failed ->
+                snackbarHostState.showSnackbar(
+                    getString(Res.string.sync_feedback_failed, feedback.message),
+                )
+        }
+        viewModel.consumeSyncFeedback()
+    }
 
     SyncSettingsContent(
         onBack = onBack,
