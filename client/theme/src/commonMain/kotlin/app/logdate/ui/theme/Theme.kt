@@ -4,12 +4,16 @@
 package app.logdate.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 
 /**
  * The default light color scheme for the LogDate app.
@@ -71,6 +75,17 @@ fun LogDateTheme(
     MaterialExpressiveTheme(
         colorScheme = baseScheme.applyPlatformSemantics(platformSemantics),
         typography = platformTypography(),
-        content = content,
-    )
+    ) {
+        // MaterialTheme sets the colour scheme but not LocalContentColor, which stays at
+        // Compose's default black. Any Text that does not name a colour therefore rendered
+        // black-on-black in dark mode - screen titles across onboarding and account setup were
+        // effectively invisible. A Surface at the root supplies both the themed background and
+        // the matching content colour, so unstyled text is legible everywhere by default.
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.onBackground,
+            content = content,
+        )
+    }
 }

@@ -3,9 +3,11 @@
 package app.logdate.feature.core.account
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -129,19 +131,22 @@ fun CloudAccountOnboardingScreen(
         }
     }
 
-    when (uiState.currentStep) {
-        OnboardingStep.Welcome -> {
-            CloudAccountWelcomeScreen(
-                onContinue = viewModel::goToNextStep,
-                onSignIn = viewModel::goToSignIn,
-                onSkip = viewModel::skipOnboarding,
-                serverSelectionState = uiState.serverSelectionState,
-                onSelectServerPreset = viewModel::selectServerPreset,
-                onCustomServerUrlChange = viewModel::updateCustomServerUrl,
-                onShowCustomServerInfo = { showCustomServerInfo.value = true },
-                isPasskeySupported = uiState.isPasskeySupported,
-                modifier = modifier,
-            )
+    // LogDateTheme supplies the background and content colour; this only has to keep the step
+    // indicator and progress bar clear of the status bar, which none of these steps did.
+    Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+        when (uiState.currentStep) {
+                OnboardingStep.Welcome -> {
+                CloudAccountWelcomeScreen(
+                    onContinue = viewModel::goToNextStep,
+                    onSignIn = viewModel::goToSignIn,
+                    onSkip = viewModel::skipOnboarding,
+                    serverSelectionState = uiState.serverSelectionState,
+                    onSelectServerPreset = viewModel::selectServerPreset,
+                    onCustomServerUrlChange = viewModel::updateCustomServerUrl,
+                    onShowCustomServerInfo = { showCustomServerInfo.value = true },
+                    isPasskeySupported = uiState.isPasskeySupported,
+                    modifier = modifier,
+                )
         }
 
         OnboardingStep.SignIn -> {
@@ -234,6 +239,7 @@ fun CloudAccountOnboardingScreen(
                 status = uiState.initialSyncStatus,
                 modifier = modifier,
             )
+        }
         }
     }
 }
