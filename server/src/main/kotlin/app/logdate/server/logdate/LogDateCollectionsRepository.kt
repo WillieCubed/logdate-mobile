@@ -19,6 +19,8 @@ data class LogDateEntry(
     val lastUpdated: Long,
     val version: Long,
     val deviceId: DeviceId,
+    /** User-authored caption for image and video entries. */
+    val caption: String? = null,
 )
 
 data class LogDateJournal(

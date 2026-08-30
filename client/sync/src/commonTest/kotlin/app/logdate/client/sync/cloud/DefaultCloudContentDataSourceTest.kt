@@ -98,6 +98,57 @@ class DefaultCloudContentDataSourceTest {
         }
 
     @Test
+    fun `image and video captions survive a round trip`() =
+        runTest {
+            val note =
+                JournalNote.Image(
+                    uid = Uuid.random(),
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                    mediaRef = "file:///test/image.jpg",
+                    caption = "Sunset from the ridge",
+                )
+            mockApiClient.uploadContentResponse =
+                Result.success(
+                    ContentUploadResponse(
+                        id = note.uid.toString(),
+                        serverVersion = 1,
+                        uploadedAt = Clock.System.now().toEpochMilliseconds(),
+                    ),
+                )
+
+            dataSource.uploadNote("test-token", note)
+
+            val (_, request) = mockApiClient.uploadCalls.first()
+            assertEquals("Sunset from the ridge", request.caption, "caption must reach the server")
+
+            // ...and come back on the device that did not write it.
+            mockApiClient.contentChangesResponse =
+                Result.success(
+                    ContentChangesResponse(
+                        changes =
+                            listOf(
+                                ContentChange(
+                                    id = note.uid.toString(),
+                                    type = "IMAGE",
+                                    mediaUri = note.mediaRef,
+                                    createdAt = note.creationTimestamp.toEpochMilliseconds(),
+                                    lastUpdated = note.lastUpdated.toEpochMilliseconds(),
+                                    serverVersion = 1,
+                                    caption = "Sunset from the ridge",
+                                ),
+                            ),
+                        deletions = emptyList(),
+                        lastTimestamp = 1,
+                    ),
+                )
+
+            val downloaded = dataSource.getContentChanges("test-token", Instant.fromEpochMilliseconds(0)).getOrThrow()
+            val image = downloaded.changes.single() as JournalNote.Image
+            assertEquals("Sunset from the ridge", image.caption, "caption must survive download")
+        }
+
+    @Test
     fun testUploadAudioNoteIncludesDuration() =
         runTest {
             // Given

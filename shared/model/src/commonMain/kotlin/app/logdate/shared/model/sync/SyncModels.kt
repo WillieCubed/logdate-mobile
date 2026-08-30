@@ -55,6 +55,13 @@ data class ContentUploadRequest(
     val lastUpdated: Long,
     val syncVersion: Long = 0,
     val deviceId: DeviceId = DeviceId.UNKNOWN,
+    /**
+     * User-authored caption for an image or video.
+     *
+     * Optional so older clients and non-media entries round-trip unchanged; absent means the
+     * entry has no caption, not that the caption is unknown.
+     */
+    val caption: String? = null,
 )
 
 @Serializable
@@ -73,6 +80,13 @@ data class ContentUpdateRequest(
     val syncVersion: Long = 0,
     val deviceId: DeviceId = DeviceId.UNKNOWN,
     val versionConstraint: VersionConstraint = VersionConstraint.None,
+    /**
+     * User-authored caption for an image or video.
+     *
+     * Optional so older clients and non-media entries round-trip unchanged; absent means the
+     * entry has no caption, not that the caption is unknown.
+     */
+    val caption: String? = null,
 )
 
 @Serializable
@@ -101,6 +115,8 @@ data class ContentChange(
     val lastUpdated: Long,
     val serverVersion: Long,
     val isDeleted: Boolean = false,
+    /** User-authored caption for an image or video; absent for entries without one. */
+    val caption: String? = null,
 )
 
 @Serializable

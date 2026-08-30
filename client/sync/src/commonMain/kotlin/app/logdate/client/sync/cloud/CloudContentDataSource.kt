@@ -144,6 +144,12 @@ class DefaultCloudContentDataSource(
             createdAt = creationTimestamp.toEpochMilliseconds(),
             lastUpdated = lastUpdated.toEpochMilliseconds(),
             syncVersion = syncVersion,
+            caption =
+                when (this) {
+                    is JournalNote.Image -> caption.takeIf { it.isNotBlank() }
+                    is JournalNote.Video -> caption.takeIf { it.isNotBlank() }
+                    else -> null
+                },
         )
 
     private suspend fun JournalNote.toUpdateRequest(): ContentUpdateRequest =
@@ -172,6 +178,12 @@ class DefaultCloudContentDataSource(
                     VersionConstraint.Known(syncVersion)
                 } else {
                     VersionConstraint.None
+                },
+            caption =
+                when (this) {
+                    is JournalNote.Image -> caption.takeIf { it.isNotBlank() }
+                    is JournalNote.Video -> caption.takeIf { it.isNotBlank() }
+                    else -> null
                 },
         )
 
@@ -203,6 +215,7 @@ class DefaultCloudContentDataSource(
                     creationTimestamp = creationTimestamp,
                     lastUpdated = lastUpdated,
                     mediaRef = mediaUri ?: "",
+                    caption = caption.orEmpty(),
                     syncVersion = serverVersion,
                 )
             "VIDEO" ->
@@ -211,6 +224,7 @@ class DefaultCloudContentDataSource(
                     creationTimestamp = creationTimestamp,
                     lastUpdated = lastUpdated,
                     mediaRef = mediaUri ?: "",
+                    caption = caption.orEmpty(),
                     syncVersion = serverVersion,
                 )
             "AUDIO" ->
