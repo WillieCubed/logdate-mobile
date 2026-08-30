@@ -494,10 +494,10 @@ try:
         fail("android_signing_certificates must be an object")
     if environment == "staging" and set(signing) not in ({"staging"}, {"staging", "play_app_signing"}):
         fail("staging requires a staging signer and may include the Play app-signing certificate")
-    if environment == "production" and set(signing) != {"upload", "play_app_signing"}:
+    if environment == "production" and set(signing) not in ({"upload"}, {"upload", "play_app_signing"}):
         if "upload" not in signing:
             fail("production requires separately identified Android upload certificate fingerprints and origins")
-        fail("production requires exactly upload and play_app_signing signing certificates")
+        fail("production requires an upload signer and may include the Play app-signing certificate")
 
     known_debug_fingerprint = "DF:32:69:D4:DC:C9:C4:FE:72:FE:61:62:A0:F4:E9:EE:5F:04:14:47:DC:B3:8E:F6:A9:25:76:FC:38:90:DB:C7"
     expected_build_signer_role = "staging" if environment == "staging" else "upload"

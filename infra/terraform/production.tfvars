@@ -34,22 +34,23 @@ domains               = ["cloud.logdate.app"]
 # https://logdate.app/.well-known/assetlinks.json, which is the relying-party domain Android
 # Credential Manager reads for the production rpId.
 #
-# The upload half is known: scripts/create-signing-keystore.sh --environment
-# production derives both values below from the keystore it manages, and prints
-# this block ready to paste. Only the Play app-signing certificate is still
-# missing, because Play issues it when the application is first created.
-# Re-run that script with --play-fingerprint to emit the completed block.
+# Both values below are derived from the keystore that
+# scripts/create-signing-keystore.sh manages; re-run it to reprint them.
 #
-# android_signing_certificates = {
-#   upload = {
-#     fingerprint         = "FC:42:9A:EC:1E:80:3A:AA:25:3C:26:B8:1A:25:FC:41:17:12:BB:55:E7:09:D5:5A:B7:61:2F:5D:F2:82:C7:DD"
-#     apk_key_hash_origin = "android:apk-key-hash:_EKa7B6AOqolPCa4GiX8QRcSu1XnCdVat2EvXfKCx90"
-#   }
-#   play_app_signing = {
-#     fingerprint         = "<colon-hex SHA-256 of the Play app-signing certificate>"
-#     apk_key_hash_origin = "<derived by create-signing-keystore.sh; do not hand-enter>"
-#   }
-# }
+# The Play app-signing certificate is deliberately absent. Play issues it when
+# the application is first created, so requiring it here would make the first
+# production deploy impossible. Add it once the app exists in Play Console --
+# installs from Play are signed with that key rather than the upload key, so
+# passkey enrolment from a Play install needs it:
+#
+#   ./scripts/create-signing-keystore.sh --environment production \
+#       --play-fingerprint <fingerprint from Setup -> App integrity>
+android_signing_certificates = {
+  upload = {
+    fingerprint         = "FC:42:9A:EC:1E:80:3A:AA:25:3C:26:B8:1A:25:FC:41:17:12:BB:55:E7:09:D5:5A:B7:61:2F:5D:F2:82:C7:DD"
+    apk_key_hash_origin = "android:apk-key-hash:_EKa7B6AOqolPCa4GiX8QRcSu1XnCdVat2EvXfKCx90"
+  }
+}
 
 create_gcs_bucket = true
 gcs_bucket_name   = "logdate-media-logdate"

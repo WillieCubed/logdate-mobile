@@ -838,14 +838,16 @@ assert_equals "first_party" "$(jq -r '.env_vars.LOGDATE_DEPLOYMENT_KIND' "$CURRE
 
 CURRENT_PRODUCTION_OUT="$TMP_DIR/current-production.out"
 CURRENT_PRODUCTION_ERR="$TMP_DIR/current-production.err"
-set +e
-run_real_renderer "$CURRENT_INPUTS_REPO" production "$CURRENT_RELEASE_SHA" "$CURRENT_PRODUCTION_OUT" "$CURRENT_PRODUCTION_ERR"
-current_production_status=$?
-set -e
-[[ "$current_production_status" != "0" ]] || fail "current committed production inputs unexpectedly rendered"
+run_real_renderer "$CURRENT_INPUTS_REPO" production "$CURRENT_RELEASE_SHA" "$CURRENT_PRODUCTION_OUT" "$CURRENT_PRODUCTION_ERR" ||
+    fail "current committed production inputs did not render"
 pass
-assert_zero_bytes "$CURRENT_PRODUCTION_OUT"
-assert_contains 'ERROR:' "$(cat "$CURRENT_PRODUCTION_ERR")"
+assert_zero_bytes "$CURRENT_PRODUCTION_ERR"
+assert_equals "first_party" "$(jq -r '.env_vars.LOGDATE_DEPLOYMENT_KIND' "$CURRENT_PRODUCTION_OUT")"
+# The upload certificate's apk-key-hash origin has to reach the runtime
+# allowlist. Without it the server rejects the ceremony an install signed with
+# that certificate presents, which is the failure this whole contract exists to
+# prevent.
+assert_contains 'android:apk-key-hash:' "$(jq -r '.env_vars.WEBAUTHN_ALLOWED_ORIGINS' "$CURRENT_PRODUCTION_OUT")"
 
 expect_failure() {
     local label="$1" environment="$2" release_sha="$3" fixture="$4" expected_error="$5"
@@ -877,6 +879,25 @@ assert_equals "staging" "$(jq -r '.android_signing.certificates | keys | join(",
 assert_equals \
     "$(jq -r '[.canonical_origin, .android_signing.certificates.staging.apk_key_hash_origin] | join(",")' "$STAGING_ONLY_OUT")" \
     "$(jq -r '.env_vars.WEBAUTHN_ALLOWED_ORIGINS' "$STAGING_ONLY_OUT")"
+
+# Production before the application exists in Play Console. Play issues the
+# app-signing certificate at creation time, so requiring it here would make the
+# first production deploy impossible. The upload certificate alone is a
+# complete, valid signer set; sideloaded release builds are signed with it.
+jq 'del(.android_signing_certificates.play_app_signing)' \
+    "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/production-only-signing.json"
+PRODUCTION_ONLY_OUT="$TMP_DIR/production-only.out"
+PRODUCTION_ONLY_ERR="$TMP_DIR/production-only.err"
+set +e
+run_renderer production "$RELEASE_SHA" production-only-signing.json "$PRODUCTION_ONLY_OUT" "$PRODUCTION_ONLY_ERR"
+production_only_status=$?
+set -e
+assert_exit_code 0 "$production_only_status"
+assert_zero_bytes "$PRODUCTION_ONLY_ERR"
+assert_equals "upload" "$(jq -r '.android_signing.certificates | keys | join(",")' "$PRODUCTION_ONLY_OUT")"
+assert_equals \
+    "$(jq -r '[.canonical_origin, .android_signing.certificates.upload.apk_key_hash_origin] | join(",")' "$PRODUCTION_ONLY_OUT")" \
+    "$(jq -r '.env_vars.WEBAUTHN_ALLOWED_ORIGINS' "$PRODUCTION_ONLY_OUT")"
 
 jq '(.android_signing_certificates[].fingerprint) |= ascii_downcase' \
     "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/lowercase-staging-signing.json"
