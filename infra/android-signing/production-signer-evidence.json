@@ -1,0 +1,13 @@
+{
+  "certificates": {
+    "upload": {
+      "apk_key_hash_origin": "android:apk-key-hash:_EKa7B6AOqolPCa4GiX8QRcSu1XnCdVat2EvXfKCx90",
+      "fingerprint": "FC:42:9A:EC:1E:80:3A:AA:25:3C:26:B8:1A:25:FC:41:17:12:BB:55:E7:09:D5:5A:B7:61:2F:5D:F2:82:C7:DD"
+    }
+  },
+  "environment": "production",
+  "expected_build_signer_fingerprint": "FC:42:9A:EC:1E:80:3A:AA:25:3C:26:B8:1A:25:FC:41:17:12:BB:55:E7:09:D5:5A:B7:61:2F:5D:F2:82:C7:DD",
+  "expected_build_signer_origin": "android:apk-key-hash:_EKa7B6AOqolPCa4GiX8QRcSu1XnCdVat2EvXfKCx90",
+  "expected_build_signer_role": "upload",
+  "package_name": "co.reasonabletech.logdate"
+}
