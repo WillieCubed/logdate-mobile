@@ -22,7 +22,10 @@ class UnavailablePasskeyAccountRepository : PasskeyAccountRepository {
 
     override suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> = unavailable()
 
-    override suspend fun authenticateWithPasskey(username: String?): Result<LogDateAccount> = unavailable()
+    override suspend fun authenticateWithPasskey(
+        username: String?,
+        adoptLocalData: Boolean,
+    ): Result<LogDateAccount> = unavailable()
 
     override suspend fun checkUsernameAvailability(username: String): Result<Boolean> =
         Result.failure(UnsupportedOperationException(UNAVAILABLE_MESSAGE))

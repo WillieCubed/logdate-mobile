@@ -302,7 +302,10 @@ class PrivacySettingsViewModelTest {
         override suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> =
             Result.failure(NotImplementedError())
 
-        override suspend fun authenticateWithPasskey(username: String?): Result<LogDateAccount> = Result.failure(NotImplementedError())
+        override suspend fun authenticateWithPasskey(
+            username: String?,
+            adoptLocalData: Boolean,
+        ): Result<LogDateAccount> = Result.failure(NotImplementedError())
 
         override suspend fun checkUsernameAvailability(username: String): Result<Boolean> = Result.success(true)
 
