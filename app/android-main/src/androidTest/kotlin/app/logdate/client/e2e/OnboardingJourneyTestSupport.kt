@@ -480,6 +480,9 @@ internal class OnboardingFakeMediaManager : MediaManager {
 
     override suspend fun getMedia(uri: String): MediaObject = sampleMedia.first { it.uri == uri }
 
+    override suspend fun deleteOwnedMedia(uri: String): Boolean = false
+
+
     override suspend fun exists(mediaId: String): Boolean = sampleMedia.any { it.uri == mediaId }
 
     override suspend fun getRecentMedia(limit: Int): Flow<List<MediaObject>> = flowOf(sampleMedia.take(limit))

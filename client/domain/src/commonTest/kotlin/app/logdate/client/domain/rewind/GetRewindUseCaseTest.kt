@@ -541,6 +541,8 @@ class GetRewindUseCaseTest {
                 timestamp = Clock.System.now(),
             )
 
+        override suspend fun deleteOwnedMedia(uri: String): Boolean = false
+
         override suspend fun exists(mediaId: String): Boolean = false
 
         override suspend fun getRecentMedia(limit: Int): Flow<List<MediaObject>> = flowOf(emptyList())
