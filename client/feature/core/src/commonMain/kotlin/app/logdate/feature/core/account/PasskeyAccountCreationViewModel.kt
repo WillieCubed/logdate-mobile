@@ -212,7 +212,9 @@ class PasskeyAccountCreationViewModel(
             CreatePasskeyAccountUseCase.CreateAccountError.ServerError ->
                 "LogDate is having trouble right now. Please try again in a few minutes."
             is CreatePasskeyAccountUseCase.CreateAccountError.Unknown ->
-                "An unexpected error occurred: ${error.message}"
+                // The exception text names servers, key hashes and file paths. It is already in
+                // the log; the user gets something they can act on.
+                "Something went wrong. Please try again."
         }
 }
 

@@ -50,7 +50,7 @@ fun CloudStorageQuota.toStorageQuotaUi(): StorageQuotaUi {
         categories =
             categories.map { category ->
                 StorageCategory(
-                    name = category.category.name,
+                    name = categoryLabel(category.category.name),
                     usedBytes = category.sizeBytes,
                     usagePercentage = if (usedBytes > 0) category.sizeBytes.toFloat() / usedBytes.toFloat() else 0f,
                     color = getCategoryColor(category.category.name),
@@ -64,6 +64,22 @@ fun CloudStorageQuota.toStorageQuotaUi(): StorageQuotaUi {
 }
 
 // This function has been replaced by CloudStorageQuota.toStorageQuotaUi()
+
+/**
+ * The quota API names its categories the way the server enumerates them. Those names are not
+ * something to put in front of someone reading a storage breakdown.
+ */
+private fun categoryLabel(categoryName: String): String =
+    when (categoryName.uppercase()) {
+        "TEXT_NOTES" -> "Written entries"
+        "IMAGE_NOTES" -> "Photos"
+        "VOICE_NOTES" -> "Recordings"
+        "VIDEO_NOTES" -> "Videos"
+        "JOURNAL_DATA" -> "Journals"
+        "USER_PROFILE" -> "Profile"
+        "ATTACHMENTS" -> "Attachments"
+        else -> "Other"
+    }
 
 /**
  * Returns a color for the given quota category name.

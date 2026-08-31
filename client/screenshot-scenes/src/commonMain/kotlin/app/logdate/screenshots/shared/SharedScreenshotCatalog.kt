@@ -678,14 +678,14 @@ object SharedScreenshotCatalog {
                             categories =
                                 listOf(
                                     StorageCategory(
-                                        name = "IMAGE_NOTES",
+                                        name = "Photos",
                                         usedBytes = 1_400_000_000,
                                         usagePercentage = 0.53f,
                                         color = Color(0xFF4CAF50),
                                         formattedUsed = "1.4 GB",
                                     ),
                                     StorageCategory(
-                                        name = "TEXT_NOTES",
+                                        name = "Written entries",
                                         usedBytes = 650_000_000,
                                         usagePercentage = 0.25f,
                                         color = Color(0xFF2196F3),

@@ -218,21 +218,21 @@ private fun QuotaUsageBlockPreview() {
             categories =
                 listOf(
                     StorageCategory(
-                        name = "IMAGE_NOTES",
+                        name = "Photos",
                         usedBytes = 255L * 1024L * 1024L, // 255MB
                         usagePercentage = 0.02f,
                         color = Color(0xFF2196F3), // Blue
                         formattedUsed = "255 MB",
                     ),
                     StorageCategory(
-                        name = "VIDEO_NOTES",
+                        name = "Videos",
                         usedBytes = 12L * 1024L * 1024L * 1024L, // 12GB
                         usagePercentage = 0.92f,
                         color = Color(0xFFFF9800), // Orange
                         formattedUsed = "12 GB",
                     ),
                     StorageCategory(
-                        name = "VOICE_NOTES",
+                        name = "Recordings",
                         usedBytes = 255L * 1024L * 1024L, // 255MB
                         usagePercentage = 0.02f,
                         color = Color(0xFFF44336), // Red
