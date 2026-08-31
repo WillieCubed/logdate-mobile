@@ -75,6 +75,10 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
         }
+        findByName("androidHostTest")?.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.serialization.json)
+        }
     }
 }
 

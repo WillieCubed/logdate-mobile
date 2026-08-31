@@ -25,6 +25,7 @@ import app.logdate.shared.model.PasskeyCapabilities
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -126,50 +127,6 @@ class AndroidPasskeyManager(
             ),
         )
 
-    private fun buildRegistrationRequestJson(options: PasskeyRegistrationOptions): String {
-        // Build the WebAuthn registration request JSON
-        // This should match the format expected by the Android Credential Manager
-        return """
-            {
-                "rp": {
-                    "id": "${options.rpId}",
-                    "name": "${options.rpName}"
-                },
-                "user": {
-                    "id": "${options.user.id}",
-                    "name": "${options.user.name}",
-                    "displayName": "${options.user.displayName}"
-                },
-                "challenge": "${options.challenge}",
-                "pubKeyCredParams": [
-                    {"type": "public-key", "alg": -7},
-                    {"type": "public-key", "alg": -257}
-                ],
-                "timeout": ${options.timeout},
-                "excludeCredentials": ${Json.encodeToString(ListSerializer(String.serializer()), options.excludeCredentials)},
-                "authenticatorSelection": {
-                    "requireResidentKey": false,
-                    "residentKey": "preferred",
-                    "userVerification": "preferred"
-                },
-                "attestation": "none"
-            }
-            """.trimIndent()
-    }
-
-    private fun buildAuthenticationRequestJson(options: PasskeyAuthenticationOptions): String {
-        // Build the WebAuthn authentication request JSON
-        return """
-            {
-                "challenge": "${options.challenge}",
-                "timeout": ${options.timeout},
-                "rpId": "${options.rpId}",
-                "allowCredentials": ${Json.encodeToString(ListSerializer(String.serializer()), options.allowCredentials)},
-                "userVerification": "preferred"
-            }
-            """.trimIndent()
-    }
-
     private fun handleCreateCredentialException(e: CreateCredentialException): PasskeyException =
         when (e) {
             is CreateCredentialCancellationException ->
@@ -182,11 +139,11 @@ class AndroidPasskeyManager(
                 PasskeyException("Unknown registration error", PasskeyErrorCodes.UNKNOWN_ERROR, e)
             is CreateCredentialUnsupportedException ->
                 PasskeyException("Passkeys not supported", PasskeyErrorCodes.NOT_SUPPORTED, e)
-            // Note: CreatePublicKeyCredentialDomException may not be available in all versions
-            // is CreatePublicKeyCredentialDomException ->
-            //     PasskeyException("Domain error: ${e.domError.type}", PasskeyErrorCodes.SECURITY_ERROR, e)
+            // Everything else -- most importantly CreatePublicKeyCredentialDomException, which
+            // carries the WebAuthn DOMException naming the real cause. Reporting a bare
+            // "Registration failed" throws that away and leaves nothing to diagnose from.
             else ->
-                PasskeyException("Registration failed", PasskeyErrorCodes.UNKNOWN_ERROR, e)
+                PasskeyException(describe("Registration failed", e.type, e.errorMessage), PasskeyErrorCodes.UNKNOWN_ERROR, e)
         }
 
     private fun handleGetCredentialException(e: GetCredentialException): PasskeyException =
@@ -204,6 +161,83 @@ class AndroidPasskeyManager(
             is NoCredentialException ->
                 PasskeyException("No credentials available", PasskeyErrorCodes.NOT_ALLOWED, e)
             else ->
-                PasskeyException("Authentication failed", PasskeyErrorCodes.UNKNOWN_ERROR, e)
+                PasskeyException(describe("Authentication failed", e.type, e.errorMessage), PasskeyErrorCodes.UNKNOWN_ERROR, e)
         }
+
+    /**
+     * Credential Manager reports unrecognised failures through [type] and [errorMessage] rather
+     * than a distinct exception class, so both are kept -- they are usually the only evidence of
+     * why a ceremony failed.
+     */
+    private fun describe(
+        summary: String,
+        type: String?,
+        errorMessage: CharSequence?,
+    ): String =
+        listOfNotNull(
+            summary,
+            type?.takeIf { it.isNotBlank() },
+            errorMessage?.toString()?.takeIf { it.isNotBlank() },
+        ).joinToString(": ")
 }
+
+internal fun buildRegistrationRequestJson(options: PasskeyRegistrationOptions): String {
+    // Build the WebAuthn registration request JSON
+    // This should match the format expected by the Android Credential Manager
+    return """
+        {
+            "rp": {
+                "id": "${options.rpId}",
+                "name": "${options.rpName}"
+            },
+            "user": {
+                "id": "${options.user.id}",
+                "name": "${options.user.name}",
+                "displayName": "${options.user.displayName}"
+            },
+            "challenge": "${options.challenge}",
+            "pubKeyCredParams": [
+                {"type": "public-key", "alg": -7},
+                {"type": "public-key", "alg": -257}
+            ],
+            "timeout": ${options.timeout},
+            "excludeCredentials": ${credentialDescriptors(options.excludeCredentials)},
+            "authenticatorSelection": {
+                "requireResidentKey": false,
+                "residentKey": "preferred",
+                "userVerification": "preferred"
+            },
+            "attestation": "none"
+        }
+        """.trimIndent()
+}
+
+internal fun buildAuthenticationRequestJson(options: PasskeyAuthenticationOptions): String {
+    // Build the WebAuthn authentication request JSON
+    return """
+        {
+            "challenge": "${options.challenge}",
+            "timeout": ${options.timeout},
+            "rpId": "${options.rpId}",
+            "allowCredentials": ${credentialDescriptors(options.allowCredentials)},
+            "userVerification": "preferred"
+        }
+        """.trimIndent()
+}
+
+/**
+ * WebAuthn's `allowCredentials` and `excludeCredentials` take credential descriptors, not bare
+ * ids. Credential Manager silently matches nothing when handed a list of strings, so sign-in
+ * fails with "No credentials available" even when the passkey is present and healthy.
+ */
+private fun credentialDescriptors(credentialIds: List<String>): String =
+    Json.encodeToString(
+        ListSerializer(PublicKeyCredentialDescriptorJson.serializer()),
+        credentialIds.map { PublicKeyCredentialDescriptorJson(type = "public-key", id = it) },
+    )
+
+@Serializable
+private data class PublicKeyCredentialDescriptorJson(
+    val type: String,
+    val id: String,
+)
