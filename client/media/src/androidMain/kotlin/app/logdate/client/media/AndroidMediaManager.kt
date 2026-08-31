@@ -1009,19 +1009,31 @@ class AndroidMediaManager(
         }
     }
 
+    /**
+     * Answers with false rather than propagating a provider failure. Callers are asking whether
+     * something is there, and a provider that refuses the question has not established that it is.
+     */
     private fun queryUriExists(uri: Uri): Boolean =
-        contentResolver
-            .query(
-                uri,
-                arrayOf(MediaStore.MediaColumns._ID),
-                null,
-                null,
-                null,
-            )?.use { cursor ->
-                cursor.moveToFirst()
-            } == true
+        runCatching {
+            contentResolver
+                .query(
+                    uri,
+                    arrayOf(MediaStore.MediaColumns._ID),
+                    null,
+                    null,
+                    null,
+                )?.use { cursor ->
+                    cursor.moveToFirst()
+                } == true
+        }.getOrElse { error ->
+            Napier.d("Could not check whether $uri exists: ${error.message}")
+            false
+        }
 
     private fun queryLegacyMediaStoreIdExists(mediaId: String): Boolean {
+        if (!looksLikeMediaStoreId(mediaId)) {
+            return false
+        }
         val imageUri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, mediaId)
         val videoUri = Uri.withAppendedPath(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, mediaId)
         return queryUriExists(imageUri) || queryUriExists(videoUri)
@@ -1352,3 +1364,10 @@ class AndroidMediaManager(
         )
     }
 }
+
+/**
+ * MediaStore ids are row numbers. Appending anything else to a collection URI builds a path
+ * MediaStore rejects outright, which turned an existence check on an ordinary file path into a
+ * thrown UnsupportedOperationException.
+ */
+internal fun looksLikeMediaStoreId(mediaId: String): Boolean = mediaId.isNotEmpty() && mediaId.all { it.isDigit() }
