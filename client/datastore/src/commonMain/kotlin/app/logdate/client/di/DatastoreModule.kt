@@ -5,6 +5,8 @@ import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.datastore.LogDateConfigDataSource
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.createDataStore
+import app.logdate.client.datastore.featureflags.DataStoreFeatureFlagStore
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import org.koin.core.module.Module
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
@@ -42,6 +44,10 @@ val commonDatastoreModule =
         // Legacy data source (will be migrated to use KeyValueStorage)
         factory {
             LogdatePreferencesDataSource(get(named("mainDataStore")))
+        }
+
+        single<FeatureFlagStore> {
+            DataStoreFeatureFlagStore(get(named("mainDataStore")))
         }
 
         single {
