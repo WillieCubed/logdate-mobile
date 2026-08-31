@@ -117,8 +117,8 @@ fun S06_CloudAccountCreationFinal() {
         PasskeyAccountCreationFinalContent(
             displayName = "Alex Johnson",
             username = "alex_j",
-            bio = "",
-            onBioChange = {},
+            stepNumber = 2,
+            stepCount = 2,
             onCreateAccount = {},
             onBack = {},
             isCreatingAccount = false,
@@ -139,8 +139,8 @@ fun S07_CloudAccountCreationFinalCreating() {
         PasskeyAccountCreationFinalContent(
             displayName = "Alex Johnson",
             username = "alex_j",
-            bio = "Explorer and photographer",
-            onBioChange = {},
+            stepNumber = 2,
+            stepCount = 2,
             onCreateAccount = {},
             onBack = {},
             isCreatingAccount = true,
@@ -161,8 +161,8 @@ fun S08_CloudAccountCreationFinalError() {
         PasskeyAccountCreationFinalContent(
             displayName = "Alex Johnson",
             username = "alex_j",
-            bio = "Explorer and photographer",
-            onBioChange = {},
+            stepNumber = 2,
+            stepCount = 2,
             onCreateAccount = {},
             onBack = {},
             isCreatingAccount = false,
