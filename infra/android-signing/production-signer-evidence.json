@@ -1,5 +1,9 @@
 {
   "certificates": {
+    "play_app_signing": {
+      "apk_key_hash_origin": "android:apk-key-hash:7epoIxi73keDS4F98iOOS6UMFG0PSqYI1v3v-N5sibI",
+      "fingerprint": "ED:EA:68:23:18:BB:DE:47:83:4B:81:7D:F2:23:8E:4B:A5:0C:14:6D:0F:4A:A6:08:D6:FD:EF:F8:DE:6C:89:B2"
+    },
     "upload": {
       "apk_key_hash_origin": "android:apk-key-hash:_EKa7B6AOqolPCa4GiX8QRcSu1XnCdVat2EvXfKCx90",
       "fingerprint": "FC:42:9A:EC:1E:80:3A:AA:25:3C:26:B8:1A:25:FC:41:17:12:BB:55:E7:09:D5:5A:B7:61:2F:5D:F2:82:C7:DD"
