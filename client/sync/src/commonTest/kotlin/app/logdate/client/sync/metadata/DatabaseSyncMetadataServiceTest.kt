@@ -53,9 +53,10 @@ class DatabaseSyncMetadataServiceTest {
         DatabaseSyncMetadataService(
             dao = dao,
             configRepository = DefaultLogDateConfigRepository(initialBackendUrl = serverOrigin),
-            canonicalOwnerProvider = object : CanonicalOwnerProvider {
-                override suspend fun getCanonicalOwnerId(): String = ownerId
-            },
+            canonicalOwnerProvider =
+                object : CanonicalOwnerProvider {
+                    override suspend fun getCanonicalOwnerId(): String = ownerId
+                },
         )
 
     private class InMemorySyncMetadataDao : SyncMetadataDao {
@@ -63,11 +64,17 @@ class DatabaseSyncMetadataServiceTest {
         val cursors = mutableListOf<SyncCursorEntity>()
         private val pendingCount = MutableStateFlow(0)
 
-        override suspend fun getCursor(ownerId: String, serverOrigin: String, entityType: String): SyncCursorEntity? =
+        override suspend fun getCursor(
+            ownerId: String,
+            serverOrigin: String,
+            entityType: String,
+        ): SyncCursorEntity? =
             cursors.firstOrNull { it.ownerId == ownerId && it.serverOrigin == serverOrigin && it.entityType == entityType }
 
-        override suspend fun getLegacyCursor(serverOrigin: String, entityType: String): SyncCursorEntity? =
-            getCursor("", serverOrigin, entityType)
+        override suspend fun getLegacyCursor(
+            serverOrigin: String,
+            entityType: String,
+        ): SyncCursorEntity? = getCursor("", serverOrigin, entityType)
 
         override suspend fun upsertCursor(cursor: SyncCursorEntity) {
             cursors.removeAll {
@@ -76,21 +83,38 @@ class DatabaseSyncMetadataServiceTest {
             cursors += cursor
         }
 
-        override suspend fun deleteCursorsForOrigin(ownerId: String, serverOrigin: String) {
+        override suspend fun deleteCursorsForOrigin(
+            ownerId: String,
+            serverOrigin: String,
+        ) {
             cursors.removeAll { it.ownerId == ownerId && it.serverOrigin == serverOrigin }
         }
 
-        override suspend fun deleteLegacyCursor(serverOrigin: String, entityType: String) {
+        override suspend fun deleteLegacyCursor(
+            serverOrigin: String,
+            entityType: String,
+        ) {
             cursors.removeAll { it.ownerId.isEmpty() && it.serverOrigin == serverOrigin && it.entityType == entityType }
         }
 
-        override suspend fun getPendingByType(ownerId: String, serverOrigin: String, entityType: String): List<PendingUploadEntity> =
+        override suspend fun getPendingByType(
+            ownerId: String,
+            serverOrigin: String,
+            entityType: String,
+        ): List<PendingUploadEntity> =
             pendingRows.filter { it.ownerId == ownerId && it.serverOrigin == serverOrigin && it.entityType == entityType }
 
-        override suspend fun getLegacyPendingByType(serverOrigin: String, entityType: String): List<PendingUploadEntity> =
-            getPendingByType("", serverOrigin, entityType)
+        override suspend fun getLegacyPendingByType(
+            serverOrigin: String,
+            entityType: String,
+        ): List<PendingUploadEntity> = getPendingByType("", serverOrigin, entityType)
 
-        override suspend fun getPending(ownerId: String, serverOrigin: String, entityType: String, entityId: String): PendingUploadEntity? =
+        override suspend fun getPending(
+            ownerId: String,
+            serverOrigin: String,
+            entityType: String,
+            entityId: String,
+        ): PendingUploadEntity? =
             pendingRows.firstOrNull {
                 it.ownerId == ownerId && it.serverOrigin == serverOrigin && it.entityType == entityType && it.entityId == entityId
             }
@@ -108,26 +132,47 @@ class DatabaseSyncMetadataServiceTest {
             pendingCount.value = pendingRows.size
         }
 
-        override suspend fun deletePending(ownerId: String, serverOrigin: String, entityType: String, entityId: String) {
+        override suspend fun deletePending(
+            ownerId: String,
+            serverOrigin: String,
+            entityType: String,
+            entityId: String,
+        ) {
             pendingRows.removeAll {
                 it.ownerId == ownerId && it.serverOrigin == serverOrigin && it.entityType == entityType && it.entityId == entityId
             }
             pendingCount.value = pendingRows.size
         }
 
-        override suspend fun deletePendingForOrigin(ownerId: String, serverOrigin: String) {
+        override suspend fun deletePendingForOrigin(
+            ownerId: String,
+            serverOrigin: String,
+        ) {
             pendingRows.removeAll { it.ownerId == ownerId && it.serverOrigin == serverOrigin }
             pendingCount.value = pendingRows.size
         }
 
-        override suspend fun getPendingCount(ownerId: String, serverOrigin: String): Int =
-            pendingRows.count { it.ownerId == ownerId && it.serverOrigin == serverOrigin }
+        override suspend fun getPendingCount(
+            ownerId: String,
+            serverOrigin: String,
+        ): Int = pendingRows.count { it.ownerId == ownerId && it.serverOrigin == serverOrigin }
 
-        override fun observePendingCount(ownerId: String, serverOrigin: String): Flow<Int> = pendingCount
+        override fun observePendingCount(
+            ownerId: String,
+            serverOrigin: String,
+        ): Flow<Int> = pendingCount
 
-        override suspend fun incrementRetryCount(ownerId: String, serverOrigin: String, entityType: String, entityId: String) = Unit
+        override suspend fun incrementRetryCount(
+            ownerId: String,
+            serverOrigin: String,
+            entityType: String,
+            entityId: String,
+        ) = Unit
 
-        override suspend fun deleteLegacyPendingByType(serverOrigin: String, entityType: String) {
+        override suspend fun deleteLegacyPendingByType(
+            serverOrigin: String,
+            entityType: String,
+        ) {
             pendingRows.removeAll { it.ownerId.isEmpty() && it.serverOrigin == serverOrigin && it.entityType == entityType }
             pendingCount.value = pendingRows.size
         }

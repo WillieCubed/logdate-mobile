@@ -44,8 +44,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -87,6 +87,7 @@ class AndroidCameraCaptureManager(
 
     private val mainExecutor: Executor = ContextCompat.getMainExecutor(context)
     private val captureScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     /**
      * Capture output must survive activity teardown and Android's cache eviction. The
      * finalizer may still be running after the camera ViewModel is cleared, so these files
@@ -253,35 +254,35 @@ class AndroidCameraCaptureManager(
             val outputOptions = ImageCapture.OutputFileOptions.Builder(sourceFile).build()
             val capturedPath =
                 suspendCancellableCoroutine<String?> { continuation ->
-                continuation.invokeOnCancellation {
-                    // Keep the durable staged file for the capture finalizer/recovery path.
-                    // Deleting it here loses a valid capture when the activity is destroyed
-                    // while CameraX is delivering the callback.
-                }
-                capture.takePicture(
-                    outputOptions,
-                    mainExecutor,
-                    object : ImageCapture.OnImageSavedCallback {
-                        override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                            if (continuation.isActive) {
-                                continuation.resume(sourceFile.absolutePath)
-                            } else {
-                                // The callback can arrive after the activity/VM was torn down.
-                                // Keep the durable staged file for recovery instead of losing
-                                // a successfully captured photo.
-                                Napier.d("Photo capture completed after camera teardown; retaining staged output")
+                    continuation.invokeOnCancellation {
+                        // Keep the durable staged file for the capture finalizer/recovery path.
+                        // Deleting it here loses a valid capture when the activity is destroyed
+                        // while CameraX is delivering the callback.
+                    }
+                    capture.takePicture(
+                        outputOptions,
+                        mainExecutor,
+                        object : ImageCapture.OnImageSavedCallback {
+                            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                                if (continuation.isActive) {
+                                    continuation.resume(sourceFile.absolutePath)
+                                } else {
+                                    // The callback can arrive after the activity/VM was torn down.
+                                    // Keep the durable staged file for recovery instead of losing
+                                    // a successfully captured photo.
+                                    Napier.d("Photo capture completed after camera teardown; retaining staged output")
+                                }
                             }
-                        }
 
-                        override fun onError(exception: ImageCaptureException) {
-                            Napier.e("Photo capture failed", exception)
-                            _state.update { it.copy(error = CameraCaptureError.CaptureFailed) }
-                            sourceFile.delete()
-                            continuation.resume(null)
-                        }
-                    },
-                )
-            }
+                            override fun onError(exception: ImageCaptureException) {
+                                Napier.e("Photo capture failed", exception)
+                                _state.update { it.copy(error = CameraCaptureError.CaptureFailed) }
+                                sourceFile.delete()
+                                continuation.resume(null)
+                            }
+                        },
+                    )
+                }
             capturedPath ?: return@withContext null
             try {
                 val uri =

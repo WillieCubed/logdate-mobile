@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.core.account
 
 import androidx.compose.foundation.layout.Arrangement
@@ -84,9 +86,7 @@ internal fun CloudAccountWelcomeIntro(
 }
 
 @Composable
-internal fun CloudAccountWelcomeBenefits(
-    modifier: Modifier = Modifier,
-) {
+internal fun CloudAccountWelcomeBenefits(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),

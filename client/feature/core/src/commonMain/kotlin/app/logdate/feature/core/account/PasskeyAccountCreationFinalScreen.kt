@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.core.account
 
 import androidx.compose.animation.AnimatedVisibility

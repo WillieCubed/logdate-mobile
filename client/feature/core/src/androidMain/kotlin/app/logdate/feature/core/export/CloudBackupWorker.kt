@@ -34,7 +34,7 @@ class CloudBackupWorker(
             return Result.success()
         }
 
-        val archive = File(context.filesDir, "cloud-backup-${id}.zip")
+        val archive = File(context.filesDir, "cloud-backup-$id.zip")
         return try {
             val export =
                 exportUserDataUseCase

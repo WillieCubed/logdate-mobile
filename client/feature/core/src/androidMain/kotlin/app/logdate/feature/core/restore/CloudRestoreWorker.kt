@@ -55,7 +55,7 @@ class CloudRestoreWorker(
                     }.maxByOrNull { it.createdAt }
                     ?: return Result.success()
 
-            val archive = File(context.filesDir, "cloud-restore-${id}.zip")
+            val archive = File(context.filesDir, "cloud-restore-$id.zip")
             val downloaded =
                 cloudBackupDataSource
                     .downloadBackup(session.accessToken, backup.id)

@@ -443,18 +443,19 @@ class DefaultPasskeyAccountRepositoryTest {
     @Test
     fun `authenticateWithPasskey refuses an alternate server without canonical owner binding`() =
         runTest {
-            val configRepository = FakeConfigRepository().apply {
-                updateBackendUrl("https://alternate.logdate.test")
-                updateServerDescriptor(
-                    ServerDescriptor(
-                        serverOrigin = "https://alternate.logdate.test",
-                        apiBaseUrl = "https://alternate.logdate.test/api/v1",
-                        deploymentKind = DeploymentKind.SELF_HOSTED,
-                        displayName = "Alternate LogDate",
-                        capabilities = listOf(ServerCapability.AUTH_PASSKEY),
-                    ),
-                )
-            }
+            val configRepository =
+                FakeConfigRepository().apply {
+                    updateBackendUrl("https://alternate.logdate.test")
+                    updateServerDescriptor(
+                        ServerDescriptor(
+                            serverOrigin = "https://alternate.logdate.test",
+                            apiBaseUrl = "https://alternate.logdate.test/api/v1",
+                            deploymentKind = DeploymentKind.SELF_HOSTED,
+                            displayName = "Alternate LogDate",
+                            capabilities = listOf(ServerCapability.AUTH_PASSKEY),
+                        ),
+                    )
+                }
             val apiClient = FakePasskeyApiClient()
             val repository = createRepository(apiClient = apiClient, configRepository = configRepository)
 

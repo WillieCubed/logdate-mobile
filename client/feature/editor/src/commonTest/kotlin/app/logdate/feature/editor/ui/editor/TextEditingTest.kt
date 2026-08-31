@@ -247,7 +247,9 @@ class TextEditingTest {
 
             viewModel.loadExistingEntry(noteId)
             advanceUntilIdle()
-            val loaded = viewModel.editorState.value.blocks.single() as TextBlockUiState
+            val loaded =
+                viewModel.editorState.value.blocks
+                    .single() as TextBlockUiState
             viewModel.updateBlock(loaded.copy(content = "Unsaved edit"))
             advanceUntilIdle()
 
@@ -258,8 +260,10 @@ class TextEditingTest {
 
             assertEquals(
                 "Unsaved edit",
-                (viewModel.editorState.value.blocks.single() as TextBlockUiState)
-                    .content,
+                (
+                    viewModel.editorState.value.blocks
+                        .single() as TextBlockUiState
+                ).content,
             )
         }
 

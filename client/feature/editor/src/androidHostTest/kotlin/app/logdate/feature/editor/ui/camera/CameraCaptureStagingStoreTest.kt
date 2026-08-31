@@ -1,6 +1,5 @@
 package app.logdate.feature.editor.ui.camera
 
-import java.io.File
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,9 +35,11 @@ class CameraCaptureStagingStoreTest {
         val root = createTempDirectory("logdate-camera-staging-").toFile()
         try {
             root.resolve("not-a-capture.tmp").writeBytes(byteArrayOf(1))
-            root.resolve("LOGDATE_20260802_120000.txt.00000000-0000-0000-0000-000000000000.tmp")
+            root
+                .resolve("LOGDATE_20260802_120000.txt.00000000-0000-0000-0000-000000000000.tmp")
                 .writeBytes(byteArrayOf(1))
-            root.resolve("LOGDATE_20260802_120000.jpg.00000000-0000-0000-0000-000000000000.tmp")
+            root
+                .resolve("LOGDATE_20260802_120000.jpg.00000000-0000-0000-0000-000000000000.tmp")
                 .writeBytes(byteArrayOf(1))
 
             val recovered = CameraCaptureStagingStore(root).recoverableFiles()
