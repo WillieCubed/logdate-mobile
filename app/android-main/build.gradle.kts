@@ -471,6 +471,35 @@ val writeLocalGoogleServices by tasks.registering(Exec::class) {
     commandLine("bash", rootProject.file("scripts/write-local-google-services.sh").absolutePath)
 }
 
+/**
+ * A real Firebase configuration arrives from outside the repository -- repository secrets in CI,
+ * a download locally -- so one taken before an applicationId change declares no client for the
+ * new ID, and the Google Services plugin then fails the build. These add the missing client from
+ * the app ID recorded in infra/firebase/android-app-ids.json. Both are no-ops once every
+ * configuration source carries the client, at which point they can be deleted along with the
+ * script and the mapping.
+ */
+val reconcileGoogleServices =
+    listOf(
+        "Debug" to layout.projectDirectory.file("google-services.json").asFile,
+        "Release" to layout.projectDirectory.file("src/release/google-services.json").asFile,
+    ).map { (variant, config) ->
+        tasks.register<Exec>("reconcileGoogleServices$variant") {
+            description = "Adds the applicationId being built to $variant google-services.json if absent."
+            mustRunAfter(writeLocalGoogleServices)
+            onlyIf { config.exists() }
+            commandLine(
+                "bash",
+                rootProject.file("scripts/reconcile-google-services.sh").absolutePath,
+                "--file",
+                config.absolutePath,
+                "--application-id",
+                resolvedApplicationId,
+            )
+        }
+    }
+
 tasks.matching { it.name.startsWith("process") && it.name.endsWith("GoogleServices") }.configureEach {
     dependsOn(writeLocalGoogleServices)
+    dependsOn(reconcileGoogleServices)
 }

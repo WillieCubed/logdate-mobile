@@ -1,0 +1,15 @@
+{
+  "_comment": [
+    "Firebase Android app IDs per project, keyed by application ID.",
+    "These are public identifiers -- they ship inside every APK -- and are recorded here so a",
+    "google-services.json that predates an applicationId change can be reconciled at build time",
+    "instead of failing the build. See scripts/reconcile-google-services.sh.",
+    "Remove an entry once every google-services source already carries that client."
+  ],
+  "logdate-dev": {
+    "studio.hypertext.logdate": "1:786734185325:android:d1d954e3ec8b414b23f864"
+  },
+  "logdate": {
+    "studio.hypertext.logdate": "1:216887423795:android:1d5cb98b3aaefc568ec446"
+  }
+}
