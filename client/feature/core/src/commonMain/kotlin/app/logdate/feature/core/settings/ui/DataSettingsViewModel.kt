@@ -259,6 +259,13 @@ class DataSettingsViewModel(
             try {
                 Napier.d("Starting manual sync...")
                 val result = syncManager.fullSync()
+                // Keep going after the app leaves the foreground. fullSync runs in this
+                // ViewModel's scope, so a first sync of several hundred entries stopped the moment
+                // the user switched apps and only resumed when they came back. Handing the
+                // remainder to the platform's background sync means it finishes on its own.
+                if (syncManager.getSyncStatus().pendingUploads > 0) {
+                    syncManager.sync(startNow = true)
+                }
                 _syncFeedback.value =
                     if (result.success) {
                         Napier.i("Sync completed successfully: uploaded=${result.uploadedItems}, downloaded=${result.downloadedItems}")
