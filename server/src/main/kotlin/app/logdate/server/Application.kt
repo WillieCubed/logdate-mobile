@@ -32,6 +32,7 @@ import app.logdate.server.oauth.OAuthConfig
 import app.logdate.server.oauth.OAuthDpopVerifier
 import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthNonceService
+import app.logdate.server.passkeys.PasskeyRepository
 import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnConfig
 import app.logdate.server.passkeys.WebAuthnPasskeyService
@@ -42,6 +43,7 @@ import app.logdate.server.routes.authV1Routes
 import app.logdate.server.routes.identityApiRoutes
 import app.logdate.server.routes.identityRoutes
 import app.logdate.server.routes.oauthRoutes
+import app.logdate.server.routes.passkeyRoutes
 import app.logdate.server.routes.quotaRoutes
 import app.logdate.server.routes.resourceRoutes
 import app.logdate.server.routes.serverInfoRoutes
@@ -272,6 +274,7 @@ fun Application.module(
     val accountIdentityRepository by inject<AccountIdentityRepository>()
     val sessionManager by inject<SessionManager>()
     val webAuthnService by inject<WebAuthnPasskeyService>()
+    val passkeyRepository by inject<PasskeyRepository>()
     val restoreCredentialService by inject<RestoreCredentialService>()
     val atprotoIdentityService by inject<AtprotoIdentityService>()
     val tokenService by inject<TokenService>()
@@ -468,6 +471,10 @@ fun Application.module(
                 tokenService = tokenService,
                 entitlementService = entitlementService,
                 usageCalculator = usageCalculator,
+            )
+            passkeyRoutes(
+                tokenService = tokenService,
+                passkeyRepository = passkeyRepository,
             )
             resourceRoutes(
                 accountRepository = accountRepository,
