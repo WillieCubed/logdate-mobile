@@ -129,7 +129,15 @@ extensions.configure<ApplicationExtension> {
             ":client:feature:speechrecognition",
         )
     defaultConfig {
-        applicationId = "studio.hypertext.logdate"
+        // LogDate ships as studio.hypertext.logdate. The retired co.reasonabletech.logdate is
+        // still installed on developer devices holding real data, and an install only upgrades
+        // in place when the package matches, so -Plogdate.applicationId rebuilds the current
+        // source under the old identity until those installs are migrated.
+        applicationId =
+            providers
+                .gradleProperty("logdate.applicationId")
+                .orElse("studio.hypertext.logdate")
+                .get()
         // The account type res/xml/authenticator.xml declares. AndroidAccountManager derives the
         // same value from the installed package name, so the two cannot drift apart.
         resValue("string", "logdate_account_type", "$applicationId.account")
