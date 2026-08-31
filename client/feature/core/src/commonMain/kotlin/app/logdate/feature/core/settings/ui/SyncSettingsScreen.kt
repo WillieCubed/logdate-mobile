@@ -75,6 +75,7 @@ import logdate.client.feature.core.generated.resources.sync_feedback_up_to_date
 import logdate.client.feature.core.generated.resources.sync_now
 import logdate.client.feature.core.generated.resources.sync_status
 import logdate.client.feature.core.generated.resources.syncing
+import logdate.client.feature.core.generated.resources.syncing_remaining
 import logdate.client.ui.generated.resources.common_loading
 import logdate.client.ui.generated.resources.common_refresh
 import org.jetbrains.compose.resources.getString
@@ -432,7 +433,18 @@ private fun SyncStatusItem(
 private fun SyncStatusText(syncStatus: app.logdate.client.sync.SyncStatus?) {
     syncStatus?.let { status ->
         if (status.isSyncing) {
-            Text(stringResource(Res.string.syncing), color = MaterialTheme.colorScheme.primary)
+            // A bare "Syncing..." says nothing about whether 6 or 600 entries are left, which on a
+            // first sync is the difference between a moment and an hour.
+            val remaining = status.pendingUploads
+            Text(
+                text =
+                    if (remaining > 0) {
+                        stringResource(Res.string.syncing_remaining, remaining)
+                    } else {
+                        stringResource(Res.string.syncing)
+                    },
+                color = MaterialTheme.colorScheme.primary,
+            )
         } else {
             val statusText =
                 if (status.hasErrors) {
