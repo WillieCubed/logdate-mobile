@@ -1,9 +1,7 @@
 package app.logdate.feature.core
 
-import android.content.Context
 import android.content.Intent
 import android.provider.Settings
-import androidx.activity.result.contract.ActivityResultContract
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
@@ -15,11 +13,11 @@ import java.lang.ref.WeakReference
 
 /**
  * An implementation of [BiometricGatekeeper] that uses the Android Biometric API.
+ *
+ * Whether app lock is on is not this class's business: `AppViewModel` reads the security level
+ * from the datastore and decides when a prompt is required. This performs the challenge.
  */
-class AndroidBiometricGatekeeper(
-    // TODO: Load whether biometric authentication is enabled from the user datastore
-//    private val activity: FragmentActivity,
-) : BiometricGatekeeper {
+class AndroidBiometricGatekeeper : BiometricGatekeeper {
     private var activityRef = WeakReference<FragmentActivity>(null)
 
     private val activity: FragmentActivity
@@ -133,11 +131,20 @@ class AndroidBiometricGatekeeper(
      * This will launch the system biometric enrollment activity.
      */
     override fun requestEnrollment() {
-        val request =
-            activity.registerForActivityResult(BiometricEnrollmentActivityContract()) {
-                // TODO: Handle the result
+        // Launched as a plain intent rather than through registerForActivityResult: this runs
+        // from authenticate(), long after the activity has STARTED, and registering a launcher
+        // that late throws. The result is not needed either -- when the user comes back,
+        // authenticate() re-runs canAuthenticate() and sees whatever they actually enrolled.
+        val intent =
+            Intent(Settings.ACTION_BIOMETRIC_ENROLL).apply {
+                putExtra(
+                    Settings.EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED,
+                    BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                        BiometricManager.Authenticators.DEVICE_CREDENTIAL,
+                )
             }
-        request.launch(Unit)
+        runCatching { activity.startActivity(intent) }
+            .onFailure { Napier.e("Could not open biometric enrollment", it, tag = TAG) }
     }
 
     /**
@@ -152,24 +159,5 @@ class AndroidBiometricGatekeeper(
 
     private companion object {
         const val TAG = "BiometricGatekeeper"
-    }
-}
-
-private class BiometricEnrollmentActivityContract : ActivityResultContract<Unit, Unit>() {
-    override fun createIntent(
-        context: Context,
-        input: Unit,
-    ) = Intent(Settings.ACTION_BIOMETRIC_ENROLL).apply {
-        putExtra(
-            Settings.EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED,
-            BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL,
-        )
-    }
-
-    override fun parseResult(
-        resultCode: Int,
-        intent: Intent?,
-    ) {
-        Napier.d("Biometric enrollment result: $resultCode", tag = "BiometricEnrollment")
     }
 }
