@@ -41,6 +41,8 @@
     <string name="ready_to_start_your_journaling_journey">Ready to start your journaling journey!</string>
     <string name="recommended">Recommended</string>
     <string name="recover_account">Recover Account</string>
+    <string name="recovery_phrase_entry_skip">Not now</string>
+    <string name="recovery_phrase_entry_skip_explanation">Your entries still sync without this. You can restore your recovery phrase later in Settings.</string>
     <string name="secure_with_passkeys">Secure with Passkeys</string>
     <string name="select_an_option_above_to_continue">Select an option above to continue</string>
     <string name="select_memories">Select Memories</string>

@@ -26,6 +26,7 @@ fun RecoveryPhraseEntryScreen(
     onRecoverPhrase: suspend (List<String>) -> Result<Unit>,
     onRecovered: () -> Unit,
     onError: (String) -> Unit = {},
+    onSkip: (() -> Unit)? = null,
 ) {
     val coroutineScope = rememberCoroutineScope()
     var phraseWords by remember { mutableStateOf(List(12) { "" }) }
@@ -51,6 +52,7 @@ fun RecoveryPhraseEntryScreen(
                 onRecoverPhrase = onRecoverPhrase,
                 onRecovered = onRecovered,
                 onError = onError,
+                onSkip = onSkip,
                 phraseWords = phraseWords,
                 errorMessageRes = errorMessageRes,
                 onIsRecoveringChange = { isRecovering = it },
@@ -78,6 +80,7 @@ fun RecoveryPhraseEntryScreen(
                         onRecoverPhrase = onRecoverPhrase,
                         onRecovered = onRecovered,
                         onError = onError,
+                        onSkip = onSkip,
                         phraseWords = phraseWords,
                         errorMessageRes = errorMessageRes,
                         onIsRecoveringChange = { isRecovering = it },
@@ -96,6 +99,7 @@ fun RecoveryPhraseEntryScreen(
                         onRecoverPhrase = onRecoverPhrase,
                         onRecovered = onRecovered,
                         onError = onError,
+                        onSkip = onSkip,
                     )
                 },
             )
@@ -199,6 +203,7 @@ private fun RecoveryPhraseEntryBottomPane(
     onRecoverPhrase: suspend (List<String>) -> Result<Unit>,
     onRecovered: () -> Unit,
     onError: (String) -> Unit,
+    onSkip: (() -> Unit)?,
     phraseWords: List<String>,
     errorMessageRes: StringResource?,
     onIsRecoveringChange: (Boolean) -> Unit,
@@ -248,6 +253,23 @@ private fun RecoveryPhraseEntryBottomPane(
         ) {
             Text(stringResource(Res.string.recover_account))
         }
+
+        // The recovery phrase restores the AT Protocol signing key. Entries sync without it, so
+        // demanding it here left someone signing in on a second device with no way forward.
+        if (onSkip != null) {
+            TextButton(
+                onClick = onSkip,
+                enabled = !isRecovering,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(Res.string.recovery_phrase_entry_skip))
+            }
+            Text(
+                text = stringResource(Res.string.recovery_phrase_entry_skip_explanation),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -262,6 +284,7 @@ private fun RecoveryPhraseEntryCompactContent(
     onRecoverPhrase: suspend (List<String>) -> Result<Unit>,
     onRecovered: () -> Unit,
     onError: (String) -> Unit,
+    onSkip: (() -> Unit)?,
 ) {
     val coroutineScope = rememberCoroutineScope()
 
@@ -364,6 +387,20 @@ private fun RecoveryPhraseEntryCompactContent(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(Res.string.recover_account))
+        }
+        if (onSkip != null) {
+            TextButton(
+                onClick = onSkip,
+                enabled = !isRecovering,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(Res.string.recovery_phrase_entry_skip))
+            }
+            Text(
+                text = stringResource(Res.string.recovery_phrase_entry_skip_explanation),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

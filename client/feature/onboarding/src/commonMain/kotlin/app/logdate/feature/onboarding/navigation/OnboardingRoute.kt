@@ -336,11 +336,26 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
             )
         }
 
+        // Advances without claiming the identity key was restored -- the user can still do that
+        // from Settings, and their entries sync in the meantime.
+        fun continueWithoutRecovery() {
+            onGoToItem(
+                routeForStep(
+                    nextOnboardingStepAfter(
+                        currentStep = OnboardingStep.RECOVERY_PHRASE,
+                        entryMode = entryMode,
+                        snapshot = progressSnapshot,
+                    ) ?: terminalStepFor(entryMode),
+                ),
+            )
+        }
+
         if (entryMode == OnboardingEntryMode.CONTINUE_SETUP) {
             OnboardingInsets {
                 RecoveryPhraseEntryScreen(
                     onRecoverPhrase = recoveryViewModel::recoverIdentity,
                     onRecovered = ::continueAfterRecovery,
+                    onSkip = ::continueWithoutRecovery,
                 )
             }
         } else {
