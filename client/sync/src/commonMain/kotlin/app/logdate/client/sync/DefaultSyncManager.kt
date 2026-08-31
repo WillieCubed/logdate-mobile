@@ -792,7 +792,10 @@ class DefaultSyncManager(
                     // Distinguish "the bytes are gone" from "the read happened to fail". Only the
                     // former is hopeless; an upload that fails for any other reason is still worth
                     // retrying.
-                    return if (!mediaManager.exists(mediaRef)) {
+                    // If the check itself fails we cannot show the file is still there, and the
+                    // read has already failed -- treat it as gone rather than blocking the queue.
+                    val stillOnDisk = runCatching { mediaManager.exists(mediaRef) }.getOrDefault(false)
+                    return if (!stillOnDisk) {
                         Result.failure(MissingMediaException(mediaRef, error))
                     } else {
                         Result.failure(error)
