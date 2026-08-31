@@ -18,12 +18,15 @@ import app.logdate.shared.model.CloudStorageQuota
 import app.logdate.shared.model.ServerCapability
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
@@ -95,7 +98,14 @@ class DataSettingsViewModel(
     private val _syncFeedback = MutableStateFlow<SyncFeedback?>(null)
     val syncFeedback: StateFlow<SyncFeedback?> = _syncFeedback.asStateFlow()
 
-    private val quotaFlow = observeCloudQuotaUseCase()
+    // combine() waits for every source before it emits anything, so a slow or failing quota
+    // fetch used to hold back the entire screen -- including whether the user is signed in, which
+    // the initial value hard-codes to false. That showed "Create Account" to someone who was
+    // signed in and syncing. Neither quota flow gates the rest of the screen any more.
+    private val quotaFlow: Flow<CloudStorageQuota?> =
+        observeCloudQuotaUseCase()
+            .map<CloudStorageQuota, CloudStorageQuota?> { it }
+            .onStart { emit(null) }
     private val sessionFlow = sessionStorage.getSessionFlow()
     private val backgroundSyncEnabledFlow = preferencesDataSource.backgroundSyncEnabled
     private val quotaAvailabilityFlow =
@@ -106,7 +116,7 @@ class DataSettingsViewModel(
                     backendUrl == DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL -> true
                     else -> false
                 }
-            }
+            }.onStart { emit(true) }
 
     private val syncStatusFlow =
         flow {
