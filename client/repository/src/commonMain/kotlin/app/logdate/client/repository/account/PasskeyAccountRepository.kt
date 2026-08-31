@@ -32,9 +32,15 @@ interface PasskeyAccountRepository {
      * Authenticate with an existing LogDate Cloud account using passkeys.
      *
      * @param username Optional username hint for authentication
+     * @param adoptLocalData the user has been told this installation's existing entries will
+     * become part of the account being signed into, and agreed. Signing in without it fails with
+     * [LocalDataAdoptionRequiredException] when there is anything to adopt.
      * @return Result containing the authenticated account or error
      */
-    suspend fun authenticateWithPasskey(username: String? = null): Result<LogDateAccount>
+    suspend fun authenticateWithPasskey(
+        username: String? = null,
+        adoptLocalData: Boolean = false,
+    ): Result<LogDateAccount>
 
     /**
      * Check if a username is available for new account registration.
@@ -124,3 +130,10 @@ data class AccountCreationRequest(
     val bio: String? = null,
     val email: String? = null,
 )
+
+/**
+ * This installation holds entries that no account has claimed. Signing in would make them part of
+ * the account, which is usually what the user wants on a second device -- but not something to do
+ * behind their back.
+ */
+class LocalDataAdoptionRequiredException : IllegalStateException("Signing in would add this device's existing entries to the account")

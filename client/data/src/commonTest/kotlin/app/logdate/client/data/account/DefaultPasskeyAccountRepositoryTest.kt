@@ -10,6 +10,7 @@ import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.client.permissions.PasskeyManager
 import app.logdate.client.permissions.RestoreCredentialManager
 import app.logdate.client.repository.account.AccountCreationRequest
+import app.logdate.client.repository.account.LocalDataAdoptionRequiredException
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.AccountTokens
@@ -36,12 +37,16 @@ import app.logdate.shared.model.UsernameAvailabilityData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -123,11 +128,21 @@ class DefaultPasskeyAccountRepositoryTest {
                     saveSession(testSession)
                 }
 
-            val repository = createRepository(sessionStorage = sessionStorage, repositoryScope = this)
+            val repository = createRepository(sessionStorage = sessionStorage, repositoryScope = repositoryObserverScope())
 
             advanceUntilIdle()
 
             assertTrue(repository.isAuthenticated.value)
+        }
+
+    /**
+     * The repository observes its session for as long as its scope lives. Handing it the TestScope
+     * meant runTest waited on collectors that never finish; handing it a real dispatcher made the
+     * assertions race the observer. This scope runs eagerly and dies with the test.
+     */
+    private fun TestScope.repositoryObserverScope(): CoroutineScope =
+        CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler)).also { scope ->
+            backgroundScope.coroutineContext[Job]?.invokeOnCompletion { scope.cancel() }
         }
 
     /**
@@ -151,7 +166,7 @@ class DefaultPasskeyAccountRepositoryTest {
                 createRepository(
                     sessionStorage = sessionStorage,
                     canonicalOwnerProvider = FakeCanonicalOwnerProvider(Uuid.random().toString()),
-                    repositoryScope = this,
+                    repositoryScope = repositoryObserverScope(),
                 )
 
             advanceUntilIdle()
@@ -240,6 +255,7 @@ class DefaultPasskeyAccountRepositoryTest {
                     sessionStorage = sessionStorage,
                     platformAccountManager = platformAccountManager,
                     configRepository = configRepository,
+                    repositoryScope = repositoryObserverScope(),
                 )
 
             val request =
@@ -424,7 +440,7 @@ class DefaultPasskeyAccountRepositoryTest {
         }
 
     @Test
-    fun `authenticateWithPasskey refuses to adopt a remote owner when local data exists`() =
+    fun `authenticateWithPasskey asks before adopting an installation that already has entries`() =
         runTest {
             val sessionStorage = FakeSessionStorage()
             val repository =
@@ -437,6 +453,44 @@ class DefaultPasskeyAccountRepositoryTest {
             val result = repository.authenticateWithPasskey("testuser")
 
             assertTrue(result.isFailure)
+            assertTrue(
+                result.exceptionOrNull() is LocalDataAdoptionRequiredException,
+                "the caller has to be able to tell this apart from a refusal so it can ask",
+            )
+            assertNull(sessionStorage.getSession())
+        }
+
+    @Test
+    fun `authenticateWithPasskey adopts an installation with entries once the user agrees`() =
+        runTest {
+            val sessionStorage = FakeSessionStorage()
+            val repository =
+                createRepository(
+                    sessionStorage = sessionStorage,
+                    canonicalOwnerProvider = FreshInstallationCanonicalOwnerProvider(),
+                    hasLocalData = { true },
+                )
+
+            val result = repository.authenticateWithPasskey("testuser", adoptLocalData = true)
+
+            assertTrue(result.isSuccess)
+            assertEquals(testAccount.id.toString(), sessionStorage.getSession()?.accountId)
+        }
+
+    @Test
+    fun `authenticateWithPasskey still refuses an installation bound to a different account`() =
+        runTest {
+            val sessionStorage = FakeSessionStorage()
+            val repository =
+                createRepository(
+                    sessionStorage = sessionStorage,
+                    canonicalOwnerProvider = FakeCanonicalOwnerProvider(Uuid.random().toString()),
+                    hasLocalData = { true },
+                )
+
+            val result = repository.authenticateWithPasskey("testuser", adoptLocalData = true)
+
+            assertTrue(result.isFailure, "consent must not override an existing account binding")
             assertNull(sessionStorage.getSession())
         }
 
@@ -989,19 +1043,22 @@ class DefaultPasskeyAccountRepositoryTest {
         override suspend fun clearRestoreCredential(): Result<Unit> = Result.success(Unit)
     }
 
-    /**
-     * Fake implementation of SessionStorage for testing.
-     */
+    /** An installation an account has already claimed. */
     private class FakeCanonicalOwnerProvider(
         private val ownerId: String,
     ) : CanonicalOwnerProvider {
         override suspend fun getCanonicalOwnerId(): String = ownerId
+
+        override suspend fun hasBoundOwner(): Boolean = true
     }
 
+    /** An installation no account has claimed, whether or not it has been used offline. */
     private class FreshInstallationCanonicalOwnerProvider : CanonicalOwnerProvider {
         private var ownerId: String? = null
 
         override suspend fun getCanonicalOwnerId(): String = ownerId ?: "a8a3400a-9f3c-4fca-9a7a-7c8cbe5ca24e"
+
+        override suspend fun hasBoundOwner(): Boolean = ownerId != null
 
         override suspend fun adoptRemoteOwnerIfUninitialized(remoteOwnerId: String): Boolean {
             if (ownerId != null) return ownerId == remoteOwnerId

@@ -39,6 +39,7 @@ import logdate.client.feature.core.generated.resources.google_sign_in_no_account
 import logdate.client.feature.core.generated.resources.google_sign_in_rate_limited
 import logdate.client.feature.core.generated.resources.google_sign_in_server_error
 import logdate.client.feature.core.generated.resources.google_sign_in_unavailable
+import logdate.client.ui.generated.resources.common_cancel
 import logdate.client.ui.generated.resources.common_dismiss
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
@@ -115,6 +116,32 @@ fun CloudAccountOnboardingScreen(
             confirmButton = {
                 TextButton(onClick = { showRecoveryInfo.value = false }) {
                     Text(stringResource(UiRes.string.common_dismiss))
+                }
+            },
+        )
+    }
+
+    // Signing in on a device that has already been written in folds those entries into the
+    // account. That is usually exactly what someone wants on a second device, but it is not
+    // something to do without saying so.
+    uiState.pendingLocalDataAdoption?.let { pendingUsername ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissLocalDataAdoption,
+            title = { Text("Keep what's already here?") },
+            text = {
+                Text(
+                    "This device has entries that aren't in any account yet. Signing in adds them " +
+                        "to your account and syncs them to your other devices.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.signInAdoptingLocalData(pendingUsername) }) {
+                    Text("Sign in and keep them")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissLocalDataAdoption) {
+                    Text(stringResource(UiRes.string.common_cancel))
                 }
             },
         )

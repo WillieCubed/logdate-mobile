@@ -344,15 +344,36 @@ class CloudAccountOnboardingViewModel(
     }
 
     fun signInWithPasskey(username: String) {
+        signInWithPasskey(username, adoptLocalData = false)
+    }
+
+    /**
+     * Signs in and accepts that entries already on this device become part of the account. Only
+     * called once the user has seen [CloudAccountOnboardingUiState.pendingLocalDataAdoption] and
+     * agreed.
+     */
+    fun signInAdoptingLocalData(username: String) {
+        signInWithPasskey(username, adoptLocalData = true)
+    }
+
+    fun dismissLocalDataAdoption() {
+        _uiState.value = _uiState.value.copy(pendingLocalDataAdoption = null)
+    }
+
+    private fun signInWithPasskey(
+        username: String,
+        adoptLocalData: Boolean,
+    ) {
         _uiState.value =
             _uiState.value.copy(
                 isSigningIn = true,
                 errorMessage = null,
+                pendingLocalDataAdoption = null,
             )
 
         viewModelScope.launch {
             val usernameParam = username.takeIf { it.isNotBlank() }
-            val result = authenticateWithPasskeyUseCase(usernameParam)
+            val result = authenticateWithPasskeyUseCase(usernameParam, adoptLocalData)
 
             when (result) {
                 is AuthenticateWithPasskeyUseCase.Result.Success -> {
@@ -368,11 +389,17 @@ class CloudAccountOnboardingViewModel(
                     performInitialSync(markCompletedBy = SyncCompletion.SIGNED_IN)
                 }
                 is AuthenticateWithPasskeyUseCase.Result.Error -> {
+                    val needsConsent =
+                        result.error == AuthenticateWithPasskeyUseCase.AuthenticationError.LocalDataNeedsAdoption
                     _uiState.value =
                         _uiState.value.copy(
                             isSigningIn = false,
-                            errorMessage = mapAuthErrorToMessage(result.error),
+                            pendingLocalDataAdoption = username.takeIf { needsConsent } ?: "",
+                            errorMessage = if (needsConsent) null else mapAuthErrorToMessage(result.error),
                         )
+                    if (!needsConsent) {
+                        _uiState.value = _uiState.value.copy(pendingLocalDataAdoption = null)
+                    }
                 }
             }
         }
@@ -645,6 +672,8 @@ class CloudAccountOnboardingViewModel(
                 "Account not found. Please check your username or create a new account."
             AuthenticateWithPasskeyUseCase.AuthenticationError.NetworkError ->
                 "Network error. Please check your connection and try again."
+            AuthenticateWithPasskeyUseCase.AuthenticationError.LocalDataNeedsAdoption ->
+                "This device has entries that aren't in an account yet."
             is AuthenticateWithPasskeyUseCase.AuthenticationError.Unknown ->
                 // The exception text names servers, key hashes and file paths. It is already in
                 // the log; the user gets something they can act on.
@@ -722,6 +751,11 @@ class CloudAccountOnboardingViewModel(
 }
 
 data class CloudAccountOnboardingUiState(
+    /**
+     * Set to the username being signed in when this device already holds entries that no account
+     * has claimed. Signing in makes them part of that account, so the user confirms first.
+     */
+    val pendingLocalDataAdoption: String? = null,
     val currentStep: OnboardingStep = OnboardingStep.Welcome,
     val serverSelectionState: ServerSelectionState = ServerSelectionState(),
     val displayName: String = "",

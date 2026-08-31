@@ -1,5 +1,6 @@
 package app.logdate.client.domain.account
 
+import app.logdate.client.repository.account.LocalDataAdoptionRequiredException
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.shared.model.LogDateAccount
 import io.github.aakira.napier.Napier
@@ -33,14 +34,23 @@ class AuthenticateWithPasskeyUseCase(
 
         object NetworkError : AuthenticationError()
 
+        /**
+         * This device has entries that belong to no account yet. Signing in makes them part of the
+         * account, so the caller has to confirm before retrying with [adoptLocalData].
+         */
+        object LocalDataNeedsAdoption : AuthenticationError()
+
         data class Unknown(
             val message: String,
         ) : AuthenticationError()
     }
 
-    suspend operator fun invoke(username: String? = null): Result =
+    suspend operator fun invoke(
+        username: String? = null,
+        adoptLocalData: Boolean = false,
+    ): Result =
         try {
-            val authResult = passkeyAccountRepository.authenticateWithPasskey(username)
+            val authResult = passkeyAccountRepository.authenticateWithPasskey(username, adoptLocalData)
 
             if (authResult.isSuccess) {
                 val account = authResult.getOrThrow()
@@ -59,6 +69,8 @@ class AuthenticateWithPasskeyUseCase(
 
     private fun mapExceptionToError(exception: Throwable?): AuthenticationError =
         when {
+            exception is LocalDataAdoptionRequiredException ->
+                AuthenticationError.LocalDataNeedsAdoption
             exception?.message?.contains("USER_CANCELLED", ignoreCase = true) == true ->
                 AuthenticationError.PasskeyCancelled
             exception?.message?.contains("NOT_SUPPORTED", ignoreCase = true) == true ->
