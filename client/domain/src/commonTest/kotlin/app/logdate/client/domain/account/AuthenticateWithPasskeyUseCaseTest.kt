@@ -42,8 +42,10 @@ class AuthenticateWithPasskeyUseCaseTest {
                         request: app.logdate.client.repository.account.AccountCreationRequest,
                     ): kotlin.Result<LogDateAccount> = kotlin.Result.failure(NotImplementedError())
 
-                    override suspend fun authenticateWithPasskey(username: String?): kotlin.Result<LogDateAccount> =
-                        kotlin.Result.success(mockAccount)
+                    override suspend fun authenticateWithPasskey(
+                        username: String?,
+                        adoptLocalData: Boolean,
+                    ): kotlin.Result<LogDateAccount> = kotlin.Result.success(mockAccount)
 
                     override suspend fun checkUsernameAvailability(username: String): kotlin.Result<Boolean> =
                         kotlin.Result.failure(NotImplementedError())
@@ -89,8 +91,10 @@ class AuthenticateWithPasskeyUseCaseTest {
                         request: app.logdate.client.repository.account.AccountCreationRequest,
                     ): kotlin.Result<LogDateAccount> = kotlin.Result.failure(NotImplementedError())
 
-                    override suspend fun authenticateWithPasskey(username: String?): kotlin.Result<LogDateAccount> =
-                        kotlin.Result.success(mockAccount)
+                    override suspend fun authenticateWithPasskey(
+                        username: String?,
+                        adoptLocalData: Boolean,
+                    ): kotlin.Result<LogDateAccount> = kotlin.Result.success(mockAccount)
 
                     override suspend fun checkUsernameAvailability(username: String): kotlin.Result<Boolean> =
                         kotlin.Result.failure(NotImplementedError())
@@ -136,8 +140,10 @@ class AuthenticateWithPasskeyUseCaseTest {
                         request: app.logdate.client.repository.account.AccountCreationRequest,
                     ): kotlin.Result<LogDateAccount> = kotlin.Result.failure(NotImplementedError())
 
-                    override suspend fun authenticateWithPasskey(username: String?): kotlin.Result<LogDateAccount> =
-                        kotlin.Result.failure(Exception("USER_CANCELLED"))
+                    override suspend fun authenticateWithPasskey(
+                        username: String?,
+                        adoptLocalData: Boolean,
+                    ): kotlin.Result<LogDateAccount> = kotlin.Result.failure(Exception("USER_CANCELLED"))
 
                     override suspend fun checkUsernameAvailability(username: String): kotlin.Result<Boolean> =
                         kotlin.Result.failure(NotImplementedError())
@@ -183,8 +189,10 @@ class AuthenticateWithPasskeyUseCaseTest {
                         request: app.logdate.client.repository.account.AccountCreationRequest,
                     ): kotlin.Result<LogDateAccount> = kotlin.Result.failure(NotImplementedError())
 
-                    override suspend fun authenticateWithPasskey(username: String?): kotlin.Result<LogDateAccount> =
-                        kotlin.Result.failure(Exception("NOT_SUPPORTED"))
+                    override suspend fun authenticateWithPasskey(
+                        username: String?,
+                        adoptLocalData: Boolean,
+                    ): kotlin.Result<LogDateAccount> = kotlin.Result.failure(Exception("NOT_SUPPORTED"))
 
                     override suspend fun checkUsernameAvailability(username: String): kotlin.Result<Boolean> =
                         kotlin.Result.failure(NotImplementedError())
@@ -230,8 +238,10 @@ class AuthenticateWithPasskeyUseCaseTest {
                         request: app.logdate.client.repository.account.AccountCreationRequest,
                     ): kotlin.Result<LogDateAccount> = kotlin.Result.failure(NotImplementedError())
 
-                    override suspend fun authenticateWithPasskey(username: String?): kotlin.Result<LogDateAccount> =
-                        kotlin.Result.failure(Exception("NETWORK_ERROR: Connection failed"))
+                    override suspend fun authenticateWithPasskey(
+                        username: String?,
+                        adoptLocalData: Boolean,
+                    ): kotlin.Result<LogDateAccount> = kotlin.Result.failure(Exception("NETWORK_ERROR: Connection failed"))
 
                     override suspend fun checkUsernameAvailability(username: String): kotlin.Result<Boolean> =
                         kotlin.Result.failure(NotImplementedError())
@@ -277,8 +287,10 @@ class AuthenticateWithPasskeyUseCaseTest {
                         request: app.logdate.client.repository.account.AccountCreationRequest,
                     ): kotlin.Result<LogDateAccount> = kotlin.Result.failure(NotImplementedError())
 
-                    override suspend fun authenticateWithPasskey(username: String?): kotlin.Result<LogDateAccount> =
-                        throw RuntimeException("Unexpected error")
+                    override suspend fun authenticateWithPasskey(
+                        username: String?,
+                        adoptLocalData: Boolean,
+                    ): kotlin.Result<LogDateAccount> = throw RuntimeException("Unexpected error")
 
                     override suspend fun checkUsernameAvailability(username: String): kotlin.Result<Boolean> =
                         kotlin.Result.failure(NotImplementedError())

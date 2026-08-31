@@ -21,8 +21,6 @@ import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
 import app.logdate.client.repository.journals.SyncableJournalContentRepository
-import app.logdate.client.repository.journals.SyncableJournalNotesRepository
-import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.client.repository.location.LocationCapturePipeline
 import app.logdate.client.repository.location.LocationCaptureSource
 import app.logdate.client.repository.location.LocationHistoryRepository
@@ -98,8 +96,6 @@ class RestoreUserDataUseCase(
                     ),
             )
 
-        val syncableJournals = journalRepository as? SyncableJournalRepository
-        val syncableNotes = journalNotesRepository as? SyncableJournalNotesRepository
         val syncableContent = journalContentRepository as? SyncableJournalContentRepository
 
         var journalsImported = 0
@@ -122,6 +118,11 @@ class RestoreUserDataUseCase(
                 hasProfile = profilePayload != null,
             )
 
+        // Restored entries are written through the ordinary create/update path, not the
+        // *FromSync variants. Those exist so data arriving from the server is not echoed straight
+        // back, and they leave nothing queued -- an archive restored that way was invisible to
+        // sync for ever, however many times Sync Now was pressed. An archive is local data the
+        // server has never seen, so it has to be queued like anything else written on the device.
         val createdJournalIds = mutableListOf<Uuid>()
         val createdNoteIds = mutableListOf<Uuid>()
         val createdLinks = mutableListOf<Pair<Uuid, Uuid>>()
@@ -134,19 +135,11 @@ class RestoreUserDataUseCase(
                 val existing = journalRepository.getJournalById(journal.id)
                 val shouldWrite = shouldOverwrite(existing?.lastUpdated, journal.lastUpdated, options.strategy)
                 if (existing == null) {
-                    if (syncableJournals != null) {
-                        syncableJournals.createFromSync(journal)
-                    } else {
-                        journalRepository.create(journal)
-                    }
+                    journalRepository.create(journal)
                     createdJournalIds.add(journal.id)
                     journalsImported++
                 } else if (shouldWrite) {
-                    if (syncableJournals != null) {
-                        syncableJournals.updateFromSync(journal)
-                    } else {
-                        journalRepository.update(journal)
-                    }
+                    journalRepository.update(journal)
                     journalsImported++
                 }
             }
@@ -183,21 +176,12 @@ class RestoreUserDataUseCase(
                 val existing = journalNotesRepository.getNoteById(parsedId)
                 val shouldWrite = shouldOverwrite(existing?.lastUpdated, restored.lastUpdated, options.strategy)
                 if (existing == null) {
-                    if (syncableNotes != null) {
-                        syncableNotes.createFromSync(restored)
-                    } else {
-                        journalNotesRepository.create(restored)
-                    }
+                    journalNotesRepository.create(restored)
                     createdNoteIds.add(parsedId)
                     notesImported++
                 } else if (shouldWrite) {
-                    if (syncableNotes != null) {
-                        syncableNotes.deleteFromSync(parsedId)
-                        syncableNotes.createFromSync(restored)
-                    } else {
-                        journalNotesRepository.removeById(parsedId)
-                        journalNotesRepository.create(restored)
-                    }
+                    journalNotesRepository.removeById(parsedId)
+                    journalNotesRepository.create(restored)
                     notesImported++
                 }
             }

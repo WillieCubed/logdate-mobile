@@ -56,6 +56,8 @@ class DatabaseSyncMetadataServiceTest {
             canonicalOwnerProvider =
                 object : CanonicalOwnerProvider {
                     override suspend fun getCanonicalOwnerId(): String = ownerId
+
+                    override suspend fun hasBoundOwner(): Boolean = true
                 },
         )
 
