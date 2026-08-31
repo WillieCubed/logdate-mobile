@@ -16,7 +16,8 @@ class CloudBackupDataSourceTest {
                 FakeCloudApiClient().apply {
                     uploadBackupResponse =
                         Result.success(
-                            app.logdate.shared.model.sync.BackupUploadResponse("backup-1", 100, 2),
+                            app.logdate.shared.model.sync
+                                .BackupUploadResponse("backup-1", 100, 2),
                         )
                     listBackupsResponse =
                         Result.success(
@@ -41,7 +42,11 @@ class CloudBackupDataSourceTest {
             )
             assertEquals(
                 "backup-1",
-                source.listBackups("token").getOrThrow().single().id,
+                source
+                    .listBackups("token")
+                    .getOrThrow()
+                    .single()
+                    .id,
             )
             val downloaded = source.downloadBackup("token", "backup-1").getOrThrow()
             assertEquals(file.deviceId, downloaded.deviceId)

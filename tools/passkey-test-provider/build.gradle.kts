@@ -15,7 +15,10 @@ plugins {
  */
 android {
     namespace = "app.logdate.tools.passkeyprovider"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
+    compileSdk =
+        libs.versions.android.compileSdk
+            .get()
+            .toInt()
 
     defaultConfig {
         applicationId = "app.logdate.tools.passkeyprovider"
@@ -23,7 +26,10 @@ android {
         // authenticator, never shipped, so it pins its own floor rather than forcing the app's
         // minSdk up or scattering @RequiresApi over every override.
         minSdk = 34
-        targetSdk = libs.versions.android.targetSdk.get().toInt()
+        targetSdk =
+            libs.versions.android.targetSdk
+                .get()
+                .toInt()
         versionCode = 1
         versionName = "1.0"
     }
@@ -49,5 +55,4 @@ kotlin {
 dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.core.ktx)
-
 }

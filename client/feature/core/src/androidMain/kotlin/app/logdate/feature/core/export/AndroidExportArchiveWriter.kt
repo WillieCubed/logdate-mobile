@@ -115,11 +115,12 @@ class AndroidExportArchiveWriter(
         val sourceUri = mediaFile.sourceUri
         var entryOpened = false
         return try {
-            val resolvedInput = resolveMediaInput(mediaFile)
-                ?: return MediaWriteResult(
-                    written = false,
-                    issue = ExportIssue(code = ExportIssueCode.MEDIA_BYTES_MISSING, source = sourceUri),
-                )
+            val resolvedInput =
+                resolveMediaInput(mediaFile)
+                    ?: return MediaWriteResult(
+                        written = false,
+                        issue = ExportIssue(code = ExportIssueCode.MEDIA_BYTES_MISSING, source = sourceUri),
+                    )
             zipOut.putNextEntry(ZipEntry(mediaFile.exportPath))
             entryOpened = true
             resolvedInput.openStream().use { it.copyTo(zipOut) }

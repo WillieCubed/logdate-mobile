@@ -57,11 +57,11 @@ import app.logdate.client.watch.WatchAssociationRequestFactory
 import app.logdate.client.watch.WatchCompanionAssociationManager
 import app.logdate.dynamic.DynamicFeatureLoader
 import app.logdate.dynamic.PlayDynamicFeatureLoader
-import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
-import app.logdate.feature.core.settings.updates.AppUpdateController
 import app.logdate.feature.core.export.CloudBackupScheduler
 import app.logdate.feature.core.export.CloudBackupWorker
 import app.logdate.feature.core.restore.CloudRestoreScheduler
+import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
+import app.logdate.feature.core.settings.updates.AppUpdateController
 import coil3.SingletonImageLoader
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers

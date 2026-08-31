@@ -204,8 +204,7 @@ interface CloudApiClient {
     suspend fun uploadBackup(
         accessToken: String,
         backup: BackupUploadRequest,
-    ): Result<BackupUploadResponse> =
-        Result.failure(UnsupportedOperationException("Backup uploads are not supported by this cloud client"))
+    ): Result<BackupUploadResponse> = Result.failure(UnsupportedOperationException("Backup uploads are not supported by this cloud client"))
 
     suspend fun listBackups(accessToken: String): Result<BackupListResponse> =
         Result.failure(UnsupportedOperationException("Backup listing is not supported by this cloud client"))
@@ -213,8 +212,7 @@ interface CloudApiClient {
     suspend fun getBackup(
         accessToken: String,
         backupId: String,
-    ): Result<BackupInfoResponse> =
-        Result.failure(UnsupportedOperationException("Backup metadata is not supported by this cloud client"))
+    ): Result<BackupInfoResponse> = Result.failure(UnsupportedOperationException("Backup metadata is not supported by this cloud client"))
 
     suspend fun downloadBackup(
         accessToken: String,
@@ -225,8 +223,7 @@ interface CloudApiClient {
     suspend fun deleteBackup(
         accessToken: String,
         backupId: String,
-    ): Result<Unit> =
-        Result.failure(UnsupportedOperationException("Backup deletion is not supported by this cloud client"))
+    ): Result<Unit> = Result.failure(UnsupportedOperationException("Backup deletion is not supported by this cloud client"))
 }
 
 /**

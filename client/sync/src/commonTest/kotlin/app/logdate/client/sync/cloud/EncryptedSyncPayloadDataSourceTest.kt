@@ -6,9 +6,9 @@ import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.KeyDerivation
 import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.repository.journals.JournalNote
-import app.logdate.client.repository.journals.NotePlace
-import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NoteCoordinates
+import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.journals.NotePlace
 import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.client.sync.test.FakeCloudApiClient
 import app.logdate.shared.model.EditorDraft
