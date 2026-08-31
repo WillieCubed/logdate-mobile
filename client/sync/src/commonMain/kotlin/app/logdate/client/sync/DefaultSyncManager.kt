@@ -542,6 +542,7 @@ class DefaultSyncManager(
         }
 
     override suspend fun fullSync(): SyncResult {
+        enqueueEverythingOnFirstSync()
         val downloadResult = downloadRemoteChanges()
         val uploadResult = uploadPendingChanges()
         val draftResult = syncDrafts()
@@ -554,6 +555,52 @@ class DefaultSyncManager(
             errors = downloadResult.errors + uploadResult.errors + draftResult.errors,
             lastSyncTime = latestSyncTime(),
         )
+    }
+
+    /**
+     * Queues everything already on this device the first time it syncs with a server.
+     *
+     * Entries can exist before the device has ever talked to a server: written offline, or restored
+     * from a backup. Nothing enqueues those retrospectively, so without this they sit on the device
+     * for ever while sync reports success and uploads nothing. Signing in on a second device
+     * promises exactly this, and it has to be true.
+     *
+     * Only runs while the server has never been synced with, and enqueueing coalesces, so an entry
+     * already waiting is not queued twice.
+     */
+    private suspend fun enqueueEverythingOnFirstSync() {
+        val entityTypes = listOf(EntityType.JOURNAL, EntityType.NOTE)
+        val neverSynced = entityTypes.filter { syncMetadataService.getLastSyncTime(it) == null }
+        if (neverSynced.isEmpty()) {
+            return
+        }
+
+        runCatching {
+            if (EntityType.JOURNAL in neverSynced) {
+                val journals = journalRepository.allJournalsObserved.first()
+                journals.forEach { journal ->
+                    syncMetadataService.enqueuePending(
+                        entityId = journal.id.toString(),
+                        entityType = EntityType.JOURNAL,
+                        operation = PendingOperation.CREATE,
+                    )
+                }
+                Napier.i("First sync: queued ${'$'}{journals.size} journals already on this device")
+            }
+            if (EntityType.NOTE in neverSynced) {
+                val notes = journalNotesRepository.allNotesObserved.first()
+                notes.forEach { note ->
+                    syncMetadataService.enqueuePending(
+                        entityId = note.uid.toString(),
+                        entityType = EntityType.NOTE,
+                        operation = PendingOperation.CREATE,
+                    )
+                }
+                Napier.i("First sync: queued ${'$'}{notes.size} entries already on this device")
+            }
+        }.onFailure { error ->
+            Napier.w("Could not queue existing entries for the first sync", error)
+        }
     }
 
     private suspend fun refreshObservedQuotaFromServer(reason: String) {
