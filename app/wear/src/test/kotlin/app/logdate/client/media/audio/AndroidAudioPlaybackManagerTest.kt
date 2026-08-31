@@ -1,15 +1,19 @@
 package app.logdate.client.media.audio
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import com.google.common.util.concurrent.Futures
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
+import io.mockk.mockkStatic
 import io.mockk.runs
 import io.mockk.slot
+import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,6 +23,8 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import java.util.concurrent.Executor
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -40,6 +46,20 @@ class AndroidAudioPlaybackManagerTest {
     private val controller = mockk<MediaController>()
     private val controllerListener = slot<Player.Listener>()
     private val directExecutor = Executor { runnable -> runnable.run() }
+
+    @BeforeTest
+    fun mockSystemClock() {
+        // PlaybackException's constructor reads SystemClock.elapsedRealtime() for its
+        // timestamp; the plain android.jar stub used by these JVM unit tests throws unless
+        // it's mocked.
+        mockkStatic(SystemClock::class)
+        every { SystemClock.elapsedRealtime() } returns 0L
+    }
+
+    @AfterTest
+    fun unmockSystemClock() {
+        unmockkStatic(SystemClock::class)
+    }
 
     @Test
     fun `startPlayback starts service and configures media controller with metadata`() =
@@ -201,6 +221,57 @@ class AndroidAudioPlaybackManagerTest {
             assertEquals(1, completedCount)
             assertEquals(1f, manager.playbackStatus.value.progress)
             assertFalse(manager.playbackStatus.value.isPlaying)
+            manager.release()
+        }
+
+    @Test
+    fun `player error stops playback, reports completion, and surfaces the failure`() =
+        runTest {
+            var completedCount = 0
+            val manager = createManager(this, currentPosition = PlaybackStateHolder(0L))
+
+            manager.startPlayback(
+                uri = "file:///tmp/voice-note.m4a",
+                onProgressUpdated = {},
+                onPlaybackCompleted = { completedCount += 1 },
+            )
+
+            val error =
+                PlaybackException(
+                    "Source error",
+                    null,
+                    PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
+                )
+            controllerListener.captured.onPlayerError(error)
+
+            assertEquals(1, completedCount)
+            assertFalse(manager.playbackStatus.value.isPlaying)
+            assertEquals(error.errorCodeName, manager.playbackStatus.value.errorMessage)
+            manager.release()
+        }
+
+    @Test
+    fun `starting playback again clears a previous error`() =
+        runTest {
+            val manager = createManager(this, currentPosition = PlaybackStateHolder(0L))
+
+            manager.startPlayback(
+                uri = "file:///tmp/voice-note.m4a",
+                onProgressUpdated = {},
+                onPlaybackCompleted = {},
+            )
+            controllerListener.captured.onPlayerError(
+                PlaybackException("Source error", null, PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND),
+            )
+            assertEquals("ERROR_CODE_IO_FILE_NOT_FOUND", manager.playbackStatus.value.errorMessage)
+
+            manager.startPlayback(
+                uri = "file:///tmp/voice-note-2.m4a",
+                onProgressUpdated = {},
+                onPlaybackCompleted = {},
+            )
+
+            assertEquals(null, manager.playbackStatus.value.errorMessage)
             manager.release()
         }
 

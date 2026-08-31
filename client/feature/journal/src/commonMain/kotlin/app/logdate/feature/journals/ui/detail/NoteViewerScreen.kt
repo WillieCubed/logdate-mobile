@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Share
@@ -68,7 +70,9 @@ import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.audio.LocalAudioPlaybackState
+import app.logdate.ui.common.BannerContent
 import app.logdate.ui.common.MarkdownText
+import app.logdate.ui.common.MessageBanner
 import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
@@ -776,27 +780,66 @@ fun AudioNoteViewerContent(
         }
 
         is AudioNoteViewerUiState.Ready -> {
-            ImmersiveAudioScreen(
-                amplitudes = uiState.context.amplitudes,
-                progress = uiState.playbackState.progress,
-                isPlaying = uiState.playbackState.isPlaying,
-                palette = uiState.context.palette,
-                daylightPeriod = uiState.context.daylightPeriod,
-                durationMs = uiState.durationMs,
-                createdAt = uiState.createdAt,
-                segments = uiState.context.segments,
-                detectedSounds = uiState.detectedSounds,
-                onPlayPause = onPlayPause,
-                onSeek = onSeek,
-                onSkipBack = onSkipBack,
-                onSkipForward = onSkipForward,
-                onClose = onGoBack,
-                outputSelection = audioPlaybackState.outputSelection,
-                onOutputDeviceSelected = audioPlaybackState.selectOutputDevice,
-                modifier = modifier.fillMaxSize(),
-            )
+            // Only the player itself carries the caller's modifier (which may include a
+            // shared-element transition anchor) — the wrapping Box is a plain overlay host so the
+            // error banner doesn't get pulled into that transition's resize/clip animation.
+            Box(modifier = Modifier.fillMaxSize()) {
+                ImmersiveAudioScreen(
+                    amplitudes = uiState.context.amplitudes,
+                    progress = uiState.playbackState.progress,
+                    isPlaying = uiState.playbackState.isPlaying,
+                    palette = uiState.context.palette,
+                    daylightPeriod = uiState.context.daylightPeriod,
+                    durationMs = uiState.durationMs,
+                    createdAt = uiState.createdAt,
+                    segments = uiState.context.segments,
+                    detectedSounds = uiState.detectedSounds,
+                    onPlayPause = onPlayPause,
+                    onSeek = onSeek,
+                    onSkipBack = onSkipBack,
+                    onSkipForward = onSkipForward,
+                    onClose = onGoBack,
+                    outputSelection = audioPlaybackState.outputSelection,
+                    onOutputDeviceSelected = audioPlaybackState.selectOutputDevice,
+                    modifier = modifier.fillMaxSize(),
+                )
+                AudioPlaybackErrorBanner(
+                    visible = uiState.playbackState.errorMessage != null,
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .statusBarsPadding()
+                            .padding(Spacing.lg),
+                )
+            }
         }
     }
+}
+
+/**
+ * Transient banner shown over the immersive player when the current recording fails to play
+ * (e.g. the underlying file is missing or unreadable), so a failed tap gives real feedback
+ * instead of silently doing nothing.
+ */
+@Composable
+private fun AudioPlaybackErrorBanner(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    MessageBanner(
+        content =
+            if (visible) {
+                BannerContent(
+                    message = "Recording playback failed",
+                    icon = Icons.Filled.Error,
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            } else {
+                null
+            },
+        modifier = modifier,
+    )
 }
 
 // endregion

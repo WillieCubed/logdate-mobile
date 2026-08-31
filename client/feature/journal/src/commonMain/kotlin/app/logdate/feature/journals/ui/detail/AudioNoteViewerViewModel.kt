@@ -222,6 +222,7 @@ class AudioNoteViewerViewModel(
                     cachedPlaybackState.copy(
                         progress = status.progress,
                         isPlaying = status.isPlaying,
+                        errorMessage = status.errorMessage,
                     )
 
                 _uiState.update { state ->
@@ -327,9 +328,14 @@ class AudioNoteViewerViewModel(
                 }
             },
             onPlaybackCompleted = {
+                // A playback error also invokes this callback (not just natural end-of-track), so
+                // only force progress to 100% on a real completion — otherwise the error banner
+                // (driven by observePlaybackStatus) would be contradicted by a "fully played" bar.
+                val failed = statusProvider?.playbackStatus?.value?.errorMessage != null
+                val completedProgress = if (failed) cachedPlaybackState.progress else 1f
                 cachedPlaybackState =
                     cachedPlaybackState.copy(
-                        progress = 1f,
+                        progress = completedProgress,
                         isPlaying = false,
                     )
                 _uiState.update { state ->
@@ -337,7 +343,7 @@ class AudioNoteViewerViewModel(
                     ready.copy(
                         playbackState =
                             ready.playbackState.copy(
-                                progress = 1f,
+                                progress = completedProgress,
                                 isPlaying = false,
                             ),
                     )
@@ -363,6 +369,7 @@ class AudioNoteViewerViewModel(
 data class AudioPlaybackUiState(
     val progress: Float = 0f,
     val isPlaying: Boolean = false,
+    val errorMessage: String? = null,
 )
 
 /**

@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -75,6 +76,7 @@ class AndroidAudioPlaybackManager(
         this.onPlaybackCompleted = onPlaybackCompleted
         currentUri = uri
         currentMetadata = metadata
+        _playbackStatus.value = _playbackStatus.value.copy(errorMessage = null)
         // startService (not startForegroundService) ensures MediaSessionService.onStartCommand
         // fires so its MediaNotificationManager gets a valid startId. Without this, the service
         // is only bound via BIND_AUTO_CREATE and stops itself ~1s after the controller connects.
@@ -140,6 +142,11 @@ class AndroidAudioPlaybackManager(
                 onReady(resolved)
             } catch (e: Exception) {
                 Napier.e(e) { "Failed to create MediaController for audio playback" }
+                _playbackStatus.value =
+                    _playbackStatus.value.copy(
+                        isPlaying = false,
+                        errorMessage = e.message ?: e::class.simpleName ?: "Unknown playback error",
+                    )
                 onPlaybackCompleted?.invoke()
             }
         }, controllerExecutor)
@@ -172,6 +179,17 @@ class AndroidAudioPlaybackManager(
 
             override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
                 controller?.let { updateStatus(it) }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                Napier.e(error) { "Playback failed for $currentUri" }
+                stopProgressTracking()
+                _playbackStatus.value =
+                    _playbackStatus.value.copy(
+                        isPlaying = false,
+                        errorMessage = error.errorCodeName,
+                    )
+                onPlaybackCompleted?.invoke()
             }
         }
 
@@ -222,6 +240,11 @@ class AndroidAudioPlaybackManager(
                 metadata = currentMetadata,
                 isSuppressedForUnsuitableOutput =
                     player.playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_UNSUITABLE_AUDIO_OUTPUT,
+                // Preserved rather than reset: onPlayerError sets this outside of updateStatus, and
+                // Media3 fires onPlaybackStateChanged/onIsPlayingChanged as part of the same failure
+                // transition, which would otherwise clobber the error before anything observes it.
+                // startPlayback is the only place that explicitly clears it, for a fresh attempt.
+                errorMessage = _playbackStatus.value.errorMessage,
             )
     }
 

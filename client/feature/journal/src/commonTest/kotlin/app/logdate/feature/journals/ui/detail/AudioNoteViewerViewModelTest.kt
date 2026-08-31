@@ -14,6 +14,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -211,5 +212,52 @@ class AudioNoteViewerViewModelTest {
             val ready = assertIs<AudioNoteViewerUiState.Ready>(state)
             assertTrue(ready.playbackState.isPlaying)
             assertEquals(0.5f, ready.playbackState.progress)
+        }
+
+    @Test
+    fun playbackFailureSurfacesAsAnErrorInsteadOfHanging() =
+        runTest(dispatcher) {
+            val noteId = Uuid.random()
+            val now = Instant.parse("2025-01-01T00:00:00Z")
+            val note =
+                JournalNote.Audio(
+                    mediaRef = "audio://test",
+                    durationMs = 1000L,
+                    uid = noteId,
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                )
+            val repository = FakeJournalNotesRepository(listOf(note))
+            val audioPlaybackManager = FakeAudioPlaybackManager()
+            val audioContextProcessor =
+                AudioContextProcessor(
+                    amplitudeExtractor = FakeAmplitudeExtractor(),
+                    waveformStorage = FakeWaveformStorage(),
+                    coroutineContext = dispatcher,
+                )
+            val viewModel =
+                AudioNoteViewerViewModel(
+                    noteId = noteId,
+                    notesRepository = repository,
+                    audioContextProcessor = audioContextProcessor,
+                    durationResolver = FakeAudioDurationResolver(durationMs = 1000L),
+                    audioPlaybackManager = audioPlaybackManager,
+                    getJournalMembership = GetJournalMembershipUseCase(FakeDetailJournalContentRepository()),
+                    audioTagRepository = FakeAudioTagRepository(),
+                )
+
+            advanceUntilIdle()
+
+            audioPlaybackManager.updateStatus(
+                audioPlaybackManager.playbackStatus.value.copy(
+                    isPlaying = false,
+                    errorMessage = "ERROR_CODE_IO_FILE_NOT_FOUND",
+                ),
+            )
+            advanceUntilIdle()
+
+            val ready = assertIs<AudioNoteViewerUiState.Ready>(viewModel.uiState.value)
+            assertFalse(ready.playbackState.isPlaying)
+            assertEquals("ERROR_CODE_IO_FILE_NOT_FOUND", ready.playbackState.errorMessage)
         }
 }

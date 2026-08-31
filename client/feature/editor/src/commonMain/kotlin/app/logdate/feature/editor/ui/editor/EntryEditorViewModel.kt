@@ -1109,8 +1109,13 @@ class EntryEditorViewModel(
     }
 
     private sealed interface LoadRequest {
-        data class Draft(val id: Uuid) : LoadRequest
+        data class Draft(
+            val id: Uuid,
+        ) : LoadRequest
 
-        data class Existing(val id: Uuid, val journalId: Uuid?) : LoadRequest
+        data class Existing(
+            val id: Uuid,
+            val journalId: Uuid?,
+        ) : LoadRequest
     }
 }
