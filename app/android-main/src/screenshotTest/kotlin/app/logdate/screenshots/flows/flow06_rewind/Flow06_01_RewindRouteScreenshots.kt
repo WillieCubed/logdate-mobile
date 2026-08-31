@@ -56,7 +56,7 @@ fun S03_RewindDetailStory() {
                             ImageRewindPanelUiState(
                                 sourceId = rewindId,
                                 timestamp = ScreenshotTestData.baseInstant,
-                                imageUri = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher",
+                                imageUri = "android.resource://studio.hypertext.logdate/mipmap/ic_launcher",
                                 caption = "Wrapped the route harness late into the evening.",
                                 dateFormatted = "Feb 20, 2025",
                             ),

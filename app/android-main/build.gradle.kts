@@ -129,7 +129,10 @@ extensions.configure<ApplicationExtension> {
             ":client:feature:speechrecognition",
         )
     defaultConfig {
-        applicationId = "co.reasonabletech.logdate"
+        applicationId = "studio.hypertext.logdate"
+        // The account type res/xml/authenticator.xml declares. AndroidAccountManager derives the
+        // same value from the installed package name, so the two cannot drift apart.
+        resValue("string", "logdate_account_type", "$applicationId.account")
         minSdk =
             libs.versions.android.minSdk
                 .get()
@@ -242,6 +245,8 @@ extensions.configure<ApplicationExtension> {
 
     buildFeatures {
         compose = true
+        // For the generated logdate_account_type string; res values are off by default repo-wide.
+        resValues = true
     }
 
     experimentalProperties["android.experimental.enableScreenshotTest"] = true

@@ -731,7 +731,7 @@ try:
     rendered_env["RELEASE_VERSION"] = f"logdate-server@{release_sha}"
     expected_build_signer = normalized_certificates[expected_build_signer_role]
     contract = {
-        "android_package_name": "co.reasonabletech.logdate",
+        "android_package_name": "studio.hypertext.logdate",
         "environment": environment,
         "release_sha": release_sha,
         "project_id": project_id,

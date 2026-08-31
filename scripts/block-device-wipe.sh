@@ -32,7 +32,7 @@ if echo "$command" | grep -qiE '\bpm\s+uninstall\b'; then
 fi
 
 # pm clear targeting the LogDate package
-if echo "$command" | grep -qiE '\bpm\s+clear\b.*co\.reasonabletech'; then
+if echo "$command" | grep -qiE '\bpm\s+clear\b.*logdate'; then
     echo "$BLOCKED_MSG"
     exit 2
 fi
@@ -44,7 +44,7 @@ if echo "$command" | grep -qiE '\bcmd\s+package\s+uninstall\b'; then
 fi
 
 # rm -rf on the app data directory
-if echo "$command" | grep -qiE '\brm\s+-[a-z]*r[a-z]*\s.*/data/data/co\.reasonabletech'; then
+if echo "$command" | grep -qiE '\brm\s+-[a-z]*r[a-z]*\s.*/data/data/[^ ]*logdate'; then
     echo "$BLOCKED_MSG"
     exit 2
 fi
@@ -62,7 +62,7 @@ if echo "$command" | grep -qiE '\buninstallDebug\b|\buninstallRelease\b|\buninst
 fi
 
 # Piped/xargs indirection targeting pm uninstall or pm clear
-if echo "$command" | grep -qiE '(echo|printf|cat|xargs).*\bpm\s+(uninstall|clear)\b.*co\.reasonabletech'; then
+if echo "$command" | grep -qiE '(echo|printf|cat|xargs).*\bpm\s+(uninstall|clear)\b.*logdate'; then
     echo "$BLOCKED_MSG"
     exit 2
 fi

@@ -4,13 +4,15 @@ Refer to `AGENTS.md` at the repository root for full development workflow, commi
 
 ## Device Safety
 
-The LogDate app (`co.reasonabletech.logdate`) may be installed on the developer's personal device with real data. **Never suggest or generate** any of the following:
+LogDate ships as `studio.hypertext.logdate`, and the retired `<logdate-package>` may still be installed alongside it. Either may hold the developer's real data. **Never suggest or generate** any of the following:
 
-- `adb uninstall co.reasonabletech.logdate` (or any variant with flags like `-k`, `--user`, `-s <serial>`)
-- `adb shell pm uninstall co.reasonabletech.logdate`
-- `adb shell pm clear co.reasonabletech.logdate`
-- `adb shell cmd package uninstall co.reasonabletech.logdate`
-- `adb shell rm -rf /data/data/co.reasonabletech.logdate`
+(`<logdate-package>` is either `studio.hypertext.logdate` or `co.reasonabletech.logdate`.)
+
+- `adb uninstall <logdate-package>` (or any variant with flags like `-k`, `--user`, `-s <serial>`)
+- `adb shell pm uninstall <logdate-package>`
+- `adb shell pm clear <logdate-package>`
+- `adb shell cmd package uninstall <logdate-package>`
+- `adb shell rm -rf /data/data/<logdate-package>`
 - Any Gradle `uninstall*` task (e.g., `./gradlew uninstallDebug`)
 
 **Safe commands** (preserve app data):

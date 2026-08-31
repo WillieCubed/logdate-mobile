@@ -49,7 +49,7 @@ private val rootTimelineDays =
                 listOf(
                     ImageNoteUiState(
                         noteId = Uuid.parse("00000000-0000-0000-0000-000000000061"),
-                        uri = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher",
+                        uri = "android.resource://studio.hypertext.logdate/mipmap/ic_launcher",
                         timestamp = Instant.parse("2025-02-20T18:10:00Z"),
                     ),
                     TextNoteUiState(

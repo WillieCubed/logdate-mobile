@@ -145,8 +145,8 @@ import kotlin.uuid.Uuid
 private const val BOOK_FOLDABLE = "spec:width=1440dp,height=900dp"
 private const val TABLETOP_FOLDABLE = "spec:width=1440dp,height=900dp"
 private const val SAMPLE_IMAGE_URI =
-    "android.resource://co.reasonabletech.logdate/drawable/sample_note_photo"
-private const val SAMPLE_VIDEO_URI = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher"
+    "android.resource://studio.hypertext.logdate/drawable/sample_note_photo"
+private const val SAMPLE_VIDEO_URI = "android.resource://studio.hypertext.logdate/mipmap/ic_launcher"
 
 private val bookPostureLayoutInfo =
     FoldableLayoutInfo(

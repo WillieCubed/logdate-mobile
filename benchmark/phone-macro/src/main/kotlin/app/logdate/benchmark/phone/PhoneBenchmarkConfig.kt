@@ -8,7 +8,7 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 
 internal object PhoneBenchmarkConfig {
-    const val PACKAGE_NAME = "co.reasonabletech.logdate"
+    const val PACKAGE_NAME = "studio.hypertext.logdate"
     private const val MAIN_ACTIVITY = "app.logdate.client.MainActivity"
     private const val ONBOARDING_FIXTURE_EXTRA = "app.logdate.client.testing.onboarding.FIXTURE"
     private const val DEFAULT_WAIT_TIMEOUT_MS = 5_000L
