@@ -13,6 +13,7 @@ import app.logdate.client.permissions.PasskeyManager
 import app.logdate.client.permissions.RestoreCredentialError
 import app.logdate.client.permissions.RestoreCredentialManager
 import app.logdate.client.repository.account.AccountCreationRequest
+import app.logdate.client.repository.account.LocalDataAdoptionRequiredException
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.AccountTokens
@@ -193,7 +194,10 @@ class DefaultPasskeyAccountRepository(
             "LogDate Cloud returned an account that does not match this installation's identity",
         )
 
-    override suspend fun authenticateWithPasskey(username: String?): Result<LogDateAccount> {
+    override suspend fun authenticateWithPasskey(
+        username: String?,
+        adoptLocalData: Boolean,
+    ): Result<LogDateAccount> {
         return try {
             requireCanonicalOwnerBinding()
             // Step 1: Begin authentication
@@ -237,8 +241,12 @@ class DefaultPasskeyAccountRepository(
             }
 
             val completeData = completeResult.getOrThrow()
-            if (!belongsToCanonicalOwner(completeData.account)) {
-                return Result.failure(CanonicalOwnerMismatchException())
+            when (ownerBindingFor(completeData.account, adoptLocalData)) {
+                OwnerBinding.ALLOWED -> Unit
+                OwnerBinding.NEEDS_LOCAL_DATA_CONSENT ->
+                    return Result.failure(LocalDataAdoptionRequiredException())
+                OwnerBinding.REFUSED ->
+                    return Result.failure(CanonicalOwnerMismatchException())
             }
 
             // Step 5: Store session and account data
@@ -386,12 +394,37 @@ class DefaultPasskeyAccountRepository(
         _isAuthenticated.value = true
     }
 
-    private suspend fun belongsToCanonicalOwner(account: LogDateAccount): Boolean {
-        if (runCatching { hasLocalData() }.getOrDefault(true)) {
-            return account.id.toString() == canonicalOwnerProvider.getCanonicalOwnerId()
+    private enum class OwnerBinding { ALLOWED, NEEDS_LOCAL_DATA_CONSENT, REFUSED }
+
+    /**
+     * An installation already claimed by an account stays with it. One that no account has claimed
+     * can be adopted -- but if it holds entries written offline, those entries become part of the
+     * account, so the user is asked first rather than told afterwards.
+     */
+    private suspend fun ownerBindingFor(
+        account: LogDateAccount,
+        adoptLocalData: Boolean,
+    ): OwnerBinding {
+        if (canonicalOwnerProvider.hasBoundOwner()) {
+            val matches = account.id.toString() == canonicalOwnerProvider.getCanonicalOwnerId()
+            return if (matches) OwnerBinding.ALLOWED else OwnerBinding.REFUSED
         }
-        return canonicalOwnerProvider.adoptRemoteOwnerIfUninitialized(account.id.toString())
+
+        // A probe that fails tells us nothing about what is on the device, so ask rather than
+        // silently adopt.
+        if (!adoptLocalData && runCatching { hasLocalData() }.getOrDefault(true)) {
+            return OwnerBinding.NEEDS_LOCAL_DATA_CONSENT
+        }
+
+        return if (canonicalOwnerProvider.adoptRemoteOwnerIfUninitialized(account.id.toString())) {
+            OwnerBinding.ALLOWED
+        } else {
+            OwnerBinding.REFUSED
+        }
     }
+
+    private suspend fun belongsToCanonicalOwner(account: LogDateAccount): Boolean =
+        ownerBindingFor(account, adoptLocalData = false) == OwnerBinding.ALLOWED
 
     private suspend fun sessionBelongsToCanonicalOwner(session: UserSession): Boolean =
         runCatching { session.accountId == canonicalOwnerProvider.getCanonicalOwnerId() }.getOrDefault(false)

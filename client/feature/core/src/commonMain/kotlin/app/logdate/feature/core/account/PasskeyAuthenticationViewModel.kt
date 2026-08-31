@@ -25,6 +25,23 @@ class PasskeyAuthenticationViewModel(
     }
 
     fun authenticate() {
+        authenticate(adoptLocalData = false)
+    }
+
+    /**
+     * Signs in and accepts that this device's existing entries become part of the account. Only
+     * called after the user has been shown [PasskeyAuthenticationUiState.needsLocalDataConsent]
+     * and agreed.
+     */
+    fun authenticateAdoptingLocalData() {
+        authenticate(adoptLocalData = true)
+    }
+
+    fun dismissLocalDataConsent() {
+        _uiState.value = _uiState.value.copy(needsLocalDataConsent = false)
+    }
+
+    private fun authenticate(adoptLocalData: Boolean) {
         val currentState = _uiState.value
         val username = currentState.username.takeIf { it.isNotBlank() }
 
@@ -32,10 +49,11 @@ class PasskeyAuthenticationViewModel(
             currentState.copy(
                 isAuthenticating = true,
                 errorMessage = null,
+                needsLocalDataConsent = false,
             )
 
         viewModelScope.launch {
-            val result = authenticateWithPasskeyUseCase(username)
+            val result = authenticateWithPasskeyUseCase(username, adoptLocalData)
 
             when (result) {
                 is AuthenticateWithPasskeyUseCase.Result.Success -> {
@@ -47,10 +65,13 @@ class PasskeyAuthenticationViewModel(
                         )
                 }
                 is AuthenticateWithPasskeyUseCase.Result.Error -> {
+                    val needsConsent =
+                        result.error == AuthenticateWithPasskeyUseCase.AuthenticationError.LocalDataNeedsAdoption
                     _uiState.value =
                         currentState.copy(
                             isAuthenticating = false,
-                            errorMessage = mapErrorToMessage(result.error),
+                            needsLocalDataConsent = needsConsent,
+                            errorMessage = if (needsConsent) null else mapErrorToMessage(result.error),
                         )
                 }
             }
@@ -96,6 +117,8 @@ class PasskeyAuthenticationViewModel(
                 "Account not found. Please check your username or create a new account."
             AuthenticateWithPasskeyUseCase.AuthenticationError.NetworkError ->
                 "Network error. Please check your connection and try again."
+            AuthenticateWithPasskeyUseCase.AuthenticationError.LocalDataNeedsAdoption ->
+                "This device has entries that aren't in an account yet."
             is AuthenticateWithPasskeyUseCase.AuthenticationError.Unknown ->
                 // The exception text names servers, key hashes and file paths. It is already in
                 // the log; the user gets something they can act on.
@@ -111,6 +134,8 @@ data class PasskeyAuthenticationUiState(
     val isAuthenticated: Boolean = false,
     val authenticatedAccount: app.logdate.shared.model.LogDateAccount? = null,
     val errorMessage: String? = null,
+    /** Signing in will fold this device's existing entries into the account; ask before it does. */
+    val needsLocalDataConsent: Boolean = false,
 ) {
     val canAuthenticate: Boolean
         get() = isPasskeySupported && !isAuthenticating
