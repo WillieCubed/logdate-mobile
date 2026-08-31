@@ -67,6 +67,11 @@ class DesktopScreenshotTest {
      *  FlowRow + verticalScroll would fix it but is invasive product code; quarantining the
      *  family until that lands. */
 
+    private val nonDeterministicScenePrefixes: List<String> =
+        listOf(
+            "memory-selection-",
+        )
+
     /**
      * Whether to skip because there is no display to render into.
      *
@@ -84,11 +89,6 @@ class DesktopScreenshotTest {
         println("Skipping desktop screenshots: no display available.")
         return true
     }
-
-    private val nonDeterministicScenePrefixes: List<String> =
-        listOf(
-            "memory-selection-",
-        )
 
     @Test
     fun lock_screen_matches_baseline() {
