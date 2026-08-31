@@ -11,6 +11,7 @@ import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.recording.WearAudioRecordingManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.sample
@@ -30,6 +31,7 @@ class AudioRecordingViewModel(
     private val storageChecker: StorageSpaceChecker,
     private val noteHealthAnnotator: NoteHealthAnnotator,
     private val locationCaptureCoordinator: WearLocationCaptureCoordinator,
+    private val clock: Clock = Clock.System,
 ) : AndroidViewModel(application) {
     companion object {
         // Estimate size of 1-minute audio recording (AAC format, 128kbps)
@@ -38,6 +40,9 @@ class AudioRecordingViewModel(
 
         // Buffer space to leave free (0.5 MB)
         private const val BUFFER_SPACE_BYTES = 512 * 1024L
+
+        // How often the elapsed-time readout refreshes while recording.
+        private const val DURATION_TICK_MS = 100L
     }
 
     // UI state exposed to the Composable
@@ -128,7 +133,7 @@ class AudioRecordingViewModel(
                 // Check if recording was successful
                 if (audioPath != null) {
                     // Create and save the audio note
-                    val now = Clock.System.now()
+                    val now = clock.now()
                     val noteLocation = locationCaptureCoordinator.captureForJournalEntry()
                     val audioNote =
                         JournalNote.Audio(
@@ -257,7 +262,7 @@ class AudioRecordingViewModel(
         audioLevelJob?.cancel()
         durationJob?.cancel()
 
-        val recordingStartMs = Clock.System.now().toEpochMilliseconds()
+        val recordingStartMs = clock.now().toEpochMilliseconds()
 
         audioLevelJob =
             viewModelScope.launch {
@@ -266,14 +271,21 @@ class AudioRecordingViewModel(
                     .sample(periodMillis = 100)
                     .collect { level ->
                         _uiState.update { state ->
-                            val levels = (state.audioLevels + level).takeLast(50)
-                            val elapsed = Clock.System.now().toEpochMilliseconds() - recordingStartMs
-                            state.copy(
-                                audioLevels = levels,
-                                durationMs = elapsed,
-                            )
+                            state.copy(audioLevels = (state.audioLevels + level).takeLast(50))
                         }
                     }
+            }
+
+        // The elapsed time has its own ticker rather than riding on audio levels, which only
+        // arrive while there is sound to report -- the readout used to freeze whenever the
+        // wearer stopped talking.
+        durationJob =
+            viewModelScope.launch {
+                while (true) {
+                    delay(DURATION_TICK_MS)
+                    val elapsed = clock.now().toEpochMilliseconds() - recordingStartMs
+                    _uiState.update { it.copy(durationMs = elapsed) }
+                }
             }
     }
 

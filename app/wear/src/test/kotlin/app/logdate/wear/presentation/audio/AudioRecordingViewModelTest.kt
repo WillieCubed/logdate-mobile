@@ -23,7 +23,10 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
@@ -87,7 +90,16 @@ class AudioRecordingViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel(): AudioRecordingViewModel =
+    /**
+     * Reads the test scheduler's virtual clock, so assertions about elapsed recording time are
+     * driven by advanceTimeBy rather than by how fast the machine runs the test.
+     */
+    private fun TestScope.virtualClock(): Clock =
+        object : Clock {
+            override fun now(): Instant = Instant.fromEpochMilliseconds(testScheduler.currentTime)
+        }
+
+    private fun TestScope.createViewModel(): AudioRecordingViewModel =
         AudioRecordingViewModel(
             application,
             recordingManager,
@@ -95,6 +107,7 @@ class AudioRecordingViewModelTest {
             storageChecker,
             noteHealthAnnotator,
             locationCaptureCoordinator,
+            virtualClock(),
         )
 
     private fun AudioRecordingViewModel.cancelScope() {
