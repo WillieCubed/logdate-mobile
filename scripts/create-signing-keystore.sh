@@ -18,7 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 SIGNING_DIR="${LOGDATE_SIGNING_DIR:-$HOME/.logdate-signing}"
-PACKAGE_NAME="${LOGDATE_PACKAGE_NAME:-co.reasonabletech.logdate}"
+PACKAGE_NAME="${LOGDATE_PACKAGE_NAME:-studio.hypertext.logdate}"
 KEY_ALGORITHM="RSA"
 KEY_SIZE=4096
 VALIDITY_DAYS=10000
@@ -68,7 +68,7 @@ Options:
   --alias NAME             Override the key alias
   --env-file PATH          Override the credentials file path
   --package-name NAME      Android application id
-                           (default: co.reasonabletech.logdate)
+                           (default: studio.hypertext.logdate)
   --play-fingerprint FP    Colon-hex SHA-256 of the Play app-signing
                            certificate, from Play Console -> Setup -> App
                            integrity. Supplying it completes the Terraform

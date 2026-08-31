@@ -42,7 +42,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.uuid.Uuid
 
-private const val sampleMediaUri = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher"
+private const val sampleMediaUri = "android.resource://studio.hypertext.logdate/mipmap/ic_launcher"
 
 private val sharedNote =
     NoteViewerShared(

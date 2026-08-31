@@ -42,7 +42,7 @@ private val timelineDays =
                 listOf(
                     ImageNoteUiState(
                         noteId = Uuid.parse("00000000-0000-0000-0000-000000000031"),
-                        uri = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher",
+                        uri = "android.resource://studio.hypertext.logdate/mipmap/ic_launcher",
                         timestamp = ScreenshotTestData.baseInstant,
                     ),
                     TextNoteUiState(
@@ -91,7 +91,7 @@ private val timelineDetailState =
                 ),
                 ImageNoteUiState(
                     noteId = Uuid.parse("00000000-0000-0000-0000-000000000042"),
-                    uri = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher",
+                    uri = "android.resource://studio.hypertext.logdate/mipmap/ic_launcher",
                     timestamp = ScreenshotTestData.baseInstant,
                 ),
                 AudioNoteUiState(
@@ -104,7 +104,7 @@ private val timelineDetailState =
                     noteId = Uuid.parse("00000000-0000-0000-0000-000000000044"),
                     uri = "preview://video",
                     timestamp = ScreenshotTestData.baseInstant,
-                    thumbnailUri = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher",
+                    thumbnailUri = "android.resource://studio.hypertext.logdate/mipmap/ic_launcher",
                     duration = 61_000L,
                 ),
             ),

@@ -5,7 +5,7 @@ prefix_rule(
     justification = "Do not use adb for LogDate from Codex. Use an emulator or Gradle Managed Device workflow instead.",
     match = [
         "adb devices",
-        "adb shell pm clear co.reasonabletech.logdate",
+        "adb shell pm clear studio.hypertext.logdate",
         "adb install app.apk",
     ],
 )

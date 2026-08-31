@@ -22,7 +22,7 @@ data class AssetLinksConfig(
     val sha256CertFingerprints: List<String>,
 ) {
     companion object {
-        const val DEFAULT_PACKAGE_NAME = "co.reasonabletech.logdate"
+        const val DEFAULT_PACKAGE_NAME = "studio.hypertext.logdate"
 
         fun fromEnvironment(
             packageName: String? = System.getenv("ANDROID_PACKAGE_NAME"),

@@ -16,7 +16,6 @@ class AndroidAccountManager(
     context: Context,
 ) : PlatformAccountManager {
     companion object {
-        const val ACCOUNT_TYPE = "app.logdate.account"
         const val TOKEN_TYPE_ACCESS = "access_token"
         const val TOKEN_TYPE_REFRESH = "refresh_token"
 
@@ -30,6 +29,13 @@ class AndroidAccountManager(
         const val KEY_UPDATED_AT = "updated_at"
     }
 
+    /**
+     * The account type LogDate owns in the platform AccountManager. Derived from the installed
+     * package so it cannot drift from the `logdate_account_type` resource the authenticator
+     * declares, which the app module generates from the same `applicationId`.
+     */
+    private val accountType = "${context.packageName}.account"
+
     private val accountManager = AccountManager.get(context)
 
     override suspend fun addAccount(
@@ -40,11 +46,11 @@ class AndroidAccountManager(
     ): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
-                val backendAwareAccount = Account(accountKey(account.username, backendUrl), ACCOUNT_TYPE)
+                val backendAwareAccount = Account(accountKey(account.username, backendUrl), accountType)
 
                 // The OS AccountManager is an implementation detail, not an account chooser.
                 // Remove stale LogDate entries before recording the sole canonical identity.
-                accountManager.getAccountsByType(ACCOUNT_TYPE).forEach { existing ->
+                accountManager.getAccountsByType(accountType).forEach { existing ->
                     accountManager.removeAccountExplicitly(existing)
                 }
 
@@ -160,7 +166,7 @@ class AndroidAccountManager(
     override suspend fun getStoredAccounts(): Result<List<PlatformAccountInfo>> =
         withContext(Dispatchers.IO) {
             try {
-                val accounts = accountManager.getAccountsByType(ACCOUNT_TYPE)
+                val accounts = accountManager.getAccountsByType(accountType)
 
                 val accountInfos =
                     accounts.map { account ->
@@ -207,15 +213,15 @@ class AndroidAccountManager(
     override suspend fun clearAllTokens(): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
-                val accounts = accountManager.getAccountsByType(ACCOUNT_TYPE)
+                val accounts = accountManager.getAccountsByType(accountType)
 
                 accounts.forEach { account ->
                     accountManager.invalidateAuthToken(
-                        ACCOUNT_TYPE,
+                        accountType,
                         accountManager.peekAuthToken(account, TOKEN_TYPE_ACCESS),
                     )
                     accountManager.invalidateAuthToken(
-                        ACCOUNT_TYPE,
+                        accountType,
                         accountManager.peekAuthToken(account, TOKEN_TYPE_REFRESH),
                     )
                 }
@@ -233,7 +239,7 @@ class AndroidAccountManager(
         backendUrl: String,
     ): Account? =
         accountManager
-            .getAccountsByType(ACCOUNT_TYPE)
+            .getAccountsByType(accountType)
             .find { account ->
                 accountManager.getUserData(account, KEY_BACKEND_URL) == backendUrl &&
                     accountManager.getUserData(account, KEY_USERNAME) == username

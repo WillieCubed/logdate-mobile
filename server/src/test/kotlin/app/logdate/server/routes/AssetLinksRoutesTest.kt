@@ -33,7 +33,7 @@ class AssetLinksRoutesTest {
                 routing {
                     assetLinksRoutes(
                         AssetLinksConfig(
-                            packageName = "co.reasonabletech.logdate",
+                            packageName = "studio.hypertext.logdate",
                             sha256CertFingerprints = listOf("AB:CD:EF"),
                         ),
                     )
@@ -56,7 +56,7 @@ class AssetLinksRoutesTest {
 
             val target = statement["target"]!!.jsonObject
             assertEquals("android_app", target["namespace"]!!.jsonPrimitive.content)
-            assertEquals("co.reasonabletech.logdate", target["package_name"]!!.jsonPrimitive.content)
+            assertEquals("studio.hypertext.logdate", target["package_name"]!!.jsonPrimitive.content)
             assertEquals(
                 listOf("AB:CD:EF"),
                 target["sha256_cert_fingerprints"]!!.jsonArray.map { it.jsonPrimitive.content },
@@ -75,7 +75,7 @@ class AssetLinksRoutesTest {
     fun `fromEnvironment parses a comma-separated fingerprint list and drops blanks`() {
         val config =
             AssetLinksConfig.fromEnvironment(
-                packageName = "co.reasonabletech.logdate",
+                packageName = "studio.hypertext.logdate",
                 certFingerprints = "AB:CD , , EF:01",
             )
 

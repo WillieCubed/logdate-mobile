@@ -600,7 +600,7 @@ run_real_renderer() {
 
 cat >"$FIXTURE_DIR/staging-contract.json" <<EOF
 {
-  "android_package_name": "co.reasonabletech.logdate",
+  "android_package_name": "studio.hypertext.logdate",
   "android_signing": {
     "certificates": {
       "play_app_signing": {
@@ -706,7 +706,7 @@ run_renderer production "$RELEASE_SHA" production-source.json "$PRODUCTION_OUT" 
 assert_zero_bytes "$PRODUCTION_ERR"
 cat >"$FIXTURE_DIR/production-contract.json" <<EOF
 {
-  "android_package_name": "co.reasonabletech.logdate",
+  "android_package_name": "studio.hypertext.logdate",
   "android_signing": {
     "certificates": {
       "play_app_signing": {

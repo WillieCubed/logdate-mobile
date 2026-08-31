@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Declares LogDate as the owner of its account type. The accountType here must stay identical to
-    AndroidAccountManager.ACCOUNT_TYPE; the platform matches on the literal string, and a mismatch
-    fails addAccountExplicitly with a SecurityException rather than any clearer error.
+    Declares LogDate as the owner of its account type. The platform matches on the literal string,
+    and a mismatch fails addAccountExplicitly with a SecurityException rather than any clearer
+    error, so both sides derive the type from the applicationId: the build generates
+    logdate_account_type, and AndroidAccountManager appends the same suffix to its package name.
 -->
 <account-authenticator xmlns:android="http://schemas.android.com/apk/res/android"
     android:accountType="@string/logdate_account_type"

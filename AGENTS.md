@@ -138,10 +138,11 @@ repository.
   device validation.
 - Never run `connected*AndroidTest`, `install*`, `adb install`, `adb shell am instrument`,
   `adb uninstall`, `adb shell pm clear`, or any other `adb` command against a physical device.
-- Never suggest or run app-data-destructive commands for `co.reasonabletech.logdate` (for example
-  `adb uninstall`, `adb shell pm uninstall`, `adb shell pm clear`,
-  `adb shell cmd package uninstall`, `adb shell rm -rf /data/data/co.reasonabletech.logdate`, or
-  Gradle `uninstall*` tasks).
+- Never suggest or run app-data-destructive commands for any LogDate package — the current
+  `studio.hypertext.logdate` and the retired `co.reasonabletech.logdate`, which may still be
+  installed with real data (for example `adb uninstall`, `adb shell pm uninstall`,
+  `adb shell pm clear`, `adb shell cmd package uninstall`,
+  `adb shell rm -rf /data/data/studio.hypertext.logdate`, or Gradle `uninstall*` tasks).
 - Only use Android emulators or Gradle Managed Devices for Android app installs, instrumentation
   tests, UI tests, screenshots, benchmarks, and manual validation.
 - If Android instrumentation coverage is needed, use an emulator-only or Gradle Managed Device task

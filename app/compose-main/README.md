@@ -91,7 +91,7 @@ The app implements adaptive layouts to support different screen sizes and orient
 
 ### Android
 ```kotlin
-applicationId = "co.reasonabletech.logdate"
+applicationId = "studio.hypertext.logdate"
 versionCode = 1
 versionName = "0.1.0"
 ```

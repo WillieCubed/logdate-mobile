@@ -18,7 +18,7 @@ plugins {
 kotlin {
     android {
         // TODO: Migrate to app.logdate.mobile once we have ability to migrate
-        namespace = "co.reasonabletech.logdate"
+        namespace = "studio.hypertext.logdate"
         compileSdk =
             libs.versions.android.compileSdk
                 .get()

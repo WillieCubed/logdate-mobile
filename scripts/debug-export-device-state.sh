@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-PACKAGE_NAME="${PACKAGE_NAME:-co.reasonabletech.logdate}"
+PACKAGE_NAME="${PACKAGE_NAME:-studio.hypertext.logdate}"
 OUTPUT_DIR="${OUTPUT_DIR:-$(pwd)/tmp}"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 OUTPUT_FILE="${OUTPUT_DIR}/logdate-export-debug-${TIMESTAMP}.txt"

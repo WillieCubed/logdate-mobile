@@ -65,7 +65,7 @@ In-app updates only work correctly on builds installed by Google Play. Sideloade
 
 ### Prerequisites
 
-- Keep the same `applicationId`: `co.reasonabletech.logdate`
+- Keep the same `applicationId`: `studio.hypertext.logdate`
 - Upload a build with a higher `versionCode` than the one currently installed
 - Use a tester account enrolled in the relevant Play track
 - Install the baseline build from Google Play before testing the update

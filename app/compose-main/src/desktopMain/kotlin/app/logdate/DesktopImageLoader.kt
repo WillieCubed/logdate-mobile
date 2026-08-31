@@ -37,9 +37,9 @@ fun buildLogDateImageLoader(context: PlatformContext): ImageLoader =
 /**
  * Resolves the OS-appropriate cache directory for LogDate's image cache.
  *
- * macOS: `~/Library/Caches/co.reasonabletech.logdate/image_cache`.
- * Windows: `%LOCALAPPDATA%\co.reasonabletech.logdate\image_cache`.
- * Linux / other: `~/.cache/co.reasonabletech.logdate/image_cache`.
+ * macOS: `~/Library/Caches/studio.hypertext.logdate/image_cache`.
+ * Windows: `%LOCALAPPDATA%\studio.hypertext.logdate\image_cache`.
+ * Linux / other: `~/.cache/studio.hypertext.logdate/image_cache`.
  */
 private fun resolveDesktopCacheDir(): File {
     val os = System.getProperty("os.name").lowercase(Locale.ROOT)
@@ -67,4 +67,4 @@ private const val IMAGE_CROSSFADE_MS = 200
 private const val MEMORY_CACHE_PERCENT = 0.25
 private const val IMAGE_CACHE_DIR = "image_cache"
 private const val IMAGE_CACHE_MAX_BYTES = 250L * 1024 * 1024 // 250 MB
-private const val APP_DIR_NAME = "co.reasonabletech.logdate"
+private const val APP_DIR_NAME = "studio.hypertext.logdate"

@@ -2,7 +2,7 @@
 
 package app.logdate.client.feature.widgets
 
-import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -49,13 +49,18 @@ internal fun OnThisDayWidgetContent(state: OnThisDayWidgetState) {
     }
 }
 
-private fun createWidgetLaunchIntent(dateIso: String? = null): Intent =
-    Intent().apply {
-        component =
-            ComponentName(
-                "app.logdate.client",
-                "app.logdate.client.MainActivity",
-            )
+/**
+ * Resolves the launcher entry point from the installed package rather than a hardcoded component,
+ * so the widget keeps opening the app across an applicationId change.
+ */
+private fun createWidgetLaunchIntent(
+    context: Context,
+    dateIso: String? = null,
+): Intent =
+    (
+        context.packageManager.getLaunchIntentForPackage(context.packageName)
+            ?: Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+    ).apply {
         if (dateIso != null) {
             putExtra(EXTRA_NAV_SOURCE, NAV_SOURCE_ON_THIS_DAY_WIDGET)
             putExtra(EXTRA_WIDGET_TARGET_DATE, dateIso)
@@ -113,7 +118,7 @@ private fun WidgetContainer(
 @Composable
 private fun MemoryContent(state: OnThisDayWidgetState.HasMemory) {
     val context = LocalContext.current
-    val launchIntent = createWidgetLaunchIntent(dateIso = state.dateIso)
+    val launchIntent = createWidgetLaunchIntent(context, dateIso = state.dateIso)
     val size = LocalSize.current
     val isCompact = size.height < 120.dp || size.width < 200.dp
     val isNarrow = size.width < 190.dp
@@ -248,7 +253,7 @@ private fun LoadingContent() {
 @Composable
 private fun NewUserContent() {
     val context = LocalContext.current
-    val launchIntent = createWidgetLaunchIntent()
+    val launchIntent = createWidgetLaunchIntent(context)
 
     WidgetContainer(
         onClick = launchIntent,
@@ -277,7 +282,7 @@ private fun NewUserContent() {
 @Composable
 private fun NoMemoryTodayContent() {
     val context = LocalContext.current
-    val launchIntent = createWidgetLaunchIntent()
+    val launchIntent = createWidgetLaunchIntent(context)
 
     WidgetContainer(
         onClick = launchIntent,

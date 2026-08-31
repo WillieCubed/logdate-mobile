@@ -26,7 +26,7 @@ import com.android.tools.screenshot.PreviewTest
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-private const val sampleImageUri = "android.resource://co.reasonabletech.logdate/mipmap/ic_launcher"
+private const val sampleImageUri = "android.resource://studio.hypertext.logdate/mipmap/ic_launcher"
 private const val sampleVideoUri = sampleImageUri
 
 private val editorAudioPalette =
