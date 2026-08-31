@@ -87,6 +87,7 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.nav3.runtime)
+            implementation(libs.jetbrains.navigation3.ui)
             // External dependencies
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))
