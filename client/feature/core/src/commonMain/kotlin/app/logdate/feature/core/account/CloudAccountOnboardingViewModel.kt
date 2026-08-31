@@ -552,9 +552,10 @@ class CloudAccountOnboardingViewModel(
                         },
                 )
             }.onFailure { error ->
+                Napier.w("Server validation failed", error)
                 updateServerSelectionState(
-                    validationState = ServerValidationState.Error(error.message ?: failureMessage),
-                    errorMessage = error.message ?: failureMessage,
+                    validationState = ServerValidationState.Error(failureMessage),
+                    errorMessage = failureMessage,
                 )
             }
     }
@@ -645,7 +646,9 @@ class CloudAccountOnboardingViewModel(
             AuthenticateWithPasskeyUseCase.AuthenticationError.NetworkError ->
                 "Network error. Please check your connection and try again."
             is AuthenticateWithPasskeyUseCase.AuthenticationError.Unknown ->
-                "An unexpected error occurred: ${error.message}"
+                // The exception text names servers, key hashes and file paths. It is already in
+                // the log; the user gets something they can act on.
+                "Something went wrong. Please try again."
         }
 
     private fun mapErrorToMessage(error: CreatePasskeyAccountUseCase.CreateAccountError): String =
@@ -669,7 +672,9 @@ class CloudAccountOnboardingViewModel(
             CreatePasskeyAccountUseCase.CreateAccountError.ServerError ->
                 "Something went wrong on our end. Please try again in a few minutes."
             is CreatePasskeyAccountUseCase.CreateAccountError.Unknown ->
-                "An unexpected error occurred: ${error.message}"
+                // The exception text names servers, key hashes and file paths. It is already in
+                // the log; the user gets something they can act on.
+                "Something went wrong. Please try again."
         }
 
     fun onVerifyEmailClicked() {

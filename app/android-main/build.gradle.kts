@@ -449,3 +449,28 @@ afterEvaluate {
         }
     }
 }
+
+/**
+ * The Google Services plugin refuses to build unless google-services.json declares a client for the
+ * applicationId being built. The real file comes from repository secrets; locally there is a
+ * placeholder, and it has to be rewritten whenever -Plogdate.applicationId changes. Doing that by
+ * hand means a confusing "No matching client found" failure every time it is forgotten.
+ */
+val resolvedApplicationId =
+    providers
+        .gradleProperty("logdate.applicationId")
+        .orElse("studio.hypertext.logdate")
+        .get()
+
+val writeLocalGoogleServices by tasks.registering(Exec::class) {
+    description = "Regenerates the placeholder google-services.json for the applicationId being built."
+    val config = layout.projectDirectory.file("google-services.json").asFile
+    // A real Firebase configuration is left alone; the script refuses to overwrite one.
+    onlyIf { !config.exists() || config.readText().contains("logdate-local-stub") }
+    environment("LOGDATE_APPLICATION_ID", resolvedApplicationId)
+    commandLine("bash", rootProject.file("scripts/write-local-google-services.sh").absolutePath)
+}
+
+tasks.matching { it.name.startsWith("process") && it.name.endsWith("GoogleServices") }.configureEach {
+    dependsOn(writeLocalGoogleServices)
+}
