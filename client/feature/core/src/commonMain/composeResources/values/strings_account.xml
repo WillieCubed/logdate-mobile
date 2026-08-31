@@ -218,4 +218,8 @@
     <string name="account_passkey_point_multi_device">Syncs to your other devices through your password manager</string>
     <string name="account_create_cta">Create account</string>
     <string name="account_will_sign_in_to">You'll be signed in to %1$s</string>
+    <!-- Second-device sign-in: adopting entries already on this device -->
+    <string name="account_adopt_local_data_title">Keep what's already here?</string>
+    <string name="account_adopt_local_data_body">This device has entries that aren't in any account yet. Signing in adds them to your account and syncs them to your other devices.</string>
+    <string name="account_adopt_local_data_confirm">Sign in and keep them</string>
 </resources>
