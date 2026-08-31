@@ -157,11 +157,11 @@ private fun SyncIssuesSummaryPane(
         }
 
         records
-            .groupingBy { it.entityType.lowercase().replaceFirstChar { char -> char.uppercase() } }
+            .groupingBy { it.entityType }
             .eachCount()
-            .forEach { (type, count) ->
+            .forEach { (entityType, count) ->
                 Text(
-                    text = "$type · $count",
+                    text = "$count ${describeThing(entityType, count)}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -204,17 +204,12 @@ private fun SyncIssueCard(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "${record.entityType.lowercase().replaceFirstChar { it.uppercase() }} · ${record.operation.lowercase()}",
+                text = describeIssue(record),
                 style = MaterialTheme.typography.titleSmall,
             )
             Text(
-                text = record.lastError,
+                text = explainIssue(record),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = "Retried ${record.retryCount}×",
-                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.size(4.dp))
@@ -233,3 +228,48 @@ private fun SyncIssueCard(
         }
     }
 }
+
+/**
+ * The dead-letter record is written for diagnosis: it holds enum names, an operation, a retry
+ * count, and a raw exception message that includes on-disk paths. None of that belongs on screen,
+ * so the card is written from the record rather than printing it.
+ */
+private fun describeThing(
+    entityType: String,
+    count: Int,
+): String {
+    val singular =
+        when (entityType.uppercase()) {
+            "NOTE" -> "entry"
+            "JOURNAL" -> "journal"
+            "MEDIA" -> "photo or recording"
+            "DRAFT" -> "draft"
+            "ASSOCIATION" -> "entry link"
+            "HEALTH" -> "health record"
+            else -> "item"
+        }
+    return if (count == 1) singular else "${singular}s"
+}
+
+private fun describeIssue(record: SyncDeadLetterRecord): String {
+    val thing = describeThing(record.entityType, count = 1)
+    return if (record.isMissingFile()) {
+        "This $thing's file is missing"
+    } else {
+        "This $thing didn't upload"
+    }
+}
+
+private fun explainIssue(record: SyncDeadLetterRecord): String =
+    if (record.isMissingFile()) {
+        "The file it points to is no longer on this device, so there is nothing left to upload. " +
+            "Discarding it removes it from the queue and leaves the entry itself alone."
+    } else {
+        "It was tried several times without success. Retry if you are back online, " +
+            "or discard it if you no longer need it synced."
+    }
+
+private fun SyncDeadLetterRecord.isMissingFile(): Boolean =
+    lastError.contains("no longer exists", ignoreCase = true) ||
+        lastError.contains("ENOENT", ignoreCase = true) ||
+        lastError.contains("No such file", ignoreCase = true)

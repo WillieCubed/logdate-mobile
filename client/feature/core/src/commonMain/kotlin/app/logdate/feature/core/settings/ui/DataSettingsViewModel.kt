@@ -271,12 +271,12 @@ class DataSettingsViewModel(
                         if (error?.type == SyncErrorType.AUTHENTICATION_ERROR) {
                             SyncFeedback.NeedsAccount
                         } else {
-                            SyncFeedback.Failed(error?.message ?: "Unknown sync error")
+                            SyncFeedback.Failed(describeSyncFailure(error?.type))
                         }
                     }
             } catch (e: Exception) {
                 Napier.e("Sync failed with exception", e)
-                _syncFeedback.value = SyncFeedback.Failed(e.message ?: "Unknown sync error")
+                _syncFeedback.value = SyncFeedback.Failed(describeSyncFailure(null))
             }
         }
     }
@@ -292,3 +292,16 @@ class DataSettingsViewModel(
         }
     }
 }
+
+/**
+ * Sync errors carry exception text meant for the log -- entity ids, on-disk paths, the package
+ * name. The snackbar says what happened and what to do about it, and leaves the detail to Napier.
+ */
+private fun describeSyncFailure(type: SyncErrorType?): String =
+    when (type) {
+        SyncErrorType.NETWORK_ERROR -> "Couldn't reach LogDate Cloud. Check your connection and try again."
+        SyncErrorType.SERVER_ERROR -> "LogDate Cloud had a problem. Try again in a moment."
+        SyncErrorType.STORAGE_ERROR -> "Some changes couldn't be uploaded. Review them in Sync issues."
+        SyncErrorType.CONFLICT_ERROR -> "Some changes need review before they can sync."
+        else -> "Sync didn't finish. Try again in a moment."
+    }
