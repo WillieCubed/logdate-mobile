@@ -786,8 +786,20 @@ class DefaultSyncManager(
             return Result.success(note.withMediaRef(cached.remoteUrl))
         }
 
+        val payload =
+            runCatching { mediaManager.readMedia(mediaRef) }
+                .getOrElse { error ->
+                    // Distinguish "the bytes are gone" from "the read happened to fail". Only the
+                    // former is hopeless; an upload that fails for any other reason is still worth
+                    // retrying.
+                    return if (!mediaManager.exists(mediaRef)) {
+                        Result.failure(MissingMediaException(mediaRef, error))
+                    } else {
+                        Result.failure(error)
+                    }
+                }
+
         return runCatching {
-            val payload = mediaManager.readMedia(mediaRef)
             val uploadResult =
                 cloudMediaDataSource.uploadMedia(
                     accessToken,
@@ -920,11 +932,14 @@ class DefaultSyncManager(
         entityType: EntityType,
         pending: PendingUpload,
         error: Throwable,
+        permanent: Boolean = false,
     ): Boolean {
         val nextRetryCount = pending.retryCount + 1
         syncMetadataService.incrementRetryCount(pending.entityId, entityType)
 
-        if (nextRetryCount >= MAX_RETRY_ATTEMPTS) {
+        // A permanent failure will fail identically every time, so spending the retry budget on it
+        // only keeps the queue blocked for longer.
+        if (permanent || nextRetryCount >= MAX_RETRY_ATTEMPTS) {
             deadLetterStore.add(
                 SyncDeadLetterRecord(
                     id = "${entityType.name}:${pending.entityId}",
@@ -1256,6 +1271,7 @@ class DefaultSyncManager(
                                                 entityType = EntityType.NOTE,
                                                 pending = pending,
                                                 error = error,
+                                                permanent = error is MissingMediaException,
                                             )
                                         errors.add(
                                             SyncError(
@@ -2344,3 +2360,11 @@ class DefaultSyncManager(
             handleSyncException(e, "Download associations")
         }
 }
+
+/**
+ * The media a note points at is no longer on disk, so no number of retries can upload it.
+ */
+class MissingMediaException(
+    mediaRef: String,
+    cause: Throwable,
+) : Exception("Media no longer exists at $mediaRef: ${cause.message}", cause)

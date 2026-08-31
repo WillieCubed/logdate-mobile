@@ -8,7 +8,7 @@ import kotlin.time.Instant
 /**
  * Deterministic in-memory [MediaManager] used by cross-module tests.
  */
-class InMemoryMediaManager : MediaManager {
+open class InMemoryMediaManager : MediaManager {
     override suspend fun getMedia(uri: String): MediaObject =
         MediaObject.Video(
             name = "In-memory video",
