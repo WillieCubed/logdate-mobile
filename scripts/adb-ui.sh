@@ -18,6 +18,30 @@ readonly SERIAL="${1:?serial required}"
 readonly COMMAND="${2:?command required}"
 shift 2
 
+# Anything that types or taps goes to whatever happens to be in front. A phone that rings, an
+# install that restarts the app, or the owner picking the device up is enough to put another app
+# there between one step and the next -- which is how a username once ended up typed into somebody's
+# text conversation. Set LOGDATE_UI_REQUIRE_PACKAGE and every input refuses to fire unless that
+# package is still the focused one.
+readonly REQUIRED_PACKAGE="${LOGDATE_UI_REQUIRE_PACKAGE:-}"
+
+focused_package() {
+    adb -s "$SERIAL" shell "dumpsys window" 2>/dev/null |
+        grep -m1 "mCurrentFocus" |
+        sed -nE 's|.* ([A-Za-z0-9_.]+)/[A-Za-z0-9_.$]+.*|\1|p'
+}
+
+require_foreground() {
+    [[ -z "$REQUIRED_PACKAGE" ]] && return 0
+    local focused
+    focused="$(focused_package)"
+    if [[ "$focused" != "$REQUIRED_PACKAGE" ]]; then
+        echo "refusing to send input: $REQUIRED_PACKAGE is not in the foreground (found: ${focused:-none})" >&2
+        return 1
+    fi
+    return 0
+}
+
 dump() {
     adb -s "$SERIAL" shell "uiautomator dump /sdcard/logdate-ui.xml >/dev/null 2>&1; cat /sdcard/logdate-ui.xml" 2>/dev/null
 }
@@ -40,6 +64,7 @@ case "$COMMAND" in
         ;;
     tap)
         needle="${1:?needle required}"
+        require_foreground || exit 1
         read -r x y <<<"$(centre_of "$needle")"
         [[ -n "${x:-}" ]] || { echo "no match for: $needle" >&2; exit 1; }
         adb -s "$SERIAL" shell "input tap $x $y" >/dev/null
@@ -48,6 +73,7 @@ case "$COMMAND" in
         ;;
     scroll-to)
         needle="${1:?needle required}"
+        require_foreground || exit 1
         for _ in $(seq 1 "${2:-6}"); do
             [[ -n "$(centre_of "$needle")" ]] && { echo "found: $needle"; exit 0; }
             adb -s "$SERIAL" shell "input swipe 540 1700 540 900 300" >/dev/null
@@ -57,8 +83,12 @@ case "$COMMAND" in
         exit 1
         ;;
     type)
+        require_foreground || exit 1
         adb -s "$SERIAL" shell "input text '${1//\'/}'" >/dev/null
         sleep 2
+        ;;
+    foreground)
+        focused_package
         ;;
     *)
         echo "unknown command: $COMMAND" >&2
