@@ -9,5 +9,5 @@
   "expected_build_signer_fingerprint": "DB:66:7C:A5:99:80:91:23:E2:F1:8B:86:98:42:A0:23:1B:52:D5:8B:94:A2:95:76:07:B9:A1:0D:1D:EC:26:88",
   "expected_build_signer_origin": "android:apk-key-hash:22Z8pZmAkSPi8YuGmEKgIxtS1YuUopV2B7mhDR3sJog",
   "expected_build_signer_role": "staging",
-  "package_name": "co.reasonabletech.logdate"
+  "package_name": "studio.hypertext.logdate"
 }
