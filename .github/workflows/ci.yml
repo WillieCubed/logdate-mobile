@@ -62,7 +62,10 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Run tests
-        run: ./gradlew test --continue
+        # `test` alone reaches only the twelve JVM/Android projects; every multiplatform module
+        # aggregates under `allTests`, and the two sets do not overlap. Running one without the
+        # other means the client's tests never run.
+        run: ./gradlew test allTests --continue
         env:
           DATABASE_URL: jdbc:postgresql://localhost:5432/logdate_test
           DATABASE_USER: test

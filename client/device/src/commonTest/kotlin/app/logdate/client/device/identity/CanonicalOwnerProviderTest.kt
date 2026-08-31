@@ -69,7 +69,7 @@ class CanonicalOwnerProviderTest {
         }
 
     @Test
-    fun `fresh installation adopts the remote owner without replacing an existing local identity`() =
+    fun `fresh installation adopts the remote owner`() =
         runTest {
             val remoteOwner = "b930bf49-d1e9-4a65-b84b-8e74af45012b"
             val freshStorage = InMemoryKeyValueStorage()
@@ -78,19 +78,76 @@ class CanonicalOwnerProviderTest {
 
             assertEquals(true, adopted)
             assertEquals(remoteOwner, DefaultCanonicalOwnerProvider(freshStorage).getCanonicalOwnerId())
+        }
 
-            val existingOwner = "a8a3400a-9f3c-4fca-9a7a-7c8cbe5ca24e"
-            val populatedStorage =
+    /**
+     * A device used before signing in has already minted itself a local owner ID. Signing in has to
+     * be able to replace it, or that device could never join the account it belongs to -- an ID it
+     * generated on its own can never match the one the Cloud issued.
+     */
+    @Test
+    fun `signing in replaces an owner the device generated for itself`() =
+        runTest {
+            val remoteOwner = "b930bf49-d1e9-4a65-b84b-8e74af45012b"
+            val selfGeneratedOwner = "a8a3400a-9f3c-4fca-9a7a-7c8cbe5ca24e"
+            val storage =
                 InMemoryKeyValueStorage().apply {
-                    putString("identity.canonical_owner_id", existingOwner)
+                    putString("identity.canonical_owner_id", selfGeneratedOwner)
                 }
 
-            val replaced =
-                DefaultCanonicalOwnerProvider(populatedStorage)
-                    .adoptRemoteOwnerIfUninitialized(remoteOwner)
+            val adopted = DefaultCanonicalOwnerProvider(storage).adoptRemoteOwnerIfUninitialized(remoteOwner)
 
-            assertEquals(false, replaced)
-            assertEquals(existingOwner, DefaultCanonicalOwnerProvider(populatedStorage).getCanonicalOwnerId())
+            assertEquals(true, adopted)
+            assertEquals(remoteOwner, DefaultCanonicalOwnerProvider(storage).getCanonicalOwnerId())
+        }
+
+    /**
+     * Once an account has claimed the installation the binding is final. Adopting a different owner
+     * would fold two people's journals together on one device.
+     */
+    @Test
+    fun `an owner an account has claimed is never replaced by a different one`() =
+        runTest {
+            val boundOwner = "a8a3400a-9f3c-4fca-9a7a-7c8cbe5ca24e"
+            val otherOwner = "b930bf49-d1e9-4a65-b84b-8e74af45012b"
+            val storage =
+                InMemoryKeyValueStorage().apply {
+                    putString("identity.canonical_owner_id", boundOwner)
+                    putString("identity.canonical_owner_bound", "true")
+                }
+
+            val adopted = DefaultCanonicalOwnerProvider(storage).adoptRemoteOwnerIfUninitialized(otherOwner)
+
+            assertEquals(false, adopted)
+            assertEquals(boundOwner, DefaultCanonicalOwnerProvider(storage).getCanonicalOwnerId())
+        }
+
+    @Test
+    fun `signing back in to the same account is accepted`() =
+        runTest {
+            val boundOwner = "a8a3400a-9f3c-4fca-9a7a-7c8cbe5ca24e"
+            val storage =
+                InMemoryKeyValueStorage().apply {
+                    putString("identity.canonical_owner_id", boundOwner)
+                    putString("identity.canonical_owner_bound", "true")
+                }
+
+            val adopted = DefaultCanonicalOwnerProvider(storage).adoptRemoteOwnerIfUninitialized(boundOwner)
+
+            assertEquals(true, adopted)
+        }
+
+    @Test
+    fun `adoption marks the installation as claimed`() =
+        runTest {
+            val remoteOwner = "b930bf49-d1e9-4a65-b84b-8e74af45012b"
+            val storage = InMemoryKeyValueStorage()
+            val provider = DefaultCanonicalOwnerProvider(storage)
+
+            assertEquals(false, provider.hasBoundOwner())
+            provider.adoptRemoteOwnerIfUninitialized(remoteOwner)
+
+            assertEquals(true, DefaultCanonicalOwnerProvider(storage).hasBoundOwner())
         }
 
     private class InMemoryKeyValueStorage(

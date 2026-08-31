@@ -38,7 +38,7 @@ run|run:desktop|Run desktop app|./gradlew :app:compose-main:run
 run|run:server|Run server locally|./gradlew :server:run
 run|run:wear|Install and run on connected Wear device|./gradlew :app:wear:installDebug && adb shell am start -n app.logdate.wear/app.logdate.wear.presentation.MainActivity
 
-test|test|Run all unit tests|./gradlew test
+test|test|Run all unit tests|./gradlew test allTests
 test|test:android|Run Android unit tests|./gradlew :app:android-main:testDebugUnitTest
 test|test:server|Run server tests|./gradlew :server:test
 test|test:coverage|Generate test coverage report|./gradlew koverHtmlReport
