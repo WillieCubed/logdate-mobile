@@ -98,6 +98,8 @@ class DraftManagementTest {
                 locationProvider = locationProvider,
                 locationHistoryRepository = locationHistoryRepository,
                 locationRetryWorker = locationRetryWorker,
+                canonicalOwnerProvider = TestCanonicalOwnerProvider(),
+                deviceIdProvider = TestDeviceIdProvider(),
             )
         val mediaManager = FakeMediaManager()
 

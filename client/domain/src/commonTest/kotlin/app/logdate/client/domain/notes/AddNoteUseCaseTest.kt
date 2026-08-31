@@ -1,5 +1,7 @@
 package app.logdate.client.domain.notes
 
+import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.domain.location.LocationRetryWorker
 import app.logdate.client.domain.location.LogCurrentLocationUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
@@ -24,7 +26,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
@@ -463,7 +468,14 @@ class AddNoteUseCaseTest {
                 locationHistoryRepository = locationHistoryRepository,
                 coroutineScope = CoroutineScope(Dispatchers.Unconfined),
             )
-        val useCase = LogCurrentLocationUseCase(locationProvider, locationHistoryRepository, retryWorker)
+        val useCase =
+            LogCurrentLocationUseCase(
+                locationProvider,
+                locationHistoryRepository,
+                retryWorker,
+                TestCanonicalOwnerProvider(),
+                TestDeviceIdProvider(),
+            )
         val loggedLocations: Int
             get() = locationHistoryRepository.loggedLocations
     }
@@ -608,4 +620,23 @@ class AddNoteUseCaseTest {
 
         override suspend fun getLocationCount(): Int = 0
     }
+}
+
+/** Identity stand-ins so location rows carry a stable owner and device in tests. */
+private class TestCanonicalOwnerProvider(
+    private val ownerId: String = "00000000-0000-4000-8000-000000000001",
+) : CanonicalOwnerProvider {
+    override suspend fun getCanonicalOwnerId(): String = ownerId
+
+    override suspend fun hasBoundOwner(): Boolean = true
+}
+
+private class TestDeviceIdProvider(
+    deviceId: Uuid = Uuid.parse("00000000-0000-4000-8000-000000000002"),
+) : DeviceIdProvider {
+    private val state = MutableStateFlow(deviceId)
+
+    override fun getDeviceId(): StateFlow<Uuid> = state.asStateFlow()
+
+    override suspend fun refreshDeviceId() = Unit
 }

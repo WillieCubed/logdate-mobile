@@ -1,5 +1,7 @@
 package app.logdate.client.domain.location
 
+import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
@@ -14,12 +16,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * Unit tests for [CaptureLocationForTimelineReviewUseCase].
@@ -77,6 +83,8 @@ class CaptureLocationForTimelineReviewUseCaseTest {
                     locationHistoryRepository = repository,
                     coroutineScope = CoroutineScope(Dispatchers.Unconfined),
                 ),
+            canonicalOwnerProvider = TestCanonicalOwnerProvider(),
+            deviceIdProvider = TestDeviceIdProvider(),
         )
     }
 
@@ -166,4 +174,23 @@ class CaptureLocationForTimelineReviewUseCaseTest {
 
         override suspend fun getLocationCount(): Int = loggedLocations
     }
+}
+
+/** Identity stand-ins so location rows carry a stable owner and device in tests. */
+private class TestCanonicalOwnerProvider(
+    private val ownerId: String = "00000000-0000-4000-8000-000000000001",
+) : CanonicalOwnerProvider {
+    override suspend fun getCanonicalOwnerId(): String = ownerId
+
+    override suspend fun hasBoundOwner(): Boolean = true
+}
+
+private class TestDeviceIdProvider(
+    deviceId: Uuid = Uuid.parse("00000000-0000-4000-8000-000000000002"),
+) : DeviceIdProvider {
+    private val state = MutableStateFlow(deviceId)
+
+    override fun getDeviceId(): StateFlow<Uuid> = state.asStateFlow()
+
+    override suspend fun refreshDeviceId() = Unit
 }
