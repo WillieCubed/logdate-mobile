@@ -22,10 +22,15 @@ die() {
 
 [[ -f "$BUILD_FILE" ]] || die "cannot find $BUILD_FILE"
 
-package_name="$(
-    sed -n 's/^[[:space:]]*applicationId[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$BUILD_FILE" | head -1
-)"
-[[ -n "$package_name" ]] || die "could not read applicationId from $BUILD_FILE"
+# Mirrors the -Plogdate.applicationId override the app module honours, so a legacy-identity
+# build gets a stub the Google Services plugin will accept.
+package_name="${LOGDATE_APPLICATION_ID:-}"
+if [[ -z "$package_name" ]]; then
+    package_name="$(
+        sed -n 's/.*\.orElse("\([a-z0-9_.]*\)").*/\1/p' "$BUILD_FILE" | head -1
+    )"
+fi
+[[ -n "$package_name" ]] || die "could not determine the applicationId from $BUILD_FILE"
 
 if [[ -f "$OUTPUT_FILE" ]] && ! grep -q '"project_id": "logdate-local-stub"' "$OUTPUT_FILE"; then
     die "$OUTPUT_FILE is a real Firebase configuration; refusing to overwrite it.
