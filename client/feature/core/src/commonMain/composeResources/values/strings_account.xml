@@ -82,6 +82,8 @@
     <string name="your_passkeys">Your passkeys</string>
     <string name="passkey_stored_on_device">Stored on %1$s • Last used %2$s</string>
     <string name="passkey_last_used">Last used %1$s</string>
+    <string name="passkey_generic_name">Passkey</string>
+    <string name="passkey_ends_in">Ends in %1$s</string>
     <string name="collapse_passkey_options">Collapse passkey options</string>
     <string name="expand_passkey_options">Expand passkey options</string>
     <string name="account_passkey_create_success_toast">Passkey created successfully!</string>

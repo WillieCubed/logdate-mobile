@@ -40,34 +40,40 @@ import logdate.client.feature.core.generated.resources.collapse_passkey_options
 import logdate.client.feature.core.generated.resources.create_passkey
 import logdate.client.feature.core.generated.resources.expand_passkey_options
 import logdate.client.feature.core.generated.resources.learn_more
+import logdate.client.feature.core.generated.resources.passkey_ends_in
+import logdate.client.feature.core.generated.resources.passkey_generic_name
 import logdate.client.feature.core.generated.resources.passkey_last_used
-import logdate.client.feature.core.generated.resources.passkey_stored_on_device
 import logdate.client.feature.core.generated.resources.passkeys
 import logdate.client.feature.core.generated.resources.your_passkeys
 import logdate.client.ui.generated.resources.common_delete
 import org.jetbrains.compose.resources.stringResource
-import kotlin.time.Clock
 import kotlin.time.Instant
 import logdate.client.ui.generated.resources.Res as UiRes
 
 private const val PASSKEYS_HELP_URL = "https://logdate.app/help/passkeys"
 
 /**
- * UI-facing metadata for a passkey credential.
+ * A passkey as the settings screen can currently describe it.
  *
- * @property id Credential identifier used for revocation.
- * @property name Display name shown in the list.
- * @property device Human-readable device label.
- * @property createdAt Display string for creation time.
- * @property lastUsed Timestamp of last usage.
+ * The server records a nickname, a device type, and when each passkey was created and last used,
+ * but no endpoint exposes them yet -- the account payload carries only credential IDs. Everything
+ * beyond [id] is therefore nullable, and the UI leaves out what it does not know. This is a screen
+ * someone uses to decide which credential to revoke, so a plausible guess is worse than a blank:
+ * it invites revoking the wrong one.
  */
 data class PasskeyInfo(
     val id: String,
-    val name: String = "Passkey",
-    val device: String = "This Device",
-    val createdAt: String = "Recently",
-    val lastUsed: Instant = Clock.System.now(),
-)
+    val device: String? = null,
+    val createdAt: String? = null,
+    val lastUsed: Instant? = null,
+) {
+    /** The tail of the credential ID, which is stable and distinguishes one passkey from another. */
+    val shortIdentifier: String get() = id.takeLast(SHORT_IDENTIFIER_LENGTH)
+
+    private companion object {
+        const val SHORT_IDENTIFIER_LENGTH = 8
+    }
+}
 
 /**
  * Displays passkey details and an optional create action.
@@ -205,12 +211,15 @@ private fun MaterialContainerScope.PasskeyItem(
                     verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                 ) {
                     Text(
-                        text = passkey.name,
+                        text = stringResource(Res.string.passkey_generic_name),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = stringResource(Res.string.passkey_stored_on_device, passkey.device, formatPasskeyLastUsed(passkey.lastUsed)),
+                        text =
+                            passkey.lastUsed
+                                ?.let { stringResource(Res.string.passkey_last_used, formatPasskeyLastUsed(it)) }
+                                ?: stringResource(Res.string.passkey_ends_in, passkey.shortIdentifier),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -244,15 +253,17 @@ private fun MaterialContainerScope.PasskeyItem(
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Text(
-                        text = passkey.device,
+                        text = passkey.device ?: stringResource(Res.string.passkey_ends_in, passkey.shortIdentifier),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    Text(
-                        text = stringResource(Res.string.passkey_last_used, formatPasskeyLastUsed(passkey.lastUsed)),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    passkey.lastUsed?.let { lastUsed ->
+                        Text(
+                            text = stringResource(Res.string.passkey_last_used, formatPasskeyLastUsed(lastUsed)),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -288,7 +299,6 @@ private fun PasskeysInfoSectionSinglePreview() {
             listOf(
                 PasskeyInfo(
                     id = "1",
-                    name = "Passkey #1",
                     device = "your Pixel 7",
                     lastUsed = Instant.parse("2024-03-13T00:00:00Z"),
                 ),
@@ -305,13 +315,11 @@ private fun PasskeysInfoSectionMultiplePreview() {
             listOf(
                 PasskeyInfo(
                     id = "1",
-                    name = "Passkey #1",
                     device = "your Pixel 7",
                     lastUsed = Instant.parse("2024-03-13T00:00:00Z"),
                 ),
                 PasskeyInfo(
                     id = "2",
-                    name = "Passkey #2",
                     device = "Windows Device",
                     lastUsed = Instant.parse("2024-03-13T00:00:00Z"),
                 ),

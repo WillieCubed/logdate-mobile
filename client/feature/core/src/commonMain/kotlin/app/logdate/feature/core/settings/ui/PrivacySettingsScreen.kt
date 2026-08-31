@@ -136,7 +136,7 @@ private fun PasskeyDeletionConfirmationDialog(
                 Text(
                     stringResource(
                         Res.string.remove_passkey_from_device,
-                        passkey.device,
+                        passkey.device ?: passkey.shortIdentifier,
                     ),
                 )
             },
@@ -610,7 +610,6 @@ private fun PrivacySettingsScreenPreview() {
             listOf(
                 PasskeyInfo(
                     id = "1",
-                    name = "Passkey #1",
                     device = "Pixel 7",
                     createdAt = "2024-03-13",
                 ),
@@ -644,7 +643,6 @@ private fun PrivacySettingsScreenLoadingRevocationPreview() {
             listOf(
                 PasskeyInfo(
                     id = "1",
-                    name = "Passkey #1",
                     device = "Pixel 7",
                     createdAt = "2024-03-13",
                 ),
@@ -665,7 +663,6 @@ private fun PrivacySettingsScreenLoadingCreationPreview() {
             listOf(
                 PasskeyInfo(
                     id = "1",
-                    name = "Passkey #1",
                     device = "Pixel 7",
                     createdAt = "2024-03-13",
                 ),

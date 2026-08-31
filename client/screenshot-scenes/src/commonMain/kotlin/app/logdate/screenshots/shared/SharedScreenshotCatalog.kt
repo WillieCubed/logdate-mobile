@@ -619,7 +619,6 @@ object SharedScreenshotCatalog {
                         listOf(
                             PasskeyInfo(
                                 id = "passkey-ios",
-                                name = "Primary Passkey",
                                 device = "iPhone 16 Pro",
                                 lastUsed = baseInstant,
                             ),
@@ -657,7 +656,6 @@ object SharedScreenshotCatalog {
                         listOf(
                             PasskeyInfo(
                                 id = "passkey-mac",
-                                name = "MacBook Passkey",
                                 device = "MacBook Pro",
                                 lastUsed = baseInstant,
                             ),
