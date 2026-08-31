@@ -25,7 +25,10 @@ internal class CameraCaptureStagingStore(
             .asSequence()
             .filter { it.isFile && it.name.endsWith(".$TEMP_SUFFIX") }
             .mapNotNull(::parse)
-            .sortedBy { it.file.lastModified() }
+            // Ordered by the capture's own timestamped name, not the file's mtime: two captures
+            // taken moments apart can share an mtime at filesystem granularity, and the tie is
+            // then broken arbitrarily, handing a photo and a video back in the wrong order.
+            .sortedBy { it.fileName }
             .toList()
 
     private fun parse(file: File): PendingCapture? {
