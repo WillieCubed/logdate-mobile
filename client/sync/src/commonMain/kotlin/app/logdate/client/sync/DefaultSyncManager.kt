@@ -47,8 +47,6 @@ import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.sync.DeviceId
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -170,13 +168,6 @@ class DefaultSyncManager(
         val errors: List<SyncError>,
     )
 
-    private data class UploadBatchResult(
-        val journalResult: SyncResult,
-        val contentResult: SyncResult,
-        val associationResult: SyncResult,
-        val draftResult: SyncResult,
-    )
-
     override fun sync(startNow: Boolean) {
         if (startNow) {
             syncScope.launch {
@@ -220,14 +211,16 @@ class DefaultSyncManager(
                     getAccessToken()
                         ?: return authError()
 
-                val (journalResult, contentResult, associationResult, draftResult) =
-                    coroutineScope {
-                        val j = async { uploadJournals(accessToken) }
-                        val c = async { uploadContent(accessToken) }
-                        val a = async { uploadAssociations(accessToken) }
-                        val d = async { uploadDrafts(accessToken) }
-                        UploadBatchResult(j.await(), c.await(), a.await(), d.await())
-                    }
+                // Deliberately sequential. Every one of these writes into the same AT Protocol
+                // repo, and a repo write is read-whole-tree, rebuild, write-head. Two of them in
+                // flight at once each build a tree missing the other's record, and the later head
+                // write wins -- the earlier record survives as an orphaned block but is no longer
+                // reachable, so it silently disappears. Running them in parallel bought nothing
+                // (they contend on one repo) and cost entries.
+                val journalResult = uploadJournals(accessToken)
+                val contentResult = uploadContent(accessToken)
+                val associationResult = uploadAssociations(accessToken)
+                val draftResult = uploadDrafts(accessToken)
                 val totalUploaded =
                     journalResult.uploadedItems +
                         contentResult.uploadedItems +
@@ -294,13 +287,12 @@ class DefaultSyncManager(
                 val contentSince = cursorFor(EntityType.NOTE)
                 val associationSince = cursorFor(EntityType.ASSOCIATION)
 
-                val (journalResult, contentResult, associationResult) =
-                    coroutineScope {
-                        val j = async { downloadJournals(accessToken, journalSince) }
-                        val c = async { downloadContent(accessToken, contentSince) }
-                        val a = async { downloadAssociations(accessToken, associationSince) }
-                        Triple(j.await(), c.await(), a.await())
-                    }
+                // Sequential for the same reason as the upload side: these share one server
+                // instance whose per-request cost is proportional to repo size, and fanning out
+                // was enough on its own to starve every request thread it had.
+                val journalResult = downloadJournals(accessToken, journalSince)
+                val contentResult = downloadContent(accessToken, contentSince)
+                val associationResult = downloadAssociations(accessToken, associationSince)
                 val totalDownloaded =
                     journalResult.downloadedItems +
                         contentResult.downloadedItems +
