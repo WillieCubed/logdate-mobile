@@ -9,6 +9,7 @@
     <string name="sync_now">Sync Now</string>
     <string name="sync_status">Sync Status</string>
     <string name="syncing">Syncing...</string>
+    <string name="syncing_remaining">Syncing… %1$d left</string>
     <string name="last_synced_time">Last synced: %1$s</string>
     <string name="last_sync_failed">Last sync failed</string>
     <string name="never_synced">Never synced</string>
