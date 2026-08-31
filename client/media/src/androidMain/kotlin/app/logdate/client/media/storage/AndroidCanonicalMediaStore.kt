@@ -3,6 +3,7 @@ package app.logdate.client.media.storage
 import android.system.Os
 import android.system.OsConstants
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -13,6 +14,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.net.URI
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -90,6 +92,35 @@ class AndroidCanonicalMediaStore(
             throw error
         }
     }
+
+    /**
+     * Deletes a stored object, and reports whether it was there to delete.
+     *
+     * Refuses anything that does not resolve inside this store's own objects directory. That is
+     * the whole safety property: a note's media may be a photo the user picked from their gallery,
+     * and deleting the note must not delete their photo. Symlinks are refused for the same reason,
+     * since one could point anywhere.
+     */
+    suspend fun deleteOwned(uri: String): Boolean =
+        withContext(Dispatchers.IO) {
+            val target =
+                runCatching { File(URI(uri)) }
+                    .getOrNull()
+                    ?.takeIf { it.isFile }
+                    ?: return@withContext false
+
+            val objectsRoot =
+                runCatching { objectsDirectory.canonicalFile.toPath() }.getOrNull()
+                    ?: return@withContext false
+            val resolved =
+                runCatching { target.canonicalFile.toPath() }.getOrNull()
+                    ?: return@withContext false
+
+            if (!resolved.startsWith(objectsRoot)) return@withContext false
+            if (Files.isSymbolicLink(target.toPath())) return@withContext false
+
+            target.delete()
+        }
 
     private fun isVerifiedObject(
         file: File,

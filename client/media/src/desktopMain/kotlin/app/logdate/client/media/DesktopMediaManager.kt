@@ -23,6 +23,12 @@ class DesktopMediaManager : MediaManager {
         return toMediaObject(path) ?: error("Unsupported or missing media at $uri")
     }
 
+    /**
+     * Always `false`: desktop has no store of LogDate-owned copies yet, so there is nothing this
+     * can safely delete. Media referenced here belongs to the user's own filesystem.
+     */
+    override suspend fun deleteOwnedMedia(uri: String): Boolean = false
+
     override suspend fun exists(mediaId: String): Boolean = Files.exists(resolvePath(mediaId))
 
     override suspend fun getRecentMedia(limit: Int): Flow<List<MediaObject>> {

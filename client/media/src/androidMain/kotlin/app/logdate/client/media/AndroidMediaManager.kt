@@ -223,6 +223,8 @@ class AndroidMediaManager(
             awaitClose { contentResolver.unregisterContentObserver(observer) }
         }.conflate()
 
+    override suspend fun deleteOwnedMedia(uri: String): Boolean = canonicalMediaStore.deleteOwned(uri)
+
     override suspend fun exists(mediaId: String): Boolean {
         val parsedUri = Uri.parse(mediaId)
 

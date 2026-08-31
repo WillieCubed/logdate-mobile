@@ -522,6 +522,68 @@ class OfflineFirstJournalNotesRepositoryTest {
             lastUpdated = Clock.System.now(),
         )
 
+    @Test
+    fun removingANoteRemovesTheMediaItWasTheLastToReference() =
+        runTest {
+            val repository = createRepository()
+            val note = createTestImageNote()
+            imageNoteDao.addNote(note.toEntity())
+
+            repository.remove(note)
+
+            assertEquals(listOf(note.mediaRef), mediaManager.deletedOwnedMedia)
+        }
+
+    /**
+     * Media is stored content-addressed, so two entries holding identical bytes share one file.
+     * Deleting one must not take the other's photo with it.
+     */
+    @Test
+    fun removingANoteLeavesMediaAnotherNoteStillReferences() =
+        runTest {
+            val repository = createRepository()
+            val shared = "shared-image.jpg"
+            val first = createTestImageNote().copy(mediaRef = shared)
+            val second = createTestImageNote().copy(mediaRef = shared)
+            imageNoteDao.addNote(first.toEntity())
+            imageNoteDao.addNote(second.toEntity())
+
+            repository.remove(first)
+
+            assertTrue(
+                mediaManager.deletedOwnedMedia.isEmpty(),
+                "media still referenced by another entry must not be deleted",
+            )
+
+            repository.remove(second)
+
+            assertEquals(listOf(shared), mediaManager.deletedOwnedMedia)
+        }
+
+    @Test
+    fun removingATextNoteDeletesNoMedia() =
+        runTest {
+            val repository = createRepository()
+            val note = createTestTextNote()
+            textNoteDao.addNote(note.toEntity())
+
+            repository.remove(note)
+
+            assertTrue(mediaManager.deletedOwnedMedia.isEmpty())
+        }
+
+    @Test
+    fun removingByIdAlsoRemovesTheMedia() =
+        runTest {
+            val repository = createRepository()
+            val note = createTestImageNote()
+            imageNoteDao.addNote(note.toEntity())
+
+            repository.removeById(note.uid)
+
+            assertEquals(listOf(note.mediaRef), mediaManager.deletedOwnedMedia)
+        }
+
     /**
      * Converts a Journal model to a JournalEntity for database operations.
      */
@@ -626,6 +688,10 @@ class OfflineFirstJournalNotesRepositoryTest {
         val mediaByUri = mutableMapOf<String, MediaObject>()
 
         override suspend fun getMedia(uri: String): MediaObject = mediaByUri.getValue(uri)
+
+        val deletedOwnedMedia = mutableListOf<String>()
+
+        override suspend fun deleteOwnedMedia(uri: String): Boolean = deletedOwnedMedia.add(uri)
 
         override suspend fun exists(mediaId: String): Boolean = mediaByUri.containsKey(mediaId)
 

@@ -82,6 +82,12 @@ class IosMediaManager(
             return@withContext media ?: error("Unsupported or missing media at $uri")
         }
 
+    /**
+     * Always `false`: iOS has no store of LogDate-owned copies yet, so there is nothing this can
+     * safely delete. Media referenced here belongs to the user's photo library.
+     */
+    override suspend fun deleteOwnedMedia(uri: String): Boolean = false
+
     override suspend fun exists(mediaId: String): Boolean =
         withContext(Dispatchers.Default) {
             if (mediaId.isPhotoLibraryUri()) {

@@ -18,6 +18,18 @@ interface MediaManager {
     suspend fun exists(mediaId: String): Boolean
 
     /**
+     * Deletes media that LogDate itself stored, and reports whether anything was removed.
+     *
+     * Only LogDate's own copies are eligible. A [uri] that points at something the user owns --
+     * a photo in their gallery, a file they picked -- is left alone and `false` is returned:
+     * removing an entry from a journal must never remove the original from the device.
+     *
+     * Callers are responsible for establishing that nothing else references the media. Media is
+     * stored content-addressed, so two entries holding identical bytes share one file.
+     */
+    suspend fun deleteOwnedMedia(uri: String): Boolean
+
+    /**
      * Retrieves the most recent media objects.
      *
      * This consists of the most recent images and videos currently available from the

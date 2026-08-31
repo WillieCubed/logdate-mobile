@@ -208,6 +208,8 @@ private class CopyingMediaManager(
 
     override suspend fun getMedia(uri: String): MediaObject = error("Not needed")
 
+    override suspend fun deleteOwnedMedia(uri: String): Boolean = false
+
     override suspend fun exists(mediaId: String): Boolean = managedBytes.containsKey(mediaId)
 
     override suspend fun getRecentMedia(limit: Int): Flow<List<MediaObject>> = flowOf(emptyList())

@@ -29,6 +29,7 @@ import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncMetadataService
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -349,6 +350,30 @@ class OfflineFirstJournalNotesRepository(
         }
     }
 
+    /**
+     * Removes the media a deleted note pointed at, if nothing else points at it.
+     *
+     * Media is stored content-addressed, so two entries holding identical bytes share one file --
+     * deleting one entry must not take the other's photo with it. This runs after the note rows
+     * are gone, so the count it reads is the number of *remaining* references.
+     *
+     * [MediaManager.deleteOwnedMedia] refuses anything LogDate did not store itself, so a note
+     * that referenced a photo from the user's own library leaves that photo alone.
+     */
+    private suspend fun deleteMediaIfUnreferenced(contentUri: String?) {
+        if (contentUri.isNullOrEmpty()) return
+        val manager = mediaManager ?: return
+
+        val remainingReferences =
+            imageNoteDao.countByContentUri(contentUri) +
+                videoNoteDao.countByContentUri(contentUri) +
+                audioNoteDao.countByContentUri(contentUri)
+        if (remainingReferences > 0) return
+
+        runCatching { manager.deleteOwnedMedia(contentUri) }
+            .onFailure { Napier.w("Could not remove media for a deleted note", it) }
+    }
+
     override suspend fun remove(note: JournalNote) {
         val journalIds = journalContentDao.getJournalsForContent(note.uid).first()
 
@@ -360,15 +385,18 @@ class OfflineFirstJournalNotesRepository(
             is JournalNote.Image -> {
                 imageNoteDao.removeNote(note.uid)
                 mediaCaptionDao.deleteCaption(note.uid)
+                deleteMediaIfUnreferenced(note.mediaRef)
             }
 
             is JournalNote.Audio -> {
                 audioNoteDao.removeNote(note.uid)
+                deleteMediaIfUnreferenced(note.mediaRef)
             }
 
             is JournalNote.Video -> {
                 videoNoteDao.removeNote(note.uid)
                 mediaCaptionDao.deleteCaption(note.uid)
+                deleteMediaIfUnreferenced(note.mediaRef)
             }
         }
 
@@ -396,12 +424,16 @@ class OfflineFirstJournalNotesRepository(
 
     override suspend fun removeById(noteId: Uuid) {
         val journalIds = journalContentDao.getJournalsForContent(noteId).first()
+        // Read before deleting: once the rows are gone there is no way back to the media.
+        val mediaRef = runCatching { getNoteById(noteId) }.getOrNull()?.mediaRefOrNull()
 
         textNoteDao.removeNote(noteId)
         imageNoteDao.removeNote(noteId)
         audioNoteDao.removeNote(noteId)
         videoNoteDao.removeNote(noteId)
         mediaCaptionDao.deleteCaption(noteId)
+
+        deleteMediaIfUnreferenced(mediaRef)
 
         journalIds.forEach { journalId ->
             syncMetadataService.enqueuePending(
@@ -675,3 +707,14 @@ data class JournalContentBackup(
     val generated: Instant = Clock.System.now(),
     val version: String = "1.0",
 )
+
+/**
+ * The media this note points at, or `null` for a note that has none.
+ */
+private fun JournalNote.mediaRefOrNull(): String? =
+    when (this) {
+        is JournalNote.Image -> mediaRef
+        is JournalNote.Video -> mediaRef
+        is JournalNote.Audio -> mediaRef
+        is JournalNote.Text -> null
+    }
