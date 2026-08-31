@@ -20,8 +20,12 @@ data class PersonalIntroUiState(
     val canContinueFromName: Boolean
         get() = name.trim().isNotEmpty() && nameError == null && !isLoading
 
+    /**
+     * A bio is something to offer, not a toll. Requiring one left anyone who did not want to write
+     * about themselves unable to finish setting up the app at all.
+     */
     val canContinueFromBio: Boolean
-        get() = bio.trim().isNotEmpty() && bioError == null && !isProcessingLlm && !isLoading
+        get() = bioError == null && !isProcessingLlm && !isLoading
 
     val canFinish: Boolean
         get() = currentStep == PersonalIntroStep.LlmResponse && llmResponse != null && !isLoading

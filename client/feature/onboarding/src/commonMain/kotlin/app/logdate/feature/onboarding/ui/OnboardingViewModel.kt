@@ -97,7 +97,9 @@ class OnboardingViewModel(
             },
         ) { identity, hasIdentityKey, inputs ->
             OnboardingProgressSnapshot(
-                hasPersonalIntro = identity.displayName.isNotBlank() && !identity.bio.isNullOrBlank(),
+                // Only the name is asked for; a blank bio must not send someone back through the
+                // introduction every time they open the app.
+                hasPersonalIntro = identity.displayName.isNotBlank(),
                 hasBirthday = identity.birthday != null,
                 hasCloudAccount =
                     identity.isAuthenticated ||
