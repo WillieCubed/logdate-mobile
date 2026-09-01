@@ -703,8 +703,12 @@ class DefaultSyncManager(
     }
 
     /**
-     * Retry a sync operation if it fails with a 401 Unauthorized error.
-     * Attempts to refresh the access token and retry the operation once.
+     * Runs a server call, and if it comes back 401, refreshes the access token and tries once more.
+     *
+     * Every call that talks to the server goes through here. Downloads used to reuse a token
+     * captured once at the start of the run, so an hour-old session made them fail with 401 and
+     * nothing refreshed it. A full sync downloads before it uploads, so that one rejection failed
+     * the whole run -- the device looked signed in and simply stopped backing anything up.
      */
     private suspend fun <T> retryWithFreshToken(
         operation: suspend (accessToken: String) -> Result<T>,
@@ -1684,7 +1688,11 @@ class DefaultSyncManager(
             val errors = mutableListOf<SyncError>()
 
             while (hasMore) {
-                val result = cloudJournalDataSource.getJournalChanges(accessToken, cursor, SYNC_PAGE_SIZE).getOrThrow()
+                val result =
+                    retryWithFreshToken(
+                        { token -> cloudJournalDataSource.getJournalChanges(token, cursor, SYNC_PAGE_SIZE) },
+                        "getJournalChanges",
+                    ).getOrThrow()
 
                 val batchResult =
                     transactionManager.withTransaction {
@@ -1896,7 +1904,11 @@ class DefaultSyncManager(
             val errors = mutableListOf<SyncError>()
 
             while (hasMore) {
-                val result = cloudContentDataSource.getContentChanges(accessToken, cursor, SYNC_PAGE_SIZE).getOrThrow()
+                val result =
+                    retryWithFreshToken(
+                        { token -> cloudContentDataSource.getContentChanges(token, cursor, SYNC_PAGE_SIZE) },
+                        "getContentChanges",
+                    ).getOrThrow()
                 val hydratedChanges = result.changes.map { downloadMediaIfNeeded(accessToken, it) }
 
                 val batchResult =
@@ -2271,7 +2283,11 @@ class DefaultSyncManager(
             val errors = mutableListOf<SyncError>()
 
             while (hasMore) {
-                val result = cloudAssociationDataSource.getAssociationChanges(accessToken, cursor, SYNC_PAGE_SIZE).getOrThrow()
+                val result =
+                    retryWithFreshToken(
+                        { token -> cloudAssociationDataSource.getAssociationChanges(token, cursor, SYNC_PAGE_SIZE) },
+                        "getAssociationChanges",
+                    ).getOrThrow()
 
                 val batchResult =
                     transactionManager.withTransaction {
