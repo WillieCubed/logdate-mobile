@@ -4,6 +4,7 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.networking.DataRestriction
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.shouldSyncMedia
 import app.logdate.client.repository.journals.JournalContentRepository
@@ -145,7 +146,24 @@ class DefaultSyncManager(
                 isSyncing = syncStateFlow.value is SyncState.Syncing,
                 hasErrors = lastErrorFlow.value != null,
                 lastError = lastErrorFlow.value,
+                pausedReason = currentPausedReason(authenticated),
             )
+    }
+
+    /**
+     * Why the backup cannot progress right now, or null if nothing is holding it back.
+     *
+     * Reported whether or not anything is queued: background data being off means entries
+     * written from here on will not back up either, and the user should hear that before
+     * they lose a week of writing to a setting they do not know is on.
+     */
+    private suspend fun currentPausedReason(authenticated: Boolean): SyncPausedReason? {
+        if (!authenticated) return SyncPausedReason.NOT_SIGNED_IN
+        return when (runCatching { dataUsagePolicy.currentRestriction() }.getOrNull()) {
+            DataRestriction.OFFLINE -> SyncPausedReason.OFFLINE
+            DataRestriction.BACKGROUND_DATA_BLOCKED -> SyncPausedReason.BACKGROUND_DATA_OFF
+            DataRestriction.NONE, null -> null
+        }
     }
 
     /**
@@ -611,6 +629,7 @@ class DefaultSyncManager(
             isSyncing = syncStateFlow.value is SyncState.Syncing,
             hasErrors = lastErrorFlow.value != null,
             lastError = lastErrorFlow.value,
+            pausedReason = currentPausedReason(authenticated),
         )
     }
 

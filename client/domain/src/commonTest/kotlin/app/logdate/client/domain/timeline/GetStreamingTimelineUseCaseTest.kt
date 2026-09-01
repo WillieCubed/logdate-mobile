@@ -15,6 +15,7 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIResponse
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.networking.DataRestriction
 import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
@@ -606,6 +607,8 @@ class GetStreamingTimelineUseCaseTest {
                         override val policy = MutableStateFlow(DataUsageMode.Unrestricted)
 
                         override suspend fun currentMode() = DataUsageMode.Unrestricted
+
+                        override suspend fun currentRestriction(): DataRestriction = DataRestriction.NONE
                     },
             )
         val summarizeUseCase =
@@ -626,6 +629,8 @@ class GetStreamingTimelineUseCaseTest {
                                 override val policy = MutableStateFlow(DataUsageMode.Unrestricted)
 
                                 override suspend fun currentMode() = DataUsageMode.Unrestricted
+
+                                override suspend fun currentRestriction(): DataRestriction = DataRestriction.NONE
                             },
                     ),
             )
@@ -641,6 +646,8 @@ class GetStreamingTimelineUseCaseTest {
                                 override val policy = MutableStateFlow(DataUsageMode.Unrestricted)
 
                                 override suspend fun currentMode() = DataUsageMode.Unrestricted
+
+                                override suspend fun currentRestriction(): DataRestriction = DataRestriction.NONE
                             },
                     ),
                 audioTagRepository = FakeAudioTagRepository(),

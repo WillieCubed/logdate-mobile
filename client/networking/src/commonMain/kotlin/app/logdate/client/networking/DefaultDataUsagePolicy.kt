@@ -23,7 +23,16 @@ class DefaultDataUsagePolicy(
         networkSaverModeProvider.dataSaverModeState.map { it.toDataUsageMode() }
 
     override suspend fun currentMode(): DataUsageMode = networkSaverModeProvider.getCurrentDataSaverState().toDataUsageMode()
+
+    override suspend fun currentRestriction(): DataRestriction = networkSaverModeProvider.getCurrentDataSaverState().toDataRestriction()
 }
+
+internal fun NetworkSaverState.toDataRestriction(): DataRestriction =
+    when {
+        connectionType == NetworkConnectionType.NONE -> DataRestriction.OFFLINE
+        isDataSaverEnabled -> DataRestriction.BACKGROUND_DATA_BLOCKED
+        else -> DataRestriction.NONE
+    }
 
 internal fun NetworkSaverState.toDataUsageMode(): DataUsageMode =
     when {

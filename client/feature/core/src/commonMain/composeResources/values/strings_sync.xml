@@ -86,4 +86,8 @@
     <string name="sync_issue_upload_failed_association">This entry link didn't upload</string>
     <string name="sync_issue_upload_failed_health">This health record didn't upload</string>
     <string name="sync_issue_upload_failed_other">This item didn't upload</string>
+    <string name="sync_paused_background_data_off">Paused — Android is blocking background data for LogDate</string>
+    <string name="sync_paused_background_data_off_fix">Turn on background data for LogDate in Android Settings to resume backing up.</string>
+    <string name="sync_paused_offline">Paused — waiting for a connection</string>
+    <string name="sync_paused_signed_out">Sign in to start backing up</string>
 </resources>

@@ -13,6 +13,7 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatMessage
 import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
 import app.logdate.client.intelligence.generativeai.GenerativeAIResponse
+import app.logdate.client.networking.DataRestriction
 import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
@@ -63,6 +64,8 @@ class SummarizeJournalEntriesUseCaseTest {
                                 override val policy = MutableStateFlow(DataUsageMode.Unrestricted)
 
                                 override suspend fun currentMode() = DataUsageMode.Unrestricted
+
+                                override suspend fun currentRestriction(): DataRestriction = DataRestriction.NONE
                             },
                     ),
             )

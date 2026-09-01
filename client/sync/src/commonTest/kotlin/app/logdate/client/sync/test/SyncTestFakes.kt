@@ -4,6 +4,7 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.media.InMemoryMediaManager
 import app.logdate.client.media.MediaManager
+import app.logdate.client.networking.DataRestriction
 import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.repository.journals.JournalContentRepository
@@ -157,11 +158,16 @@ fun <T> lastWriteWinsResolver(): ConflictResolver<T> = LastWriteWinsResolver()
 
 fun testSyncTransactionManager(): TestSyncTransactionManager = TestSyncTransactionManager()
 
-fun fakeDataUsagePolicy(mode: DataUsageMode = DataUsageMode.Unrestricted): DataUsagePolicy =
+fun fakeDataUsagePolicy(
+    mode: DataUsageMode = DataUsageMode.Unrestricted,
+    restriction: DataRestriction = DataRestriction.NONE,
+): DataUsagePolicy =
     object : DataUsagePolicy {
         override val policy: Flow<DataUsageMode> = flowOf(mode)
 
         override suspend fun currentMode(): DataUsageMode = mode
+
+        override suspend fun currentRestriction(): DataRestriction = restriction
     }
 
 fun testDefaultSyncManager(

@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.logdate.client.sync.SyncPausedReason
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
@@ -74,6 +75,10 @@ import logdate.client.feature.core.generated.resources.sync_feedback_started
 import logdate.client.feature.core.generated.resources.sync_feedback_succeeded
 import logdate.client.feature.core.generated.resources.sync_feedback_up_to_date
 import logdate.client.feature.core.generated.resources.sync_now
+import logdate.client.feature.core.generated.resources.sync_paused_background_data_off
+import logdate.client.feature.core.generated.resources.sync_paused_background_data_off_fix
+import logdate.client.feature.core.generated.resources.sync_paused_offline
+import logdate.client.feature.core.generated.resources.sync_paused_signed_out
 import logdate.client.feature.core.generated.resources.sync_status
 import logdate.client.feature.core.generated.resources.syncing
 import logdate.client.feature.core.generated.resources.syncing_remaining
@@ -436,6 +441,7 @@ private fun SyncStatusItem(
 @Composable
 private fun SyncStatusText(syncStatus: app.logdate.client.sync.SyncStatus?) {
     syncStatus?.let { status ->
+        val pausedReason = status.pausedReason
         if (status.isSyncing) {
             // A bare "Syncing..." says nothing about whether 6 or 600 entries are left, which on a
             // first sync is the difference between a moment and an hour.
@@ -449,6 +455,30 @@ private fun SyncStatusText(syncStatus: app.logdate.client.sync.SyncStatus?) {
                     },
                 color = MaterialTheme.colorScheme.primary,
             )
+        } else if (pausedReason != null) {
+            // A paused backup used to render as "Last synced <hours ago>", which reads as
+            // healthy while nothing is being backed up at all. Say what is holding it up, and
+            // for the one cause the user can actually clear, say what to do about it.
+            Column {
+                Text(
+                    text =
+                        when (pausedReason) {
+                            SyncPausedReason.BACKGROUND_DATA_OFF ->
+                                stringResource(Res.string.sync_paused_background_data_off)
+
+                            SyncPausedReason.OFFLINE -> stringResource(Res.string.sync_paused_offline)
+                            SyncPausedReason.NOT_SIGNED_IN -> stringResource(Res.string.sync_paused_signed_out)
+                        },
+                    color = MaterialTheme.colorScheme.error,
+                )
+                if (pausedReason == SyncPausedReason.BACKGROUND_DATA_OFF) {
+                    Text(
+                        text = stringResource(Res.string.sync_paused_background_data_off_fix),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         } else {
             val statusText =
                 if (status.hasErrors) {

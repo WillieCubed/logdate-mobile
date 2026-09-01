@@ -9,6 +9,7 @@ import app.logdate.client.intelligence.entity.people.PeopleExtractor
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
 import app.logdate.client.intelligence.generativeai.GenerativeAIResponse
+import app.logdate.client.networking.DataRestriction
 import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
@@ -120,6 +121,8 @@ private object UnrestrictedDataUsagePolicy : DataUsagePolicy {
     override val policy: Flow<DataUsageMode> = flowOf(DataUsageMode.Unrestricted)
 
     override suspend fun currentMode(): DataUsageMode = DataUsageMode.Unrestricted
+
+    override suspend fun currentRestriction(): DataRestriction = DataRestriction.NONE
 }
 
 private class FakePeopleRepository(

@@ -21,6 +21,34 @@ interface DataUsagePolicy {
      * Returns the current [DataUsageMode] as a snapshot.
      */
     suspend fun currentMode(): DataUsageMode
+
+    /**
+     * Why the platform is currently withholding network access, if it is.
+     *
+     * [currentMode] collapses "no connection" and "background data is blocked" into
+     * [DataUsageMode.Restricted], which is the right call for deciding *whether* to make a
+     * request but useless for telling the user *why* nothing is happening. The two have very
+     * different answers: one resolves itself, the other needs a setting changed.
+     */
+    suspend fun currentRestriction(): DataRestriction
+}
+
+/**
+ * The platform-level reason network work cannot proceed.
+ */
+enum class DataRestriction {
+    /** Network work may proceed. */
+    NONE,
+
+    /** No usable connection. Resolves on its own once the device is back online. */
+    OFFLINE,
+
+    /**
+     * The platform refuses this app background network - either system-wide Data Saver, or
+     * the app sitting on the per-app restrict-background list. Retrying never clears it; the
+     * user has to allow background data for LogDate.
+     */
+    BACKGROUND_DATA_BLOCKED,
 }
 
 /**

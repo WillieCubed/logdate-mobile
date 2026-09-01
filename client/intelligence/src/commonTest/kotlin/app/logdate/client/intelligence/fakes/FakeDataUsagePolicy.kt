@@ -1,5 +1,6 @@
 package app.logdate.client.intelligence.fakes
 
+import app.logdate.client.networking.DataRestriction
 import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
 import kotlinx.coroutines.flow.Flow
@@ -13,6 +14,8 @@ class FakeDataUsagePolicy(
     override val policy: Flow<DataUsageMode> = modeFlow
 
     override suspend fun currentMode(): DataUsageMode = modeFlow.value
+
+    override suspend fun currentRestriction(): DataRestriction = DataRestriction.NONE
 
     fun setMode(mode: DataUsageMode) {
         modeFlow.value = mode

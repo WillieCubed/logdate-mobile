@@ -123,7 +123,29 @@ data class SyncStatus(
     val isSyncing: Boolean,
     val hasErrors: Boolean,
     val lastError: SyncError? = null,
+    val pausedReason: SyncPausedReason? = null,
 )
+
+/**
+ * Why the backup is not making progress right now.
+ *
+ * This is distinct from [SyncError]: an error means an attempt was made and failed, and a
+ * retry is worth trying. A pause means no attempt can even be made until something outside
+ * the app changes, so retrying in a loop only burns battery and tells the user nothing.
+ */
+enum class SyncPausedReason {
+    /** There is no signed-in account to back up to. */
+    NOT_SIGNED_IN,
+
+    /** The device has no usable connection. Clears itself once it is back online. */
+    OFFLINE,
+
+    /**
+     * The platform is withholding background network from LogDate, so queued work is never
+     * allowed to run. Only the user can clear this, by allowing background data for LogDate.
+     */
+    BACKGROUND_DATA_OFF,
+}
 
 /**
  * Represents a sync error that occurred during a sync operation.

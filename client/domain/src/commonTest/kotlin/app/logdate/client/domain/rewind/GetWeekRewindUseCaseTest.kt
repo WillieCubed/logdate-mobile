@@ -29,6 +29,7 @@ import app.logdate.client.intelligence.rewind.strategy.RewindStrategySelector
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.networking.DataRestriction
 import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.repository.journals.JournalNote
@@ -94,6 +95,8 @@ class GetWeekRewindUseCaseTest {
                 override val policy = MutableStateFlow(DataUsageMode.Unrestricted)
 
                 override suspend fun currentMode() = DataUsageMode.Unrestricted
+
+                override suspend fun currentRestriction(): DataRestriction = DataRestriction.NONE
             }
         val narrativeSynthesizer =
             WeekNarrativeSynthesizer(

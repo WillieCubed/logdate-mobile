@@ -9,6 +9,7 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
 import app.logdate.client.intelligence.generativeai.GenerativeAIResponse
 import app.logdate.client.intelligence.narrative.AnnualRewindSequencer
 import app.logdate.client.intelligence.narrative.YearNarrativeSynthesizer
+import app.logdate.client.networking.DataRestriction
 import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
@@ -55,6 +56,8 @@ class GenerateAnnualRewindUseCaseTest {
                                     override val policy: Flow<DataUsageMode> = flowOf(DataUsageMode.Restricted)
 
                                     override suspend fun currentMode(): DataUsageMode = DataUsageMode.Restricted
+
+                                    override suspend fun currentRestriction(): DataRestriction = DataRestriction.NONE
                                 },
                         ),
                     annualRewindSequencer = AnnualRewindSequencer(),
