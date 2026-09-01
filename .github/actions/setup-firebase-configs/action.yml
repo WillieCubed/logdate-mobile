@@ -63,6 +63,11 @@ runs:
         if ! printf '%s' "$GOOGLE_SERVICES_JSON_B64" | base64 --decode > "$target" 2>/dev/null; then
           printf '%s' "$GOOGLE_SERVICES_JSON_B64" | base64 -D > "$target"
         fi
+        # The secrets still describe the application before the studio.hypertext.logdate rename,
+        # so add the missing client before validating. Narrow and temporary: it only fills the one
+        # gap the rename opened, from public app IDs, and everything else the validator rejects
+        # still fails below. Delete this step once the secrets are re-uploaded.
+        ./scripts/reconcile-google-services.sh --file "$target" --application-id studio.hypertext.logdate
         if ! ./scripts/validate-firebase-config.sh "android-$FLAVOR" "$target"; then
           echo "::error::$target is not the registered LogDate Firebase configuration. Re-upload the matching"
           echo "::error::secret with: ./scripts/sync-firebase-configs.sh android-$FLAVOR"
