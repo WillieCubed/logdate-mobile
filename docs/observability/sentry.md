@@ -35,33 +35,15 @@ secret, must not land in source control.
 For each environment (staging = `logdate-dev`, production = `logdate`):
 
 ```bash
-PROJECT=logdate-dev          # or logdate
-SERVICE=logdate-server-staging   # or logdate-server
-REGION=us-central1
-DSN='https://...'                # paste from Sentry dashboard
-
-# 1. Create the Secret Manager secret.
-echo -n "$DSN" \
-  | gcloud secrets create logdate-sentry-dsn \
-      --project="$PROJECT" \
-      --replication-policy=automatic \
-      --data-file=-
-
-# 2. Grant the Cloud Run runtime SA read access.
-RUNTIME_SA=$(gcloud run services describe "$SERVICE" \
-  --project="$PROJECT" --region="$REGION" \
-  --format='value(spec.template.spec.serviceAccountName)')
-
-gcloud secrets add-iam-policy-binding logdate-sentry-dsn \
-  --project="$PROJECT" \
-  --member="serviceAccount:$RUNTIME_SA" \
-  --role=roles/secretmanager.secretAccessor
-
-# 3. Mount the secret as the SENTRY_DSN env var.
-gcloud run services update "$SERVICE" \
-  --project="$PROJECT" --region="$REGION" \
-  --update-secrets=SENTRY_DSN=logdate-sentry-dsn:latest
+scripts/set-sentry-dsn.sh production   # or staging; the DSN is read from stdin
 ```
+
+The script creates or versions the secret, grants the Cloud Run runtime service
+account read access, and mounts it as `SENTRY_DSN` — the three steps this used
+to spell out by hand, with the project, service, region and runtime service
+account kept in step by the script rather than by whoever is pasting. Reading
+the DSN from stdin keeps it out of shell history and process listings.
+
 
 The Cloud Run rollout is a fresh revision; existing in-flight requests
 finish on the old revision. After ~30 s the new revision is serving 100%
