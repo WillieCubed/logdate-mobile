@@ -7,6 +7,8 @@ import app.logdate.server.logdate.LogDateCollectionsMetadataStore
 import app.logdate.server.logdate.LogDateCollectionsPurgeResult
 import app.logdate.server.logdate.LogDateCollectionsState
 import app.logdate.server.logdate.LogDateCollectionsStatus
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
@@ -24,43 +26,49 @@ import kotlin.time.Clock
 
 internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMetadataStore {
     override suspend fun status(userId: UUID): LogDateCollectionsStatus =
-        transaction {
-            val state =
+        withContext(Dispatchers.IO) {
+            transaction {
+                val state =
+                    LogDateCollectionStatesTable
+                        .selectAll()
+                        .where { LogDateCollectionStatesTable.userId eq userId }
+                        .singleOrNull()
+                        ?.toCollectionsState()
+                LogDateCollectionsStatus(
+                    entryCount = liveCount(userId, LogDateCollectionKind.ENTRY),
+                    journalCount = liveCount(userId, LogDateCollectionKind.JOURNAL),
+                    associationCount = liveCount(userId, LogDateCollectionKind.ASSOCIATION),
+                    lastTimestamp = state?.lastVersion ?: System.currentTimeMillis(),
+                )
+            }
+        }
+
+    override suspend fun state(userId: UUID): LogDateCollectionsState? =
+        withContext(Dispatchers.IO) {
+            transaction {
                 LogDateCollectionStatesTable
                     .selectAll()
                     .where { LogDateCollectionStatesTable.userId eq userId }
                     .singleOrNull()
                     ?.toCollectionsState()
-            LogDateCollectionsStatus(
-                entryCount = liveCount(userId, LogDateCollectionKind.ENTRY),
-                journalCount = liveCount(userId, LogDateCollectionKind.JOURNAL),
-                associationCount = liveCount(userId, LogDateCollectionKind.ASSOCIATION),
-                lastTimestamp = state?.lastVersion ?: System.currentTimeMillis(),
-            )
-        }
-
-    override suspend fun state(userId: UUID): LogDateCollectionsState? =
-        transaction {
-            LogDateCollectionStatesTable
-                .selectAll()
-                .where { LogDateCollectionStatesTable.userId eq userId }
-                .singleOrNull()
-                ?.toCollectionsState()
+            }
         }
 
     override suspend fun listLive(
         userId: UUID,
         collection: LogDateCollectionKind,
     ): List<LogDateCollectionMetadata> =
-        transaction {
-            LogDateCollectionRecordsTable
-                .selectAll()
-                .where {
-                    (LogDateCollectionRecordsTable.userId eq userId) and
-                        (LogDateCollectionRecordsTable.collection eq collection.storageName) and
-                        (LogDateCollectionRecordsTable.deleted eq false)
-                }.orderBy(LogDateCollectionRecordsTable.serverVersion to SortOrder.ASC)
-                .map(ResultRow::toCollectionMetadata)
+        withContext(Dispatchers.IO) {
+            transaction {
+                LogDateCollectionRecordsTable
+                    .selectAll()
+                    .where {
+                        (LogDateCollectionRecordsTable.userId eq userId) and
+                            (LogDateCollectionRecordsTable.collection eq collection.storageName) and
+                            (LogDateCollectionRecordsTable.deleted eq false)
+                    }.orderBy(LogDateCollectionRecordsTable.serverVersion to SortOrder.ASC)
+                    .map(ResultRow::toCollectionMetadata)
+            }
         }
 
     override suspend fun metadata(
@@ -68,16 +76,18 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
         collection: LogDateCollectionKind,
         recordKey: String,
     ): LogDateCollectionMetadata? =
-        transaction {
-            LogDateCollectionRecordsTable
-                .selectAll()
-                .where {
-                    (LogDateCollectionRecordsTable.userId eq userId) and
-                        (LogDateCollectionRecordsTable.collection eq collection.storageName) and
-                        (LogDateCollectionRecordsTable.recordKey eq recordKey) and
-                        (LogDateCollectionRecordsTable.deleted eq false)
-                }.singleOrNull()
-                ?.toCollectionMetadata()
+        withContext(Dispatchers.IO) {
+            transaction {
+                LogDateCollectionRecordsTable
+                    .selectAll()
+                    .where {
+                        (LogDateCollectionRecordsTable.userId eq userId) and
+                            (LogDateCollectionRecordsTable.collection eq collection.storageName) and
+                            (LogDateCollectionRecordsTable.recordKey eq recordKey) and
+                            (LogDateCollectionRecordsTable.deleted eq false)
+                    }.singleOrNull()
+                    ?.toCollectionMetadata()
+            }
         }
 
     override suspend fun changes(
@@ -86,41 +96,43 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
         since: Long,
         limit: Int,
     ): LogDateCollectionChangesMetadata =
-        transaction {
-            val changeRows =
-                LogDateCollectionRecordsTable
-                    .selectAll()
-                    .where {
-                        (LogDateCollectionRecordsTable.userId eq userId) and
-                            (LogDateCollectionRecordsTable.collection eq collection.storageName) and
-                            (LogDateCollectionRecordsTable.deleted eq false) and
-                            (LogDateCollectionRecordsTable.serverVersion greater since)
-                    }.orderBy(LogDateCollectionRecordsTable.serverVersion to SortOrder.ASC)
-                    .limit(limit + 1)
-                    .toList()
-            val deletionRows =
-                LogDateCollectionRecordsTable
-                    .selectAll()
-                    .where {
-                        (LogDateCollectionRecordsTable.userId eq userId) and
-                            (LogDateCollectionRecordsTable.collection eq collection.storageName) and
-                            (LogDateCollectionRecordsTable.deleted eq true) and
-                            (LogDateCollectionRecordsTable.serverVersion greater since)
-                    }.orderBy(LogDateCollectionRecordsTable.serverVersion to SortOrder.ASC)
-                    .limit(limit + 1)
-                    .toList()
-            val limitedChanges = changeRows.take(limit)
-            val limitedDeletions = deletionRows.take(limit)
-            LogDateCollectionChangesMetadata(
-                changes = limitedChanges.map(ResultRow::toCollectionMetadata),
-                deletions = limitedDeletions.map(ResultRow::toCollectionMetadata),
-                lastTimestamp =
-                    listOfNotNull(
-                        limitedChanges.maxOfOrNull { it[LogDateCollectionRecordsTable.serverVersion] },
-                        limitedDeletions.maxOfOrNull { it[LogDateCollectionRecordsTable.serverVersion] },
-                    ).maxOrNull() ?: since,
-                hasMore = changeRows.size > limit || deletionRows.size > limit,
-            )
+        withContext(Dispatchers.IO) {
+            transaction {
+                val changeRows =
+                    LogDateCollectionRecordsTable
+                        .selectAll()
+                        .where {
+                            (LogDateCollectionRecordsTable.userId eq userId) and
+                                (LogDateCollectionRecordsTable.collection eq collection.storageName) and
+                                (LogDateCollectionRecordsTable.deleted eq false) and
+                                (LogDateCollectionRecordsTable.serverVersion greater since)
+                        }.orderBy(LogDateCollectionRecordsTable.serverVersion to SortOrder.ASC)
+                        .limit(limit + 1)
+                        .toList()
+                val deletionRows =
+                    LogDateCollectionRecordsTable
+                        .selectAll()
+                        .where {
+                            (LogDateCollectionRecordsTable.userId eq userId) and
+                                (LogDateCollectionRecordsTable.collection eq collection.storageName) and
+                                (LogDateCollectionRecordsTable.deleted eq true) and
+                                (LogDateCollectionRecordsTable.serverVersion greater since)
+                        }.orderBy(LogDateCollectionRecordsTable.serverVersion to SortOrder.ASC)
+                        .limit(limit + 1)
+                        .toList()
+                val limitedChanges = changeRows.take(limit)
+                val limitedDeletions = deletionRows.take(limit)
+                LogDateCollectionChangesMetadata(
+                    changes = limitedChanges.map(ResultRow::toCollectionMetadata),
+                    deletions = limitedDeletions.map(ResultRow::toCollectionMetadata),
+                    lastTimestamp =
+                        listOfNotNull(
+                            limitedChanges.maxOfOrNull { it[LogDateCollectionRecordsTable.serverVersion] },
+                            limitedDeletions.maxOfOrNull { it[LogDateCollectionRecordsTable.serverVersion] },
+                        ).maxOrNull() ?: since,
+                    hasMore = changeRows.size > limit || deletionRows.size > limit,
+                )
+            }
         }
 
     override suspend fun upsert(
@@ -129,37 +141,39 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
         collection: LogDateCollectionKind,
         recordKey: String,
     ): LogDateCollectionMetadata =
-        transaction {
-            val state = nextState(userId, repoDid)
-            val existing =
-                LogDateCollectionRecordsTable
-                    .selectAll()
-                    .where {
+        withContext(Dispatchers.IO) {
+            transaction {
+                val state = nextState(userId, repoDid)
+                val existing =
+                    LogDateCollectionRecordsTable
+                        .selectAll()
+                        .where {
+                            (LogDateCollectionRecordsTable.userId eq userId) and
+                                (LogDateCollectionRecordsTable.collection eq collection.storageName) and
+                                (LogDateCollectionRecordsTable.recordKey eq recordKey)
+                        }.singleOrNull()
+                if (existing == null) {
+                    LogDateCollectionRecordsTable.insert {
+                        it[LogDateCollectionRecordsTable.userId] = userId
+                        it[LogDateCollectionRecordsTable.collection] = collection.storageName
+                        it[LogDateCollectionRecordsTable.recordKey] = recordKey
+                        it[serverVersion] = state.lastVersion
+                        it[deleted] = false
+                        it[deletedAt] = null
+                    }
+                } else {
+                    LogDateCollectionRecordsTable.update({
                         (LogDateCollectionRecordsTable.userId eq userId) and
                             (LogDateCollectionRecordsTable.collection eq collection.storageName) and
                             (LogDateCollectionRecordsTable.recordKey eq recordKey)
-                    }.singleOrNull()
-            if (existing == null) {
-                LogDateCollectionRecordsTable.insert {
-                    it[LogDateCollectionRecordsTable.userId] = userId
-                    it[LogDateCollectionRecordsTable.collection] = collection.storageName
-                    it[LogDateCollectionRecordsTable.recordKey] = recordKey
-                    it[serverVersion] = state.lastVersion
-                    it[deleted] = false
-                    it[deletedAt] = null
+                    }) {
+                        it[serverVersion] = state.lastVersion
+                        it[deleted] = false
+                        it[deletedAt] = null
+                    }
                 }
-            } else {
-                LogDateCollectionRecordsTable.update({
-                    (LogDateCollectionRecordsTable.userId eq userId) and
-                        (LogDateCollectionRecordsTable.collection eq collection.storageName) and
-                        (LogDateCollectionRecordsTable.recordKey eq recordKey)
-                }) {
-                    it[serverVersion] = state.lastVersion
-                    it[deleted] = false
-                    it[deletedAt] = null
-                }
+                LogDateCollectionMetadata(recordKey = recordKey, version = state.lastVersion, deletedAt = null)
             }
-            LogDateCollectionMetadata(recordKey = recordKey, version = state.lastVersion, deletedAt = null)
         }
 
     override suspend fun delete(
@@ -169,96 +183,102 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
         recordKey: String,
         deletedAt: Long,
     ): LogDateCollectionMetadata? =
-        transaction {
-            val existing =
-                LogDateCollectionRecordsTable
-                    .selectAll()
-                    .where {
-                        (LogDateCollectionRecordsTable.userId eq userId) and
-                            (LogDateCollectionRecordsTable.collection eq collection.storageName) and
-                            (LogDateCollectionRecordsTable.recordKey eq recordKey)
-                    }.singleOrNull() ?: return@transaction null
-            val state = nextState(userId, repoDid)
-            LogDateCollectionRecordsTable.update({
-                (LogDateCollectionRecordsTable.userId eq userId) and
-                    (LogDateCollectionRecordsTable.collection eq collection.storageName) and
-                    (LogDateCollectionRecordsTable.recordKey eq recordKey)
-            }) {
-                it[serverVersion] = state.lastVersion
-                it[LogDateCollectionRecordsTable.deleted] = true
-                it[LogDateCollectionRecordsTable.deletedAt] = deletedAt
+        withContext(Dispatchers.IO) {
+            transaction {
+                val existing =
+                    LogDateCollectionRecordsTable
+                        .selectAll()
+                        .where {
+                            (LogDateCollectionRecordsTable.userId eq userId) and
+                                (LogDateCollectionRecordsTable.collection eq collection.storageName) and
+                                (LogDateCollectionRecordsTable.recordKey eq recordKey)
+                        }.singleOrNull() ?: return@transaction null
+                val state = nextState(userId, repoDid)
+                LogDateCollectionRecordsTable.update({
+                    (LogDateCollectionRecordsTable.userId eq userId) and
+                        (LogDateCollectionRecordsTable.collection eq collection.storageName) and
+                        (LogDateCollectionRecordsTable.recordKey eq recordKey)
+                }) {
+                    it[serverVersion] = state.lastVersion
+                    it[LogDateCollectionRecordsTable.deleted] = true
+                    it[LogDateCollectionRecordsTable.deletedAt] = deletedAt
+                }
+                existing.toCollectionMetadata().copy(version = state.lastVersion, deletedAt = deletedAt)
             }
-            existing.toCollectionMetadata().copy(version = state.lastVersion, deletedAt = deletedAt)
         }
 
     override suspend fun purgeAllTombstones(olderThan: Long): LogDateCollectionsPurgeResult =
-        transaction {
-            // This sweep is tenant-wide, so the expired set is bounded only by how many
-            // tombstones the whole deployment has accumulated. Count with aggregates rather
-            // than loading every row into the heap just to tally three numbers.
-            fun countOf(kind: LogDateCollectionKind): Int =
-                LogDateCollectionRecordsTable
-                    .selectAll()
-                    .where {
-                        (LogDateCollectionRecordsTable.collection eq kind.storageName) and
-                            (LogDateCollectionRecordsTable.deleted eq true) and
-                            (LogDateCollectionRecordsTable.deletedAt less olderThan)
-                    }.count()
-                    .toInt()
+        withContext(Dispatchers.IO) {
+            transaction {
+                // This sweep is tenant-wide, so the expired set is bounded only by how many
+                // tombstones the whole deployment has accumulated. Count with aggregates rather
+                // than loading every row into the heap just to tally three numbers.
+                fun countOf(kind: LogDateCollectionKind): Int =
+                    LogDateCollectionRecordsTable
+                        .selectAll()
+                        .where {
+                            (LogDateCollectionRecordsTable.collection eq kind.storageName) and
+                                (LogDateCollectionRecordsTable.deleted eq true) and
+                                (LogDateCollectionRecordsTable.deletedAt less olderThan)
+                        }.count()
+                        .toInt()
 
-            // Counted before the delete; afterwards the rows are gone.
-            val entryPurged = countOf(LogDateCollectionKind.ENTRY)
-            val journalPurged = countOf(LogDateCollectionKind.JOURNAL)
-            val associationPurged = countOf(LogDateCollectionKind.ASSOCIATION)
+                // Counted before the delete; afterwards the rows are gone.
+                val entryPurged = countOf(LogDateCollectionKind.ENTRY)
+                val journalPurged = countOf(LogDateCollectionKind.JOURNAL)
+                val associationPurged = countOf(LogDateCollectionKind.ASSOCIATION)
 
-            LogDateCollectionRecordsTable.deleteWhere {
-                (LogDateCollectionRecordsTable.deleted eq true) and
-                    (LogDateCollectionRecordsTable.deletedAt less olderThan)
+                LogDateCollectionRecordsTable.deleteWhere {
+                    (LogDateCollectionRecordsTable.deleted eq true) and
+                        (LogDateCollectionRecordsTable.deletedAt less olderThan)
+                }
+
+                LogDateCollectionsPurgeResult(
+                    entryPurged = entryPurged,
+                    journalPurged = journalPurged,
+                    associationPurged = associationPurged,
+                    cutoff = olderThan,
+                )
             }
-
-            LogDateCollectionsPurgeResult(
-                entryPurged = entryPurged,
-                journalPurged = journalPurged,
-                associationPurged = associationPurged,
-                cutoff = olderThan,
-            )
         }
 
     override suspend fun purgeTombstones(
         userId: UUID,
         olderThan: Long,
     ): LogDateCollectionsPurgeResult =
-        transaction {
-            val rowsToRemove =
-                LogDateCollectionRecordsTable
-                    .selectAll()
-                    .where {
+        withContext(Dispatchers.IO) {
+            transaction {
+                val rowsToRemove =
+                    LogDateCollectionRecordsTable
+                        .selectAll()
+                        .where {
+                            (LogDateCollectionRecordsTable.userId eq userId) and
+                                (LogDateCollectionRecordsTable.deleted eq true) and
+                                (LogDateCollectionRecordsTable.deletedAt less olderThan)
+                        }.toList()
+                rowsToRemove.forEach { row ->
+                    LogDateCollectionRecordsTable.deleteWhere {
                         (LogDateCollectionRecordsTable.userId eq userId) and
-                            (LogDateCollectionRecordsTable.deleted eq true) and
-                            (LogDateCollectionRecordsTable.deletedAt less olderThan)
-                    }.toList()
-            rowsToRemove.forEach { row ->
-                LogDateCollectionRecordsTable.deleteWhere {
-                    (LogDateCollectionRecordsTable.userId eq userId) and
-                        (LogDateCollectionRecordsTable.collection eq row[LogDateCollectionRecordsTable.collection]) and
-                        (LogDateCollectionRecordsTable.recordKey eq row[LogDateCollectionRecordsTable.recordKey])
+                            (LogDateCollectionRecordsTable.collection eq row[LogDateCollectionRecordsTable.collection]) and
+                            (LogDateCollectionRecordsTable.recordKey eq row[LogDateCollectionRecordsTable.recordKey])
+                    }
                 }
+                LogDateCollectionsPurgeResult(
+                    entryPurged =
+                        rowsToRemove.count {
+                            it[LogDateCollectionRecordsTable.collection] == LogDateCollectionKind.ENTRY.storageName
+                        },
+                    journalPurged =
+                        rowsToRemove.count {
+                            it[LogDateCollectionRecordsTable.collection] == LogDateCollectionKind.JOURNAL.storageName
+                        },
+                    associationPurged =
+                        rowsToRemove.count {
+                            it[LogDateCollectionRecordsTable.collection] == LogDateCollectionKind.ASSOCIATION.storageName
+                        },
+                    cutoff = olderThan,
+                )
             }
-            LogDateCollectionsPurgeResult(
-                entryPurged =
-                    rowsToRemove.count {
-                        it[LogDateCollectionRecordsTable.collection] == LogDateCollectionKind.ENTRY.storageName
-                    },
-                journalPurged =
-                    rowsToRemove.count {
-                        it[LogDateCollectionRecordsTable.collection] == LogDateCollectionKind.JOURNAL.storageName
-                    },
-                associationPurged =
-                    rowsToRemove.count {
-                        it[LogDateCollectionRecordsTable.collection] == LogDateCollectionKind.ASSOCIATION.storageName
-                    },
-                cutoff = olderThan,
-            )
         }
 
     private fun liveCount(

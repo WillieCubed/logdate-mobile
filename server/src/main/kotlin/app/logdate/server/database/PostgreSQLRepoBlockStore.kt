@@ -1,5 +1,7 @@
 package app.logdate.server.database
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
@@ -25,41 +27,51 @@ import kotlin.time.Clock
  * library can keep speaking pure AT Protocol identifiers.
  */
 class PostgreSQLRepoBlockStore : RepoBlockStore {
+    // Every method here is blocking JDBC. Run on the caller's thread it held a Ktor request
+    // worker for the whole query, and a one-CPU instance sizes that pool at one - so a few
+    // in-flight repo writes left nothing to answer /health with, and the liveness probe killed
+    // the container. The work still blocks; it no longer blocks a thread whose job is accepting
+    // requests.
+
     override suspend fun readHead(repo: AtprotoDid): Result<RepoHead?> =
         runCatching {
-            transaction {
-                AtprotoRepoHeadsTable
-                    .selectAll()
-                    .where { AtprotoRepoHeadsTable.repoDid eq repo.toString() }
-                    .singleOrNull()
-                    ?.toRepoHead()
+            withContext(Dispatchers.IO) {
+                transaction {
+                    AtprotoRepoHeadsTable
+                        .selectAll()
+                        .where { AtprotoRepoHeadsTable.repoDid eq repo.toString() }
+                        .singleOrNull()
+                        ?.toRepoHead()
+                }
             }
         }
 
     override suspend fun writeHead(head: RepoHead): Result<Unit> =
         runCatching {
-            transaction {
-                val repoDid = head.repo.toString()
-                val existing =
-                    AtprotoRepoHeadsTable
-                        .selectAll()
-                        .where { AtprotoRepoHeadsTable.repoDid eq repoDid }
-                        .singleOrNull()
+            withContext(Dispatchers.IO) {
+                transaction {
+                    val repoDid = head.repo.toString()
+                    val existing =
+                        AtprotoRepoHeadsTable
+                            .selectAll()
+                            .where { AtprotoRepoHeadsTable.repoDid eq repoDid }
+                            .singleOrNull()
 
-                if (existing == null) {
-                    AtprotoRepoHeadsTable.insert {
-                        it[AtprotoRepoHeadsTable.repoDid] = repoDid
-                        it[rootCid] = head.root.toString()
-                        it[commitCid] = head.commitCid.toString()
-                        it[revision] = head.revision
-                        it[updatedAt] = Clock.System.now()
-                    }
-                } else {
-                    AtprotoRepoHeadsTable.update({ AtprotoRepoHeadsTable.repoDid eq repoDid }) {
-                        it[rootCid] = head.root.toString()
-                        it[commitCid] = head.commitCid.toString()
-                        it[revision] = head.revision
-                        it[updatedAt] = Clock.System.now()
+                    if (existing == null) {
+                        AtprotoRepoHeadsTable.insert {
+                            it[AtprotoRepoHeadsTable.repoDid] = repoDid
+                            it[rootCid] = head.root.toString()
+                            it[commitCid] = head.commitCid.toString()
+                            it[revision] = head.revision
+                            it[updatedAt] = Clock.System.now()
+                        }
+                    } else {
+                        AtprotoRepoHeadsTable.update({ AtprotoRepoHeadsTable.repoDid eq repoDid }) {
+                            it[rootCid] = head.root.toString()
+                            it[commitCid] = head.commitCid.toString()
+                            it[revision] = head.revision
+                            it[updatedAt] = Clock.System.now()
+                        }
                     }
                 }
             }
@@ -70,51 +82,55 @@ class PostgreSQLRepoBlockStore : RepoBlockStore {
         expectedRevision: Long?,
     ): Result<Boolean> =
         runCatching {
-            transaction {
-                val repoDid = head.repo.toString()
-                if (expectedRevision == null) {
-                    // No head yet. The insert itself is the guard: a unique repoDid means a
-                    // racing writer that also thought the repo was empty loses here.
-                    val alreadyPresent =
-                        AtprotoRepoHeadsTable
-                            .selectAll()
-                            .where { AtprotoRepoHeadsTable.repoDid eq repoDid }
-                            .any()
-                    if (alreadyPresent) {
-                        return@transaction false
-                    }
-                    AtprotoRepoHeadsTable.insert {
-                        it[AtprotoRepoHeadsTable.repoDid] = repoDid
-                        it[rootCid] = head.root.toString()
-                        it[commitCid] = head.commitCid.toString()
-                        it[revision] = head.revision
-                        it[updatedAt] = Clock.System.now()
-                    }
-                    true
-                } else {
-                    val updated =
-                        AtprotoRepoHeadsTable.update({
-                            (AtprotoRepoHeadsTable.repoDid eq repoDid) and
-                                (AtprotoRepoHeadsTable.revision eq expectedRevision)
-                        }) {
+            withContext(Dispatchers.IO) {
+                transaction {
+                    val repoDid = head.repo.toString()
+                    if (expectedRevision == null) {
+                        // No head yet. The insert itself is the guard: a unique repoDid means a
+                        // racing writer that also thought the repo was empty loses here.
+                        val alreadyPresent =
+                            AtprotoRepoHeadsTable
+                                .selectAll()
+                                .where { AtprotoRepoHeadsTable.repoDid eq repoDid }
+                                .any()
+                        if (alreadyPresent) {
+                            return@transaction false
+                        }
+                        AtprotoRepoHeadsTable.insert {
+                            it[AtprotoRepoHeadsTable.repoDid] = repoDid
                             it[rootCid] = head.root.toString()
                             it[commitCid] = head.commitCid.toString()
                             it[revision] = head.revision
                             it[updatedAt] = Clock.System.now()
                         }
-                    updated > 0
+                        true
+                    } else {
+                        val updated =
+                            AtprotoRepoHeadsTable.update({
+                                (AtprotoRepoHeadsTable.repoDid eq repoDid) and
+                                    (AtprotoRepoHeadsTable.revision eq expectedRevision)
+                            }) {
+                                it[rootCid] = head.root.toString()
+                                it[commitCid] = head.commitCid.toString()
+                                it[revision] = head.revision
+                                it[updatedAt] = Clock.System.now()
+                            }
+                        updated > 0
+                    }
                 }
             }
         }
 
     override suspend fun readBlock(cid: Cid): Result<RepoBlock?> =
         runCatching {
-            transaction {
-                AtprotoRepoBlocksTable
-                    .selectAll()
-                    .where { AtprotoRepoBlocksTable.cid eq cid.toString() }
-                    .singleOrNull()
-                    ?.toRepoBlock()
+            withContext(Dispatchers.IO) {
+                transaction {
+                    AtprotoRepoBlocksTable
+                        .selectAll()
+                        .where { AtprotoRepoBlocksTable.cid eq cid.toString() }
+                        .singleOrNull()
+                        ?.toRepoBlock()
+                }
             }
         }
 
@@ -123,35 +139,37 @@ class PostgreSQLRepoBlockStore : RepoBlockStore {
         block: RepoBlock,
     ): Result<Unit> =
         runCatching {
-            transaction {
-                val cidValue = block.cid.toString()
-                val existingBlock =
-                    AtprotoRepoBlocksTable
-                        .selectAll()
-                        .where { AtprotoRepoBlocksTable.cid eq cidValue }
-                        .singleOrNull()
-                if (existingBlock == null) {
-                    AtprotoRepoBlocksTable.insert {
-                        it[cid] = cidValue
-                        it[bytes] = block.bytes
+            withContext(Dispatchers.IO) {
+                transaction {
+                    val cidValue = block.cid.toString()
+                    val existingBlock =
+                        AtprotoRepoBlocksTable
+                            .selectAll()
+                            .where { AtprotoRepoBlocksTable.cid eq cidValue }
+                            .singleOrNull()
+                    if (existingBlock == null) {
+                        AtprotoRepoBlocksTable.insert {
+                            it[cid] = cidValue
+                            it[bytes] = block.bytes
+                        }
+                    } else {
+                        AtprotoRepoBlocksTable.update({ AtprotoRepoBlocksTable.cid eq cidValue }) {
+                            it[bytes] = block.bytes
+                        }
                     }
-                } else {
-                    AtprotoRepoBlocksTable.update({ AtprotoRepoBlocksTable.cid eq cidValue }) {
-                        it[bytes] = block.bytes
-                    }
-                }
 
-                val existingLink =
-                    AtprotoRepoBlockLinksTable
-                        .selectAll()
-                        .where {
-                            (AtprotoRepoBlockLinksTable.repoDid eq repo.toString()) and
-                                (AtprotoRepoBlockLinksTable.cid eq cidValue)
-                        }.singleOrNull()
-                if (existingLink == null) {
-                    AtprotoRepoBlockLinksTable.insert {
-                        it[repoDid] = repo.toString()
-                        it[cid] = cidValue
+                    val existingLink =
+                        AtprotoRepoBlockLinksTable
+                            .selectAll()
+                            .where {
+                                (AtprotoRepoBlockLinksTable.repoDid eq repo.toString()) and
+                                    (AtprotoRepoBlockLinksTable.cid eq cidValue)
+                            }.singleOrNull()
+                    if (existingLink == null) {
+                        AtprotoRepoBlockLinksTable.insert {
+                            it[repoDid] = repo.toString()
+                            it[cid] = cidValue
+                        }
                     }
                 }
             }
@@ -159,28 +177,32 @@ class PostgreSQLRepoBlockStore : RepoBlockStore {
 
     override suspend fun clearRepo(repo: AtprotoDid): Result<Unit> =
         runCatching {
-            transaction {
-                val repoDid = repo.toString()
-                AtprotoRepoHeadsTable.deleteWhere { AtprotoRepoHeadsTable.repoDid eq repoDid }
-                AtprotoRepoBlockLinksTable.deleteWhere { AtprotoRepoBlockLinksTable.repoDid eq repoDid }
-                AtprotoRepoCommitsTable.deleteWhere { AtprotoRepoCommitsTable.repoDid eq repoDid }
+            withContext(Dispatchers.IO) {
+                transaction {
+                    val repoDid = repo.toString()
+                    AtprotoRepoHeadsTable.deleteWhere { AtprotoRepoHeadsTable.repoDid eq repoDid }
+                    AtprotoRepoBlockLinksTable.deleteWhere { AtprotoRepoBlockLinksTable.repoDid eq repoDid }
+                    AtprotoRepoCommitsTable.deleteWhere { AtprotoRepoCommitsTable.repoDid eq repoDid }
+                }
             }
         }
 
     override suspend fun listBlocks(repo: AtprotoDid): Result<List<RepoBlock>> =
         runCatching {
-            transaction {
-                AtprotoRepoBlockLinksTable
-                    .innerJoin(AtprotoRepoBlocksTable)
-                    .selectAll()
-                    .where { AtprotoRepoBlockLinksTable.repoDid eq repo.toString() }
-                    .orderBy(AtprotoRepoBlocksTable.cid, SortOrder.ASC)
-                    .map { row ->
-                        RepoBlock(
-                            cid = Cid.require(row[AtprotoRepoBlocksTable.cid]),
-                            bytes = row[AtprotoRepoBlocksTable.bytes],
-                        )
-                    }
+            withContext(Dispatchers.IO) {
+                transaction {
+                    AtprotoRepoBlockLinksTable
+                        .innerJoin(AtprotoRepoBlocksTable)
+                        .selectAll()
+                        .where { AtprotoRepoBlockLinksTable.repoDid eq repo.toString() }
+                        .orderBy(AtprotoRepoBlocksTable.cid, SortOrder.ASC)
+                        .map { row ->
+                            RepoBlock(
+                                cid = Cid.require(row[AtprotoRepoBlocksTable.cid]),
+                                bytes = row[AtprotoRepoBlocksTable.bytes],
+                            )
+                        }
+                }
             }
         }
 
@@ -189,36 +211,38 @@ class PostgreSQLRepoBlockStore : RepoBlockStore {
         commit: SignedRepoCommit,
     ): Result<Unit> =
         runCatching {
-            transaction {
-                val existing =
-                    AtprotoRepoCommitsTable
-                        .selectAll()
-                        .where {
+            withContext(Dispatchers.IO) {
+                transaction {
+                    val existing =
+                        AtprotoRepoCommitsTable
+                            .selectAll()
+                            .where {
+                                (AtprotoRepoCommitsTable.repoDid eq repo.toString()) and
+                                    (AtprotoRepoCommitsTable.revision eq commit.commit.revision)
+                            }.singleOrNull()
+                    if (existing == null) {
+                        AtprotoRepoCommitsTable.insert {
+                            it[repoDid] = repo.toString()
+                            it[revision] = commit.commit.revision
+                            it[cid] = commit.cid.toString()
+                            it[rootCid] = commit.commit.root.toString()
+                            it[prevCid] = commit.commit.prev?.toString()
+                            it[createdAtEpochMillis] = commit.commit.createdAtEpochMillis
+                            it[recordCount] = commit.commit.recordCount
+                            it[signature] = commit.signature
+                        }
+                    } else {
+                        AtprotoRepoCommitsTable.update({
                             (AtprotoRepoCommitsTable.repoDid eq repo.toString()) and
                                 (AtprotoRepoCommitsTable.revision eq commit.commit.revision)
-                        }.singleOrNull()
-                if (existing == null) {
-                    AtprotoRepoCommitsTable.insert {
-                        it[repoDid] = repo.toString()
-                        it[revision] = commit.commit.revision
-                        it[cid] = commit.cid.toString()
-                        it[rootCid] = commit.commit.root.toString()
-                        it[prevCid] = commit.commit.prev?.toString()
-                        it[createdAtEpochMillis] = commit.commit.createdAtEpochMillis
-                        it[recordCount] = commit.commit.recordCount
-                        it[signature] = commit.signature
-                    }
-                } else {
-                    AtprotoRepoCommitsTable.update({
-                        (AtprotoRepoCommitsTable.repoDid eq repo.toString()) and
-                            (AtprotoRepoCommitsTable.revision eq commit.commit.revision)
-                    }) {
-                        it[cid] = commit.cid.toString()
-                        it[rootCid] = commit.commit.root.toString()
-                        it[prevCid] = commit.commit.prev?.toString()
-                        it[createdAtEpochMillis] = commit.commit.createdAtEpochMillis
-                        it[recordCount] = commit.commit.recordCount
-                        it[signature] = commit.signature
+                        }) {
+                            it[cid] = commit.cid.toString()
+                            it[rootCid] = commit.commit.root.toString()
+                            it[prevCid] = commit.commit.prev?.toString()
+                            it[createdAtEpochMillis] = commit.commit.createdAtEpochMillis
+                            it[recordCount] = commit.commit.recordCount
+                            it[signature] = commit.signature
+                        }
                     }
                 }
             }
@@ -226,12 +250,14 @@ class PostgreSQLRepoBlockStore : RepoBlockStore {
 
     override suspend fun listCommits(repo: AtprotoDid): Result<List<SignedRepoCommit>> =
         runCatching {
-            transaction {
-                AtprotoRepoCommitsTable
-                    .selectAll()
-                    .where { AtprotoRepoCommitsTable.repoDid eq repo.toString() }
-                    .orderBy(AtprotoRepoCommitsTable.revision, SortOrder.ASC)
-                    .map(ResultRow::toSignedRepoCommit)
+            withContext(Dispatchers.IO) {
+                transaction {
+                    AtprotoRepoCommitsTable
+                        .selectAll()
+                        .where { AtprotoRepoCommitsTable.repoDid eq repo.toString() }
+                        .orderBy(AtprotoRepoCommitsTable.revision, SortOrder.ASC)
+                        .map(ResultRow::toSignedRepoCommit)
+                }
             }
         }
 }

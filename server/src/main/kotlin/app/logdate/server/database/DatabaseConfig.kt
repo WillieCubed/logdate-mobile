@@ -10,6 +10,14 @@ import javax.sql.DataSource
 
 object DatabaseConfig {
     /**
+     * Requests Cloud Run sends to one instance at a time.
+     *
+     * Mirrors `request_concurrency` in the Terraform tfvars. The pool is sized from this, so if
+     * the two drift apart the instance starves itself; keep them in step.
+     */
+    internal const val CLOUD_RUN_REQUEST_CONCURRENCY = 16
+
+    /**
      * Whether the server should run Flyway migrations on boot.
      *
      * Profile-aware: development and test boot with migrations enabled so a local iteration cycle
@@ -167,13 +175,24 @@ object DatabaseConfig {
             driverClassName = "org.postgresql.Driver"
 
             // Connection pool settings, tuned for serverless Postgres (Neon) on Cloud Run.
-            // Kept small with no idle floor: releasing idle connections is what lets Neon
-            // autosuspend its compute to zero when traffic stops, keeping idle cost near zero.
-            // Cloud Run caps request concurrency at 16 per instance, so a handful of connections
-            // is ample; `connectionTimeout` leaves headroom for a cold-start wake from autosuspend.
-            maximumPoolSize = 5
+            // No idle floor: releasing idle connections is what lets Neon autosuspend its compute
+            // to zero when traffic stops, keeping idle cost near zero.
+            //
+            // The pool matches Cloud Run's per-instance request concurrency deliberately. It used
+            // to be five against a concurrency of sixteen, on the reasoning that a handful of
+            // connections is ample - but every request here holds its connection for the whole of
+            // its blocking JDBC work, so eleven of sixteen would queue instead of run. Waiting for
+            // a connection took precedence over answering, health checks included: the liveness
+            // probe allows five seconds and three failures, so a thirty-second wait for a
+            // connection did not fail the request, it killed the instance. One device syncing was
+            // enough to do it.
+            //
+            // `connectionTimeout` is now shorter than the pool is likely to make anyone wait, but
+            // still long enough to cover a Neon wake from autosuspend. A request that cannot get a
+            // connection should fail and say so rather than sit on a worker thread.
+            maximumPoolSize = CLOUD_RUN_REQUEST_CONCURRENCY
             minimumIdle = 0
-            connectionTimeout = 30000
+            connectionTimeout = 10000
             idleTimeout = 300000
             maxLifetime = 1800000
             initializationFailTimeout = -1

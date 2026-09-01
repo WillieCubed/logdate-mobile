@@ -87,10 +87,14 @@ class DatabaseConfigTest {
         assertEquals("user", config.username)
         assertEquals("pass", config.password)
         assertEquals("org.postgresql.Driver", config.driverClassName)
-        // Small pool with no idle floor so serverless Postgres (Neon) can autosuspend when idle.
-        assertEquals(5, config.maximumPoolSize)
+        // No idle floor so serverless Postgres (Neon) can autosuspend when idle, and a pool at
+        // least as large as Cloud Run's per-instance concurrency: a smaller one made requests
+        // queue for a connection rather than run, which starved the health checks and got the
+        // instance killed under a single device's sync.
+        assertTrue(config.maximumPoolSize >= DatabaseConfig.CLOUD_RUN_REQUEST_CONCURRENCY)
         assertEquals(0, config.minimumIdle)
-        assertEquals(30000, config.connectionTimeout)
+        // Shorter than the liveness probe's patience, so a request fails rather than the instance.
+        assertTrue(config.connectionTimeout < 30000)
         assertEquals(300000, config.idleTimeout)
         assertEquals(1800000, config.maxLifetime)
         assertTrue(!config.isAutoCommit)
@@ -181,7 +185,7 @@ class DatabaseConfigTest {
         assertEquals("logdate-prod:us-central1:logdate-db", source.dataSourceProperties["cloudSqlInstance"])
         assertEquals("PUBLIC,PRIVATE", source.dataSourceProperties["ipTypes"])
         assertEquals("lazy", source.dataSourceProperties["cloudSqlRefreshStrategy"])
-        assertEquals(5, source.maximumPoolSize)
+        assertTrue(source.maximumPoolSize >= DatabaseConfig.CLOUD_RUN_REQUEST_CONCURRENCY)
         assertEquals(0, source.minimumIdle)
         source.close()
     }
