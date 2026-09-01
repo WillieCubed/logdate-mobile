@@ -25,6 +25,9 @@ inputs:
   android-maps-api-key:
     description: Dedicated Android-restricted key for Maps SDK and Places API.
     required: false
+  google-server-client-id:
+    description: Web OAuth client ID used as the audience for Google ID tokens.
+    required: false
   ios-google-service-info-plist-base64:
     description: |
       Base64 of iosApp/iosApp/Firebase/GoogleService-Info-Release.plist.
@@ -63,11 +66,6 @@ runs:
         if ! printf '%s' "$GOOGLE_SERVICES_JSON_B64" | base64 --decode > "$target" 2>/dev/null; then
           printf '%s' "$GOOGLE_SERVICES_JSON_B64" | base64 -D > "$target"
         fi
-        # The secrets still describe the application before the studio.hypertext.logdate rename,
-        # so add the missing client before validating. Narrow and temporary: it only fills the one
-        # gap the rename opened, from public app IDs, and everything else the validator rejects
-        # still fails below. Delete this step once the secrets are re-uploaded.
-        ./scripts/reconcile-google-services.sh --file "$target" --application-id studio.hypertext.logdate
         if ! ./scripts/validate-firebase-config.sh "android-$FLAVOR" "$target"; then
           echo "::error::$target is not the registered LogDate Firebase configuration. Re-upload the matching"
           echo "::error::secret with: ./scripts/sync-firebase-configs.sh android-$FLAVOR"
@@ -81,6 +79,13 @@ runs:
       env:
         MAPS_API_KEY: ${{ inputs.android-maps-api-key }}
       run: echo "LOGDATE_GOOGLE_MAPS_API_KEY=$MAPS_API_KEY" >> "$GITHUB_ENV"
+
+    - name: Export Google OAuth server client ID
+      if: ${{ inputs.google-server-client-id != '' }}
+      shell: bash
+      env:
+        CLIENT_ID: ${{ inputs.google-server-client-id }}
+      run: echo "LOGDATE_GOOGLE_SERVER_CLIENT_ID=$CLIENT_ID" >> "$GITHUB_ENV"
 
     - name: Materialize iOS GoogleService-Info.plist
       if: ${{ inputs.ios-google-service-info-plist-base64 != '' && runner.os == 'macOS' }}

@@ -36,18 +36,18 @@ cpu_idle            = true
 startup_cpu_boost   = true
 
 cloud_run_env = {
-  LOGDATE_ENV                    = "production"
-  LOGDATE_EXPECT_FIRST_PARTY     = "true"
-  LOGDATE_DEPLOYMENT_KIND        = "first_party"
-  LOGDATE_SERVER_DISPLAY_NAME    = "LogDate Cloud (Staging)"
-  LOGDATE_PUBLIC_ORIGIN          = "https://cloud-staging.logdate.app"
-  ATPROTO_PDS_SERVICE_URL        = "https://cloud-staging.logdate.app"
-  ATPROTO_HANDLE_DOMAIN          = "cloud-staging.logdate.app"
-  BILLING_PROVIDER               = "play"
-  SERVER_ENCRYPTION_ENABLED      = "true"
-  SYNC_MEDIA_SIGNED_URLS         = "true"
+  LOGDATE_ENV                     = "production"
+  LOGDATE_EXPECT_FIRST_PARTY      = "true"
+  LOGDATE_DEPLOYMENT_KIND         = "first_party"
+  LOGDATE_SERVER_DISPLAY_NAME     = "LogDate Cloud (Staging)"
+  LOGDATE_PUBLIC_ORIGIN           = "https://cloud-staging.logdate.app"
+  ATPROTO_PDS_SERVICE_URL         = "https://cloud-staging.logdate.app"
+  ATPROTO_HANDLE_DOMAIN           = "cloud-staging.logdate.app"
+  BILLING_PROVIDER                = "play"
+  SERVER_ENCRYPTION_ENABLED       = "true"
+  SYNC_MEDIA_SIGNED_URLS          = "true"
   SYNC_MEDIA_SIGNED_URL_TTL_HOURS = "1"
-  AUTO_MIGRATE                   = "false"
+  AUTO_MIGRATE                    = "false"
 }
 
 # Secret IDs are scoped to this project's Secret Manager namespace (separate
@@ -60,12 +60,12 @@ cloud_run_secret_env = {
   SERVER_ENCRYPTION_KEY    = { secret_id = "logdate-server-encryption-key", version = "1" }
   SERVER_ENCRYPTION_KEY_ID = { secret_id = "logdate-server-encryption-key-id", version = "1" }
   HEALTH_INTERNAL_TOKEN    = { secret_id = "logdate-health-internal-token", version = "1" }
+  GOOGLE_OIDC_CLIENT_IDS   = { secret_id = "logdate-google-oidc-client-ids", version = "1" }
   # Mount these only AFTER the matching secret has at least one version.
   # Cloud Run fails the revision if it tries to mount an empty container.
   # Provisioning steps: docs/observability/sentry.md.
   #   SENTRY_DSN              = { secret_id = "logdate-sentry-dsn", version = "1" }
   # Opt-in only — populate the secret container then add an entry here:
-  #   GOOGLE_OIDC_CLIENT_IDS = { secret_id = "logdate-google-oidc-client-ids" }
   #   REDIS_URL              = { secret_id = "logdate-redis-url" }
 }
 

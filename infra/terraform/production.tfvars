@@ -93,13 +93,13 @@ cloud_run_secret_env = {
   SERVER_ENCRYPTION_KEY    = { secret_id = "logdate-server-encryption-key", version = "1" }
   SERVER_ENCRYPTION_KEY_ID = { secret_id = "logdate-server-encryption-key-id", version = "1" }
   HEALTH_INTERNAL_TOKEN    = { secret_id = "logdate-health-internal-token", version = "1" }
+  GOOGLE_OIDC_CLIENT_IDS   = { secret_id = "logdate-google-oidc-client-ids", version = "1" }
   # Mount these only AFTER the matching secret has at least one version.
   # Cloud Run fails the revision if it tries to mount an empty container.
   # Provisioning steps: docs/observability/sentry.md.
   #   SENTRY_DSN             = { secret_id = "logdate-sentry-dsn", version = "1" }
   # Opt-in only — add entries below and drop a matching key into
-  # infra/terraform/production.env to configure Google OIDC or Redis:
-  #   GOOGLE_OIDC_CLIENT_IDS = { secret_id = "logdate-google-oidc-client-ids" }
+  # infra/terraform/production.env to configure Redis:
   #   REDIS_URL              = { secret_id = "logdate-redis-url" }
 }
 
