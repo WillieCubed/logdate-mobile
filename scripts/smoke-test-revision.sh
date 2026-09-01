@@ -589,13 +589,13 @@ probe_asset_links() {
     status="$(http_request GET "$asset_links_origin/.well-known/assetlinks.json" "$body" "")"
     [[ "$status" == "200" ]] || { fail "asset links did not return 200"; return 1; }
     jq -e --arg package "$ANDROID_PACKAGE_NAME" \
-        'length == 1 and .[0].target.namespace == "android_app" and .[0].target.package_name == $package' \
+        '([.[] | select(.target.namespace == "android_app" and .target.package_name == $package)] | length) == 1' \
         "$body" >/dev/null 2>&1 || {
         fail "asset links package does not match the contract"
         return 1
     }
-    jq -e '
-        (.[0].relation | sort) == ([
+    jq -e --arg package "$ANDROID_PACKAGE_NAME" '
+        ([.[] | select(.target.namespace == "android_app" and .target.package_name == $package)][0].relation | sort) == ([
             "delegate_permission/common.get_login_creds",
             "delegate_permission/common.handle_all_urls"
         ] | sort)
@@ -603,7 +603,9 @@ probe_asset_links() {
         fail "asset links relations do not match"
         return 1
     }
-    actual_certificates="$(jq -r '.[0].target.sha256_cert_fingerprints[]' "$body" 2>/dev/null | LC_ALL=C sort || true)"
+    actual_certificates="$(jq -r --arg package "$ANDROID_PACKAGE_NAME" \
+        '.[] | select(.target.namespace == "android_app" and .target.package_name == $package) | .target.sha256_cert_fingerprints[]' \
+        "$body" 2>/dev/null | LC_ALL=C sort || true)"
     if [[ "$actual_certificates" != "$EXPECTED_CERTIFICATES_SORTED" ]]; then
         fail "asset links certificate set does not match the contract"
         return 1

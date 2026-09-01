@@ -234,6 +234,9 @@ case "$path" in
             assetlinks_extra_cert) certificates="[\"${FAKE_CERT_ONE}\",\"${FAKE_CERT_TWO}\",\"AA:BB\"]" ;;
         esac
         body="[{\"relation\":$relations,\"target\":{\"namespace\":\"android_app\",\"package_name\":\"$package_name\",\"sha256_cert_fingerprints\":$certificates}}]"
+        if [[ "$scenario" == "assetlinks_legacy_compatible" ]]; then
+            body="${body%]} ,{\"relation\":$relations,\"target\":{\"namespace\":\"android_app\",\"package_name\":\"co.reasonabletech.logdate\",\"sha256_cert_fingerprints\":[\"${FAKE_CERT_ONE}\"]}}]"
+        fi
         ;;
     /api/v1/auth/signup/passkey/begin)
         body="{\"success\":true,\"data\":{\"sessionToken\":\"test-session\",\"registrationOptions\":{\"rpId\":\"${FAKE_RP_ID:?}\"}}}"
@@ -892,6 +895,19 @@ for case_spec in "${negative_cases[@]}"; do
     assert_not_contains "$PRIVATE_TOKEN" "$case_output"
     assert_not_contains "$HEALTH_TOKEN" "$case_output"
 done
+
+# A relying-party host may keep a separate statement for a retired package so
+# existing installs retain their credentials. The current package statement is
+# still required to match the immutable release contract exactly.
+reset_http_state
+: >"$state_file"
+chmod 600 "$state_file"
+set +e
+legacy_assetlinks_output="$(run_smoke assetlinks_legacy_compatible "$CANDIDATE_ORIGIN" health-only "$state_file" 1 "$invoker_token_file" 2>&1)"
+legacy_assetlinks_status=$?
+set -e
+assert_exit_code 0 "$legacy_assetlinks_status"
+assert_contains "Health and first-party identity proof passed" "$legacy_assetlinks_output"
 
 # Prepare proves candidate identity, creates one disposable identity, verifies exact
 # finite quota, uploads random bytes, and retains only a 0600 state file.
