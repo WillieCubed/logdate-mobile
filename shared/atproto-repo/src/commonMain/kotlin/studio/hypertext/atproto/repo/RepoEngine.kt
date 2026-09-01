@@ -212,7 +212,7 @@ public class DefaultRepoEngine(
             blockStore.writeBlock(recordId.repo, RepoBlock(recordCid, recordBytes)).getOrThrow()
 
             val updatedTree = snapshot.tree.put(recordId.collection, recordId.recordKey, recordCid)
-            persistSnapshot(recordId.repo, updatedTree, snapshot.head)
+            persistSnapshot(recordId.repo, updatedTree, snapshot.head, snapshot.tree)
             RepoWriteResult(
                 uri = recordId.uri,
                 cid = recordCid.toString(),
@@ -241,7 +241,7 @@ public class DefaultRepoEngine(
                 throw InvalidSwapException(expectedCid = previousCid, providedCid = swapRecord)
             }
             val updatedTree = snapshot.tree.remove(recordId.collection, recordId.recordKey)
-            persistSnapshot(recordId.repo, updatedTree, snapshot.head)
+            persistSnapshot(recordId.repo, updatedTree, snapshot.head, snapshot.tree)
             true
         }
 
@@ -322,7 +322,11 @@ public class DefaultRepoEngine(
 
     private suspend fun loadSnapshot(repo: AtprotoDid): RepoSnapshot {
         val head = blockStore.readHead(repo).getOrThrow() ?: return RepoSnapshot(head = null, tree = MerkleSearchTree.empty())
-        val tree = MerkleSearchTree.fromBlocks(head.root) { cid -> blockStore.readBlock(cid).getOrThrow() }
+        // Walking the tree with one readBlock per node meant a round trip per node, so simply
+        // opening a repo cost work proportional to how much was in it -- the dominant cost in
+        // every read and every write. The store can hand over a repo's blocks in one go.
+        val blocks = blockStore.listBlocks(repo).getOrThrow().associateBy { it.cid }
+        val tree = MerkleSearchTree.fromBlocks(head.root) { cid -> blocks[cid] }
         return RepoSnapshot(head = head, tree = tree)
     }
 
@@ -330,10 +334,23 @@ public class DefaultRepoEngine(
         repo: AtprotoDid,
         tree: MerkleSearchTree,
         previousHead: RepoHead?,
+        previousTree: MerkleSearchTree?,
     ): RepoHead {
         val graph = tree.toBlockGraph()
+        // Node blocks are content addressed, so a node the write did not touch serialises to the
+        // exact bytes already stored. Writing the whole tree every time made a single record cost
+        // a round trip per node -- work proportional to the size of the journal, on every save.
+        // Only the nodes on the changed path are actually new.
+        val alreadyStored =
+            previousTree
+                ?.toBlockGraph()
+                ?.blocks
+                ?.mapTo(mutableSetOf()) { it.cid }
+                ?: emptySet()
         graph.blocks.forEach { block ->
-            blockStore.writeBlock(repo, block).getOrThrow()
+            if (block.cid !in alreadyStored) {
+                blockStore.writeBlock(repo, block).getOrThrow()
+            }
         }
         val rootCid = graph.root
 
