@@ -73,8 +73,12 @@ case "$COMMAND" in
         ;;
     scroll-to)
         needle="${1:?needle required}"
-        require_foreground || exit 1
+        # Checked before *every* swipe, not once up front. A single check at the top is no
+        # guard at all here: the loop keeps swiping for up to a dozen seconds, which is plenty
+        # of time for a call, a notification, or the owner picking the phone up to put another
+        # app in front - and the remaining swipes then land on that app instead.
         for _ in $(seq 1 "${2:-6}"); do
+            require_foreground || exit 1
             [[ -n "$(centre_of "$needle")" ]] && { echo "found: $needle"; exit 0; }
             adb -s "$SERIAL" shell "input swipe 540 1700 540 900 300" >/dev/null
             sleep 2
