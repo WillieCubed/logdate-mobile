@@ -22,6 +22,11 @@ kotlin {
                 .get()
                 .toInt()
         withHostTestBuilder {}
+        // The backup worker's foreground notification needs strings, and the module has to own
+        // them: it is the module Android holds responsible for the service.
+        androidResources {
+            enable = true
+        }
 
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)

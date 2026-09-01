@@ -151,6 +151,16 @@ object AndroidLogDateNotificationCatalog {
                 soundEnabled = false,
                 lockscreenVisibility = Notification.VISIBILITY_PRIVATE,
             ),
+            AndroidLogDateNotificationChannelSpec(
+                key = LogDateNotificationChannelKey.CLOUD_SYNC,
+                nameResId = R.string.notification_channel_cloud_sync_name,
+                descriptionResId = R.string.notification_channel_cloud_sync_description,
+                importance = NotificationManager.IMPORTANCE_LOW,
+                showBadge = false,
+                vibrationEnabled = false,
+                soundEnabled = false,
+                lockscreenVisibility = Notification.VISIBILITY_PRIVATE,
+            ),
         )
 
     fun channel(key: LogDateNotificationChannelKey): AndroidLogDateNotificationChannelSpec = phoneChannels.first { it.key == key }

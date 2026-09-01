@@ -7,6 +7,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
+import androidx.work.ForegroundInfo
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
@@ -42,9 +43,20 @@ class AndroidLogDateSyncWorker(
     KoinComponent {
     private val syncManager: DefaultSyncManager by inject()
 
+    override suspend fun getForegroundInfo(): ForegroundInfo =
+        SyncForegroundNotification.info(
+            applicationContext,
+            applicationContext.getString(R.string.sync_notification_starting),
+        )
+
     override suspend fun doWork(): Result =
         try {
             Napier.i("Starting Android background sync worker")
+            // Without this the sync is ordinary background work and dies when the app leaves the
+            // screen - part way through, with the queue half drained. Failing to promote is not
+            // fatal (the permission may be denied); the sync just goes back to being cancellable.
+            runCatching { setForeground(getForegroundInfo()) }
+                .onFailure { Napier.w("Backup running without a foreground notification", it) }
 
             val syncType = inputData.getString(KEY_SYNC_TYPE) ?: SYNC_TYPE_FULL
 
@@ -249,7 +261,11 @@ class AndroidSyncManager(
             OneTimeWorkRequestBuilder<AndroidLogDateSyncWorker>()
                 .setConstraints(constraints)
                 .setInputData(inputData)
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                // DROP_WORK_REQUEST rather than RUN_AS_NON_EXPEDITED: the latter silently turns
+                // an expedited request into an ordinary one, so asking for expedited did nothing
+                // at all. If there is no expedited quota, this request is better dropped and
+                // picked up by the periodic sync than pretending it was urgent.
+                .setExpedited(OutOfQuotaPolicy.DROP_WORK_REQUEST)
                 .build()
 
         // Unique, and an already-running sync wins. Stacking runs would put several writers on

@@ -75,6 +75,11 @@ enum class LogDateNotificationChannelKey(
         groupKey = LogDateNotificationGroupKey.IMPORT_EXPORT,
         notificationId = 1002,
     ),
+    CLOUD_SYNC(
+        id = "cloud_sync_channel",
+        groupKey = LogDateNotificationGroupKey.BACKGROUND_SERVICES,
+        notificationId = 1004,
+    ),
 }
 
 object LogDateNotificationChannels {
@@ -90,6 +95,7 @@ object LogDateNotificationChannels {
             LogDateNotificationChannelKey.WATCH_SYNC,
             LogDateNotificationChannelKey.DATA_EXPORT,
             LogDateNotificationChannelKey.DATA_RESTORE,
+            LogDateNotificationChannelKey.CLOUD_SYNC,
         )
 
     val legacyChannelIds: Set<String> =

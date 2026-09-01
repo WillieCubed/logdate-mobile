@@ -1,3 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      The backup worker runs as a foreground service so a sync that is part way through several
+      hundred entries is not killed the moment the app leaves the screen. Both permissions are
+      declared here rather than in the app so the module that needs them carries them.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application />
 </manifest>
