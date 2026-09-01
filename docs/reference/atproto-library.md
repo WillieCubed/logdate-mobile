@@ -104,7 +104,8 @@ The full module set:
 - `studio.hypertext.atproto:atproto-pds:$version`
 - `studio.hypertext.atproto:atproto-pds-runtime:$version`
 
-The repo-wide default version lives in [`gradle.properties`](/Users/williecubed/Projects/WillieCubed/logdate-mobile/gradle.properties) as `atproto.version`.
+The repo-wide default version lives in [`gradle.properties`](../../gradle.properties) as
+`atproto.version`.
 
 ## Quick Start
 
@@ -139,7 +140,7 @@ val response: ResolveHandleResponse =
 ## Publishing
 
 Maintainers should use the detailed publishing guide in
-[`atproto-publishing.md`](/Users/williecubed/Projects/WillieCubed/logdate-mobile/docs/reference/atproto-publishing.md)
+[`atproto-publishing.md`](atproto-publishing.md)
 for property precedence, remote publish task names, signing behavior, and
 artifact expectations.
 
@@ -179,11 +180,13 @@ Regenerate the checked-in official AT Protocol lexicon models used by this repo:
 ```
 
 Android Studio users can run the same Dokka task through
-[`Generate ATProto Dokka.run.xml`](/Users/williecubed/Projects/WillieCubed/logdate-mobile/.run/Generate%20ATProto%20Dokka.run.xml).
+[`Generate ATProto Dokka.run.xml`](../../.run/Generate%20ATProto%20Dokka.run.xml).
 
 ## Standalone Sample
 
-The consumer sample in [`samples/atproto-consumer`](/Users/williecubed/Projects/WillieCubed/logdate-mobile/samples/atproto-consumer) is intentionally outside the main Gradle build. It depends on `mavenLocal()` artifacts, not project modules, so it verifies the published API surface the way an external JVM consumer would.
+The consumer sample in [`samples/atproto-consumer`](../../samples/atproto-consumer) is intentionally
+outside the main Gradle build. It depends on `mavenLocal()` artifacts, not project modules, so it
+verifies the published API surface the way an external JVM consumer would.
 
 Run it after publishing the ATProto modules locally:
 

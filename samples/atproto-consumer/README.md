@@ -31,7 +31,7 @@ Resolved alice.example.com to did:web:example.com and loaded at://did:web:exampl
 ## Version Override
 
 By default the sample reads `atproto.version` from the root
-[`gradle.properties`](/Users/williecubed/Projects/TheHypertextStudio/logdate-android/gradle.properties).
+[`gradle.properties`](../../gradle.properties).
 
 To point it at a different locally published version:
 

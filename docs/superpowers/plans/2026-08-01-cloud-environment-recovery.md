@@ -91,8 +91,8 @@ scripts/render-cloud-run-contract.sh \
   "region": "us-central1",
   "service_name": "logdate-server-staging",
   "canonical_origin": "https://cloud-staging.logdate.app",
-  "runtime_service_account": "logdate-runtime@logdate-dev.iam.gserviceaccount.com",
-  "image": "us-central1-docker.pkg.dev/logdate-dev/logdate/logdate-server:0123456789abcdef0123456789abcdef01234567",
+  "runtime_service_account": "<staging-runtime-service-account>",
+  "image": "<staging-image-uri>:0123456789abcdef0123456789abcdef01234567",
   "env_vars": {},
   "secret_env": {},
   "runtime": {}
@@ -246,7 +246,7 @@ bash scripts/tests/deploy/test-reconcile-first-party-secrets.sh
 
 ### 1A.3 Reconcile staging and production before enabling rollout v2
 
-- [ ] Reauthenticate `willie@hypertext.studio`, inventory both projects, and record only redacted status evidence.
+- [ ] Reauthenticate an authorized gcloud operator, inventory both projects, and record only redacted status evidence.
 - [ ] Recover existing JWT signing and encryption material from its authoritative source if a project contains data but a mounted secret lacks a version. Never replace either with a new key.
 - [ ] Supply missing database values through private files/stdin, validate connectivity, and erase the input files.
 - [ ] Run the inventory again, apply the non-secret numeric lock proposal to tfvars as a reviewed commit, and require every mounted exact version to be enabled. Do not deploy a same-SHA candidate after changing a secret version.
@@ -476,7 +476,7 @@ bash scripts/tests/deploy/test-terraform-environment.sh
 
 ### 4.3 Reconcile live environments before applying
 
-- [ ] Reauthenticate the `willie@hypertext.studio` gcloud account interactively.
+- [ ] Reauthenticate an authorized gcloud operator interactively.
 - [ ] Create or verify the two state buckets with versioning and uniform bucket-level access.
 - [ ] Reconcile staging into its state, then production into its state.
 - [ ] Save both plan JSON files as launch evidence and require zero unexpected deletes/replacements.
@@ -699,8 +699,8 @@ allocation when canonical verification fails.
 
 **Files:**
 
-- Modify in `/Users/williecubed/Projects/TheHypertextStudio/logdate-web`: `apps/web/public/.well-known/assetlinks.json`
-- Modify in `/Users/williecubed/Projects/TheHypertextStudio/logdate-web`: `tests/e2e/dal.spec.ts`
+- Modify in the `logdate-web` repository: `apps/web/public/.well-known/assetlinks.json`
+- Modify in the `logdate-web` repository: `tests/e2e/dal.spec.ts`
 - Modify if necessary: `apps/web/scripts/extract-signing-fingerprint.mjs`
 - Modify in this repository: `scripts/tests/deploy/test-render-cloud-run-contract.sh`
 

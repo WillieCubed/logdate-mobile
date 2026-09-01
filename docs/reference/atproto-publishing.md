@@ -8,7 +8,7 @@ publish flows without guessing.
 ## Scope
 
 The publishing convention is implemented in
-[`AtprotoPublishedModulePlugin.kt`](/Users/williecubed/Projects/TheHypertextStudio/logdate-android/build-logic/src/main/kotlin/app/logdate/AtprotoPublishedModulePlugin.kt)
+[`AtprotoPublishedModulePlugin.kt`](../../build-logic/src/main/kotlin/app/logdate/AtprotoPublishedModulePlugin.kt)
 and applied by every `shared/atproto-*` module.
 
 Today it is intentionally ATProto-specific, not a generic repo-wide publishing
@@ -16,7 +16,7 @@ plugin.
 
 The repo also includes supporting release workflow and aggregate tasks:
 
-- [`publish-atproto.yml`](/Users/williecubed/Projects/TheHypertextStudio/logdate-android/.github/workflows/publish-atproto.yml)
+- [`publish-atproto.yml`](../../.github/workflows/publish-atproto.yml)
   runs hosted Maven publication from CI
 - `publishAtprotoToMavenLocal` publishes the full module set locally
 - `generateAtprotoDokka` generates HTML docs for the full module set
@@ -176,7 +176,7 @@ directory, for example:
 - `shared/atproto-pds-runtime/build/dokka/html/index.html`
 
 The repo includes an Android Studio run configuration for the same task in
-[`Generate ATProto Dokka.run.xml`](/Users/williecubed/Projects/TheHypertextStudio/logdate-android/.run/Generate%20ATProto%20Dokka.run.xml).
+[`Generate ATProto Dokka.run.xml`](../../.run/Generate%20ATProto%20Dokka.run.xml).
 
 Regenerate the checked-in LogDate lexicon models:
 
@@ -300,7 +300,7 @@ identical across both targets — no coordinate migration needed.
 ## Standalone Consumer Verification
 
 The standalone sample in
-[`samples/atproto-consumer`](/Users/williecubed/Projects/TheHypertextStudio/logdate-android/samples/atproto-consumer)
+[`samples/atproto-consumer`](../../samples/atproto-consumer)
 is intentionally outside the main build so it consumes published artifacts,
 not project dependencies.
 

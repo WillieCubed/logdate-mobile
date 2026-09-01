@@ -1,8 +1,9 @@
 # Release secrets — iOS + Android publish setup
 
 One-time and rotation runbook for the credentials that the publish
-workflows need. Keep this file out of any commit that adds a real
-secret value; only the placeholders + how-to instructions live here.
+workflows need. Never commit real secret values, provider-assigned client
+IDs, certificate fingerprints, account identities, or deployment receipts
+here. Read current values from the named secret store or provider console.
 
 The workflows that consume these secrets:
 
@@ -26,24 +27,22 @@ run one command.
 | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64` | `app/android-main/google-services.json` (debug Firebase project) | When Firebase debug project config changes. |
 | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_RELEASE_BASE64` | `app/android-main/src/release/google-services.json` (release Firebase project) | When Firebase release project config changes. |
 | `LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64` | `iosApp/iosApp/Firebase/GoogleService-Info-Release.plist` (single iOS Firebase project) | When Firebase iOS project config changes. |
-| `LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG` | Dedicated `logdate-dev` Android key restricted to `studio.hypertext.logdate`, the debug SHA-1, Places API, and Maps SDK for Android. | When the debug signing key or API restriction changes. |
-| `LOGDATE_GOOGLE_MAPS_API_KEY_RELEASE` | Dedicated `logdate` Android key restricted to `studio.hypertext.logdate`, the upload SHA-1, Places API, and Maps SDK for Android. | When the upload or Play signing key changes. |
+| `LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG` | Dedicated debug-project Android key restricted to `studio.hypertext.logdate`, the debug signing certificate, Places API, and Maps SDK for Android. | When the debug signing key or API restriction changes. |
+| `LOGDATE_GOOGLE_MAPS_API_KEY_RELEASE` | Dedicated release-project Android key restricted to `studio.hypertext.logdate` and the applicable release signing certificates, Places API, and Maps SDK for Android. | When the upload or Play signing key changes. |
 
 ### Google ID-token audiences and Android OAuth clients
 
 The build workflows pass the web/server OAuth client ID separately from
 `google-services.json`. These are GitHub repository variables, not secrets:
 
-| Variable | Firebase project | OAuth client ID |
+| Variable | Environment | Authoritative source |
 |---|---|---|
-| `LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG` | `logdate-dev` | `<debug-web-server-oauth-client-id>` |
-| `LOGDATE_GOOGLE_SERVER_CLIENT_ID_RELEASE` | `logdate` | `<release-web-server-oauth-client-id>` |
+| `LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG` | Debug | Web/server OAuth client in the debug Google Auth Platform project |
+| `LOGDATE_GOOGLE_SERVER_CLIENT_ID_RELEASE` | Release | Web/server OAuth client in the release Google Auth Platform project |
 
-The production Android upload-certificate client is named
-`LogDate Android upload client (production)`. It is restricted to package
-`studio.hypertext.logdate` and SHA-1
-`<upload-signing-sha1>`; its client ID is
-`<release-upload-android-oauth-client-id>`.
+The release project must also contain an Android OAuth client restricted to package
+`studio.hypertext.logdate` and the upload-signing certificate. Read the client and certificate
+values from Google Auth Platform and the signing-key authority; do not copy them into this file.
 
 Creating or changing an Android OAuth client changes the generated Firebase config. Download the
 new `google-services.json`, validate it, and rerun
