@@ -194,7 +194,7 @@ fun HomeScreen(
                             SyncAction.ManageStorage,
                             -> onOpenSettings()
                             SyncAction.ReviewConflicts -> onOpenSyncIssues()
-                            SyncAction.Retry -> Unit
+                            SyncAction.Retry -> syncPresentationViewModel.retry()
                         }
                     },
                     modifier =
@@ -320,7 +320,7 @@ fun HomeScreen(
                                                     app.logdate.ui.sync.SyncAction.ManageStorage,
                                                     -> onOpenSettings()
                                                     app.logdate.ui.sync.SyncAction.ReviewConflicts -> onOpenSyncIssues()
-                                                    app.logdate.ui.sync.SyncAction.Retry -> Unit
+                                                    app.logdate.ui.sync.SyncAction.Retry -> syncPresentationViewModel.retry()
                                                 }
                                             },
                                         )

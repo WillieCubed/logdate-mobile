@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.stateIn
  * foreground; sharing means we don't re-collect on every rotation).
  */
 class SyncPresentationViewModel(
-    syncManager: SyncManager,
+    private val syncManager: SyncManager,
     sessionStorage: SessionStorage,
 ) : ViewModel() {
     val presentation: StateFlow<SyncPresentation> =
@@ -27,4 +27,15 @@ class SyncPresentationViewModel(
                 started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
                 initialValue = SyncPresentation.Hidden,
             )
+
+    /**
+     * Starts a backup in response to the timeline's sync affordance being tapped.
+     *
+     * Tapping it used to do nothing at all: the action reached the screen and was mapped to
+     * Unit. An indicator that reports a problem and then ignores being pressed is worse than no
+     * indicator, because it teaches people the app is not listening.
+     */
+    fun retry() {
+        syncManager.sync(startNow = true)
+    }
 }
