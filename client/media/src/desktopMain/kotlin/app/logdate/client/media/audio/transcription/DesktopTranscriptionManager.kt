@@ -58,6 +58,9 @@ class DesktopTranscriptionManager(
                     is TranscriptionResult.InProgress -> {
                         Napier.d("Transcription in progress for note $noteId")
                     }
+                    TranscriptionResult.Cancelled -> {
+                        Napier.d("Transcription cancelled for note $noteId")
+                    }
                 }
             } catch (e: Exception) {
                 Napier.e("Error in transcription job for note $noteId", e)

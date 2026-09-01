@@ -34,23 +34,45 @@ data class OnboardingTestFixture(
     }
 }
 
+internal fun selectOnboardingTestFixture(
+    isDebuggable: Boolean,
+    skipOnboardingRequested: Boolean,
+    intentFixture: OnboardingTestFixture?,
+    processFixture: OnboardingTestFixture?,
+): OnboardingTestFixture? =
+    when {
+        !isDebuggable -> null
+        skipOnboardingRequested -> OnboardingTestFixture.ONBOARDED_HOME
+        intentFixture != null -> intentFixture
+        else -> processFixture
+    }
+
 fun Intent.putOnboardingTestFixture(fixture: OnboardingTestFixture): Intent =
     apply {
         putExtra(ONBOARDING_TEST_FIXTURE_EXTRA, ONBOARDING_TEST_FIXTURE_JSON.encodeToString(OnboardingTestFixture.serializer(), fixture))
     }
 
-fun Intent.readOnboardingTestFixture(): OnboardingTestFixture? {
-    val serialized =
+fun Intent.readOnboardingTestFixture(isDebuggable: Boolean): OnboardingTestFixture? {
+    if (!isDebuggable) return null
+
+    val skipOnboardingRequested = getBooleanExtra(DEBUG_SKIP_ONBOARDING_EXTRA, false)
+    val intentFixture =
         getStringExtra(ONBOARDING_TEST_FIXTURE_EXTRA)
-            ?: ActivityLaunchTestOverrides.onboardingFixture?.let {
-                ONBOARDING_TEST_FIXTURE_JSON.encodeToString(OnboardingTestFixture.serializer(), it)
+            ?.takeUnless { skipOnboardingRequested }
+            ?.let { serialized ->
+                runCatching {
+                    ONBOARDING_TEST_FIXTURE_JSON.decodeFromString(OnboardingTestFixture.serializer(), serialized)
+                }.onFailure { error ->
+                    Napier.w("Ignoring invalid onboarding test fixture payload", error)
+                }.getOrNull()
             }
-            ?: return null
-    return runCatching {
-        ONBOARDING_TEST_FIXTURE_JSON.decodeFromString(OnboardingTestFixture.serializer(), serialized)
-    }.onFailure { error ->
-        Napier.w("Ignoring invalid onboarding test fixture payload", error)
-    }.getOrNull()
+
+    return selectOnboardingTestFixture(
+        isDebuggable = isDebuggable,
+        skipOnboardingRequested = skipOnboardingRequested,
+        intentFixture = intentFixture,
+        processFixture = ActivityLaunchTestOverrides.onboardingFixture,
+    )
 }
 
 class OnboardingTestFixtureApplier(
@@ -111,6 +133,7 @@ class OnboardingTestFixtureApplier(
 }
 
 const val ONBOARDING_TEST_FIXTURE_EXTRA = "app.logdate.client.testing.onboarding.FIXTURE"
+const val DEBUG_SKIP_ONBOARDING_EXTRA = "app.logdate.client.testing.onboarding.SKIP"
 
 private val ONBOARDING_TEST_FIXTURE_JSON =
     Json {

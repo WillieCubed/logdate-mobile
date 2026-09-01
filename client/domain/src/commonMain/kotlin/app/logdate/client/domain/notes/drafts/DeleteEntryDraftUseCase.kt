@@ -43,6 +43,17 @@ class DeleteEntryDraftUseCase(
         }
         entryDraftRepository.deleteDraft(draftId)
     }
+
+    /**
+     * Removes a draft that has already been promoted to permanent notes.
+     *
+     * Published media is deliberately retained because the permanent note now
+     * owns the same path. Reusing the discard path here would delete the user's
+     * recording immediately after saving it.
+     */
+    suspend fun deleteAfterPublish(draftId: Uuid) {
+        entryDraftRepository.deleteDraft(draftId)
+    }
 }
 
 /**

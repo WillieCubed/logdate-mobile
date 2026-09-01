@@ -4,6 +4,7 @@ import app.logdate.client.database.dao.AudioNoteDao
 import app.logdate.client.database.dao.TranscriptionDao
 import app.logdate.client.database.entities.TranscriptionEntity
 import app.logdate.client.database.entities.TranscriptionSegmentEntity
+import app.logdate.client.media.audio.transcription.TranscriptionFailure
 import app.logdate.client.media.audio.transcription.TranscriptionManager
 import app.logdate.client.repository.transcription.TranscriptDocument
 import app.logdate.client.repository.transcription.TranscriptSegment
@@ -17,6 +18,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 private typealias DbTranscriptionStatus = app.logdate.client.database.entities.TranscriptionStatus
@@ -28,6 +32,8 @@ class OfflineFirstTranscriptionRepository(
     private val transcriptionDao: TranscriptionDao,
     private val audioNoteDao: AudioNoteDao,
     private val transcriptionManager: TranscriptionManager,
+    private val now: () -> Instant = { Clock.System.now() },
+    private val staleAfter: Duration = 10.minutes,
 ) : TranscriptionRepository {
     private val transcriptJson =
         Json {
@@ -42,44 +48,46 @@ class OfflineFirstTranscriptionRepository(
         val note =
             try {
                 audioNoteDao.getNoteOneOff(noteId)
-            } catch (e: Exception) {
+            } catch (e: NoSuchElementException) {
                 Napier.e("Cannot request transcription: Note $noteId does not exist", e)
+                return false
+            } catch (e: Exception) {
+                Napier.e("Cannot request transcription: failed to read note $noteId", e)
                 return false
             }
 
         // Check if a transcription already exists
-        val existingTranscription = transcriptionDao.getTranscriptionByNoteId(noteId)
+        val existingTranscription =
+            try {
+                transcriptionDao.getTranscriptionByNoteId(noteId)
+            } catch (e: Exception) {
+                Napier.e("Cannot request transcription: failed to read existing state for note $noteId", e)
+                return false
+            }
         if (existingTranscription != null) {
             Napier.d("Transcription already exists for note $noteId with status ${existingTranscription.status}")
             // If it's already completed or in progress, don't request again
             return when (existingTranscription.status) {
                 DbTranscriptionStatus.COMPLETED -> true
-                DbTranscriptionStatus.IN_PROGRESS -> true
+                DbTranscriptionStatus.IN_PROGRESS -> {
+                    if (now() - existingTranscription.lastUpdated < staleAfter) {
+                        true
+                    } else {
+                        Napier.w("Requeuing stale in-progress transcription for note $noteId")
+                        requeue(existingTranscription, note.contentUri)
+                    }
+                }
                 DbTranscriptionStatus.PENDING -> {
-                    // Re-queue if it's pending
-                    val audioUri = note.contentUri
-                    transcriptionManager.enqueueTranscription(noteId, audioUri)
-                    true
+                    enqueueOrFail(existingTranscription, note.contentUri)
                 }
                 DbTranscriptionStatus.FAILED -> {
-                    // Create a new transcription request if previous one failed
-                    val now = Clock.System.now()
-                    val updatedTranscription =
-                        existingTranscription.copy(
-                            status = DbTranscriptionStatus.PENDING,
-                            errorMessage = null,
-                            lastUpdated = now,
-                        )
-                    transcriptionDao.updateTranscription(updatedTranscription)
-                    val audioUri = note.contentUri
-                    transcriptionManager.enqueueTranscription(noteId, audioUri)
-                    true
+                    requeue(existingTranscription, note.contentUri)
                 }
             }
         }
 
         // Create a new transcription entry
-        val now = Clock.System.now()
+        val now = now()
         val transcription =
             TranscriptionEntity(
                 noteId = noteId,
@@ -94,11 +102,57 @@ class OfflineFirstTranscriptionRepository(
             transcriptionDao.insertTranscription(transcription)
             // Enqueue the transcription job
             val audioUri = note.contentUri
-            transcriptionManager.enqueueTranscription(noteId, audioUri)
-            return true
+            return enqueueOrFail(transcription, audioUri)
         } catch (e: Exception) {
             Napier.e("Failed to request transcription", e)
             return false
+        }
+    }
+
+    private suspend fun requeue(
+        transcription: TranscriptionEntity,
+        audioUri: String,
+    ): Boolean {
+        return try {
+            val pending =
+                transcription.copy(
+                    status = DbTranscriptionStatus.PENDING,
+                    errorMessage = null,
+                    lastUpdated = now(),
+                )
+            if (transcriptionDao.updateTranscription(pending) <= 0) {
+                Napier.e("Failed to move transcription for ${transcription.noteId} back to PENDING")
+                return false
+            }
+            enqueueOrFail(pending, audioUri)
+        } catch (e: Exception) {
+            Napier.e("Failed to requeue transcription for ${transcription.noteId}", e)
+            return false
+        }
+    }
+
+    private suspend fun enqueueOrFail(
+        transcription: TranscriptionEntity,
+        audioUri: String,
+    ): Boolean {
+        return try {
+            if (transcriptionManager.enqueueTranscription(transcription.noteId, audioUri)) {
+                return true
+            }
+            val failed =
+                transcription.copy(
+                    status = DbTranscriptionStatus.FAILED,
+                    errorMessage = TranscriptionFailure.SchedulingError.toString(),
+                    lastUpdated = now(),
+                )
+            val persisted = transcriptionDao.updateTranscription(failed) > 0
+            if (!persisted) {
+                Napier.e("Failed to persist scheduling failure for ${transcription.noteId}")
+            }
+            false
+        } catch (e: Exception) {
+            Napier.e("Failed to schedule transcription for ${transcription.noteId}", e)
+            false
         }
     }
 
@@ -131,50 +185,44 @@ class OfflineFirstTranscriptionRepository(
                 TranscriptionStatus.FAILED -> DbTranscriptionStatus.FAILED
             }
 
-        val transcription =
-            transcriptionDao.getTranscriptionByNoteId(noteId)
-                ?: run {
-                    // No row yet — create one if the note exists in the database.
-                    // This happens when live transcription completes before the note's
-                    // auto-save fires or before requestTranscription() is explicitly called.
-                    val noteExists =
-                        try {
-                            audioNoteDao.getNoteOneOff(noteId)
-                            true
-                        } catch (e: Exception) {
-                            false
-                        }
-                    if (!noteExists) {
-                        Napier.w("Cannot persist transcript: note $noteId not in DB yet — will retry on next emission")
-                        return false
-                    }
-                    val now = Clock.System.now()
-                    transcriptionDao.insertTranscription(
-                        TranscriptionEntity(
-                            noteId = noteId,
+        return try {
+            val transcription = transcriptionDao.getTranscriptionByNoteId(noteId)
+            val timestamp = now()
+            if (transcription == null) {
+                // Live transcription can finish before note auto-save. Returning
+                // false keeps the in-memory persistence retrier active until the
+                // note exists instead of losing the transcript.
+                try {
+                    audioNoteDao.getNoteOneOff(noteId)
+                } catch (e: Exception) {
+                    Napier.w("Cannot persist transcript: note $noteId is not available yet", e)
+                    return false
+                }
+                transcriptionDao.insertTranscription(
+                    TranscriptionEntity(
+                        noteId = noteId,
+                        text = text,
+                        status = dbStatus,
+                        errorMessage = errorMessage,
+                        created = timestamp,
+                        lastUpdated = timestamp,
+                    ),
+                )
+            } else {
+                val updated =
+                    transcriptionDao.updateTranscription(
+                        transcription.copy(
                             text = text,
                             status = dbStatus,
-                            created = now,
-                            lastUpdated = now,
+                            errorMessage = errorMessage,
+                            lastUpdated = timestamp,
                         ),
                     )
-                    transcriptionDao.replaceSegmentsForNote(
-                        noteId = noteId,
-                        segments = text.toLegacySegmentEntities(noteId),
-                    )
-                    return true
+                if (updated <= 0) {
+                    Napier.e("Transcription update touched no row for note $noteId")
+                    return false
                 }
-
-        val now = Clock.System.now()
-        return try {
-            transcriptionDao.updateTranscription(
-                transcription.copy(
-                    text = text,
-                    status = dbStatus,
-                    errorMessage = errorMessage,
-                    lastUpdated = now,
-                ),
-            )
+            }
             transcriptionDao.replaceSegmentsForNote(
                 noteId = noteId,
                 segments = text.toLegacySegmentEntities(noteId),
@@ -194,15 +242,38 @@ class OfflineFirstTranscriptionRepository(
     ): Boolean {
         Napier.d("Updating structured transcription for note $noteId to status $status")
 
-        val dbStatus = status.toDbStatus()
-        val documentJson = transcriptJson.encodeToString(document)
-        val transcription =
-            transcriptionDao.getTranscriptionByNoteId(noteId)
-                ?: run {
-                    val now = Clock.System.now()
-                    transcriptionDao.insertTranscription(
-                        TranscriptionEntity(
-                            noteId = noteId,
+        return try {
+            val dbStatus = status.toDbStatus()
+            val documentJson = transcriptJson.encodeToString(document)
+            val transcription = transcriptionDao.getTranscriptionByNoteId(noteId)
+            val timestamp = now()
+            if (transcription == null) {
+                try {
+                    audioNoteDao.getNoteOneOff(noteId)
+                } catch (e: Exception) {
+                    Napier.w("Cannot persist structured transcript: note $noteId is not available yet", e)
+                    return false
+                }
+                transcriptionDao.insertTranscription(
+                    TranscriptionEntity(
+                        noteId = noteId,
+                        text = document.plainText,
+                        documentJson = documentJson,
+                        language = document.language,
+                        source = document.primarySourceName(),
+                        revision = document.revision,
+                        isCloudEnhanced = document.isCloudEnhanced,
+                        speakerCount = document.speakers.size,
+                        status = dbStatus,
+                        errorMessage = errorMessage,
+                        created = timestamp,
+                        lastUpdated = timestamp,
+                    ),
+                )
+            } else {
+                val updated =
+                    transcriptionDao.updateTranscription(
+                        transcription.copy(
                             text = document.plainText,
                             documentJson = documentJson,
                             language = document.language,
@@ -212,28 +283,17 @@ class OfflineFirstTranscriptionRepository(
                             speakerCount = document.speakers.size,
                             status = dbStatus,
                             errorMessage = errorMessage,
-                            created = now,
-                            lastUpdated = now,
+                            lastUpdated = timestamp,
                         ),
                     )
-                    return true
+                if (updated <= 0) {
+                    Napier.e("Structured transcription update touched no row for note $noteId")
+                    return false
                 }
-
-        val now = Clock.System.now()
-        return try {
-            transcriptionDao.updateTranscription(
-                transcription.copy(
-                    text = document.plainText,
-                    documentJson = documentJson,
-                    language = document.language,
-                    source = document.primarySourceName(),
-                    revision = document.revision,
-                    isCloudEnhanced = document.isCloudEnhanced,
-                    speakerCount = document.speakers.size,
-                    status = dbStatus,
-                    errorMessage = errorMessage,
-                    lastUpdated = now,
-                ),
+            }
+            transcriptionDao.replaceSegmentsForNote(
+                noteId = noteId,
+                segments = document.toSegmentEntities(noteId),
             )
             true
         } catch (e: Exception) {

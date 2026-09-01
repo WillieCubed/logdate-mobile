@@ -29,8 +29,35 @@ sealed interface TranscriptionFailure {
     /** An audio capture or processing error. */
     data object AudioError : TranscriptionFailure
 
+    /** The recognizer accepted audio but did not detect speech. */
+    data object NoSpeechDetected : TranscriptionFailure
+
+    /** A locally produced result could not be saved after retrying. */
+    data object PersistenceError : TranscriptionFailure
+
+    /** Durable recovery work could not be scheduled. */
+    data object SchedulingError : TranscriptionFailure
+
     /** An unexpected error — check logs for the underlying cause. */
     data object Unknown : TranscriptionFailure
+}
+
+/**
+ * Synchronous acknowledgement for a live transcription start request.
+ *
+ * [Started] means the service owns an active session and will publish a
+ * terminal [TranscriptionResult.Success] or [TranscriptionResult.Error]. It
+ * does not wait for the session to finish and therefore does not add latency
+ * to realtime partial results.
+ */
+sealed interface TranscriptionStartResult {
+    data object Started : TranscriptionStartResult
+
+    data object AlreadyRunning : TranscriptionStartResult
+
+    data class Failed(
+        val reason: TranscriptionFailure,
+    ) : TranscriptionStartResult
 }
 
 /**
@@ -65,6 +92,9 @@ sealed class TranscriptionResult {
     data class Error(
         val reason: TranscriptionFailure,
     ) : TranscriptionResult()
+
+    /** The caller explicitly ended the session before transcription completed. */
+    data object Cancelled : TranscriptionResult()
 }
 
 /**
@@ -79,14 +109,16 @@ interface TranscriptionService {
 
     /**
      * Starts a transcription session from live audio
-     * @return true if started successfully
+     * @return typed acknowledgement of whether the service owns a live session
      */
-    suspend fun startLiveTranscription(): Boolean
+    suspend fun startLiveTranscription(): TranscriptionStartResult
 
     /**
-     * Stops a live transcription session
+     * Stops a live transcription session and returns the latest terminal or
+     * refining result so callers can select a durable file-recovery path
+     * without racing a flow collector.
      */
-    suspend fun stopLiveTranscription()
+    suspend fun stopLiveTranscription(): TranscriptionResult
 
     /**
      * Transcribes a recorded audio file
@@ -98,7 +130,7 @@ interface TranscriptionService {
     /**
      * Cancels any in-progress transcription
      */
-    fun cancelTranscription()
+    suspend fun cancelTranscription()
 
     /**
      * Gets the currently supported languages for transcription
@@ -164,6 +196,22 @@ interface TranscriptionService {
      */
     fun release()
 }
+
+/**
+ * Stops a live session and synchronously hands a successful terminal result to
+ * its durable owner before control returns to navigation or fallback work.
+ * Realtime partials still flow independently; this closes only the stop-time
+ * race where a final SharedFlow emission can arrive after the editor exits.
+ */
+internal suspend fun stopLiveTranscriptionWithHandoff(
+    service: TranscriptionService,
+    onSuccess: (TranscriptionResult.Success) -> Unit,
+): TranscriptionResult =
+    service.stopLiveTranscription().also { result ->
+        if (result is TranscriptionResult.Success) {
+            onSuccess(result)
+        }
+    }
 
 /**
  * Shared "no-op" download state used by [TranscriptionService] and

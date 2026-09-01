@@ -5,6 +5,7 @@ import app.logdate.client.media.audio.transcription.TranscriptAccumulator
 import app.logdate.client.media.audio.transcription.TranscriptionFailure
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
+import app.logdate.client.media.audio.transcription.TranscriptionStartResult
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +43,8 @@ internal class DesktopSherpaTranscriptionService(
         DesktopSherpaOfflineRecognizerProvider(modelManager),
     private val wavDecoder: DesktopWavDecoder = DesktopWavDecoder(),
 ) : TranscriptionService {
+    private val unsupportedLiveResult = TranscriptionResult.Error(TranscriptionFailure.NotSupported)
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private val _transcriptionFlow = MutableSharedFlow<TranscriptionResult>(replay = 1)
@@ -90,9 +93,10 @@ internal class DesktopSherpaTranscriptionService(
 
     override val supportsFileTranscription: Boolean = true
 
-    override suspend fun startLiveTranscription(): Boolean = false
+    override suspend fun startLiveTranscription(): TranscriptionStartResult =
+        TranscriptionStartResult.Failed(TranscriptionFailure.NotSupported)
 
-    override suspend fun stopLiveTranscription() = Unit
+    override suspend fun stopLiveTranscription(): TranscriptionResult = unsupportedLiveResult
 
     override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult {
         if (!offlineRecognizer.ensureInitialized()) {
@@ -146,7 +150,7 @@ internal class DesktopSherpaTranscriptionService(
         return finalResult
     }
 
-    override fun cancelTranscription() = Unit
+    override suspend fun cancelTranscription() = Unit
 
     override fun getSupportedLanguages(): List<String> = listOf("en-US")
 

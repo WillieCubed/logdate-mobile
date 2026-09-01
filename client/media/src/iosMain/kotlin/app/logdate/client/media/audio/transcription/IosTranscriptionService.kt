@@ -39,6 +39,7 @@ import kotlin.coroutines.resumeWithException
  */
 internal class IosTranscriptionService : TranscriptionService {
     private val _transcriptionFlow = MutableSharedFlow<TranscriptionResult>(replay = 1)
+    private val unsupportedLiveResult = TranscriptionResult.Error(TranscriptionFailure.NotSupported)
 
     // SFSpeechRecognizer is stateful on the main thread; lazily created so it
     // initialises on the correct thread when first accessed.
@@ -46,15 +47,15 @@ internal class IosTranscriptionService : TranscriptionService {
 
     override fun getTranscriptionFlow(): SharedFlow<TranscriptionResult> = _transcriptionFlow.asSharedFlow()
 
-    override suspend fun startLiveTranscription(): Boolean {
+    override suspend fun startLiveTranscription(): TranscriptionStartResult {
         // Live buffer-based transcription requires AVAudioEngine tapping,
         // which conflicts with AVAudioRecorder. File transcription via
         // transcribeAudioFile() is the primary path on iOS.
-        _transcriptionFlow.emit(TranscriptionResult.InProgress)
-        return false
+        _transcriptionFlow.emit(unsupportedLiveResult)
+        return TranscriptionStartResult.Failed(TranscriptionFailure.NotSupported)
     }
 
-    override suspend fun stopLiveTranscription() = Unit
+    override suspend fun stopLiveTranscription(): TranscriptionResult = unsupportedLiveResult
 
     override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult {
         val r = recognizer ?: return TranscriptionResult.Error(TranscriptionFailure.NotAvailable)
@@ -100,7 +101,7 @@ internal class IosTranscriptionService : TranscriptionService {
             cont.invokeOnCancellation { task.cancel() }
         }
 
-    override fun cancelTranscription() = Unit
+    override suspend fun cancelTranscription() = Unit
 
     override fun getSupportedLanguages(): List<String> = listOf("en-US")
 

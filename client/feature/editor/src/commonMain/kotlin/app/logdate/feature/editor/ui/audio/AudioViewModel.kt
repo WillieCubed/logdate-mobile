@@ -117,13 +117,17 @@ class AudioViewModel(
 
                 startRecordingCollectors()
                 val transcriptionState =
-                    if (
-                        transcriptionService.supportsLiveTranscription ||
-                        transcriptionService.supportsFileTranscription
-                    ) {
-                        AudioUiState.TranscriptionState.InProgress
-                    } else {
-                        AudioUiState.TranscriptionState.NotRequested
+                    when (val current = _uiState.value.transcriptionState) {
+                        is AudioUiState.TranscriptionState.Error -> current
+                        else ->
+                            if (
+                                transcriptionService.supportsLiveTranscription ||
+                                transcriptionService.supportsFileTranscription
+                            ) {
+                                AudioUiState.TranscriptionState.InProgress
+                            } else {
+                                AudioUiState.TranscriptionState.NotRequested
+                            }
                     }
                 _uiState.update {
                     it.copy(
@@ -549,6 +553,11 @@ class AudioViewModel(
                                     } else {
                                         it.copy(transcriptionState = AudioUiState.TranscriptionState.InProgress)
                                     }
+                                }
+                            }
+                            TranscriptionResult.Cancelled -> {
+                                _uiState.update {
+                                    it.copy(transcriptionState = AudioUiState.TranscriptionState.NotRequested)
                                 }
                             }
                         }

@@ -18,6 +18,7 @@ import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.notes.drafts.GetAllDraftsUseCase
 import app.logdate.client.domain.notes.drafts.UpdateEntryDraftUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
+import app.logdate.client.media.MediaCleaner
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.feature.editor.ui.editor.delegate.AudioBlockFinalizer
 import app.logdate.feature.editor.ui.editor.delegate.ContentLoader
@@ -72,6 +73,7 @@ class EntryEditorViewModelAudioSaveTest {
     private lateinit var journalNotesRepository: FakeJournalNotesRepository
     private lateinit var entryDraftRepository: FakeEntryDraftRepository
     private lateinit var fakeFinalizer: RecordingAudioBlockFinalizer
+    private lateinit var mediaCleaner: RecordingMediaCleaner
 
     private fun buildViewModel(finalizer: AudioBlockFinalizer = fakeFinalizer): EntryEditorViewModel {
         val journalContentRepository = FakeJournalContentRepository()
@@ -106,7 +108,7 @@ class EntryEditorViewModelAudioSaveTest {
                 settingsRepository = FakeLocationTrackingSettingsRepository(),
                 mediaManager = mediaManager,
             )
-        val deleteEntryDraft = DeleteEntryDraftUseCase(entryDraftRepository)
+        val deleteEntryDraft = DeleteEntryDraftUseCase(entryDraftRepository, mediaCleaner)
 
         val observeEditorData =
             ObserveEditorDataUseCase(
@@ -155,6 +157,7 @@ class EntryEditorViewModelAudioSaveTest {
         journalNotesRepository = FakeJournalNotesRepository()
         entryDraftRepository = FakeEntryDraftRepository()
         fakeFinalizer = RecordingAudioBlockFinalizer()
+        mediaCleaner = RecordingMediaCleaner()
     }
 
     @AfterTest
@@ -344,6 +347,30 @@ class EntryEditorViewModelAudioSaveTest {
         }
 
     @Test
+    fun `publishing an autosaved audio draft retains the permanent recording`() =
+        testScope.runTest {
+            val viewModel = buildViewModel()
+            viewModel.editorState.first()
+            val recordingPath = "file:///audio_notes/permanent.m4a"
+            viewModel.seedAudioBlock(
+                AudioCaptureState.Ready(uri = recordingPath, durationMs = 3_000L),
+            )
+            advanceUntilIdle()
+
+            viewModel.persistDraft(viewModel.editorState.value)
+            advanceUntilIdle()
+            viewModel.saveEntry(viewModel.editorState.value)
+            advanceUntilIdle()
+
+            val saved = journalNotesRepository.allNotesObserved.first()
+            assertEquals(recordingPath, assertIs<JournalNote.Audio>(saved.single()).mediaRef)
+            assertTrue(
+                mediaCleaner.deletedPaths.isEmpty(),
+                "publishing must remove the draft row without deleting media now owned by the permanent note",
+            )
+        }
+
+    @Test
     fun `save entry with mixed text and pending audio persists both`() =
         testScope.runTest {
             val viewModel = buildViewModel()
@@ -383,6 +410,14 @@ class EntryEditorViewModelAudioSaveTest {
         ): AudioCaptureState {
             invocationCount += 1
             return responses[blockId] ?: currentState
+        }
+    }
+
+    private class RecordingMediaCleaner : MediaCleaner {
+        val deletedPaths = mutableListOf<String>()
+
+        override suspend fun delete(path: String) {
+            deletedPaths += path
         }
     }
 

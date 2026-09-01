@@ -15,6 +15,7 @@ import app.logdate.client.EditorActivity
 import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.client.media.audio.transcription.TranscriptionService
+import app.logdate.client.media.audio.transcription.TranscriptionStartResult
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.permissions.PermissionManager
 import app.logdate.client.permissions.PermissionResult
@@ -211,14 +212,14 @@ private class FakeTranscriptionService : TranscriptionService {
 
     override fun getTranscriptionFlow(): SharedFlow<TranscriptionResult> = transcriptionFlow
 
-    override suspend fun startLiveTranscription(): Boolean = true
+    override suspend fun startLiveTranscription(): TranscriptionStartResult = TranscriptionStartResult.Started
 
-    override suspend fun stopLiveTranscription() = Unit
+    override suspend fun stopLiveTranscription(): TranscriptionResult = TranscriptionResult.Cancelled
 
     override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult =
         TranscriptionResult.Success("Test transcription")
 
-    override fun cancelTranscription() = Unit
+    override suspend fun cancelTranscription() = Unit
 
     override fun getSupportedLanguages(): List<String> = emptyList()
 

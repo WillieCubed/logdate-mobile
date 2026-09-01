@@ -7,8 +7,12 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import app.logdate.client.media.audio.tagging.AudioTaggingResult
 import app.logdate.client.media.audio.tagging.AudioTaggingService
+import app.logdate.client.media.audio.transcription.TranscriptionFailure
+import app.logdate.client.media.audio.transcription.TranscriptionPersistenceRetrier
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
+import app.logdate.client.media.audio.transcription.TranscriptionStartResult
+import app.logdate.client.media.audio.transcription.stopLiveTranscriptionWithHandoff
 import app.logdate.client.media.audio.transcription.toTranscriptDocument
 import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.client.repository.audio.AudioTag
@@ -69,6 +73,11 @@ class AndroidAudioRecordingManager(
     private var startRequested = false
     private var serviceStateJob: Job? = null
     private var routeSyncJob: Job? = null
+    private var transcriptPersistenceJob: Job? = null
+    private var transcriptionCollectorJob: Job? = null
+    private var transcriptionWarmUpJob: Job? = null
+    private var liveTranscriptionStarted = false
+    private val persistenceRetrier = TranscriptionPersistenceRetrier()
 
     private val recordingDurationFlow: Flow<Duration> = durationFlow.map { it.milliseconds }
 
@@ -133,37 +142,47 @@ class AndroidAudioRecordingManager(
         this.transcriptionService = service
 
         // Eagerly warm up models so they're ready when the user taps Record
-        scope.launch(Dispatchers.IO) {
-            try {
-                service.warmUp()
-            } catch (e: Exception) {
-                Napier.e("Transcription model warm-up failed", e)
+        transcriptionWarmUpJob?.cancel()
+        transcriptionWarmUpJob =
+            scope.launch(Dispatchers.IO) {
+                try {
+                    service.warmUp()
+                } catch (e: Exception) {
+                    Napier.e("Transcription model warm-up failed", e)
+                }
             }
-        }
 
         // Listen for transcription updates. This collector lives on the
         // singleton's own scope so a Whisper refinement pass that is still
         // mid-utterance when the editor view model goes away will continue
         // to flow through here and get persisted to the database.
-        scope.launch {
-            service.getTranscriptionFlow().collectLatest { result ->
-                when (result) {
-                    is TranscriptionResult.Success -> {
-                        transcriptionFlow.value = result.text
-                        structuredTranscriptionFlow.value = result
-                        persistRefinedTranscript(result)
-                    }
-                    is TranscriptionResult.Error -> {
-                        Napier.e("Transcription error: ${result.reason}")
-                        structuredTranscriptionFlow.value = result
-                    }
-                    is TranscriptionResult.InProgress -> {
-                        // Just wait for the text
-                        structuredTranscriptionFlow.value = result
+        transcriptionCollectorJob?.cancel()
+        transcriptionCollectorJob =
+            scope.launch {
+                service.getTranscriptionFlow().collectLatest { result ->
+                    when (result) {
+                        is TranscriptionResult.Success -> {
+                            transcriptionFlow.value = result.text
+                            structuredTranscriptionFlow.value = result
+                            scheduleTranscriptPersistence(result)
+                        }
+                        is TranscriptionResult.Error -> {
+                            Napier.e("Transcription error: ${result.reason}")
+                            if (result.reason != TranscriptionFailure.PersistenceError) {
+                                liveTranscriptionStarted = false
+                            }
+                            structuredTranscriptionFlow.value = result
+                        }
+                        is TranscriptionResult.InProgress -> {
+                            // Just wait for the text
+                            structuredTranscriptionFlow.value = result
+                        }
+                        TranscriptionResult.Cancelled -> {
+                            structuredTranscriptionFlow.value = result
+                        }
                     }
                 }
             }
-        }
     }
 
     /**
@@ -171,8 +190,8 @@ class AndroidAudioRecordingManager(
      * and persists each cumulative result to the audio tag repository under
      * [noteId]. The tagger emits progressively as windows complete, so the
      * note's tag set in the database fills in over the seconds after the
-     * user stops recording. Errors and "unavailable" results are dropped
-     * silently — ambient tagging is enrichment, not critical path.
+     * user stops recording. Ambient tagging remains outside the critical path,
+     * but unavailable and failed results are logged for diagnosis.
      */
     private fun runAmbientTagging(
         audioPath: String,
@@ -199,7 +218,7 @@ class AndroidAudioRecordingManager(
                             Napier.w("Audio tagging failed for $noteId: ${result.message}")
                         }
                         AudioTaggingResult.Unavailable -> {
-                            // Model not on device yet — silently skip.
+                            Napier.d("Audio tagging unavailable for $noteId because its optional model is not installed")
                         }
                     }
                 }
@@ -236,38 +255,56 @@ class AndroidAudioRecordingManager(
             } else {
                 TranscriptionStatus.IN_PROGRESS
             }
-        try {
-            val timedTranscript = result.timedTranscript
-            if (timedTranscript != null) {
-                transcriptionRepository.updateTranscriptDocument(
-                    noteId = noteId,
-                    document =
-                        timedTranscript.toTranscriptDocument(
-                            status =
-                                if (status == TranscriptionStatus.COMPLETED) {
-                                    TranscriptDocumentStatus.FINAL
-                                } else {
-                                    TranscriptDocumentStatus.REFINING
-                                },
-                            source =
-                                if (result.isRefining) {
-                                    TranscriptSource.LOCAL_REFINEMENT
-                                } else {
-                                    TranscriptSource.LOCAL_LIVE
-                                },
-                        ),
-                    status = status,
-                )
-            } else {
-                transcriptionRepository.updateTranscription(
-                    noteId = noteId,
-                    text = result.text,
-                    status = status,
-                )
+        val persisted =
+            persistenceRetrier.persist {
+                try {
+                    val timedTranscript = result.timedTranscript
+                    if (timedTranscript != null) {
+                        transcriptionRepository.updateTranscriptDocument(
+                            noteId = noteId,
+                            document =
+                                timedTranscript.toTranscriptDocument(
+                                    status =
+                                        if (status == TranscriptionStatus.COMPLETED) {
+                                            TranscriptDocumentStatus.FINAL
+                                        } else {
+                                            TranscriptDocumentStatus.REFINING
+                                        },
+                                    source =
+                                        if (result.isRefining) {
+                                            TranscriptSource.LOCAL_REFINEMENT
+                                        } else {
+                                            TranscriptSource.LOCAL_LIVE
+                                        },
+                                ),
+                            status = status,
+                        )
+                    } else {
+                        transcriptionRepository.updateTranscription(
+                            noteId = noteId,
+                            text = result.text,
+                            status = status,
+                        )
+                    }
+                } catch (e: Exception) {
+                    Napier.e("Transcript persistence attempt failed for $noteId", e)
+                    false
+                }
             }
-        } catch (e: Exception) {
-            Napier.e("Failed to persist refined transcript for $noteId", e)
+        if (!persisted) {
+            Napier.e("Transcript persistence exhausted retries for $noteId")
+            structuredTranscriptionFlow.value =
+                TranscriptionResult.Error(TranscriptionFailure.PersistenceError)
         }
+    }
+
+    private fun scheduleTranscriptPersistence(result: TranscriptionResult.Success) {
+        if (result.text.isBlank() || recordingActive || sessionTargetNoteId == null) return
+        transcriptPersistenceJob?.cancel()
+        transcriptPersistenceJob =
+            scope.launch(Dispatchers.IO) {
+                persistRefinedTranscript(result)
+            }
     }
 
     override suspend fun startRecording(targetNoteId: Uuid?): Boolean {
@@ -280,6 +317,7 @@ class AndroidAudioRecordingManager(
         try {
             recordingTarget = audioStorage.createRecordingTarget()
             sessionTargetNoteId = targetNoteId
+            liveTranscriptionStarted = false
             transcriptionFlow.value = null
             structuredTranscriptionFlow.value = null
             // Start foreground service for recording
@@ -290,15 +328,38 @@ class AndroidAudioRecordingManager(
 
             // Bind to the service to get updates
             // recordingActive will be set true via onServiceConnected → service state flow
-            bindToService()
+            if (!bindToService()) {
+                context.stopAudioRecordingService()
+                startRequested = false
+                Napier.e("Recording service rejected the bind request")
+                return false
+            }
 
             // Start live transcription in parallel with recording.
             // SherpaOnnxTranscriptionService uses AudioRecord (no audio focus) so music keeps playing.
-            transcriptionService?.let { service ->
-                service.resetTranscription()
-                if (service.supportsLiveTranscription) {
-                    scope.launch { service.startLiveTranscription() }
+            try {
+                val service = transcriptionService
+                if (service == null) {
+                    structuredTranscriptionFlow.value =
+                        TranscriptionResult.Error(
+                            TranscriptionFailure.NotAvailable,
+                        )
+                } else {
+                    service.resetTranscription()
+                    if (service.supportsLiveTranscription) {
+                        when (val start = service.startLiveTranscription()) {
+                            TranscriptionStartResult.Started,
+                            TranscriptionStartResult.AlreadyRunning,
+                            -> liveTranscriptionStarted = true
+                            is TranscriptionStartResult.Failed -> {
+                                structuredTranscriptionFlow.value = TranscriptionResult.Error(start.reason)
+                            }
+                        }
+                    }
                 }
+            } catch (e: Exception) {
+                Napier.e("Transcription failed to start; audio recording will continue", e)
+                structuredTranscriptionFlow.value = TranscriptionResult.Error(TranscriptionFailure.Unknown)
             }
 
             return true
@@ -309,15 +370,15 @@ class AndroidAudioRecordingManager(
         }
     }
 
-    private fun bindToService() {
+    private fun bindToService(): Boolean =
         try {
             val intent = Intent(context, AudioRecordingService::class.java)
             context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
             // serviceBound is set to true in onServiceConnected, not here
         } catch (e: Exception) {
             Napier.e("Error binding to recording service", e)
+            false
         }
-    }
 
     private fun unbindServiceSafely() {
         if (serviceBound) {
@@ -355,16 +416,37 @@ class AndroidAudioRecordingManager(
 
             // Stop live transcription
             transcriptionService?.let { service ->
-                if (service.supportsLiveTranscription) {
-                    service.stopLiveTranscription()
-                }
+                val liveSessionWasHealthy = liveTranscriptionStarted
+                val stopResult =
+                    if (service.supportsLiveTranscription) {
+                        try {
+                            stopLiveTranscriptionWithHandoff(service) { result ->
+                                transcriptionFlow.value = result.text
+                                structuredTranscriptionFlow.value = result
+                                scheduleTranscriptPersistence(result)
+                            }
+                        } catch (e: Exception) {
+                            Napier.e("Transcription failed while stopping; recovering from the recorded file", e)
+                            TranscriptionResult.Error(TranscriptionFailure.Unknown)
+                        }
+                    } else {
+                        TranscriptionResult.Error(TranscriptionFailure.NotSupported)
+                    }
+                liveTranscriptionStarted = false
 
-                // If file transcription is supported, transcribe the recorded file
-                if (service.supportsFileTranscription && filePath != null) {
+                // File transcription is the recovery path when a live session
+                // could not start or terminated with an error. A healthy live
+                // session already produced the realtime transcript.
+                if (
+                    (!liveSessionWasHealthy || stopResult is TranscriptionResult.Error) &&
+                    service.supportsFileTranscription &&
+                    filePath != null
+                ) {
                     scope.launch {
                         val result = service.transcribeAudioFile(filePath)
                         if (result is TranscriptionResult.Success) {
                             transcriptionFlow.value = result.text
+                            scheduleTranscriptPersistence(result)
                         }
                         structuredTranscriptionFlow.value = result
                     }
@@ -419,7 +501,14 @@ class AndroidAudioRecordingManager(
             if (resumed) {
                 transcriptionService?.let { svc ->
                     if (svc.supportsLiveTranscription) {
-                        scope.launch { svc.startLiveTranscription() }
+                        when (val start = svc.startLiveTranscription()) {
+                            TranscriptionStartResult.Started,
+                            TranscriptionStartResult.AlreadyRunning,
+                            -> liveTranscriptionStarted = true
+                            is TranscriptionStartResult.Failed -> {
+                                structuredTranscriptionFlow.value = TranscriptionResult.Error(start.reason)
+                            }
+                        }
                     }
                 }
             }
@@ -464,6 +553,12 @@ class AndroidAudioRecordingManager(
         scope.cancel()
         serviceStateJob?.cancel()
         serviceStateJob = null
+        transcriptPersistenceJob?.cancel()
+        transcriptPersistenceJob = null
+        transcriptionWarmUpJob?.cancel()
+        transcriptionWarmUpJob = null
+        transcriptionCollectorJob?.cancel()
+        transcriptionCollectorJob = null
         try {
             val wasRecording = recordingActive
             if (recordingActive) {

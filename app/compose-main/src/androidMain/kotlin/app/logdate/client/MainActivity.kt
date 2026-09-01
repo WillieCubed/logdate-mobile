@@ -6,6 +6,7 @@ import android.app.HandoffActivityDataRequestInfo
 import android.app.HandoffActivityParams
 import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -65,6 +66,8 @@ import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_ID
 import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_TARGET
 import app.logdate.client.rewind.REWIND_NOTIFICATION_TARGET_DETAIL
 import app.logdate.client.testing.navigation.readNavigationTestDestination
+import app.logdate.client.testing.onboarding.DEBUG_SKIP_ONBOARDING_EXTRA
+import app.logdate.client.testing.onboarding.ONBOARDING_TEST_FIXTURE_EXTRA
 import app.logdate.client.testing.onboarding.OnboardingTestFixtureApplier
 import app.logdate.client.testing.onboarding.readOnboardingTestFixture
 import app.logdate.client.ui.navigation.LocationTimelineRoute
@@ -311,7 +314,8 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun applyOnboardingTestFixtureFromLaunchIntent() {
-        val fixture = intent?.readOnboardingTestFixture() ?: return
+        val isDebuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        val fixture = intent?.readOnboardingTestFixture(isDebuggable) ?: return
         runBlocking {
             OnboardingTestFixtureApplier(
                 profileRepository = profileRepository,
@@ -323,7 +327,8 @@ class MainActivity : FragmentActivity() {
                 onboardingDeviceStateRepository = onboardingDeviceStateRepository,
             ).apply(fixture)
         }
-        intent?.removeExtra(app.logdate.client.testing.onboarding.ONBOARDING_TEST_FIXTURE_EXTRA)
+        intent?.removeExtra(ONBOARDING_TEST_FIXTURE_EXTRA)
+        intent?.removeExtra(DEBUG_SKIP_ONBOARDING_EXTRA)
         Napier.i("Applied onboarding test fixture from launch intent", tag = APP_LAUNCH_TAG)
     }
 

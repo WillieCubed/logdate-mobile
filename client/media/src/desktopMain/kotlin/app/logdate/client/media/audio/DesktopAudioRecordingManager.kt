@@ -77,6 +77,7 @@ class DesktopAudioRecordingManager(
                     is TranscriptionResult.InProgress -> {
                         // Just wait for the text
                     }
+                    TranscriptionResult.Cancelled -> Unit
                 }
             }
         }

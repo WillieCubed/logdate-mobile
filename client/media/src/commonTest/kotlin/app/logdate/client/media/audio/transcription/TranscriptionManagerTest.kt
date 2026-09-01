@@ -23,14 +23,15 @@ class TranscriptionManagerTest {
 
                 override fun getTranscriptionFlow() = updates
 
-                override suspend fun startLiveTranscription(): Boolean = false
+                override suspend fun startLiveTranscription(): TranscriptionStartResult =
+                    TranscriptionStartResult.Failed(TranscriptionFailure.NotSupported)
 
-                override suspend fun stopLiveTranscription() = Unit
+                override suspend fun stopLiveTranscription(): TranscriptionResult = TranscriptionResult.Cancelled
 
                 override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult =
                     TranscriptionResult.Success("This is a mock transcription result")
 
-                override fun cancelTranscription() = Unit
+                override suspend fun cancelTranscription() = Unit
 
                 override fun getSupportedLanguages(): List<String> = emptyList()
 

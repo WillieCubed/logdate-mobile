@@ -1,17 +1,17 @@
 package app.logdate.feature.speech.recognition
 
 import android.content.Context
+import app.logdate.client.media.audio.SpeechFeatureProvider
 import app.logdate.client.media.audio.tagging.AudioTaggingService
 import app.logdate.client.media.audio.transcription.TranscriptAccumulator
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import kotlinx.coroutines.CoroutineScope
 
 /**
- * Provider object loaded via reflection by [OnDemandTranscriptionService][app.logdate.client.media.audio.transcription.OnDemandTranscriptionService]
- * when the speech-recognition dynamic feature module is installed.
+ * Provider loaded by the base app from the install-time speech feature split.
  */
-object SpeechRecognitionProvider {
-    fun create(
+object SpeechRecognitionProvider : SpeechFeatureProvider {
+    override fun createTranscription(
         context: Context,
         scope: CoroutineScope,
     ): TranscriptionService {
@@ -36,7 +36,7 @@ object SpeechRecognitionProvider {
      * downloaded on demand, and [AudioTaggingService.isAvailable] reports
      * whether tagging can actually run.
      */
-    fun createAudioTagging(context: Context): AudioTaggingService {
+    override fun createAudioTagging(context: Context): AudioTaggingService {
         val decoder = AudioDecoder(context)
         return SherpaOnnxAudioTaggingService(context, decoder)
     }

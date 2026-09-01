@@ -6,8 +6,8 @@ import androidx.work.WorkerParameters
 import app.logdate.client.media.audio.transcription.AndroidTranscriptionManager.Companion.KEY_AUDIO_URI
 import app.logdate.client.media.audio.transcription.AndroidTranscriptionManager.Companion.KEY_NOTE_ID
 import app.logdate.client.repository.transcription.TranscriptionRepository
-import app.logdate.client.repository.transcription.TranscriptionStatus
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
@@ -57,50 +57,18 @@ class TranscriptionWorker(
                     }
 
                 Napier.d("Starting transcription for note $noteId, URI: $audioUri")
-
-                // Update status to IN_PROGRESS
-                val updateSuccess =
-                    transcriptionRepository.updateTranscription(
-                        noteId = noteId,
-                        text = null,
-                        status = TranscriptionStatus.IN_PROGRESS,
+                val runner =
+                    TranscriptionWorkRunner(
+                        update = transcriptionRepository::updateTranscription,
+                        transcribe = transcriptionService::transcribeAudioFile,
                     )
-
-                if (!updateSuccess) {
-                    Napier.e("Failed to update transcription status to IN_PROGRESS")
-                    return@withContext Result.retry()
+                when (runner.run(noteId, audioUri)) {
+                    TranscriptionWorkOutcome.Success -> Result.success()
+                    TranscriptionWorkOutcome.Retry -> Result.retry()
+                    TranscriptionWorkOutcome.Failure -> Result.failure()
                 }
-
-                // Perform transcription
-                val result = transcriptionService.transcribeAudioFile(audioUri)
-
-                // Update transcription with result
-                when (result) {
-                    is TranscriptionResult.Success -> {
-                        Napier.d("Transcription successful for note $noteId")
-                        transcriptionRepository.updateTranscription(
-                            noteId = noteId,
-                            text = result.text,
-                            status = TranscriptionStatus.COMPLETED,
-                        )
-                        Result.success()
-                    }
-                    is TranscriptionResult.Error -> {
-                        Napier.e("Transcription failed for note $noteId: ${result.reason}")
-                        transcriptionRepository.updateTranscription(
-                            noteId = noteId,
-                            text = null,
-                            status = TranscriptionStatus.FAILED,
-                            errorMessage = result.reason.toString(),
-                        )
-                        Result.failure()
-                    }
-                    is TranscriptionResult.InProgress -> {
-                        // This should not happen with transcribeAudioFile, but just in case
-                        Napier.w("Transcription still in progress, will retry")
-                        Result.retry()
-                    }
-                }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Napier.e("Error in TranscriptionWorker", e)
                 Result.failure()

@@ -8,8 +8,10 @@ import app.logdate.client.media.audio.tagging.NoopAudioTaggingService
 import app.logdate.client.media.audio.transcription.TimedTranscript
 import app.logdate.client.media.audio.transcription.TimedUtterance
 import app.logdate.client.media.audio.transcription.TimedWord
+import app.logdate.client.media.audio.transcription.TranscriptionFailure
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
+import app.logdate.client.media.audio.transcription.TranscriptionStartResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -149,6 +151,35 @@ class AudioViewModelTest {
         }
 
     @Test
+    fun `a transcription start failure is not overwritten by optimistic progress`() =
+        runTest(dispatcher) {
+            val recordingManager =
+                FakeAudioRecordingManager(
+                    outputUri = "file:///test/audio.m4a",
+                    initialDuration = 1.seconds,
+                    initialLevel = 0.1f,
+                    startResult = TranscriptionResult.Error(TranscriptionFailure.NotAvailable),
+                )
+            val viewModel =
+                AudioViewModel(
+                    audioRecordingManager = recordingManager,
+                    audioPlaybackManager = FakeAudioPlaybackManager(),
+                    audioDurationResolver = FakeAudioDurationResolver(),
+                    transcriptionService = FakeTranscriptionService(),
+                    audioTaggingService = NoopAudioTaggingService,
+                )
+
+            viewModel.startRecording()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.uiState.value.isRecording)
+            assertEquals(
+                AudioUiState.TranscriptionState.Error(TranscriptionFailure.NotAvailable),
+                viewModel.uiState.value.transcriptionState,
+            )
+        }
+
+    @Test
     fun `structured transcription preserves timed transcript`() =
         runTest(dispatcher) {
             val recordingManager =
@@ -232,6 +263,7 @@ private class FakeAudioRecordingManager(
     private val outputUri: String,
     initialDuration: Duration,
     initialLevel: Float,
+    private val startResult: TranscriptionResult? = null,
 ) : AudioRecordingManager {
     private val audioLevelFlow = MutableStateFlow(initialLevel)
     private val durationFlow = MutableStateFlow(initialDuration)
@@ -243,6 +275,7 @@ private class FakeAudioRecordingManager(
 
     override suspend fun startRecording(targetNoteId: kotlin.uuid.Uuid?): Boolean {
         isRecording = true
+        startResult?.let { structuredFlow.emit(it) }
         return true
     }
 
@@ -318,13 +351,13 @@ private class FakeTranscriptionService : TranscriptionService {
 
     override fun getTranscriptionFlow(): SharedFlow<TranscriptionResult> = transcriptionFlow
 
-    override suspend fun startLiveTranscription(): Boolean = true
+    override suspend fun startLiveTranscription(): TranscriptionStartResult = TranscriptionStartResult.Started
 
-    override suspend fun stopLiveTranscription() = Unit
+    override suspend fun stopLiveTranscription(): TranscriptionResult = TranscriptionResult.Cancelled
 
     override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult = TranscriptionResult.Success("Test transcription")
 
-    override fun cancelTranscription() = Unit
+    override suspend fun cancelTranscription() = Unit
 
     override fun getSupportedLanguages(): List<String> = emptyList()
 

@@ -22,7 +22,7 @@ class SaveEntryUseCase(
     ) {
         addNoteUseCase(notes = notes, journalIds = journalIds)
         if (activeDraftId != null) {
-            deleteEntryDraft(activeDraftId)
+            deleteEntryDraft.deleteAfterPublish(activeDraftId)
         }
     }
 }

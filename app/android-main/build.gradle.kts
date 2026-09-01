@@ -2,6 +2,7 @@
 
 import com.android.build.api.dsl.ApplicationExtension
 import java.util.Properties
+import java.util.zip.ZipFile
 
 plugins {
     alias(libs.plugins.android.application)
@@ -317,6 +318,69 @@ tasks.configureEach {
 play {
     track.set(resolvedPlayTrack)
     defaultToAppBundles.set(true)
+}
+
+fun registerSpeechBundleVerification(variantName: String) =
+    tasks.register("verifySpeechRecognition${variantName.replaceFirstChar(Char::uppercase)}Bundle") {
+        val bundleTaskName = "bundle${variantName.replaceFirstChar(Char::uppercase)}"
+        val bundleFile = layout.buildDirectory.file("outputs/bundle/$variantName/android-main-$variantName.aab")
+        group = "verification"
+        description = "Verifies that the $variantName app bundle contains the install-time speech engine."
+        dependsOn(bundleTaskName)
+        inputs.file(bundleFile)
+
+        doLast {
+            val artifact = bundleFile.get().asFile
+            check(artifact.isFile) { "Android App Bundle not found: ${artifact.absolutePath}" }
+
+            ZipFile(artifact).use { bundle ->
+                val entries = bundle.entries().asSequence().associateBy { it.name }
+                val requiredEntries =
+                    listOf(
+                        "speechrecognition/manifest/AndroidManifest.xml",
+                        "speechrecognition/assets/sherpa-onnx-stt-en.zip",
+                        "speechrecognition/assets/sherpa-onnx-punct-en.zip",
+                        "speechrecognition/assets/silero-vad.zip",
+                    )
+                val missingEntries = requiredEntries.filterNot(entries::containsKey)
+                check(missingEntries.isEmpty()) {
+                    "Speech recognition bundle entries are missing: ${missingEntries.joinToString()}"
+                }
+
+                val manifestText =
+                    bundle
+                        .getInputStream(entries.getValue("speechrecognition/manifest/AndroidManifest.xml"))
+                        .readBytes()
+                        .toString(Charsets.ISO_8859_1)
+                check("install-time" in manifestText) {
+                    "The speechrecognition feature must use install-time delivery"
+                }
+
+                val featureDexEntries = entries.values.filter { it.name.matches(Regex("speechrecognition/dex/classes\\d*\\.dex")) }
+                check(
+                    featureDexEntries.any { dexEntry ->
+                        bundle
+                            .getInputStream(dexEntry)
+                            .readBytes()
+                            .toString(Charsets.ISO_8859_1)
+                            .contains("SpeechRecognitionProvider")
+                    },
+                ) {
+                    "SpeechRecognitionProvider is missing from the speechrecognition feature dex"
+                }
+
+                check(entries.keys.any { it.matches(Regex("speechrecognition/lib/.+/libsherpa-onnx-jni\\.so")) }) {
+                    "Sherpa-ONNX native libraries are missing from the speechrecognition feature"
+                }
+            }
+        }
+    }
+
+val verifySpeechRecognitionDebugBundle = registerSpeechBundleVerification("debug")
+val verifySpeechRecognitionReleaseBundle = registerSpeechBundleVerification("release")
+
+tasks.matching { it.name == "publishReleaseBundle" }.configureEach {
+    dependsOn(verifySpeechRecognitionReleaseBundle)
 }
 
 dependencies {

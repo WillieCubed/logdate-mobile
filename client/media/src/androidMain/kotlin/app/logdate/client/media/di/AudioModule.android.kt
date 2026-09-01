@@ -8,9 +8,10 @@ import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.client.media.audio.AudioStorage
+import app.logdate.client.media.audio.SpeechFeatureProviderLoader
 import app.logdate.client.media.audio.tagging.AudioTaggingService
-import app.logdate.client.media.audio.tagging.OnDemandAudioTaggingService
-import app.logdate.client.media.audio.transcription.OnDemandTranscriptionService
+import app.logdate.client.media.audio.tagging.InstallTimeAudioTaggingService
+import app.logdate.client.media.audio.transcription.InstallTimeTranscriptionService
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import app.logdate.client.media.device.AndroidAudioRouteRepository
 import app.logdate.client.media.device.AudioRouteRepository
@@ -39,17 +40,24 @@ actual val audioModule: Module =
         single<AudioDurationResolver> { AndroidAudioDurationResolver(androidContext()) }
         single<AudioRouteRepository> { AndroidAudioRouteRepository(androidContext()) }
 
-        // On-demand transcription: loads Sherpa-ONNX from dynamic module when available,
-        // falls back to Android's built-in SpeechRecognizer otherwise
+        single { SpeechFeatureProviderLoader() }
+
+        // Core on-device speech ships as an install-time feature split. The facade
+        // keeps the base module independent of Sherpa-ONNX while making recording
+        // treat transcription as an always-present product capability.
         single<TranscriptionService> {
-            OnDemandTranscriptionService(
+            InstallTimeTranscriptionService(
                 context = androidContext(),
                 scope = get(),
-                dataUsagePolicy = get(),
+                providerLoader = get(),
             )
         }
 
-        // On-device ambient sound tagging. Loads CED from the speech-recognition
-        // dynamic feature module when present and reports as unavailable otherwise.
-        single<AudioTaggingService> { OnDemandAudioTaggingService(androidContext()) }
+        // CED remains an optional model download inside the installed speech feature.
+        single<AudioTaggingService> {
+            InstallTimeAudioTaggingService(
+                context = androidContext(),
+                providerLoader = get(),
+            )
+        }
     }

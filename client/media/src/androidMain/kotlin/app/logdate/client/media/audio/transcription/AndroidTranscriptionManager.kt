@@ -5,7 +5,7 @@ import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -37,40 +37,17 @@ class AndroidTranscriptionManager(
 
         return withContext(Dispatchers.IO) {
             try {
-                // Prepare input data
-                val inputData =
-                    Data
-                        .Builder()
-                        .putString(KEY_NOTE_ID, noteId.toString())
-                        .putString(KEY_AUDIO_URI, audioUri)
-                        .build()
-
-                // Define work constraints
-                val constraints =
-                    Constraints
-                        .Builder()
-                        .setRequiresBatteryNotLow(true)
-                        .setRequiredNetworkType(NetworkType.CONNECTED)
-                        .build()
-
-                // Create work request
-                val workRequest =
-                    OneTimeWorkRequestBuilder<TranscriptionWorker>()
-                        .setInputData(inputData)
-                        .setConstraints(constraints)
-                        .setBackoffCriteria(
-                            BackoffPolicy.EXPONENTIAL,
-                            10, // Initial backoff delay in seconds
-                            TimeUnit.SECONDS,
-                        ).build()
+                val workRequest = buildTranscriptionWorkRequest(noteId, audioUri)
 
                 // Enqueue unique work to ensure only one transcription job runs for this note
                 val workName = WORK_NAME_PREFIX + noteId.toString()
-                workManager.enqueueUniqueWork(
-                    workName,
-                    ExistingWorkPolicy.REPLACE, // Replace any existing work for this note
-                    workRequest,
-                )
+                workManager
+                    .enqueueUniqueWork(
+                        workName,
+                        ExistingWorkPolicy.REPLACE,
+                        workRequest,
+                    ).result
+                    .get()
 
                 true
             } catch (e: Exception) {
@@ -86,7 +63,7 @@ class AndroidTranscriptionManager(
         return withContext(Dispatchers.IO) {
             try {
                 val workName = WORK_NAME_PREFIX + noteId.toString()
-                workManager.cancelUniqueWork(workName)
+                workManager.cancelUniqueWork(workName).result.get()
                 true
             } catch (e: Exception) {
                 Napier.e("Failed to cancel transcription", e)
@@ -104,7 +81,7 @@ class AndroidTranscriptionManager(
                 val workInfos = workManager.getWorkInfosByTag(TranscriptionWorker.TAG).get()
 
                 // Cancel all work
-                workManager.cancelAllWorkByTag(TranscriptionWorker.TAG)
+                workManager.cancelAllWorkByTag(TranscriptionWorker.TAG).result.get()
 
                 // Return count of canceled jobs
                 workInfos.count { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED }
@@ -114,4 +91,31 @@ class AndroidTranscriptionManager(
             }
         }
     }
+}
+
+internal fun buildTranscriptionWorkRequest(
+    noteId: Uuid,
+    audioUri: String,
+): OneTimeWorkRequest {
+    val inputData =
+        Data
+            .Builder()
+            .putString(AndroidTranscriptionManager.KEY_NOTE_ID, noteId.toString())
+            .putString(AndroidTranscriptionManager.KEY_AUDIO_URI, audioUri)
+            .build()
+    val constraints =
+        Constraints
+            .Builder()
+            .setRequiresBatteryNotLow(true)
+            .build()
+
+    return OneTimeWorkRequestBuilder<TranscriptionWorker>()
+        .setInputData(inputData)
+        .setConstraints(constraints)
+        .addTag(TranscriptionWorker.TAG)
+        .setBackoffCriteria(
+            BackoffPolicy.EXPONENTIAL,
+            10,
+            TimeUnit.SECONDS,
+        ).build()
 }

@@ -191,10 +191,10 @@ docker-compose --profile full-stack up
 
 ### Client Applications
 ```bash
-# Build Android app
+# Build the Android base APK only (dynamic feature code is not included)
 ./gradlew :app:android-main:assembleDebug
 
-# Build and install Android app
+# Build and install the app with its install-time feature splits
 ./gradlew :app:android-main:installDebug
 
 # Build a release app bundle
@@ -206,6 +206,11 @@ docker-compose --profile full-stack up
 # Run Desktop app
 ./gradlew :app:compose-main:run
 ```
+
+On-device transcription ships in the `speechrecognition` install-time feature
+split. Use Android Studio's Run action, `installDebug`, or an Android App Bundle
+for a functional app installation. Installing the standalone APK produced by
+`assembleDebug` omits that split and therefore cannot provide transcription.
 
 ### Testing
 ```bash
