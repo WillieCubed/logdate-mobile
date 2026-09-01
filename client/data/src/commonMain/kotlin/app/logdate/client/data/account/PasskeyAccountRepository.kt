@@ -25,6 +25,7 @@ import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyAssertionResponse
 import app.logdate.shared.model.PasskeyAuthenticationOptions
 import app.logdate.shared.model.PasskeyCredentialResponse
+import app.logdate.shared.model.PasskeyInfo
 import app.logdate.shared.model.ServerCapability
 import app.logdate.shared.model.ServerProtocolFeature
 import io.github.aakira.napier.Napier
@@ -546,6 +547,22 @@ class DefaultPasskeyAccountRepository(
     }
 
     override suspend fun getCurrentAccount(): LogDateAccount? = _currentAccount.value
+
+    override suspend fun listPasskeys(): Result<List<PasskeyInfo>> {
+        val session =
+            sessionStorage.getSession()
+                ?: return Result.failure(Exception("No active session"))
+
+        val result = apiClient.listPasskeys(session.accessToken)
+        if (result.isSuccess) return result
+
+        // Same refresh-and-retry as the other authenticated calls: an expired token should cost
+        // the user a refresh, not an empty list that reads as "you have no passkeys".
+        val refreshResult = refreshAuthentication()
+        if (!refreshResult.isSuccess) return result
+        val updatedSession = sessionStorage.getSession() ?: return result
+        return apiClient.listPasskeys(updatedSession.accessToken)
+    }
 
     override suspend fun deletePasskey(credentialId: String): Result<Unit> {
         return try {

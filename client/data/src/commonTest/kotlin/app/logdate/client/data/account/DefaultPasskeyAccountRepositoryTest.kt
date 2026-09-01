@@ -28,6 +28,7 @@ import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyAllowCredential
 import app.logdate.shared.model.PasskeyAuthenticationOptions
 import app.logdate.shared.model.PasskeyCapabilities
+import app.logdate.shared.model.PasskeyInfo
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyUser
 import app.logdate.shared.model.PublicKeyCredentialParameter
@@ -950,6 +951,8 @@ class DefaultPasskeyAccountRepositoryTest {
             loggedOutRefreshToken = refreshToken
             return logoutResponse
         }
+
+        override suspend fun listPasskeys(accessToken: String): Result<List<PasskeyInfo>> = Result.success(emptyList())
 
         override suspend fun deletePasskey(
             accessToken: String,

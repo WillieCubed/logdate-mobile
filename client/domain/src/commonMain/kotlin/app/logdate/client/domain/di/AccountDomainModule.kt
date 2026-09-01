@@ -13,6 +13,7 @@ import app.logdate.client.domain.account.GetAccountSetupDataUseCase
 import app.logdate.client.domain.account.GetAvailablePlansUseCase
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
 import app.logdate.client.domain.account.GetCurrentEntitlementUseCase
+import app.logdate.client.domain.account.GetPasskeysUseCase
 import app.logdate.client.domain.account.HasLogDateCloudAccountUseCase
 import app.logdate.client.domain.account.PreferencesBackfilledAccountTracker
 import app.logdate.client.domain.account.SignInWithGoogleUseCase
@@ -36,6 +37,7 @@ val accountDomainModule: Module =
         factory { GetCurrentAccountUseCase(get()) }
         factory { HasLogDateCloudAccountUseCase(get()) }
         factory { DeletePasskeyUseCase(get()) }
+        factory { GetPasskeysUseCase(get()) }
         factory { GetAccountSetupDataUseCase(get()) }
         factory { CreateRemoteAccountUseCase(get()) }
         factory { CheckUsernameAvailabilityUseCase(get()) }

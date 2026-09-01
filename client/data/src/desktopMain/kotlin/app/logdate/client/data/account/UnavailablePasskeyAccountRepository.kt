@@ -3,6 +3,7 @@ package app.logdate.client.data.account
 import app.logdate.client.repository.account.AccountCreationRequest
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.PasskeyInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,6 +47,8 @@ class UnavailablePasskeyAccountRepository : PasskeyAccountRepository {
 
     override suspend fun deletePasskey(credentialId: String): Result<Unit> =
         Result.failure(UnsupportedOperationException(UNAVAILABLE_MESSAGE))
+
+    override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = unavailable()
 
     private fun <T> unavailable(): Result<T> = Result.failure(UnsupportedOperationException(UNAVAILABLE_MESSAGE))
 

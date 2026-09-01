@@ -12,12 +12,14 @@ import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.domain.account.CreatePasskeyUseCase
 import app.logdate.client.domain.account.DeletePasskeyUseCase
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
+import app.logdate.client.domain.account.GetPasskeysUseCase
 import app.logdate.client.repository.account.AccountCreationRequest
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.feature.core.AppAuthState
 import app.logdate.feature.core.BiometricGatekeeper
 import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.PasskeyInfo
 import app.logdate.shared.model.user.AppSecurityLevel
 import app.logdate.shared.model.user.UserData
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +29,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -41,6 +44,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PrivacySettingsViewModelTest {
@@ -55,6 +59,70 @@ class PrivacySettingsViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
     }
+
+    /**
+     * The account payload carries credential IDs and nothing else, so without the details call the
+     * list cannot say which device a credential belongs to -- which is the whole decision the
+     * screen exists to support.
+     */
+    @Test
+    fun `passkeys carry the details the account payload does not`() =
+        runTest {
+            val credentialId = "cred-a"
+            val viewModel =
+                buildViewModel(
+                    gatekeeper = ScriptedBiometricGatekeeper(AppAuthState.NO_PROMPT_NEEDED),
+                    userStateRepository = FakeUserStateRepository(),
+                    account = accountWithPasskeys(credentialId),
+                    passkeyDetails =
+                        listOf(
+                            PasskeyInfo(
+                                id = Uuid.random(),
+                                credentialId = credentialId,
+                                nickname = "Pixel",
+                                deviceType = "platform",
+                                createdAt = Instant.parse("2026-01-01T00:00:00Z"),
+                                lastUsedAt = Instant.parse("2026-06-01T00:00:00Z"),
+                            ),
+                        ),
+                    session = UserSession(accessToken = "a", refreshToken = "r", accountId = "acct"),
+                )
+
+            // state is shared WhileSubscribed, so without a collector it never leaves its initial value.
+            backgroundScope.launch { viewModel.state.collect {} }
+            advanceUntilIdle()
+
+            val passkey =
+                viewModel.state.value.passkeys
+                    .single()
+            assertEquals(credentialId, passkey.id)
+            assertEquals("platform", passkey.device)
+            assertEquals(Instant.parse("2026-06-01T00:00:00Z"), passkey.lastUsed)
+        }
+
+    /** A credential the details call did not describe still renders, just without the extras. */
+    @Test
+    fun `a passkey with no details still appears`() =
+        runTest {
+            val viewModel =
+                buildViewModel(
+                    gatekeeper = ScriptedBiometricGatekeeper(AppAuthState.NO_PROMPT_NEEDED),
+                    userStateRepository = FakeUserStateRepository(),
+                    account = accountWithPasskeys("cred-unknown"),
+                    passkeyDetails = emptyList(),
+                    session = UserSession(accessToken = "a", refreshToken = "r", accountId = "acct"),
+                )
+
+            backgroundScope.launch { viewModel.state.collect {} }
+            advanceUntilIdle()
+
+            val passkey =
+                viewModel.state.value.passkeys
+                    .single()
+            assertEquals("cred-unknown", passkey.id)
+            assertNull(passkey.device)
+            assertNull(passkey.lastUsed)
+        }
 
     @Test
     fun `enabling biometric persists only when authentication succeeds`() =
@@ -145,20 +213,33 @@ class PrivacySettingsViewModelTest {
         gatekeeper: BiometricGatekeeper,
         userStateRepository: UserStateRepository,
         identityKeyManager: IdentityKeyManager = buildIdentityKeyManager(),
+        account: LogDateAccount? = null,
+        passkeyDetails: List<PasskeyInfo> = emptyList(),
+        session: UserSession? = null,
     ): PrivacySettingsViewModel {
-        val passkeyRepository = FakePasskeyAccountRepository()
+        val passkeyRepository = FakePasskeyAccountRepository(account, passkeyDetails)
         return PrivacySettingsViewModel(
             preferencesDataSource = LogdatePreferencesDataSource(InMemoryPreferencesDataStore()),
             userStateRepository = userStateRepository,
-            sessionStorage = FakeSessionStorage(),
+            sessionStorage = FakeSessionStorage(session),
             getCurrentAccountUseCase = GetCurrentAccountUseCase(passkeyRepository),
             createPasskeyUseCase = CreatePasskeyUseCase(passkeyRepository),
             deletePasskeyUseCase = DeletePasskeyUseCase(passkeyRepository),
+            getPasskeysUseCase = GetPasskeysUseCase(passkeyRepository),
             biometricGatekeeper = gatekeeper,
             identityKeyManager = identityKeyManager,
             supportsSystemSearchVisibilityToggle = false,
         )
     }
+
+    /** An account holding the given credential IDs, which is all the account payload ever carries. */
+    private fun accountWithPasskeys(vararg credentialIds: String): LogDateAccount =
+        LogDateAccount(
+            id = Uuid.random(),
+            username = "someone",
+            displayName = "Someone",
+            passkeyCredentialIds = credentialIds.toList(),
+        )
 
     private fun buildIdentityKeyManager(): IdentityKeyManager =
         IdentityKeyManager(
@@ -283,21 +364,26 @@ class PrivacySettingsViewModelTest {
         ): ByteArray = ciphertext
     }
 
-    private class FakeSessionStorage : SessionStorage {
-        override fun getSession(): UserSession? = null
+    private class FakeSessionStorage(
+        private val session: UserSession? = null,
+    ) : SessionStorage {
+        override fun getSession(): UserSession? = session
 
-        override fun getSessionFlow(): StateFlow<UserSession?> = MutableStateFlow(null)
+        override fun getSessionFlow(): StateFlow<UserSession?> = MutableStateFlow(session)
 
-        override suspend fun hasValidSession(): Boolean = false
+        override suspend fun hasValidSession(): Boolean = session != null
 
         override fun saveSession(session: UserSession) {}
 
         override fun clearSession() {}
     }
 
-    private class FakePasskeyAccountRepository : PasskeyAccountRepository {
-        override val currentAccount: StateFlow<LogDateAccount?> = MutableStateFlow(null)
-        override val isAuthenticated: StateFlow<Boolean> = MutableStateFlow(false)
+    private class FakePasskeyAccountRepository(
+        account: LogDateAccount? = null,
+        private val passkeys: List<PasskeyInfo> = emptyList(),
+    ) : PasskeyAccountRepository {
+        override val currentAccount: StateFlow<LogDateAccount?> = MutableStateFlow(account)
+        override val isAuthenticated: StateFlow<Boolean> = MutableStateFlow(account != null)
 
         override suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> =
             Result.failure(NotImplementedError())
@@ -316,6 +402,8 @@ class PrivacySettingsViewModelTest {
         override suspend fun getAccountInfo(): Result<LogDateAccount> = Result.failure(NotImplementedError())
 
         override suspend fun refreshAuthentication(): Result<Unit> = Result.success(Unit)
+
+        override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = Result.success(passkeys)
 
         override suspend fun deletePasskey(credentialId: String): Result<Unit> = Result.success(Unit)
 

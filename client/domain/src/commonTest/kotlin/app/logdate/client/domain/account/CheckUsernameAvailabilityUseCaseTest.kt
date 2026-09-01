@@ -2,6 +2,7 @@ package app.logdate.client.domain.account
 
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.PasskeyInfo
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -41,6 +42,8 @@ class CheckUsernameAvailabilityUseCaseTest {
                     override suspend fun getAccountInfo(): kotlin.Result<LogDateAccount> = kotlin.Result.failure(NotImplementedError())
 
                     override suspend fun refreshAuthentication(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = Result.success(emptyList())
 
                     override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> =
                         kotlin.Result.failure(NotImplementedError())
@@ -90,6 +93,8 @@ class CheckUsernameAvailabilityUseCaseTest {
 
                     override suspend fun refreshAuthentication(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
 
+                    override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = Result.success(emptyList())
+
                     override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> =
                         kotlin.Result.failure(NotImplementedError())
 
@@ -137,6 +142,8 @@ class CheckUsernameAvailabilityUseCaseTest {
                     override suspend fun getAccountInfo(): kotlin.Result<LogDateAccount> = kotlin.Result.failure(NotImplementedError())
 
                     override suspend fun refreshAuthentication(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = Result.success(emptyList())
 
                     override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> =
                         kotlin.Result.failure(NotImplementedError())
@@ -186,6 +193,8 @@ class CheckUsernameAvailabilityUseCaseTest {
 
                     override suspend fun refreshAuthentication(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
 
+                    override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = Result.success(emptyList())
+
                     override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> =
                         kotlin.Result.failure(NotImplementedError())
 
@@ -233,6 +242,8 @@ class CheckUsernameAvailabilityUseCaseTest {
                     override suspend fun getAccountInfo(): kotlin.Result<LogDateAccount> = kotlin.Result.failure(NotImplementedError())
 
                     override suspend fun refreshAuthentication(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = Result.success(emptyList())
 
                     override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> =
                         kotlin.Result.failure(NotImplementedError())
@@ -282,6 +293,8 @@ class CheckUsernameAvailabilityUseCaseTest {
 
                     override suspend fun refreshAuthentication(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
 
+                    override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = Result.success(emptyList())
+
                     override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> =
                         kotlin.Result.failure(NotImplementedError())
 
@@ -330,6 +343,8 @@ class CheckUsernameAvailabilityUseCaseTest {
                     override suspend fun getAccountInfo(): kotlin.Result<LogDateAccount> = kotlin.Result.failure(NotImplementedError())
 
                     override suspend fun refreshAuthentication(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+                    override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = Result.success(emptyList())
 
                     override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> =
                         kotlin.Result.failure(NotImplementedError())

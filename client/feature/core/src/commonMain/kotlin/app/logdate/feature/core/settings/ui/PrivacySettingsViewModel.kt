@@ -8,6 +8,7 @@ import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.domain.account.CreatePasskeyUseCase
 import app.logdate.client.domain.account.DeletePasskeyUseCase
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
+import app.logdate.client.domain.account.GetPasskeysUseCase
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.feature.core.AppAuthState
 import app.logdate.feature.core.BiometricGatekeeper
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import app.logdate.shared.model.PasskeyInfo as SharedPasskeyInfo
 
 data class PrivacySettingsState(
     val isBiometricsEnabled: Boolean,
@@ -65,6 +67,7 @@ class PrivacySettingsViewModel(
     private val getCurrentAccountUseCase: GetCurrentAccountUseCase,
     private val createPasskeyUseCase: CreatePasskeyUseCase,
     private val deletePasskeyUseCase: DeletePasskeyUseCase,
+    private val getPasskeysUseCase: GetPasskeysUseCase,
     private val biometricGatekeeper: BiometricGatekeeper,
     private val identityKeyManager: IdentityKeyManager,
     private val supportsSystemSearchVisibilityToggle: Boolean = false,
@@ -89,17 +92,36 @@ class PrivacySettingsViewModel(
             }
         }
 
+    /**
+     * Details for each passkey, fetched separately because the account payload carries only IDs.
+     *
+     * Starts empty and fills in, so the list appears immediately from what the account already
+     * knows rather than waiting on the network to show anything at all.
+     */
+    private val passkeyDetails = MutableStateFlow<List<SharedPasskeyInfo>>(emptyList())
+
+    init {
+        // Load whenever a session appears, and clear on sign-out so one account's device names
+        // cannot be left on screen for the next person to sign in.
+        viewModelScope.launch {
+            sessionStorage.getSessionFlow().collect { session ->
+                passkeyDetails.value = if (session == null) emptyList() else getPasskeysUseCase()
+            }
+        }
+    }
+
     val state: StateFlow<PrivacySettingsState> =
         combine(
             preferencesDataSource.observeSystemSearchVisibilityEnabled(),
             userStateRepository.userData,
             sessionStorage.getSessionFlow(),
             currentAccountFlow,
-        ) { isSystemSearchVisibilityEnabled, userData, session, account ->
+            passkeyDetails,
+        ) { isSystemSearchVisibilityEnabled, userData, session, account, details ->
             PrivacySettingsState(
                 isBiometricsEnabled = userData.securityLevel == AppSecurityLevel.BIOMETRIC,
                 isAuthenticated = session != null,
-                passkeys = account.orDefault().toPasskeyInfoList(),
+                passkeys = account.orDefault().toPasskeyInfoList(details),
                 isSystemSearchVisibilityEnabled = isSystemSearchVisibilityEnabled,
                 showSystemSearchVisibilityToggle = supportsSystemSearchVisibilityToggle,
             )
@@ -114,6 +136,18 @@ class PrivacySettingsViewModel(
                 showSystemSearchVisibilityToggle = supportsSystemSearchVisibilityToggle,
             ),
         )
+
+    /**
+     * Reloads the passkey details.
+     *
+     * Failure is deliberately quiet: the list still renders from the credential IDs the account
+     * carries, and an error banner over supplementary detail would be noise on a settings screen.
+     */
+    fun refreshPasskeyDetails() {
+        viewModelScope.launch {
+            passkeyDetails.value = getPasskeysUseCase()
+        }
+    }
 
     fun setBiometricEnabled(enabled: Boolean) {
         if (!enabled) {
@@ -187,6 +221,9 @@ class PrivacySettingsViewModel(
             _passkeyCreationState.value =
                 when (result) {
                     is CreatePasskeyUseCase.CreatePasskeyResult.Success -> {
+                        // The new passkey's nickname and device come from the server, so the list
+                        // stays a credential short until it is read back.
+                        refreshPasskeyDetails()
                         PasskeyCreationState.Success(result.account)
                     }
                     is CreatePasskeyUseCase.CreatePasskeyResult.Error -> {
@@ -202,7 +239,12 @@ class PrivacySettingsViewModel(
             val result = deletePasskeyUseCase(DeletePasskeyUseCase.DeletePasskeyRequest(credentialId))
             _passkeyRevocationState.value =
                 when (result) {
-                    is DeletePasskeyUseCase.DeletePasskeyResult.Success -> PasskeyRevocationState.Success
+                    is DeletePasskeyUseCase.DeletePasskeyResult.Success -> {
+                        // Drop the revoked credential's details rather than leaving a row
+                        // describing something the account no longer has.
+                        refreshPasskeyDetails()
+                        PasskeyRevocationState.Success
+                    }
                     is DeletePasskeyUseCase.DeletePasskeyResult.Error -> PasskeyRevocationState.Error(result.message)
                 }
         }

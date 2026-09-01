@@ -5,6 +5,7 @@ import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.user.UserData
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
+import app.logdate.shared.model.PasskeyInfo as SharedPasskeyInfo
 
 fun UserData?.orDefault(): UserData = this ?: UserData()
 
@@ -46,9 +47,19 @@ fun LogDateAccount.toUserProfile(): UserProfile =
  * server does record a nickname, device type, and real timestamps; exposing them needs an endpoint
  * that does not exist yet.
  */
-fun LogDateAccount.toPasskeyInfoList(): List<PasskeyInfo> =
-    if (username.isNotEmpty()) {
-        passkeyCredentialIds.map { credentialId -> PasskeyInfo(id = credentialId) }
-    } else {
-        emptyList()
+fun LogDateAccount.toPasskeyInfoList(details: List<SharedPasskeyInfo> = emptyList()): List<PasskeyInfo> {
+    if (username.isEmpty()) return emptyList()
+
+    val byCredentialId = details.associateBy { it.credentialId }
+    return passkeyCredentialIds.map { credentialId ->
+        val detail = byCredentialId[credentialId]
+        PasskeyInfo(
+            id = credentialId,
+            // Only what the server actually said. A credential the details call did not cover
+            // still renders, just without the extras -- better a sparse row than an invented one.
+            device = detail?.deviceType,
+            createdAt = detail?.createdAt?.toString(),
+            lastUsed = detail?.lastUsedAt,
+        )
     }
+}
