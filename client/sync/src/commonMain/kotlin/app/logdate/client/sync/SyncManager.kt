@@ -145,6 +145,13 @@ enum class SyncPausedReason {
      * allowed to run. Only the user can clear this, by allowing background data for LogDate.
      */
     BACKGROUND_DATA_OFF,
+
+    /**
+     * Photos and videos are held back until the device is on Wi-Fi. Text still syncs, so this is
+     * a partial pause: it is reported only once something has actually been held back, never as a
+     * standing warning about being on cellular.
+     */
+    MEDIA_WAITING_FOR_WIFI,
 }
 
 /**

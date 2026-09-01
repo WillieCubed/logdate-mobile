@@ -77,6 +77,7 @@ import logdate.client.feature.core.generated.resources.sync_feedback_up_to_date
 import logdate.client.feature.core.generated.resources.sync_now
 import logdate.client.feature.core.generated.resources.sync_paused_background_data_off
 import logdate.client.feature.core.generated.resources.sync_paused_background_data_off_fix
+import logdate.client.feature.core.generated.resources.sync_paused_media_waiting_for_wifi
 import logdate.client.feature.core.generated.resources.sync_paused_offline
 import logdate.client.feature.core.generated.resources.sync_paused_signed_out
 import logdate.client.feature.core.generated.resources.sync_status
@@ -467,9 +468,23 @@ private fun SyncStatusText(syncStatus: app.logdate.client.sync.SyncStatus?) {
                                 stringResource(Res.string.sync_paused_background_data_off)
 
                             SyncPausedReason.OFFLINE -> stringResource(Res.string.sync_paused_offline)
+                            SyncPausedReason.MEDIA_WAITING_FOR_WIFI ->
+                                stringResource(Res.string.sync_paused_media_waiting_for_wifi)
                             SyncPausedReason.NOT_SIGNED_IN -> stringResource(Res.string.sync_paused_signed_out)
                         },
-                    color = MaterialTheme.colorScheme.error,
+                    // Only the states the user has to do something about are coloured as
+                    // problems. Waiting for Wi-Fi resolves itself, and dressing it up as an error
+                    // teaches people to ignore the line that matters.
+                    color =
+                        when (pausedReason) {
+                            SyncPausedReason.BACKGROUND_DATA_OFF,
+                            SyncPausedReason.NOT_SIGNED_IN,
+                            -> MaterialTheme.colorScheme.error
+
+                            SyncPausedReason.OFFLINE,
+                            SyncPausedReason.MEDIA_WAITING_FOR_WIFI,
+                            -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                 )
                 if (pausedReason == SyncPausedReason.BACKGROUND_DATA_OFF) {
                     Text(

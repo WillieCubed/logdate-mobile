@@ -100,6 +100,14 @@ class DefaultSyncManager(
 
     private var isEnabled = true
 
+    /**
+     * Whether the last upload pass held a photo or video back for want of Wi-Fi.
+     *
+     * Reset at the start of each upload pass so the status reflects the current run rather than
+     * a deferral the device has long since worked through.
+     */
+    private var mediaDeferredForNetwork = false
+
     private val _syncStatusFlow =
         MutableStateFlow(
             SyncStatus(
@@ -159,10 +167,16 @@ class DefaultSyncManager(
      */
     private suspend fun currentPausedReason(authenticated: Boolean): SyncPausedReason? {
         if (!authenticated) return SyncPausedReason.NOT_SIGNED_IN
-        return when (runCatching { dataUsagePolicy.currentRestriction() }.getOrNull()) {
+        val restriction = runCatching { dataUsagePolicy.currentRestriction() }.getOrNull()
+        return when (restriction) {
             DataRestriction.OFFLINE -> SyncPausedReason.OFFLINE
             DataRestriction.BACKGROUND_DATA_BLOCKED -> SyncPausedReason.BACKGROUND_DATA_OFF
-            DataRestriction.NONE, null -> null
+            DataRestriction.NONE, null ->
+                // Only after something was actually held back - being on cellular with nothing
+                // waiting is not a pause, and saying so would train the user to ignore the line.
+                SyncPausedReason.MEDIA_WAITING_FOR_WIFI.takeIf {
+                    mediaDeferredForNetwork && !dataUsagePolicy.currentMode().shouldSyncMedia()
+                }
         }
     }
 
@@ -1240,6 +1254,7 @@ class DefaultSyncManager(
         return try {
             var uploadedCount = 0
             val errors = mutableListOf<SyncError>()
+            mediaDeferredForNetwork = false
 
             val pendingUploads = syncMetadataService.getPendingUploads(EntityType.NOTE)
             if (pendingUploads.isEmpty()) {
@@ -1331,6 +1346,7 @@ class DefaultSyncManager(
                         val uploadReadyNote =
                             if (mediaRef != null && !isRemoteMediaRef(mediaRef)) {
                                 if (!dataUsagePolicy.currentMode().shouldSyncMedia()) {
+                                    mediaDeferredForNetwork = true
                                     Napier.d("Deferring media upload for note ${note.uid} — data usage policy restricts media sync")
                                     continue
                                 } else {

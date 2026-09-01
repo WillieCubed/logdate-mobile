@@ -90,4 +90,5 @@
     <string name="sync_paused_background_data_off_fix">Turn on background data for LogDate in Android Settings to resume backing up.</string>
     <string name="sync_paused_offline">Paused — waiting for a connection</string>
     <string name="sync_paused_signed_out">Sign in to start backing up</string>
+    <string name="sync_paused_media_waiting_for_wifi">Photos and videos are waiting for Wi-Fi</string>
 </resources>

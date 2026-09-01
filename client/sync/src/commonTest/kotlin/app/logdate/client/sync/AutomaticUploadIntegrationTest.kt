@@ -178,6 +178,13 @@ class AutomaticUploadIntegrationTest {
                 syncMetadataService.getPendingUploads(EntityType.NOTE).size,
                 "The note should remain pending until media sync is allowed",
             )
+            // Deferring was silent: the note stayed queued with nothing on screen to say why, so
+            // a photo could sit unbacked-up indefinitely while the app reported itself healthy.
+            assertEquals(
+                SyncPausedReason.MEDIA_WAITING_FOR_WIFI,
+                syncManager.getSyncStatus().pausedReason,
+                "a deferred photo should say it is waiting for Wi-Fi",
+            )
         }
 
     @Test

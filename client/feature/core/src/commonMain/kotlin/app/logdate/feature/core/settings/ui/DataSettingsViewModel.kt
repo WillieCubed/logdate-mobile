@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
@@ -121,14 +120,10 @@ class DataSettingsViewModel(
                 }
             }.onStart { emit(true) }
 
-    private val syncStatusFlow =
-        flow {
-            while (true) {
-                val status = syncManager.getSyncStatus()
-                emit(status)
-                delay(5000)
-            }
-        }
+    // The manager publishes status as it changes, so polling it every five seconds only made the
+    // screen up to five seconds wrong -- long enough for "Back up now" to look like it did
+    // nothing -- while waking the device on a timer for the whole time Settings was open.
+    private val syncStatusFlow = syncManager.syncStatusFlow
 
     private val sourceStateFlow =
         combine(
