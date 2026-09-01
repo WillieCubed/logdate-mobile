@@ -68,6 +68,9 @@ sealed interface SyncFeedback {
         val downloadedItems: Int,
     ) : SyncFeedback
 
+    /** A sync has been handed to background sync; progress shows in the sync status. */
+    data object Started : SyncFeedback
+
     data class Failed(
         val message: String,
     ) : SyncFeedback
@@ -264,35 +267,26 @@ class DataSettingsViewModel(
         }
     }
 
+    /**
+     * Hands the whole sync to the platform's background worker rather than running it here.
+     *
+     * Running it in this ViewModel tied it to the screen that started it: switching apps cancelled
+     * the coroutine mid-run ("Job was cancelled") and hundreds of entries stopped uploading. The
+     * worker survives the app going away, and progress is visible from the sync status either way,
+     * so there is nothing to report back here beyond needing an account.
+     */
     fun syncNow() {
         viewModelScope.launch {
             try {
-                Napier.d("Starting manual sync...")
-                val result = syncManager.fullSync()
-                // Keep going after the app leaves the foreground. fullSync runs in this
-                // ViewModel's scope, so a first sync of several hundred entries stopped the moment
-                // the user switched apps and only resumed when they came back. Handing the
-                // remainder to the platform's background sync means it finishes on its own.
-                if (syncManager.getSyncStatus().pendingUploads > 0) {
-                    syncManager.sync(startNow = true)
+                if (sessionStorage.getSession() == null) {
+                    _syncFeedback.value = SyncFeedback.NeedsAccount
+                    return@launch
                 }
-                _syncFeedback.value =
-                    if (result.success) {
-                        Napier.i("Sync completed successfully: uploaded=${result.uploadedItems}, downloaded=${result.downloadedItems}")
-                        SyncFeedback.Succeeded(result.uploadedItems, result.downloadedItems)
-                    } else {
-                        val error = result.errors.firstOrNull()
-                        Napier.w("Sync failed: ${error?.message ?: "Unknown sync error"}")
-                        // Being signed out is the expected state before an account exists, not a
-                        // failure to report as one. Send the user somewhere useful instead.
-                        if (error?.type == SyncErrorType.AUTHENTICATION_ERROR) {
-                            SyncFeedback.NeedsAccount
-                        } else {
-                            SyncFeedback.Failed(describeSyncFailure(error?.type))
-                        }
-                    }
+                Napier.d("Handing a manual sync to background sync")
+                syncManager.sync(startNow = true)
+                _syncFeedback.value = SyncFeedback.Started
             } catch (e: Exception) {
-                Napier.e("Sync failed with exception", e)
+                Napier.e("Could not start sync", e)
                 _syncFeedback.value = SyncFeedback.Failed(describeSyncFailure(null))
             }
         }

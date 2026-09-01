@@ -90,6 +90,7 @@ import logdate.client.feature.core.generated.resources.sync_feature_sync
 import logdate.client.feature.core.generated.resources.sync_feedback_failed
 import logdate.client.feature.core.generated.resources.sync_feedback_needs_account
 import logdate.client.feature.core.generated.resources.sync_feedback_sign_in_action
+import logdate.client.feature.core.generated.resources.sync_feedback_started
 import logdate.client.feature.core.generated.resources.sync_feedback_succeeded
 import logdate.client.feature.core.generated.resources.sync_feedback_up_to_date
 import logdate.client.feature.core.generated.resources.sync_now
@@ -156,6 +157,9 @@ fun DataSettingsScreen(
                     },
                 )
             }
+
+            SyncFeedback.Started ->
+                snackbarHostState.showSnackbar(getString(Res.string.sync_feedback_started))
 
             is SyncFeedback.Failed ->
                 snackbarHostState.showSnackbar(

@@ -1020,7 +1020,15 @@ class DefaultSyncManager(
 
     private companion object {
         const val MAX_RETRY_ATTEMPTS = 9
-        const val SYNC_PAGE_SIZE = 200
+
+        /**
+         * Deliberately small. The server reads each record out of the account's repo, so the cost
+         * of a page grows with the size of the page *and* the journal behind it; asking for 200 at
+         * once stopped completing inside the request timeout once an account held a few hundred
+         * entries, and a download that times out fails the whole sync. Raise this once a page is
+         * cheap to serve again.
+         */
+        const val SYNC_PAGE_SIZE = 25
     }
 
     private suspend fun uploadJournals(accessToken: String): SyncResult {

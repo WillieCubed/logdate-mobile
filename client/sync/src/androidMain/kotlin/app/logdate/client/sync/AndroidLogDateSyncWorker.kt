@@ -6,6 +6,7 @@ import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
@@ -251,7 +252,14 @@ class AndroidSyncManager(
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .build()
 
-        workManager.enqueue(request)
+        // Unique, and an already-running sync wins. Stacking runs would put several writers on
+        // the same account's repo at once, which is exactly the contention that used to drop
+        // records and starve the server of request threads.
+        workManager.enqueueUniqueWork(
+            AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC,
+            ExistingWorkPolicy.KEEP,
+            request,
+        )
         Napier.d("Scheduled immediate sync: $syncType")
     }
 
