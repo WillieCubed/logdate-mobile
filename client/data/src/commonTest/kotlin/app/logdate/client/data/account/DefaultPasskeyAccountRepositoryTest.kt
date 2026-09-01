@@ -35,7 +35,6 @@ import app.logdate.shared.model.ServerCapability
 import app.logdate.shared.model.ServerDescriptor
 import app.logdate.shared.model.UsernameAvailabilityData
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -92,7 +91,15 @@ class DefaultPasskeyAccountRepositoryTest {
             accountId = testAccount.id.toString(),
         )
 
-    private fun createRepository(
+    /**
+     * Builds a repository whose background work runs on the test scheduler.
+     *
+     * The repository restores session state from `init`, so a scope backed by a real dispatcher
+     * lets that work race the assertions -- the test then passes or fails depending on which
+     * thread wins. Defaulting to [TestScope.backgroundScope] makes the ordering the test's to
+     * control, and stops the work outliving the test.
+     */
+    private fun TestScope.createRepository(
         apiClient: FakePasskeyApiClient = FakePasskeyApiClient(),
         passkeyManager: FakePasskeyManager = FakePasskeyManager(),
         restoreCredentialManager: FakeRestoreCredentialManager = FakeRestoreCredentialManager(),
@@ -101,7 +108,7 @@ class DefaultPasskeyAccountRepositoryTest {
         configRepository: FakeConfigRepository = FakeConfigRepository(),
         canonicalOwnerProvider: CanonicalOwnerProvider = FakeCanonicalOwnerProvider(testAccount.id.toString()),
         hasLocalData: suspend () -> Boolean = { false },
-        repositoryScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+        repositoryScope: CoroutineScope = backgroundScope,
     ): DefaultPasskeyAccountRepository =
         DefaultPasskeyAccountRepository(
             apiClient = apiClient,
