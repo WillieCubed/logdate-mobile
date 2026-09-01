@@ -239,6 +239,45 @@ public class DefaultRepoEngine(
             )
         }
 
+    override suspend fun putRecords(records: List<Pair<RepoRecordId, JsonObject>>): Result<List<RepoWriteResult>> =
+        runCatching {
+            if (records.isEmpty()) return@runCatching emptyList()
+            val repo = records.first().first.repo
+            require(records.all { it.first.repo == repo }) {
+                "putRecords writes one repo at a time; got records for more than one"
+            }
+            retryingOnHeadConflict {
+                putRecordsOnce(repo, records)
+            }
+        }
+
+    private suspend fun putRecordsOnce(
+        repo: AtprotoDid,
+        records: List<Pair<RepoRecordId, JsonObject>>,
+    ): List<RepoWriteResult> {
+        // The tree is read once and persisted once, however many records are in the batch; the
+        // per-record work is a block write and a tree put.
+        val snapshot = loadSnapshot(repo)
+        var tree = snapshot.tree
+        val results = mutableListOf<RepoWriteResult>()
+
+        for ((recordId, value) in records) {
+            val recordBytes = DagCborCodec.encode(value)
+            val recordCid = Cid.sha256(DAG_CBOR_CODEC, recordBytes)
+            blockStore.writeBlock(repo, RepoBlock(recordCid, recordBytes)).getOrThrow()
+            tree = tree.put(recordId.collection, recordId.recordKey, recordCid)
+            results +=
+                RepoWriteResult(
+                    uri = recordId.uri,
+                    cid = recordCid.toString(),
+                    validationStatus = RepoValidationStatus.UNKNOWN,
+                )
+        }
+
+        persistSnapshot(repo, tree, snapshot.head, snapshot.tree)
+        return results
+    }
+
     override suspend fun deleteRecord(
         recordId: RepoRecordId,
         swapRecord: String?,

@@ -60,6 +60,18 @@ public interface RepoRecordStore {
     ): Result<RepoWriteResult>
 
     /**
+     * Replaces or inserts every record in [records], in one write.
+     *
+     * A single put reads the whole tree, rebuilds it and writes a new head, so applying a list one
+     * record at a time costs that entire cycle per record - which is what made an endpoint that
+     * accepts a list no cheaper than the caller sending them one by one. Implementations should
+     * open the repo once and leave one commit behind. The default is the naive loop, which is
+     * correct but has exactly the cost this exists to avoid.
+     */
+    public suspend fun putRecords(records: List<Pair<RepoRecordId, JsonObject>>): Result<List<RepoWriteResult>> =
+        runCatching { records.map { (id, value) -> putRecord(id, value).getOrThrow() } }
+
+    /**
      * Deletes the record at [recordId].
      *
      * Returns `true` when a record was deleted, or `false` when nothing existed.

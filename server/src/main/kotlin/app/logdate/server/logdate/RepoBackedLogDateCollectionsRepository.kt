@@ -250,12 +250,20 @@ internal class RepoBackedLogDateCollectionsRepository(
         associations: List<LogDateAssociation>,
     ): List<LogDateAssociation> {
         val repoDid = canonicalRepoDid(userId)
+        if (associations.isEmpty()) return emptyList()
+
+        // One commit for the whole list. This used to put each record separately, so an endpoint
+        // that accepts a list cost exactly as much as the client sending them one at a time -
+        // a full read-rebuild-write of the repo per link.
+        repoEngine
+            .putRecords(
+                associations.map { association ->
+                    associationRecordId(repoDid, association.journalId, association.entryId) to
+                        association.toRepoJson()
+                },
+            ).getOrThrow()
+
         return associations.map { association ->
-            repoEngine
-                .putRecord(
-                    associationRecordId(repoDid, association.journalId, association.entryId),
-                    association.toRepoJson(),
-                ).getOrThrow()
             val metadata =
                 metadataStore.upsert(
                     userId = userId,
